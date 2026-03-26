@@ -1,0 +1,20 @@
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <item>
+      <title>2026-03-26</title>
+      <link>https://imjuya.github.io/juya-ai-daily/issue-40/</link>
+      <description>AI 早报 2026-03-26</description>
+      <content:encoded><![CDATA[
+        <h2>概览</h2>
+        <h3>要闻</h3>
+        <ul>
+          <li>谷歌推出 Lyria 3 Pro 音乐模型 <a href="https://blog.google/lyria">↗</a> <code>#1</code></li>
+        </ul>
+        <h3>开发生态</h3>
+        <ul>
+          <li>Figma 宣布向 AI agents 开放 Figma Canvas <a href="https://www.figma.com/blog/the-figma-canvas-is-now-open-to-agents/">↗</a> <code>#6</code></li>
+        </ul>
+      ]]></content:encoded>
+    </item>
+  </channel>
+</rss>

@@ -1,9 +1,88 @@
+import { loadRuntimeConfig } from "./core/config/loadRuntimeConfig.js";
+import { fetchAndExtractArticle } from "./core/fetch/extractArticle.js";
+import { sendDailyEmail } from "./core/mail/sendDailyEmail.js";
+import { runDailyDigest } from "./core/pipeline/runDailyDigest.js";
+import type { DailyReportTrigger } from "./core/report/buildDailyReport.js";
+import { createRunLock } from "./core/runtime/runLock.js";
+import { startScheduler } from "./core/scheduler/startScheduler.js";
+import { loadLatestIssue } from "./core/source/loadLatestIssue.js";
+import { listReportDates, readTextFile } from "./core/storage/reportStore.js";
 import { createServer } from "./server/createServer.js";
 
-const app = createServer();
-const port = Number(process.env.PORT ?? 3010);
+type ReportSummary = {
+  date: string;
+  topicCount: number;
+  degraded: boolean;
+  mailStatus: string;
+};
 
-app.listen({ host: "127.0.0.1", port }).catch((error) => {
-  app.log.error(error);
-  process.exit(1);
+const config = await loadRuntimeConfig();
+const lock = createRunLock();
+
+// This runs the full digest under a single-process lock so manual and scheduled runs never overlap.
+async function triggerDigest(triggerType: DailyReportTrigger) {
+  return await lock.runExclusive(async () => {
+    return await runDailyDigest(config, triggerType, {
+      loadLatestIssue,
+      fetchArticle: fetchAndExtractArticle,
+      sendDailyEmail
+    });
+  });
+}
+
+// History entries are rebuilt from stored run metadata so the server can boot without a database.
+async function listStoredReportSummaries(): Promise<ReportSummary[]> {
+  const dates = await listReportDates(config.report.dataDir);
+
+  return await Promise.all(
+    dates.map(async (date) => {
+      try {
+        const text = await readTextFile(config.report.dataDir, date, "run-meta.json");
+        return parseReportSummary(date, text);
+      } catch {
+        return {
+          date,
+          topicCount: 0,
+          degraded: true,
+          mailStatus: "unknown"
+        };
+      }
+    })
+  );
+}
+
+// The summary reader is intentionally strict about field types and falls back only at the page level.
+function parseReportSummary(date: string, fileText: string): ReportSummary {
+  const parsed = JSON.parse(fileText) as Record<string, unknown>;
+
+  return {
+    date,
+    topicCount: typeof parsed.topicCount === "number" && Number.isFinite(parsed.topicCount) ? parsed.topicCount : 0,
+    degraded: typeof parsed.degraded === "boolean" ? parsed.degraded : true,
+    mailStatus: typeof parsed.mailStatus === "string" ? parsed.mailStatus : "unknown"
+  };
+}
+
+const app = createServer({
+  config,
+  isRunning: () => lock.isRunning(),
+  listReportSummaries: listStoredReportSummaries,
+  latestReportDate: async () => (await listReportDates(config.report.dataDir))[0] ?? null,
+  readReportHtml: async (date: string) => await readTextFile(config.report.dataDir, date, "report.html"),
+  triggerManualRun: config.manualRun.enabled
+    ? async () => {
+        await triggerDigest("manual");
+        return { accepted: true };
+      }
+    : undefined
 });
+
+startScheduler(config, async () => {
+  try {
+    await triggerDigest("scheduled");
+  } catch (error) {
+    app.log.error(error);
+  }
+});
+
+await app.listen({ host: "127.0.0.1", port: config.server.port });

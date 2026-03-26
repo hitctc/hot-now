@@ -4,6 +4,20 @@ import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 import { createServer } from "../../src/server/createServer.js";
 
+function makeAppEnv() {
+  return {
+    ...process.env,
+    PORT: "0",
+    SMTP_HOST: "smtp.qq.com",
+    SMTP_PORT: "465",
+    SMTP_SECURE: "true",
+    SMTP_USER: "sender@qq.com",
+    SMTP_PASS: "test-auth-code",
+    MAIL_TO: "receiver@example.com",
+    BASE_URL: "http://127.0.0.1:3010"
+  };
+}
+
 async function runCommand(command: string, args: string[]) {
   const child = spawn(command, args, {
     env: process.env,
@@ -121,10 +135,8 @@ describe("createServer", () => {
 
   it("starts the built entry point and returns health", async () => {
     const child = spawn(process.execPath, [fileURLToPath(new URL("../../dist/main.js", import.meta.url))], {
-      env: {
-        ...process.env,
-        PORT: "0"
-      },
+      // The built entry now boots the real digest app, so the smoke test has to provide the required runtime env.
+      env: makeAppEnv(),
       stdio: ["ignore", "pipe", "pipe"]
     });
     const childExit = once(child, "exit");

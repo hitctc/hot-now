@@ -1,6 +1,12 @@
 import { readFile } from "node:fs/promises";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { loadLatestIssue } from "../../src/core/source/loadLatestIssue.js";
 import { parseJuyaIssue } from "../../src/core/source/parseJuyaIssue.js";
+import type { RuntimeConfig } from "../../src/core/types/appConfig.js";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("parseJuyaIssue", () => {
   it("extracts ranked items from content:encoded", async () => {
@@ -22,5 +28,48 @@ describe("parseJuyaIssue", () => {
         sourceUrl: "https://www.figma.com/blog/the-figma-canvas-is-now-open-to-agents/"
       })
     ]);
+  });
+
+  it("ignores list items without a positive integer rank", async () => {
+    const xml = await readFile("tests/fixtures/juya-rss.xml", "utf8");
+    const issue = await parseJuyaIssue(xml);
+
+    expect(issue.items).toHaveLength(2);
+  });
+
+  it("fails when title is missing", async () => {
+    const xml = `<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><item><link>https://example.com/issue</link><content:encoded><![CDATA[<h3>要闻</h3><ul><li>示例 <a href="https://example.com/a">↗</a><code>#1</code></li></ul>]]></content:encoded></item></channel></rss>`;
+
+    await expect(parseJuyaIssue(xml)).rejects.toThrow("RSS issue item is missing title");
+  });
+
+  it("fails when link is missing", async () => {
+    const xml = `<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><item><title>2026-03-26</title><content:encoded><![CDATA[<h3>要闻</h3><ul><li>示例 <a href="https://example.com/a">↗</a><code>#1</code></li></ul>]]></content:encoded></item></channel></rss>`;
+
+    await expect(parseJuyaIssue(xml)).rejects.toThrow("RSS issue item is missing link");
+  });
+
+  it("fails when content is missing", async () => {
+    const xml = `<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><item><title>2026-03-26</title><link>https://example.com/issue</link></item></channel></rss>`;
+
+    await expect(parseJuyaIssue(xml)).rejects.toThrow("RSS issue item is missing content");
+  });
+});
+
+describe("loadLatestIssue", () => {
+  it("fails when the rss request is not successful", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: vi.fn()
+    }));
+
+    const config = {
+      source: {
+        rssUrl: "https://example.com/rss.xml"
+      }
+    } as RuntimeConfig;
+
+    await expect(loadLatestIssue(config)).rejects.toThrow("RSS request failed with 500");
   });
 });

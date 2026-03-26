@@ -24,9 +24,21 @@ export async function parseJuyaIssue(feedXml: string): Promise<DailyIssue> {
     throw new Error("RSS feed does not contain any issue items");
   }
 
-  const date = latestItem.title ?? "unknown-date";
-  const issueUrl = latestItem.link ?? "";
-  const html = latestItem["content:encoded"] ?? latestItem.content ?? "";
+  const date = latestItem.title?.trim();
+  if (!date) {
+    throw new Error("RSS issue item is missing title");
+  }
+
+  const issueUrl = latestItem.link?.trim();
+  if (!issueUrl) {
+    throw new Error("RSS issue item is missing link");
+  }
+
+  const html = latestItem["content:encoded"]?.trim() ?? latestItem.content?.trim();
+  if (!html) {
+    throw new Error("RSS issue item is missing content");
+  }
+
   const $ = cheerio.load(html);
   const items: CandidateItem[] = [];
   let currentCategory = "未分类";
@@ -39,7 +51,12 @@ export async function parseJuyaIssue(feedXml: string): Promise<DailyIssue> {
 
     const link = $(element).find("a").attr("href") ?? "";
     const rankText = $(element).find("code").text().trim();
-    const rank = Number(rankText.replace("#", ""));
+    const rankMatch = rankText.match(/^#([1-9]\d*)$/);
+    if (!rankMatch) {
+      return;
+    }
+
+    const rank = Number(rankMatch[1]);
     const title = $(element)
       .clone()
       .find("a, code")
@@ -49,7 +66,7 @@ export async function parseJuyaIssue(feedXml: string): Promise<DailyIssue> {
       .replace("↗", "")
       .trim();
 
-    if (link && Number.isFinite(rank) && title) {
+    if (link && title) {
       items.push({ rank, category: currentCategory, title, sourceUrl: link });
     }
   });

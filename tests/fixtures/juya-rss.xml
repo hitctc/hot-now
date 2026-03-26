@@ -9,6 +9,7 @@
         <h3>要闻</h3>
         <ul>
           <li>谷歌推出 Lyria 3 Pro 音乐模型 <a href="https://blog.google/lyria">↗</a> <code>#1</code></li>
+          <li>普通列表项 <a href="https://example.com/plain-item">↗</a></li>
         </ul>
         <h3>开发生态</h3>
         <ul>

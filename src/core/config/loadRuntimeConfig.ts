@@ -66,29 +66,31 @@ function parseSmtpSecure(value: string) {
 
 function parseRuntimeConfigFile(fileText: string): Omit<RuntimeConfig, "smtp"> {
   const parsed = JSON.parse(fileText) as Record<string, unknown>;
+  const server = getRequiredObject(parsed.server, "server");
+  const schedule = getRequiredObject(parsed.schedule, "schedule");
+  const report = getRequiredObject(parsed.report, "report");
+  const source = getRequiredObject(parsed.source, "source");
+  const manualRun = getRequiredObject(parsed.manualRun, "manualRun");
 
   return {
     server: {
-      port: requiredConfigNumber(getRequiredObject(parsed.server, "server").port, "server.port")
+      port: requiredRunnablePort(server.port, "server.port")
     },
     schedule: {
-      enabled: requiredConfigBoolean(getRequiredObject(parsed.schedule, "schedule").enabled, "schedule.enabled"),
-      dailyTime: requiredConfigString(getRequiredObject(parsed.schedule, "schedule").dailyTime, "schedule.dailyTime"),
-      timezone: requiredConfigString(getRequiredObject(parsed.schedule, "schedule").timezone, "schedule.timezone")
+      enabled: requiredConfigBoolean(schedule.enabled, "schedule.enabled"),
+      dailyTime: requiredConfigString(schedule.dailyTime, "schedule.dailyTime"),
+      timezone: requiredConfigString(schedule.timezone, "schedule.timezone")
     },
     report: {
-      topN: requiredConfigNumber(getRequiredObject(parsed.report, "report").topN, "report.topN"),
-      dataDir: requiredConfigString(getRequiredObject(parsed.report, "report").dataDir, "report.dataDir"),
-      allowDegraded: requiredConfigBoolean(
-        getRequiredObject(parsed.report, "report").allowDegraded,
-        "report.allowDegraded"
-      )
+      topN: requiredPositiveInteger(report.topN, "report.topN"),
+      dataDir: requiredConfigString(report.dataDir, "report.dataDir"),
+      allowDegraded: requiredConfigBoolean(report.allowDegraded, "report.allowDegraded")
     },
     source: {
-      rssUrl: requiredConfigString(getRequiredObject(parsed.source, "source").rssUrl, "source.rssUrl")
+      rssUrl: requiredConfigString(source.rssUrl, "source.rssUrl")
     },
     manualRun: {
-      enabled: requiredConfigBoolean(getRequiredObject(parsed.manualRun, "manualRun").enabled, "manualRun.enabled")
+      enabled: requiredConfigBoolean(manualRun.enabled, "manualRun.enabled")
     }
   };
 }
@@ -123,4 +125,24 @@ function requiredConfigBoolean(value: unknown, key: string) {
   }
 
   return value;
+}
+
+function requiredRunnablePort(value: unknown, key: string) {
+  const port = requiredConfigNumber(value, key);
+
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid ${key}: ${port}`);
+  }
+
+  return port;
+}
+
+function requiredPositiveInteger(value: unknown, key: string) {
+  const number = requiredConfigNumber(value, key);
+
+  if (!Number.isInteger(number) || number < 1) {
+    throw new Error(`Invalid ${key}: ${number}`);
+  }
+
+  return number;
 }

@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadRuntimeConfig } from "../../src/core/config/loadRuntimeConfig.js";
-import { listReportDates } from "../../src/core/storage/reportStore.js";
+import { listReportDates, readTextFile, writeJsonFile, writeTextFile } from "../../src/core/storage/reportStore.js";
 
 const baseEnv = {
   SMTP_HOST: "smtp.qq.com",
@@ -149,6 +149,46 @@ describe("loadRuntimeConfig", () => {
       "Missing required config field: report.dataDir"
     );
   });
+
+  it("throws when server.port is outside the runnable range", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-config-"));
+    const configPath = path.join(tempDir, "hot-now.config.json");
+
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        server: { port: 70000 },
+        schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
+        report: { topN: 10, dataDir: "../data/reports", allowDegraded: true },
+        source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
+        manualRun: { enabled: true }
+      })
+    );
+
+    await expect(loadRuntimeConfig({ configPath, env: baseEnv })).rejects.toThrow(
+      "Invalid server.port: 70000"
+    );
+  });
+
+  it("throws when report.topN is not a positive integer", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-config-"));
+    const configPath = path.join(tempDir, "hot-now.config.json");
+
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        server: { port: 3010 },
+        schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
+        report: { topN: 0, dataDir: "../data/reports", allowDegraded: true },
+        source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
+        manualRun: { enabled: true }
+      })
+    );
+
+    await expect(loadRuntimeConfig({ configPath, env: baseEnv })).rejects.toThrow(
+      "Invalid report.topN: 0"
+    );
+  });
 });
 
 describe("listReportDates", () => {
@@ -166,5 +206,28 @@ describe("listReportDates", () => {
     await writeFile(filePath, "not a directory");
 
     await expect(listReportDates(filePath)).rejects.toThrow();
+  });
+});
+
+describe("reportStore path safety", () => {
+  it("rejects reportDate traversal when writing text files", async () => {
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-store-"));
+
+    await expect(writeTextFile(rootDir, "../escape", "summary.txt", "hello")).rejects.toThrow();
+  });
+
+  it("rejects fileName traversal when writing json files", async () => {
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-store-"));
+
+    await expect(writeJsonFile(rootDir, "2026-03-27", "../escape.json", { ok: true })).rejects.toThrow();
+  });
+
+  it("rejects fileName traversal when reading text files", async () => {
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-store-"));
+    const escapedFile = path.resolve(rootDir, "../escape.txt");
+
+    await writeFile(escapedFile, "hello");
+
+    await expect(readTextFile(rootDir, "2026-03-27", "../escape.txt")).rejects.toThrow();
   });
 });

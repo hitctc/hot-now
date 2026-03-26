@@ -17,7 +17,9 @@ describe("parseJuyaIssue", () => {
       }),
       expect.objectContaining({
         rank: 6,
-        category: "开发生态"
+        category: "开发生态",
+        title: "Figma 宣布向 AI agents 开放 Figma Canvas",
+        sourceUrl: "https://www.figma.com/blog/the-figma-canvas-is-now-open-to-agents/"
       })
     ]);
   });

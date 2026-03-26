@@ -68,10 +68,12 @@ export function clusterTopics(items: RankedInput[]): Topic[] {
 }
 
 function scoreItem(item: RankedInput) {
+  // Rank stays the main signal, while category bonus keeps source-provided priority visible in the final order.
   return 100 - item.rank + (PRIORITY_BONUS[item.category] ?? 0);
 }
 
 function deriveTopicKey(item: RankedInput) {
+  // Known entity keywords get stable topic keys first so obvious repeats always land in the same bucket.
   const haystack = `${item.title} ${item.article.title} ${item.article.text}`.toLowerCase();
 
   for (const entry of TOPIC_KEYWORDS) {
@@ -90,10 +92,12 @@ function deriveTopicKey(item: RankedInput) {
 }
 
 function pickBestItem(items: RankedInput[]) {
+  // The best item is the lowest-rank source entry, with URL only used as a stable tiebreaker.
   return items.slice().sort(compareItems)[0];
 }
 
 function compareItems(left: RankedInput, right: RankedInput) {
+  // Sorting rules stay explicit so headline selection does not depend on insertion order.
   if (left.rank !== right.rank) {
     return left.rank - right.rank;
   }
@@ -102,6 +106,7 @@ function compareItems(left: RankedInput, right: RankedInput) {
 }
 
 function tokenizeTopicText(text: string) {
+  // This keeps fallback topic keys readable for both Latin text and compact Chinese titles.
   const normalized = text.normalize("NFKC").toLowerCase();
   const rawTokens = normalized
     .replace(/[^\p{L}\p{N}\s]/gu, " ")

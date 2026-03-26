@@ -25,6 +25,7 @@ export function summarizeTopic(topic: Topic): TopicSummary {
 }
 
 function pickBestItem(items: Topic["items"]) {
+  // The summary always follows the strongest-ranked item so the explanation stays consistent with the topic order.
   return items.slice().sort((left, right) => {
     if (left.rank !== right.rank) {
       return left.rank - right.rank;
@@ -35,10 +36,12 @@ function pickBestItem(items: Topic["items"]) {
 }
 
 function collapseWhitespace(text: string) {
+  // Report summaries should not preserve source formatting noise or repeated line breaks.
   return text.replace(/\s+/g, " ").trim();
 }
 
 function extractKeywords(title: string) {
+  // Keywords stay title-only so the report remains deterministic even when article text changes.
   const normalized = title.normalize("NFKC");
   const rawTokens = normalized
     .replace(/[^\p{L}\p{N}\s]/gu, " ")

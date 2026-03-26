@@ -78,4 +78,20 @@ describe("loadLatestIssue", () => {
 
     await expect(loadLatestIssue(config)).rejects.toThrow("RSS request failed with 500");
   });
+
+  it("fails when the rss request returns a non-200 success status", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      text: vi.fn()
+    }));
+
+    const config = {
+      source: {
+        rssUrl: "https://example.com/rss.xml"
+      }
+    } as RuntimeConfig;
+
+    await expect(loadLatestIssue(config)).rejects.toThrow("RSS request failed with 204");
+  });
 });

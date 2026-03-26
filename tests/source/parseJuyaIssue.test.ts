@@ -37,22 +37,28 @@ describe("parseJuyaIssue", () => {
     expect(issue.items).toHaveLength(2);
   });
 
-  it("fails when title is missing", async () => {
+  it("defaults the date when title is missing", async () => {
     const xml = `<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><item><link>https://example.com/issue</link><content:encoded><![CDATA[<h3>要闻</h3><ul><li>示例 <a href="https://example.com/a">↗</a><code>#1</code></li></ul>]]></content:encoded></item></channel></rss>`;
 
-    await expect(parseJuyaIssue(xml)).rejects.toThrow("RSS issue item is missing title");
+    const issue = await parseJuyaIssue(xml);
+
+    expect(issue.date).toBe("unknown-date");
   });
 
-  it("fails when link is missing", async () => {
+  it("defaults the issue url when link is missing", async () => {
     const xml = `<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><item><title>2026-03-26</title><content:encoded><![CDATA[<h3>要闻</h3><ul><li>示例 <a href="https://example.com/a">↗</a><code>#1</code></li></ul>]]></content:encoded></item></channel></rss>`;
 
-    await expect(parseJuyaIssue(xml)).rejects.toThrow("RSS issue item is missing link");
+    const issue = await parseJuyaIssue(xml);
+
+    expect(issue.issueUrl).toBe("");
   });
 
-  it("fails when content is missing", async () => {
+  it("returns no items when html content is missing", async () => {
     const xml = `<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><item><title>2026-03-26</title><link>https://example.com/issue</link></item></channel></rss>`;
 
-    await expect(parseJuyaIssue(xml)).rejects.toThrow("RSS issue item is missing content");
+    const issue = await parseJuyaIssue(xml);
+
+    expect(issue.items).toEqual([]);
   });
 });
 

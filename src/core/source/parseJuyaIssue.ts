@@ -24,20 +24,9 @@ export async function parseJuyaIssue(feedXml: string): Promise<DailyIssue> {
     throw new Error("RSS feed does not contain any issue items");
   }
 
-  const date = latestItem.title?.trim();
-  if (!date) {
-    throw new Error("RSS issue item is missing title");
-  }
-
-  const issueUrl = latestItem.link?.trim();
-  if (!issueUrl) {
-    throw new Error("RSS issue item is missing link");
-  }
-
-  const html = latestItem["content:encoded"]?.trim() ?? latestItem.content?.trim();
-  if (!html) {
-    throw new Error("RSS issue item is missing content");
-  }
+  const date = latestItem.title?.trim() || "unknown-date";
+  const issueUrl = latestItem.link?.trim() || "";
+  const html = latestItem["content:encoded"]?.trim() ?? latestItem.content?.trim() ?? "";
 
   const $ = cheerio.load(html);
   const items: CandidateItem[] = [];

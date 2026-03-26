@@ -28,7 +28,11 @@ export async function listReportDates(rootDir: string) {
       .map((entry) => entry.name)
       .sort()
       .reverse();
-  } catch {
-    return [];
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
+
+    throw error;
   }
 }

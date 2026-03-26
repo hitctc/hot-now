@@ -11,9 +11,18 @@ async function runCommand(command: string, args: string[]) {
     stdio: "inherit"
   });
 
-  const [code] = (await once(child, "exit")) as [number | null];
+  const outcome = Promise.race([
+    once(child, "error").then(([error]) => {
+      throw error;
+    }),
+    once(child, "exit").then(([code]) => {
+      if (code !== 0) {
+        throw new Error(`${command} ${args.join(" ")} exited with code ${code}`);
+      }
+    })
+  ]);
 
-  expect(code).toBe(0);
+  await outcome;
 }
 
 async function getFreePort() {
@@ -81,25 +90,35 @@ describe("createServer", () => {
 
   it("starts the built entry point and returns health", async () => {
     const port = await getFreePort();
-    const entryPoint = fileURLToPath(new URL("../../dist/main.js", import.meta.url));
-    const child = spawn(process.execPath, [entryPoint], {
+    const child = spawn(process.execPath, [fileURLToPath(new URL("../../dist/main.js", import.meta.url))], {
       env: {
         ...process.env,
         PORT: String(port)
       },
       stdio: "inherit"
     });
+    const childExit = once(child, "exit");
+    const childError = once(child, "error").then(([error]) => {
+      throw error;
+    });
+    const childFailedBeforeHealth = childExit.then(([code, signal]) => {
+      throw new Error(
+        `Built entry point exited before /health became ready (code: ${code}, signal: ${signal ?? "none"})`
+      );
+    });
 
     try {
-      await waitForHealth(port);
+      await Promise.race([waitForHealth(port), childError, childFailedBeforeHealth]);
 
       const response = await fetch(`http://127.0.0.1:${port}/health`);
 
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ ok: true });
     } finally {
-      child.kill();
-      await once(child, "exit");
+      if (child.exitCode === null && child.signalCode === null) {
+        child.kill();
+        await childExit;
+      }
     }
   });
 });

@@ -1,0 +1,8 @@
+{
+  "date": "2026-03-27",
+  "trigger": "manual",
+  "generatedAt": "2026-03-27T03:07:14.327Z",
+  "mailStatus": "failed:connect ECONNREFUSED 127.0.0.1:2525",
+  "degraded": true,
+  "topicCount": 10
+}

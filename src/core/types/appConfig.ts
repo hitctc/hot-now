@@ -4,6 +4,7 @@ export type RuntimeConfig = {
   report: { topN: number; dataDir: string; allowDegraded: boolean };
   source: { rssUrl: string };
   manualRun: { enabled: boolean };
+  database: { file: string };
   smtp: {
     host: string;
     port: number;
@@ -12,5 +13,10 @@ export type RuntimeConfig = {
     pass: string;
     to: string;
     baseUrl: string;
+  };
+  auth: {
+    username: string;
+    password: string;
+    sessionSecret: string;
   };
 };

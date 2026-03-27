@@ -8,16 +8,23 @@ type Options = {
 };
 
 export async function loadRuntimeConfig(options: Options = {}): Promise<RuntimeConfig> {
+  // Runtime config is split between the checked-in JSON file and required secrets from env,
+  // so startup resolves both sides here into one object the rest of the app can trust.
   const env = options.env ?? process.env;
   const configPath = options.configPath ?? path.resolve("config/hot-now.config.json");
   const fileText = await readFile(configPath, "utf8");
   const fileConfig = parseRuntimeConfigFile(fileText);
   const reportDir = path.resolve(path.dirname(configPath), fileConfig.report.dataDir);
+  const databaseFile = path.resolve(path.dirname(configPath), fileConfig.database.file);
   const smtpPort = parseSmtpPort(required(env.SMTP_PORT, "SMTP_PORT"));
   const smtpSecure = parseSmtpSecure(required(env.SMTP_SECURE, "SMTP_SECURE"));
 
   return {
     ...fileConfig,
+    database: {
+      ...fileConfig.database,
+      file: databaseFile
+    },
     report: {
       ...fileConfig.report,
       dataDir: reportDir
@@ -30,6 +37,11 @@ export async function loadRuntimeConfig(options: Options = {}): Promise<RuntimeC
       pass: required(env.SMTP_PASS, "SMTP_PASS"),
       to: required(env.MAIL_TO, "MAIL_TO"),
       baseUrl: required(env.BASE_URL, "BASE_URL")
+    },
+    auth: {
+      username: required(env.AUTH_USERNAME, "AUTH_USERNAME"),
+      password: required(env.AUTH_PASSWORD, "AUTH_PASSWORD"),
+      sessionSecret: required(env.SESSION_SECRET, "SESSION_SECRET")
     }
   };
 }
@@ -64,13 +76,15 @@ function parseSmtpSecure(value: string) {
   throw new Error(`Invalid SMTP_SECURE: ${value}`);
 }
 
-function parseRuntimeConfigFile(fileText: string): Omit<RuntimeConfig, "smtp"> {
+function parseRuntimeConfigFile(fileText: string): Omit<RuntimeConfig, "smtp" | "auth"> {
+  // The config file keeps deploy-time knobs only; secrets stay out of JSON and are injected later.
   const parsed = JSON.parse(fileText) as Record<string, unknown>;
   const server = getRequiredObject(parsed.server, "server");
   const schedule = getRequiredObject(parsed.schedule, "schedule");
   const report = getRequiredObject(parsed.report, "report");
   const source = getRequiredObject(parsed.source, "source");
   const manualRun = getRequiredObject(parsed.manualRun, "manualRun");
+  const database = getRequiredObject(parsed.database, "database");
 
   return {
     server: {
@@ -91,6 +105,9 @@ function parseRuntimeConfigFile(fileText: string): Omit<RuntimeConfig, "smtp"> {
     },
     manualRun: {
       enabled: requiredConfigBoolean(manualRun.enabled, "manualRun.enabled")
+    },
+    database: {
+      file: requiredConfigString(database.file, "database.file")
     }
   };
 }

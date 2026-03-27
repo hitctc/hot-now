@@ -3,5 +3,6 @@
   "schedule": { "enabled": true, "dailyTime": "08:00", "timezone": "Asia/Shanghai" },
   "report": { "topN": 10, "dataDir": "../data/reports", "allowDegraded": true },
   "source": { "rssUrl": "https://imjuya.github.io/juya-ai-daily/rss.xml" },
-  "manualRun": { "enabled": true }
+  "manualRun": { "enabled": true },
+  "database": { "file": "../data/hot-now.sqlite" }
 }

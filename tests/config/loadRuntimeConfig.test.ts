@@ -12,7 +12,10 @@ const baseEnv = {
   SMTP_USER: "sender@qq.com",
   SMTP_PASS: "secret",
   MAIL_TO: "receiver@example.com",
-  BASE_URL: "http://127.0.0.1:3010"
+  BASE_URL: "http://127.0.0.1:3010",
+  AUTH_USERNAME: "admin",
+  AUTH_PASSWORD: "super-secret",
+  SESSION_SECRET: "session-secret-value"
 } satisfies Record<string, string>;
 
 describe("loadRuntimeConfig", () => {
@@ -25,7 +28,7 @@ describe("loadRuntimeConfig", () => {
     expect(config.report.dataDir).toBe(path.resolve("data/reports"));
   });
 
-  it("loads config file values and SMTP env values", async () => {
+  it("loads config file values plus database and auth settings", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-config-"));
     const configPath = path.join(tempDir, "hot-now.config.json");
 
@@ -36,7 +39,8 @@ describe("loadRuntimeConfig", () => {
         schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
         report: { topN: 10, dataDir: path.join(tempDir, "reports"), allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
-        manualRun: { enabled: true }
+        manualRun: { enabled: true },
+        database: { file: "./data/hot-now.sqlite" }
       })
     );
 
@@ -50,9 +54,15 @@ describe("loadRuntimeConfig", () => {
     expect(config.report.topN).toBe(10);
     expect(config.smtp.user).toBe("sender@qq.com");
     expect(config.report.dataDir).toContain("reports");
+    expect(config.database.file).toBe(path.resolve(tempDir, "data/hot-now.sqlite"));
+    expect(config.auth).toEqual({
+      username: "admin",
+      password: "super-secret",
+      sessionSecret: "session-secret-value"
+    });
   });
 
-  it("throws when an smtp env value is missing", async () => {
+  it("throws when a required runtime env value is missing", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-config-"));
     const configPath = path.join(tempDir, "hot-now.config.json");
 
@@ -63,7 +73,8 @@ describe("loadRuntimeConfig", () => {
         schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
         report: { topN: 10, dataDir: "./data/reports", allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
-        manualRun: { enabled: true }
+        manualRun: { enabled: true },
+        database: { file: "./data/hot-now.sqlite" }
       })
     );
 
@@ -72,10 +83,10 @@ describe("loadRuntimeConfig", () => {
         configPath,
         env: {
           ...baseEnv,
-          SMTP_PASS: undefined
+          SESSION_SECRET: undefined
         }
       })
-    ).rejects.toThrow("Missing required env: SMTP_PASS");
+    ).rejects.toThrow("Missing required env: SESSION_SECRET");
   });
 
   it("throws when SMTP_PORT is not numeric", async () => {
@@ -89,7 +100,8 @@ describe("loadRuntimeConfig", () => {
         schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
         report: { topN: 10, dataDir: "./data/reports", allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
-        manualRun: { enabled: true }
+        manualRun: { enabled: true },
+        database: { file: "./data/hot-now.sqlite" }
       })
     );
 
@@ -115,7 +127,8 @@ describe("loadRuntimeConfig", () => {
         schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
         report: { topN: 10, dataDir: "./data/reports", allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
-        manualRun: { enabled: true }
+        manualRun: { enabled: true },
+        database: { file: "./data/hot-now.sqlite" }
       })
     );
 
@@ -141,7 +154,8 @@ describe("loadRuntimeConfig", () => {
         schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
         report: { topN: 10, allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
-        manualRun: { enabled: true }
+        manualRun: { enabled: true },
+        database: { file: "./data/hot-now.sqlite" }
       })
     );
 
@@ -161,7 +175,8 @@ describe("loadRuntimeConfig", () => {
         schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
         report: { topN: 10, dataDir: "../data/reports", allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
-        manualRun: { enabled: true }
+        manualRun: { enabled: true },
+        database: { file: "./data/hot-now.sqlite" }
       })
     );
 
@@ -181,7 +196,8 @@ describe("loadRuntimeConfig", () => {
         schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
         report: { topN: 0, dataDir: "../data/reports", allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
-        manualRun: { enabled: true }
+        manualRun: { enabled: true },
+        database: { file: "./data/hot-now.sqlite" }
       })
     );
 

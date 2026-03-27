@@ -1,6 +1,16 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
+const schemaVersion = 1;
+const baselineMigrationName = "001_unified_site_baseline";
+
 const migrationStatements = [
+  `
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      version INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `,
   `
     CREATE TABLE IF NOT EXISTS content_sources (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,6 +87,9 @@ const migrationStatements = [
   `
     CREATE TABLE IF NOT EXISTS user_profile (
       id INTEGER PRIMARY KEY CHECK (id = 1),
+      username TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'admin',
       display_name TEXT,
       email TEXT,
       preferences_json TEXT NOT NULL DEFAULT '{}',
@@ -112,13 +125,20 @@ const migrationStatements = [
 
 export function runMigrations(db: SqliteDatabase): void {
   // Phase 1 only needs a predictable bootstrap path, so migrations stay as idempotent SQL
-  // statements that can run every startup without tracking an external migration history yet.
-  // Keeping migrations as idempotent CREATE statements is enough for phase 1 bootstrap
-  // and lets the app re-run startup without any external migration tool.
+  // statements plus one recorded baseline marker that later tasks can extend safely.
   const migrate = db.transaction(() => {
     for (const statement of migrationStatements) {
       db.exec(statement);
     }
+
+    db.pragma(`user_version = ${schemaVersion}`);
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(schemaVersion, baselineMigrationName);
   });
 
   migrate();

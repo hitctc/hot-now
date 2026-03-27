@@ -2,6 +2,13 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { RuntimeConfig } from "../types/appConfig.js";
 
+const defaultDatabaseFile = "./data/hot-now.sqlite";
+const defaultAuth = {
+  username: "admin",
+  password: "admin",
+  sessionSecret: "dev-session-secret"
+} as const;
+
 type Options = {
   configPath?: string;
   env?: Record<string, string | undefined>;
@@ -39,9 +46,11 @@ export async function loadRuntimeConfig(options: Options = {}): Promise<RuntimeC
       baseUrl: required(env.BASE_URL, "BASE_URL")
     },
     auth: {
-      username: required(env.AUTH_USERNAME, "AUTH_USERNAME"),
-      password: required(env.AUTH_PASSWORD, "AUTH_PASSWORD"),
-      sessionSecret: required(env.SESSION_SECRET, "SESSION_SECRET")
+      // Auth does not gate the legacy digest workflow yet, so these defaults keep
+      // older deployments bootable until later tasks wire real login persistence.
+      username: env.AUTH_USERNAME || defaultAuth.username,
+      password: env.AUTH_PASSWORD || defaultAuth.password,
+      sessionSecret: env.SESSION_SECRET || defaultAuth.sessionSecret
     }
   };
 }
@@ -84,7 +93,7 @@ function parseRuntimeConfigFile(fileText: string): Omit<RuntimeConfig, "smtp" | 
   const report = getRequiredObject(parsed.report, "report");
   const source = getRequiredObject(parsed.source, "source");
   const manualRun = getRequiredObject(parsed.manualRun, "manualRun");
-  const database = getRequiredObject(parsed.database, "database");
+  const database = getOptionalObject(parsed.database, "database");
 
   return {
     server: {
@@ -107,13 +116,27 @@ function parseRuntimeConfigFile(fileText: string): Omit<RuntimeConfig, "smtp" | 
       enabled: requiredConfigBoolean(manualRun.enabled, "manualRun.enabled")
     },
     database: {
-      file: requiredConfigString(database.file, "database.file")
+      file: requiredConfigString(database?.file ?? defaultDatabaseFile, "database.file")
     }
   };
 }
 
 function getRequiredObject(value: unknown, key: string) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`Missing required config field: ${key}`);
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function getOptionalObject(value: unknown, key: string) {
+  // Legacy config files may not know about new sections yet, so callers can opt into
+  // newer blocks without breaking older checked-in JSON.
+  if (value == null) {
+    return undefined;
+  }
+
+  if (typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`Missing required config field: ${key}`);
   }
 

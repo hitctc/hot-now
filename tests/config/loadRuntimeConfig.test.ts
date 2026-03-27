@@ -28,6 +28,42 @@ describe("loadRuntimeConfig", () => {
     expect(config.report.dataDir).toBe(path.resolve("data/reports"));
   });
 
+  it("fills in database and auth defaults for legacy config and env", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-config-"));
+    const configPath = path.join(tempDir, "hot-now.config.json");
+
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        server: { port: 3010 },
+        schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
+        report: { topN: 10, dataDir: "./data/reports", allowDegraded: true },
+        source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
+        manualRun: { enabled: true }
+      })
+    );
+
+    const config = await loadRuntimeConfig({
+      configPath,
+      env: {
+        SMTP_HOST: baseEnv.SMTP_HOST,
+        SMTP_PORT: baseEnv.SMTP_PORT,
+        SMTP_SECURE: baseEnv.SMTP_SECURE,
+        SMTP_USER: baseEnv.SMTP_USER,
+        SMTP_PASS: baseEnv.SMTP_PASS,
+        MAIL_TO: baseEnv.MAIL_TO,
+        BASE_URL: baseEnv.BASE_URL
+      }
+    });
+
+    expect(config.database.file).toBe(path.resolve(tempDir, "data/hot-now.sqlite"));
+    expect(config.auth).toEqual({
+      username: "admin",
+      password: "admin",
+      sessionSecret: "dev-session-secret"
+    });
+  });
+
   it("loads config file values plus database and auth settings", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-config-"));
     const configPath = path.join(tempDir, "hot-now.config.json");
@@ -62,7 +98,7 @@ describe("loadRuntimeConfig", () => {
     });
   });
 
-  it("throws when a required runtime env value is missing", async () => {
+  it("throws when a required SMTP env value is missing", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-config-"));
     const configPath = path.join(tempDir, "hot-now.config.json");
 
@@ -83,10 +119,10 @@ describe("loadRuntimeConfig", () => {
         configPath,
         env: {
           ...baseEnv,
-          SESSION_SECRET: undefined
+          SMTP_PASS: undefined
         }
       })
-    ).rejects.toThrow("Missing required env: SESSION_SECRET");
+    ).rejects.toThrow("Missing required env: SMTP_PASS");
   });
 
   it("throws when SMTP_PORT is not numeric", async () => {

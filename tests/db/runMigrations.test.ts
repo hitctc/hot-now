@@ -34,8 +34,14 @@ describe("runMigrations", () => {
     databasesToClose.push(db);
 
     runMigrations(db);
-    seedInitialData(db);
-    seedInitialData(db);
+    seedInitialData(db, {
+      username: "admin",
+      password: "bootstrap-password"
+    });
+    seedInitialData(db, {
+      username: "admin",
+      password: "bootstrap-password"
+    });
 
     const rows = db
       .prepare(
@@ -49,7 +55,22 @@ describe("runMigrations", () => {
       )
       .all() as Array<{ name: string }>;
 
-    expect(rows.map((row) => row.name)).toEqual(expectedTables);
+    expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
+
+    const schemaVersion = db.pragma("user_version", { simple: true }) as number;
+    expect(schemaVersion).toBe(1);
+
+    const appliedMigrations = db
+      .prepare(
+        `
+          SELECT version, name
+          FROM schema_migrations
+          ORDER BY version
+        `
+      )
+      .all() as Array<{ version: number; name: string }>;
+
+    expect(appliedMigrations).toEqual([{ version: 1, name: "001_unified_site_baseline" }]);
 
     const sourceKinds = db
       .prepare(
@@ -67,5 +88,20 @@ describe("runMigrations", () => {
       "openai",
       "techcrunch_ai"
     ]);
+
+    const adminRow = db
+      .prepare(
+        `
+          SELECT username, password_hash, role
+          FROM user_profile
+          WHERE id = 1
+        `
+      )
+      .get() as { username: string; password_hash: string; role: string } | undefined;
+
+    expect(adminRow?.username).toBe("admin");
+    expect(adminRow?.role).toBe("admin");
+    expect(adminRow?.password_hash).toMatch(/^scrypt\$/);
+    expect(adminRow?.password_hash).not.toContain("bootstrap-password");
   });
 });

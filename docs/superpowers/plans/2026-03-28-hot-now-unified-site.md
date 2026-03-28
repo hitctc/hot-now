@@ -71,7 +71,7 @@
 
 ```ts
 // tests/config/loadRuntimeConfig.test.ts
-it("loads database and auth settings alongside existing digest config", async () => {
+it("loads database and auth settings when the new fields are provided", async () => {
   await writeFile(
     configPath,
     JSON.stringify({
@@ -102,6 +102,35 @@ it("loads database and auth settings alongside existing digest config", async ()
   expect(config.database.file).toMatch(/hot-now\.sqlite$/);
   expect(config.auth.username).toBe("admin");
   expect(config.auth.sessionSecret).toBe("0123456789abcdef0123456789abcdef");
+});
+
+it("keeps legacy digest setups bootable by filling database and auth defaults", async () => {
+  await writeFile(
+    configPath,
+    JSON.stringify({
+      server: { port: 3010 },
+      schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
+      report: { topN: 10, dataDir: "../data/reports", allowDegraded: true },
+      source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
+      manualRun: { enabled: true }
+    })
+  );
+
+  const config = await loadRuntimeConfig({
+    configPath,
+    env: {
+      SMTP_HOST: "smtp.qq.com",
+      SMTP_PORT: "465",
+      SMTP_SECURE: "true",
+      SMTP_USER: "sender@qq.com",
+      SMTP_PASS: "secret",
+      MAIL_TO: "receiver@example.com",
+      BASE_URL: "http://127.0.0.1:3010"
+    }
+  });
+
+  expect(config.database.file).toMatch(/hot-now\.sqlite$/);
+  expect(config.auth.username).toBe("admin");
 });
 ```
 
@@ -151,7 +180,7 @@ Run:
 npm run test -- tests/config/loadRuntimeConfig.test.ts tests/db/runMigrations.test.ts
 ```
 
-Expected: FAIL with missing `database`, `auth`, or `src/core/db/*` modules.
+Expected: FAIL with missing `src/core/db/*` modules or missing extended runtime config support.
 
 - [ ] **Step 3: Implement runtime config parsing, database bootstrap, and seed helpers**
 
@@ -189,6 +218,26 @@ export type RuntimeConfig = {
     baseUrl: string;
   };
 };
+```
+
+```ts
+// src/core/config/loadRuntimeConfig.ts
+const defaultDatabaseFile = "./data/hot-now.sqlite";
+const defaultAuth = {
+  username: "admin",
+  password: "admin",
+  sessionSecret: "dev-session-secret"
+} as const;
+
+// Keep legacy digest setups bootable while the unified-site login flow is not wired yet.
+database: {
+  file: requiredConfigString(database?.file ?? defaultDatabaseFile, "database.file")
+},
+auth: {
+  username: env.AUTH_USERNAME || defaultAuth.username,
+  password: env.AUTH_PASSWORD || defaultAuth.password,
+  sessionSecret: env.SESSION_SECRET || defaultAuth.sessionSecret
+}
 ```
 
 ```ts

@@ -16,7 +16,7 @@
 - 目标：本地单机运行的每日热点应用
 - 当前主链路：`定时 / 手动触发 -> 拉取 enabled RSS sources -> 抓取原文 -> 规则聚类 -> 生成 JSON/HTML 报告 -> 网页查看 -> SMTP 发邮件`
 - 当前数据源：`https://imjuya.github.io/juya-ai-daily/rss.xml`、`https://openai.com/news/rss.xml`、`https://blog.google/technology/ai/rss/`、`https://techcrunch.com/category/artificial-intelligence/feed/`
-- 当前采集语义：以 `is_enabled` 为准决定是否参与采集，`is_active` 仍保留兼容；后续系统菜单会再统一收口成多源状态视图
+- 当前采集语义：以 `is_enabled` 为准决定是否参与采集；`is_active` 仅保留兼容，不再作为系统菜单主语义
 - 当前技术栈：`Node.js + TypeScript + Fastify + Vitest`
 
 当前仓库已经有较完整的实现、配置模板、测试和设计/计划文档，不要把它当成从零开始的脚手架项目处理。
@@ -64,7 +64,7 @@
 - `/articles`：统一站点文章页（登录后）
 - `/ai`：统一站点 AI 页（登录后）
 - `/settings/view-rules`：统一站点筛选策略页（登录后）
-- `/settings/sources`：统一站点数据迭代收集页（登录后，当前 UI 仍保留单源控制外观，后台采集已按 enabled sources 运行；可手动执行一次采集）
+- `/settings/sources`：统一站点数据迭代收集页（登录后，可启用/停用 source，并手动执行一次全量采集）
 - `/settings/profile`：统一站点当前登录用户页（登录后）
 - 统一站点左侧导航底部支持深色 / 浅色主题切换，偏好写入浏览器本地 `localStorage` 并在刷新后保持
 - `unified shell` 页面（`/`、`/articles`、`/ai`、`/settings/*`）已完整接入赛博双主题
@@ -72,7 +72,7 @@
 - `/reports/:date`：指定日期报告（legacy，当前仍保留）
 - `/control`：控制台（legacy，当前仍保留）
 - legacy `/history`、`/control` 与 `/reports/:date` 的 fallback notice 轻量跟随共享主题资源
-- `POST /actions/run`：手动触发一次日报任务（legacy，当前仍保留）
+- `POST /actions/run`：手动触发一次日报任务（会对所有 enabled sources 执行采集；legacy，当前仍保留）
 - 兼容约定：真实应用默认启用 `requireLogin=true` 的 unified shell；auth 开启时 legacy 路由也需要登录；测试或未注入 auth 的场景仍可保持 legacy `/ -> 最新报告` 与 legacy 路由公开行为
 
 当前报告产物目录：
@@ -162,7 +162,7 @@
 
 ## 9. 当前阶段快照
 
-截至 `2026-03-28`，仓库状态可按下面理解：
+截至 `2026-03-29`，仓库状态可按下面理解：
 
 - 已有设计文档和实现计划
 - 已有主体实现与测试文件
@@ -176,8 +176,10 @@
 - 原文抓取过程中出现过一次 `jsdom` 的 `Could not parse CSS stylesheet` 日志噪音，未阻断本轮任务完成；如果后续要收口发布质量，可以继续评估是否需要单独治理
 - Task4（single-user login + unified app shell）已落地：新增 `passwords/session` auth helper、登录页与统一壳层菜单路由，且保留 legacy 报告路由兼容
 - 真实入口已收紧：`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 现在是必填；auth 开启时 legacy 路由也要求登录，`POST /actions/run` 未登录返回未授权
-- Task4（multi-source enabled collection backend）已完成：`is_enabled` 决定采集范围，`loadEnabledSourceIssues` / `runDailyDigest` 已接入多源并行汇总，`is_active` 暂保留兼容，Task5 再收 UI
-- Task6（系统菜单）已收口：筛选策略支持保存 JSON 规则，数据迭代收集支持 source 切换、逐 source 最近抓取状态展示和统一站点内手动执行采集，当前登录用户页可展示基础账号信息；主题切换与 localStorage 持久化也已落地
-- Task7（legacy 报告兼容、文档同步、最终验证）已完成：legacy `/history`、`/reports/:date`、`/control` 与 unified shell 共存，且相关测试和文档已同步
+- 内容页评分已切为系统自动百分制，页面保留收藏 / 点赞 / 点踩，不再提供手工评分表单
+- 多源采集后端已完成：`loadEnabledSourceIssues` / `runDailyDigest` 已接入多源并行汇总，单个 feed 失败不会阻断整次日报，只有全部 enabled sources 都失败时才会硬失败
+- 系统菜单已收口到多源语义：`/settings/sources` 支持 source 启用/停用、逐 source 最近抓取状态展示和统一站点内手动执行采集；`/settings/view-rules` 支持按字段表单保存权重规则；当前登录用户信息已并到侧边栏底部
+- unified shell 已去掉顶部 header，页面信息和账号区都收进左侧侧边栏；主题切换与 localStorage 持久化已落地
+- legacy `/history`、`/reports/:date`、`/control` 与 unified shell 共存，且相关测试和文档已同步
 
 如果后续有人补充了更完整的端到端验证、继续扩展 source adapter，或确认上述日志噪音属于需要修复的问题，请同步更新这一节，避免误导下一位协作者。

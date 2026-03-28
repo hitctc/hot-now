@@ -1,6 +1,6 @@
 # hot-now
 
-本地单机运行的每日热点应用。它会拉取多个已启用的 RSS 源、抓取原文、做规则聚类、生成 HTML/JSON 报告，并通过 QQ 邮箱 SMTP 发送邮件。
+本地单机运行的科技资讯控制台。它会拉取多个已启用的 RSS 源、抓取原文、做规则聚类、按系统百分制评分排序内容、生成 HTML/JSON 报告，并通过 QQ 邮箱 SMTP 发送邮件。
 
 ## 本地启动
 
@@ -45,13 +45,14 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 健康检查：`/health`
 - 登录页：`/login`
 - 统一站点菜单（登录后访问）：`/`、`/articles`、`/ai`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`
+- 内容页统一展示系统自动分数（`0-100`）和解释标签，不再提供手工评分表单
 - 统一站点左侧导航底部支持深色 / 浅色主题切换，主题偏好保存在浏览器本地 `localStorage`，刷新后保持
 - `unified shell` 页面已完整接入赛博双主题：`/`、`/articles`、`/ai`、`/settings/*`
 - Legacy 报告页（当前仍保留）：`/history`、`/reports/:date`、`/control`
 - legacy `/history`、`/control` 与 `/reports/:date` 的 fallback notice 轻量跟随共享主题资源
 - 手动触发任务：`POST /actions/run`
 
-统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。`content_sources.is_enabled` 决定哪些 source 参与采集，`is_active` 目前仍保留兼容；`/settings/sources` 页面还会继续沿用旧的单源控制外观，后续会再收口成多源状态视图。
+统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。`content_sources.is_enabled` 决定哪些 source 参与采集，`/settings/sources` 现在可以直接启用/停用 source，并在统一站点里手动执行一次全量采集。
 
 ## 配置
 

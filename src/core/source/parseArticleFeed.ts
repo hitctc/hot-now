@@ -11,15 +11,21 @@ export async function parseArticleFeed(
   source: Pick<SourceDefinition, "kind" | "name" | "category">
 ): Promise<LoadedIssue> {
   const feed = await parser.parseString(feedXml);
-  const items = feed.items
-    .map((item, index) => toCandidateItem(item, index, source))
-    .filter((item): item is CandidateItem => item !== null);
-  const publishedAt = items[0]?.publishedAt;
+  const items = feed.items.reduce<CandidateItem[]>((accumulator, item) => {
+    const candidateItem = toCandidateItem(item, accumulator.length + 1, source);
+
+    if (candidateItem) {
+      accumulator.push(candidateItem);
+    }
+
+    return accumulator;
+  }, []);
+  const freshestPublishedAt = getFreshestPublishedAt(items);
 
   // Article feeds do not expose a digest-style issue date, so we anchor the issue on the
   // freshest item publication date and fall back to an explicit unknown marker when missing.
   return {
-    date: toIssueDate(publishedAt),
+    date: toIssueDate(freshestPublishedAt),
     issueUrl: feed.link?.trim() ?? "",
     sourceKind: source.kind,
     items
@@ -30,7 +36,7 @@ export async function parseArticleFeed(
 // storage only sees links we can trace back to the publisher.
 function toCandidateItem(
   item: Parser.Item,
-  index: number,
+  rank: number,
   source: Pick<SourceDefinition, "name" | "category">
 ): CandidateItem | null {
   const title = item.title?.trim() ?? "";
@@ -47,7 +53,7 @@ function toCandidateItem(
   );
 
   return {
-    rank: index + 1,
+    rank,
     category: source.category,
     title,
     sourceUrl,
@@ -56,6 +62,22 @@ function toCandidateItem(
     ...(publishedAt ? { publishedAt } : {}),
     ...(summary ? { summary } : {})
   };
+}
+
+// Feed order still defines rank, but issue-level freshness should use the newest valid publish
+// time anywhere in the parsed list rather than whichever entry happened to appear first.
+function getFreshestPublishedAt(items: CandidateItem[]): string | undefined {
+  return items.reduce<string | undefined>((freshest, item) => {
+    if (!item.publishedAt) {
+      return freshest;
+    }
+
+    if (!freshest || item.publishedAt > freshest) {
+      return item.publishedAt;
+    }
+
+    return freshest;
+  }, undefined);
 }
 
 // The normalized issue date is only used as a coarse grouping key, so the newest item date is

@@ -14,8 +14,12 @@ export async function loadActiveSourceIssue(db: SqliteDatabase): Promise<LoadedI
   const activeSource = readActiveSourceRow(db);
 
   if (!activeSource) {
-    throw new Error("No content source is available");
+    throw new Error(
+      hasIsActiveColumn(db) ? "No active content source configured" : "No content source is available"
+    );
   }
+
+  const adapter = readSourceAdapter(activeSource.kind);
 
   const rssUrl = activeSource.rss_url?.trim();
   if (!rssUrl) {
@@ -31,14 +35,14 @@ export async function loadActiveSourceIssue(db: SqliteDatabase): Promise<LoadedI
   }
 
   const xml = await response.text();
-  return sourceAdapters[activeSource.kind](xml);
+  return adapter(xml);
 }
 
 // Task 2 has to work against both the current Task 1 schema and the future active-source schema,
 // so this lookup prefers `is_active` when present and otherwise preserves the legacy juya default.
 function readActiveSourceRow(db: SqliteDatabase): SourceRow | undefined {
   if (hasIsActiveColumn(db)) {
-    const active = db
+    return db
       .prepare(
         `
           SELECT kind, rss_url
@@ -48,10 +52,6 @@ function readActiveSourceRow(db: SqliteDatabase): SourceRow | undefined {
         `
       )
       .get() as SourceRow | undefined;
-
-    if (active) {
-      return active;
-    }
   }
 
   // Task 1's baseline schema has no active-source column yet, so Task 2 keeps the old behavior
@@ -76,4 +76,14 @@ function hasIsActiveColumn(db: SqliteDatabase): boolean {
     .all() as Array<{ name: string }>;
 
   return columns.some((column) => column.name === "is_active");
+}
+
+// The adapter registry is explicit, so unexpected DB values should fail with a targeted message
+// instead of falling through to an undefined function call.
+function readSourceAdapter(kind: string) {
+  if (!Object.hasOwn(sourceAdapters, kind)) {
+    throw new Error(`Unsupported content source kind: "${kind}"`);
+  }
+
+  return sourceAdapters[kind as SourceKind];
 }

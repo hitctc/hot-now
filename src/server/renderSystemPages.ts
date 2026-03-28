@@ -1,3 +1,5 @@
+import { viewRuleFieldDefinitions } from "../core/viewRules/viewRuleConfig.js";
+
 type ViewRuleItem = {
   ruleKey: string;
   displayName: string;
@@ -28,7 +30,7 @@ type ProfileView = {
 };
 
 export function renderViewRulesPage(rules: ViewRuleItem[]): string {
-  // The settings module keeps one card per rule so users can edit JSON config without leaving unified shell.
+  // The settings module keeps one card per rule so users can edit the weight form without leaving unified shell.
   if (rules.length === 0) {
     return renderEmptyState("筛选策略", "当前还没有可编辑的规则，请先完成系统初始化。");
   }
@@ -38,7 +40,7 @@ export function renderViewRulesPage(rules: ViewRuleItem[]): string {
   return `
     <section class="content-intro content-intro--system">
       <p class="content-kicker">系统菜单</p>
-      <p class="content-description">筛选策略：查看并保存 hot / articles / ai 的 JSON 配置。</p>
+      <p class="content-description">筛选策略：通过字段表单调整 hot / articles / ai 的条数、窗口和权重。</p>
     </section>
     <section class="system-stack system-stack--control">
       ${cardsHtml}
@@ -109,25 +111,18 @@ export function renderProfilePage(profile: ProfileView | null): string {
 }
 
 function renderViewRuleCard(rule: ViewRuleItem): string {
-  // JSON textarea stays plaintext so operators can copy/paste config snippets directly.
+  // Each rule exposes the same fixed set of inputs so operators can tune weights without editing raw JSON.
   return `
     <article class="system-card system-card--control system-card--view-rule" data-system-card="view-rule" data-rule-key="${escapeHtml(rule.ruleKey)}">
       <header class="system-card-header">
         <h3 class="system-card-title">${escapeHtml(rule.displayName)}</h3>
-        <p class="system-card-meta">rule_key: <code>${escapeHtml(rule.ruleKey)}</code> · ${
-          rule.isEnabled ? "启用中" : "已禁用"
-        }</p>
+        <p class="system-card-meta">rule_key: <code>${escapeHtml(rule.ruleKey)}</code> · ${rule.isEnabled ? "启用中" : "已禁用"}</p>
       </header>
-      <form class="system-form" data-system-action="view-rule-save" data-rule-key="${escapeHtml(rule.ruleKey)}">
-        <label class="system-label" for="rule-config-${escapeHtml(rule.ruleKey)}">当前 JSON 配置</label>
-        <textarea
-          id="rule-config-${escapeHtml(rule.ruleKey)}"
-          class="system-textarea"
-          data-role="view-rule-config"
-          name="config"
-          rows="8"
-          spellcheck="false"
-        >${escapeHtml(JSON.stringify(rule.config, null, 2))}</textarea>
+      <form class="system-form rating-form" data-system-action="view-rule-save" data-rule-key="${escapeHtml(rule.ruleKey)}">
+        <div class="rating-grid">
+          ${viewRuleFieldDefinitions.map((field) => renderViewRuleField(rule, field)).join("")}
+        </div>
+        <p class="system-card-meta">保存时会自动补齐缺省字段，权重建议填写 0 到 1 之间的小数。</p>
         <div class="system-action-row">
           <button type="submit" class="primary-mini-button">保存策略</button>
         </div>
@@ -136,6 +131,28 @@ function renderViewRuleCard(rule: ViewRuleItem): string {
         </div>
       </form>
     </article>
+  `;
+}
+
+function renderViewRuleField(rule: ViewRuleItem, field: (typeof viewRuleFieldDefinitions)[number]): string {
+  const rawValue = rule.config[field.name];
+  const value = typeof rawValue === "number" && Number.isFinite(rawValue) ? String(rawValue) : "";
+
+  return `
+    <label class="rating-field">
+      <span class="field-label">${escapeHtml(field.label)}</span>
+      <input
+        class="field-input"
+        type="number"
+        name="${escapeHtml(field.name)}"
+        value="${escapeHtml(value)}"
+        inputmode="${field.inputMode}"
+        min="${field.min}"
+        step="${field.step}"
+        required
+      />
+      <span class="system-card-meta">${escapeHtml(field.description)}</span>
+    </label>
   `;
 }
 

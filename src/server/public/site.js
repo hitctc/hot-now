@@ -2,6 +2,15 @@
   const root = document;
   const themeRoot = document.documentElement;
   const themeStorageKey = "hot-now-theme";
+  const viewRuleFieldOrder = [
+    { name: "limit", label: "条数限制", integer: true },
+    { name: "freshnessWindowDays", label: "新鲜度窗口", integer: true },
+    { name: "freshnessWeight", label: "新鲜度权重", integer: false },
+    { name: "sourceWeight", label: "来源权重", integer: false },
+    { name: "completenessWeight", label: "完整度权重", integer: false },
+    { name: "aiWeight", label: "AI 权重", integer: false },
+    { name: "heatWeight", label: "热点权重", integer: false }
+  ];
 
   applyInitialTheme();
 
@@ -128,7 +137,7 @@
   }
 
   async function handleViewRuleSave(form) {
-    // Rule save parses textarea JSON first so malformed payloads fail before hitting server.
+    // Rule save now reads a fixed field set and posts the assembled config object directly.
     const ruleKey = (form.dataset.ruleKey || "").trim();
 
     if (!ruleKey) {
@@ -136,28 +145,23 @@
       return;
     }
 
-    const textarea = form.querySelector('[data-role="view-rule-config"]');
+    if (typeof form.checkValidity === "function" && !form.checkValidity()) {
+      if (typeof form.reportValidity === "function") {
+        form.reportValidity();
+      }
 
-    if (!(textarea instanceof HTMLTextAreaElement)) {
-      showFormStatus(form, "未找到配置输入框。");
+      showFormStatus(form, "请先把规则字段填写完整。");
       return;
     }
 
-    let parsedConfig;
+    const config = readViewRuleConfig(form);
 
-    try {
-      parsedConfig = JSON.parse(textarea.value);
-    } catch {
-      showFormStatus(form, "JSON 格式错误，请先修正再保存。");
+    if (!config.ok) {
+      showFormStatus(form, config.message);
       return;
     }
 
-    if (!isPlainObject(parsedConfig)) {
-      showFormStatus(form, "配置必须是 JSON 对象。");
-      return;
-    }
-
-    const response = await postJson(`/actions/view-rules/${encodeURIComponent(ruleKey)}`, { config: parsedConfig });
+    const response = await postJson(`/actions/view-rules/${encodeURIComponent(ruleKey)}`, { config: config.config });
 
     if (!response.ok) {
       showFormStatus(form, await readSystemActionError(response, "保存失败，请稍后再试。"));
@@ -284,7 +288,7 @@
     const payload = await safeJson(response);
 
     if (payload?.reason === "invalid-view-rule-payload") {
-      return "规则配置不合法，请检查 JSON 内容。";
+      return "规则配置不合法，请检查表单字段。";
     }
 
     if (payload?.reason === "invalid-source-kind") {
@@ -323,6 +327,30 @@
     } catch {
       return null;
     }
+  }
+
+  function readViewRuleConfig(form) {
+    // The browser sends numeric fields as strings, so the submit handler converts them into numbers once here.
+    const formData = new FormData(form);
+    const config = {};
+
+    for (const field of viewRuleFieldOrder) {
+      const rawValue = formData.get(field.name);
+
+      if (typeof rawValue !== "string" || rawValue.trim() === "") {
+        return { ok: false, message: `${field.label} 不能为空。` };
+      }
+
+      const parsedValue = Number(rawValue);
+
+      if (!Number.isFinite(parsedValue)) {
+        return { ok: false, message: `${field.label} 必须是有效数字。` };
+      }
+
+      config[field.name] = field.integer ? Math.floor(parsedValue) : parsedValue;
+    }
+
+    return { ok: true, config };
   }
 
   function applyInitialTheme() {
@@ -367,10 +395,5 @@
       const isPressed = themeButton.dataset.themeChoice === theme;
       themeButton.setAttribute("aria-pressed", isPressed ? "true" : "false");
     }
-  }
-
-  function isPlainObject(value) {
-    // The frontend enforces object payloads so accidental scalar JSON cannot hit rule-save route.
-    return typeof value === "object" && value !== null && !Array.isArray(value);
   }
 })();

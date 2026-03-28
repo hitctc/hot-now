@@ -1,17 +1,24 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
+import {
+  defaultViewRuleDefinitions,
+  normalizeViewRuleConfig,
+  type ViewRuleConfigValues,
+  type ViewRuleKey
+} from "./viewRuleConfig.js";
 
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 type DefaultViewRule = {
-  ruleKey: "hot" | "articles" | "ai";
+  ruleKey: ViewRuleKey;
   displayName: string;
-  config: { limit: number; sort: string };
+  config: ViewRuleConfigValues;
+  seedConfig: Record<string, JsonValue>;
 };
 
 export type ViewRuleConfig = {
   ruleKey: string;
   displayName: string;
-  config: Record<string, JsonValue>;
+  config: ViewRuleConfigValues;
   isEnabled: boolean;
 };
 
@@ -24,11 +31,12 @@ type ViewRuleRow = {
   is_enabled: number;
 };
 
-const defaultViewRules: DefaultViewRule[] = [
-  { ruleKey: "hot", displayName: "热点策略", config: { limit: 20, sort: "recent" } },
-  { ruleKey: "articles", displayName: "文章策略", config: { limit: 20, sort: "completeness" } },
-  { ruleKey: "ai", displayName: "AI 策略", config: { limit: 20, sort: "ai_score" } }
-];
+const defaultViewRules: DefaultViewRule[] = defaultViewRuleDefinitions.map((rule) => ({
+  ruleKey: rule.ruleKey,
+  displayName: rule.displayName,
+  config: rule.config,
+  seedConfig: rule.seedConfig
+}));
 
 const defaultViewRuleByKey = new Map(defaultViewRules.map((rule) => [rule.ruleKey, rule]));
 
@@ -43,10 +51,11 @@ export function ensureDefaultViewRules(db: SqliteDatabase): void {
   );
   const ensureDefaults = db.transaction(() => {
     for (const rule of defaultViewRules) {
+      // The seed keeps the legacy compact payload for compatibility, while reads normalize it into the new shape.
       insertRule.run({
         ruleKey: rule.ruleKey,
         displayName: rule.displayName,
-        configJson: JSON.stringify(rule.config)
+        configJson: JSON.stringify(rule.seedConfig)
       });
     }
   });
@@ -87,11 +96,13 @@ export function saveViewRuleConfig(
   ensureDefaultViewRules(db);
 
   const normalizedRuleKey = ruleKey.trim();
-  const defaultRule = defaultViewRuleByKey.get(normalizedRuleKey as DefaultViewRule["ruleKey"]);
+  const defaultRule = defaultViewRuleByKey.get(normalizedRuleKey as ViewRuleKey);
 
   if (!defaultRule) {
     return { ok: false, reason: "not-found" };
   }
+
+  const normalizedConfig = normalizeViewRuleConfig(normalizedRuleKey, config);
 
   const updateResult = db
     .prepare(
@@ -102,7 +113,7 @@ export function saveViewRuleConfig(
         WHERE rule_key = ?
       `
     )
-    .run(JSON.stringify(config), normalizedRuleKey);
+    .run(JSON.stringify(normalizedConfig), normalizedRuleKey);
 
   if (updateResult.changes > 0) {
     return { ok: true };
@@ -113,25 +124,25 @@ export function saveViewRuleConfig(
       INSERT INTO view_rule_configs (rule_key, display_name, config_json, is_enabled)
       VALUES (?, ?, ?, 1)
     `
-  ).run(defaultRule.ruleKey, defaultRule.displayName, JSON.stringify(config));
+  ).run(defaultRule.ruleKey, defaultRule.displayName, JSON.stringify(normalizedConfig));
 
   return { ok: true };
 }
 
-function parseConfigJson(ruleKey: string, rawValue: string): Record<string, JsonValue> {
+function parseConfigJson(ruleKey: string, rawValue: string): ViewRuleConfigValues {
   // Persisted config_json is parsed defensively so one bad row does not break the whole settings page.
   try {
     const parsed = JSON.parse(rawValue);
 
     if (isJsonObject(parsed)) {
-      return parsed;
+      return normalizeViewRuleConfig(ruleKey, parsed);
     }
   } catch {
     // Invalid rows fall through to deterministic defaults.
   }
 
-  const defaultRule = defaultViewRuleByKey.get(ruleKey as DefaultViewRule["ruleKey"]);
-  return defaultRule?.config ?? {};
+  const defaultRule = defaultViewRuleByKey.get(ruleKey as ViewRuleKey);
+  return defaultRule?.config ?? defaultViewRuleDefinitions[0].config;
 }
 
 function isJsonObject(value: unknown): value is Record<string, JsonValue> {

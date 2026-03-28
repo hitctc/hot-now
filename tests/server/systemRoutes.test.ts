@@ -8,7 +8,15 @@ describe("system routes", () => {
         {
           ruleKey: "hot",
           displayName: "热点策略",
-          config: { limit: 20, sort: "recent" },
+          config: {
+            limit: 20,
+            freshnessWindowDays: 3,
+            freshnessWeight: 0.35,
+            sourceWeight: 0.1,
+            completenessWeight: 0.1,
+            aiWeight: 0.05,
+            heatWeight: 0.4
+          },
           isEnabled: true
         }
       ])
@@ -29,7 +37,14 @@ describe("system routes", () => {
     expect(response.body).toContain('class="system-card system-card--control system-card--view-rule"');
     expect(response.body).toContain('class="action-status system-status"');
     expect(response.body).toContain("hot");
-    expect(response.body).toContain("&quot;sort&quot;: &quot;recent&quot;");
+    expect(response.body).toContain('name="limit"');
+    expect(response.body).toContain('name="freshnessWindowDays"');
+    expect(response.body).toContain('name="freshnessWeight"');
+    expect(response.body).toContain('name="sourceWeight"');
+    expect(response.body).toContain('name="completenessWeight"');
+    expect(response.body).toContain('name="aiWeight"');
+    expect(response.body).toContain('name="heatWeight"');
+    expect(response.body).not.toContain("<textarea");
   });
 
   it("renders sources page with active source state", async () => {
@@ -160,13 +175,26 @@ describe("system routes", () => {
       payload: {
         config: {
           limit: 10,
-          sort: "recent"
+          freshnessWindowDays: 3,
+          freshnessWeight: 0.4,
+          sourceWeight: 0.1,
+          completenessWeight: 0.1,
+          aiWeight: 0.05,
+          heatWeight: 0.35
         }
       }
     });
 
     expect(response.statusCode).toBe(200);
-    expect(saveViewRuleConfig).toHaveBeenCalledWith("hot", { limit: 10, sort: "recent" });
+    expect(saveViewRuleConfig).toHaveBeenCalledWith("hot", {
+      limit: 10,
+      freshnessWindowDays: 3,
+      freshnessWeight: 0.4,
+      sourceWeight: 0.1,
+      completenessWeight: 0.1,
+      aiWeight: 0.05,
+      heatWeight: 0.35
+    });
   });
 
   it("returns 400 for invalid view-rule payload", async () => {
@@ -204,7 +232,17 @@ describe("system routes", () => {
     const ruleResponse = await app.inject({
       method: "POST",
       url: "/actions/view-rules/hot",
-      payload: { config: { limit: 20, sort: "recent" } }
+      payload: {
+        config: {
+          limit: 20,
+          freshnessWindowDays: 3,
+          freshnessWeight: 0.35,
+          sourceWeight: 0.1,
+          completenessWeight: 0.1,
+          aiWeight: 0.05,
+          heatWeight: 0.4
+        }
+      }
     });
 
     expect(activateResponse.statusCode).toBe(401);

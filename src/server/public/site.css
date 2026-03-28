@@ -10,6 +10,54 @@
   --transition-base: 220ms ease;
   --shell-content-width: 1440px;
   color-scheme: dark;
+  /* /login 这类没有 data-theme 的页面会直接吃 :root，所以这里把 dark token 作为默认基线。 */
+  --bg-page: #07111d;
+  --bg-page-glow-a: rgba(82, 229, 255, 0.16);
+  --bg-page-glow-b: rgba(83, 243, 195, 0.12);
+  --bg-page-glow-c: rgba(72, 109, 255, 0.12);
+  --grid-line: rgba(131, 201, 255, 0.06);
+  --scanline: rgba(255, 255, 255, 0.04);
+  --bg-sidebar: linear-gradient(180deg, rgba(7, 15, 29, 0.98) 0%, rgba(10, 20, 38, 0.96) 100%);
+  --bg-sidebar-panel: rgba(12, 24, 43, 0.9);
+  --bg-header: rgba(8, 16, 30, 0.78);
+  --bg-panel: rgba(8, 17, 31, 0.78);
+  --bg-panel-strong: rgba(11, 24, 44, 0.9);
+  --bg-empty: rgba(7, 16, 29, 0.66);
+  --bg-input: rgba(5, 12, 22, 0.65);
+  --bg-input-focus: rgba(7, 18, 32, 0.92);
+  --bg-control: rgba(14, 27, 49, 0.72);
+  --bg-control-hover: rgba(21, 39, 69, 0.88);
+  --bg-chip: rgba(12, 24, 42, 0.72);
+  --bg-chip-hover: rgba(18, 36, 64, 0.88);
+  --bg-chip-active: linear-gradient(135deg, rgba(82, 229, 255, 0.94), rgba(83, 243, 195, 0.92));
+  --bg-theme-toggle: rgba(12, 24, 43, 0.84);
+  --bg-theme-toggle-hover: rgba(18, 35, 62, 0.92);
+  --bg-link: rgba(148, 163, 184, 0.14);
+  --bg-link-active: linear-gradient(135deg, #29d3ff, #17c8a7);
+  --bg-link-active-strong: rgba(11, 27, 46, 0.32);
+  --text-main: #edf6ff;
+  --text-body: #c7d7ea;
+  --text-muted: #91a8bf;
+  --text-sidebar: #e3efff;
+  --text-sidebar-muted: #9fb4cb;
+  --text-on-accent: #04111f;
+  --accent: #52e5ff;
+  --accent-strong: #53f3c3;
+  --accent-soft: rgba(82, 229, 255, 0.45);
+  --border: rgba(145, 177, 210, 0.18);
+  --border-strong: rgba(82, 229, 255, 0.32);
+  --border-sidebar: rgba(105, 138, 173, 0.2);
+  --border-sidebar-soft: rgba(105, 138, 173, 0.22);
+  --border-accent: rgba(82, 229, 255, 0.52);
+  --ring: rgba(82, 229, 255, 0.24);
+  --success: #49e6b2;
+  --warning: #f5c15b;
+  --danger: #ff7b8a;
+  --shadow-page: 0 24px 70px rgba(1, 7, 16, 0.55);
+  --shadow-panel: 0 18px 46px rgba(2, 7, 15, 0.32);
+  --shadow-floating: 0 18px 36px rgba(1, 7, 16, 0.28);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --shadow-accent: 0 0 0 1px rgba(82, 229, 255, 0.16), 0 16px 30px rgba(15, 86, 126, 0.18);
 }
 
 html[data-theme="dark"] {

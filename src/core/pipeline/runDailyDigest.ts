@@ -90,8 +90,15 @@ export async function runDailyDigest(
     }
 
     const topics = clusterTopics(enrichedItems);
-    const report = buildDailyReport({ issue: buildAggregateIssue(reportIssue, enrichedItems), trigger, topics, topN: config.report.topN });
+    const report = buildDailyReport({
+      issue: buildAggregateIssue(reportIssue, enrichedIssues, enrichedItems),
+      trigger,
+      topics,
+      topN: config.report.topN
+    });
     report.meta.degraded = report.meta.degraded || hasSourceFailures;
+    report.meta.sourceFailureCount = sourceFailures.length;
+    report.meta.failedSourceKinds = sourceFailures.map((failure) => failure.kind);
     const mailStatus = await sendReportEmail(config, report, runtimeDeps.sendDailyEmail);
     report.meta.mailStatus = mailStatus;
 
@@ -254,10 +261,16 @@ function pickReportIssue(issues: LoadedIssue[]): LoadedIssue {
   return selectedIssue;
 }
 
-function buildAggregateIssue(issue: LoadedIssue, items: readonly EnrichedCollectedItem[]): DailyReportIssue {
+function buildAggregateIssue(
+  issue: LoadedIssue,
+  issues: readonly LoadedIssue[],
+  items: readonly EnrichedCollectedItem[]
+): DailyReportIssue {
   return {
     date: issue.date,
     issueUrl: issue.issueUrl,
+    issueUrls: uniqueStrings(issues.map((entry) => entry.issueUrl)),
+    sourceKinds: uniqueStrings(issues.map((entry) => entry.sourceKind)),
     items
   };
 }
@@ -280,4 +293,8 @@ function compareIssues(left: LoadedIssue, right: LoadedIssue): number {
 function toIssueDateMs(value: string): number {
   const parsed = Date.parse(`${value}T00:00:00.000Z`);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function uniqueStrings(values: readonly string[]) {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }

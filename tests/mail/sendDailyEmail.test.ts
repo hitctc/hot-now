@@ -11,9 +11,13 @@ describe("sendDailyEmail", () => {
         generatedAt: "2026-03-26T00:00:00.000Z",
         trigger: "manual",
         issueUrl: "",
+        issueUrls: ["https://openai.com/news/", "https://blog.google/technology/ai/"],
+        sourceKinds: ["openai", "google_ai"],
         topicCount: 1,
         degraded: false,
-        mailStatus: "pending"
+        mailStatus: "pending",
+        sourceFailureCount: 1,
+        failedSourceKinds: ["juya"]
       },
       topics: [
         {
@@ -57,5 +61,8 @@ describe("sendDailyEmail", () => {
     const [[message]] = sendMail.mock.calls;
     expect(message.html).toContain("2026-03-26");
     expect(message.html).toContain("http://127.0.0.1:3030/reports/2026-03-26");
+    expect(message.html).toContain("HotNow 多源热点汇总");
+    expect(message.html).toContain("数据源：openai / google_ai");
+    expect(message.html).toContain("本次有 1 个来源抓取失败：juya");
   });
 });

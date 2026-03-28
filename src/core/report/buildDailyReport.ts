@@ -6,6 +6,8 @@ export type DailyReportTrigger = "manual" | "scheduled";
 export type DailyReportIssue = {
   date: string;
   issueUrl: string;
+  issueUrls: string[];
+  sourceKinds: string[];
   items: readonly unknown[];
 };
 
@@ -36,9 +38,13 @@ export type DailyReport = {
     generatedAt: string;
     trigger: DailyReportTrigger;
     issueUrl: string;
+    issueUrls: string[];
+    sourceKinds: string[];
     topicCount: number;
     degraded: boolean;
     mailStatus: string;
+    sourceFailureCount: number;
+    failedSourceKinds: string[];
   };
   topics: DailyReportTopic[];
 };
@@ -65,9 +71,13 @@ export function buildDailyReport({ issue, trigger, topics, topN }: BuildDailyRep
       generatedAt: new Date().toISOString(),
       trigger,
       issueUrl: issue.issueUrl,
+      issueUrls: issue.issueUrls,
+      sourceKinds: issue.sourceKinds,
       topicCount: Math.min(safeTopN, topics.length),
       degraded: hasDegradedContent(topics),
-      mailStatus: "pending"
+      mailStatus: "pending",
+      sourceFailureCount: 0,
+      failedSourceKinds: []
     },
     topics: reportTopics
   };

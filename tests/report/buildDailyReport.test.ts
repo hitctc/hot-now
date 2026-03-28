@@ -33,6 +33,11 @@ describe("buildDailyReport", () => {
       issue: {
         date: "2026-03-26",
         issueUrl: "https://imjuya.github.io/juya-ai-daily/issue-40/",
+        issueUrls: [
+          "https://imjuya.github.io/juya-ai-daily/issue-40/",
+          "https://openai.com/news/"
+        ],
+        sourceKinds: ["juya", "openai"],
         items: []
       },
       trigger: "manual",
@@ -65,9 +70,16 @@ describe("buildDailyReport", () => {
 
     expect(report.meta.date).toBe("2026-03-26");
     expect(report.meta.issueUrl).toBe("https://imjuya.github.io/juya-ai-daily/issue-40/");
+    expect(report.meta.issueUrls).toEqual([
+      "https://imjuya.github.io/juya-ai-daily/issue-40/",
+      "https://openai.com/news/"
+    ]);
+    expect(report.meta.sourceKinds).toEqual(["juya", "openai"]);
     expect(report.meta.topicCount).toBe(1);
     expect(report.meta.degraded).toBe(true);
     expect(report.meta.mailStatus).toBe("pending");
+    expect(report.meta.sourceFailureCount).toBe(0);
+    expect(report.meta.failedSourceKinds).toEqual([]);
     expect(report.topics).toHaveLength(1);
     expect(report.topics[0].title).toContain("Lyria 3 Pro");
     expect(report.topics[0].relatedItems).toHaveLength(1);
@@ -78,6 +90,8 @@ describe("buildDailyReport", () => {
       issue: {
         date: "2026-03-26",
         issueUrl: "https://example.com",
+        issueUrls: ["https://example.com", "https://openai.com/news/"],
+        sourceKinds: ["juya", "openai"],
         items: []
       },
       trigger: "manual",
@@ -88,7 +102,10 @@ describe("buildDailyReport", () => {
     const html = renderReportHtml(report);
 
     expect(html).toContain("<!doctype html>");
-    expect(html).toContain("HotNow 每日热点 2026-03-26");
+    expect(html).toContain("HotNow 多源热点汇总 2026-03-26");
+    expect(html).toContain("数据源：juya / openai");
+    expect(html).toContain("来源入口：");
     expect(html).toContain("邮件状态：pending");
+    expect(html).toContain("失败源数：0");
   });
 });

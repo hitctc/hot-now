@@ -1,6 +1,6 @@
 # hot-now
 
-本地单机运行的科技资讯控制台。它会拉取多个已启用的 RSS 源、抓取原文、做规则聚类、按系统百分制评分排序内容、生成 HTML/JSON 报告，并通过 QQ 邮箱 SMTP 发送邮件。
+本地单机运行的科技资讯控制台。它会拉取多个已启用的 RSS 源、抓取原文、做规则聚类、按系统百分制评分排序内容、生成多源汇总的 HTML/JSON 报告，并通过 QQ 邮箱 SMTP 发送邮件。
 
 ## 本地启动
 
@@ -61,8 +61,8 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 
 默认报告目录是 `data/reports/<YYYY-MM-DD>/`，其中会保存：
 
-- `report.json`
-- `report.html`
+- `report.json`：包含 `sourceKinds`、`issueUrls`、`sourceFailureCount` 等多源元信息
+- `report.html`：展示“多源热点汇总”页面，而不是单一日报文案
 - `run-meta.json`
 
 ## 验证

@@ -163,11 +163,20 @@ describe("runDailyDigest", () => {
     expect(result.report.meta.degraded).toBe(true);
     expect(reportJson.meta.mailStatus).toBe("sent");
     expect(reportJson.meta.degraded).toBe(true);
-    expect(reportHtml).toContain("HotNow 每日热点 2026-03-29");
+    expect(reportHtml).toContain("HotNow 多源热点汇总 2026-03-29");
+    expect(reportHtml).toContain("数据源：openai / google_ai");
     expect(reportHtml).toContain("邮件状态：sent");
+    expect(reportHtml).toContain("失败源数：0");
     expect(reportHtml).toContain("降级抓取");
     expect(runMeta.mailStatus).toBe("sent");
     expect(runMeta.degraded).toBe(true);
+    expect(reportJson.meta.sourceKinds).toEqual(["openai", "google_ai"]);
+    expect(reportJson.meta.issueUrls).toEqual([
+      "https://openai.com/news/",
+      "https://blog.google/technology/ai/"
+    ]);
+    expect(reportJson.meta.sourceFailureCount).toBe(0);
+    expect(reportJson.meta.failedSourceKinds).toEqual([]);
 
     const contentItems = db
       .prepare(
@@ -317,6 +326,10 @@ describe("runDailyDigest", () => {
     expect(result.mailStatus).toBe("sent");
     expect(result.report.meta.degraded).toBe(true);
     expect(reportJson.meta.degraded).toBe(true);
+    expect(reportJson.meta.sourceKinds).toEqual(["google_ai"]);
+    expect(reportJson.meta.issueUrls).toEqual(["https://blog.google/technology/ai/"]);
+    expect(reportJson.meta.sourceFailureCount).toBe(1);
+    expect(reportJson.meta.failedSourceKinds).toEqual(["openai"]);
     expect(runMeta.mailStatus).toBe("sent");
     expect(runMeta.degraded).toBe(true);
     expect(runMeta.sourceFailureCount).toBe(1);
@@ -373,6 +386,8 @@ describe("runDailyDigest", () => {
     expect(result.mailStatus).toBe("failed:smtp down");
     expect(result.report.meta.mailStatus).toBe("failed:smtp down");
     expect(reportJson.meta.mailStatus).toBe("failed:smtp down");
+    expect(reportJson.meta.sourceKinds).toEqual(["juya"]);
+    expect(reportJson.meta.issueUrls).toEqual(["https://example.com"]);
     expect(reportHtml).toContain("邮件状态：failed:smtp down");
     expect(runMeta.mailStatus).toBe("failed:smtp down");
 
@@ -452,6 +467,8 @@ describe("runDailyDigest", () => {
 
     expect(result.mailStatus).toBe("sent");
     expect(reportJson.meta.mailStatus).toBe("sent");
+    expect(reportJson.meta.sourceKinds).toEqual(["juya"]);
+    expect(reportJson.meta.issueUrls).toEqual(["https://example.com"]);
     expect(reportHtml).toContain("邮件状态：sent");
     expect(runMeta.mailStatus).toBe("sent");
   });

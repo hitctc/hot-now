@@ -48,7 +48,7 @@ function buildEmailMessage(config: RuntimeConfig, report: DailyReport): EmailMes
   return {
     from: config.smtp.user,
     to: config.smtp.to,
-    subject: `HotNow 每日热点 ${report.meta.date}`,
+    subject: `HotNow 多源热点汇总 ${report.meta.date}`,
     html: renderEmailHtml(config, report)
   };
 }
@@ -56,6 +56,11 @@ function buildEmailMessage(config: RuntimeConfig, report: DailyReport): EmailMes
 // The email content mirrors the report summary without depending on the HTML report page.
 function renderEmailHtml(config: RuntimeConfig, report: DailyReport) {
   const reportUrl = new URL(`/reports/${report.meta.date}`, config.smtp.baseUrl).toString();
+  const sourceKindsText = report.meta.sourceKinds.length > 0 ? report.meta.sourceKinds.map(escapeHtml).join(" / ") : "未记录";
+  const failureNotice =
+    report.meta.sourceFailureCount > 0
+      ? `<p>本次有 ${report.meta.sourceFailureCount} 个来源抓取失败：${escapeHtml(report.meta.failedSourceKinds.join(" / ") || "未记录")}</p>`
+      : "";
   const topicHtml = report.topics
     .map(
       (topic) => `
@@ -70,8 +75,10 @@ function renderEmailHtml(config: RuntimeConfig, report: DailyReport) {
   return `<!doctype html>
 <html lang="zh-CN">
   <body>
-    <h1>HotNow 每日热点 ${escapeHtml(report.meta.date)}</h1>
+    <h1>HotNow 多源热点汇总 ${escapeHtml(report.meta.date)}</h1>
+    <p>数据源：${sourceKindsText}</p>
     <p>网页报告：<a href="${escapeHtml(reportUrl)}">${escapeHtml(reportUrl)}</a></p>
+    ${failureNotice}
     <ul>
       ${topicHtml}
     </ul>

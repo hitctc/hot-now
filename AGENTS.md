@@ -77,8 +77,8 @@
 
 当前报告产物目录：
 
-- `data/reports/<YYYY-MM-DD>/report.json`
-- `data/reports/<YYYY-MM-DD>/report.html`
+- `data/reports/<YYYY-MM-DD>/report.json`：包含 `sourceKinds`、`issueUrls`、`sourceFailureCount`、`failedSourceKinds`
+- `data/reports/<YYYY-MM-DD>/report.html`：多源热点汇总 HTML 报告
 - `data/reports/<YYYY-MM-DD>/run-meta.json`
 
 当前仓库允许把示例报告产物提交进版本库，用来直观看到阶段性成果；如果后续重新改回忽略策略，必须同步更新本文档、`README.md` 和 `.gitignore`。
@@ -167,8 +167,8 @@
 - 已有设计文档和实现计划
 - 已有主体实现与测试文件
 - Git 主分支已建立并同步远端
-- 当前工作区已完成 unified site 主题阶段的最终验证：
-  - `npm run test` 通过，结果为 `20` 个测试文件、`101` 个测试全部通过
+- 当前工作区已完成 unified site 与多源采集阶段的最终验证：
+  - `npm run test` 通过，结果为 `23` 个测试文件、`120` 个测试全部通过
   - `npm run build` 通过
   - Playwright MCP 本地验收已跑通：`/login` 登录成功；`/`、`/articles`、`/ai`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常
   - 浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持
@@ -180,6 +180,7 @@
 - 多源采集后端已完成：`loadEnabledSourceIssues` / `runDailyDigest` 已接入多源并行汇总，单个 feed 失败不会阻断整次日报，只有全部 enabled sources 都失败时才会硬失败
 - 系统菜单已收口到多源语义：`/settings/sources` 支持 source 启用/停用、逐 source 最近抓取状态展示和统一站点内手动执行采集；`/settings/view-rules` 支持按字段表单保存权重规则；当前登录用户信息已并到侧边栏底部
 - unified shell 已去掉顶部 header，页面信息和账号区都收进左侧侧边栏；主题切换与 localStorage 持久化已落地
+- 报告层已切到多源语义：`report.json` / `report.html` / 邮件正文会保留 `sourceKinds`、`issueUrls`、失败 source 数量等信息，不再把输出描述成单一日报
 - legacy `/history`、`/reports/:date`、`/control` 与 unified shell 共存，且相关测试和文档已同步
 
 如果后续有人补充了更完整的端到端验证、继续扩展 source adapter，或确认上述日志噪音属于需要修复的问题，请同步更新这一节，避免误导下一位协作者。

@@ -3,6 +3,8 @@ import type { DailyReport } from "./buildDailyReport.js";
 // This renders the report payload as a standalone HTML document without touching the filesystem or network.
 export function renderReportHtml(report: DailyReport) {
   const topicHtml = report.topics.length > 0 ? report.topics.map(renderTopicSection).join("\n") : renderEmptyState();
+  const sourceLinksHtml = renderSourceLinks(report.meta.issueUrls);
+  const sourceKindsText = report.meta.sourceKinds.length > 0 ? report.meta.sourceKinds.map(escapeHtml).join(" / ") : "未记录";
 
   return `<!doctype html>
 <html lang="zh-CN">
@@ -128,12 +130,15 @@ export function renderReportHtml(report: DailyReport) {
   <body>
     <main>
       <header>
-        <h1>HotNow 每日热点 ${escapeHtml(report.meta.date)}</h1>
-        <p>原始日报：${renderLink(report.meta.issueUrl, report.meta.issueUrl || "暂无链接")}</p>
+        <h1>HotNow 多源热点汇总 ${escapeHtml(report.meta.date)}</h1>
+        <p>数据源：${sourceKindsText}</p>
+        <p>来源入口：${sourceLinksHtml}</p>
         <div class="meta-grid">
           <div class="meta-card">生成时间：${escapeHtml(report.meta.generatedAt)}</div>
+          <div class="meta-card">数据源数：${report.meta.sourceKinds.length}</div>
           <div class="meta-card">邮件状态：${escapeHtml(report.meta.mailStatus)}</div>
           <div class="meta-card">降级报告：${report.meta.degraded ? "是" : "否"}</div>
+          <div class="meta-card">失败源数：${report.meta.sourceFailureCount}</div>
           <div class="meta-card">主题数量：${report.meta.topicCount}</div>
         </div>
       </header>
@@ -187,6 +192,14 @@ function renderLink(href: string, text: string) {
   }
 
   return `<a href="${safeHref}" target="_blank" rel="noreferrer noopener">${safeText}</a>`;
+}
+
+function renderSourceLinks(urls: string[]) {
+  if (urls.length === 0) {
+    return "暂无链接";
+  }
+
+  return urls.map((url) => renderLink(url, url)).join(" / ");
 }
 
 // The report is plain HTML, so all dynamic content needs a small escape helper.

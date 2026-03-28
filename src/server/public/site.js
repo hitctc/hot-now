@@ -74,7 +74,7 @@
     const response = await postJson(`/actions/content/${contentId}/favorite`, { isFavorited: nextFavorited });
 
     if (!response.ok) {
-      showStatus(card, "收藏操作失败，请稍后再试。");
+      showStatus(card, await readActionError(response, "收藏操作失败，请稍后再试。"));
       return;
     }
 
@@ -97,7 +97,7 @@
     const response = await postJson(`/actions/content/${contentId}/reaction`, { reaction: nextReaction });
 
     if (!response.ok) {
-      showStatus(card, "反馈提交失败，请稍后再试。");
+      showStatus(card, await readActionError(response, "反馈提交失败，请稍后再试。"));
       return;
     }
 
@@ -147,7 +147,7 @@
     const response = await postJson(`/actions/content/${contentId}/ratings`, { scores });
 
     if (!response.ok) {
-      showStatus(card, "评分保存失败，请稍后再试。");
+      showStatus(card, await readActionError(response, "评分保存失败，请稍后再试。"));
       return;
     }
 
@@ -175,6 +175,31 @@
     } catch {
       return { ok: false };
     }
+  }
+
+  async function readActionError(response, fallbackMessage) {
+    // Error parsing centralizes route-specific reasons so each handler can keep one concise fallback path.
+    if (!response || typeof response !== "object") {
+      return fallbackMessage;
+    }
+
+    if (typeof response.status === "number") {
+      if (response.status === 401) {
+        return "请先登录后再操作。";
+      }
+
+      if (response.status === 404) {
+        return "内容不存在，可能已被删除。";
+      }
+    }
+
+    const payload = await safeJson(response);
+
+    if (payload?.reason === "unknown-dimensions" && Array.isArray(payload.unknownKeys) && payload.unknownKeys.length > 0) {
+      return `评分项不存在：${payload.unknownKeys.join(", ")}`;
+    }
+
+    return fallbackMessage;
   }
 
   function showStatus(card, message) {

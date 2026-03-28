@@ -1,8 +1,14 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
 
 export type ReactionValue = "like" | "dislike" | "none";
+export type FeedbackSaveResult = { ok: true } | { ok: false; reason: "not-found" };
 
-export function saveFavorite(db: SqliteDatabase, contentItemId: number, isFavorited: boolean): void {
+export function saveFavorite(db: SqliteDatabase, contentItemId: number, isFavorited: boolean): FeedbackSaveResult {
+  // The server maps missing content rows to 404, so repository writes first verify the target row exists.
+  if (!contentItemExists(db, contentItemId)) {
+    return { ok: false, reason: "not-found" };
+  }
+
   // The feedback table has no uniqueness constraint, so we rewrite one logical state per content + kind.
   const rewriteFavorite = db.transaction(() => {
     db.prepare(
@@ -24,9 +30,15 @@ export function saveFavorite(db: SqliteDatabase, contentItemId: number, isFavori
   });
 
   rewriteFavorite();
+  return { ok: true };
 }
 
-export function saveReaction(db: SqliteDatabase, contentItemId: number, reaction: ReactionValue): void {
+export function saveReaction(db: SqliteDatabase, contentItemId: number, reaction: ReactionValue): FeedbackSaveResult {
+  // Missing content should not bubble up as FK errors, because callers need a stable not-found contract.
+  if (!contentItemExists(db, contentItemId)) {
+    return { ok: false, reason: "not-found" };
+  }
+
   // A neutral reaction clears persisted state so list queries can treat missing rows as `none`.
   const rewriteReaction = db.transaction(() => {
     db.prepare(
@@ -48,4 +60,13 @@ export function saveReaction(db: SqliteDatabase, contentItemId: number, reaction
   });
 
   rewriteReaction();
+  return { ok: true };
+}
+
+function contentItemExists(db: SqliteDatabase, contentItemId: number): boolean {
+  // Existence is checked in one helper so favorite/reaction writes stay behaviorally aligned.
+  const row = db.prepare("SELECT id FROM content_items WHERE id = ? LIMIT 1").get(contentItemId) as
+    | { id: number }
+    | undefined;
+  return Boolean(row);
 }

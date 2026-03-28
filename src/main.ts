@@ -120,16 +120,10 @@ const app = createServer({
   },
   isRunning: () => lock.isRunning(),
   listContentView: async (viewKey) => listContentCards(db, viewKey),
-  saveFavorite: async (contentItemId, isFavorited) => {
-    saveFavorite(db, contentItemId, isFavorited);
-  },
-  saveReaction: async (contentItemId, reaction) => {
-    saveReaction(db, contentItemId, reaction);
-  },
+  saveFavorite: async (contentItemId, isFavorited) => saveFavorite(db, contentItemId, isFavorited),
+  saveReaction: async (contentItemId, reaction) => saveReaction(db, contentItemId, reaction),
   listRatingDimensions: async () => listRatingDimensions(db),
-  saveRatings: async (contentItemId, scores) => {
-    saveRatings(db, contentItemId, scores);
-  },
+  saveRatings: async (contentItemId, scores) => saveRatings(db, contentItemId, scores),
   listReportSummaries: listStoredReportSummaries,
   latestReportDate: async () => (await listReportDates(config.report.dataDir))[0] ?? null,
   readReportHtml: async (date: string) => await readTextFile(config.report.dataDir, date, "report.html"),

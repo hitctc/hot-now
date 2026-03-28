@@ -32,8 +32,21 @@ describe("content routes", () => {
     expect(listContentView).toHaveBeenCalledWith("hot");
   });
 
+  it("keeps system menu pages accessible in public content mode", async () => {
+    const app = createServer({
+      listContentView: vi.fn().mockResolvedValue([]),
+      listRatingDimensions: vi.fn().mockResolvedValue([])
+    } as never);
+
+    const response = await app.inject({ method: "GET", url: "/settings/profile" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain("个人信息");
+    expect(response.body).toContain("模块占位");
+  });
+
   it("calls saveFavorite for favorite action", async () => {
-    const saveFavorite = vi.fn().mockResolvedValue(undefined);
+    const saveFavorite = vi.fn().mockResolvedValue({ ok: true });
     const app = createServer({
       saveFavorite
     } as never);
@@ -49,7 +62,7 @@ describe("content routes", () => {
   });
 
   it("calls saveReaction for reaction action", async () => {
-    const saveReaction = vi.fn().mockResolvedValue(undefined);
+    const saveReaction = vi.fn().mockResolvedValue({ ok: true });
     const app = createServer({
       saveReaction
     } as never);
@@ -64,8 +77,12 @@ describe("content routes", () => {
     expect(saveReaction).toHaveBeenCalledWith(42, "dislike");
   });
 
-  it("calls saveRatings for ratings action", async () => {
-    const saveRatings = vi.fn().mockResolvedValue(undefined);
+  it("returns latest average rating in ratings action response", async () => {
+    const saveRatings = vi.fn().mockResolvedValue({
+      ok: true,
+      saved: 2,
+      averageRating: 4.5
+    });
     const app = createServer({
       saveRatings
     } as never);
@@ -78,6 +95,58 @@ describe("content routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(saveRatings).toHaveBeenCalledWith(42, { value: 4, credibility: 5 });
+    expect(response.json()).toEqual({ ok: true, contentItemId: 42, saved: 2, averageRating: 4.5 });
+  });
+
+  it("returns 404 for content actions when content id does not exist", async () => {
+    const app = createServer({
+      saveFavorite: vi.fn().mockResolvedValue({ ok: false, reason: "not-found" }),
+      saveReaction: vi.fn().mockResolvedValue({ ok: false, reason: "not-found" }),
+      saveRatings: vi.fn().mockResolvedValue({ ok: false, reason: "not-found" })
+    } as never);
+
+    const favoriteResponse = await app.inject({
+      method: "POST",
+      url: "/actions/content/999/favorite",
+      payload: { isFavorited: true }
+    });
+    const reactionResponse = await app.inject({
+      method: "POST",
+      url: "/actions/content/999/reaction",
+      payload: { reaction: "like" }
+    });
+    const ratingsResponse = await app.inject({
+      method: "POST",
+      url: "/actions/content/999/ratings",
+      payload: { scores: { value: 4 } }
+    });
+
+    expect(favoriteResponse.statusCode).toBe(404);
+    expect(reactionResponse.statusCode).toBe(404);
+    expect(ratingsResponse.statusCode).toBe(404);
+  });
+
+  it("returns 400 when ratings payload contains unknown dimensions", async () => {
+    const app = createServer({
+      saveRatings: vi.fn().mockResolvedValue({
+        ok: false,
+        reason: "unknown-dimensions",
+        unknownKeys: ["custom-x"]
+      })
+    } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/content/42/ratings",
+      payload: { scores: { "custom-x": 3 } }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      ok: false,
+      reason: "unknown-dimensions",
+      unknownKeys: ["custom-x"]
+    });
   });
 
   it("rejects anonymous content actions with 401 when auth is enabled", async () => {
@@ -87,9 +156,9 @@ describe("content routes", () => {
         sessionSecret: "test-secret",
         verifyLogin: vi.fn().mockResolvedValue(null)
       },
-      saveFavorite: vi.fn().mockResolvedValue(undefined),
-      saveReaction: vi.fn().mockResolvedValue(undefined),
-      saveRatings: vi.fn().mockResolvedValue(undefined)
+      saveFavorite: vi.fn().mockResolvedValue({ ok: true }),
+      saveReaction: vi.fn().mockResolvedValue({ ok: true }),
+      saveRatings: vi.fn().mockResolvedValue({ ok: true, saved: 1, averageRating: 4 })
     });
 
     const favoriteResponse = await app.inject({

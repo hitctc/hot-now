@@ -2,8 +2,8 @@ import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { ContentCardView, ContentViewKey } from "../core/content/listContentView.js";
-import type { ReactionValue } from "../core/feedback/feedbackRepository.js";
-import type { RatingDimension } from "../core/ratings/ratingRepository.js";
+import type { FeedbackSaveResult, ReactionValue } from "../core/feedback/feedbackRepository.js";
+import type { RatingDimension, SaveRatingsResult } from "../core/ratings/ratingRepository.js";
 import type { RuntimeConfig } from "../core/types/appConfig.js";
 import {
   createSessionToken,
@@ -35,10 +35,10 @@ type ServerDeps = {
   triggerManualRun?: () => Promise<{ accepted: boolean }>;
   isRunning?: () => boolean;
   listContentView?: (viewKey: ContentViewKey) => Promise<ContentCardView[]> | ContentCardView[];
-  saveFavorite?: (contentItemId: number, isFavorited: boolean) => Promise<void> | void;
-  saveReaction?: (contentItemId: number, reaction: ReactionValue) => Promise<void> | void;
+  saveFavorite?: (contentItemId: number, isFavorited: boolean) => Promise<FeedbackSaveResult> | FeedbackSaveResult;
+  saveReaction?: (contentItemId: number, reaction: ReactionValue) => Promise<FeedbackSaveResult> | FeedbackSaveResult;
   listRatingDimensions?: () => Promise<RatingDimension[]> | RatingDimension[];
-  saveRatings?: (contentItemId: number, scores: Record<string, number>) => Promise<void> | void;
+  saveRatings?: (contentItemId: number, scores: Record<string, number>) => Promise<SaveRatingsResult> | SaveRatingsResult;
   auth?: {
     requireLogin: boolean;
     sessionSecret: string;
@@ -159,7 +159,7 @@ export function createServer(deps: ServerDeps = {}) {
       });
     }
   } else if (deps.listContentView) {
-    for (const page of getAppShellPages().filter((entry) => entry.section === "content")) {
+    for (const page of getAppShellPages()) {
       app.get(page.path, async (_request, reply) => {
         const currentPage = findAppShellPage(page.path);
 
@@ -283,7 +283,12 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.code(400).send({ ok: false, reason: "invalid-favorite-payload" });
     }
 
-    await deps.saveFavorite(contentItemId, body.isFavorited);
+    const result = await deps.saveFavorite(contentItemId, body.isFavorited);
+
+    if (!result.ok && result.reason === "not-found") {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+
     return reply.send({ ok: true, contentItemId, isFavorited: body.isFavorited });
   });
 
@@ -308,7 +313,12 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.code(400).send({ ok: false, reason: "invalid-reaction" });
     }
 
-    await deps.saveReaction(contentItemId, body.reaction);
+    const result = await deps.saveReaction(contentItemId, body.reaction);
+
+    if (!result.ok && result.reason === "not-found") {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+
     return reply.send({ ok: true, contentItemId, reaction: body.reaction });
   });
 
@@ -334,8 +344,22 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.code(400).send({ ok: false, reason: "invalid-ratings-payload" });
     }
 
-    await deps.saveRatings(contentItemId, scores);
-    return reply.send({ ok: true, contentItemId, saved: Object.keys(scores).length });
+    const result = await deps.saveRatings(contentItemId, scores);
+
+    if (!result.ok && result.reason === "not-found") {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+
+    if (!result.ok && result.reason === "unknown-dimensions") {
+      return reply.code(400).send({ ok: false, reason: "unknown-dimensions", unknownKeys: result.unknownKeys });
+    }
+
+    return reply.send({
+      ok: true,
+      contentItemId,
+      saved: result.saved,
+      averageRating: result.averageRating
+    });
   });
 
   return app;

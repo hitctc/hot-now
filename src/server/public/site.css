@@ -644,10 +644,14 @@ code {
   margin: 8px 0 0;
   font-size: clamp(1.12rem, 1vw + 1rem, 1.32rem);
   line-height: 1.38;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .content-title a {
   color: var(--text-main);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .content-title a:hover {
@@ -658,6 +662,9 @@ code {
   margin: 0;
   color: var(--text-body);
   line-height: 1.75;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
 }
 
 .content-actions {
@@ -970,6 +977,18 @@ code {
   .placeholder-card:hover,
   .login-card:hover {
     transform: translateY(-2px);
+  }
+}
+
+@media (min-width: 901px) {
+  /* 桌面端把侧栏钉在视口内，导航和主题 dock 就不会被长内容页挤到很远。 */
+  .shell-sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
   }
 }
 

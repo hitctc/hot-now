@@ -18,10 +18,13 @@ describe("system routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("筛选策略");
+    expect(response.body).toContain('class="content-kicker"');
     expect(response.body).toContain('class="content-intro content-intro--system"');
     expect(response.body).toContain('class="system-stack system-stack--control"');
     expect(response.body).toContain("热点策略");
+    expect(response.body).toMatch(/class="[^"]*\bsystem-card\b[^"]*"/);
     expect(response.body).toContain('class="system-card system-card--control system-card--view-rule"');
+    expect(response.body).toContain('class="action-status system-status"');
     expect(response.body).toContain("hot");
     expect(response.body).toContain("&quot;sort&quot;: &quot;recent&quot;");
   });

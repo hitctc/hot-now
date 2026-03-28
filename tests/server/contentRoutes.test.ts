@@ -39,10 +39,12 @@ describe("content routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("AI Weekly Insight");
+    expect(response.body).toContain('class="content-kicker"');
     expect(response.body).toContain('class="content-intro content-intro--signal"');
     expect(response.body).toContain('class="content-stack content-stack--signal"');
     expect(response.body).toContain('data-content-id="101"');
     expect(response.body).toContain('class="content-card content-card--signal"');
+    expect(response.body).toContain('class="action-status"');
     expect(response.body).toContain('href="https://example.com/ai-weekly"');
     expect(response.body).not.toContain('href="javascript:alert(1)"');
     expect(response.body).toContain("Unsafe Link Item");

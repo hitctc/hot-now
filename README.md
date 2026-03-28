@@ -16,6 +16,9 @@ export SMTP_USER="your-qq-mail@qq.com"
 export SMTP_PASS="your-qq-smtp-auth-code"
 export MAIL_TO="receiver@example.com"
 export BASE_URL="http://127.0.0.1:3010"
+export AUTH_USERNAME="admin"
+export AUTH_PASSWORD="replace-with-strong-password"
+export SESSION_SECRET="replace-with-long-random-secret"
 ```
 
 4. 启动开发服务：`npm run dev`
@@ -30,12 +33,12 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - Legacy 报告页（当前仍保留）：`/history`、`/reports/:date`、`/control`
 - 手动触发任务：`POST /actions/run`
 
-统一站点默认启用单用户登录壳层。控制台仍支持查看当前计划时间、收件邮箱和手动触发一次任务。
+统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。控制台仍支持查看当前计划时间、收件邮箱和手动触发一次任务。
 
 ## 配置
 
 - `config/hot-now.config.json`：服务端口、每日执行时间、热点数量、报告目录、RSS 源、是否允许手动触发
-- 环境变量：SMTP 主机、端口、发件人、授权码、收件人、网页基础地址
+- 环境变量：SMTP 主机、端口、发件人、授权码、收件人、网页基础地址，以及统一站点登录凭据与会话密钥
 
 默认报告目录是 `data/reports/<YYYY-MM-DD>/`，其中会保存：
 

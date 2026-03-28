@@ -14,7 +14,10 @@ function makeAppEnv() {
     SMTP_USER: "sender@qq.com",
     SMTP_PASS: "test-auth-code",
     MAIL_TO: "receiver@example.com",
-    BASE_URL: "http://127.0.0.1:3010"
+    BASE_URL: "http://127.0.0.1:3010",
+    AUTH_USERNAME: "admin",
+    AUTH_PASSWORD: "admin",
+    SESSION_SECRET: "test-session-secret"
   };
 }
 
@@ -250,5 +253,44 @@ describe("createServer", () => {
     expect(response.statusCode).toBe(302);
     expect(response.headers.location).toBe("/login");
     expect(setCookie).toContain("Max-Age=0");
+  });
+
+  it("redirects anonymous legacy page routes to login when auth is enabled", async () => {
+    const app = createServer({
+      auth: {
+        requireLogin: true,
+        sessionSecret: "test-secret",
+        verifyLogin: vi.fn().mockResolvedValue(null)
+      },
+      latestReportDate: vi.fn().mockResolvedValue("2026-03-26"),
+      readReportHtml: vi.fn().mockResolvedValue("<html>report</html>")
+    });
+
+    const historyResponse = await app.inject({ method: "GET", url: "/history" });
+    const reportResponse = await app.inject({ method: "GET", url: "/reports/2026-03-26" });
+    const controlResponse = await app.inject({ method: "GET", url: "/control" });
+
+    expect(historyResponse.statusCode).toBe(302);
+    expect(historyResponse.headers.location).toBe("/login");
+    expect(reportResponse.statusCode).toBe(302);
+    expect(reportResponse.headers.location).toBe("/login");
+    expect(controlResponse.statusCode).toBe(302);
+    expect(controlResponse.headers.location).toBe("/login");
+  });
+
+  it("rejects anonymous manual run route with unauthorized when auth is enabled", async () => {
+    const app = createServer({
+      auth: {
+        requireLogin: true,
+        sessionSecret: "test-secret",
+        verifyLogin: vi.fn().mockResolvedValue(null)
+      },
+      triggerManualRun: vi.fn().mockResolvedValue({ accepted: true })
+    });
+
+    const response = await app.inject({ method: "POST", url: "/actions/run" });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({ accepted: false, reason: "unauthorized" });
   });
 });

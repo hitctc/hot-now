@@ -2,6 +2,7 @@ import { mkdtemp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { verifyPassword } from "../../src/core/auth/passwords.js";
 import { openDatabase } from "../../src/core/db/openDatabase.js";
 import { runMigrations } from "../../src/core/db/runMigrations.js";
 import { seedInitialData } from "../../src/core/db/seedInitialData.js";
@@ -103,6 +104,8 @@ describe("runMigrations", () => {
     expect(adminRow?.role).toBe("admin");
     expect(adminRow?.password_hash).toMatch(/^scrypt\$/);
     expect(adminRow?.password_hash).not.toContain("bootstrap-password");
+    expect(verifyPassword("bootstrap-password", adminRow?.password_hash ?? "")).toBe(true);
+    expect(verifyPassword("wrong-password", adminRow?.password_hash ?? "")).toBe(false);
   });
 
   it("keeps the juya row aligned with legacy config.source.rssUrl without resetting other source URLs", async () => {

@@ -28,7 +28,7 @@ describe("loadRuntimeConfig", () => {
     expect(config.report.dataDir).toBe(path.resolve("data/reports"));
   });
 
-  it("fills in database and auth defaults for legacy config and env", async () => {
+  it("throws when AUTH env values are missing", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-config-"));
     const configPath = path.join(tempDir, "hot-now.config.json");
 
@@ -43,25 +43,38 @@ describe("loadRuntimeConfig", () => {
       })
     );
 
-    const config = await loadRuntimeConfig({
-      configPath,
-      env: {
-        SMTP_HOST: baseEnv.SMTP_HOST,
-        SMTP_PORT: baseEnv.SMTP_PORT,
-        SMTP_SECURE: baseEnv.SMTP_SECURE,
-        SMTP_USER: baseEnv.SMTP_USER,
-        SMTP_PASS: baseEnv.SMTP_PASS,
-        MAIL_TO: baseEnv.MAIL_TO,
-        BASE_URL: baseEnv.BASE_URL
-      }
-    });
+    await expect(
+      loadRuntimeConfig({
+        configPath,
+        env: {
+          SMTP_HOST: baseEnv.SMTP_HOST,
+          SMTP_PORT: baseEnv.SMTP_PORT,
+          SMTP_SECURE: baseEnv.SMTP_SECURE,
+          SMTP_USER: baseEnv.SMTP_USER,
+          SMTP_PASS: baseEnv.SMTP_PASS,
+          MAIL_TO: baseEnv.MAIL_TO,
+          BASE_URL: baseEnv.BASE_URL
+        }
+      })
+    ).rejects.toThrow("Missing required env: AUTH_USERNAME");
+  });
 
-    expect(config.database.file).toBe(path.resolve(tempDir, "data/hot-now.sqlite"));
-    expect(config.auth).toEqual({
-      username: "admin",
-      password: "admin",
-      sessionSecret: "dev-session-secret"
-    });
+  it("throws when AUTH_PASSWORD is missing", async () => {
+    await expect(
+      loadRuntimeConfig({
+        configPath: path.resolve("config/hot-now.config.json"),
+        env: { ...baseEnv, AUTH_PASSWORD: undefined }
+      })
+    ).rejects.toThrow("Missing required env: AUTH_PASSWORD");
+  });
+
+  it("throws when SESSION_SECRET is missing", async () => {
+    await expect(
+      loadRuntimeConfig({
+        configPath: path.resolve("config/hot-now.config.json"),
+        env: { ...baseEnv, SESSION_SECRET: undefined }
+      })
+    ).rejects.toThrow("Missing required env: SESSION_SECRET");
   });
 
   it("loads config file values plus database and auth settings", async () => {

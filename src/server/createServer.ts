@@ -161,11 +161,28 @@ export function createServer(deps: ServerDeps = {}) {
   }
 
   app.get("/history", async (_request, reply) => {
+    if (authEnabled) {
+      // Legacy pages stay mounted for compatibility, but unified auth mode requires a valid session first.
+      const session = readAuthenticatedSession(_request.headers.cookie, authConfig?.sessionSecret ?? "");
+
+      if (!session) {
+        return reply.redirect("/login");
+      }
+    }
+
     const summaries = (await deps.listReportSummaries?.()) ?? [];
     return reply.type("text/html").send(renderHistoryPage(summaries));
   });
 
   app.get("/reports/:date", async (request, reply) => {
+    if (authEnabled) {
+      const session = readAuthenticatedSession(request.headers.cookie, authConfig?.sessionSecret ?? "");
+
+      if (!session) {
+        return reply.redirect("/login");
+      }
+    }
+
     if (!deps.readReportHtml) {
       return reply.code(503).type("text/html").send(renderNoticePage("HotNow 报告", "报告内容暂不可用"));
     }
@@ -176,10 +193,27 @@ export function createServer(deps: ServerDeps = {}) {
   });
 
   app.get("/control", async (_request, reply) => {
+    if (authEnabled) {
+      const session = readAuthenticatedSession(_request.headers.cookie, authConfig?.sessionSecret ?? "");
+
+      if (!session) {
+        return reply.redirect("/login");
+      }
+    }
+
     return reply.type("text/html").send(renderControlPage(deps.config, deps.isRunning?.() ?? false));
   });
 
-  app.post("/actions/run", async (_request, reply) => {
+  app.post("/actions/run", async (request, reply) => {
+    if (authEnabled) {
+      // Manual trigger is a state-changing action, so anonymous callers get a hard auth error instead of redirect.
+      const session = readAuthenticatedSession(request.headers.cookie, authConfig?.sessionSecret ?? "");
+
+      if (!session) {
+        return reply.code(401).send({ accepted: false, reason: "unauthorized" });
+      }
+    }
+
     if (deps.isRunning?.()) {
       return reply.code(409).send({ accepted: false, reason: "already-running" });
     }

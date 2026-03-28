@@ -3,11 +3,6 @@ import path from "node:path";
 import { RuntimeConfig } from "../types/appConfig.js";
 
 const defaultDatabaseFile = "./data/hot-now.sqlite";
-const defaultAuth = {
-  username: "admin",
-  password: "admin",
-  sessionSecret: "dev-session-secret"
-} as const;
 
 type Options = {
   configPath?: string;
@@ -46,11 +41,11 @@ export async function loadRuntimeConfig(options: Options = {}): Promise<RuntimeC
       baseUrl: required(env.BASE_URL, "BASE_URL")
     },
     auth: {
-      // Auth does not gate the legacy digest workflow yet, so these defaults keep
-      // older deployments bootable until later tasks wire real login persistence.
-      username: env.AUTH_USERNAME || defaultAuth.username,
-      password: env.AUTH_PASSWORD || defaultAuth.password,
-      sessionSecret: env.SESSION_SECRET || defaultAuth.sessionSecret
+      // Unified shell auth is enabled in the real entry point, so credentials and session secret
+      // must be explicit env values instead of silent development defaults.
+      username: required(env.AUTH_USERNAME, "AUTH_USERNAME"),
+      password: required(env.AUTH_PASSWORD, "AUTH_PASSWORD"),
+      sessionSecret: required(env.SESSION_SECRET, "SESSION_SECRET")
     }
   };
 }

@@ -69,7 +69,7 @@
 - `/reports/:date`：指定日期报告（legacy，当前仍保留）
 - `/control`：控制台（legacy，当前仍保留）
 - `POST /actions/run`：手动触发一次日报任务（legacy，当前仍保留）
-- 兼容约定：真实应用默认启用 `requireLogin=true` 的 unified shell；测试或未注入 auth 的场景仍可保持 legacy `/ -> 最新报告` 行为
+- 兼容约定：真实应用默认启用 `requireLogin=true` 的 unified shell；auth 开启时 legacy 路由也需要登录；测试或未注入 auth 的场景仍可保持 legacy `/ -> 最新报告` 与 legacy 路由公开行为
 
 当前报告产物目录：
 
@@ -100,7 +100,7 @@
 
 推荐 smoke test：
 
-1. 准备 `SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_USER`、`SMTP_PASS`、`MAIL_TO`、`BASE_URL`
+1. 准备 `SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_USER`、`SMTP_PASS`、`MAIL_TO`、`BASE_URL`、`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET`
 2. 启动 `npm run dev`
 3. 打开 `/control`
 4. 手动触发一次任务
@@ -123,6 +123,9 @@
 - `SMTP_PASS`
 - `MAIL_TO`
 - `BASE_URL`
+- `AUTH_USERNAME`
+- `AUTH_PASSWORD`
+- `SESSION_SECRET`
 
 如果新增、删除或重命名环境变量，必须同步更新：
 
@@ -167,5 +170,6 @@
 - 本轮 smoke test 使用的是占位 SMTP 环境变量，邮件状态为连接拒绝，这验证了“邮件发送失败不会阻断报告落盘”的降级路径，但不代表真实 SMTP 发信已经验证通过
 - 原文抓取过程中出现过一次 `jsdom` 的 `Could not parse CSS stylesheet` 日志噪音，未阻断本轮任务完成；如果后续要收口发布质量，可以继续评估是否需要单独治理
 - Task4（single-user login + unified app shell）已落地：新增 `passwords/session` auth helper、登录页与统一壳层菜单路由，且保留 legacy 报告路由兼容
+- 真实入口已收紧：`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 现在是必填；auth 开启时 legacy 路由也要求登录，`POST /actions/run` 未登录返回未授权
 
 如果后续有人完成了真实 SMTP 验证、补充了更完整的端到端验证，或确认上述日志噪音属于需要修复的问题，请同步更新这一节，避免误导下一位协作者。

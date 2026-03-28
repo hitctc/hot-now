@@ -77,13 +77,13 @@ describe("listSourceCards", () => {
 
     expect(cards.find((card) => card.kind === "juya")).toMatchObject({
       kind: "juya",
-      isActive: false,
+      isEnabled: true,
       lastCollectedAt: "2026-03-28T08:05:00.000Z",
       lastCollectionStatus: "completed"
     });
     expect(cards.find((card) => card.kind === "openai")).toMatchObject({
       kind: "openai",
-      isActive: true,
+      isEnabled: true,
       lastCollectedAt: "2026-03-28T09:01:00.000Z",
       lastCollectionStatus: "failed"
     });

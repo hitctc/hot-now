@@ -4,7 +4,7 @@ type SourceRow = {
   kind: string;
   name: string;
   rss_url: string | null;
-  is_active: number;
+  is_enabled: number;
 };
 
 type CollectionRunRow = {
@@ -18,7 +18,7 @@ export type SourceCard = {
   kind: string;
   name: string;
   rssUrl: string | null;
-  isActive: boolean;
+  isEnabled: boolean;
   lastCollectedAt: string | null;
   lastCollectionStatus: string | null;
 };
@@ -29,7 +29,7 @@ export function listSourceCards(db: SqliteDatabase): SourceCard[] {
   const sourceRows = db
     .prepare(
       `
-        SELECT kind, name, rss_url, is_active
+        SELECT kind, name, rss_url, is_enabled
         FROM content_sources
         ORDER BY id ASC
       `
@@ -53,7 +53,7 @@ export function listSourceCards(db: SqliteDatabase): SourceCard[] {
       kind: source.kind,
       name: source.name,
       rssUrl: source.rss_url,
-      isActive: source.is_active === 1,
+      isEnabled: source.is_enabled === 1,
       lastCollectedAt: latestRun?.finishedAt ?? latestRun?.startedAt ?? null,
       lastCollectionStatus: latestRun?.status ?? null
     };

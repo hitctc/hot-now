@@ -28,7 +28,7 @@ const appShellPages: AppShellPage[] = [
     section: "system",
     description: "这里会配置各内容菜单的筛选规则与展示偏好。"
   },
-  { path: "/settings/sources", title: "数据迭代收集", section: "system", description: "这里会管理 RSS 数据源、当前启用项和采集状态。" },
+  { path: "/settings/sources", title: "数据迭代收集", section: "system", description: "这里会管理 RSS 数据源的启用状态、抓取结果和手动采集。" },
   { path: "/settings/profile", title: "当前登录用户", section: "system", description: "这里会展示当前账号资料、角色和登录状态。" }
 ];
 

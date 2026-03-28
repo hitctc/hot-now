@@ -31,7 +31,7 @@ type ParseRatingScoresResult =
   | { ok: true; scores: Record<string, number> }
   | { ok: false; reason: "invalid-ratings-payload" };
 type SaveViewRuleResult = { ok: true } | { ok: false; reason: "invalid-config" | "not-found" };
-type SetActiveSourceResult = { ok: true } | { ok: false; reason: "not-found" };
+type ToggleSourceResult = { ok: true } | { ok: false; reason: "not-found" };
 type ViewRuleCard = {
   ruleKey: string;
   displayName: string;
@@ -42,7 +42,7 @@ type SourceCard = {
   kind: string;
   name: string;
   rssUrl: string | null;
-  isActive: boolean;
+  isEnabled: boolean;
   lastCollectedAt: string | null;
   lastCollectionStatus: string | null;
 };
@@ -68,7 +68,7 @@ type ServerDeps = {
   listViewRules?: () => Promise<ViewRuleCard[]> | ViewRuleCard[];
   saveViewRuleConfig?: (ruleKey: string, config: Record<string, unknown>) => Promise<SaveViewRuleResult> | SaveViewRuleResult;
   listSources?: () => Promise<SourceCard[]> | SourceCard[];
-  setActiveSource?: (kind: string) => Promise<SetActiveSourceResult> | SetActiveSourceResult;
+  toggleSource?: (kind: string, enable: boolean) => Promise<ToggleSourceResult> | ToggleSourceResult;
   getCurrentUserProfile?: () => Promise<CurrentUserProfile | null> | CurrentUserProfile | null;
   auth?: {
     requireLogin: boolean;
@@ -435,29 +435,34 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.send({ ok: true, ruleKey });
   });
 
-  app.post("/actions/sources/activate", async (request, reply) => {
+  app.post("/actions/sources/toggle", async (request, reply) => {
     if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
       return;
     }
 
-    if (!deps.setActiveSource) {
+    if (!deps.toggleSource) {
       return reply.code(503).send({ ok: false, reason: "sources-disabled" });
     }
 
-    const body = request.body as { kind?: unknown } | undefined;
+    const body = request.body as { kind?: unknown; enable?: unknown } | undefined;
     const kind = typeof body?.kind === "string" ? body.kind.trim() : "";
+    const enable = typeof body?.enable === "boolean" ? body.enable : null;
 
     if (!kind) {
       return reply.code(400).send({ ok: false, reason: "invalid-source-kind" });
     }
 
-    const result = await deps.setActiveSource(kind);
+    if (enable === null) {
+      return reply.code(400).send({ ok: false, reason: "invalid-source-enable" });
+    }
+
+    const result = await deps.toggleSource(kind, enable);
 
     if (!result.ok && result.reason === "not-found") {
       return reply.code(404).send({ ok: false, reason: "not-found" });
     }
 
-    return reply.send({ ok: true, kind });
+    return reply.send({ ok: true, kind, enable });
   });
 
   return app;

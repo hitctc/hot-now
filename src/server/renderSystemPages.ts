@@ -11,7 +11,7 @@ type SourceItem = {
   kind: string;
   name: string;
   rssUrl: string | null;
-  isActive: boolean;
+  isEnabled: boolean;
   lastCollectedAt: string | null;
   lastCollectionStatus: string | null;
 };
@@ -49,21 +49,21 @@ export function renderViewRulesPage(rules: ViewRuleItem[]): string {
 }
 
 export function renderSourcesPage(sources: SourceItem[], options: SourcesPageOptions): string {
-  // Source cards expose active state and latest collection hints for day-to-day switching decisions.
+  // Source cards expose enable state and latest collection hints so operators can manage multi-source intake.
   if (sources.length === 0) {
     return renderEmptyState("数据迭代收集", "尚未发现数据源，请先执行种子初始化。");
   }
 
-  const activeSource = sources.find((source) => source.isActive) ?? null;
+  const enabledSources = sources.filter((source) => source.isEnabled);
   const cardsHtml = sources.map((source) => renderSourceCard(source)).join("");
 
   return `
     <section class="content-intro content-intro--system">
       <p class="content-kicker">系统菜单</p>
-      <p class="content-description">数据迭代收集：切换当前启用 source，并查看最近抓取状态。</p>
+      <p class="content-description">数据迭代收集：管理多 source 启用状态，并查看最近抓取结果。</p>
     </section>
     <section class="system-stack system-stack--control">
-      ${renderManualCollectionCard(activeSource, options)}
+      ${renderManualCollectionCard(enabledSources, options)}
       ${cardsHtml}
     </section>
   `;
@@ -157,9 +157,11 @@ function renderViewRuleField(rule: ViewRuleItem, field: (typeof viewRuleFieldDef
 }
 
 function renderSourceCard(source: SourceItem): string {
-  // Activation form posts only source kind to keep the route contract explicit and tiny.
+  // Toggle forms post only source kind plus the next enable state so the action contract stays tiny and explicit.
+  const nextEnable = source.isEnabled ? "false" : "true";
+
   return `
-    <article class="system-card system-card--control system-card--source" data-system-card="source" data-source-kind="${escapeHtml(source.kind)}">
+    <article class="system-card system-card--control system-card--source" data-system-card="source" data-source-kind="${escapeHtml(source.kind)}" data-source-name="${escapeHtml(source.name)}">
       <header class="system-card-header">
         <h3 class="system-card-title">${escapeHtml(source.name)}</h3>
         <p class="system-card-meta">kind: <code>${escapeHtml(source.kind)}</code></p>
@@ -171,7 +173,7 @@ function renderSourceCard(source: SourceItem): string {
         </div>
         <div class="system-detail-row">
           <dt>状态</dt>
-          <dd data-role="source-active-state">${source.isActive ? "当前启用" : "未启用"}</dd>
+          <dd data-role="source-enabled-state">${source.isEnabled ? "已启用" : "已停用"}</dd>
         </div>
         <div class="system-detail-row">
           <dt>最近抓取时间</dt>
@@ -182,9 +184,9 @@ function renderSourceCard(source: SourceItem): string {
           <dd>${escapeHtml(source.lastCollectionStatus?.trim() || "unknown")}</dd>
         </div>
       </dl>
-      <form class="system-form" data-system-action="activate-source" data-source-kind="${escapeHtml(source.kind)}">
-        <button type="submit" class="primary-mini-button" data-role="activate-button"${source.isActive ? " disabled" : ""}>
-          ${source.isActive ? "当前启用" : "设为当前启用"}
+      <form class="system-form" data-system-action="toggle-source" data-source-kind="${escapeHtml(source.kind)}" data-enable="${nextEnable}">
+        <button type="submit" class="primary-mini-button" data-role="toggle-button">
+          ${source.isEnabled ? "停用 source" : "启用 source"}
         </button>
         <div class="system-status-region">
           <p class="action-status system-status" data-role="action-status" aria-live="polite"></p>
@@ -194,9 +196,9 @@ function renderSourceCard(source: SourceItem): string {
   `;
 }
 
-function renderManualCollectionCard(source: SourceItem | null, options: SourcesPageOptions): string {
-  // Manual collection reuses the existing digest trigger so operators can run the active source from the unified page.
-  const activeSourceName = source?.name ?? "未设置";
+function renderManualCollectionCard(sources: SourceItem[], options: SourcesPageOptions): string {
+  // Manual collection still reuses the existing digest trigger, but now it makes clear that all enabled sources are included.
+  const enabledSourceNames = formatEnabledSourceNames(sources);
   const buttonText = options.isRunning ? "采集中..." : "手动执行采集";
   const disabledAttr = options.canTriggerManualRun && !options.isRunning ? "" : " disabled";
   const initialStatus = options.canTriggerManualRun
@@ -206,10 +208,10 @@ function renderManualCollectionCard(source: SourceItem | null, options: SourcesP
     : "当前环境未启用手动采集。";
 
   return `
-    <article class="system-card system-card--control system-card--manual-collection">
+    <article class="system-card system-card--control system-card--manual-collection" data-system-card="manual-collection">
       <header class="system-card-header">
         <h3 class="system-card-title">手动执行采集</h3>
-        <p class="system-card-meta">当前启用 source：${escapeHtml(activeSourceName)}</p>
+        <p class="system-card-meta" data-role="enabled-sources-summary">当前启用 sources：${escapeHtml(enabledSourceNames)}</p>
       </header>
       <form class="system-form" data-system-action="manual-collection-run">
         <div class="system-action-row">
@@ -223,6 +225,14 @@ function renderManualCollectionCard(source: SourceItem | null, options: SourcesP
       </form>
     </article>
   `;
+}
+
+function formatEnabledSourceNames(sources: SourceItem[]): string {
+  if (sources.length === 0) {
+    return "未设置";
+  }
+
+  return sources.map((source) => source.name.trim()).filter(Boolean).join(" / ");
 }
 
 function renderEmptyState(title: string, description: string): string {

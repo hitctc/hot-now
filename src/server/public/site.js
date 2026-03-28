@@ -74,9 +74,9 @@
       return;
     }
 
-    if (target.dataset.systemAction === "activate-source") {
+    if (target.dataset.systemAction === "toggle-source") {
       event.preventDefault();
-      await handleActivateSource(target);
+      await handleToggleSource(target);
       return;
     }
 
@@ -171,45 +171,42 @@
     showFormStatus(form, "规则已保存。");
   }
 
-  async function handleActivateSource(form) {
-    // Activating a source updates all source cards locally so users see the new single-active state immediately.
+  async function handleToggleSource(form) {
+    // Toggling a source updates the local system cards immediately so the multi-source page stays in sync without a refresh.
     const sourceKind = (form.dataset.sourceKind || "").trim();
+    const enable = form.dataset.enable === "true";
 
     if (!sourceKind) {
       showFormStatus(form, "source kind 缺失，无法切换。");
       return;
     }
 
-    const response = await postJson("/actions/sources/activate", { kind: sourceKind });
+    const response = await postJson("/actions/sources/toggle", { kind: sourceKind, enable });
 
     if (!response.ok) {
       showFormStatus(form, await readSystemActionError(response, "切换失败，请稍后再试。"));
       return;
     }
 
-    const sourceCards = root.querySelectorAll('[data-system-card="source"]');
+    const sourceCard = form.closest('[data-system-card="source"]');
 
-    for (const sourceCard of sourceCards) {
-      if (!(sourceCard instanceof HTMLElement)) {
-        continue;
-      }
-
-      const kind = (sourceCard.dataset.sourceKind || "").trim();
-      const isActive = kind === sourceKind;
-      const statusNode = sourceCard.querySelector('[data-role="source-active-state"]');
-      const actionButton = sourceCard.querySelector('[data-role="activate-button"]');
+    if (sourceCard instanceof HTMLElement) {
+      const statusNode = sourceCard.querySelector('[data-role="source-enabled-state"]');
+      const actionButton = sourceCard.querySelector('[data-role="toggle-button"]');
 
       if (statusNode instanceof HTMLElement) {
-        statusNode.textContent = isActive ? "当前启用" : "未启用";
+        statusNode.textContent = enable ? "已启用" : "已停用";
       }
 
       if (actionButton instanceof HTMLButtonElement) {
-        actionButton.disabled = isActive;
-        actionButton.textContent = isActive ? "当前启用" : "设为当前启用";
+        actionButton.textContent = enable ? "停用 source" : "启用 source";
       }
+
+      form.dataset.enable = enable ? "false" : "true";
     }
 
-    showFormStatus(form, "已切换当前启用 source。");
+    refreshEnabledSourcesSummary();
+    showFormStatus(form, enable ? "已启用 source。" : "已停用 source。");
   }
 
   async function handleManualCollectionRun(form) {
@@ -295,6 +292,10 @@
       return "source 参数不合法。";
     }
 
+    if (payload?.reason === "invalid-source-enable") {
+      return "source 启用状态参数不合法。";
+    }
+
     if (payload?.reason === "already-running") {
       return "当前已有任务执行中，请稍后再试。";
     }
@@ -318,6 +319,32 @@
     if (statusNode instanceof HTMLElement) {
       statusNode.textContent = message;
     }
+  }
+
+  function refreshEnabledSourcesSummary() {
+    // The manual-run card reads enabled source names from the current DOM so source toggles feel immediate.
+    const summaryNode = root.querySelector('[data-role="enabled-sources-summary"]');
+
+    if (!(summaryNode instanceof HTMLElement)) {
+      return;
+    }
+
+    const enabledNames = [...root.querySelectorAll('[data-system-card="source"]')].flatMap((sourceCard) => {
+      if (!(sourceCard instanceof HTMLElement)) {
+        return [];
+      }
+
+      const statusNode = sourceCard.querySelector('[data-role="source-enabled-state"]');
+      const sourceName = (sourceCard.dataset.sourceName || "").trim();
+
+      if (statusNode instanceof HTMLElement && statusNode.textContent?.trim() === "已启用" && sourceName) {
+        return [sourceName];
+      }
+
+      return [];
+    });
+
+    summaryNode.textContent = `当前启用 sources：${enabledNames.join(" / ") || "未设置"}`;
   }
 
   async function safeJson(response) {

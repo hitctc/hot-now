@@ -37,7 +37,7 @@ type UserProfileRow = {
   display_name: string | null;
   email: string | null;
 };
-type ActiveSourceUpdateResult = { ok: true } | { ok: false; reason: "not-found" };
+type ToggleSourceResult = { ok: true } | { ok: false; reason: "not-found" };
 
 const config = await loadRuntimeConfig();
 const db = openDatabase(config.database.file);
@@ -70,11 +70,12 @@ const readSourceByKind = db.prepare(
     LIMIT 1
   `
 );
-const setSingleActiveSourceStatement = db.prepare(
+const setSourceEnabledStatement = db.prepare(
   `
     UPDATE content_sources
-    SET is_active = CASE WHEN kind = ? THEN 1 ELSE 0 END,
+    SET is_enabled = ?,
         updated_at = CURRENT_TIMESTAMP
+    WHERE kind = ?
   `
 );
 
@@ -142,20 +143,20 @@ async function verifyLogin(username: string, password: string) {
   };
 }
 
-function setActiveSource(kind: string): ActiveSourceUpdateResult {
-  // Activation runs in one transaction to guarantee there is never more than one active source.
-  const activate = db.transaction((normalizedKind: string): ActiveSourceUpdateResult => {
+function toggleSource(kind: string, enable: boolean): ToggleSourceResult {
+  // Source toggles update only the targeted row so operators can keep multiple feeds enabled at once.
+  const toggle = db.transaction((normalizedKind: string, nextEnabled: boolean): ToggleSourceResult => {
     const source = readSourceByKind.get(normalizedKind) as { id: number } | undefined;
 
     if (!source) {
       return { ok: false, reason: "not-found" };
     }
 
-    setSingleActiveSourceStatement.run(normalizedKind);
+    setSourceEnabledStatement.run(nextEnabled ? 1 : 0, normalizedKind);
     return { ok: true };
   });
 
-  return activate(kind.trim());
+  return toggle(kind.trim(), enable);
 }
 
 function getCurrentUserProfile() {
@@ -190,7 +191,7 @@ const app = createServer({
   listViewRules: async () => listViewRules(db),
   saveViewRuleConfig: async (ruleKey, config) => saveViewRuleConfig(db, ruleKey, config),
   listSources: async () => listSourceCards(db),
-  setActiveSource: async (kind) => setActiveSource(kind),
+  toggleSource: async (kind, enable) => toggleSource(kind, enable),
   getCurrentUserProfile: async () => getCurrentUserProfile(),
   listReportSummaries: listStoredReportSummaries,
   latestReportDate: async () => (await listReportDates(config.report.dataDir))[0] ?? null,

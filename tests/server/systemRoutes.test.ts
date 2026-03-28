@@ -47,14 +47,14 @@ describe("system routes", () => {
     expect(response.body).not.toContain("<textarea");
   });
 
-  it("renders sources page with active source state", async () => {
+  it("renders sources page with enable toggles instead of active-source copy", async () => {
     const app = createServer({
       listSources: vi.fn().mockResolvedValue([
         {
           kind: "juya",
           name: "Juya AI Daily",
           rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml",
-          isActive: true,
+          isEnabled: true,
           lastCollectedAt: "2026-03-28T08:00:00.000Z",
           lastCollectionStatus: "completed"
         },
@@ -62,7 +62,7 @@ describe("system routes", () => {
           kind: "openai",
           name: "OpenAI",
           rssUrl: "https://openai.com/news/rss.xml",
-          isActive: false,
+          isEnabled: false,
           lastCollectedAt: null,
           lastCollectionStatus: null
         }
@@ -79,9 +79,13 @@ describe("system routes", () => {
     expect(response.body).toContain('class="system-stack system-stack--control"');
     expect(response.body).toContain("手动执行采集");
     expect(response.body).toContain('class="system-card system-card--control system-card--manual-collection"');
-    expect(response.body).toContain("当前启用 source：Juya AI Daily");
+    expect(response.body).toContain("当前启用 sources：Juya AI Daily");
     expect(response.body).toContain("Juya AI Daily");
-    expect(response.body).toContain("当前启用");
+    expect(response.body).toContain("已启用");
+    expect(response.body).toContain("已停用");
+    expect(response.body).toContain("停用 source");
+    expect(response.body).toContain("启用 source");
+    expect(response.body).not.toContain("设为当前启用");
     expect(response.body).toContain("completed");
   });
 
@@ -92,7 +96,7 @@ describe("system routes", () => {
           kind: "openai",
           name: "OpenAI",
           rssUrl: "https://openai.com/news/rss.xml",
-          isActive: true,
+          isEnabled: true,
           lastCollectedAt: "2026-03-28T08:00:00.000Z",
           lastCollectionStatus: "running"
         }
@@ -132,35 +136,52 @@ describe("system routes", () => {
     expect(response.body).toContain("admin@example.com");
   });
 
-  it("calls setActiveSource for source activation action", async () => {
-    const setActiveSource = vi.fn().mockResolvedValue({ ok: true });
+  it("calls toggleSource for source enable action", async () => {
+    const toggleSource = vi.fn().mockResolvedValue({ ok: true });
     const app = createServer({
-      setActiveSource
+      toggleSource
     } as never);
 
     const response = await app.inject({
       method: "POST",
-      url: "/actions/sources/activate",
-      payload: { kind: "openai" }
+      url: "/actions/sources/toggle",
+      payload: { kind: "openai", enable: true }
     });
 
     expect(response.statusCode).toBe(200);
-    expect(setActiveSource).toHaveBeenCalledWith("openai");
+    expect(toggleSource).toHaveBeenCalledWith("openai", true);
   });
 
-  it("returns 404 when activating a source kind that does not exist", async () => {
+  it("returns 404 when toggling a source kind that does not exist", async () => {
     const app = createServer({
-      setActiveSource: vi.fn().mockResolvedValue({ ok: false, reason: "not-found" })
+      toggleSource: vi.fn().mockResolvedValue({ ok: false, reason: "not-found" })
     } as never);
 
     const response = await app.inject({
       method: "POST",
-      url: "/actions/sources/activate",
-      payload: { kind: "missing-source" }
+      url: "/actions/sources/toggle",
+      payload: { kind: "missing-source", enable: false }
     });
 
     expect(response.statusCode).toBe(404);
     expect(response.json()).toEqual({ ok: false, reason: "not-found" });
+  });
+
+  it("returns 400 when source enable payload is not boolean", async () => {
+    const toggleSource = vi.fn();
+    const app = createServer({
+      toggleSource
+    } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/sources/toggle",
+      payload: { kind: "openai", enable: "yes" }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ ok: false, reason: "invalid-source-enable" });
+    expect(toggleSource).not.toHaveBeenCalled();
   });
 
   it("calls saveViewRuleConfig for view rule save action", async () => {
@@ -220,14 +241,14 @@ describe("system routes", () => {
         sessionSecret: "test-secret",
         verifyLogin: vi.fn().mockResolvedValue(null)
       },
-      setActiveSource: vi.fn().mockResolvedValue({ ok: true }),
+      toggleSource: vi.fn().mockResolvedValue({ ok: true }),
       saveViewRuleConfig: vi.fn().mockResolvedValue({ ok: true })
     } as never);
 
     const activateResponse = await app.inject({
       method: "POST",
-      url: "/actions/sources/activate",
-      payload: { kind: "openai" }
+      url: "/actions/sources/toggle",
+      payload: { kind: "openai", enable: true }
     });
     const ruleResponse = await app.inject({
       method: "POST",

@@ -14,6 +14,7 @@ import { createRunLock } from "./core/runtime/runLock.js";
 import { startScheduler } from "./core/scheduler/startScheduler.js";
 import { loadActiveSourceIssue } from "./core/source/loadActiveSourceIssue.js";
 import { listReportDates, readTextFile } from "./core/storage/reportStore.js";
+import { listViewRules, saveViewRuleConfig } from "./core/viewRules/viewRuleRepository.js";
 import { createServer } from "./server/createServer.js";
 
 type ReportSummary = {
@@ -29,6 +30,24 @@ type AdminProfileRow = {
   role: string | null;
   display_name: string | null;
 };
+type UserProfileRow = {
+  username: string;
+  role: string | null;
+  display_name: string | null;
+  email: string | null;
+};
+type SourceRow = {
+  kind: string;
+  name: string;
+  rss_url: string | null;
+  is_active: number;
+};
+type CollectionRunRow = {
+  started_at: string;
+  finished_at: string | null;
+  status: string;
+};
+type ActiveSourceUpdateResult = { ok: true } | { ok: false; reason: "not-found" };
 
 const config = await loadRuntimeConfig();
 const db = openDatabase(config.database.file);
@@ -44,6 +63,43 @@ const readAdminProfile = db.prepare(
     SELECT username, password_hash, role, display_name
     FROM user_profile
     WHERE id = 1
+  `
+);
+const readCurrentUserProfile = db.prepare(
+  `
+    SELECT username, role, display_name, email
+    FROM user_profile
+    WHERE id = 1
+  `
+);
+const listSourcesStatement = db.prepare(
+  `
+    SELECT kind, name, rss_url, is_active
+    FROM content_sources
+    ORDER BY id ASC
+  `
+);
+const readLatestCollectionRun = db.prepare(
+  `
+    SELECT started_at, finished_at, status
+    FROM collection_runs
+    ORDER BY datetime(COALESCE(finished_at, started_at)) DESC, id DESC
+    LIMIT 1
+  `
+);
+const readSourceByKind = db.prepare(
+  `
+    SELECT id
+    FROM content_sources
+    WHERE kind = ?
+    LIMIT 1
+  `
+);
+const setSingleActiveSourceStatement = db.prepare(
+  `
+    UPDATE content_sources
+    SET is_active = CASE WHEN kind = ? THEN 1 ELSE 0 END,
+        updated_at = CURRENT_TIMESTAMP
   `
 );
 
@@ -111,6 +167,54 @@ async function verifyLogin(username: string, password: string) {
   };
 }
 
+function listSourceCards() {
+  // Source list attaches latest collection run metadata only to the currently active source.
+  const sources = listSourcesStatement.all() as SourceRow[];
+  const latestRun = readLatestCollectionRun.get() as CollectionRunRow | undefined;
+
+  return sources.map((source) => ({
+    kind: source.kind,
+    name: source.name,
+    rssUrl: source.rss_url,
+    isActive: source.is_active === 1,
+    lastCollectedAt:
+      source.is_active === 1 ? latestRun?.finished_at ?? latestRun?.started_at ?? null : null,
+    lastCollectionStatus: source.is_active === 1 ? latestRun?.status ?? null : null
+  }));
+}
+
+function setActiveSource(kind: string): ActiveSourceUpdateResult {
+  // Activation runs in one transaction to guarantee there is never more than one active source.
+  const activate = db.transaction((normalizedKind: string): ActiveSourceUpdateResult => {
+    const source = readSourceByKind.get(normalizedKind) as { id: number } | undefined;
+
+    if (!source) {
+      return { ok: false, reason: "not-found" };
+    }
+
+    setSingleActiveSourceStatement.run(normalizedKind);
+    return { ok: true };
+  });
+
+  return activate(kind.trim());
+}
+
+function getCurrentUserProfile() {
+  // Unified profile page only needs one bootstrap account row from user_profile(id=1).
+  const profile = readCurrentUserProfile.get() as UserProfileRow | undefined;
+
+  if (!profile) {
+    return null;
+  }
+
+  return {
+    username: profile.username,
+    displayName: profile.display_name?.trim() || profile.username,
+    role: profile.role?.trim() || "admin",
+    email: profile.email
+  };
+}
+
 const app = createServer({
   config,
   auth: {
@@ -124,6 +228,11 @@ const app = createServer({
   saveReaction: async (contentItemId, reaction) => saveReaction(db, contentItemId, reaction),
   listRatingDimensions: async () => listRatingDimensions(db),
   saveRatings: async (contentItemId, scores) => saveRatings(db, contentItemId, scores),
+  listViewRules: async () => listViewRules(db),
+  saveViewRuleConfig: async (ruleKey, config) => saveViewRuleConfig(db, ruleKey, config),
+  listSources: async () => listSourceCards(),
+  setActiveSource: async (kind) => setActiveSource(kind),
+  getCurrentUserProfile: async () => getCurrentUserProfile(),
   listReportSummaries: listStoredReportSummaries,
   latestReportDate: async () => (await listReportDates(config.report.dataDir))[0] ?? null,
   readReportHtml: async (date: string) => await readTextFile(config.report.dataDir, date, "report.html"),

@@ -1,0 +1,119 @@
+import { mkdtemp } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { openDatabase } from "../../src/core/db/openDatabase.js";
+import { runMigrations } from "../../src/core/db/runMigrations.js";
+import { seedInitialData } from "../../src/core/db/seedInitialData.js";
+
+describe("seedInitialData", () => {
+  const databasesToClose: ReturnType<typeof openDatabase>[] = [];
+
+  afterEach(() => {
+    while (databasesToClose.length > 0) {
+      databasesToClose.pop()?.close();
+    }
+  });
+
+  async function createTestDatabase() {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-seed-"));
+    const db = openDatabase(path.join(tempDir, "hot-now.sqlite"));
+    databasesToClose.push(db);
+    runMigrations(db);
+    return db;
+  }
+
+  it("adds is_active to content_sources and activates juya on first seed", async () => {
+    const db = await createTestDatabase();
+
+    seedInitialData(db, { username: "admin", password: "bootstrap-password" });
+
+    const columns = db
+      .prepare("PRAGMA table_info(content_sources)")
+      .all() as Array<{ name: string }>;
+
+    expect(columns.some((column) => column.name === "is_active")).toBe(true);
+
+    const activeRows = db
+      .prepare(
+        `
+          SELECT kind
+          FROM content_sources
+          WHERE is_active = 1
+          ORDER BY kind
+        `
+      )
+      .all() as Array<{ kind: string }>;
+
+    expect(activeRows).toEqual([{ kind: "juya" }]);
+  });
+
+  it("keeps manually switched active source on reseed", async () => {
+    const db = await createTestDatabase();
+
+    seedInitialData(db, { username: "admin", password: "bootstrap-password" });
+
+    db.exec(`
+      UPDATE content_sources
+      SET is_active = CASE WHEN kind = 'openai' THEN 1 ELSE 0 END
+    `);
+
+    seedInitialData(db, { username: "admin", password: "bootstrap-password" });
+
+    const activeRows = db
+      .prepare(
+        `
+          SELECT kind
+          FROM content_sources
+          WHERE is_active = 1
+          ORDER BY kind
+        `
+      )
+      .all() as Array<{ kind: string }>;
+
+    expect(activeRows).toEqual([{ kind: "openai" }]);
+  });
+
+  it("seeds default view rules without overwriting existing config_json", async () => {
+    const db = await createTestDatabase();
+
+    db.prepare(
+      `
+        INSERT INTO view_rule_configs (rule_key, display_name, config_json, is_enabled)
+        VALUES (?, ?, ?, ?)
+      `
+    ).run("hot", "热点（自定义）", JSON.stringify({ limit: 99, sort: "manual" }), 1);
+
+    seedInitialData(db, { username: "admin", password: "bootstrap-password" });
+
+    const rows = db
+      .prepare(
+        `
+          SELECT rule_key, display_name, config_json, is_enabled
+          FROM view_rule_configs
+          ORDER BY rule_key
+        `
+      )
+      .all() as Array<{
+      rule_key: string;
+      display_name: string;
+      config_json: string;
+      is_enabled: number;
+    }>;
+
+    expect(rows.map((row) => row.rule_key)).toEqual(["ai", "articles", "hot"]);
+    expect(JSON.parse(rows.find((row) => row.rule_key === "hot")?.config_json ?? "{}")).toEqual({
+      limit: 99,
+      sort: "manual"
+    });
+    expect(rows.find((row) => row.rule_key === "hot")?.display_name).toBe("热点（自定义）");
+    expect(JSON.parse(rows.find((row) => row.rule_key === "articles")?.config_json ?? "{}")).toEqual({
+      limit: 20,
+      sort: "completeness"
+    });
+    expect(JSON.parse(rows.find((row) => row.rule_key === "ai")?.config_json ?? "{}")).toEqual({
+      limit: 20,
+      sort: "ai_score"
+    });
+  });
+});

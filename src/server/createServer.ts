@@ -19,6 +19,7 @@ import {
 } from "./renderPages.js";
 import { findAppShellPage, getAppShellPages, renderAppLayout } from "./renderAppLayout.js";
 import { renderContentPage } from "./renderContentPages.js";
+import { renderProfilePage, renderSourcesPage, renderViewRulesPage } from "./renderSystemPages.js";
 
 type ReportSummary = {
   date: string;
@@ -29,6 +30,28 @@ type ReportSummary = {
 type ParseRatingScoresResult =
   | { ok: true; scores: Record<string, number> }
   | { ok: false; reason: "invalid-ratings-payload" };
+type SaveViewRuleResult = { ok: true } | { ok: false; reason: "invalid-config" | "not-found" };
+type SetActiveSourceResult = { ok: true } | { ok: false; reason: "not-found" };
+type ViewRuleCard = {
+  ruleKey: string;
+  displayName: string;
+  config: Record<string, unknown>;
+  isEnabled: boolean;
+};
+type SourceCard = {
+  kind: string;
+  name: string;
+  rssUrl: string | null;
+  isActive: boolean;
+  lastCollectedAt: string | null;
+  lastCollectionStatus: string | null;
+};
+type CurrentUserProfile = {
+  username: string;
+  displayName: string;
+  role: string;
+  email: string | null;
+};
 
 type ServerDeps = {
   config?: Partial<RuntimeConfig>;
@@ -42,6 +65,11 @@ type ServerDeps = {
   saveReaction?: (contentItemId: number, reaction: ReactionValue) => Promise<FeedbackSaveResult> | FeedbackSaveResult;
   listRatingDimensions?: () => Promise<RatingDimension[]> | RatingDimension[];
   saveRatings?: (contentItemId: number, scores: Record<string, number>) => Promise<SaveRatingsResult> | SaveRatingsResult;
+  listViewRules?: () => Promise<ViewRuleCard[]> | ViewRuleCard[];
+  saveViewRuleConfig?: (ruleKey: string, config: Record<string, unknown>) => Promise<SaveViewRuleResult> | SaveViewRuleResult;
+  listSources?: () => Promise<SourceCard[]> | SourceCard[];
+  setActiveSource?: (kind: string) => Promise<SetActiveSourceResult> | SetActiveSourceResult;
+  getCurrentUserProfile?: () => Promise<CurrentUserProfile | null> | CurrentUserProfile | null;
   auth?: {
     requireLogin: boolean;
     sessionSecret: string;
@@ -62,6 +90,9 @@ export function createServer(deps: ServerDeps = {}) {
   const app = Fastify({ logger: true });
   const authConfig = deps.auth;
   const authEnabled = authConfig?.requireLogin === true;
+  const hasUnifiedShellDeps = Boolean(
+    deps.listContentView || deps.listViewRules || deps.listSources || deps.getCurrentUserProfile
+  );
   const siteCss = readSiteCss();
   const siteJs = readSiteJs();
 
@@ -145,7 +176,9 @@ export function createServer(deps: ServerDeps = {}) {
         }
 
         const contentViewKey = mapPathToContentViewKey(currentPage.path);
-        const contentHtml = contentViewKey ? await renderContentForView(deps, contentViewKey) : undefined;
+        const contentHtml = contentViewKey
+          ? await renderContentForView(deps, contentViewKey)
+          : await renderSystemPageForPath(deps, currentPage.path, true);
 
         return reply.type("text/html").send(
           renderAppLayout({
@@ -161,7 +194,7 @@ export function createServer(deps: ServerDeps = {}) {
         );
       });
     }
-  } else if (deps.listContentView) {
+  } else if (hasUnifiedShellDeps) {
     for (const page of getAppShellPages()) {
       app.get(page.path, async (_request, reply) => {
         const currentPage = findAppShellPage(page.path);
@@ -171,7 +204,9 @@ export function createServer(deps: ServerDeps = {}) {
         }
 
         const contentViewKey = mapPathToContentViewKey(currentPage.path);
-        const contentHtml = contentViewKey ? await renderContentForView(deps, contentViewKey) : undefined;
+        const contentHtml = contentViewKey
+          ? await renderContentForView(deps, contentViewKey)
+          : await renderSystemPageForPath(deps, currentPage.path, false);
 
         return reply.type("text/html").send(
           renderAppLayout({
@@ -266,7 +301,7 @@ export function createServer(deps: ServerDeps = {}) {
   });
 
   app.post("/actions/content/:id/favorite", async (request, reply) => {
-    if (!ensureContentActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
       return;
     }
 
@@ -296,7 +331,7 @@ export function createServer(deps: ServerDeps = {}) {
   });
 
   app.post("/actions/content/:id/reaction", async (request, reply) => {
-    if (!ensureContentActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
       return;
     }
 
@@ -326,7 +361,7 @@ export function createServer(deps: ServerDeps = {}) {
   });
 
   app.post("/actions/content/:id/ratings", async (request, reply) => {
-    if (!ensureContentActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
       return;
     }
 
@@ -363,6 +398,66 @@ export function createServer(deps: ServerDeps = {}) {
       saved: result.saved,
       averageRating: result.averageRating
     });
+  });
+
+  app.post("/actions/view-rules/:ruleKey", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.saveViewRuleConfig) {
+      return reply.code(503).send({ ok: false, reason: "view-rules-disabled" });
+    }
+
+    const ruleKeyCandidate = (request.params as { ruleKey?: unknown } | undefined)?.ruleKey;
+    const ruleKey = typeof ruleKeyCandidate === "string" ? ruleKeyCandidate.trim() : "";
+
+    if (!ruleKey) {
+      return reply.code(400).send({ ok: false, reason: "invalid-rule-key" });
+    }
+
+    const body = request.body as { config?: unknown } | undefined;
+
+    if (!isPlainObject(body?.config)) {
+      return reply.code(400).send({ ok: false, reason: "invalid-view-rule-payload" });
+    }
+
+    const result = await deps.saveViewRuleConfig(ruleKey, body.config);
+
+    if (!result.ok && result.reason === "not-found") {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+
+    if (!result.ok && result.reason === "invalid-config") {
+      return reply.code(400).send({ ok: false, reason: "invalid-view-rule-payload" });
+    }
+
+    return reply.send({ ok: true, ruleKey });
+  });
+
+  app.post("/actions/sources/activate", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.setActiveSource) {
+      return reply.code(503).send({ ok: false, reason: "sources-disabled" });
+    }
+
+    const body = request.body as { kind?: unknown } | undefined;
+    const kind = typeof body?.kind === "string" ? body.kind.trim() : "";
+
+    if (!kind) {
+      return reply.code(400).send({ ok: false, reason: "invalid-source-kind" });
+    }
+
+    const result = await deps.setActiveSource(kind);
+
+    if (!result.ok && result.reason === "not-found") {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+
+    return reply.send({ ok: true, kind });
   });
 
   return app;
@@ -434,13 +529,56 @@ async function renderContentForView(deps: ServerDeps, viewKey: ContentViewKey): 
   return renderContentPage({ viewKey, cards, dimensions });
 }
 
-function ensureContentActionAuthorized(
+async function renderSystemPageForPath(deps: ServerDeps, pathname: string, loggedIn: boolean): Promise<string | undefined> {
+  // System pages keep callback wiring in main; routes only decide which renderer to call for the current path.
+  if (pathname === "/settings/view-rules") {
+    if (!deps.listViewRules) {
+      return undefined;
+    }
+
+    const rules = await deps.listViewRules();
+    return renderViewRulesPage(rules);
+  }
+
+  if (pathname === "/settings/sources") {
+    if (!deps.listSources) {
+      return undefined;
+    }
+
+    const sources = await deps.listSources();
+    return renderSourcesPage(sources);
+  }
+
+  if (pathname === "/settings/profile") {
+    if (!deps.getCurrentUserProfile) {
+      return undefined;
+    }
+
+    const profile = await deps.getCurrentUserProfile();
+
+    if (!profile) {
+      return renderProfilePage(null);
+    }
+
+    return renderProfilePage({
+      username: profile.username,
+      displayName: profile.displayName,
+      role: profile.role,
+      email: profile.email,
+      loggedIn
+    });
+  }
+
+  return undefined;
+}
+
+function ensureStateActionAuthorized(
   request: FastifyRequest,
   reply: FastifyReply,
   authEnabled: boolean,
   sessionSecret: string
 ) {
-  // Content actions must return hard 401 in auth mode because these routes mutate user-facing state.
+  // State-changing routes return hard 401 in auth mode, which keeps API-style actions script-friendly.
   if (!authEnabled) {
     return true;
   }
@@ -499,6 +637,11 @@ function parseRatingScores(value: unknown): ParseRatingScoresResult {
   }
 
   return { ok: true, scores: parsedScores };
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  // System action payloads currently rely on JSON object shapes and reject arrays/primitives.
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function renderLoginPage() {

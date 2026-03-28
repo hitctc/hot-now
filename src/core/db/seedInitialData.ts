@@ -1,5 +1,6 @@
 import { randomBytes, scryptSync } from "node:crypto";
 import type { SqliteDatabase } from "./openDatabase.js";
+import { ensureDefaultViewRules } from "../viewRules/viewRuleRepository.js";
 
 type AuthBootstrap = {
   username: string;
@@ -39,6 +40,8 @@ export function seedInitialData(db: SqliteDatabase, authBootstrap?: AuthBootstra
   // stable metadata without overwriting source URLs that later tasks or operators may have edited.
   // The seed also keeps one bootstrap admin row aligned with the runtime auth values so
   // the unified-site schema is coherent before dedicated user management lands.
+  ensureContentSourcesActiveColumn(db);
+
   const insertSource = db.prepare(
     `
       INSERT INTO content_sources (kind, name, site_url, rss_url, is_builtin, updated_at)
@@ -84,6 +87,9 @@ export function seedInitialData(db: SqliteDatabase, authBootstrap?: AuthBootstra
       insertSource.run(source);
     }
 
+    ensureDefaultViewRules(db);
+    ensureDefaultActiveSource(db);
+
     if (authBootstrap?.juyaRssUrl) {
       // Legacy config still treats `config.source.rssUrl` as the effective juya feed, so bootstrap
       // keeps that single row aligned until dedicated source management replaces the old setting.
@@ -100,6 +106,50 @@ export function seedInitialData(db: SqliteDatabase, authBootstrap?: AuthBootstra
   });
 
   seed();
+}
+
+function ensureContentSourcesActiveColumn(db: SqliteDatabase): void {
+  // Task6 keeps baseline migration untouched, so seed performs a one-time schema patch for is_active.
+  if (hasContentSourcesActiveColumn(db)) {
+    return;
+  }
+
+  db.exec("ALTER TABLE content_sources ADD COLUMN is_active INTEGER NOT NULL DEFAULT 0");
+}
+
+function hasContentSourcesActiveColumn(db: SqliteDatabase): boolean {
+  // PRAGMA introspection lets the seed stay compatible with both legacy and patched local databases.
+  const columns = db
+    .prepare("PRAGMA table_info(content_sources)")
+    .all() as Array<{ name: string }>;
+
+  return columns.some((column) => column.name === "is_active");
+}
+
+function ensureDefaultActiveSource(db: SqliteDatabase): void {
+  // Seed only selects juya when no active source exists, so user-selected active source stays untouched.
+  const activeSource = db
+    .prepare(
+      `
+        SELECT kind
+        FROM content_sources
+        WHERE is_active = 1
+        LIMIT 1
+      `
+    )
+    .get() as { kind: string } | undefined;
+
+  if (activeSource) {
+    return;
+  }
+
+  db.prepare(
+    `
+      UPDATE content_sources
+      SET is_active = CASE WHEN kind = 'juya' THEN 1 ELSE 0 END,
+          updated_at = CURRENT_TIMESTAMP
+    `
+  ).run();
 }
 
 function hashPassword(password: string) {

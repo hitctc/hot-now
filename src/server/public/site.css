@@ -330,6 +330,117 @@ a {
   color: var(--text-muted);
 }
 
+.system-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.system-card {
+  background: var(--bg-shell);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  padding: 18px 20px;
+}
+
+.system-card-header {
+  margin-bottom: 12px;
+}
+
+.system-card-title {
+  margin: 0;
+  font-size: 19px;
+}
+
+.system-card-meta {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.system-card-meta code {
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+
+.system-form {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.system-label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.system-textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  background: #f8fafc;
+  color: var(--text-main);
+  resize: vertical;
+}
+
+.system-action-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.system-status {
+  margin-top: 0;
+}
+
+.system-detail-list {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.system-detail-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
+.system-detail-row dt {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.system-detail-row dd {
+  margin: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.system-empty {
+  background: var(--bg-shell);
+  border: 1px dashed #bfdbfe;
+  border-radius: var(--radius);
+  padding: 22px;
+}
+
+.system-empty h3 {
+  margin: 0;
+}
+
+.system-empty p {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+}
+
 .login-page {
   min-height: 100vh;
   display: grid;
@@ -422,5 +533,10 @@ a {
 
   .content-card {
     padding: 16px;
+  }
+
+  .system-detail-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 }

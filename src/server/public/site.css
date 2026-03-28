@@ -998,14 +998,72 @@ code {
   }
 
   .shell-sidebar {
+    position: static;
+    height: auto;
+    overflow: visible;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 14px 14px 12px;
     border-right: 0;
     border-bottom: 1px solid var(--border-sidebar);
+  }
+
+  /* 窄屏侧栏保留导航能力，但把品牌区和主题区压缩到更短的首屏高度。 */
+  .brand-block,
+  .sidebar-footer {
+    grid-column: 1 / -1;
+  }
+
+  .brand-block {
+    margin-bottom: 0;
+    padding-bottom: 10px;
+  }
+
+  .brand-kicker {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+  }
+
+  .brand-title {
+    margin-top: 6px;
+    font-size: 18px;
+    line-height: 1.15;
+  }
+
+  .brand-description {
+    display: none;
+  }
+
+  .nav-group {
+    gap: 6px;
+  }
+
+  .nav-group + .nav-group {
+    margin-top: 0;
+  }
+
+  .nav-title {
+    margin-bottom: 2px;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+  }
+
+  .nav-link {
+    padding: 8px 10px 8px 12px;
+    min-height: 36px;
+    font-size: 13px;
+  }
+
+  .sidebar-footer {
+    margin-top: 0;
+    padding-top: 0;
   }
 
   .shell-header {
     flex-direction: column;
     align-items: flex-start;
-    padding: 20px;
+    padding: 16px 16px 14px;
   }
 
   .header-user {
@@ -1014,18 +1072,34 @@ code {
   }
 
   .shell-content {
-    padding: 24px 20px 32px;
+    padding: 20px 16px 28px;
+    gap: 14px;
   }
 
   .theme-switch {
     grid-template-columns: 1fr;
   }
 
+  .theme-dock {
+    padding: 10px;
+  }
+
+  .theme-dock-title {
+    margin-bottom: 8px;
+    font-size: 11px;
+  }
+
+  .theme-switch-button {
+    min-height: 36px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
   .content-card,
   .system-card,
   .placeholder-card,
   .login-card {
-    padding: 16px;
+    padding: 14px;
   }
 
   .system-detail-row {

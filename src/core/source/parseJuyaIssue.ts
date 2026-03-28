@@ -60,5 +60,12 @@ export async function parseJuyaIssue(feedXml: string): Promise<DailyIssue> {
     }
   });
 
-  return { date, issueUrl, sourceKind: "juya", items };
+  return {
+    date,
+    issueUrl,
+    sourceKind: "juya",
+    sourceType: BUILTIN_SOURCES.juya.sourceType,
+    sourcePriority: BUILTIN_SOURCES.juya.sourcePriority,
+    items
+  };
 }

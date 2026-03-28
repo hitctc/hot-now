@@ -8,27 +8,45 @@ export const BUILTIN_SOURCES: Record<SourceKind, SourceDefinition> = {
     name: "Juya AI Daily",
     siteUrl: "https://imjuya.github.io/juya-ai-daily/",
     rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml",
-    category: "热点资讯"
+    category: "热点资讯",
+    sourceType: "aggregator",
+    sourcePriority: 70
   },
   openai: {
     kind: "openai",
     name: "OpenAI",
     siteUrl: "https://openai.com/news/",
     rssUrl: "https://openai.com/news/rss.xml",
-    category: "最新 AI 消息"
+    category: "最新 AI 消息",
+    sourceType: "official",
+    sourcePriority: 95
   },
   google_ai: {
     kind: "google_ai",
     name: "Google AI",
     siteUrl: "https://blog.google/technology/ai/",
     rssUrl: "https://blog.google/technology/ai/rss/",
-    category: "最新 AI 消息"
+    category: "最新 AI 消息",
+    sourceType: "official",
+    sourcePriority: 92
   },
   techcrunch_ai: {
     kind: "techcrunch_ai",
     name: "TechCrunch AI",
     siteUrl: "https://techcrunch.com/category/artificial-intelligence/",
     rssUrl: "https://techcrunch.com/category/artificial-intelligence/feed/",
-    category: "热门文章"
+    category: "热门文章",
+    sourceType: "media",
+    sourcePriority: 84
   }
 };
+
+export function resolveBuiltinSourceDefinition(kind: string): SourceDefinition {
+  const source = BUILTIN_SOURCES[kind as SourceKind];
+
+  if (!source) {
+    throw new Error(`Unsupported content source kind: "${kind}"`);
+  }
+
+  return source;
+}

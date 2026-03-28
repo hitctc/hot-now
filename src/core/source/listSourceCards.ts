@@ -71,32 +71,45 @@ function buildLatestRunIndex(rows: CollectionRunRow[]): Map<string, LatestRunSum
   const latestRunBySourceKind = new Map<string, LatestRunSummary>();
 
   for (const row of rows) {
-    const sourceKind = parseSourceKind(row.notes);
+    const sourceKinds = parseSourceKinds(row.notes);
 
-    if (!sourceKind || latestRunBySourceKind.has(sourceKind)) {
+    if (sourceKinds.length === 0) {
       continue;
     }
 
-    latestRunBySourceKind.set(sourceKind, {
-      startedAt: row.started_at,
-      finishedAt: row.finished_at,
-      status: row.status
-    });
+    for (const sourceKind of sourceKinds) {
+      if (latestRunBySourceKind.has(sourceKind)) {
+        continue;
+      }
+
+      latestRunBySourceKind.set(sourceKind, {
+        startedAt: row.started_at,
+        finishedAt: row.finished_at,
+        status: row.status
+      });
+    }
   }
 
   return latestRunBySourceKind;
 }
 
-function parseSourceKind(notes: string | null): string | null {
+function parseSourceKinds(notes: string | null): string[] {
   // Run notes are tolerated as freeform JSON, so malformed or partial rows are ignored instead of breaking the page.
   if (!notes) {
-    return null;
+    return [];
   }
 
   try {
     const parsed = JSON.parse(notes) as Record<string, unknown>;
-    return typeof parsed.sourceKind === "string" && parsed.sourceKind.trim() ? parsed.sourceKind.trim() : null;
+    if (Array.isArray(parsed.sourceKinds)) {
+      return parsed.sourceKinds
+        .filter((sourceKind): sourceKind is string => typeof sourceKind === "string")
+        .map((sourceKind) => sourceKind.trim())
+        .filter(Boolean);
+    }
+
+    return typeof parsed.sourceKind === "string" && parsed.sourceKind.trim() ? [parsed.sourceKind.trim()] : [];
   } catch {
-    return null;
+    return [];
   }
 }

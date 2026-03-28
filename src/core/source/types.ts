@@ -6,6 +6,8 @@ export type SourceDefinition = {
   siteUrl: string;
   rssUrl: string;
   category: string;
+  sourceType: "official" | "media" | "aggregator";
+  sourcePriority: number;
 };
 
 export type CandidateItem = {
@@ -23,6 +25,8 @@ export type LoadedIssue = {
   date: string;
   issueUrl: string;
   sourceKind: SourceKind;
+  sourceType: SourceDefinition["sourceType"];
+  sourcePriority: number;
   items: CandidateItem[];
 };
 

@@ -1,0 +1,65 @@
+import { readFile } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { openDatabase } from "../../src/core/db/openDatabase.js";
+import { runMigrations } from "../../src/core/db/runMigrations.js";
+import { seedInitialData } from "../../src/core/db/seedInitialData.js";
+import { loadEnabledSourceIssues } from "../../src/core/source/loadEnabledSourceIssues.js";
+
+describe("loadEnabledSourceIssues", () => {
+  const databasesToClose: ReturnType<typeof openDatabase>[] = [];
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    while (databasesToClose.length > 0) {
+      databasesToClose.pop()?.close();
+    }
+  });
+
+  it("loads enabled sources in priority order and skips disabled sources", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-enabled-sources-"));
+    const db = openDatabase(path.join(tempDir, "hot-now.sqlite"));
+    databasesToClose.push(db);
+    runMigrations(db);
+    seedInitialData(db, { username: "admin", password: "bootstrap-password" });
+
+    db.prepare(
+      `
+        UPDATE content_sources
+        SET is_enabled = CASE WHEN kind IN ('openai', 'google_ai') THEN 1 ELSE 0 END
+      `
+    ).run();
+
+    const openAiXml = await readFile("tests/fixtures/openai-rss.xml", "utf8");
+    const googleAiXml = await readFile("tests/fixtures/google-ai-rss.xml", "utf8");
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("openai.com")) {
+        return { status: 200, text: async () => openAiXml };
+      }
+
+      if (url.includes("blog.google")) {
+        return { status: 200, text: async () => googleAiXml };
+      }
+
+      return { status: 404, text: async () => "" };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const issues = await loadEnabledSourceIssues(db);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(issues.map((issue) => issue.sourceKind)).toEqual(["openai", "google_ai"]);
+    expect(issues[0]).toMatchObject({
+      sourceKind: "openai",
+      sourceType: "official",
+      sourcePriority: 95
+    });
+    expect(issues[1]).toMatchObject({
+      sourceKind: "google_ai",
+      sourceType: "official",
+      sourcePriority: 92
+    });
+  });
+});

@@ -73,21 +73,21 @@ describe("runMigrations", () => {
 
     expect(appliedMigrations).toEqual([{ version: 1, name: "001_unified_site_baseline" }]);
 
-    const sourceKinds = db
+    const sourceRows = db
       .prepare(
         `
-          SELECT kind
+          SELECT kind, is_enabled
           FROM content_sources
           ORDER BY kind
         `
       )
-      .all() as Array<{ kind: string }>;
+      .all() as Array<{ kind: string; is_enabled: number }>;
 
-    expect(sourceKinds.map((row) => row.kind)).toEqual([
-      "google_ai",
-      "juya",
-      "openai",
-      "techcrunch_ai"
+    expect(sourceRows).toEqual([
+      { kind: "google_ai", is_enabled: 1 },
+      { kind: "juya", is_enabled: 1 },
+      { kind: "openai", is_enabled: 1 },
+      { kind: "techcrunch_ai", is_enabled: 1 }
     ]);
 
     const adminRow = db

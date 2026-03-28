@@ -8,7 +8,7 @@ const parser = new Parser();
 // same downstream pipeline without custom ranking logic.
 export async function parseArticleFeed(
   feedXml: string,
-  source: Pick<SourceDefinition, "kind" | "name" | "category">
+  source: Pick<SourceDefinition, "kind" | "name" | "category" | "sourceType" | "sourcePriority">
 ): Promise<LoadedIssue> {
   const feed = await parser.parseString(feedXml);
   const items = feed.items.reduce<CandidateItem[]>((accumulator, item) => {
@@ -28,6 +28,8 @@ export async function parseArticleFeed(
     date: toIssueDate(freshestPublishedAt),
     issueUrl: feed.link?.trim() ?? "",
     sourceKind: source.kind,
+    sourceType: source.sourceType,
+    sourcePriority: source.sourcePriority,
     items
   };
 }

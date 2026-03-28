@@ -18,6 +18,7 @@ const migrationStatements = [
       name TEXT NOT NULL,
       site_url TEXT NOT NULL,
       rss_url TEXT,
+      is_enabled INTEGER NOT NULL DEFAULT 1,
       is_builtin INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP

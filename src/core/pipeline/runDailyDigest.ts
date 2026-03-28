@@ -3,9 +3,9 @@ import { createCollectionRun, finishCollectionRun, resolveSourceByKind, upsertCo
 import type { SqliteDatabase } from "../db/openDatabase.js";
 import { fetchAndExtractArticle } from "../fetch/extractArticle.js";
 import { sendDailyEmail } from "../mail/sendDailyEmail.js";
-import { buildDailyReport, type DailyReport, type DailyReportTrigger } from "../report/buildDailyReport.js";
+import { buildDailyReport, type DailyReport, type DailyReportIssue, type DailyReportTrigger } from "../report/buildDailyReport.js";
 import { renderReportHtml } from "../report/renderReportHtml.js";
-import { loadLatestIssue } from "../source/loadLatestIssue.js";
+import { loadEnabledSourceIssues } from "../source/loadEnabledSourceIssues.js";
 import { reportDayDir, upsertDigestReport, writeJsonFile, writeTextFile } from "../storage/reportStore.js";
 import { clusterTopics, type RankedInput } from "../topics/clusterTopics.js";
 import type { ArticleResult } from "../fetch/extractArticle.js";
@@ -16,15 +16,18 @@ type EnrichedCollectedItem = LoadedIssue["items"][number] & {
   article: ArticleResult;
 };
 
+type EnrichedIssue = LoadedIssue & {
+  items: EnrichedCollectedItem[];
+};
+
 export type RunDailyDigestDeps = {
   db?: SqliteDatabase;
-  loadLatestIssue?: (config: RuntimeConfig) => Promise<LoadedIssue>;
+  loadEnabledSourceIssues?: () => Promise<LoadedIssue[]>;
   fetchArticle?: (url: string) => Promise<ArticleResult>;
   sendDailyEmail?: (config: RuntimeConfig, report: DailyReport) => Promise<unknown>;
 };
 
 const defaultDeps = {
-  loadLatestIssue,
   fetchArticle: fetchAndExtractArticle,
   sendDailyEmail
 };
@@ -42,36 +45,47 @@ export async function runDailyDigest(
 ): Promise<RunDailyDigestResult> {
   const runtimeDeps = {
     db: deps.db,
-    loadLatestIssue: deps.loadLatestIssue ?? defaultDeps.loadLatestIssue,
     fetchArticle: deps.fetchArticle ?? defaultDeps.fetchArticle,
     sendDailyEmail: deps.sendDailyEmail ?? defaultDeps.sendDailyEmail
   };
 
-  const issue = await runtimeDeps.loadLatestIssue(config);
+  if (!runtimeDeps.db && !deps.loadEnabledSourceIssues) {
+    throw new Error("runDailyDigest requires a database-backed source loader");
+  }
+
+  const loadEnabledSourceIssuesFn = deps.loadEnabledSourceIssues ?? (() => loadEnabledSourceIssues(runtimeDeps.db!));
+  const issues = await loadEnabledSourceIssuesFn();
+  const reportIssue = pickReportIssue(issues);
   const startedAt = new Date().toISOString();
   const collectionRunId = runtimeDeps.db
     ? runDbMirrorStep(() =>
         createCollectionRun(runtimeDeps.db!, {
-          runDate: issue.date,
+          runDate: reportIssue.date,
           triggerKind: trigger,
           status: "running",
           startedAt,
-          notes: JSON.stringify({ sourceKind: issue.sourceKind, issueUrl: issue.issueUrl })
+          notes: JSON.stringify({
+            sourceKinds: issues.map((issue) => issue.sourceKind),
+            sourceCount: issues.length
+          })
         })
       )
     : undefined;
 
   try {
-    const enrichedItems = await Promise.all(issue.items.map((item) => enrichItem(item, runtimeDeps.fetchArticle)));
+    const enrichedIssues = await Promise.all(issues.map((issue) => enrichIssue(issue, runtimeDeps.fetchArticle)));
+    const enrichedItems = enrichedIssues.flatMap((issue) => issue.items);
 
     if (runtimeDeps.db) {
       runDbMirrorStep(() => {
-        persistCollectedItems(runtimeDeps.db!, issue, enrichedItems);
+        for (const issue of enrichedIssues) {
+          persistCollectedItems(runtimeDeps.db!, issue, issue.items);
+        }
       });
     }
 
     const topics = clusterTopics(enrichedItems);
-    const report = buildDailyReport({ issue, trigger, topics, topN: config.report.topN });
+    const report = buildDailyReport({ issue: buildAggregateIssue(reportIssue, enrichedItems), trigger, topics, topN: config.report.topN });
     const mailStatus = await sendReportEmail(config, report, runtimeDeps.sendDailyEmail);
     report.meta.mailStatus = mailStatus;
 
@@ -96,8 +110,9 @@ export async function runDailyDigest(
           status: "completed",
           finishedAt: new Date().toISOString(),
           notes: JSON.stringify({
-            sourceKind: issue.sourceKind,
-            itemCount: issue.items.length,
+            sourceKinds: issues.map((issue) => issue.sourceKind),
+            sourceCount: issues.length,
+            itemCount: enrichedItems.length,
             degraded: report.meta.degraded,
             mailStatus
           })
@@ -123,7 +138,8 @@ export async function runDailyDigest(
           status: "failed",
           finishedAt: new Date().toISOString(),
           notes: JSON.stringify({
-            sourceKind: issue.sourceKind,
+            sourceKinds: issues.map((issue) => issue.sourceKind),
+            sourceCount: issues.length,
             error: error instanceof Error ? error.message : "unknown"
           })
         });
@@ -142,6 +158,18 @@ async function enrichItem(
   return {
     ...item,
     article: await fetchArticle(item.sourceUrl)
+  };
+}
+
+// Each enabled issue is enriched independently so one source can still contribute even if a
+// sibling source has a degraded article fetch.
+async function enrichIssue(
+  issue: LoadedIssue,
+  fetchArticle: (url: string) => Promise<ArticleResult>
+): Promise<EnrichedIssue> {
+  return {
+    ...issue,
+    items: await Promise.all(issue.items.map((item) => enrichItem(item, fetchArticle)))
   };
 }
 
@@ -201,4 +229,43 @@ function runDbMirrorStep<T>(operation: () => T): T | undefined {
   } catch {
     return undefined;
   }
+}
+
+function pickReportIssue(issues: LoadedIssue[]): LoadedIssue {
+  const sortedIssues = [...issues].sort(compareIssues);
+  const selectedIssue = sortedIssues[0];
+
+  if (!selectedIssue) {
+    throw new Error("No enabled content sources are available");
+  }
+
+  return selectedIssue;
+}
+
+function buildAggregateIssue(issue: LoadedIssue, items: readonly EnrichedCollectedItem[]): DailyReportIssue {
+  return {
+    date: issue.date,
+    issueUrl: issue.issueUrl,
+    items
+  };
+}
+
+function compareIssues(left: LoadedIssue, right: LoadedIssue): number {
+  const leftDate = toIssueDateMs(left.date);
+  const rightDate = toIssueDateMs(right.date);
+
+  if (rightDate !== leftDate) {
+    return rightDate - leftDate;
+  }
+
+  if (right.sourcePriority !== left.sourcePriority) {
+    return right.sourcePriority - left.sourcePriority;
+  }
+
+  return left.sourceKind.localeCompare(right.sourceKind);
+}
+
+function toIssueDateMs(value: string): number {
+  const parsed = Date.parse(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed) ? parsed : 0;
 }

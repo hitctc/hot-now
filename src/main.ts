@@ -13,7 +13,7 @@ import type { DailyReportTrigger } from "./core/report/buildDailyReport.js";
 import { createRunLock } from "./core/runtime/runLock.js";
 import { startScheduler } from "./core/scheduler/startScheduler.js";
 import { listSourceCards } from "./core/source/listSourceCards.js";
-import { loadActiveSourceIssue } from "./core/source/loadActiveSourceIssue.js";
+import { loadEnabledSourceIssues } from "./core/source/loadEnabledSourceIssues.js";
 import { listReportDates, readTextFile } from "./core/storage/reportStore.js";
 import { listViewRules, saveViewRuleConfig } from "./core/viewRules/viewRuleRepository.js";
 import { createServer } from "./server/createServer.js";
@@ -83,7 +83,7 @@ async function triggerDigest(triggerType: DailyReportTrigger) {
   return await lock.runExclusive(async () => {
     return await runDailyDigest(config, triggerType, {
       db,
-      loadLatestIssue: async () => await loadActiveSourceIssue(db),
+      loadEnabledSourceIssues: async () => await loadEnabledSourceIssues(db),
       fetchArticle: fetchAndExtractArticle,
       sendDailyEmail
     });

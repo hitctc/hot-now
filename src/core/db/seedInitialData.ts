@@ -40,12 +40,13 @@ export function seedInitialData(db: SqliteDatabase, authBootstrap?: AuthBootstra
   // stable metadata without overwriting source URLs that later tasks or operators may have edited.
   // The seed also keeps one bootstrap admin row aligned with the runtime auth values so
   // the unified-site schema is coherent before dedicated user management lands.
+  ensureContentSourcesEnabledColumn(db);
   ensureContentSourcesActiveColumn(db);
 
   const insertSource = db.prepare(
     `
-      INSERT INTO content_sources (kind, name, site_url, rss_url, is_builtin, updated_at)
-      VALUES (@kind, @name, @siteUrl, @rssUrl, 1, CURRENT_TIMESTAMP)
+      INSERT INTO content_sources (kind, name, site_url, rss_url, is_enabled, is_builtin, updated_at)
+      VALUES (@kind, @name, @siteUrl, @rssUrl, 1, 1, CURRENT_TIMESTAMP)
       ON CONFLICT(kind) DO UPDATE SET
         name = excluded.name,
         site_url = excluded.site_url,
@@ -117,6 +118,16 @@ function ensureContentSourcesActiveColumn(db: SqliteDatabase): void {
   db.exec("ALTER TABLE content_sources ADD COLUMN is_active INTEGER NOT NULL DEFAULT 0");
 }
 
+function ensureContentSourcesEnabledColumn(db: SqliteDatabase): void {
+  // Multi-source collection needs a separate enable flag, and older local databases get it via
+  // the same seed-time schema patch so existing installs keep booting.
+  if (hasContentSourcesEnabledColumn(db)) {
+    return;
+  }
+
+  db.exec("ALTER TABLE content_sources ADD COLUMN is_enabled INTEGER NOT NULL DEFAULT 1");
+}
+
 function hasContentSourcesActiveColumn(db: SqliteDatabase): boolean {
   // PRAGMA introspection lets the seed stay compatible with both legacy and patched local databases.
   const columns = db
@@ -124,6 +135,15 @@ function hasContentSourcesActiveColumn(db: SqliteDatabase): boolean {
     .all() as Array<{ name: string }>;
 
   return columns.some((column) => column.name === "is_active");
+}
+
+function hasContentSourcesEnabledColumn(db: SqliteDatabase): boolean {
+  // PRAGMA introspection lets the seed stay compatible with both legacy and patched local databases.
+  const columns = db
+    .prepare("PRAGMA table_info(content_sources)")
+    .all() as Array<{ name: string }>;
+
+  return columns.some((column) => column.name === "is_enabled");
 }
 
 function ensureDefaultActiveSource(db: SqliteDatabase): void {

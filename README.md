@@ -1,6 +1,6 @@
 # hot-now
 
-本地单机运行的每日热点应用。它会拉取 `juya-ai-daily` RSS、抓取原文、做规则聚类、生成 HTML/JSON 报告，并通过 QQ 邮箱 SMTP 发送邮件。
+本地单机运行的每日热点应用。它会拉取多个已启用的 RSS 源、抓取原文、做规则聚类、生成 HTML/JSON 报告，并通过 QQ 邮箱 SMTP 发送邮件。
 
 ## 本地启动
 
@@ -51,7 +51,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - legacy `/history`、`/control` 与 `/reports/:date` 的 fallback notice 轻量跟随共享主题资源
 - 手动触发任务：`POST /actions/run`
 
-统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。`/settings/sources` 页面现在支持切换当前启用 source，并在统一站点内手动执行一次采集；legacy `/control` 仍保留。
+统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。`content_sources.is_enabled` 决定哪些 source 参与采集，`is_active` 目前仍保留兼容；`/settings/sources` 页面还会继续沿用旧的单源控制外观，后续会再收口成多源状态视图。
 
 ## 配置
 
@@ -66,6 +66,6 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 
 ## 验证
 
-- 运行测试：`npm run test`，通过：20 个测试文件、101 个测试全部通过
-- 类型构建：`npm run build`，通过
+- 相关测试：已通过
+- 类型构建：已通过
 - Playwright MCP 本地验收通过：`/login` 登录成功；`/`、`/articles`、`/ai`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常；浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持

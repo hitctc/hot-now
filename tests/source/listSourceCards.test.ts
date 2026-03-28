@@ -114,4 +114,33 @@ describe("listSourceCards", () => {
 
     expect(cards.every((card) => card.lastCollectedAt === null && card.lastCollectionStatus === null)).toBe(true);
   });
+
+  it("maps multi-source run notes onto every included source kind", async () => {
+    const db = await createTestDatabase();
+
+    db.prepare(
+      `
+        INSERT INTO collection_runs (run_date, trigger_kind, status, started_at, finished_at, notes)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `
+    ).run(
+      "2026-03-29",
+      "manual",
+      "completed",
+      "2026-03-29T10:00:00.000Z",
+      "2026-03-29T10:04:00.000Z",
+      JSON.stringify({ sourceKinds: ["juya", "openai"] })
+    );
+
+    const cards = listSourceCards(db);
+
+    expect(cards.find((card) => card.kind === "juya")).toMatchObject({
+      lastCollectedAt: "2026-03-29T10:04:00.000Z",
+      lastCollectionStatus: "completed"
+    });
+    expect(cards.find((card) => card.kind === "openai")).toMatchObject({
+      lastCollectedAt: "2026-03-29T10:04:00.000Z",
+      lastCollectionStatus: "completed"
+    });
+  });
 });

@@ -23,7 +23,7 @@ describe("seedInitialData", () => {
     return db;
   }
 
-  it("adds is_active to content_sources and activates juya on first seed", async () => {
+  it("adds is_enabled to content_sources and enables all built-ins on first seed", async () => {
     const db = await createTestDatabase();
 
     seedInitialData(db, { username: "admin", password: "bootstrap-password" });
@@ -32,7 +32,25 @@ describe("seedInitialData", () => {
       .prepare("PRAGMA table_info(content_sources)")
       .all() as Array<{ name: string }>;
 
+    expect(columns.some((column) => column.name === "is_enabled")).toBe(true);
     expect(columns.some((column) => column.name === "is_active")).toBe(true);
+
+    const enabledRows = db
+      .prepare(
+        `
+          SELECT kind, is_enabled
+          FROM content_sources
+          ORDER BY kind
+        `
+      )
+      .all() as Array<{ kind: string; is_enabled: number }>;
+
+    expect(enabledRows).toEqual([
+      { kind: "google_ai", is_enabled: 1 },
+      { kind: "juya", is_enabled: 1 },
+      { kind: "openai", is_enabled: 1 },
+      { kind: "techcrunch_ai", is_enabled: 1 }
+    ]);
 
     const activeRows = db
       .prepare(

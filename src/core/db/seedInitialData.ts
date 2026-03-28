@@ -4,6 +4,7 @@ import type { SqliteDatabase } from "./openDatabase.js";
 type AuthBootstrap = {
   username: string;
   password: string;
+  juyaRssUrl?: string;
 };
 
 const builtinSources = [
@@ -35,7 +36,7 @@ const builtinSources = [
 
 export function seedInitialData(db: SqliteDatabase, authBootstrap?: AuthBootstrap): void {
   // Built-in source definitions belong to the app itself, so rerunning the seed should refresh
-  // their metadata instead of forcing operators to clean duplicates by hand.
+  // stable metadata without overwriting source URLs that later tasks or operators may have edited.
   // The seed also keeps one bootstrap admin row aligned with the runtime auth values so
   // the unified-site schema is coherent before dedicated user management lands.
   const insertSource = db.prepare(
@@ -45,9 +46,16 @@ export function seedInitialData(db: SqliteDatabase, authBootstrap?: AuthBootstra
       ON CONFLICT(kind) DO UPDATE SET
         name = excluded.name,
         site_url = excluded.site_url,
-        rss_url = excluded.rss_url,
         is_builtin = excluded.is_builtin,
         updated_at = CURRENT_TIMESTAMP
+    `
+  );
+  const updateJuyaRssUrl = db.prepare(
+    `
+      UPDATE content_sources
+      SET rss_url = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE kind = 'juya'
     `
   );
   const upsertAdmin = db.prepare(
@@ -74,6 +82,12 @@ export function seedInitialData(db: SqliteDatabase, authBootstrap?: AuthBootstra
   const seed = db.transaction(() => {
     for (const source of builtinSources) {
       insertSource.run(source);
+    }
+
+    if (authBootstrap?.juyaRssUrl) {
+      // Legacy config still treats `config.source.rssUrl` as the effective juya feed, so bootstrap
+      // keeps that single row aligned until dedicated source management replaces the old setting.
+      updateJuyaRssUrl.run(authBootstrap.juyaRssUrl);
     }
 
     if (authBootstrap) {

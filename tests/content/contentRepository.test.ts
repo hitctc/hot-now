@@ -126,6 +126,68 @@ describe("contentRepository", () => {
     });
   });
 
+  it("keeps an existing non-empty body when a later degraded update has an empty body", async () => {
+    const db = await createTestDatabase();
+    const source = resolveSourceByKind(db, "juya");
+
+    expect(source).toBeDefined();
+
+    upsertContentItems(db, {
+      sourceId: source!.id,
+      items: [
+        {
+          externalId: "item-1",
+          title: "Initial title",
+          canonicalUrl: "https://example.com/article-1",
+          summary: "initial summary",
+          bodyMarkdown: "preserved body",
+          publishedAt: "2026-03-28T08:00:00.000Z",
+          fetchedAt: "2026-03-28T08:05:00.000Z"
+        }
+      ]
+    });
+
+    upsertContentItems(db, {
+      sourceId: source!.id,
+      items: [
+        {
+          externalId: "item-1-retry",
+          title: "Retry title",
+          canonicalUrl: "https://example.com/article-1",
+          summary: "retry summary",
+          bodyMarkdown: "",
+          publishedAt: "2026-03-28T08:00:00.000Z",
+          fetchedAt: "2026-03-28T09:00:00.000Z"
+        }
+      ]
+    });
+
+    const row = db
+      .prepare(
+        `
+          SELECT external_id, title, summary, body_markdown, fetched_at
+          FROM content_items
+          WHERE source_id = ?
+            AND canonical_url = ?
+        `
+      )
+      .get(source!.id, "https://example.com/article-1") as {
+      external_id: string;
+      title: string;
+      summary: string;
+      body_markdown: string;
+      fetched_at: string;
+    };
+
+    expect(row).toEqual({
+      external_id: "item-1-retry",
+      title: "Retry title",
+      summary: "retry summary",
+      body_markdown: "preserved body",
+      fetched_at: "2026-03-28T09:00:00.000Z"
+    });
+  });
+
   async function createTestDatabase() {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-content-"));
     const db = openDatabase(path.join(tempDir, "hot-now.sqlite"));

@@ -104,4 +104,48 @@ describe("runMigrations", () => {
     expect(adminRow?.password_hash).toMatch(/^scrypt\$/);
     expect(adminRow?.password_hash).not.toContain("bootstrap-password");
   });
+
+  it("keeps the juya row aligned with legacy config.source.rssUrl without resetting other source URLs", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-db-"));
+    const dbPath = path.join(tempDir, "hot-now.sqlite");
+    const db = openDatabase(dbPath);
+    databasesToClose.push(db);
+
+    runMigrations(db);
+    seedInitialData(db, {
+      username: "admin",
+      password: "bootstrap-password",
+      juyaRssUrl: "https://legacy.example.com/custom-juya.xml"
+    });
+
+    db.prepare(
+      `
+        UPDATE content_sources
+        SET rss_url = ?
+        WHERE kind = 'openai'
+      `
+    ).run("https://manual.example.com/openai.xml");
+
+    seedInitialData(db, {
+      username: "admin",
+      password: "bootstrap-password",
+      juyaRssUrl: "https://legacy.example.com/custom-juya.xml"
+    });
+
+    const rows = db
+      .prepare(
+        `
+          SELECT kind, rss_url
+          FROM content_sources
+          WHERE kind IN ('juya', 'openai')
+          ORDER BY kind
+        `
+      )
+      .all() as Array<{ kind: string; rss_url: string }>;
+
+    expect(rows).toEqual([
+      { kind: "juya", rss_url: "https://legacy.example.com/custom-juya.xml" },
+      { kind: "openai", rss_url: "https://manual.example.com/openai.xml" }
+    ]);
+  });
 });

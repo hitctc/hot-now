@@ -83,7 +83,11 @@ export function upsertContentItems(
         external_id = excluded.external_id,
         title = excluded.title,
         summary = excluded.summary,
-        body_markdown = excluded.body_markdown,
+        body_markdown = CASE
+          WHEN excluded.body_markdown IS NOT NULL AND LENGTH(TRIM(excluded.body_markdown)) > 0
+            THEN excluded.body_markdown
+          ELSE content_items.body_markdown
+        END,
         published_at = excluded.published_at,
         fetched_at = excluded.fetched_at,
         updated_at = CURRENT_TIMESTAMP

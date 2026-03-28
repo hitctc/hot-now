@@ -305,6 +305,52 @@ describe("runDailyDigest", () => {
 
     db.close();
   });
+
+  it("keeps writing report artifacts when sqlite mirror persistence fails", async () => {
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-run-"));
+    const config = makeConfig(rootDir);
+
+    const result = await runDailyDigest(config, "manual", {
+      db: {
+        prepare: vi.fn(() => {
+          throw new Error("sqlite unavailable");
+        })
+      } as never,
+      loadLatestIssue: vi.fn().mockResolvedValue({
+        date: "2026-03-28",
+        issueUrl: "https://example.com",
+        sourceKind: "juya",
+        items: [
+          {
+            rank: 1,
+            category: "要闻",
+            title: "数据库镜像失败不应阻断落盘",
+            sourceUrl: "https://example.com/persist",
+            sourceName: "Example",
+            externalId: "juya-persist-1",
+            summary: "摘要",
+            publishedAt: "2026-03-28T08:00:00.000Z"
+          }
+        ]
+      }),
+      fetchArticle: vi.fn().mockResolvedValue({
+        ok: true,
+        url: "https://example.com/persist",
+        title: "数据库镜像失败不应阻断落盘",
+        text: "正文内容"
+      }),
+      sendDailyEmail: vi.fn().mockResolvedValue(undefined)
+    });
+
+    const reportJson = JSON.parse(await readFile(path.join(rootDir, "2026-03-28", "report.json"), "utf8")) as typeof result.report;
+    const reportHtml = await readFile(path.join(rootDir, "2026-03-28", "report.html"), "utf8");
+    const runMeta = JSON.parse(await readFile(path.join(rootDir, "2026-03-28", "run-meta.json"), "utf8")) as Record<string, unknown>;
+
+    expect(result.mailStatus).toBe("sent");
+    expect(reportJson.meta.mailStatus).toBe("sent");
+    expect(reportHtml).toContain("邮件状态：sent");
+    expect(runMeta.mailStatus).toBe("sent");
+  });
 });
 
 function createTestDatabase(file: string) {

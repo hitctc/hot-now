@@ -50,20 +50,24 @@ export async function runDailyDigest(
   const issue = await runtimeDeps.loadLatestIssue(config);
   const startedAt = new Date().toISOString();
   const collectionRunId = runtimeDeps.db
-    ? createCollectionRun(runtimeDeps.db, {
-        runDate: issue.date,
-        triggerKind: trigger,
-        status: "running",
-        startedAt,
-        notes: JSON.stringify({ sourceKind: issue.sourceKind, issueUrl: issue.issueUrl })
-      })
+    ? runDbMirrorStep(() =>
+        createCollectionRun(runtimeDeps.db!, {
+          runDate: issue.date,
+          triggerKind: trigger,
+          status: "running",
+          startedAt,
+          notes: JSON.stringify({ sourceKind: issue.sourceKind, issueUrl: issue.issueUrl })
+        })
+      )
     : undefined;
 
   try {
     const enrichedItems = await Promise.all(issue.items.map((item) => enrichItem(item, runtimeDeps.fetchArticle)));
 
     if (runtimeDeps.db) {
-      persistCollectedItems(runtimeDeps.db, issue, enrichedItems);
+      runDbMirrorStep(() => {
+        persistCollectedItems(runtimeDeps.db!, issue, enrichedItems);
+      });
     }
 
     const topics = clusterTopics(enrichedItems);
@@ -86,37 +90,43 @@ export async function runDailyDigest(
     });
 
     if (runtimeDeps.db && collectionRunId != null) {
-      finishCollectionRun(runtimeDeps.db, {
-        id: collectionRunId,
-        status: "completed",
-        finishedAt: new Date().toISOString(),
-        notes: JSON.stringify({
-          sourceKind: issue.sourceKind,
-          itemCount: issue.items.length,
-          degraded: report.meta.degraded,
-          mailStatus
-        })
+      runDbMirrorStep(() => {
+        finishCollectionRun(runtimeDeps.db!, {
+          id: collectionRunId,
+          status: "completed",
+          finishedAt: new Date().toISOString(),
+          notes: JSON.stringify({
+            sourceKind: issue.sourceKind,
+            itemCount: issue.items.length,
+            degraded: report.meta.degraded,
+            mailStatus
+          })
+        });
       });
-      upsertDigestReport(runtimeDeps.db, {
-        reportDate: report.meta.date,
-        collectionRunId,
-        reportJsonPath: path.join(dayDir, "report.json"),
-        reportHtmlPath: path.join(dayDir, "report.html"),
-        mailStatus
+      runDbMirrorStep(() => {
+        upsertDigestReport(runtimeDeps.db!, {
+          reportDate: report.meta.date,
+          collectionRunId,
+          reportJsonPath: path.join(dayDir, "report.json"),
+          reportHtmlPath: path.join(dayDir, "report.html"),
+          mailStatus
+        });
       });
     }
 
     return { report, mailStatus };
   } catch (error) {
     if (runtimeDeps.db && collectionRunId != null) {
-      finishCollectionRun(runtimeDeps.db, {
-        id: collectionRunId,
-        status: "failed",
-        finishedAt: new Date().toISOString(),
-        notes: JSON.stringify({
-          sourceKind: issue.sourceKind,
-          error: error instanceof Error ? error.message : "unknown"
-        })
+      runDbMirrorStep(() => {
+        finishCollectionRun(runtimeDeps.db!, {
+          id: collectionRunId,
+          status: "failed",
+          finishedAt: new Date().toISOString(),
+          notes: JSON.stringify({
+            sourceKind: issue.sourceKind,
+            error: error instanceof Error ? error.message : "unknown"
+          })
+        });
       });
     }
 
@@ -181,4 +191,14 @@ function pickPersistedTitle(feedTitle: string, article: ArticleResult): string {
   }
 
   return feedTitle;
+}
+
+// SQLite is only a mirror in this phase, so persistence failures must never take down the
+// established file-report and mail behavior.
+function runDbMirrorStep<T>(operation: () => T): T | undefined {
+  try {
+    return operation();
+  } catch {
+    return undefined;
+  }
 }

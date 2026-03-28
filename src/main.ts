@@ -24,7 +24,8 @@ const db = openDatabase(config.database.file);
 runMigrations(db);
 seedInitialData(db, {
   username: config.auth.username,
-  password: config.auth.password
+  password: config.auth.password,
+  juyaRssUrl: config.source.rssUrl
 });
 const lock = createRunLock();
 

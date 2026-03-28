@@ -253,6 +253,82 @@ describe("runDailyDigest", () => {
     db.close();
   });
 
+  it("keeps writing report artifacts and marks the run degraded when one source loader fails", async () => {
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-run-"));
+    const config = makeConfig(rootDir);
+    const db = createTestDatabase(path.join(rootDir, "hot-now.sqlite"));
+
+    const loaderResult = Object.assign(
+      [
+        {
+          date: "2026-03-29",
+          issueUrl: "https://blog.google/technology/ai/",
+          sourceKind: "google_ai",
+          sourceType: "official",
+          sourcePriority: 92,
+          items: [
+            {
+              rank: 1,
+              category: "最新 AI 消息",
+              title: "Google 推出 Lyria 3 Pro 音乐模型",
+              sourceUrl: "https://blog.google/lyria",
+              sourceName: "Google AI",
+              externalId: "google-1",
+              summary: "音乐模型摘要",
+              publishedAt: "2026-03-29T08:00:00.000Z"
+            }
+          ]
+        }
+      ],
+      {
+        failures: [
+          {
+            kind: "openai",
+            reason: "RSS request failed with 500 for openai"
+          }
+        ]
+      }
+    );
+
+    const result = await runDailyDigest(config, "manual", {
+      db,
+      loadEnabledSourceIssues: vi.fn().mockResolvedValue(loaderResult),
+      fetchArticle: vi.fn().mockResolvedValue({
+        ok: true,
+        url: "https://blog.google/lyria",
+        title: "Lyria 3 Pro",
+        text: "Google 发布新的音乐模型。"
+      }),
+      sendDailyEmail: vi.fn().mockResolvedValue(undefined)
+    });
+
+    const reportJson = JSON.parse(await readFile(path.join(rootDir, "2026-03-29", "report.json"), "utf8")) as typeof result.report;
+    const runMeta = JSON.parse(await readFile(path.join(rootDir, "2026-03-29", "run-meta.json"), "utf8")) as Record<string, unknown>;
+    const collectionRun = db
+      .prepare(
+        `
+          SELECT status, notes
+          FROM collection_runs
+          LIMIT 1
+        `
+      )
+      .get() as { status: string; notes: string };
+
+    expect(result.mailStatus).toBe("sent");
+    expect(result.report.meta.degraded).toBe(true);
+    expect(reportJson.meta.degraded).toBe(true);
+    expect(runMeta.mailStatus).toBe("sent");
+    expect(runMeta.degraded).toBe(true);
+    expect(runMeta.sourceFailureCount).toBe(1);
+    expect(runMeta.failedSourceKinds).toEqual(["openai"]);
+    expect(collectionRun.status).toBe("completed");
+    expect(collectionRun.notes).toContain('"sourceKinds":["google_ai"]');
+    expect(collectionRun.notes).toContain('"sourceFailureCount":1');
+    expect(collectionRun.notes).toContain('"failedSourceKinds":["openai"]');
+
+    db.close();
+  });
+
   it("keeps writing report artifacts when email sending fails", async () => {
     const rootDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-run-"));
     const config = makeConfig(rootDir);

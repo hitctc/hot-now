@@ -6,6 +6,7 @@ import { sendDailyEmail } from "../mail/sendDailyEmail.js";
 import { buildDailyReport, type DailyReport, type DailyReportIssue, type DailyReportTrigger } from "../report/buildDailyReport.js";
 import { renderReportHtml } from "../report/renderReportHtml.js";
 import { loadEnabledSourceIssues } from "../source/loadEnabledSourceIssues.js";
+import type { LoadedSourceIssues } from "../source/loadEnabledSourceIssues.js";
 import { reportDayDir, upsertDigestReport, writeJsonFile, writeTextFile } from "../storage/reportStore.js";
 import { clusterTopics, type RankedInput } from "../topics/clusterTopics.js";
 import type { ArticleResult } from "../fetch/extractArticle.js";
@@ -22,7 +23,7 @@ type EnrichedIssue = LoadedIssue & {
 
 export type RunDailyDigestDeps = {
   db?: SqliteDatabase;
-  loadEnabledSourceIssues?: () => Promise<LoadedIssue[]>;
+  loadEnabledSourceIssues?: () => Promise<LoadedSourceIssues>;
   fetchArticle?: (url: string) => Promise<ArticleResult>;
   sendDailyEmail?: (config: RuntimeConfig, report: DailyReport) => Promise<unknown>;
 };
@@ -55,6 +56,8 @@ export async function runDailyDigest(
 
   const loadEnabledSourceIssuesFn = deps.loadEnabledSourceIssues ?? (() => loadEnabledSourceIssues(runtimeDeps.db!));
   const issues = await loadEnabledSourceIssuesFn();
+  const sourceFailures = issues.failures ?? [];
+  const hasSourceFailures = sourceFailures.length > 0;
   const reportIssue = pickReportIssue(issues);
   const startedAt = new Date().toISOString();
   const collectionRunId = runtimeDeps.db
@@ -66,7 +69,9 @@ export async function runDailyDigest(
           startedAt,
           notes: JSON.stringify({
             sourceKinds: issues.map((issue) => issue.sourceKind),
-            sourceCount: issues.length
+            sourceCount: issues.length,
+            sourceFailureCount: sourceFailures.length,
+            failedSourceKinds: sourceFailures.map((failure) => failure.kind)
           })
         })
       )
@@ -86,6 +91,7 @@ export async function runDailyDigest(
 
     const topics = clusterTopics(enrichedItems);
     const report = buildDailyReport({ issue: buildAggregateIssue(reportIssue, enrichedItems), trigger, topics, topN: config.report.topN });
+    report.meta.degraded = report.meta.degraded || hasSourceFailures;
     const mailStatus = await sendReportEmail(config, report, runtimeDeps.sendDailyEmail);
     report.meta.mailStatus = mailStatus;
 
@@ -100,7 +106,9 @@ export async function runDailyDigest(
       generatedAt: report.meta.generatedAt,
       mailStatus,
       degraded: report.meta.degraded,
-      topicCount: report.meta.topicCount
+      topicCount: report.meta.topicCount,
+      sourceFailureCount: sourceFailures.length,
+      failedSourceKinds: sourceFailures.map((failure) => failure.kind)
     });
 
     if (runtimeDeps.db && collectionRunId != null) {
@@ -112,6 +120,8 @@ export async function runDailyDigest(
           notes: JSON.stringify({
             sourceKinds: issues.map((issue) => issue.sourceKind),
             sourceCount: issues.length,
+            sourceFailureCount: sourceFailures.length,
+            failedSourceKinds: sourceFailures.map((failure) => failure.kind),
             itemCount: enrichedItems.length,
             degraded: report.meta.degraded,
             mailStatus
@@ -140,6 +150,8 @@ export async function runDailyDigest(
           notes: JSON.stringify({
             sourceKinds: issues.map((issue) => issue.sourceKind),
             sourceCount: issues.length,
+            sourceFailureCount: sourceFailures.length,
+            failedSourceKinds: sourceFailures.map((failure) => failure.kind),
             error: error instanceof Error ? error.message : "unknown"
           })
         });

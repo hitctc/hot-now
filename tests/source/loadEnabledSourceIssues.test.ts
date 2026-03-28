@@ -100,6 +100,12 @@ describe("loadEnabledSourceIssues", () => {
       sourceType: "official",
       sourcePriority: 92
     });
+    expect(issues.failures).toEqual([
+      {
+        kind: "openai",
+        reason: "RSS request failed with 500 for openai"
+      }
+    ]);
   });
 
   it("fails when every enabled source fails to load", async () => {
@@ -124,6 +130,6 @@ describe("loadEnabledSourceIssues", () => {
       })
     );
 
-    await expect(loadEnabledSourceIssues(db)).rejects.toThrow("No enabled content sources could be loaded");
+    await expect(loadEnabledSourceIssues(db)).rejects.toThrow("RSS request failed with 500 for openai");
   });
 });

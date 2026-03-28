@@ -12,7 +12,7 @@ const baseEnv = {
   SMTP_USER: "sender@qq.com",
   SMTP_PASS: "secret",
   MAIL_TO: "receiver@example.com",
-  BASE_URL: "http://127.0.0.1:3010",
+  BASE_URL: "http://127.0.0.1:3030",
   AUTH_USERNAME: "admin",
   AUTH_PASSWORD: "super-secret",
   SESSION_SECRET: "session-secret-value"
@@ -35,7 +35,7 @@ describe("loadRuntimeConfig", () => {
     await writeFile(
       configPath,
       JSON.stringify({
-        server: { port: 3010 },
+        server: { port: 3030 },
         schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
         report: { topN: 10, dataDir: "./data/reports", allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
@@ -84,7 +84,7 @@ describe("loadRuntimeConfig", () => {
     await writeFile(
       configPath,
       JSON.stringify({
-        server: { port: 3010 },
+        server: { port: 3030 },
         schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
         report: { topN: 10, dataDir: path.join(tempDir, "reports"), allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
@@ -118,7 +118,7 @@ describe("loadRuntimeConfig", () => {
     await writeFile(
       configPath,
       JSON.stringify({
-        server: { port: 3010 },
+        server: { port: 3030 },
         schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
         report: { topN: 10, dataDir: "./data/reports", allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
@@ -145,7 +145,7 @@ describe("loadRuntimeConfig", () => {
     await writeFile(
       configPath,
       JSON.stringify({
-        server: { port: 3010 },
+        server: { port: 3030 },
         schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
         report: { topN: 10, dataDir: "./data/reports", allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
@@ -172,7 +172,7 @@ describe("loadRuntimeConfig", () => {
     await writeFile(
       configPath,
       JSON.stringify({
-        server: { port: 3010 },
+        server: { port: 3030 },
         schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
         report: { topN: 10, dataDir: "./data/reports", allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
@@ -199,7 +199,7 @@ describe("loadRuntimeConfig", () => {
     await writeFile(
       configPath,
       JSON.stringify({
-        server: { port: 3010 },
+        server: { port: 3030 },
         schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
         report: { topN: 10, allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
@@ -241,7 +241,7 @@ describe("loadRuntimeConfig", () => {
     await writeFile(
       configPath,
       JSON.stringify({
-        server: { port: 3010 },
+        server: { port: 3030 },
         schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
         report: { topN: 0, dataDir: "../data/reports", allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },

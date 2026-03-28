@@ -38,7 +38,7 @@ describe("sendDailyEmail", () => {
           user: "sender@qq.com",
           pass: "secret",
           to: "receiver@example.com",
-          baseUrl: "http://127.0.0.1:3010"
+          baseUrl: "http://127.0.0.1:3030"
         }
       } as never,
       report,
@@ -56,6 +56,6 @@ describe("sendDailyEmail", () => {
 
     const [[message]] = sendMail.mock.calls;
     expect(message.html).toContain("2026-03-26");
-    expect(message.html).toContain("http://127.0.0.1:3010/reports/2026-03-26");
+    expect(message.html).toContain("http://127.0.0.1:3030/reports/2026-03-26");
   });
 });

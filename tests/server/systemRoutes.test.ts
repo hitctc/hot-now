@@ -42,16 +42,44 @@ describe("system routes", () => {
           lastCollectedAt: null,
           lastCollectionStatus: null
         }
-      ])
+      ]),
+      triggerManualRun: vi.fn().mockResolvedValue({ accepted: true }),
+      isRunning: () => false
     } as never);
 
     const response = await app.inject({ method: "GET", url: "/settings/sources" });
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("数据迭代收集");
+    expect(response.body).toContain("手动执行采集");
+    expect(response.body).toContain("当前启用 source：Juya AI Daily");
     expect(response.body).toContain("Juya AI Daily");
     expect(response.body).toContain("当前启用");
     expect(response.body).toContain("completed");
+  });
+
+  it("renders running state on the manual collection card when a job is already running", async () => {
+    const app = createServer({
+      listSources: vi.fn().mockResolvedValue([
+        {
+          kind: "openai",
+          name: "OpenAI",
+          rssUrl: "https://openai.com/news/rss.xml",
+          isActive: true,
+          lastCollectedAt: "2026-03-28T08:00:00.000Z",
+          lastCollectionStatus: "running"
+        }
+      ]),
+      triggerManualRun: vi.fn().mockResolvedValue({ accepted: true }),
+      isRunning: () => true
+    } as never);
+
+    const response = await app.inject({ method: "GET", url: "/settings/sources" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain("采集中...");
+    expect(response.body).toContain("当前已有任务执行中，请稍后再试。");
+    expect(response.body).toContain("disabled");
   });
 
   it("renders profile page with current user profile", async () => {

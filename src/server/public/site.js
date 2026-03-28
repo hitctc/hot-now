@@ -59,6 +59,12 @@
       return;
     }
 
+    if (target.dataset.systemAction === "manual-collection-run") {
+      event.preventDefault();
+      await handleManualCollectionRun(target);
+      return;
+    }
+
     if (target.dataset.contentAction !== "ratings") {
       return;
     }
@@ -257,6 +263,29 @@
     showFormStatus(form, "已切换当前启用 source。");
   }
 
+  async function handleManualCollectionRun(form) {
+    // Manual collection uses the same digest endpoint as the legacy control page, but keeps feedback inline in the unified shell.
+    const runButton = form.querySelector('[data-role="manual-run-button"]');
+
+    if (!(runButton instanceof HTMLButtonElement)) {
+      showFormStatus(form, "未找到采集按钮。");
+      return;
+    }
+
+    runButton.disabled = true;
+    runButton.textContent = "采集中...";
+    const response = await postJson("/actions/run", {});
+
+    if (!response.ok) {
+      runButton.disabled = false;
+      runButton.textContent = "手动执行采集";
+      showFormStatus(form, await readSystemActionError(response, "采集任务启动失败，请稍后再试。"));
+      return;
+    }
+
+    showFormStatus(form, "已开始执行采集，请稍后刷新查看结果。");
+  }
+
   async function postJson(url, body) {
     // Network failures return a shape with `ok: false` so callers can share one error branch.
     try {
@@ -319,6 +348,10 @@
 
     if (payload?.reason === "invalid-source-kind") {
       return "source 参数不合法。";
+    }
+
+    if (payload?.reason === "already-running") {
+      return "当前已有任务执行中，请稍后再试。";
     }
 
     return fallbackMessage;

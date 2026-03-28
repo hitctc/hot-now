@@ -14,7 +14,7 @@ function makeAppEnv() {
     SMTP_USER: "sender@qq.com",
     SMTP_PASS: "test-auth-code",
     MAIL_TO: "receiver@example.com",
-    BASE_URL: "http://127.0.0.1:3010",
+    BASE_URL: "http://127.0.0.1:3030",
     AUTH_USERNAME: "admin",
     AUTH_PASSWORD: "admin",
     SESSION_SECRET: "test-session-secret"
@@ -233,6 +233,12 @@ describe("createServer", () => {
     expect(shellResponse.body).toContain("系统管理员");
     expect(shellResponse.body).toContain("/articles");
     expect(shellResponse.body).toContain("/settings/profile");
+    expect(shellResponse.body).toContain("热点资讯");
+    expect(shellResponse.body).toContain("热门文章");
+    expect(shellResponse.body).toContain("最新 AI 消息");
+    expect(shellResponse.body).toContain("筛选策略");
+    expect(shellResponse.body).toContain("数据迭代收集");
+    expect(shellResponse.body).toContain("当前登录用户");
     expect(shellResponse.body).toContain("退出登录");
   });
 

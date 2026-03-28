@@ -62,9 +62,9 @@
 - `/`：统一站点首页（登录后）
 - `/articles`：统一站点文章页（登录后）
 - `/ai`：统一站点 AI 页（登录后）
-- `/settings/view-rules`：统一站点查看规则页（登录后）
-- `/settings/sources`：统一站点数据源页（登录后）
-- `/settings/profile`：统一站点个人信息页（登录后）
+- `/settings/view-rules`：统一站点筛选策略页（登录后）
+- `/settings/sources`：统一站点数据迭代收集页（登录后，可切换当前启用 source，并手动执行一次采集）
+- `/settings/profile`：统一站点当前登录用户页（登录后）
 - `/history`：历史报告（legacy，当前仍保留）
 - `/reports/:date`：指定日期报告（legacy，当前仍保留）
 - `/control`：控制台（legacy，当前仍保留）
@@ -102,10 +102,10 @@
 
 1. 准备 `SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_USER`、`SMTP_PASS`、`MAIL_TO`、`BASE_URL`、`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET`
 2. 启动 `npm run dev`
-3. 打开 `/control`
-4. 手动触发一次任务
+3. 打开 `/login` 并完成登录
+4. 进入 `/settings/sources` 或 legacy `/control` 手动触发一次任务
 5. 检查是否生成报告目录与 `report.json`、`report.html`、`run-meta.json`
-6. 检查 `/`、`/history`、`/reports/:date` 是否正常显示
+6. 检查 `/`、`/settings/sources`、`/history`、`/reports/:date` 是否正常显示
 
 ## 6. 配置与安全约束
 
@@ -171,5 +171,6 @@
 - 原文抓取过程中出现过一次 `jsdom` 的 `Could not parse CSS stylesheet` 日志噪音，未阻断本轮任务完成；如果后续要收口发布质量，可以继续评估是否需要单独治理
 - Task4（single-user login + unified app shell）已落地：新增 `passwords/session` auth helper、登录页与统一壳层菜单路由，且保留 legacy 报告路由兼容
 - 真实入口已收紧：`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 现在是必填；auth 开启时 legacy 路由也要求登录，`POST /actions/run` 未登录返回未授权
+- Task6（系统菜单）已具备基础可用性：筛选策略支持保存 JSON 规则，数据迭代收集支持 source 切换和统一站点内手动执行采集，当前登录用户页可展示基础账号信息
 
 如果后续有人完成了真实 SMTP 验证、补充了更完整的端到端验证，或确认上述日志噪音属于需要修复的问题，请同步更新这一节，避免误导下一位协作者。

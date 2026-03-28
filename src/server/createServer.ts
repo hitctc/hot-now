@@ -546,7 +546,10 @@ async function renderSystemPageForPath(deps: ServerDeps, pathname: string, logge
     }
 
     const sources = await deps.listSources();
-    return renderSourcesPage(sources);
+    return renderSourcesPage(sources, {
+      canTriggerManualRun: typeof deps.triggerManualRun === "function",
+      isRunning: deps.isRunning?.() ?? false
+    });
   }
 
   if (pathname === "/settings/profile") {

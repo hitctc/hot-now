@@ -14,6 +14,11 @@ type SourceItem = {
   lastCollectionStatus: string | null;
 };
 
+type SourcesPageOptions = {
+  canTriggerManualRun: boolean;
+  isRunning: boolean;
+};
+
 type ProfileView = {
   username: string;
   displayName: string;
@@ -41,12 +46,13 @@ export function renderViewRulesPage(rules: ViewRuleItem[]): string {
   `;
 }
 
-export function renderSourcesPage(sources: SourceItem[]): string {
+export function renderSourcesPage(sources: SourceItem[], options: SourcesPageOptions): string {
   // Source cards expose active state and latest collection hints for day-to-day switching decisions.
   if (sources.length === 0) {
     return renderEmptyState("数据迭代收集", "尚未发现数据源，请先执行种子初始化。");
   }
 
+  const activeSource = sources.find((source) => source.isActive) ?? null;
   const cardsHtml = sources.map((source) => renderSourceCard(source)).join("");
 
   return `
@@ -55,6 +61,7 @@ export function renderSourcesPage(sources: SourceItem[]): string {
       <p class="content-description">数据迭代收集：切换当前启用 source，并查看最近抓取状态。</p>
     </section>
     <section class="system-stack">
+      ${renderManualCollectionCard(activeSource, options)}
       ${cardsHtml}
     </section>
   `;
@@ -161,6 +168,35 @@ function renderSourceCard(source: SourceItem): string {
           ${source.isActive ? "当前启用" : "设为当前启用"}
         </button>
         <p class="action-status system-status" data-role="action-status" aria-live="polite"></p>
+      </form>
+    </article>
+  `;
+}
+
+function renderManualCollectionCard(source: SourceItem | null, options: SourcesPageOptions): string {
+  // Manual collection reuses the existing digest trigger so operators can run the active source from the unified page.
+  const activeSourceName = source?.name ?? "未设置";
+  const buttonText = options.isRunning ? "采集中..." : "手动执行采集";
+  const disabledAttr = options.canTriggerManualRun && !options.isRunning ? "" : " disabled";
+  const initialStatus = options.canTriggerManualRun
+    ? options.isRunning
+      ? "当前已有任务执行中，请稍后再试。"
+      : ""
+    : "当前环境未启用手动采集。";
+
+  return `
+    <article class="system-card">
+      <header class="system-card-header">
+        <h3 class="system-card-title">手动执行采集</h3>
+        <p class="system-card-meta">当前启用 source：${escapeHtml(activeSourceName)}</p>
+      </header>
+      <form class="system-form" data-system-action="manual-collection-run">
+        <div class="system-action-row">
+          <button type="submit" class="primary-mini-button" data-role="manual-run-button"${disabledAttr}>
+            ${buttonText}
+          </button>
+        </div>
+        <p class="action-status system-status" data-role="action-status" aria-live="polite">${escapeHtml(initialStatus)}</p>
       </form>
     </article>
   `;

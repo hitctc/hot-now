@@ -1,5 +1,5 @@
 {
-  "server": { "port": 3010 },
+  "server": { "port": 3030 },
   "schedule": { "enabled": true, "dailyTime": "08:00", "timezone": "Asia/Shanghai" },
   "report": { "topN": 10, "dataDir": "../data/reports", "allowDegraded": true },
   "source": { "rssUrl": "https://imjuya.github.io/juya-ai-daily/rss.xml" },

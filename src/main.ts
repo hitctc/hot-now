@@ -12,6 +12,7 @@ import { listRatingDimensions, saveRatings } from "./core/ratings/ratingReposito
 import type { DailyReportTrigger } from "./core/report/buildDailyReport.js";
 import { createRunLock } from "./core/runtime/runLock.js";
 import { startScheduler } from "./core/scheduler/startScheduler.js";
+import { listSourceCards } from "./core/source/listSourceCards.js";
 import { loadActiveSourceIssue } from "./core/source/loadActiveSourceIssue.js";
 import { listReportDates, readTextFile } from "./core/storage/reportStore.js";
 import { listViewRules, saveViewRuleConfig } from "./core/viewRules/viewRuleRepository.js";
@@ -36,17 +37,6 @@ type UserProfileRow = {
   display_name: string | null;
   email: string | null;
 };
-type SourceRow = {
-  kind: string;
-  name: string;
-  rss_url: string | null;
-  is_active: number;
-};
-type CollectionRunRow = {
-  started_at: string;
-  finished_at: string | null;
-  status: string;
-};
 type ActiveSourceUpdateResult = { ok: true } | { ok: false; reason: "not-found" };
 
 const config = await loadRuntimeConfig();
@@ -70,21 +60,6 @@ const readCurrentUserProfile = db.prepare(
     SELECT username, role, display_name, email
     FROM user_profile
     WHERE id = 1
-  `
-);
-const listSourcesStatement = db.prepare(
-  `
-    SELECT kind, name, rss_url, is_active
-    FROM content_sources
-    ORDER BY id ASC
-  `
-);
-const readLatestCollectionRun = db.prepare(
-  `
-    SELECT started_at, finished_at, status
-    FROM collection_runs
-    ORDER BY datetime(COALESCE(finished_at, started_at)) DESC, id DESC
-    LIMIT 1
   `
 );
 const readSourceByKind = db.prepare(
@@ -167,22 +142,6 @@ async function verifyLogin(username: string, password: string) {
   };
 }
 
-function listSourceCards() {
-  // Source list attaches latest collection run metadata only to the currently active source.
-  const sources = listSourcesStatement.all() as SourceRow[];
-  const latestRun = readLatestCollectionRun.get() as CollectionRunRow | undefined;
-
-  return sources.map((source) => ({
-    kind: source.kind,
-    name: source.name,
-    rssUrl: source.rss_url,
-    isActive: source.is_active === 1,
-    lastCollectedAt:
-      source.is_active === 1 ? latestRun?.finished_at ?? latestRun?.started_at ?? null : null,
-    lastCollectionStatus: source.is_active === 1 ? latestRun?.status ?? null : null
-  }));
-}
-
 function setActiveSource(kind: string): ActiveSourceUpdateResult {
   // Activation runs in one transaction to guarantee there is never more than one active source.
   const activate = db.transaction((normalizedKind: string): ActiveSourceUpdateResult => {
@@ -230,7 +189,7 @@ const app = createServer({
   saveRatings: async (contentItemId, scores) => saveRatings(db, contentItemId, scores),
   listViewRules: async () => listViewRules(db),
   saveViewRuleConfig: async (ruleKey, config) => saveViewRuleConfig(db, ruleKey, config),
-  listSources: async () => listSourceCards(),
+  listSources: async () => listSourceCards(db),
   setActiveSource: async (kind) => setActiveSource(kind),
   getCurrentUserProfile: async () => getCurrentUserProfile(),
   listReportSummaries: listStoredReportSummaries,

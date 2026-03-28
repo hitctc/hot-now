@@ -23,7 +23,7 @@ afterEach(() => {
 
 function makeConfig(rootDir: string): RuntimeConfig {
   return {
-    server: { port: 3010 },
+    server: { port: 3030 },
     schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
     report: { topN: 10, dataDir: rootDir, allowDegraded: true },
     source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
@@ -36,7 +36,7 @@ function makeConfig(rootDir: string): RuntimeConfig {
       user: "sender@qq.com",
       pass: "secret",
       to: "receiver@example.com",
-      baseUrl: "http://127.0.0.1:3010"
+      baseUrl: "http://127.0.0.1:3030"
     },
     auth: {
       username: "admin",

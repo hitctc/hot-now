@@ -19,17 +19,17 @@ type AppShellView = {
 };
 
 const appShellPages: AppShellPage[] = [
-  { path: "/", title: "今日看板", section: "content", description: "这里会展示今日重点热点与整体摘要。" },
-  { path: "/articles", title: "文章库", section: "content", description: "这里会承载文章搜索、筛选和详情入口。" },
-  { path: "/ai", title: "AI 视角", section: "content", description: "这里会放置 AI 评分、聚类和观点整合结果。" },
+  { path: "/", title: "热点资讯", section: "content", description: "这里会展示统一内容池中的热点内容与时效优先结果。" },
+  { path: "/articles", title: "热门文章", section: "content", description: "这里会承载适合深读、完整度更高的文章内容。" },
+  { path: "/ai", title: "最新 AI 消息", section: "content", description: "这里会展示 AI 相关性更高、发布时间更近的内容。" },
   {
     path: "/settings/view-rules",
-    title: "查看规则",
+    title: "筛选策略",
     section: "system",
-    description: "这里会配置热点筛选规则与展示偏好。"
+    description: "这里会配置各内容菜单的筛选规则与展示偏好。"
   },
-  { path: "/settings/sources", title: "数据源", section: "system", description: "这里会管理 RSS 与外部数据源配置。" },
-  { path: "/settings/profile", title: "个人信息", section: "system", description: "这里会管理当前账号资料与安全设置。" }
+  { path: "/settings/sources", title: "数据迭代收集", section: "system", description: "这里会管理 RSS 数据源、当前启用项和采集状态。" },
+  { path: "/settings/profile", title: "当前登录用户", section: "system", description: "这里会展示当前账号资料、角色和登录状态。" }
 ];
 
 // The server resolves shell pages from one canonical list so route registration and navigation stay in sync.

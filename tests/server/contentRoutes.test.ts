@@ -55,7 +55,7 @@ describe("content routes", () => {
     const response = await app.inject({ method: "GET", url: "/settings/profile" });
 
     expect(response.statusCode).toBe(200);
-    expect(response.body).toContain("个人信息");
+    expect(response.body).toContain("当前登录用户");
     expect(response.body).toContain("模块占位");
   });
 

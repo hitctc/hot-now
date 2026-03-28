@@ -20,6 +20,9 @@ describe("system routes", () => {
     expect(response.body).toContain("筛选策略");
     expect(response.body).toContain('class="content-kicker"');
     expect(response.body).toContain('class="content-intro content-intro--system"');
+    expect(response.body).toContain('class="sidebar-page-summary"');
+    expect(response.body).toContain("这里会配置各内容菜单的筛选规则与展示偏好。");
+    expect(response.body).not.toContain('class="shell-header"');
     expect(response.body).toContain('class="system-stack system-stack--control"');
     expect(response.body).toContain("热点策略");
     expect(response.body).toMatch(/class="[^"]*\bsystem-card\b[^"]*"/);
@@ -107,6 +110,8 @@ describe("system routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("当前登录用户");
     expect(response.body).toContain('class="content-intro content-intro--system"');
+    expect(response.body).toContain('class="sidebar-page-summary"');
+    expect(response.body).not.toContain('class="shell-header"');
     expect(response.body).toContain('class="system-card system-card--control system-card--profile"');
     expect(response.body).toContain("系统管理员");
     expect(response.body).toContain("admin@example.com");

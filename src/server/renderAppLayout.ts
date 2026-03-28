@@ -47,7 +47,8 @@ export function renderAppLayout(view: AppShellView): string {
   const contentLinks = renderNavGroup(appShellPages.filter((page) => page.section === "content"), view.currentPath);
   const systemLinks = renderNavGroup(appShellPages.filter((page) => page.section === "system"), view.currentPath);
   const pageContent = view.contentHtml ?? renderPlaceholder(view.page.description);
-  const userBlock = view.user ? renderUserBlock(view.user) : `<p class="user-meta">公开访问模式</p>`;
+  const sidebarPageSummary = renderSidebarPageSummary(view.page);
+  const sidebarAccount = renderSidebarAccount(view.user);
   const themeControl = `
   <section class="theme-dock" data-theme-toggle>
     <p class="theme-dock-title">界面主题</p>
@@ -83,20 +84,13 @@ export function renderAppLayout(view: AppShellView): string {
           <p class="nav-title">系统菜单</p>
           ${systemLinks}
         </nav>
+        ${sidebarPageSummary}
         <div class="sidebar-footer">
           ${themeControl}
+          ${sidebarAccount}
         </div>
       </aside>
       <div class="shell-main">
-        <header class="shell-header">
-          <div>
-            <p class="header-overline">当前页面</p>
-            <h2 class="header-title">${escapeHtml(view.page.title)}</h2>
-          </div>
-          <div class="header-user">
-            ${userBlock}
-          </div>
-        </header>
         <main class="shell-content">
           ${pageContent}
         </main>
@@ -116,16 +110,37 @@ function renderPlaceholder(description: string) {
   `;
 }
 
-function renderUserBlock(user: AppShellUser) {
-  // Authenticated pages keep user identity and logout controls in one shared header fragment.
+function renderSidebarPageSummary(page: AppShellPage) {
+  // The sidebar summary mirrors the current page title and description so the shell keeps context in one place.
   return `
-    <div>
-      <p class="user-name">${escapeHtml(user.displayName)}</p>
-      <p class="user-meta">@${escapeHtml(user.username)} · ${escapeHtml(user.role)}</p>
-    </div>
-    <form method="post" action="/logout">
-      <button type="submit" class="ghost-button">退出登录</button>
-    </form>
+    <section class="sidebar-page-summary" aria-labelledby="sidebar-page-summary-title">
+      <p class="sidebar-page-summary-kicker">当前页面</p>
+      <h2 id="sidebar-page-summary-title" class="sidebar-page-summary-title">${escapeHtml(page.title)}</h2>
+      <p class="sidebar-page-summary-description">${escapeHtml(page.description)}</p>
+    </section>
+  `;
+}
+
+function renderSidebarAccount(user?: AppShellUser) {
+  // The sidebar account block keeps identity and logout controls anchored beside the theme switcher.
+  if (!user) {
+    return `
+      <section class="sidebar-account" aria-label="账号信息">
+        <p class="user-meta">公开访问模式</p>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="sidebar-account" aria-label="账号信息">
+      <div class="sidebar-account-body">
+        <p class="user-name">${escapeHtml(user.displayName)}</p>
+        <p class="user-meta">@${escapeHtml(user.username)} · ${escapeHtml(user.role)}</p>
+      </div>
+      <form method="post" action="/logout" class="sidebar-account-actions">
+        <button type="submit" class="ghost-button">退出登录</button>
+      </form>
+    </section>
   `;
 }
 

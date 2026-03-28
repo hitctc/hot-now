@@ -509,8 +509,44 @@ code {
 }
 
 .sidebar-footer {
+  display: grid;
+  gap: 12px;
   margin-top: auto;
   padding-top: 18px;
+}
+
+.sidebar-page-summary {
+  position: relative;
+  z-index: 1;
+  margin-top: 16px;
+  padding: 16px 14px;
+  border: 1px solid var(--border-sidebar-soft);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01));
+  box-shadow: var(--shadow-inset);
+}
+
+.sidebar-page-summary-kicker {
+  margin: 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-sidebar-muted);
+}
+
+.sidebar-page-summary-title {
+  margin: 8px 0 0;
+  font-size: 20px;
+  line-height: 1.18;
+  letter-spacing: -0.03em;
+  color: var(--text-sidebar);
+}
+
+.sidebar-page-summary-description {
+  margin: 10px 0 0;
+  color: var(--text-sidebar-muted);
+  line-height: 1.65;
+  font-size: 14px;
 }
 
 /* 主题切换器要像一个小型控制台，而不是页面底部的普通开关。 */
@@ -563,47 +599,31 @@ code {
   box-shadow: var(--shadow-accent);
 }
 
+.sidebar-account {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border-sidebar-soft);
+  border-radius: 18px;
+  background: linear-gradient(180deg, var(--bg-sidebar-panel), rgba(255, 255, 255, 0.02));
+  box-shadow: var(--shadow-inset);
+  backdrop-filter: blur(14px);
+}
+
+.sidebar-account-body {
+  display: grid;
+  gap: 3px;
+}
+
+.sidebar-account-actions {
+  margin: 0;
+}
+
 .shell-main {
   display: flex;
   flex-direction: column;
   min-width: 0;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 18%);
-}
-
-.shell-header {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 22px 32px;
-  background: var(--bg-header);
-  backdrop-filter: blur(18px);
-  border-bottom: 1px solid var(--border);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.06);
-}
-
-.header-overline {
-  margin: 0;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.header-title {
-  margin: 7px 0 0;
-  font-size: 26px;
-  line-height: 1.1;
-  letter-spacing: -0.03em;
-}
-
-.header-user {
-  display: flex;
-  align-items: center;
-  gap: 16px;
 }
 
 .user-name {
@@ -1121,8 +1141,9 @@ code {
     border-bottom: 1px solid var(--border-sidebar);
   }
 
-  /* 窄屏侧栏保留导航能力，但把品牌区和主题区压缩到更短的首屏高度。 */
+  /* 窄屏侧栏保留导航能力，但把品牌区、页面摘要和底部控制区压缩到更短的首屏高度。 */
   .brand-block,
+  .sidebar-page-summary,
   .sidebar-footer {
     grid-column: 1 / -1;
   }
@@ -1167,20 +1188,24 @@ code {
     font-size: 13px;
   }
 
+  .sidebar-page-summary {
+    grid-column: 1 / -1;
+    margin-top: 0;
+    padding: 12px 12px 13px;
+  }
+
+  .sidebar-page-summary-title {
+    font-size: 16px;
+    line-height: 1.2;
+  }
+
+  .sidebar-page-summary-description {
+    font-size: 13px;
+  }
+
   .sidebar-footer {
     margin-top: 0;
     padding-top: 0;
-  }
-
-  .shell-header {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 16px 16px 14px;
-  }
-
-  .header-user {
-    width: 100%;
-    justify-content: space-between;
   }
 
   .shell-content {

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { createSessionToken } from "../../src/core/auth/session.js";
 import { createServer } from "../../src/server/createServer.js";
 
 describe("content routes", () => {
@@ -64,12 +65,56 @@ describe("content routes", () => {
     expect(response.body).toContain('data-theme="dark"');
     expect(response.body).toContain("HotNow Signal Grid");
     expect(response.body).toContain("Cyber Intelligence Console");
-    expect(response.body).toContain('class="content-intro content-intro--signal"');
     expect(response.body).toContain("科技内容、采集状态与操作控制在同一控制台内完成。");
+    expect(response.body).toContain('class="sidebar-page-summary"');
+    expect(response.body).toContain("当前页面");
+    expect(response.body).toContain("热点资讯");
+    expect(response.body).toContain("这里会展示统一内容池中的热点内容与时效优先结果。");
     expect(response.body).toContain("data-theme-toggle");
+    expect(response.body).toContain('class="sidebar-account"');
+    expect(response.body).toContain("公开访问模式");
     expect(response.body).toContain('data-theme-choice="dark" aria-pressed="true"');
     expect(response.body).toContain('data-theme-choice="light" aria-pressed="false"');
+    expect(response.body).not.toContain('class="shell-header"');
     expect(response.body).not.toContain("主题切换将在下一步启用。");
+  });
+
+  it("renders the signed-in user block beside the theme controls", async () => {
+    const app = createServer({
+      auth: {
+        requireLogin: true,
+        sessionSecret: "test-secret"
+      },
+      getCurrentUserProfile: vi.fn().mockResolvedValue({
+        username: "admin",
+        displayName: "系统管理员",
+        role: "admin",
+        email: "admin@example.com"
+      })
+    } as never);
+    const sessionToken = createSessionToken(
+      {
+        username: "admin",
+        displayName: "系统管理员",
+        role: "admin"
+      },
+      "test-secret"
+    );
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/settings/profile",
+      headers: {
+        cookie: `hot_now_session=${sessionToken}`
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('class="sidebar-account"');
+    expect(response.body).toContain("系统管理员");
+    expect(response.body).toContain("退出登录");
+    expect(response.body).toContain('form method="post" action="/logout"');
+    expect(response.body).not.toContain('class="shell-header"');
   });
 
   it("keeps system menu pages accessible in public content mode", async () => {

@@ -268,6 +268,118 @@ code {
   font-size: 0.95em;
 }
 
+/* Legacy pages stay compact and card-based so the old routes inherit the shared theme without mimicking the unified shell. */
+.legacy-page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 32px 20px 44px;
+}
+
+.legacy-shell {
+  width: min(960px, 100%);
+  display: flex;
+  flex-direction: column;
+}
+
+.legacy-shell--notice {
+  width: min(720px, 100%);
+}
+
+.legacy-card {
+  position: relative;
+  width: 100%;
+  padding: 24px 26px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(180deg, var(--bg-panel-strong), var(--bg-panel));
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(18px);
+  overflow: hidden;
+}
+
+.legacy-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-soft), transparent);
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.legacy-card h1 {
+  margin: 0;
+  font-size: clamp(1.35rem, 1.1vw + 1.1rem, 1.7rem);
+  line-height: 1.18;
+  letter-spacing: -0.03em;
+}
+
+.legacy-card p {
+  margin: 0;
+  color: var(--text-body);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.legacy-card ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.legacy-card li {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--bg-control), rgba(255, 255, 255, 0.01));
+  color: var(--text-body);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.legacy-card a {
+  color: var(--accent);
+}
+
+.legacy-card a:hover {
+  text-decoration: underline;
+}
+
+.legacy-card form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.legacy-card button {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--bg-link-active);
+  color: var(--text-on-accent);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: var(--shadow-accent);
+  transition: transform var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
+}
+
+.legacy-card button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.legacy-card button:disabled {
+  background: var(--bg-control);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
 .shell-root {
   min-height: 100vh;
   display: grid;
@@ -1074,6 +1186,28 @@ code {
   .shell-content {
     padding: 20px 16px 28px;
     gap: 14px;
+  }
+
+  .legacy-page {
+    padding: 18px 14px 28px;
+  }
+
+  .legacy-card {
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .legacy-card ul {
+    gap: 8px;
+  }
+
+  .legacy-card li {
+    padding: 10px 12px;
+  }
+
+  .legacy-card button {
+    width: 100%;
+    justify-content: center;
   }
 
   .theme-switch {

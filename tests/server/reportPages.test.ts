@@ -2,6 +2,19 @@ import { describe, expect, it, vi } from "vitest";
 import { createServer } from "../../src/server/createServer.js";
 
 describe("report pages", () => {
+  it("ships legacy wrapper styles in the shared CSS asset", async () => {
+    const app = createServer({} as never);
+
+    const response = await app.inject({ method: "GET", url: "/assets/site.css" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain(".legacy-page {");
+    expect(response.body).toContain(".legacy-shell {");
+    expect(response.body).toContain(".legacy-card {");
+    expect(response.body).toContain(".legacy-card ul {");
+    expect(response.body).toContain(".legacy-card button {");
+  });
+
   it("renders the control page with config summary", async () => {
     const app = createServer({
       config: {

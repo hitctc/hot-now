@@ -1,5 +1,6 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import type { SqliteDatabase } from "../db/openDatabase.js";
 
 export function reportDayDir(rootDir: string, reportDate: string) {
   return resolveWithinRoot(rootDir, reportDate);
@@ -35,6 +36,44 @@ export async function listReportDates(rootDir: string) {
 
     throw error;
   }
+}
+
+export type UpsertDigestReportInput = {
+  reportDate: string;
+  collectionRunId?: number;
+  reportJsonPath?: string;
+  reportHtmlPath?: string;
+  mailStatus: string;
+};
+
+// Digest reports stay mirrored in SQLite so future UI work can query metadata without replacing
+// the existing file-based report pages in this phase.
+export function upsertDigestReport(db: SqliteDatabase, input: UpsertDigestReportInput): void {
+  db.prepare(
+    `
+      INSERT INTO digest_reports (
+        report_date,
+        collection_run_id,
+        report_json_path,
+        report_html_path,
+        mail_status,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(report_date) DO UPDATE SET
+        collection_run_id = excluded.collection_run_id,
+        report_json_path = excluded.report_json_path,
+        report_html_path = excluded.report_html_path,
+        mail_status = excluded.mail_status,
+        updated_at = CURRENT_TIMESTAMP
+    `
+  ).run(
+    input.reportDate,
+    input.collectionRunId ?? null,
+    input.reportJsonPath ?? null,
+    input.reportHtmlPath ?? null,
+    input.mailStatus
+  );
 }
 
 function resolveWithinRoot(rootDir: string, ...segments: string[]) {

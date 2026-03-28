@@ -1,11 +1,14 @@
 import { loadRuntimeConfig } from "./core/config/loadRuntimeConfig.js";
+import { openDatabase } from "./core/db/openDatabase.js";
+import { runMigrations } from "./core/db/runMigrations.js";
+import { seedInitialData } from "./core/db/seedInitialData.js";
 import { fetchAndExtractArticle } from "./core/fetch/extractArticle.js";
 import { sendDailyEmail } from "./core/mail/sendDailyEmail.js";
 import { runDailyDigest } from "./core/pipeline/runDailyDigest.js";
 import type { DailyReportTrigger } from "./core/report/buildDailyReport.js";
 import { createRunLock } from "./core/runtime/runLock.js";
 import { startScheduler } from "./core/scheduler/startScheduler.js";
-import { loadLatestIssue } from "./core/source/loadLatestIssue.js";
+import { loadActiveSourceIssue } from "./core/source/loadActiveSourceIssue.js";
 import { listReportDates, readTextFile } from "./core/storage/reportStore.js";
 import { createServer } from "./server/createServer.js";
 
@@ -17,13 +20,20 @@ type ReportSummary = {
 };
 
 const config = await loadRuntimeConfig();
+const db = openDatabase(config.database.file);
+runMigrations(db);
+seedInitialData(db, {
+  username: config.auth.username,
+  password: config.auth.password
+});
 const lock = createRunLock();
 
 // This runs the full digest under a single-process lock so manual and scheduled runs never overlap.
 async function triggerDigest(triggerType: DailyReportTrigger) {
   return await lock.runExclusive(async () => {
     return await runDailyDigest(config, triggerType, {
-      loadLatestIssue,
+      db,
+      loadLatestIssue: async () => await loadActiveSourceIssue(db),
       fetchArticle: fetchAndExtractArticle,
       sendDailyEmail
     });

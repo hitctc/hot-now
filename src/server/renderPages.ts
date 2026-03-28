@@ -12,21 +12,16 @@ type RenderConfig = {
   smtp?: { to?: string };
 };
 
-// These helpers keep the page HTML together so the server layer stays focused on routing.
+// Legacy pages now share the same theme assets as the unified shell, but keep their original layout and copy.
 export function renderNoticePage(title: string, message: string) {
-  return `<!doctype html>
-<html lang="zh-CN">
-  <head>
-    <meta charset="utf-8" />
-    <title>${escapeHtml(title)}</title>
-  </head>
-  <body>
-    <main>
+  return renderLegacyDocument({
+    pageKind: "notice",
+    title,
+    bodyHtml: `
       <h1>${escapeHtml(title)}</h1>
       <p>${escapeHtml(message)}</p>
-    </main>
-  </body>
-</html>`;
+    `
+  });
 }
 
 // The control page only needs a compact snapshot of the active schedule and SMTP target.
@@ -36,14 +31,10 @@ export function renderControlPage(config: RenderConfig = {}, running: boolean) {
   const recipient = config.smtp?.to ?? "未配置";
   const dataDir = config.report?.dataDir ?? "未配置";
 
-  return `<!doctype html>
-<html lang="zh-CN">
-  <head>
-    <meta charset="utf-8" />
-    <title>HotNow 控制台</title>
-  </head>
-  <body>
-    <main>
+  return renderLegacyDocument({
+    pageKind: "control",
+    title: "HotNow 控制台",
+    bodyHtml: `
       <h1>HotNow 控制台</h1>
       <p>每日执行时间：${escapeHtml(String(dailyTime))}</p>
       <p>Top N：${escapeHtml(String(topN))}</p>
@@ -53,9 +44,8 @@ export function renderControlPage(config: RenderConfig = {}, running: boolean) {
       <form method="post" action="/actions/run">
         <button type="submit"${running ? " disabled" : ""}>立即生成一次</button>
       </form>
-    </main>
-  </body>
-</html>`;
+    `
+  });
 }
 
 // History stays a simple index so users can jump directly into a single day report.
@@ -74,16 +64,40 @@ export function renderHistoryPage(entries: ReportSummary[]) {
         .join("")
     : `<li>暂无历史报告</li>`;
 
-  return `<!doctype html>
-<html lang="zh-CN">
-  <head>
-    <meta charset="utf-8" />
-    <title>HotNow 历史报告</title>
-  </head>
-  <body>
-    <main>
+  return renderLegacyDocument({
+    pageKind: "history",
+    title: "HotNow 历史报告",
+    bodyHtml: `
       <h1>历史报告</h1>
       <ul>${items}</ul>
+    `
+  });
+}
+
+type LegacyPageKind = "notice" | "control" | "history";
+
+type LegacyDocumentConfig = {
+  pageKind: LegacyPageKind;
+  title: string;
+  bodyHtml: string;
+};
+
+// A tiny wrapper keeps the old pages on the shared theme resources without turning them into the unified shell.
+function renderLegacyDocument(config: LegacyDocumentConfig) {
+  return `<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${escapeHtml(config.title)}</title>
+    <link rel="stylesheet" href="/assets/site.css" />
+    <script src="/assets/site.js" defer></script>
+  </head>
+  <body class="legacy-page legacy-page--${config.pageKind}">
+    <main class="legacy-shell legacy-shell--${config.pageKind}">
+      <section class="legacy-card legacy-card--${config.pageKind}">
+        ${config.bodyHtml}
+      </section>
     </main>
   </body>
 </html>`;

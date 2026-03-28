@@ -52,9 +52,10 @@ export function renderAppLayout(view: AppShellView): string {
   <section class="theme-dock" data-theme-toggle>
     <p class="theme-dock-title">界面主题</p>
     <div class="theme-switch" role="group" aria-label="界面主题切换">
-      <button type="button" class="theme-switch-button" data-theme-choice="dark">深色模式</button>
-      <button type="button" class="theme-switch-button" data-theme-choice="light">浅色模式</button>
+      <button type="button" class="theme-switch-button" data-theme-choice="dark" disabled aria-disabled="true">深色模式</button>
+      <button type="button" class="theme-switch-button" data-theme-choice="light" disabled aria-disabled="true">浅色模式</button>
     </div>
+    <p class="theme-dock-note">主题切换将在下一步启用。</p>
   </section>
 `;
 

@@ -24,11 +24,13 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 
 ## 页面
 
-- 最新报告：`/`
-- 历史报告：`/history`
-- 控制台：`/control`
+- 健康检查：`/health`
+- 登录页：`/login`
+- 统一站点菜单（登录后访问）：`/`、`/articles`、`/ai`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`
+- Legacy 报告页（当前仍保留）：`/history`、`/reports/:date`、`/control`
+- 手动触发任务：`POST /actions/run`
 
-控制台支持查看当前计划时间、收件邮箱和手动触发一次任务。
+统一站点默认启用单用户登录壳层。控制台仍支持查看当前计划时间、收件邮箱和手动触发一次任务。
 
 ## 配置
 

@@ -56,11 +56,20 @@
 当前页面：
 
 - `/health`：健康检查
-- `/`：最新报告
-- `/history`：历史报告
-- `/reports/:date`：指定日期报告
-- `/control`：控制台
-- `POST /actions/run`：手动触发一次日报任务
+- `/login`：登录页（GET）与登录提交（POST）
+- `/logout`：退出登录（POST）
+- `/assets/site.css`：统一站点样式
+- `/`：统一站点首页（登录后）
+- `/articles`：统一站点文章页（登录后）
+- `/ai`：统一站点 AI 页（登录后）
+- `/settings/view-rules`：统一站点查看规则页（登录后）
+- `/settings/sources`：统一站点数据源页（登录后）
+- `/settings/profile`：统一站点个人信息页（登录后）
+- `/history`：历史报告（legacy，当前仍保留）
+- `/reports/:date`：指定日期报告（legacy，当前仍保留）
+- `/control`：控制台（legacy，当前仍保留）
+- `POST /actions/run`：手动触发一次日报任务（legacy，当前仍保留）
+- 兼容约定：真实应用默认启用 `requireLogin=true` 的 unified shell；测试或未注入 auth 的场景仍可保持 legacy `/ -> 最新报告` 行为
 
 当前报告产物目录：
 
@@ -145,7 +154,7 @@
 
 ## 9. 当前阶段快照
 
-截至 `2026-03-27`，仓库状态可按下面理解：
+截至 `2026-03-28`，仓库状态可按下面理解：
 
 - 已有设计文档和实现计划
 - 已有主体实现与测试文件
@@ -157,5 +166,6 @@
   - 本地 `smoke test` 已跑通：`/health`、`/control`、`/history`、`/`、`/reports/:date` 可访问，手动触发可生成 `data/reports/2026-03-27/` 下的 `report.json`、`report.html`、`run-meta.json`
 - 本轮 smoke test 使用的是占位 SMTP 环境变量，邮件状态为连接拒绝，这验证了“邮件发送失败不会阻断报告落盘”的降级路径，但不代表真实 SMTP 发信已经验证通过
 - 原文抓取过程中出现过一次 `jsdom` 的 `Could not parse CSS stylesheet` 日志噪音，未阻断本轮任务完成；如果后续要收口发布质量，可以继续评估是否需要单独治理
+- Task4（single-user login + unified app shell）已落地：新增 `passwords/session` auth helper、登录页与统一壳层菜单路由，且保留 legacy 报告路由兼容
 
 如果后续有人完成了真实 SMTP 验证、补充了更完整的端到端验证，或确认上述日志噪音属于需要修复的问题，请同步更新这一节，避免误导下一位协作者。

@@ -32,7 +32,18 @@ export async function loadEnabledSourceIssues(db: SqliteDatabase): Promise<Loade
       return left.kind.localeCompare(right.kind);
     });
 
-  return await Promise.all(orderedSources.map(async (source) => await loadEnabledSourceIssue(source.kind, source.rss_url)));
+  const results = await Promise.allSettled(
+    orderedSources.map(async (source) => await loadEnabledSourceIssue(source.kind, source.rss_url))
+  );
+  const loadedIssues = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
+
+  // Multi-source mode stays useful as long as at least one source can be parsed, so one flaky feed
+  // does not block the whole digest. The caller still gets a hard failure if every enabled source fails.
+  if (loadedIssues.length === 0) {
+    throw new Error("No enabled content sources could be loaded");
+  }
+
+  return loadedIssues;
 }
 
 async function loadEnabledSourceIssue(kind: SourceKind, rssUrl: string | null): Promise<LoadedIssue> {

@@ -62,4 +62,68 @@ describe("loadEnabledSourceIssues", () => {
       sourcePriority: 92
     });
   });
+
+  it("keeps successful sources when one enabled feed fails", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-enabled-sources-"));
+    const db = openDatabase(path.join(tempDir, "hot-now.sqlite"));
+    databasesToClose.push(db);
+    runMigrations(db);
+    seedInitialData(db, { username: "admin", password: "bootstrap-password" });
+
+    db.prepare(
+      `
+        UPDATE content_sources
+        SET is_enabled = CASE WHEN kind IN ('openai', 'google_ai') THEN 1 ELSE 0 END
+      `
+    ).run();
+
+    const googleAiXml = await readFile("tests/fixtures/google-ai-rss.xml", "utf8");
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("openai.com")) {
+        return { status: 500, text: async () => "" };
+      }
+
+      if (url.includes("blog.google")) {
+        return { status: 200, text: async () => googleAiXml };
+      }
+
+      return { status: 404, text: async () => "" };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const issues = await loadEnabledSourceIssues(db);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({
+      sourceKind: "google_ai",
+      sourceType: "official",
+      sourcePriority: 92
+    });
+  });
+
+  it("fails when every enabled source fails to load", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-enabled-sources-"));
+    const db = openDatabase(path.join(tempDir, "hot-now.sqlite"));
+    databasesToClose.push(db);
+    runMigrations(db);
+    seedInitialData(db, { username: "admin", password: "bootstrap-password" });
+
+    db.prepare(
+      `
+        UPDATE content_sources
+        SET is_enabled = CASE WHEN kind = 'openai' THEN 1 ELSE 0 END
+      `
+    ).run();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        status: 500,
+        text: vi.fn().mockResolvedValue("")
+      })
+    );
+
+    await expect(loadEnabledSourceIssues(db)).rejects.toThrow("No enabled content sources could be loaded");
+  });
 });

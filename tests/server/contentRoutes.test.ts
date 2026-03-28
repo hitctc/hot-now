@@ -149,6 +149,23 @@ describe("content routes", () => {
     });
   });
 
+  it("returns 400 and skips saveRatings when payload mixes valid and invalid scores", async () => {
+    const saveRatings = vi.fn().mockResolvedValue({ ok: true, saved: 1, averageRating: 4 });
+    const app = createServer({
+      saveRatings
+    } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/content/42/ratings",
+      payload: { scores: { value: 4, credibility: 9, readability: "x" } }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ ok: false, reason: "invalid-ratings-payload" });
+    expect(saveRatings).not.toHaveBeenCalled();
+  });
+
   it("rejects anonymous content actions with 401 when auth is enabled", async () => {
     const app = createServer({
       auth: {

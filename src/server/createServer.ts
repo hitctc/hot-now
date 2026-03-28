@@ -26,6 +26,9 @@ type ReportSummary = {
   degraded: boolean;
   mailStatus: string;
 };
+type ParseRatingScoresResult =
+  | { ok: true; scores: Record<string, number> }
+  | { ok: false; reason: "invalid-ratings-payload" };
 
 type ServerDeps = {
   config?: Partial<RuntimeConfig>;
@@ -338,13 +341,13 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     const body = request.body as { scores?: unknown } | undefined;
-    const scores = parseRatingScores(body?.scores);
+    const parsedScores = parseRatingScores(body?.scores);
 
-    if (!scores || Object.keys(scores).length === 0) {
+    if (!parsedScores.ok) {
       return reply.code(400).send({ ok: false, reason: "invalid-ratings-payload" });
     }
 
-    const result = await deps.saveRatings(contentItemId, scores);
+    const result = await deps.saveRatings(contentItemId, parsedScores.scores);
 
     if (!result.ok && result.reason === "not-found") {
       return reply.code(404).send({ ok: false, reason: "not-found" });
@@ -469,29 +472,33 @@ function isReactionValue(value: unknown): value is ReactionValue {
   return value === "like" || value === "dislike" || value === "none";
 }
 
-function parseRatingScores(value: unknown): Record<string, number> | null {
-  // Scores are constrained to 1-5 numeric values so malformed payloads do not pollute persisted ratings.
+function parseRatingScores(value: unknown): ParseRatingScoresResult {
+  // Ratings payload is strict: one invalid entry invalidates the full request, so partial writes never happen.
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
+    return { ok: false, reason: "invalid-ratings-payload" };
   }
 
   const parsedScores: Record<string, number> = {};
 
   for (const [dimensionKey, rawScore] of Object.entries(value)) {
     if (typeof dimensionKey !== "string" || !dimensionKey.trim()) {
-      continue;
+      return { ok: false, reason: "invalid-ratings-payload" };
     }
 
     const score = Number(rawScore);
 
     if (!Number.isFinite(score) || score < 1 || score > 5) {
-      continue;
+      return { ok: false, reason: "invalid-ratings-payload" };
     }
 
     parsedScores[dimensionKey] = score;
   }
 
-  return parsedScores;
+  if (Object.keys(parsedScores).length === 0) {
+    return { ok: false, reason: "invalid-ratings-payload" };
+  }
+
+  return { ok: true, scores: parsedScores };
 }
 
 function renderLoginPage() {

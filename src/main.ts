@@ -1,4 +1,5 @@
 import { loadRuntimeConfig } from "./core/config/loadRuntimeConfig.js";
+import { verifyPassword } from "./core/auth/passwords.js";
 import { openDatabase } from "./core/db/openDatabase.js";
 import { runMigrations } from "./core/db/runMigrations.js";
 import { seedInitialData } from "./core/db/seedInitialData.js";
@@ -19,6 +20,13 @@ type ReportSummary = {
   mailStatus: string;
 };
 
+type AdminProfileRow = {
+  username: string;
+  password_hash: string;
+  role: string | null;
+  display_name: string | null;
+};
+
 const config = await loadRuntimeConfig();
 const db = openDatabase(config.database.file);
 runMigrations(db);
@@ -28,6 +36,13 @@ seedInitialData(db, {
   juyaRssUrl: config.source.rssUrl
 });
 const lock = createRunLock();
+const readAdminProfile = db.prepare(
+  `
+    SELECT username, password_hash, role, display_name
+    FROM user_profile
+    WHERE id = 1
+  `
+);
 
 // This runs the full digest under a single-process lock so manual and scheduled runs never overlap.
 async function triggerDigest(triggerType: DailyReportTrigger) {
@@ -74,8 +89,32 @@ function parseReportSummary(date: string, fileText: string): ReportSummary {
   };
 }
 
+// The login callback stays in main so database details do not leak into the HTTP layer.
+async function verifyLogin(username: string, password: string) {
+  const profile = readAdminProfile.get() as AdminProfileRow | undefined;
+
+  if (!profile || profile.username !== username) {
+    return null;
+  }
+
+  if (!verifyPassword(password, profile.password_hash)) {
+    return null;
+  }
+
+  return {
+    username: profile.username,
+    displayName: profile.display_name?.trim() || profile.username,
+    role: profile.role?.trim() || "admin"
+  };
+}
+
 const app = createServer({
   config,
+  auth: {
+    requireLogin: true,
+    sessionSecret: config.auth.sessionSecret,
+    verifyLogin
+  },
   isRunning: () => lock.isRunning(),
   listReportSummaries: listStoredReportSummaries,
   latestReportDate: async () => (await listReportDates(config.report.dataDir))[0] ?? null,
@@ -96,4 +135,19 @@ startScheduler(config, async () => {
   }
 });
 
-await app.listen({ host: "127.0.0.1", port: config.server.port });
+await app.listen({ host: "127.0.0.1", port: resolveListenPort(process.env.PORT, config.server.port) });
+
+function resolveListenPort(envPort: string | undefined, fallbackPort: number): number {
+  // Tests can bind to an ephemeral port with PORT=0 while production keeps the configured fixed port.
+  if (!envPort) {
+    return fallbackPort;
+  }
+
+  const port = Number(envPort);
+
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    throw new Error(`Invalid PORT: ${envPort}`);
+  }
+
+  return port;
+}

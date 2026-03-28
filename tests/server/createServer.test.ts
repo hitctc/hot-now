@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { fileURLToPath } from "node:url";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { createServer } from "../../src/server/createServer.js";
 
 function makeAppEnv() {
@@ -56,6 +56,16 @@ async function waitForHealth(port: number) {
   }
 
   throw new Error("Timed out waiting for /health from the built entry point");
+}
+
+function pickCookieValue(setCookieHeader: string | string[] | undefined) {
+  const raw = Array.isArray(setCookieHeader) ? setCookieHeader[0] : setCookieHeader;
+
+  if (!raw) {
+    return null;
+  }
+
+  return raw.split(";")[0] ?? null;
 }
 
 function extractListeningPort(output: string) {
@@ -166,5 +176,79 @@ describe("createServer", () => {
         await childExit;
       }
     }
+  });
+
+  it("redirects anonymous users to login when unified shell auth is enabled", async () => {
+    const app = createServer({
+      auth: {
+        requireLogin: true,
+        sessionSecret: "test-secret",
+        verifyLogin: vi.fn().mockResolvedValue(null)
+      }
+    });
+
+    const response = await app.inject({ method: "GET", url: "/articles" });
+
+    expect(response.statusCode).toBe(302);
+    expect(response.headers.location).toBe("/login");
+  });
+
+  it("logs in and renders unified shell pages with user info", async () => {
+    const app = createServer({
+      auth: {
+        requireLogin: true,
+        sessionSecret: "test-secret",
+        verifyLogin: vi.fn().mockResolvedValue({
+          username: "admin",
+          displayName: "系统管理员",
+          role: "admin"
+        })
+      }
+    });
+
+    const loginResponse = await app.inject({
+      method: "POST",
+      url: "/login",
+      payload: { username: "admin", password: "admin" }
+    });
+
+    expect(loginResponse.statusCode).toBe(302);
+    expect(loginResponse.headers.location).toBe("/");
+
+    const cookie = pickCookieValue(loginResponse.headers["set-cookie"]);
+    expect(cookie).toContain("hot_now_session=");
+
+    const shellResponse = await app.inject({
+      method: "GET",
+      url: "/settings/profile",
+      headers: {
+        cookie: cookie ?? ""
+      }
+    });
+
+    expect(shellResponse.statusCode).toBe(200);
+    expect(shellResponse.body).toContain("系统管理员");
+    expect(shellResponse.body).toContain("/articles");
+    expect(shellResponse.body).toContain("/settings/profile");
+    expect(shellResponse.body).toContain("退出登录");
+  });
+
+  it("clears the session cookie on logout", async () => {
+    const app = createServer({
+      auth: {
+        requireLogin: true,
+        sessionSecret: "test-secret",
+        verifyLogin: vi.fn().mockResolvedValue(null)
+      }
+    });
+
+    const response = await app.inject({ method: "POST", url: "/logout" });
+    const setCookie = Array.isArray(response.headers["set-cookie"])
+      ? response.headers["set-cookie"][0]
+      : response.headers["set-cookie"];
+
+    expect(response.statusCode).toBe(302);
+    expect(response.headers.location).toBe("/login");
+    expect(setCookie).toContain("Max-Age=0");
   });
 });

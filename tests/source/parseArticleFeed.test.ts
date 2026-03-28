@@ -159,7 +159,7 @@ describe("loadActiveSourceIssue", () => {
     databasesToClose.push(db);
     runMigrations(db);
     seedInitialData(db);
-    db.exec("ALTER TABLE content_sources ADD COLUMN is_active INTEGER NOT NULL DEFAULT 0");
+    db.prepare("UPDATE content_sources SET is_active = 0").run();
     db.prepare("UPDATE content_sources SET is_active = 1 WHERE kind = 'openai'").run();
 
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
@@ -185,7 +185,7 @@ describe("loadActiveSourceIssue", () => {
     databasesToClose.push(db);
     runMigrations(db);
     seedInitialData(db);
-    db.exec("ALTER TABLE content_sources ADD COLUMN is_active INTEGER NOT NULL DEFAULT 0");
+    db.prepare("UPDATE content_sources SET is_active = 0").run();
 
     await expect(loadActiveSourceIssue(db)).rejects.toThrow(
       "No active content source configured"
@@ -198,13 +198,13 @@ describe("loadActiveSourceIssue", () => {
     databasesToClose.push(db);
     runMigrations(db);
     seedInitialData(db);
-    db.exec("ALTER TABLE content_sources ADD COLUMN is_active INTEGER NOT NULL DEFAULT 0");
     db.prepare(
       `
-        INSERT INTO content_sources (kind, name, site_url, rss_url, is_builtin)
-        VALUES ('mystery_feed', 'Mystery Feed', 'https://example.com', 'https://example.com/rss.xml', 0)
+        INSERT INTO content_sources (kind, name, site_url, rss_url, is_builtin, is_active)
+        VALUES ('mystery_feed', 'Mystery Feed', 'https://example.com', 'https://example.com/rss.xml', 0, 0)
       `
     ).run();
+    db.prepare("UPDATE content_sources SET is_active = 0").run();
     db.prepare("UPDATE content_sources SET is_active = 1 WHERE kind = 'mystery_feed'").run();
 
     await expect(loadActiveSourceIssue(db)).rejects.toThrow(

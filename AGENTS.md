@@ -162,15 +162,17 @@
 - 已有设计文档和实现计划
 - 已有主体实现与测试文件
 - Git 主分支已建立并同步远端
-- 当前工作区已完成一轮基础验证：
+- 当前工作区已完成 unified site 阶段的最终验证：
   - `npm install`
-  - `npm test`，结果为 `9` 个测试文件、`41` 个测试全部通过
+  - `npm test`，结果为 `19` 个测试文件、`97` 个测试全部通过
   - `npm run build` 成功
-  - 本地 `smoke test` 已跑通：`/health`、`/control`、`/history`、`/`、`/reports/:date` 可访问，手动触发可生成 `data/reports/2026-03-27/` 下的 `report.json`、`report.html`、`run-meta.json`
-- 本轮 smoke test 使用的是占位 SMTP 环境变量，邮件状态为连接拒绝，这验证了“邮件发送失败不会阻断报告落盘”的降级路径，但不代表真实 SMTP 发信已经验证通过
+  - 本地 `smoke test` 已跑通：`/login`、`/`、`/articles`、`/ai`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/reports/:date`、`/control` 可访问
+  - 统一站点内手动触发采集已验证：`POST /actions/run` 返回 `202 accepted`，并刷新 `data/reports/2026-03-27/` 下的 `report.json`、`report.html`、`run-meta.json`
+- 真实 SMTP 发信已验证通过：最近一次手动采集写回的 `run-meta.json` 显示 `mailStatus: sent`
 - 原文抓取过程中出现过一次 `jsdom` 的 `Could not parse CSS stylesheet` 日志噪音，未阻断本轮任务完成；如果后续要收口发布质量，可以继续评估是否需要单独治理
 - Task4（single-user login + unified app shell）已落地：新增 `passwords/session` auth helper、登录页与统一壳层菜单路由，且保留 legacy 报告路由兼容
 - 真实入口已收紧：`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 现在是必填；auth 开启时 legacy 路由也要求登录，`POST /actions/run` 未登录返回未授权
-- Task6（系统菜单）已具备基础可用性：筛选策略支持保存 JSON 规则，数据迭代收集支持 source 切换和统一站点内手动执行采集，当前登录用户页可展示基础账号信息
+- Task6（系统菜单）已收口：筛选策略支持保存 JSON 规则，数据迭代收集支持 source 切换、逐 source 最近抓取状态展示和统一站点内手动执行采集，当前登录用户页可展示基础账号信息
+- Task7（legacy 报告兼容、文档同步、最终验证）已完成：legacy `/history`、`/reports/:date`、`/control` 与 unified shell 共存，且相关测试和文档已同步
 
-如果后续有人完成了真实 SMTP 验证、补充了更完整的端到端验证，或确认上述日志噪音属于需要修复的问题，请同步更新这一节，避免误导下一位协作者。
+如果后续有人补充了更完整的端到端验证、继续扩展 source adapter，或确认上述日志噪音属于需要修复的问题，请同步更新这一节，避免误导下一位协作者。

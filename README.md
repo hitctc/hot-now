@@ -6,7 +6,7 @@
 
 1. 安装依赖：`npm install`
 2. 检查配置文件：`config/hot-now.config.json`
-3. 通过环境变量提供 SMTP 和页面地址
+3. 准备本地环境变量，推荐直接写到 `.env.local`
 
 ```bash
 export SMTP_HOST="smtp.qq.com"
@@ -21,7 +21,22 @@ export AUTH_PASSWORD="replace-with-strong-password"
 export SESSION_SECRET="replace-with-long-random-secret"
 ```
 
-4. 启动开发服务：`npm run dev`
+4. 启动开发服务：
+
+- 标准方式：
+
+```bash
+set -a
+source .env.local
+set +a
+npm run dev
+```
+
+- 本地便捷方式：
+
+```bash
+npm run dev:local
+```
 
 QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 

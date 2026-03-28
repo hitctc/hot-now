@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/main.ts",
+    "dev:local": "set -a && . ./.env.local && set +a && tsx watch src/main.ts",
     "start": "node dist/main.js",
     "build": "rm -rf dist && tsc -p tsconfig.json",
     "test": "vitest run"

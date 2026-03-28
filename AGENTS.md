@@ -89,6 +89,7 @@
 
 - 安装依赖：`npm install`
 - 开发启动：`npm run dev`
+- 本地便捷启动：`npm run dev:local`
 - 类型构建：`npm run build`
 - 测试：`npm run test`
 

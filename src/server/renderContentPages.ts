@@ -38,6 +38,7 @@ function renderContentCard(card: ContentCardView, dimensions: RatingDimension[])
   const favoritePressed = card.isFavorited ? "true" : "false";
   const likePressed = card.reaction === "like" ? "true" : "false";
   const dislikePressed = card.reaction === "dislike" ? "true" : "false";
+  const titleHtml = renderTitleLink(card.title, card.canonicalUrl);
 
   return `
     <article class="content-card" data-content-id="${card.id}">
@@ -48,7 +49,7 @@ function renderContentCard(card: ContentCardView, dimensions: RatingDimension[])
           <span>均分：<strong data-role="average-rating">${escapeHtml(ratingLabel)}</strong></span>
         </p>
         <h3 class="content-title">
-          <a href="${escapeHtml(card.canonicalUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(card.title)}</a>
+          ${titleHtml}
         </h3>
       </header>
       <p class="content-summary">${escapeHtml(summaryText)}</p>
@@ -107,6 +108,26 @@ function renderRatingField(dimension: RatingDimension) {
       </select>
     </label>
   `;
+}
+
+function renderTitleLink(title: string, canonicalUrl: string): string {
+  // Content links are whitelisted to http/https so untrusted schemes cannot be rendered as clickable href values.
+  const safeUrl = toSafeHttpUrl(canonicalUrl);
+
+  if (!safeUrl) {
+    return `<span>${escapeHtml(title)}</span>`;
+  }
+
+  return `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a>`;
+}
+
+function toSafeHttpUrl(rawValue: string): string | null {
+  try {
+    const parsed = new URL(rawValue);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 function formatPublishedAt(rawValue: string | null) {

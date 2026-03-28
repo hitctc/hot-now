@@ -14,6 +14,17 @@ describe("content routes", () => {
         isFavorited: false,
         reaction: "none",
         averageRating: null
+      },
+      {
+        id: 102,
+        title: "Unsafe Link Item",
+        summary: "Entry containing an unsafe link value.",
+        sourceName: "Juya AI Daily",
+        canonicalUrl: "javascript:alert(1)",
+        publishedAt: "2026-03-28T09:00:00.000Z",
+        isFavorited: false,
+        reaction: "none",
+        averageRating: null
       }
     ]);
     const listRatingDimensions = vi.fn().mockResolvedValue([
@@ -29,6 +40,9 @@ describe("content routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("AI Weekly Insight");
     expect(response.body).toContain('data-content-id="101"');
+    expect(response.body).toContain('href="https://example.com/ai-weekly"');
+    expect(response.body).not.toContain('href="javascript:alert(1)"');
+    expect(response.body).toContain("Unsafe Link Item");
     expect(listContentView).toHaveBeenCalledWith("hot");
   });
 

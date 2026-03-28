@@ -36,11 +36,11 @@ export function renderViewRulesPage(rules: ViewRuleItem[]): string {
   const cardsHtml = rules.map((rule) => renderViewRuleCard(rule)).join("");
 
   return `
-    <section class="content-intro">
+    <section class="content-intro content-intro--system">
       <p class="content-kicker">系统菜单</p>
       <p class="content-description">筛选策略：查看并保存 hot / articles / ai 的 JSON 配置。</p>
     </section>
-    <section class="system-stack">
+    <section class="system-stack system-stack--control">
       ${cardsHtml}
     </section>
   `;
@@ -56,11 +56,11 @@ export function renderSourcesPage(sources: SourceItem[], options: SourcesPageOpt
   const cardsHtml = sources.map((source) => renderSourceCard(source)).join("");
 
   return `
-    <section class="content-intro">
+    <section class="content-intro content-intro--system">
       <p class="content-kicker">系统菜单</p>
       <p class="content-description">数据迭代收集：切换当前启用 source，并查看最近抓取状态。</p>
     </section>
-    <section class="system-stack">
+    <section class="system-stack system-stack--control">
       ${renderManualCollectionCard(activeSource, options)}
       ${cardsHtml}
     </section>
@@ -74,12 +74,12 @@ export function renderProfilePage(profile: ProfileView | null): string {
   }
 
   return `
-    <section class="content-intro">
+    <section class="content-intro content-intro--system">
       <p class="content-kicker">系统菜单</p>
       <p class="content-description">当前登录用户：展示账号身份、角色和联系邮箱。</p>
     </section>
-    <section class="system-stack">
-      <article class="system-card">
+    <section class="system-stack system-stack--control">
+      <article class="system-card system-card--control system-card--profile">
         <h3 class="system-card-title">当前登录用户</h3>
         <dl class="system-detail-list">
           <div class="system-detail-row">
@@ -111,7 +111,7 @@ export function renderProfilePage(profile: ProfileView | null): string {
 function renderViewRuleCard(rule: ViewRuleItem): string {
   // JSON textarea stays plaintext so operators can copy/paste config snippets directly.
   return `
-    <article class="system-card" data-system-card="view-rule" data-rule-key="${escapeHtml(rule.ruleKey)}">
+    <article class="system-card system-card--control system-card--view-rule" data-system-card="view-rule" data-rule-key="${escapeHtml(rule.ruleKey)}">
       <header class="system-card-header">
         <h3 class="system-card-title">${escapeHtml(rule.displayName)}</h3>
         <p class="system-card-meta">rule_key: <code>${escapeHtml(rule.ruleKey)}</code> · ${
@@ -131,7 +131,9 @@ function renderViewRuleCard(rule: ViewRuleItem): string {
         <div class="system-action-row">
           <button type="submit" class="primary-mini-button">保存策略</button>
         </div>
-        <p class="action-status system-status" data-role="action-status" aria-live="polite"></p>
+        <div class="system-status-region">
+          <p class="action-status system-status" data-role="action-status" aria-live="polite"></p>
+        </div>
       </form>
     </article>
   `;
@@ -140,7 +142,7 @@ function renderViewRuleCard(rule: ViewRuleItem): string {
 function renderSourceCard(source: SourceItem): string {
   // Activation form posts only source kind to keep the route contract explicit and tiny.
   return `
-    <article class="system-card" data-system-card="source" data-source-kind="${escapeHtml(source.kind)}">
+    <article class="system-card system-card--control system-card--source" data-system-card="source" data-source-kind="${escapeHtml(source.kind)}">
       <header class="system-card-header">
         <h3 class="system-card-title">${escapeHtml(source.name)}</h3>
         <p class="system-card-meta">kind: <code>${escapeHtml(source.kind)}</code></p>
@@ -167,7 +169,9 @@ function renderSourceCard(source: SourceItem): string {
         <button type="submit" class="primary-mini-button" data-role="activate-button"${source.isActive ? " disabled" : ""}>
           ${source.isActive ? "当前启用" : "设为当前启用"}
         </button>
-        <p class="action-status system-status" data-role="action-status" aria-live="polite"></p>
+        <div class="system-status-region">
+          <p class="action-status system-status" data-role="action-status" aria-live="polite"></p>
+        </div>
       </form>
     </article>
   `;
@@ -185,7 +189,7 @@ function renderManualCollectionCard(source: SourceItem | null, options: SourcesP
     : "当前环境未启用手动采集。";
 
   return `
-    <article class="system-card">
+    <article class="system-card system-card--control system-card--manual-collection">
       <header class="system-card-header">
         <h3 class="system-card-title">手动执行采集</h3>
         <p class="system-card-meta">当前启用 source：${escapeHtml(activeSourceName)}</p>
@@ -196,7 +200,9 @@ function renderManualCollectionCard(source: SourceItem | null, options: SourcesP
             ${buttonText}
           </button>
         </div>
-        <p class="action-status system-status" data-role="action-status" aria-live="polite">${escapeHtml(initialStatus)}</p>
+        <div class="system-status-region">
+          <p class="action-status system-status" data-role="action-status" aria-live="polite">${escapeHtml(initialStatus)}</p>
+        </div>
       </form>
     </article>
   `;
@@ -205,7 +211,7 @@ function renderManualCollectionCard(source: SourceItem | null, options: SourcesP
 function renderEmptyState(title: string, description: string): string {
   // Empty states keep shell pages readable even when callbacks return no rows.
   return `
-    <section class="system-empty">
+    <section class="system-empty system-empty--control">
       <h3>${escapeHtml(title)}</h3>
       <p>${escapeHtml(description)}</p>
     </section>

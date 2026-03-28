@@ -18,7 +18,10 @@ describe("system routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("筛选策略");
+    expect(response.body).toContain('class="content-intro content-intro--system"');
+    expect(response.body).toContain('class="system-stack system-stack--control"');
     expect(response.body).toContain("热点策略");
+    expect(response.body).toContain('class="system-card system-card--control system-card--view-rule"');
     expect(response.body).toContain("hot");
     expect(response.body).toContain("&quot;sort&quot;: &quot;recent&quot;");
   });
@@ -51,7 +54,10 @@ describe("system routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("数据迭代收集");
+    expect(response.body).toContain('class="content-intro content-intro--system"');
+    expect(response.body).toContain('class="system-stack system-stack--control"');
     expect(response.body).toContain("手动执行采集");
+    expect(response.body).toContain('class="system-card system-card--control system-card--manual-collection"');
     expect(response.body).toContain("当前启用 source：Juya AI Daily");
     expect(response.body).toContain("Juya AI Daily");
     expect(response.body).toContain("当前启用");
@@ -78,6 +84,7 @@ describe("system routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("采集中...");
+    expect(response.body).toContain('class="system-card system-card--control system-card--manual-collection"');
     expect(response.body).toContain("当前已有任务执行中，请稍后再试。");
     expect(response.body).toContain("disabled");
   });
@@ -96,6 +103,8 @@ describe("system routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("当前登录用户");
+    expect(response.body).toContain('class="content-intro content-intro--system"');
+    expect(response.body).toContain('class="system-card system-card--control system-card--profile"');
     expect(response.body).toContain("系统管理员");
     expect(response.body).toContain("admin@example.com");
   });

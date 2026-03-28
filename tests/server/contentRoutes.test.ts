@@ -39,7 +39,10 @@ describe("content routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("AI Weekly Insight");
+    expect(response.body).toContain('class="content-intro content-intro--signal"');
+    expect(response.body).toContain('class="content-stack content-stack--signal"');
     expect(response.body).toContain('data-content-id="101"');
+    expect(response.body).toContain('class="content-card content-card--signal"');
     expect(response.body).toContain('href="https://example.com/ai-weekly"');
     expect(response.body).not.toContain('href="javascript:alert(1)"');
     expect(response.body).toContain("Unsafe Link Item");
@@ -59,6 +62,7 @@ describe("content routes", () => {
     expect(response.body).toContain('data-theme="dark"');
     expect(response.body).toContain("HotNow Signal Grid");
     expect(response.body).toContain("Cyber Intelligence Console");
+    expect(response.body).toContain('class="content-intro content-intro--signal"');
     expect(response.body).toContain("科技内容、采集状态与操作控制在同一控制台内完成。");
     expect(response.body).toContain("data-theme-toggle");
     expect(response.body).toContain('data-theme-choice="dark" aria-pressed="true"');

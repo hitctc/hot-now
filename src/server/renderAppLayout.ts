@@ -48,6 +48,15 @@ export function renderAppLayout(view: AppShellView): string {
   const systemLinks = renderNavGroup(appShellPages.filter((page) => page.section === "system"), view.currentPath);
   const pageContent = view.contentHtml ?? renderPlaceholder(view.page.description);
   const userBlock = view.user ? renderUserBlock(view.user) : `<p class="user-meta">公开访问模式</p>`;
+  const themeControl = `
+  <section class="theme-dock" data-theme-toggle>
+    <p class="theme-dock-title">界面主题</p>
+    <div class="theme-switch" role="group" aria-label="界面主题切换">
+      <button type="button" class="theme-switch-button" data-theme-choice="dark">深色模式</button>
+      <button type="button" class="theme-switch-button" data-theme-choice="light">浅色模式</button>
+    </div>
+  </section>
+`;
 
   return `<!doctype html>
 <html lang="zh-CN">
@@ -73,6 +82,9 @@ export function renderAppLayout(view: AppShellView): string {
           <p class="nav-title">系统菜单</p>
           ${systemLinks}
         </nav>
+        <div class="sidebar-footer">
+          ${themeControl}
+        </div>
       </aside>
       <div class="shell-main">
         <header class="shell-header">

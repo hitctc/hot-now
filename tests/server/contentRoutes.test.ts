@@ -46,6 +46,20 @@ describe("content routes", () => {
     expect(listContentView).toHaveBeenCalledWith("hot");
   });
 
+  it("renders a sidebar theme switcher in the unified shell", async () => {
+    const app = createServer({
+      listContentView: vi.fn().mockResolvedValue([]),
+      listRatingDimensions: vi.fn().mockResolvedValue([])
+    } as never);
+
+    const response = await app.inject({ method: "GET", url: "/" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain("data-theme-toggle");
+    expect(response.body).toContain("浅色模式");
+    expect(response.body).toContain("深色模式");
+  });
+
   it("keeps system menu pages accessible in public content mode", async () => {
     const app = createServer({
       listContentView: vi.fn().mockResolvedValue([]),

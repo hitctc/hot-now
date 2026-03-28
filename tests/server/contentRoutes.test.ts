@@ -55,6 +55,10 @@ describe("content routes", () => {
     const response = await app.inject({ method: "GET", url: "/" });
 
     expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('data-theme="dark"');
+    expect(response.body).toContain("HotNow Signal Grid");
+    expect(response.body).toContain("Cyber Intelligence Console");
+    expect(response.body).toContain("科技内容、采集状态与操作控制在同一控制台内完成。");
     expect(response.body).toContain("data-theme-toggle");
     expect(response.body).toContain("浅色模式");
     expect(response.body).toContain("深色模式");

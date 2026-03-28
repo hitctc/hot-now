@@ -59,7 +59,7 @@ export function renderAppLayout(view: AppShellView): string {
 `;
 
   return `<!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -71,8 +71,9 @@ export function renderAppLayout(view: AppShellView): string {
     <div class="shell-root">
       <aside class="shell-sidebar">
         <div class="brand-block">
-          <p class="brand-kicker">HotNow</p>
-          <h1 class="brand-title">Unified Site</h1>
+          <p class="brand-kicker">HotNow Signal Grid</p>
+          <h1 class="brand-title">Cyber Intelligence Console</h1>
+          <p class="brand-description">科技内容、采集状态与操作控制在同一控制台内完成。</p>
         </div>
         <nav class="nav-group">
           <p class="nav-title">内容菜单</p>

@@ -55,14 +55,15 @@ describe("content routes", () => {
     const response = await app.inject({ method: "GET", url: "/" });
 
     expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('<script src="/assets/site.js" defer></script>');
     expect(response.body).toContain('data-theme="dark"');
     expect(response.body).toContain("HotNow Signal Grid");
     expect(response.body).toContain("Cyber Intelligence Console");
     expect(response.body).toContain("科技内容、采集状态与操作控制在同一控制台内完成。");
     expect(response.body).toContain("data-theme-toggle");
-    expect(response.body).toContain('data-theme-choice="dark" disabled aria-disabled="true"');
-    expect(response.body).toContain('data-theme-choice="light" disabled aria-disabled="true"');
-    expect(response.body).toContain("主题切换将在下一步启用。");
+    expect(response.body).toContain('data-theme-choice="dark" aria-pressed="true"');
+    expect(response.body).toContain('data-theme-choice="light" aria-pressed="false"');
+    expect(response.body).not.toContain("主题切换将在下一步启用。");
   });
 
   it("keeps system menu pages accessible in public content mode", async () => {

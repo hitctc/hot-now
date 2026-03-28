@@ -1,10 +1,22 @@
 (function () {
   const root = document;
+  const themeRoot = document.documentElement;
+  const themeStorageKey = "hot-now-theme";
+
+  applyInitialTheme();
 
   root.addEventListener("click", async (event) => {
     const target = event.target;
 
     if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    const themeButton = target.closest("[data-theme-choice]");
+
+    if (themeButton instanceof HTMLButtonElement) {
+      event.preventDefault();
+      setTheme(themeButton.dataset.themeChoice || "dark");
       return;
     }
 
@@ -381,6 +393,50 @@
       return await response.json();
     } catch {
       return null;
+    }
+  }
+
+  function applyInitialTheme() {
+    // Theme boot reads persisted preference first and falls back to the shell's dark default.
+    const savedTheme = readStoredTheme();
+    setTheme(savedTheme || "dark", false);
+  }
+
+  function readStoredTheme() {
+    try {
+      const value = localStorage.getItem(themeStorageKey);
+
+      return value === "light" || value === "dark" ? value : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function setTheme(theme, persist = true) {
+    // Theme state stays limited to light/dark so the shell never drifts outside the supported contract.
+    const nextTheme = theme === "light" ? "light" : "dark";
+    themeRoot.dataset.theme = nextTheme;
+    syncThemeButtons(nextTheme);
+
+    if (persist) {
+      try {
+        localStorage.setItem(themeStorageKey, nextTheme);
+      } catch {
+        // Persistence is best-effort; the runtime theme change still applies immediately.
+      }
+    }
+  }
+
+  function syncThemeButtons(theme) {
+    const themeButtons = root.querySelectorAll("[data-theme-choice]");
+
+    for (const themeButton of themeButtons) {
+      if (!(themeButton instanceof HTMLButtonElement)) {
+        continue;
+      }
+
+      const isPressed = themeButton.dataset.themeChoice === theme;
+      themeButton.setAttribute("aria-pressed", isPressed ? "true" : "false");
     }
   }
 

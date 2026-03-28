@@ -1,4 +1,5 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
+import { scoreContentItem, type ContentScoreBreakdown } from "./contentScoring.js";
 
 export type ContentViewKey = "hot" | "articles" | "ai";
 
@@ -11,19 +12,26 @@ export type ContentCardView = {
   publishedAt: string | null;
   isFavorited: boolean;
   reaction: "like" | "dislike" | "none";
-  averageRating: number | null;
+  contentScore: number;
+  scoreBadges: string[];
+};
+
+type RankedContentCardView = ContentCardView & {
+  rankingScore: number;
 };
 
 type ContentCardRow = {
   id: number;
   title: string;
   summary: string | null;
+  bodyMarkdown: string | null;
   sourceName: string;
+  sourceKind: string;
   canonicalUrl: string;
   publishedAt: string | null;
   favoriteValue: string | null;
   reactionValue: string | null;
-  averageRating: number | null;
+  rankingTimestamp: string | null;
 };
 
 const contentSelectSql = `
@@ -56,70 +64,69 @@ const contentSelectSql = `
       WHERE feedback_kind = 'reaction'
     ) ranked_reaction
     WHERE ranked_reaction.row_num = 1
-  ),
-  rating_aggregate AS (
-    SELECT
-      content_item_id,
-      AVG(score) AS average_rating
-    FROM content_ratings
-    GROUP BY content_item_id
   )
   SELECT
     ci.id AS id,
     ci.title AS title,
     ci.summary AS summary,
+    ci.body_markdown AS bodyMarkdown,
     cs.name AS sourceName,
+    cs.kind AS sourceKind,
     ci.canonical_url AS canonicalUrl,
     ci.published_at AS publishedAt,
     latest_favorite.feedback_value AS favoriteValue,
-    latest_reaction.feedback_value AS reactionValue,
-    ROUND(rating_aggregate.average_rating, 2) AS averageRating,
-    COALESCE(ci.published_at, ci.fetched_at, ci.created_at) AS rankingTimestamp,
-    (
-      CASE
-        WHEN ci.body_markdown IS NOT NULL AND LENGTH(TRIM(ci.body_markdown)) >= 160 THEN 2
-        WHEN ci.body_markdown IS NOT NULL AND LENGTH(TRIM(ci.body_markdown)) > 0 THEN 1
-        ELSE 0
-      END
-      +
-      CASE
-        WHEN ci.summary IS NOT NULL AND LENGTH(TRIM(ci.summary)) >= 80 THEN 1
-        WHEN ci.summary IS NOT NULL AND LENGTH(TRIM(ci.summary)) > 0 THEN 0.5
-        ELSE 0
-      END
-    ) AS completenessScore,
-    __AI_SCORE__ AS aiScore
+    latest_reaction.feedback_value AS reactionValue
   FROM content_items ci
   JOIN content_sources cs ON cs.id = ci.source_id
   LEFT JOIN latest_favorite ON latest_favorite.content_item_id = ci.id
   LEFT JOIN latest_reaction ON latest_reaction.content_item_id = ci.id
-  LEFT JOIN rating_aggregate ON rating_aggregate.content_item_id = ci.id
-  ORDER BY __ORDER_BY__
+  ORDER BY datetime(COALESCE(ci.published_at, ci.fetched_at, ci.created_at)) DESC, ci.id DESC
   LIMIT 80
 `;
 
-const rankingSqlByView: Record<ContentViewKey, string> = {
-  hot: "rankingTimestamp DESC, ci.id DESC",
-  articles: "completenessScore DESC, rankingTimestamp DESC, ci.id DESC",
-  ai: "aiScore DESC, rankingTimestamp DESC, ci.id DESC"
-};
-
 export function listContentView(db: SqliteDatabase, viewKey: ContentViewKey): ContentCardView[] {
-  // All menu pages read from one shared content pool; each view differs only by ranking strategy.
-  const sql = buildSelectSql(viewKey);
-  const rows = db.prepare(sql).all() as ContentCardRow[];
+  // Every tab reads the same candidate pool; the pure scoring module turns it into view-specific order.
+  const rows = db.prepare(contentSelectSql).all() as ContentCardRow[];
+  const referenceTime = new Date();
 
-  return rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    summary: row.summary?.trim() || "暂无摘要",
-    sourceName: row.sourceName,
-    canonicalUrl: row.canonicalUrl,
-    publishedAt: row.publishedAt,
-    isFavorited: row.favoriteValue === "1",
-    reaction: normalizeReaction(row.reactionValue),
-    averageRating: typeof row.averageRating === "number" ? row.averageRating : null
-  }));
+  return rows
+    .map((row) => {
+      const score = scoreContentItem(
+        {
+          title: row.title,
+          summary: row.summary ?? "",
+          bodyMarkdown: row.bodyMarkdown ?? "",
+          publishedAt: row.publishedAt,
+          sourceKind: row.sourceKind
+        },
+        { now: referenceTime }
+      );
+
+      return {
+        id: row.id,
+        title: row.title,
+        summary: row.summary?.trim() || "暂无摘要",
+        sourceName: row.sourceName,
+        canonicalUrl: row.canonicalUrl,
+        publishedAt: row.publishedAt,
+        isFavorited: row.favoriteValue === "1",
+        reaction: normalizeReaction(row.reactionValue),
+        contentScore: score.contentScore,
+        scoreBadges: score.badges,
+        rankingScore: calculateViewRankingScore(viewKey, score)
+      };
+    })
+    .sort((left, right) => {
+      const leftRank = left.rankingScore;
+      const rightRank = right.rankingScore;
+
+      if (rightRank !== leftRank) {
+        return rightRank - leftRank;
+      }
+
+      return right.id - left.id;
+    })
+    .map(({ rankingScore: _rankingScore, ...card }) => card as ContentCardView);
 }
 
 function normalizeReaction(value: string | null): "like" | "dislike" | "none" {
@@ -127,20 +134,15 @@ function normalizeReaction(value: string | null): "like" | "dislike" | "none" {
   return value === "like" || value === "dislike" ? value : "none";
 }
 
-function buildSelectSql(viewKey: ContentViewKey): string {
-  // View-specific SQL is assembled from one shared base query to keep fields consistent across tabs.
-  const aiScoreExpression = buildAiScoreExpression();
-
-  return contentSelectSql
-    .replace("__AI_SCORE__", aiScoreExpression)
-    .replace("__ORDER_BY__", rankingSqlByView[viewKey]);
-}
-
-function buildAiScoreExpression() {
-  // This lightweight keyword score is enough for Task5 and can be replaced by model-based ranking later.
-  const aiText =
-    "LOWER(COALESCE(ci.title, '') || ' ' || COALESCE(ci.summary, '') || ' ' || COALESCE(ci.body_markdown, ''))";
-  const keywords = [" ai ", "ai", "llm", "gpt", "agent", "model", "prompt", "大模型", "智能体"];
-
-  return keywords.map((keyword) => `CASE WHEN ${aiText} LIKE '%${keyword}%' THEN 1 ELSE 0 END`).join(" + ");
+function calculateViewRankingScore(viewKey: ContentViewKey, score: ContentScoreBreakdown): number {
+  // The card score is shared, while each tab gives a different signal mix a chance to win the top spots.
+  switch (viewKey) {
+    case "articles":
+      return score.completenessScore * 0.7 + score.freshnessScore * 0.15 + score.sourceScore * 0.05 + score.heatScore * 0.1;
+    case "ai":
+      return score.aiScore * 0.7 + score.freshnessScore * 0.1 + score.heatScore * 0.1 + score.contentScore * 0.1;
+    case "hot":
+    default:
+      return score.freshnessScore * 0.55 + score.heatScore * 0.15 + score.sourceScore * 0.1 + score.contentScore * 0.2;
+  }
 }

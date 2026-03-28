@@ -14,7 +14,8 @@ describe("content routes", () => {
         publishedAt: "2026-03-28T10:00:00.000Z",
         isFavorited: false,
         reaction: "none",
-        averageRating: null
+        contentScore: 91,
+        scoreBadges: ["24h 内", "官方源", "正文完整"]
       },
       {
         id: 102,
@@ -25,15 +26,13 @@ describe("content routes", () => {
         publishedAt: "2026-03-28T09:00:00.000Z",
         isFavorited: false,
         reaction: "none",
-        averageRating: null
+        contentScore: 64,
+        scoreBadges: ["3 天内", "聚合源"]
       }
-    ]);
-    const listRatingDimensions = vi.fn().mockResolvedValue([
-      { id: 1, key: "value", name: "价值", description: "是否值得投入时间", weight: 1 }
     ]);
     const app = createServer({
       listContentView,
-      listRatingDimensions
+      listRatingDimensions: vi.fn()
     } as never);
 
     const response = await app.inject({ method: "GET", url: "/" });
@@ -45,11 +44,18 @@ describe("content routes", () => {
     expect(response.body).toContain('class="content-stack content-stack--signal"');
     expect(response.body).toContain('data-content-id="101"');
     expect(response.body).toContain('class="content-card content-card--signal"');
+    expect(response.body).toContain('data-role="content-score"');
+    expect(response.body).toContain("91/100");
+    expect(response.body).toContain("24h 内");
+    expect(response.body).toContain("官方源");
+    expect(response.body).toContain("正文完整");
     expect(response.body).toContain('class="action-status"');
     expect(response.body).toContain('href="https://example.com/ai-weekly"');
     expect(response.body).not.toContain('href="javascript:alert(1)"');
     expect(response.body).toContain("Unsafe Link Item");
     expect(listContentView).toHaveBeenCalledWith("hot");
+    expect(response.body).not.toContain('class="rating-form"');
+    expect(response.body).not.toContain('data-content-action="ratings"');
   });
 
   it("renders a sidebar theme switcher in the unified shell", async () => {
@@ -128,6 +134,18 @@ describe("content routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("当前登录用户");
     expect(response.body).toContain("模块占位");
+  });
+
+  it("serves site.js without ratings submit logic", async () => {
+    const app = createServer({
+      listContentView: vi.fn().mockResolvedValue([])
+    } as never);
+
+    const response = await app.inject({ method: "GET", url: "/assets/site.js" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).not.toContain('"/actions/content/${contentId}/ratings"');
+    expect(response.body).not.toContain("handleRatings");
   });
 
   it("calls saveFavorite for favorite action", async () => {

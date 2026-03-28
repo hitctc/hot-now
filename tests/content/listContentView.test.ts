@@ -1,27 +1,32 @@
 import { mkdtemp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveSourceByKind, upsertContentItems } from "../../src/core/content/contentRepository.js";
 import { listContentView } from "../../src/core/content/listContentView.js";
 import { openDatabase } from "../../src/core/db/openDatabase.js";
 import { runMigrations } from "../../src/core/db/runMigrations.js";
 import { seedInitialData } from "../../src/core/db/seedInitialData.js";
 import { saveFavorite, saveReaction } from "../../src/core/feedback/feedbackRepository.js";
-import { saveRatings } from "../../src/core/ratings/ratingRepository.js";
 
 describe("listContentView", () => {
   const databasesToClose: ReturnType<typeof openDatabase>[] = [];
 
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-29T12:00:00.000Z"));
+  });
+
   afterEach(() => {
+    vi.useRealTimers();
     while (databasesToClose.length > 0) {
       databasesToClose.pop()?.close();
     }
   });
 
-  it("returns unified content cards with feedback and average rating merged in", async () => {
+  it("returns unified content cards with feedback and system score merged in", async () => {
     const db = await createTestDatabase();
-    const source = resolveSourceByKind(db, "juya");
+    const source = resolveSourceByKind(db, "openai");
 
     expect(source).toBeDefined();
 
@@ -32,9 +37,10 @@ describe("listContentView", () => {
           title: "Breaking quick blurb",
           canonicalUrl: "https://example.com/breaking",
           summary: "short",
-          bodyMarkdown: "",
-          publishedAt: "2026-03-28T09:00:00.000Z",
-          fetchedAt: "2026-03-28T09:05:00.000Z"
+          bodyMarkdown:
+            "This quick blurb still carries enough background, evidence, and context to count as a complete item for the system score.",
+          publishedAt: "2026-03-29T09:00:00.000Z",
+          fetchedAt: "2026-03-29T09:05:00.000Z"
         }
       ]
     });
@@ -42,7 +48,6 @@ describe("listContentView", () => {
     const itemId = findContentIdByTitle(db, "Breaking quick blurb");
     saveFavorite(db, itemId, true);
     saveReaction(db, itemId, "dislike");
-    saveRatings(db, itemId, { value: 2, credibility: 4 });
 
     const cards = listContentView(db, "hot");
     const card = cards.find((entry) => entry.id === itemId);
@@ -50,17 +55,20 @@ describe("listContentView", () => {
     expect(card).toMatchObject({
       id: itemId,
       title: "Breaking quick blurb",
-      sourceName: "Juya AI Daily",
+      sourceName: "OpenAI",
       canonicalUrl: "https://example.com/breaking",
       isFavorited: true,
       reaction: "dislike"
     });
-    expect(card?.averageRating).toBeCloseTo(3, 6);
+    expect(card?.contentScore).toBeGreaterThan(0);
+    expect(card?.contentScore).toBeLessThanOrEqual(100);
+    expect(card?.scoreBadges).toEqual(expect.arrayContaining(["24h 内", "官方源", "正文完整"]));
+    expect(card).not.toHaveProperty("averageRating");
   });
 
   it("keeps one content pool but orders at least one view differently", async () => {
     const db = await createTestDatabase();
-    const source = resolveSourceByKind(db, "juya");
+    const source = resolveSourceByKind(db, "openai");
 
     expect(source).toBeDefined();
 

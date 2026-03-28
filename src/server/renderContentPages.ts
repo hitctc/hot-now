@@ -1,10 +1,8 @@
 import type { ContentCardView, ContentViewKey } from "../core/content/listContentView.js";
-import type { RatingDimension } from "../core/ratings/ratingRepository.js";
 
 type ContentPageView = {
   viewKey: ContentViewKey;
   cards: ContentCardView[];
-  dimensions: RatingDimension[];
 };
 
 const pageSubtitle: Record<ContentViewKey, string> = {
@@ -16,7 +14,7 @@ const pageSubtitle: Record<ContentViewKey, string> = {
 export function renderContentPage(view: ContentPageView): string {
   // The page body is generated as plain HTML so server routes can inject it into the shared shell layout.
   const cardsHtml = view.cards.length > 0
-    ? view.cards.map((card) => renderContentCard(card, view.dimensions)).join("")
+    ? view.cards.map((card) => renderContentCard(card)).join("")
     : `<section class="content-empty content-empty--signal"><h3>今天还没有可展示的内容</h3><p>可以先去控制台手动触发一次抓取。</p></section>`;
 
   return `
@@ -30,14 +28,14 @@ export function renderContentPage(view: ContentPageView): string {
   `;
 }
 
-function renderContentCard(card: ContentCardView, dimensions: RatingDimension[]): string {
+function renderContentCard(card: ContentCardView): string {
   // Each card carries its content id in data attributes so site.js can post interaction updates.
-  const ratingLabel = card.averageRating === null ? "未评分" : card.averageRating.toFixed(2);
   const summaryText = card.summary?.trim() || "暂无摘要";
   const publishedText = formatPublishedAt(card.publishedAt);
   const favoritePressed = card.isFavorited ? "true" : "false";
   const likePressed = card.reaction === "like" ? "true" : "false";
   const dislikePressed = card.reaction === "dislike" ? "true" : "false";
+  const contentScoreLabel = `${card.contentScore}/100`;
   const titleHtml = renderTitleLink(card.title, card.canonicalUrl);
 
   return `
@@ -46,7 +44,7 @@ function renderContentCard(card: ContentCardView, dimensions: RatingDimension[])
         <p class="content-meta">
           <span>${escapeHtml(card.sourceName)}</span>
           <span>发布时间：${escapeHtml(publishedText)}</span>
-          <span>均分：<strong data-role="average-rating">${escapeHtml(ratingLabel)}</strong></span>
+          <span>系统分：<strong data-role="content-score">${escapeHtml(contentScoreLabel)}</strong></span>
         </p>
         <h3 class="content-title">
           ${titleHtml}
@@ -54,6 +52,9 @@ function renderContentCard(card: ContentCardView, dimensions: RatingDimension[])
       </header>
       <div class="content-card-body">
         <p class="content-summary">${escapeHtml(summaryText)}</p>
+        <div class="content-score-badges">
+          ${card.scoreBadges.map((badge) => `<span class="action-chip">${escapeHtml(badge)}</span>`).join("")}
+        </div>
         <div class="content-card-region content-card-region--actions">
           <div class="content-actions">
             <button
@@ -85,34 +86,11 @@ function renderContentCard(card: ContentCardView, dimensions: RatingDimension[])
             </button>
           </div>
         </div>
-        <form class="rating-form" data-content-action="ratings">
-          <div class="rating-grid">
-            ${dimensions.map((dimension) => renderRatingField(dimension)).join("")}
-          </div>
-          <button type="submit" class="primary-mini-button">保存评分</button>
-        </form>
         <div class="content-card-region content-card-region--status">
           <p class="action-status" data-role="action-status" aria-live="polite"></p>
         </div>
       </div>
     </article>
-  `;
-}
-
-function renderRatingField(dimension: RatingDimension) {
-  // The rating form uses simple select boxes so page actions stay framework-free.
-  return `
-    <label class="rating-field">
-      <span>${escapeHtml(dimension.name)}</span>
-      <select name="${escapeHtml(dimension.key)}">
-        <option value="">未选择</option>
-        <option value="1">1</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="5">5</option>
-      </select>
-    </label>
   `;
 }
 

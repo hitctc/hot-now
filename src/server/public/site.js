@@ -76,25 +76,6 @@
       await handleManualCollectionRun(target);
       return;
     }
-
-    if (target.dataset.contentAction !== "ratings") {
-      return;
-    }
-
-    const card = target.closest("[data-content-id]");
-
-    if (!(card instanceof HTMLElement)) {
-      return;
-    }
-
-    const contentId = Number(card.dataset.contentId);
-
-    if (!Number.isInteger(contentId) || contentId <= 0) {
-      return;
-    }
-
-    event.preventDefault();
-    await handleRatings(card, target, contentId);
   });
 
   async function handleFavorite(card, button, contentId) {
@@ -144,54 +125,6 @@
     }
 
     showStatus(card, nextReaction === "none" ? "已清除反馈。" : "反馈已保存。");
-  }
-
-  async function handleRatings(card, form, contentId) {
-    // Ratings submit only filled dimensions and leave unselected dimensions untouched.
-    const formData = new FormData(form);
-    const scores = {};
-
-    for (const [rawKey, rawValue] of formData.entries()) {
-      if (typeof rawKey !== "string" || typeof rawValue !== "string") {
-        continue;
-      }
-
-      if (!rawValue) {
-        continue;
-      }
-
-      const parsedScore = Number(rawValue);
-
-      if (!Number.isFinite(parsedScore)) {
-        continue;
-      }
-
-      scores[rawKey] = parsedScore;
-    }
-
-    if (Object.keys(scores).length === 0) {
-      showStatus(card, "请至少选择一个评分项。");
-      return;
-    }
-
-    const response = await postJson(`/actions/content/${contentId}/ratings`, { scores });
-
-    if (!response.ok) {
-      showStatus(card, await readActionError(response, "评分保存失败，请稍后再试。"));
-      return;
-    }
-
-    const payload = await safeJson(response);
-
-    if (payload && typeof payload.averageRating === "number") {
-      const averageNode = card.querySelector('[data-role="average-rating"]');
-
-      if (averageNode) {
-        averageNode.textContent = payload.averageRating.toFixed(2);
-      }
-    }
-
-    showStatus(card, "评分已保存。");
   }
 
   async function handleViewRuleSave(form) {
@@ -328,10 +261,6 @@
     }
 
     const payload = await safeJson(response);
-
-    if (payload?.reason === "unknown-dimensions" && Array.isArray(payload.unknownKeys) && payload.unknownKeys.length > 0) {
-      return `评分项不存在：${payload.unknownKeys.join(", ")}`;
-    }
 
     return fallbackMessage;
   }

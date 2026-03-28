@@ -518,15 +518,14 @@ function mapPathToContentViewKey(pathname: string): ContentViewKey | null {
 }
 
 async function renderContentForView(deps: ServerDeps, viewKey: ContentViewKey): Promise<string | undefined> {
-  // Rendering pulls cards plus rating dimensions together so templates stay decoupled from DB concerns.
+  // Rendering stays data-only now: the page consumes scored cards and no longer needs rating dimensions.
   if (!deps.listContentView) {
     return undefined;
   }
 
   const cards = await deps.listContentView(viewKey);
-  const dimensions = (await deps.listRatingDimensions?.()) ?? [];
 
-  return renderContentPage({ viewKey, cards, dimensions });
+  return renderContentPage({ viewKey, cards });
 }
 
 async function renderSystemPageForPath(deps: ServerDeps, pathname: string, loggedIn: boolean): Promise<string | undefined> {

@@ -1,0 +1,134 @@
+import { mkdtemp } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { resolveSourceByKind, upsertContentItems } from "../../src/core/content/contentRepository.js";
+import { listContentView } from "../../src/core/content/listContentView.js";
+import { openDatabase } from "../../src/core/db/openDatabase.js";
+import { runMigrations } from "../../src/core/db/runMigrations.js";
+import { seedInitialData } from "../../src/core/db/seedInitialData.js";
+import { saveFavorite, saveReaction } from "../../src/core/feedback/feedbackRepository.js";
+import { saveRatings } from "../../src/core/ratings/ratingRepository.js";
+
+describe("listContentView", () => {
+  const databasesToClose: ReturnType<typeof openDatabase>[] = [];
+
+  afterEach(() => {
+    while (databasesToClose.length > 0) {
+      databasesToClose.pop()?.close();
+    }
+  });
+
+  it("returns unified content cards with feedback and average rating merged in", async () => {
+    const db = await createTestDatabase();
+    const source = resolveSourceByKind(db, "juya");
+
+    expect(source).toBeDefined();
+
+    upsertContentItems(db, {
+      sourceId: source!.id,
+      items: [
+        {
+          title: "Breaking quick blurb",
+          canonicalUrl: "https://example.com/breaking",
+          summary: "short",
+          bodyMarkdown: "",
+          publishedAt: "2026-03-28T09:00:00.000Z",
+          fetchedAt: "2026-03-28T09:05:00.000Z"
+        }
+      ]
+    });
+
+    const itemId = findContentIdByTitle(db, "Breaking quick blurb");
+    saveFavorite(db, itemId, true);
+    saveReaction(db, itemId, "dislike");
+    saveRatings(db, itemId, { value: 2, credibility: 4 });
+
+    const cards = listContentView(db, "hot");
+    const card = cards.find((entry) => entry.id === itemId);
+
+    expect(card).toMatchObject({
+      id: itemId,
+      title: "Breaking quick blurb",
+      sourceName: "Juya AI Daily",
+      canonicalUrl: "https://example.com/breaking",
+      isFavorited: true,
+      reaction: "dislike"
+    });
+    expect(card?.averageRating).toBeCloseTo(3, 6);
+  });
+
+  it("keeps one content pool but orders at least one view differently", async () => {
+    const db = await createTestDatabase();
+    const source = resolveSourceByKind(db, "juya");
+
+    expect(source).toBeDefined();
+
+    upsertContentItems(db, {
+      sourceId: source!.id,
+      items: [
+        {
+          title: "Deep infrastructure analysis",
+          canonicalUrl: "https://example.com/deep-analysis",
+          summary:
+            "This deep analysis explains architecture decisions in detail with enough context for downstream readers.",
+          bodyMarkdown:
+            "Long-form content with background, evidence, and implementation details that make this entry article-heavy.",
+          publishedAt: "2026-03-20T10:00:00.000Z",
+          fetchedAt: "2026-03-20T10:05:00.000Z"
+        },
+        {
+          title: "Breaking quick blurb",
+          canonicalUrl: "https://example.com/breaking",
+          summary: "short",
+          bodyMarkdown: "",
+          publishedAt: "2026-03-28T09:00:00.000Z",
+          fetchedAt: "2026-03-28T09:05:00.000Z"
+        },
+        {
+          title: "AI agent system roundup",
+          canonicalUrl: "https://example.com/ai-roundup",
+          summary: "Covers AI agents and LLM model progress across products.",
+          bodyMarkdown: "This article compares GPT-style model updates and agent workflows.",
+          publishedAt: "2026-03-26T11:00:00.000Z",
+          fetchedAt: "2026-03-26T11:05:00.000Z"
+        }
+      ]
+    });
+
+    const hotCards = listContentView(db, "hot");
+    const articleCards = listContentView(db, "articles");
+    const aiCards = listContentView(db, "ai");
+
+    expect(extractSortedIds(hotCards)).toEqual(extractSortedIds(articleCards));
+    expect(extractSortedIds(hotCards)).toEqual(extractSortedIds(aiCards));
+    expect(hotCards[0]?.title).toBe("Breaking quick blurb");
+    expect(articleCards[0]?.title).toBe("Deep infrastructure analysis");
+    expect(aiCards[0]?.title).toBe("AI agent system roundup");
+  });
+
+  async function createTestDatabase() {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-content-view-"));
+    const db = openDatabase(path.join(tempDir, "hot-now.sqlite"));
+    databasesToClose.push(db);
+    runMigrations(db);
+    seedInitialData(db, { username: "admin", password: "bootstrap-password" });
+    return db;
+  }
+});
+
+function findContentIdByTitle(db: ReturnType<typeof openDatabase>, title: string): number {
+  // Tests resolve content ids by title so assertions stay readable and avoid coupling to insert order.
+  const row = db.prepare("SELECT id FROM content_items WHERE title = ? LIMIT 1").get(title) as { id: number } | undefined;
+
+  if (!row) {
+    throw new Error(`Content item not found for title: ${title}`);
+  }
+
+  return row.id;
+}
+
+function extractSortedIds(cards: Array<{ id: number }>) {
+  // Comparing sorted ids makes it explicit that all views reuse the same underlying content pool.
+  return cards.map((card) => card.id).sort((left, right) => left - right);
+}

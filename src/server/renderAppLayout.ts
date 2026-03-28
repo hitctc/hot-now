@@ -14,7 +14,8 @@ export type AppShellPage = {
 type AppShellView = {
   currentPath: string;
   page: AppShellPage;
-  user: AppShellUser;
+  user?: AppShellUser;
+  contentHtml?: string;
 };
 
 const appShellPages: AppShellPage[] = [
@@ -45,6 +46,8 @@ export function findAppShellPage(pathname: string): AppShellPage | null {
 export function renderAppLayout(view: AppShellView): string {
   const contentLinks = renderNavGroup(appShellPages.filter((page) => page.section === "content"), view.currentPath);
   const systemLinks = renderNavGroup(appShellPages.filter((page) => page.section === "system"), view.currentPath);
+  const pageContent = view.contentHtml ?? renderPlaceholder(view.page.description);
+  const userBlock = view.user ? renderUserBlock(view.user) : `<p class="user-meta">公开访问模式</p>`;
 
   return `<!doctype html>
 <html lang="zh-CN">
@@ -53,6 +56,7 @@ export function renderAppLayout(view: AppShellView): string {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(view.page.title)} | HotNow</title>
     <link rel="stylesheet" href="/assets/site.css" />
+    <script src="/assets/site.js" defer></script>
   </head>
   <body class="shell-page">
     <div class="shell-root">
@@ -77,25 +81,39 @@ export function renderAppLayout(view: AppShellView): string {
             <h2 class="header-title">${escapeHtml(view.page.title)}</h2>
           </div>
           <div class="header-user">
-            <div>
-              <p class="user-name">${escapeHtml(view.user.displayName)}</p>
-              <p class="user-meta">@${escapeHtml(view.user.username)} · ${escapeHtml(view.user.role)}</p>
-            </div>
-            <form method="post" action="/logout">
-              <button type="submit" class="ghost-button">退出登录</button>
-            </form>
+            ${userBlock}
           </div>
         </header>
         <main class="shell-content">
-          <section class="placeholder-card">
-            <h3>模块占位</h3>
-            <p>${escapeHtml(view.page.description)}</p>
-          </section>
+          ${pageContent}
         </main>
       </div>
     </div>
   </body>
 </html>`;
+}
+
+function renderPlaceholder(description: string) {
+  // Placeholder mode is preserved so shell-only pages still render when content deps are absent.
+  return `
+    <section class="placeholder-card">
+      <h3>模块占位</h3>
+      <p>${escapeHtml(description)}</p>
+    </section>
+  `;
+}
+
+function renderUserBlock(user: AppShellUser) {
+  // Authenticated pages keep user identity and logout controls in one shared header fragment.
+  return `
+    <div>
+      <p class="user-name">${escapeHtml(user.displayName)}</p>
+      <p class="user-meta">@${escapeHtml(user.username)} · ${escapeHtml(user.role)}</p>
+    </div>
+    <form method="post" action="/logout">
+      <button type="submit" class="ghost-button">退出登录</button>
+    </form>
+  `;
 }
 
 function renderNavGroup(pages: AppShellPage[], currentPath: string): string {

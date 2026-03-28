@@ -1,6 +1,9 @@
-import Fastify from "fastify";
+import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import type { ContentCardView, ContentViewKey } from "../core/content/listContentView.js";
+import type { ReactionValue } from "../core/feedback/feedbackRepository.js";
+import type { RatingDimension } from "../core/ratings/ratingRepository.js";
 import type { RuntimeConfig } from "../core/types/appConfig.js";
 import {
   createSessionToken,
@@ -15,6 +18,7 @@ import {
   renderNoticePage
 } from "./renderPages.js";
 import { findAppShellPage, getAppShellPages, renderAppLayout } from "./renderAppLayout.js";
+import { renderContentPage } from "./renderContentPages.js";
 
 type ReportSummary = {
   date: string;
@@ -30,6 +34,11 @@ type ServerDeps = {
   readReportHtml?: (date: string) => Promise<string>;
   triggerManualRun?: () => Promise<{ accepted: boolean }>;
   isRunning?: () => boolean;
+  listContentView?: (viewKey: ContentViewKey) => Promise<ContentCardView[]> | ContentCardView[];
+  saveFavorite?: (contentItemId: number, isFavorited: boolean) => Promise<void> | void;
+  saveReaction?: (contentItemId: number, reaction: ReactionValue) => Promise<void> | void;
+  listRatingDimensions?: () => Promise<RatingDimension[]> | RatingDimension[];
+  saveRatings?: (contentItemId: number, scores: Record<string, number>) => Promise<void> | void;
   auth?: {
     requireLogin: boolean;
     sessionSecret: string;
@@ -51,9 +60,11 @@ export function createServer(deps: ServerDeps = {}) {
   const authConfig = deps.auth;
   const authEnabled = authConfig?.requireLogin === true;
   const siteCss = readSiteCss();
+  const siteJs = readSiteJs();
 
   app.get("/health", async () => ({ ok: true }));
   app.get("/assets/site.css", async (_request, reply) => reply.type("text/css; charset=utf-8").send(siteCss));
+  app.get("/assets/site.js", async (_request, reply) => reply.type("application/javascript; charset=utf-8").send(siteJs));
 
   if (authEnabled) {
     app.get("/login", async (request, reply) => {
@@ -130,6 +141,9 @@ export function createServer(deps: ServerDeps = {}) {
           return reply.code(404).type("text/html").send(renderNoticePage("HotNow", "页面不存在"));
         }
 
+        const contentViewKey = mapPathToContentViewKey(currentPage.path);
+        const contentHtml = contentViewKey ? await renderContentForView(deps, contentViewKey) : undefined;
+
         return reply.type("text/html").send(
           renderAppLayout({
             currentPath: currentPage.path,
@@ -138,7 +152,29 @@ export function createServer(deps: ServerDeps = {}) {
               username: session.username,
               displayName: session.displayName,
               role: session.role
-            }
+            },
+            contentHtml
+          })
+        );
+      });
+    }
+  } else if (deps.listContentView) {
+    for (const page of getAppShellPages().filter((entry) => entry.section === "content")) {
+      app.get(page.path, async (_request, reply) => {
+        const currentPage = findAppShellPage(page.path);
+
+        if (!currentPage) {
+          return reply.code(404).type("text/html").send(renderNoticePage("HotNow", "页面不存在"));
+        }
+
+        const contentViewKey = mapPathToContentViewKey(currentPage.path);
+        const contentHtml = contentViewKey ? await renderContentForView(deps, contentViewKey) : undefined;
+
+        return reply.type("text/html").send(
+          renderAppLayout({
+            currentPath: currentPage.path,
+            page: currentPage,
+            contentHtml
           })
         );
       });
@@ -226,6 +262,82 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.code(202).send(result);
   });
 
+  app.post("/actions/content/:id/favorite", async (request, reply) => {
+    if (!ensureContentActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.saveFavorite) {
+      return reply.code(503).send({ ok: false, reason: "content-actions-disabled" });
+    }
+
+    const contentItemId = parseContentItemId(request.params);
+
+    if (!contentItemId) {
+      return reply.code(400).send({ ok: false, reason: "invalid-content-id" });
+    }
+
+    const body = request.body as { isFavorited?: unknown } | undefined;
+
+    if (typeof body?.isFavorited !== "boolean") {
+      return reply.code(400).send({ ok: false, reason: "invalid-favorite-payload" });
+    }
+
+    await deps.saveFavorite(contentItemId, body.isFavorited);
+    return reply.send({ ok: true, contentItemId, isFavorited: body.isFavorited });
+  });
+
+  app.post("/actions/content/:id/reaction", async (request, reply) => {
+    if (!ensureContentActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.saveReaction) {
+      return reply.code(503).send({ ok: false, reason: "content-actions-disabled" });
+    }
+
+    const contentItemId = parseContentItemId(request.params);
+
+    if (!contentItemId) {
+      return reply.code(400).send({ ok: false, reason: "invalid-content-id" });
+    }
+
+    const body = request.body as { reaction?: unknown } | undefined;
+
+    if (!isReactionValue(body?.reaction)) {
+      return reply.code(400).send({ ok: false, reason: "invalid-reaction" });
+    }
+
+    await deps.saveReaction(contentItemId, body.reaction);
+    return reply.send({ ok: true, contentItemId, reaction: body.reaction });
+  });
+
+  app.post("/actions/content/:id/ratings", async (request, reply) => {
+    if (!ensureContentActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.saveRatings) {
+      return reply.code(503).send({ ok: false, reason: "content-actions-disabled" });
+    }
+
+    const contentItemId = parseContentItemId(request.params);
+
+    if (!contentItemId) {
+      return reply.code(400).send({ ok: false, reason: "invalid-content-id" });
+    }
+
+    const body = request.body as { scores?: unknown } | undefined;
+    const scores = parseRatingScores(body?.scores);
+
+    if (!scores || Object.keys(scores).length === 0) {
+      return reply.code(400).send({ ok: false, reason: "invalid-ratings-payload" });
+    }
+
+    await deps.saveRatings(contentItemId, scores);
+    return reply.send({ ok: true, contentItemId, saved: Object.keys(scores).length });
+  });
+
   return app;
 }
 
@@ -251,6 +363,111 @@ function readSiteCss() {
       return "body{font-family:sans-serif;background:#f8fafc;color:#0f172a;}";
     }
   }
+}
+
+function readSiteJs() {
+  // The browser helper stays optional at runtime, but the server still serves a safe fallback script.
+  try {
+    return readFileSync(new URL("./public/site.js", import.meta.url), "utf8");
+  } catch {
+    try {
+      return readFileSync(path.resolve(process.cwd(), "src/server/public/site.js"), "utf8");
+    } catch {
+      return "(() => {})();";
+    }
+  }
+}
+
+function mapPathToContentViewKey(pathname: string): ContentViewKey | null {
+  // Content menu paths map to one canonical view key so ranking logic stays inside content modules.
+  if (pathname === "/") {
+    return "hot";
+  }
+
+  if (pathname === "/articles") {
+    return "articles";
+  }
+
+  if (pathname === "/ai") {
+    return "ai";
+  }
+
+  return null;
+}
+
+async function renderContentForView(deps: ServerDeps, viewKey: ContentViewKey): Promise<string | undefined> {
+  // Rendering pulls cards plus rating dimensions together so templates stay decoupled from DB concerns.
+  if (!deps.listContentView) {
+    return undefined;
+  }
+
+  const cards = await deps.listContentView(viewKey);
+  const dimensions = (await deps.listRatingDimensions?.()) ?? [];
+
+  return renderContentPage({ viewKey, cards, dimensions });
+}
+
+function ensureContentActionAuthorized(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  authEnabled: boolean,
+  sessionSecret: string
+) {
+  // Content actions must return hard 401 in auth mode because these routes mutate user-facing state.
+  if (!authEnabled) {
+    return true;
+  }
+
+  const session = readAuthenticatedSession(request.headers.cookie, sessionSecret);
+
+  if (!session) {
+    void reply.code(401).send({ ok: false, reason: "unauthorized" });
+    return false;
+  }
+
+  return true;
+}
+
+function parseContentItemId(params: unknown): number | null {
+  // Action routes accept ids from path params only, so we enforce positive integer parsing here once.
+  const idCandidate = (params as { id?: unknown } | undefined)?.id;
+  const parsedId = Number(idCandidate);
+
+  if (!Number.isInteger(parsedId) || parsedId <= 0) {
+    return null;
+  }
+
+  return parsedId;
+}
+
+function isReactionValue(value: unknown): value is ReactionValue {
+  // Only the three explicit reaction values are accepted to avoid writing arbitrary feedback strings.
+  return value === "like" || value === "dislike" || value === "none";
+}
+
+function parseRatingScores(value: unknown): Record<string, number> | null {
+  // Scores are constrained to 1-5 numeric values so malformed payloads do not pollute persisted ratings.
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const parsedScores: Record<string, number> = {};
+
+  for (const [dimensionKey, rawScore] of Object.entries(value)) {
+    if (typeof dimensionKey !== "string" || !dimensionKey.trim()) {
+      continue;
+    }
+
+    const score = Number(rawScore);
+
+    if (!Number.isFinite(score) || score < 1 || score > 5) {
+      continue;
+    }
+
+    parsedScores[dimensionKey] = score;
+  }
+
+  return parsedScores;
 }
 
 function renderLoginPage() {

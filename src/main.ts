@@ -1,11 +1,14 @@
 import { loadRuntimeConfig } from "./core/config/loadRuntimeConfig.js";
 import { verifyPassword } from "./core/auth/passwords.js";
+import { listContentView as listContentCards } from "./core/content/listContentView.js";
 import { openDatabase } from "./core/db/openDatabase.js";
 import { runMigrations } from "./core/db/runMigrations.js";
 import { seedInitialData } from "./core/db/seedInitialData.js";
+import { saveFavorite, saveReaction } from "./core/feedback/feedbackRepository.js";
 import { fetchAndExtractArticle } from "./core/fetch/extractArticle.js";
 import { sendDailyEmail } from "./core/mail/sendDailyEmail.js";
 import { runDailyDigest } from "./core/pipeline/runDailyDigest.js";
+import { listRatingDimensions, saveRatings } from "./core/ratings/ratingRepository.js";
 import type { DailyReportTrigger } from "./core/report/buildDailyReport.js";
 import { createRunLock } from "./core/runtime/runLock.js";
 import { startScheduler } from "./core/scheduler/startScheduler.js";
@@ -116,6 +119,17 @@ const app = createServer({
     verifyLogin
   },
   isRunning: () => lock.isRunning(),
+  listContentView: async (viewKey) => listContentCards(db, viewKey),
+  saveFavorite: async (contentItemId, isFavorited) => {
+    saveFavorite(db, contentItemId, isFavorited);
+  },
+  saveReaction: async (contentItemId, reaction) => {
+    saveReaction(db, contentItemId, reaction);
+  },
+  listRatingDimensions: async () => listRatingDimensions(db),
+  saveRatings: async (contentItemId, scores) => {
+    saveRatings(db, contentItemId, scores);
+  },
   listReportSummaries: listStoredReportSummaries,
   latestReportDate: async () => (await listReportDates(config.report.dataDir))[0] ?? null,
   readReportHtml: async (date: string) => await readTextFile(config.report.dataDir, date, "report.html"),

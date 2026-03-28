@@ -8,6 +8,7 @@ import { openDatabase } from "../../src/core/db/openDatabase.js";
 import { runMigrations } from "../../src/core/db/runMigrations.js";
 import { seedInitialData } from "../../src/core/db/seedInitialData.js";
 import { saveFavorite, saveReaction } from "../../src/core/feedback/feedbackRepository.js";
+import { saveViewRuleConfig } from "../../src/core/viewRules/viewRuleRepository.js";
 
 describe("listContentView", () => {
   const databasesToClose: ReturnType<typeof openDatabase>[] = [];
@@ -111,11 +112,11 @@ describe("listContentView", () => {
     expect(extractSortedIds(hotCards)).toEqual(extractSortedIds(articleCards));
     expect(extractSortedIds(hotCards)).toEqual(extractSortedIds(aiCards));
     expect(hotCards[0]?.title).toBe("Breaking quick blurb");
-    expect(articleCards[0]?.title).toBe("Deep infrastructure analysis");
+    expect(articleCards[0]?.title).toBe("AI agent system roundup");
     expect(aiCards[0]?.title).toBe("AI agent system roundup");
   });
 
-  it("keeps old but highly complete articles in the articles view when the pool exceeds 80 items", async () => {
+  it("keeps old but highly complete articles in the articles view when the pool exceeds the configured limit", async () => {
     const db = await createTestDatabase();
     const source = resolveSourceByKind(db, "openai");
 
@@ -141,7 +142,7 @@ describe("listContentView", () => {
     const articleCards = listContentView(db, "articles");
     const deepArchiveCard = articleCards.find((card) => card.title === "Deep archive analysis");
 
-    expect(articleCards).toHaveLength(80);
+    expect(articleCards).toHaveLength(20);
     expect(deepArchiveCard).toBeDefined();
     expect(articleCards[0]?.title).toBe("Deep archive analysis");
   });
@@ -178,6 +179,114 @@ describe("listContentView", () => {
 
     expect(hotCards[0]?.title).toBe("Newer hot item");
     expect(hotCards[1]?.title).toBe("Older hot item");
+  });
+
+  it("changes the hot view limit after saving a new rule config", async () => {
+    const db = await createTestDatabase();
+    const source = resolveSourceByKind(db, "openai");
+
+    expect(source).toBeDefined();
+
+    upsertContentItems(db, {
+      sourceId: source!.id,
+      items: [
+        {
+          title: "Limit item A",
+          canonicalUrl: "https://example.com/limit-item-a",
+          summary: "Short neutral summary.",
+          bodyMarkdown: "Compact neutral body text.",
+          publishedAt: "2026-03-29T11:00:00.000Z",
+          fetchedAt: "2026-03-29T11:05:00.000Z"
+        },
+        {
+          title: "Limit item B",
+          canonicalUrl: "https://example.com/limit-item-b",
+          summary: "Short neutral summary.",
+          bodyMarkdown: "Compact neutral body text.",
+          publishedAt: "2026-03-29T10:00:00.000Z",
+          fetchedAt: "2026-03-29T10:05:00.000Z"
+        },
+        {
+          title: "Limit item C",
+          canonicalUrl: "https://example.com/limit-item-c",
+          summary: "Short neutral summary.",
+          bodyMarkdown: "Compact neutral body text.",
+          publishedAt: "2026-03-29T09:00:00.000Z",
+          fetchedAt: "2026-03-29T09:05:00.000Z"
+        }
+      ]
+    });
+
+    saveViewRuleConfig(db, "hot", {
+      limit: 1,
+      freshnessWindowDays: 3,
+      freshnessWeight: 0.35,
+      sourceWeight: 0.1,
+      completenessWeight: 0.1,
+      aiWeight: 0.05,
+      heatWeight: 0.4
+    });
+
+    expect(listContentView(db, "hot")).toHaveLength(1);
+
+    saveViewRuleConfig(db, "hot", {
+      limit: 2,
+      freshnessWindowDays: 3,
+      freshnessWeight: 0.35,
+      sourceWeight: 0.1,
+      completenessWeight: 0.1,
+      aiWeight: 0.05,
+      heatWeight: 0.4
+    });
+
+    expect(listContentView(db, "hot")).toHaveLength(2);
+  });
+
+  it("reorders the hot view when the saved weights favor completeness over freshness", async () => {
+    const db = await createTestDatabase();
+    const source = resolveSourceByKind(db, "openai");
+
+    expect(source).toBeDefined();
+
+    upsertContentItems(db, {
+      sourceId: source!.id,
+      items: [
+        {
+          title: "Fresh quick blurb",
+          canonicalUrl: "https://example.com/fresh-quick-blurb",
+          summary: "Short neutral summary.",
+          bodyMarkdown: "Compact neutral body text.",
+          publishedAt: "2026-03-29T11:00:00.000Z",
+          fetchedAt: "2026-03-29T11:05:00.000Z"
+        },
+        {
+          title: "Complete deep analysis",
+          canonicalUrl: "https://example.com/complete-deep-analysis",
+          summary:
+            "This deep analysis explains architecture decisions in detail with enough context for downstream readers.",
+          bodyMarkdown:
+            "Long-form content with background, evidence, and implementation details that make this entry article-heavy.",
+          publishedAt: "2026-03-24T10:00:00.000Z",
+          fetchedAt: "2026-03-24T10:05:00.000Z"
+        }
+      ]
+    });
+
+    const defaultHotCards = listContentView(db, "hot");
+    expect(defaultHotCards[0]?.title).toBe("Fresh quick blurb");
+
+    saveViewRuleConfig(db, "hot", {
+      limit: 20,
+      freshnessWindowDays: 3,
+      freshnessWeight: 0.05,
+      sourceWeight: 0.05,
+      completenessWeight: 0.7,
+      aiWeight: 0.05,
+      heatWeight: 0.15
+    });
+
+    const weightedHotCards = listContentView(db, "hot");
+    expect(weightedHotCards[0]?.title).toBe("Complete deep analysis");
   });
 
   async function createTestDatabase() {

@@ -84,6 +84,29 @@ export function listViewRules(db: SqliteDatabase): ViewRuleConfig[] {
   }));
 }
 
+export function getViewRuleConfig(db: SqliteDatabase, ruleKey: string): ViewRuleConfigValues {
+  ensureDefaultViewRules(db);
+
+  const normalizedRuleKey = ruleKey.trim();
+  const row = db
+    .prepare(
+      `
+        SELECT rule_key, config_json
+        FROM view_rule_configs
+        WHERE rule_key = ?
+        LIMIT 1
+      `
+    )
+    .get(normalizedRuleKey) as ViewRuleRow | undefined;
+
+  if (row) {
+    return parseConfigJson(row.rule_key, row.config_json);
+  }
+
+  const defaultRule = defaultViewRuleByKey.get(normalizedRuleKey as ViewRuleKey);
+  return defaultRule?.config ?? defaultViewRuleDefinitions[0].config;
+}
+
 export function saveViewRuleConfig(
   db: SqliteDatabase,
   ruleKey: string,

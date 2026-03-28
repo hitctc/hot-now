@@ -1,5 +1,7 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
 import { scoreContentItem, type ContentScoreBreakdown } from "./contentScoring.js";
+import { getViewRuleConfig } from "../viewRules/viewRuleRepository.js";
+import type { ViewRuleConfigValues } from "../viewRules/viewRuleConfig.js";
 
 export type ContentViewKey = "hot" | "articles" | "ai";
 
@@ -86,7 +88,8 @@ const contentSelectSql = `
 `;
 
 export function listContentView(db: SqliteDatabase, viewKey: ContentViewKey): ContentCardView[] {
-  // Every tab reads the same candidate pool; the pure scoring module turns it into view-specific order.
+  const viewRuleConfig = getViewRuleConfig(db, viewKey);
+  // Every tab reads the same candidate pool; the saved rule weights decide which cards rise and how many survive.
   const rows = db.prepare(contentSelectSql).all() as ContentCardRow[];
   const referenceTime = new Date();
 
@@ -114,7 +117,7 @@ export function listContentView(db: SqliteDatabase, viewKey: ContentViewKey): Co
         reaction: normalizeReaction(row.reactionValue),
         contentScore: score.contentScore,
         scoreBadges: score.badges,
-        rankingScore: calculateViewRankingScore(viewKey, score),
+        rankingScore: calculateViewRankingScore(viewRuleConfig, score, row.rankingTimestamp, referenceTime),
         rankingTimestamp: row.rankingTimestamp
       };
     })
@@ -135,7 +138,7 @@ export function listContentView(db: SqliteDatabase, viewKey: ContentViewKey): Co
 
       return right.id - left.id;
     })
-    .slice(0, 80)
+    .slice(0, viewRuleConfig.limit)
     .map(({ rankingScore: _rankingScore, rankingTimestamp: _rankingTimestamp, ...card }) => card as ContentCardView);
 }
 
@@ -144,17 +147,49 @@ function normalizeReaction(value: string | null): "like" | "dislike" | "none" {
   return value === "like" || value === "dislike" ? value : "none";
 }
 
-function calculateViewRankingScore(viewKey: ContentViewKey, score: ContentScoreBreakdown): number {
-  // The card score is shared, while each tab gives a different signal mix a chance to win the top spots.
-  switch (viewKey) {
-    case "articles":
-      return score.completenessScore * 0.7 + score.freshnessScore * 0.15 + score.sourceScore * 0.05 + score.heatScore * 0.1;
-    case "ai":
-      return score.aiScore * 0.7 + score.freshnessScore * 0.1 + score.heatScore * 0.1 + score.contentScore * 0.1;
-    case "hot":
-    default:
-      return score.freshnessScore * 0.55 + score.heatScore * 0.15 + score.sourceScore * 0.1 + score.contentScore * 0.2;
+function calculateViewRankingScore(
+  viewRuleConfig: ViewRuleConfigValues,
+  score: ContentScoreBreakdown,
+  rankingTimestamp: string | null,
+  referenceTime: Date
+): number {
+  // The saved rule config now controls both the ranking mix and the freshness window.
+  const freshnessScore = calculateFreshnessWindowScore(rankingTimestamp, referenceTime, viewRuleConfig.freshnessWindowDays, score.freshnessScore);
+
+  return (
+    freshnessScore * viewRuleConfig.freshnessWeight +
+    score.sourceScore * viewRuleConfig.sourceWeight +
+    score.completenessScore * viewRuleConfig.completenessWeight +
+    score.aiScore * viewRuleConfig.aiWeight +
+    score.heatScore * viewRuleConfig.heatWeight
+  );
+}
+
+function calculateFreshnessWindowScore(
+  rankingTimestamp: string | null,
+  referenceTime: Date,
+  freshnessWindowDays: number,
+  fallbackScore: number
+): number {
+  // The freshness window is a soft decay: newer items score higher, but old items keep a fallback score if the date is missing.
+  if (!rankingTimestamp) {
+    return fallbackScore;
   }
+
+  const parsedTimestamp = Date.parse(rankingTimestamp);
+
+  if (!Number.isFinite(parsedTimestamp)) {
+    return fallbackScore;
+  }
+
+  const windowDays = Math.max(1, freshnessWindowDays);
+  const ageDays = Math.max(0, (referenceTime.getTime() - parsedTimestamp) / (24 * 60 * 60 * 1000));
+
+  if (ageDays >= windowDays) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(100, 100 - (ageDays / windowDays) * 100));
 }
 
 function toTimestampMs(value: string | null): number {

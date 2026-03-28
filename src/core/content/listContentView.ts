@@ -18,6 +18,7 @@ export type ContentCardView = {
 
 type RankedContentCardView = ContentCardView & {
   rankingScore: number;
+  rankingTimestamp: string | null;
 };
 
 type ContentCardRow = {
@@ -75,13 +76,13 @@ const contentSelectSql = `
     ci.canonical_url AS canonicalUrl,
     ci.published_at AS publishedAt,
     latest_favorite.feedback_value AS favoriteValue,
-    latest_reaction.feedback_value AS reactionValue
+    latest_reaction.feedback_value AS reactionValue,
+    COALESCE(ci.published_at, ci.fetched_at, ci.created_at) AS rankingTimestamp
   FROM content_items ci
   JOIN content_sources cs ON cs.id = ci.source_id
   LEFT JOIN latest_favorite ON latest_favorite.content_item_id = ci.id
   LEFT JOIN latest_reaction ON latest_reaction.content_item_id = ci.id
   ORDER BY datetime(COALESCE(ci.published_at, ci.fetched_at, ci.created_at)) DESC, ci.id DESC
-  LIMIT 80
 `;
 
 export function listContentView(db: SqliteDatabase, viewKey: ContentViewKey): ContentCardView[] {
@@ -113,7 +114,8 @@ export function listContentView(db: SqliteDatabase, viewKey: ContentViewKey): Co
         reaction: normalizeReaction(row.reactionValue),
         contentScore: score.contentScore,
         scoreBadges: score.badges,
-        rankingScore: calculateViewRankingScore(viewKey, score)
+        rankingScore: calculateViewRankingScore(viewKey, score),
+        rankingTimestamp: row.rankingTimestamp
       };
     })
     .sort((left, right) => {
@@ -124,9 +126,17 @@ export function listContentView(db: SqliteDatabase, viewKey: ContentViewKey): Co
         return rightRank - leftRank;
       }
 
+      const leftTimestamp = toTimestampMs(left.rankingTimestamp);
+      const rightTimestamp = toTimestampMs(right.rankingTimestamp);
+
+      if (rightTimestamp !== leftTimestamp) {
+        return rightTimestamp - leftTimestamp;
+      }
+
       return right.id - left.id;
     })
-    .map(({ rankingScore: _rankingScore, ...card }) => card as ContentCardView);
+    .slice(0, 80)
+    .map(({ rankingScore: _rankingScore, rankingTimestamp: _rankingTimestamp, ...card }) => card as ContentCardView);
 }
 
 function normalizeReaction(value: string | null): "like" | "dislike" | "none" {
@@ -145,4 +155,14 @@ function calculateViewRankingScore(viewKey: ContentViewKey, score: ContentScoreB
     default:
       return score.freshnessScore * 0.55 + score.heatScore * 0.15 + score.sourceScore * 0.1 + score.contentScore * 0.2;
   }
+}
+
+function toTimestampMs(value: string | null): number {
+  // Timestamp tie-breaks ensure newer items win when the view score itself is equal.
+  if (!value) {
+    return 0;
+  }
+
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }

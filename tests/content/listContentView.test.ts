@@ -115,6 +115,71 @@ describe("listContentView", () => {
     expect(aiCards[0]?.title).toBe("AI agent system roundup");
   });
 
+  it("keeps old but highly complete articles in the articles view when the pool exceeds 80 items", async () => {
+    const db = await createTestDatabase();
+    const source = resolveSourceByKind(db, "openai");
+
+    expect(source).toBeDefined();
+
+    upsertContentItems(db, {
+      sourceId: source!.id,
+      items: [
+        {
+          title: "Deep archive analysis",
+          canonicalUrl: "https://example.com/deep-archive-analysis",
+          summary:
+            "This deep archive analysis explains architecture decisions in detail with enough context for downstream readers.",
+          bodyMarkdown:
+            "Long-form content with background, evidence, implementation details, and follow-up context that make this entry highly complete for the article view.",
+          publishedAt: "2026-02-01T10:00:00.000Z",
+          fetchedAt: "2026-02-01T10:05:00.000Z"
+        },
+        ...buildRecentJunkItems(80)
+      ]
+    });
+
+    const articleCards = listContentView(db, "articles");
+    const deepArchiveCard = articleCards.find((card) => card.title === "Deep archive analysis");
+
+    expect(articleCards).toHaveLength(80);
+    expect(deepArchiveCard).toBeDefined();
+    expect(articleCards[0]?.title).toBe("Deep archive analysis");
+  });
+
+  it("keeps newer content ahead when two hot items score the same", async () => {
+    const db = await createTestDatabase();
+    const source = resolveSourceByKind(db, "openai");
+
+    expect(source).toBeDefined();
+
+    upsertContentItems(db, {
+      sourceId: source!.id,
+      items: [
+        {
+          title: "Newer hot item",
+          canonicalUrl: "https://example.com/newer-hot-item",
+          summary: "Short neutral summary.",
+          bodyMarkdown: "Compact neutral body text.",
+          publishedAt: "2026-03-29T11:00:00.000Z",
+          fetchedAt: "2026-03-29T11:05:00.000Z"
+        },
+        {
+          title: "Older hot item",
+          canonicalUrl: "https://example.com/older-hot-item",
+          summary: "Short neutral summary.",
+          bodyMarkdown: "Compact neutral body text.",
+          publishedAt: "2026-03-29T10:00:00.000Z",
+          fetchedAt: "2026-03-29T10:05:00.000Z"
+        }
+      ]
+    });
+
+    const hotCards = listContentView(db, "hot");
+
+    expect(hotCards[0]?.title).toBe("Newer hot item");
+    expect(hotCards[1]?.title).toBe("Older hot item");
+  });
+
   async function createTestDatabase() {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-content-view-"));
     const db = openDatabase(path.join(tempDir, "hot-now.sqlite"));
@@ -139,4 +204,22 @@ function findContentIdByTitle(db: ReturnType<typeof openDatabase>, title: string
 function extractSortedIds(cards: Array<{ id: number }>) {
   // Comparing sorted ids makes it explicit that all views reuse the same underlying content pool.
   return cards.map((card) => card.id).sort((left, right) => left - right);
+}
+
+function buildRecentJunkItems(count: number) {
+  const items = [];
+
+  for (let index = 0; index < count; index += 1) {
+    const publishedHour = String(index % 24).padStart(2, "0");
+    items.push({
+      title: `Recent filler item ${index + 1}`,
+      canonicalUrl: `https://example.com/recent-filler-${index + 1}`,
+      summary: "Short neutral summary.",
+      bodyMarkdown: "",
+      publishedAt: `2026-03-29T${publishedHour}:00:00.000Z`,
+      fetchedAt: `2026-03-29T${publishedHour}:05:00.000Z`
+    });
+  }
+
+  return items;
 }

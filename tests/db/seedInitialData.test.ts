@@ -109,11 +109,79 @@ describe("seedInitialData", () => {
     expect(rows.find((row) => row.rule_key === "hot")?.display_name).toBe("热点（自定义）");
     expect(JSON.parse(rows.find((row) => row.rule_key === "articles")?.config_json ?? "{}")).toEqual({
       limit: 20,
-      sort: "completeness"
+      freshnessWindowDays: 7,
+      freshnessWeight: 0.15,
+      sourceWeight: 0.3,
+      completenessWeight: 0.35,
+      aiWeight: 0.05,
+      heatWeight: 0.15
     });
     expect(JSON.parse(rows.find((row) => row.rule_key === "ai")?.config_json ?? "{}")).toEqual({
       limit: 20,
-      sort: "ai_score"
+      freshnessWindowDays: 5,
+      freshnessWeight: 0.1,
+      sourceWeight: 0.1,
+      completenessWeight: 0.15,
+      aiWeight: 0.5,
+      heatWeight: 0.15
     });
+  });
+
+  it("seeds fresh default view rules with weighted config_json", async () => {
+    const db = await createTestDatabase();
+
+    seedInitialData(db, { username: "admin", password: "bootstrap-password" });
+
+    const rows = db
+      .prepare(
+        `
+          SELECT rule_key, config_json
+          FROM view_rule_configs
+          ORDER BY rule_key
+        `
+      )
+      .all() as Array<{
+      rule_key: string;
+      config_json: string;
+    }>;
+
+    expect(rows).toEqual([
+      {
+        rule_key: "ai",
+        config_json: JSON.stringify({
+          limit: 20,
+          freshnessWindowDays: 5,
+          freshnessWeight: 0.1,
+          sourceWeight: 0.1,
+          completenessWeight: 0.15,
+          aiWeight: 0.5,
+          heatWeight: 0.15
+        })
+      },
+      {
+        rule_key: "articles",
+        config_json: JSON.stringify({
+          limit: 20,
+          freshnessWindowDays: 7,
+          freshnessWeight: 0.15,
+          sourceWeight: 0.3,
+          completenessWeight: 0.35,
+          aiWeight: 0.05,
+          heatWeight: 0.15
+        })
+      },
+      {
+        rule_key: "hot",
+        config_json: JSON.stringify({
+          limit: 20,
+          freshnessWindowDays: 3,
+          freshnessWeight: 0.35,
+          sourceWeight: 0.1,
+          completenessWeight: 0.1,
+          aiWeight: 0.05,
+          heatWeight: 0.4
+        })
+      }
+    ]);
   });
 });

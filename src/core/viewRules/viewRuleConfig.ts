@@ -100,7 +100,15 @@ export const defaultViewRuleDefinitions: DefaultViewRuleDefinition[] = [
       aiWeight: 0.05,
       heatWeight: 0.4
     },
-    seedConfig: { limit: 20, sort: "recent" }
+    seedConfig: {
+      limit: 20,
+      freshnessWindowDays: 3,
+      freshnessWeight: 0.35,
+      sourceWeight: 0.1,
+      completenessWeight: 0.1,
+      aiWeight: 0.05,
+      heatWeight: 0.4
+    }
   },
   {
     ruleKey: "articles",
@@ -114,7 +122,15 @@ export const defaultViewRuleDefinitions: DefaultViewRuleDefinition[] = [
       aiWeight: 0.05,
       heatWeight: 0.15
     },
-    seedConfig: { limit: 20, sort: "completeness" }
+    seedConfig: {
+      limit: 20,
+      freshnessWindowDays: 7,
+      freshnessWeight: 0.15,
+      sourceWeight: 0.3,
+      completenessWeight: 0.35,
+      aiWeight: 0.05,
+      heatWeight: 0.15
+    }
   },
   {
     ruleKey: "ai",
@@ -128,7 +144,15 @@ export const defaultViewRuleDefinitions: DefaultViewRuleDefinition[] = [
       aiWeight: 0.5,
       heatWeight: 0.15
     },
-    seedConfig: { limit: 20, sort: "ai_score" }
+    seedConfig: {
+      limit: 20,
+      freshnessWindowDays: 5,
+      freshnessWeight: 0.1,
+      sourceWeight: 0.1,
+      completenessWeight: 0.15,
+      aiWeight: 0.5,
+      heatWeight: 0.15
+    }
   }
 ];
 
@@ -140,10 +164,6 @@ export function isViewRuleKey(value: string): value is ViewRuleKey {
 
 export function getDefaultViewRuleConfig(ruleKey: string): ViewRuleConfigValues {
   return defaultViewRuleByKey.get(isViewRuleKey(ruleKey) ? ruleKey : "hot")?.config ?? defaultViewRuleDefinitions[0].config;
-}
-
-export function getDefaultViewRuleSeedConfig(ruleKey: string): Record<string, JsonValue> {
-  return defaultViewRuleByKey.get(isViewRuleKey(ruleKey) ? ruleKey : "hot")?.seedConfig ?? defaultViewRuleDefinitions[0].seedConfig;
 }
 
 export function normalizeViewRuleConfig(ruleKey: string, config: unknown): ViewRuleConfigValues {

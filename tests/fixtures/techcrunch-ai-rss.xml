@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>TechCrunch AI</title>
+    <link>https://techcrunch.com/category/artificial-intelligence/</link>
+    <description>Artificial intelligence coverage from TechCrunch</description>
+    <item>
+      <title>Anthropic launches a new enterprise agent stack</title>
+      <link>https://techcrunch.com/2026/03/27/anthropic-enterprise-agent-stack/</link>
+      <guid isPermaLink="false">tc-anthropic-enterprise-agent-stack</guid>
+      <pubDate>Fri, 27 Mar 2026 20:45:00 GMT</pubDate>
+      <description><![CDATA[<p>Anthropic says the stack is built for compliance-heavy teams.</p>]]></description>
+    </item>
+    <item>
+      <title>Why chip startups are chasing on-device AI</title>
+      <link>https://techcrunch.com/2026/03/27/chip-startups-on-device-ai/</link>
+      <guid isPermaLink="false">tc-chip-startups-on-device-ai</guid>
+      <pubDate>Fri, 27 Mar 2026 13:20:00 GMT</pubDate>
+      <description><![CDATA[<p>Founders argue privacy and latency still justify edge inference.</p>]]></description>
+    </item>
+  </channel>
+</rss>

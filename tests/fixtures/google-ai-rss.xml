@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Google AI Blog</title>
+    <link>https://blog.google/technology/ai/</link>
+    <description>Updates from Google AI</description>
+    <item>
+      <title>Gemini 3 adds longer context windows</title>
+      <link>https://blog.google/products/gemini/gemini-3-context/</link>
+      <guid isPermaLink="false">google-gemini-3-context</guid>
+      <pubDate>Fri, 28 Mar 2026 01:15:00 GMT</pubDate>
+      <description><![CDATA[<p>Gemini 3 now supports longer context and faster multimodal reasoning.</p>]]></description>
+    </item>
+    <item>
+      <title>Vertex AI ships new agent tooling</title>
+      <link>https://cloud.google.com/blog/products/ai-machine-learning/vertex-ai-agent-tooling</link>
+      <guid isPermaLink="false">google-vertex-agent-tooling</guid>
+      <pubDate>Thu, 27 Mar 2026 09:00:00 GMT</pubDate>
+      <description><![CDATA[<p>Developers can now orchestrate agents with fewer glue layers.</p>]]></description>
+    </item>
+  </channel>
+</rss>

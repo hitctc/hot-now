@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>OpenAI News</title>
+    <link>https://openai.com/news/</link>
+    <description>Latest updates from OpenAI</description>
+    <item>
+      <title>Introducing GPT-Next</title>
+      <link>https://openai.com/index/introducing-gpt-next/</link>
+      <guid isPermaLink="false">openai-gpt-next</guid>
+      <pubDate>Thu, 27 Mar 2026 18:00:00 GMT</pubDate>
+      <description>Our latest model improves reasoning and instruction following.</description>
+    </item>
+    <item>
+      <title>Expanding the Responses API</title>
+      <link>https://openai.com/index/responses-api-expansion/</link>
+      <guid isPermaLink="false">openai-responses-api</guid>
+      <pubDate>Wed, 26 Mar 2026 16:30:00 GMT</pubDate>
+      <description>New tools make agentic workflows easier to build.</description>
+    </item>
+  </channel>
+</rss>

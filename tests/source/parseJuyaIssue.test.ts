@@ -14,18 +14,23 @@ describe("parseJuyaIssue", () => {
     const issue = await parseJuyaIssue(xml);
 
     expect(issue.date).toBe("2026-03-26");
+    expect(issue.sourceKind).toBe("juya");
     expect(issue.items).toEqual([
       expect.objectContaining({
         rank: 1,
         category: "要闻",
         title: "谷歌推出 Lyria 3 Pro 音乐模型",
-        sourceUrl: "https://blog.google/lyria"
+        sourceUrl: "https://blog.google/lyria",
+        sourceName: "Juya AI Daily",
+        externalId: "https://blog.google/lyria"
       }),
       expect.objectContaining({
         rank: 6,
         category: "开发生态",
         title: "Figma 宣布向 AI agents 开放 Figma Canvas",
-        sourceUrl: "https://www.figma.com/blog/the-figma-canvas-is-now-open-to-agents/"
+        sourceUrl: "https://www.figma.com/blog/the-figma-canvas-is-now-open-to-agents/",
+        sourceName: "Juya AI Daily",
+        externalId: "https://www.figma.com/blog/the-figma-canvas-is-now-open-to-agents/"
       })
     ]);
   });

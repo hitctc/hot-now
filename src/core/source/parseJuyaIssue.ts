@@ -1,21 +1,14 @@
 import Parser from "rss-parser";
 import * as cheerio from "cheerio";
+import { BUILTIN_SOURCES } from "./sourceCatalog.js";
+import type { CandidateItem, LoadedIssue } from "./types.js";
 
-export type CandidateItem = {
-  rank: number;
-  category: string;
-  title: string;
-  sourceUrl: string;
-};
-
-export type DailyIssue = {
-  date: string;
-  issueUrl: string;
-  items: CandidateItem[];
-};
+export type DailyIssue = LoadedIssue;
 
 const parser = new Parser();
 
+// Juya keeps its existing digest-style parsing, but now enriches each item with the shared
+// source metadata that later unified-site stages expect.
 export async function parseJuyaIssue(feedXml: string): Promise<DailyIssue> {
   const feed = await parser.parseString(feedXml);
   const latestItem = feed.items[0];
@@ -56,9 +49,16 @@ export async function parseJuyaIssue(feedXml: string): Promise<DailyIssue> {
       .trim();
 
     if (link && title) {
-      items.push({ rank, category: currentCategory, title, sourceUrl: link });
+      items.push({
+        rank,
+        category: currentCategory,
+        title,
+        sourceUrl: link,
+        sourceName: BUILTIN_SOURCES.juya.name,
+        externalId: link
+      });
     }
   });
 
-  return { date, issueUrl, items };
+  return { date, issueUrl, sourceKind: "juya", items };
 }

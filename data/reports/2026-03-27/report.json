@@ -1,12 +1,12 @@
 {
   "meta": {
     "date": "2026-03-27",
-    "generatedAt": "2026-03-27T03:07:14.327Z",
-    "trigger": "manual",
+    "generatedAt": "2026-03-28T00:00:09.184Z",
+    "trigger": "scheduled",
     "issueUrl": "https://imjuya.github.io/juya-ai-daily/issue-41/",
     "topicCount": 10,
     "degraded": true,
-    "mailStatus": "failed:connect ECONNREFUSED 127.0.0.1:2525"
+    "mailStatus": "sent"
   },
   "topics": [
     {

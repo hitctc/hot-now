@@ -289,6 +289,65 @@ describe("listContentView", () => {
     expect(weightedHotCards[0]?.title).toBe("Complete deep analysis");
   });
 
+  it("reorders the hot view when only the freshness window changes", async () => {
+    const db = await createTestDatabase();
+    const source = resolveSourceByKind(db, "openai");
+
+    expect(source).toBeDefined();
+
+    upsertContentItems(db, {
+      sourceId: source!.id,
+      items: [
+        {
+          title: "Fresh concise note",
+          canonicalUrl: "https://example.com/fresh-concise-note",
+          summary: "tiny",
+          bodyMarkdown: "",
+          publishedAt: "2026-03-29T11:00:00.000Z",
+          fetchedAt: "2026-03-29T11:05:00.000Z"
+        },
+        {
+          title: "Older complete brief",
+          canonicalUrl: "https://example.com/older-complete-brief",
+          summary:
+            "This longer summary gives enough background context to count as a fuller entry in the hot view tests.",
+          bodyMarkdown:
+            "Long-form neutral body text with enough detail and follow-up context to make this entry clearly more complete. ".repeat(
+              4
+            ),
+          publishedAt: "2026-03-24T10:00:00.000Z",
+          fetchedAt: "2026-03-24T10:05:00.000Z"
+        }
+      ]
+    });
+
+    saveViewRuleConfig(db, "hot", {
+      limit: 20,
+      freshnessWindowDays: 3,
+      freshnessWeight: 0.5,
+      sourceWeight: 0,
+      completenessWeight: 0.5,
+      aiWeight: 0,
+      heatWeight: 0
+    });
+
+    const shortWindowCards = listContentView(db, "hot");
+    expect(shortWindowCards[0]?.title).toBe("Fresh concise note");
+
+    saveViewRuleConfig(db, "hot", {
+      limit: 20,
+      freshnessWindowDays: 10,
+      freshnessWeight: 0.5,
+      sourceWeight: 0,
+      completenessWeight: 0.5,
+      aiWeight: 0,
+      heatWeight: 0
+    });
+
+    const longWindowCards = listContentView(db, "hot");
+    expect(longWindowCards[0]?.title).toBe("Older complete brief");
+  });
+
   async function createTestDatabase() {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-content-view-"));
     const db = openDatabase(path.join(tempDir, "hot-now.sqlite"));

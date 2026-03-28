@@ -66,6 +66,6 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 
 ## 验证
 
-- 运行测试：`npm run test`，通过：20 个测试文件、100 个测试全部通过
+- 运行测试：`npm run test`，通过：20 个测试文件、101 个测试全部通过
 - 类型构建：`npm run build`，通过
 - Playwright MCP 本地验收通过：`/login` 登录成功；`/`、`/articles`、`/ai`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常；浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持

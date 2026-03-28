@@ -167,7 +167,7 @@
 - 已有主体实现与测试文件
 - Git 主分支已建立并同步远端
 - 当前工作区已完成 unified site 主题阶段的最终验证：
-  - `npm run test` 通过，结果为 `20` 个测试文件、`100` 个测试全部通过
+  - `npm run test` 通过，结果为 `20` 个测试文件、`101` 个测试全部通过
   - `npm run build` 通过
   - Playwright MCP 本地验收已跑通：`/login` 登录成功；`/`、`/articles`、`/ai`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常
   - 浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持

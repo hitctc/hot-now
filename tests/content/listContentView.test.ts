@@ -348,6 +348,79 @@ describe("listContentView", () => {
     expect(longWindowCards[0]?.title).toBe("Older complete brief");
   });
 
+  it("prioritizes the newly added domestic sources in their matching navigation views", async () => {
+    const db = await createTestDatabase();
+    const kr36 = resolveSourceByKind(db, "kr36");
+    const kr36Newsflash = resolveSourceByKind(db, "kr36_newsflash");
+    const aifanr = resolveSourceByKind(db, "aifanr");
+    const ithome = resolveSourceByKind(db, "ithome");
+
+    expect(kr36).toBeDefined();
+    expect(kr36Newsflash).toBeDefined();
+    expect(aifanr).toBeDefined();
+    expect(ithome).toBeDefined();
+
+    const sharedItem = {
+      summary: "统一测试摘要。",
+      bodyMarkdown: "统一测试正文，长度刚好足够避免完整度差异干扰排序。",
+      publishedAt: "2026-03-29T10:00:00.000Z",
+      fetchedAt: "2026-03-29T10:05:00.000Z"
+    };
+
+    upsertContentItems(db, {
+      sourceId: kr36!.id,
+      items: [
+        {
+          title: "36氪 热点资讯",
+          canonicalUrl: "https://example.com/kr36-1",
+          ...sharedItem
+        }
+      ]
+    });
+    upsertContentItems(db, {
+      sourceId: kr36Newsflash!.id,
+      items: [
+        {
+          title: "36氪快讯 热点新闻",
+          canonicalUrl: "https://example.com/kr36-newsflash-1",
+          ...sharedItem
+        }
+      ]
+    });
+    upsertContentItems(db, {
+      sourceId: aifanr!.id,
+      items: [
+        {
+          title: "爱范儿 AI 科技",
+          canonicalUrl: "https://example.com/aifanr-1",
+          ...sharedItem
+        }
+      ]
+    });
+    upsertContentItems(db, {
+      sourceId: ithome!.id,
+      items: [
+        {
+          title: "IT之家 科技热点",
+          canonicalUrl: "https://example.com/ithome-1",
+          ...sharedItem
+        }
+      ]
+    });
+
+    const hotCards = listContentView(db, "hot");
+    const articleCards = listContentView(db, "articles");
+    const aiCards = listContentView(db, "ai");
+
+    expect(hotCards.slice(0, 2).map((card) => card.sourceName)).toEqual(
+      expect.arrayContaining(["36氪", "36氪快讯"])
+    );
+    expect(articleCards.slice(0, 3).map((card) => card.sourceName)).toEqual(
+      expect.arrayContaining(["36氪", "爱范儿", "IT之家"])
+    );
+    expect(aiCards[0]?.sourceName).toBe("爱范儿");
+  });
+
   async function createTestDatabase() {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-content-view-"));
     const db = openDatabase(path.join(tempDir, "hot-now.sqlite"));

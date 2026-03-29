@@ -1,6 +1,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { LatestReportEmailError, type LatestReportEmailErrorReason } from "../core/pipeline/sendLatestReportEmail.js";
 import type { ContentCardView, ContentViewKey } from "../core/content/listContentView.js";
 import type { FeedbackSaveResult, ReactionValue } from "../core/feedback/feedbackRepository.js";
 import type { RatingDimension, SaveRatingsResult } from "../core/ratings/ratingRepository.js";
@@ -52,6 +53,10 @@ type CurrentUserProfile = {
   role: string;
   email: string | null;
 };
+type ManualCollectResult = { accepted: true; action: "collect" };
+type ManualSendLatestEmailResult =
+  | { accepted: true; action: "send-latest-email" }
+  | { accepted: false; reason: LatestReportEmailErrorReason };
 
 type ServerDeps = {
   config?: Partial<RuntimeConfig>;
@@ -59,6 +64,8 @@ type ServerDeps = {
   latestReportDate?: () => Promise<string | null>;
   readReportHtml?: (date: string) => Promise<string>;
   triggerManualRun?: () => Promise<{ accepted: boolean }>;
+  triggerManualCollect?: () => Promise<ManualCollectResult>;
+  triggerManualSendLatestEmail?: () => Promise<ManualSendLatestEmailResult>;
   isRunning?: () => boolean;
   listContentView?: (viewKey: ContentViewKey) => Promise<ContentCardView[]> | ContentCardView[];
   saveFavorite?: (contentItemId: number, isFavorited: boolean) => Promise<FeedbackSaveResult> | FeedbackSaveResult;
@@ -279,25 +286,36 @@ export function createServer(deps: ServerDeps = {}) {
   });
 
   app.post("/actions/run", async (request, reply) => {
-    if (authEnabled) {
-      // Manual trigger is a state-changing action, so anonymous callers get a hard auth error instead of redirect.
-      const session = readAuthenticatedSession(request.headers.cookie, authConfig?.sessionSecret ?? "");
+    return await handleManualCollectAction(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? "",
+      deps.isRunning?.() ?? false,
+      deps.triggerManualCollect ?? deps.triggerManualRun
+    );
+  });
 
-      if (!session) {
-        return reply.code(401).send({ accepted: false, reason: "unauthorized" });
-      }
-    }
+  app.post("/actions/collect", async (request, reply) => {
+    return await handleManualCollectAction(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? "",
+      deps.isRunning?.() ?? false,
+      deps.triggerManualCollect ?? deps.triggerManualRun
+    );
+  });
 
-    if (deps.isRunning?.()) {
-      return reply.code(409).send({ accepted: false, reason: "already-running" });
-    }
-
-    if (!deps.triggerManualRun) {
-      return reply.code(503).send({ accepted: false });
-    }
-
-    const result = await deps.triggerManualRun();
-    return reply.code(202).send(result);
+  app.post("/actions/send-latest-email", async (request, reply) => {
+    return await handleManualSendLatestEmailAction(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? "",
+      deps.isRunning?.() ?? false,
+      deps.triggerManualSendLatestEmail
+    );
   });
 
   app.post("/actions/content/:id/favorite", async (request, reply) => {
@@ -551,7 +569,8 @@ async function renderSystemPageForPath(deps: ServerDeps, pathname: string, logge
 
     const sources = await deps.listSources();
     return renderSourcesPage(sources, {
-      canTriggerManualRun: typeof deps.triggerManualRun === "function",
+      canTriggerManualCollect: typeof (deps.triggerManualCollect ?? deps.triggerManualRun) === "function",
+      canTriggerManualSendLatestEmail: typeof deps.triggerManualSendLatestEmail === "function",
       isRunning: deps.isRunning?.() ?? false
     });
   }
@@ -598,6 +617,106 @@ function ensureStateActionAuthorized(
   }
 
   return true;
+}
+
+async function handleManualCollectAction(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  authEnabled: boolean,
+  sessionSecret: string,
+  isRunning: boolean,
+  triggerManualCollect: ServerDeps["triggerManualCollect"] | ServerDeps["triggerManualRun"]
+) {
+  // Manual collection endpoints share the same auth, lock, and disabled semantics so the legacy alias stays behaviorally identical.
+  if (!ensureManualActionAuthorized(request, reply, authEnabled, sessionSecret)) {
+    return;
+  }
+
+  if (isRunning) {
+    return reply.code(409).send({ accepted: false, reason: "already-running" });
+  }
+
+  if (!triggerManualCollect) {
+    return reply.code(503).send({ accepted: false });
+  }
+
+  const result = await triggerManualCollect();
+  return reply.code(202).send(result);
+}
+
+async function handleManualSendLatestEmailAction(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  authEnabled: boolean,
+  sessionSecret: string,
+  isRunning: boolean,
+  triggerManualSendLatestEmail: ServerDeps["triggerManualSendLatestEmail"]
+) {
+  // Resend uses the same action gate as collection, but maps mail-specific pipeline errors to stable HTTP statuses.
+  if (!ensureManualActionAuthorized(request, reply, authEnabled, sessionSecret)) {
+    return;
+  }
+
+  if (isRunning) {
+    return reply.code(409).send({ accepted: false, reason: "already-running" });
+  }
+
+  if (!triggerManualSendLatestEmail) {
+    return reply.code(503).send({ accepted: false });
+  }
+
+  try {
+    const result = await triggerManualSendLatestEmail();
+
+    if (result.accepted) {
+      return reply.code(202).send(result);
+    }
+
+    return reply.code(mapLatestEmailReasonToStatus(result.reason)).send(result);
+  } catch (error) {
+    if (!(error instanceof LatestReportEmailError)) {
+      throw error;
+    }
+
+    return reply.code(mapLatestEmailReasonToStatus(error.reason)).send({
+      accepted: false,
+      reason: error.reason
+    });
+  }
+}
+
+function ensureManualActionAuthorized(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  authEnabled: boolean,
+  sessionSecret: string
+) {
+  // Manual job actions return API-style unauthorized payloads instead of redirects so browser forms and scripts see the same contract.
+  if (!authEnabled) {
+    return true;
+  }
+
+  const session = readAuthenticatedSession(request.headers.cookie, sessionSecret);
+
+  if (!session) {
+    void reply.code(401).send({ accepted: false, reason: "unauthorized" });
+    return false;
+  }
+
+  return true;
+}
+
+function mapLatestEmailReasonToStatus(reason: LatestReportEmailErrorReason) {
+  // The resend endpoint exposes pipeline reason codes directly, so callers can distinguish missing reports from delivery failures.
+  if (reason === "not-found") {
+    return 404;
+  }
+
+  if (reason === "report-unavailable") {
+    return 503;
+  }
+
+  return 502;
 }
 
 function parseContentItemId(params: unknown): number | null {

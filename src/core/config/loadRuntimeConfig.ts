@@ -84,21 +84,39 @@ function parseRuntimeConfigFile(fileText: string): Omit<RuntimeConfig, "smtp" | 
   // The config file keeps deploy-time knobs only; secrets stay out of JSON and are injected later.
   const parsed = JSON.parse(fileText) as Record<string, unknown>;
   const server = getRequiredObject(parsed.server, "server");
-  const schedule = getRequiredObject(parsed.schedule, "schedule");
+  const collectionSchedule = getRequiredObject(parsed.collectionSchedule, "collectionSchedule");
+  const mailSchedule = getRequiredObject(parsed.mailSchedule, "mailSchedule");
+  const manualActions = getRequiredObject(parsed.manualActions, "manualActions");
   const report = getRequiredObject(parsed.report, "report");
   const source = getRequiredObject(parsed.source, "source");
-  const manualRun = getRequiredObject(parsed.manualRun, "manualRun");
   const database = getOptionalObject(parsed.database, "database");
+  const parsedMailSchedule = {
+    enabled: requiredConfigBoolean(mailSchedule.enabled, "mailSchedule.enabled"),
+    dailyTime: requiredMailScheduleDailyTime(mailSchedule.dailyTime, "mailSchedule.dailyTime"),
+    timezone: requiredConfigString(mailSchedule.timezone, "mailSchedule.timezone")
+  };
+  const parsedCollectionSchedule = {
+    enabled: requiredConfigBoolean(collectionSchedule.enabled, "collectionSchedule.enabled"),
+    intervalMinutes: requiredCollectionIntervalMinutes(
+      collectionSchedule.intervalMinutes,
+      "collectionSchedule.intervalMinutes"
+    )
+  };
+  const parsedManualActions = {
+    collectEnabled: requiredConfigBoolean(manualActions.collectEnabled, "manualActions.collectEnabled"),
+    sendLatestEmailEnabled: requiredConfigBoolean(
+      manualActions.sendLatestEmailEnabled,
+      "manualActions.sendLatestEmailEnabled"
+    )
+  };
 
   return {
     server: {
       port: requiredRunnablePort(server.port, "server.port")
     },
-    schedule: {
-      enabled: requiredConfigBoolean(schedule.enabled, "schedule.enabled"),
-      dailyTime: requiredConfigString(schedule.dailyTime, "schedule.dailyTime"),
-      timezone: requiredConfigString(schedule.timezone, "schedule.timezone")
-    },
+    collectionSchedule: parsedCollectionSchedule,
+    mailSchedule: parsedMailSchedule,
+    manualActions: parsedManualActions,
     report: {
       topN: requiredPositiveInteger(report.topN, "report.topN"),
       dataDir: requiredConfigString(report.dataDir, "report.dataDir"),
@@ -106,9 +124,6 @@ function parseRuntimeConfigFile(fileText: string): Omit<RuntimeConfig, "smtp" | 
     },
     source: {
       rssUrl: requiredConfigString(source.rssUrl, "source.rssUrl")
-    },
-    manualRun: {
-      enabled: requiredConfigBoolean(manualRun.enabled, "manualRun.enabled")
     },
     database: {
       file: requiredConfigString(database?.file ?? defaultDatabaseFile, "database.file")
@@ -180,4 +195,24 @@ function requiredPositiveInteger(value: unknown, key: string) {
   }
 
   return number;
+}
+
+function requiredCollectionIntervalMinutes(value: unknown, key: string) {
+  const intervalMinutes = requiredConfigNumber(value, key);
+
+  if (!Number.isInteger(intervalMinutes) || intervalMinutes < 1 || intervalMinutes >= 60 || 60 % intervalMinutes !== 0) {
+    throw new Error(`Invalid ${key}: ${intervalMinutes}`);
+  }
+
+  return intervalMinutes;
+}
+
+function requiredMailScheduleDailyTime(value: unknown, key: string) {
+  const dailyTime = requiredConfigString(value, key);
+
+  if (!/^([01]\d|2[0-3]):([0-5]\d)$/.test(dailyTime)) {
+    throw new Error(`Invalid ${key}: ${dailyTime}`);
+  }
+
+  return dailyTime;
 }

@@ -11,6 +11,9 @@
     { name: "aiWeight", label: "AI 权重", integer: false },
     { name: "heatWeight", label: "热点权重", integer: false }
   ];
+  const globalStatusDisplayDurationMs = 3000;
+  const globalErrorStatusDisplayDurationMs = 7000;
+  let globalStatusTimerId = null;
 
   applyInitialTheme();
 
@@ -51,7 +54,7 @@
 
     if (action === "favorite") {
       event.preventDefault();
-      await handleFavorite(card, button, contentId);
+      await handleFavorite(button, contentId);
       return;
     }
 
@@ -85,23 +88,29 @@
       await handleManualCollectionRun(target);
       return;
     }
+
+    if (target.dataset.systemAction === "manual-send-latest-email") {
+      event.preventDefault();
+      await handleManualSendLatestEmail(target);
+      return;
+    }
   });
 
-  async function handleFavorite(card, button, contentId) {
+  async function handleFavorite(button, contentId) {
     // Favorite toggles between one persisted state and no state, matching backend delete+insert semantics.
     const currentlyFavorited = button.dataset.favorited === "true";
     const nextFavorited = !currentlyFavorited;
     const response = await postJson(`/actions/content/${contentId}/favorite`, { isFavorited: nextFavorited });
 
     if (!response.ok) {
-      showStatus(card, await readActionError(response, "收藏操作失败，请稍后再试。"));
+      showStatus(await readActionError(response, "收藏操作失败，请稍后再试。"), "error");
       return;
     }
 
     button.dataset.favorited = nextFavorited ? "true" : "false";
     button.setAttribute("aria-pressed", nextFavorited ? "true" : "false");
     button.textContent = nextFavorited ? "已收藏" : "收藏";
-    showStatus(card, nextFavorited ? "已加入收藏。" : "已取消收藏。");
+    showStatus(nextFavorited ? "已加入收藏。" : "已取消收藏。", "success");
   }
 
   async function handleReaction(card, button, contentId) {
@@ -117,7 +126,7 @@
     const response = await postJson(`/actions/content/${contentId}/reaction`, { reaction: nextReaction });
 
     if (!response.ok) {
-      showStatus(card, await readActionError(response, "反馈提交失败，请稍后再试。"));
+      showStatus(await readActionError(response, "反馈提交失败，请稍后再试。"), "error");
       return;
     }
 
@@ -133,7 +142,7 @@
       actionButton.setAttribute("aria-pressed", isPressed ? "true" : "false");
     }
 
-    showStatus(card, nextReaction === "none" ? "已清除反馈。" : "反馈已保存。");
+    showStatus(nextReaction === "none" ? "已清除反馈。" : "反馈已保存。", "success");
   }
 
   async function handleViewRuleSave(form) {
@@ -141,7 +150,7 @@
     const ruleKey = (form.dataset.ruleKey || "").trim();
 
     if (!ruleKey) {
-      showFormStatus(form, "规则标识缺失，无法保存。");
+      showFormStatus(form, "规则标识缺失，无法保存。", "error");
       return;
     }
 
@@ -150,25 +159,25 @@
         form.reportValidity();
       }
 
-      showFormStatus(form, "请先把规则字段填写完整。");
+      showFormStatus(form, "请先把规则字段填写完整。", "error");
       return;
     }
 
     const config = readViewRuleConfig(form);
 
     if (!config.ok) {
-      showFormStatus(form, config.message);
+      showFormStatus(form, config.message, "error");
       return;
     }
 
     const response = await postJson(`/actions/view-rules/${encodeURIComponent(ruleKey)}`, { config: config.config });
 
     if (!response.ok) {
-      showFormStatus(form, await readSystemActionError(response, "保存失败，请稍后再试。"));
+      showFormStatus(form, await readSystemActionError(response, "保存失败，请稍后再试。"), "error");
       return;
     }
 
-    showFormStatus(form, "规则已保存。");
+    showFormStatus(form, "规则已保存。", "success");
   }
 
   async function handleToggleSource(form) {
@@ -177,14 +186,14 @@
     const enable = form.dataset.enable === "true";
 
     if (!sourceKind) {
-      showFormStatus(form, "source kind 缺失，无法切换。");
+      showFormStatus(form, "source kind 缺失，无法切换。", "error");
       return;
     }
 
     const response = await postJson("/actions/sources/toggle", { kind: sourceKind, enable });
 
     if (!response.ok) {
-      showFormStatus(form, await readSystemActionError(response, "切换失败，请稍后再试。"));
+      showFormStatus(form, await readSystemActionError(response, "切换失败，请稍后再试。"), "error");
       return;
     }
 
@@ -206,30 +215,57 @@
     }
 
     refreshEnabledSourcesSummary();
-    showFormStatus(form, enable ? "已启用 source。" : "已停用 source。");
+    showFormStatus(form, enable ? "已启用 source。" : "已停用 source。", "success");
   }
 
   async function handleManualCollectionRun(form) {
-    // Manual collection uses the same digest endpoint as the legacy control page, but keeps feedback inline in the unified shell.
-    const runButton = form.querySelector('[data-role="manual-run-button"]');
+    // Manual collection posts to the dedicated collect route so the shell matches the new split action contract.
+    const runButton = form.querySelector('[data-role="manual-collection-button"]');
 
     if (!(runButton instanceof HTMLButtonElement)) {
-      showFormStatus(form, "未找到采集按钮。");
+      showFormStatus(form, "未找到采集按钮。", "error");
       return;
     }
 
     runButton.disabled = true;
     runButton.textContent = "采集中...";
-    const response = await postJson("/actions/run", {});
+    const response = await postJson("/actions/collect", {});
 
     if (!response.ok) {
       runButton.disabled = false;
       runButton.textContent = "手动执行采集";
-      showFormStatus(form, await readSystemActionError(response, "采集任务启动失败，请稍后再试。"));
+      showFormStatus(form, await readSystemActionError(response, "采集任务启动失败，请稍后再试。"), "error");
       return;
     }
 
-    showFormStatus(form, "已开始执行采集，请稍后刷新查看结果。");
+    showFormStatus(form, "已开始执行采集，请稍后刷新查看结果。", "success");
+  }
+
+  async function handleManualSendLatestEmail(form) {
+    // Manual resend stays inline with the sources page so operators can retry mail delivery without leaving unified shell.
+    const sendButton = form.querySelector('[data-role="manual-send-latest-email-button"]');
+
+    if (!(sendButton instanceof HTMLButtonElement)) {
+      showFormStatus(form, "未找到发信按钮。", "error");
+      return;
+    }
+
+    sendButton.disabled = true;
+    sendButton.textContent = "发送中...";
+    const response = await postJson("/actions/send-latest-email", {});
+
+    if (!response.ok) {
+      sendButton.disabled = false;
+      sendButton.textContent = "发送最新报告";
+      showFormStatus(
+        form,
+        await readSystemActionError(response, "最新报告发送失败，请稍后再试。", "manual-send-latest-email"),
+        "error"
+      );
+      return;
+    }
+
+    showFormStatus(form, "已开始发送最新报告邮件，请稍后检查投递结果。", "success");
   }
 
   async function postJson(url, body) {
@@ -266,10 +302,26 @@
     return fallbackMessage;
   }
 
-  async function readSystemActionError(response, fallbackMessage) {
-    // System actions map backend status/reason into user-facing inline text.
+  async function readSystemActionError(response, fallbackMessage, systemAction) {
+    // System actions share one error reader, while callers can pass an action hint for route-specific reason wording.
     if (!response || typeof response !== "object") {
       return fallbackMessage;
+    }
+
+    const payload = await safeJson(response);
+
+    if (systemAction === "manual-send-latest-email") {
+      if (payload?.reason === "not-found") {
+        return "最新报告不存在，请先执行一次采集。";
+      }
+
+      if (payload?.reason === "report-unavailable") {
+        return "最新报告暂不可用，请稍后重试。";
+      }
+
+      if (payload?.reason === "send-failed") {
+        return "最新报告发送失败，请检查 SMTP 配置后重试。";
+      }
     }
 
     if (typeof response.status === "number") {
@@ -281,8 +333,6 @@
         return "目标项不存在，可能已被删除或未初始化。";
       }
     }
-
-    const payload = await safeJson(response);
 
     if (payload?.reason === "invalid-view-rule-payload") {
       return "规则配置不合法，请检查表单字段。";
@@ -303,26 +353,57 @@
     return fallbackMessage;
   }
 
-  function showStatus(card, message) {
-    // Per-card status text keeps feedback local to the item the user just interacted with.
-    const statusNode = card.querySelector('[data-role="action-status"]');
+  function showStatus(message, tone = "info") {
+    // All lightweight action feedback goes through a single top-center toast so pages share one interaction rule.
+    const toast = ensureGlobalStatusToast();
+    toast.textContent = message;
+    toast.classList.toggle("is-error", tone === "error");
+    toast.classList.toggle("is-success", tone === "success");
+    toast.classList.add("is-visible");
+    toast.setAttribute("aria-live", tone === "error" ? "assertive" : "polite");
 
-    if (statusNode) {
-      statusNode.textContent = message;
+    if (globalStatusTimerId !== null) {
+      window.clearTimeout(globalStatusTimerId);
     }
+
+    globalStatusTimerId = window.setTimeout(() => {
+      toast.classList.remove("is-visible");
+      toast.classList.remove("is-error", "is-success");
+      globalStatusTimerId = null;
+    }, tone === "error" ? globalErrorStatusDisplayDurationMs : globalStatusDisplayDurationMs);
   }
 
-  function showFormStatus(form, message) {
-    // Form-level status keeps system actions consistent with content cards' localized feedback.
+  function showFormStatus(form, message, tone = "info") {
+    // System forms keep their hidden local status node for structure, but visible feedback is unified via the global toast.
     const statusNode = form.querySelector('[data-role="action-status"]');
 
     if (statusNode instanceof HTMLElement) {
       statusNode.textContent = message;
     }
+
+    showStatus(message, tone);
+  }
+
+  function ensureGlobalStatusToast() {
+    // The toast host is created lazily so pages without content actions do not render any extra chrome.
+    const existingToast = root.querySelector('[data-role="global-status-toast"]');
+
+    if (existingToast instanceof HTMLElement) {
+      return existingToast;
+    }
+
+    const toast = document.createElement("div");
+    toast.className = "global-status-toast";
+    toast.dataset.role = "global-status-toast";
+    toast.setAttribute("role", "status");
+    toast.setAttribute("aria-live", "polite");
+    toast.setAttribute("aria-atomic", "true");
+    document.body.appendChild(toast);
+    return toast;
   }
 
   function refreshEnabledSourcesSummary() {
-    // The manual-run card reads enabled source names from the current DOM so source toggles feel immediate.
+    // The manual collection card reads enabled source names from the current DOM so source toggles feel immediate.
     const summaryNode = root.querySelector('[data-role="enabled-sources-summary"]');
 
     if (!(summaryNode instanceof HTMLElement)) {

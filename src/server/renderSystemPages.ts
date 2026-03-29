@@ -17,7 +17,8 @@ type SourceItem = {
 };
 
 type SourcesPageOptions = {
-  canTriggerManualRun: boolean;
+  canTriggerManualCollect: boolean;
+  canTriggerManualSendLatestEmail: boolean;
   isRunning: boolean;
 };
 
@@ -62,9 +63,26 @@ export function renderSourcesPage(sources: SourceItem[], options: SourcesPageOpt
       <p class="content-kicker">系统菜单</p>
       <p class="content-description">数据迭代收集：管理多 source 启用状态，并查看最近抓取结果。</p>
     </section>
-    <section class="system-stack system-stack--control">
-      ${renderManualCollectionCard(enabledSources, options)}
-      ${cardsHtml}
+    <section class="system-section system-section--operations" data-system-section="operations">
+      <header class="system-section-header">
+        <p class="system-section-kicker">即时操作</p>
+        <h3 class="system-section-title">先执行动作，再查看结果</h3>
+        <p class="system-section-description">这里放直接影响采集和报告投递的操作，不和单个 source 的状态卡混在一起。</p>
+      </header>
+      <div class="system-stack system-stack--control system-stack--operations">
+        ${renderManualCollectionCard(enabledSources, options)}
+        ${renderManualSendLatestEmailCard(options)}
+      </div>
+    </section>
+    <section class="system-section system-section--sources" data-system-section="sources">
+      <header class="system-section-header">
+        <p class="system-section-kicker">数据源状态</p>
+        <h3 class="system-section-title">查看当前接入和启用情况</h3>
+        <p class="system-section-description">这里展示每个 source 的启用状态、最近抓取时间和最近抓取结果，便于逐项管理。</p>
+      </header>
+      <div class="system-stack system-stack--control system-stack--sources">
+        ${cardsHtml}
+      </div>
     </section>
   `;
 }
@@ -161,15 +179,16 @@ function renderSourceCard(source: SourceItem): string {
   const nextEnable = source.isEnabled ? "false" : "true";
 
   return `
-    <article class="system-card system-card--control system-card--source" data-system-card="source" data-source-kind="${escapeHtml(source.kind)}" data-source-name="${escapeHtml(source.name)}">
+    <article class="system-card system-card--control system-card--source system-card--inventory" data-system-card="source" data-source-kind="${escapeHtml(source.kind)}" data-source-name="${escapeHtml(source.name)}">
       <header class="system-card-header">
+        <p class="system-card-kicker">数据源</p>
         <h3 class="system-card-title">${escapeHtml(source.name)}</h3>
         <p class="system-card-meta">kind: <code>${escapeHtml(source.kind)}</code></p>
       </header>
-      <dl class="system-detail-list">
+      <dl class="system-detail-list system-detail-list--source">
         <div class="system-detail-row">
           <dt>RSS</dt>
-          <dd>${renderOptionalLink(source.rssUrl)}</dd>
+          <dd class="system-detail-value system-detail-value--rss">${renderOptionalLink(source.rssUrl)}</dd>
         </div>
         <div class="system-detail-row">
           <dt>状态</dt>
@@ -184,38 +203,74 @@ function renderSourceCard(source: SourceItem): string {
           <dd>${escapeHtml(source.lastCollectionStatus?.trim() || "unknown")}</dd>
         </div>
       </dl>
-      <form class="system-form" data-system-action="toggle-source" data-source-kind="${escapeHtml(source.kind)}" data-enable="${nextEnable}">
-        <button type="submit" class="primary-mini-button" data-role="toggle-button">
-          ${source.isEnabled ? "停用 source" : "启用 source"}
-        </button>
-        <div class="system-status-region">
-          <p class="action-status system-status" data-role="action-status" aria-live="polite"></p>
-        </div>
-      </form>
+      <div class="system-card-actions system-card-actions--source">
+        <form class="system-form system-form--source-action" data-system-action="toggle-source" data-source-kind="${escapeHtml(source.kind)}" data-enable="${nextEnable}">
+          <button type="submit" class="primary-mini-button" data-role="toggle-button">
+            ${source.isEnabled ? "停用 source" : "启用 source"}
+          </button>
+          <div class="system-status-region">
+            <p class="action-status system-status" data-role="action-status" aria-live="polite"></p>
+          </div>
+        </form>
+      </div>
     </article>
   `;
 }
 
 function renderManualCollectionCard(sources: SourceItem[], options: SourcesPageOptions): string {
-  // Manual collection still reuses the existing digest trigger, but now it makes clear that all enabled sources are included.
+  // Manual collection is its own control card so operators can see enabled sources and the action scope before they click.
   const enabledSourceNames = formatEnabledSourceNames(sources);
   const buttonText = options.isRunning ? "采集中..." : "手动执行采集";
-  const disabledAttr = options.canTriggerManualRun && !options.isRunning ? "" : " disabled";
-  const initialStatus = options.canTriggerManualRun
+  const disabledAttr = options.canTriggerManualCollect && !options.isRunning ? "" : " disabled";
+  const initialStatus = options.canTriggerManualCollect
     ? options.isRunning
       ? "当前已有任务执行中，请稍后再试。"
       : ""
     : "当前环境未启用手动采集。";
 
   return `
-    <article class="system-card system-card--control system-card--manual-collection" data-system-card="manual-collection">
+    <article class="system-card system-card--control system-card--manual-collection system-card--operation system-card--operation-primary" data-system-card="manual-collection">
       <header class="system-card-header">
+        <p class="system-card-kicker">采集动作</p>
         <h3 class="system-card-title">手动执行采集</h3>
+        <p class="system-card-meta">对当前启用 sources 立即执行一次抓取、聚类和报告生成。</p>
         <p class="system-card-meta" data-role="enabled-sources-summary">当前启用 sources：${escapeHtml(enabledSourceNames)}</p>
       </header>
       <form class="system-form" data-system-action="manual-collection-run">
         <div class="system-action-row">
-          <button type="submit" class="primary-mini-button" data-role="manual-run-button"${disabledAttr}>
+          <button type="submit" class="primary-mini-button" data-role="manual-collection-button"${disabledAttr}>
+            ${buttonText}
+          </button>
+        </div>
+        <div class="system-status-region">
+          <p class="action-status system-status" data-role="action-status" aria-live="polite">${escapeHtml(initialStatus)}</p>
+        </div>
+      </form>
+    </article>
+  `;
+}
+
+function renderManualSendLatestEmailCard(options: SourcesPageOptions): string {
+  // Latest-email is separated from collection so operators can resend the newest report without re-running the whole pipeline.
+  const buttonText = options.isRunning ? "发送中..." : "发送最新报告";
+  const disabledAttr = options.canTriggerManualSendLatestEmail && !options.isRunning ? "" : " disabled";
+  const initialStatus = options.canTriggerManualSendLatestEmail
+    ? options.isRunning
+      ? "当前已有任务执行中，请稍后再试。"
+      : ""
+    : "当前环境未启用手动发送最新报告。";
+
+  return `
+    <article class="system-card system-card--control system-card--manual-send-latest-email system-card--operation system-card--operation-secondary" data-system-card="manual-send-latest-email">
+      <header class="system-card-header">
+        <p class="system-card-kicker">投递动作</p>
+        <h3 class="system-card-title">手动发送最新报告</h3>
+        <p class="system-card-meta">对最新一份已生成报告单独执行一次邮件发送。</p>
+        <p class="system-card-meta">不重新抓取 source，也不会重跑热点归并。</p>
+      </header>
+      <form class="system-form" data-system-action="manual-send-latest-email">
+        <div class="system-action-row">
+          <button type="submit" class="primary-mini-button" data-role="manual-send-latest-email-button"${disabledAttr}>
             ${buttonText}
           </button>
         </div>

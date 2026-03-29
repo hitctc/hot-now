@@ -1,10 +1,13 @@
 {
   "date": "2026-03-29",
-  "trigger": "manual",
-  "generatedAt": "2026-03-29T02:04:45.484Z",
-  "mailStatus": "sent",
+  "trigger": "scheduled",
+  "generatedAt": "2026-03-29T15:50:06.074Z",
+  "mailStatus": "not-sent-by-collection",
   "degraded": true,
   "topicCount": 10,
-  "sourceFailureCount": 0,
-  "failedSourceKinds": []
+  "sourceFailureCount": 2,
+  "failedSourceKinds": [
+    "kr36",
+    "kr36_newsflash"
+  ]
 }

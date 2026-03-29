@@ -35,26 +35,28 @@ function renderContentCard(card: ContentCardView): string {
   const favoritePressed = card.isFavorited ? "true" : "false";
   const likePressed = card.reaction === "like" ? "true" : "false";
   const dislikePressed = card.reaction === "dislike" ? "true" : "false";
-  const contentScoreLabel = `${card.contentScore}/100`;
+  const contentScoreLabel = String(card.contentScore);
   const titleHtml = renderTitleLink(card.title, card.canonicalUrl);
 
   return `
     <article class="content-card content-card--signal" data-content-id="${card.id}">
+      <div class="content-score-pill" aria-label="评分 ${escapeHtml(contentScoreLabel)}" title="评分 ${escapeHtml(contentScoreLabel)}">
+        <span data-role="content-score">${escapeHtml(contentScoreLabel)}</span>
+      </div>
       <header class="content-card-header content-card-header--signal">
         <p class="content-meta">
           <span>${escapeHtml(card.sourceName)}</span>
           <span>发布时间：${escapeHtml(publishedText)}</span>
-          <span>系统分：<strong data-role="content-score">${escapeHtml(contentScoreLabel)}</strong></span>
         </p>
         <h3 class="content-title">
           ${titleHtml}
         </h3>
       </header>
       <div class="content-card-body">
-        <p class="content-summary">${escapeHtml(summaryText)}</p>
-        <div class="content-score-badges">
-          ${card.scoreBadges.map((badge) => `<span class="action-chip">${escapeHtml(badge)}</span>`).join("")}
+        <div class="content-summary-shell">
+          <p class="content-summary">${escapeHtml(summaryText)}</p>
         </div>
+        ${renderScoreBadges(card.scoreBadges)}
         <div class="content-card-region content-card-region--actions">
           <div class="content-actions">
             <button
@@ -86,23 +88,34 @@ function renderContentCard(card: ContentCardView): string {
             </button>
           </div>
         </div>
-        <div class="content-card-region content-card-region--status">
-          <p class="action-status" data-role="action-status" aria-live="polite"></p>
-        </div>
       </div>
     </article>
+  `;
+}
+
+function renderScoreBadges(scoreBadges: string[]): string {
+  // Score badges use a dedicated compact style so score explanations never compete with action buttons.
+  if (scoreBadges.length === 0) {
+    return "";
+  }
+
+  return `
+    <div class="content-score-badges" aria-label="评分标签">
+      ${scoreBadges.map((badge) => `<span class="content-score-badge">${escapeHtml(badge)}</span>`).join("")}
+    </div>
   `;
 }
 
 function renderTitleLink(title: string, canonicalUrl: string): string {
   // Content links are whitelisted to http/https so untrusted schemes cannot be rendered as clickable href values.
   const safeUrl = toSafeHttpUrl(canonicalUrl);
+  const escapedTitle = escapeHtml(title);
 
   if (!safeUrl) {
-    return `<span>${escapeHtml(title)}</span>`;
+    return `<span class="content-title-link" title="${escapedTitle}">${escapedTitle}</span>`;
   }
 
-  return `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a>`;
+  return `<a class="content-title-link" href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer" title="${escapedTitle}">${escapedTitle}</a>`;
 }
 
 function toSafeHttpUrl(rawValue: string): string | null {

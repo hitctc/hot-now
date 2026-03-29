@@ -47,7 +47,7 @@ describe("system routes", () => {
     expect(response.body).not.toContain("<textarea");
   });
 
-  it("renders sources page with enable toggles instead of active-source copy", async () => {
+  it("renders sources page with separate collect and send-latest-email control cards", async () => {
     const app = createServer({
       listSources: vi.fn().mockResolvedValue([
         {
@@ -68,6 +68,7 @@ describe("system routes", () => {
         }
       ]),
       triggerManualRun: vi.fn().mockResolvedValue({ accepted: true }),
+      triggerManualSendLatestEmail: vi.fn().mockResolvedValue({ accepted: true, action: "send-latest-email" }),
       isRunning: () => false
     } as never);
 
@@ -76,10 +77,31 @@ describe("system routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("数据迭代收集");
     expect(response.body).toContain('class="content-intro content-intro--system"');
-    expect(response.body).toContain('class="system-stack system-stack--control"');
+    expect(response.body).toContain('data-system-section="operations"');
+    expect(response.body).toContain('data-system-section="sources"');
+    expect(response.body).toContain("即时操作");
+    expect(response.body).toContain("数据源状态");
+    expect(response.body).toContain("先执行动作，再查看结果");
+    expect(response.body).toContain("查看当前接入和启用情况");
+    expect(response.body).toContain('class="system-stack system-stack--control system-stack--operations"');
+    expect(response.body).toContain('class="system-stack system-stack--control system-stack--sources"');
     expect(response.body).toContain("手动执行采集");
-    expect(response.body).toContain('class="system-card system-card--control system-card--manual-collection"');
+    expect(response.body).toContain("手动发送最新报告");
+    expect(response.body).toContain('class="system-card system-card--control system-card--manual-collection system-card--operation system-card--operation-primary"');
+    expect(response.body).toContain('class="system-card system-card--control system-card--manual-send-latest-email system-card--operation system-card--operation-secondary"');
+    expect(response.body).toContain('class="system-card system-card--control system-card--source system-card--inventory"');
+    expect(response.body).toContain('class="system-detail-list system-detail-list--source"');
+    expect(response.body).toContain('class="system-card-actions system-card-actions--source"');
+    expect(response.body).toContain('class="system-form system-form--source-action"');
+    expect(response.body).toContain("采集动作");
+    expect(response.body).toContain("投递动作");
+    expect(response.body).toContain("数据源");
+    expect(response.body).toContain('data-system-action="manual-collection-run"');
+    expect(response.body).toContain('data-system-action="manual-send-latest-email"');
     expect(response.body).toContain("当前启用 sources：Juya AI Daily");
+    expect(response.body).toContain("对最新一份已生成报告单独执行一次邮件发送");
+    expect(response.body).toContain("不重新抓取 source，也不会重跑热点归并");
+    expect(response.body).toContain("发送最新报告");
     expect(response.body).toContain("Juya AI Daily");
     expect(response.body).toContain("已启用");
     expect(response.body).toContain("已停用");
@@ -89,7 +111,7 @@ describe("system routes", () => {
     expect(response.body).toContain("completed");
   });
 
-  it("renders running state on the manual collection card when a job is already running", async () => {
+  it("renders disabled state on both manual action cards when a job is already running", async () => {
     const app = createServer({
       listSources: vi.fn().mockResolvedValue([
         {
@@ -102,16 +124,20 @@ describe("system routes", () => {
         }
       ]),
       triggerManualRun: vi.fn().mockResolvedValue({ accepted: true }),
+      triggerManualSendLatestEmail: vi.fn().mockResolvedValue({ accepted: true, action: "send-latest-email" }),
       isRunning: () => true
     } as never);
 
     const response = await app.inject({ method: "GET", url: "/settings/sources" });
 
     expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('data-system-section="operations"');
     expect(response.body).toContain("采集中...");
-    expect(response.body).toContain('class="system-card system-card--control system-card--manual-collection"');
+    expect(response.body).toContain('class="system-card system-card--control system-card--manual-collection system-card--operation system-card--operation-primary"');
+    expect(response.body).toContain('class="system-card system-card--control system-card--manual-send-latest-email system-card--operation system-card--operation-secondary"');
     expect(response.body).toContain("当前已有任务执行中，请稍后再试。");
-    expect(response.body).toContain("disabled");
+    expect(response.body).toContain('data-role="manual-collection-button" disabled');
+    expect(response.body).toContain('data-role="manual-send-latest-email-button" disabled');
   });
 
   it("renders profile page with current user profile", async () => {

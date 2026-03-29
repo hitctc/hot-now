@@ -196,6 +196,38 @@ describe("createServer", () => {
     expect(response.headers.location).toBe("/login");
   });
 
+  it("rejects anonymous collect actions when unified shell auth is enabled", async () => {
+    const app = createServer({
+      auth: {
+        requireLogin: true,
+        sessionSecret: "test-secret",
+        verifyLogin: vi.fn().mockResolvedValue(null)
+      },
+      triggerManualCollect: vi.fn().mockResolvedValue({ accepted: true, action: "collect" })
+    });
+
+    const response = await app.inject({ method: "POST", url: "/actions/collect" });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({ accepted: false, reason: "unauthorized" });
+  });
+
+  it("rejects anonymous send-latest-email actions when unified shell auth is enabled", async () => {
+    const app = createServer({
+      auth: {
+        requireLogin: true,
+        sessionSecret: "test-secret",
+        verifyLogin: vi.fn().mockResolvedValue(null)
+      },
+      triggerManualSendLatestEmail: vi.fn().mockResolvedValue({ accepted: true, action: "send-latest-email" })
+    });
+
+    const response = await app.inject({ method: "POST", url: "/actions/send-latest-email" });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({ accepted: false, reason: "unauthorized" });
+  });
+
   it("logs in and renders unified shell pages with user info", async () => {
     const app = createServer({
       auth: {

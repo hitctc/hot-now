@@ -44,12 +44,21 @@ describe("content routes", () => {
     expect(response.body).toContain('class="content-stack content-stack--signal"');
     expect(response.body).toContain('data-content-id="101"');
     expect(response.body).toContain('class="content-card content-card--signal"');
+    expect(response.body).toContain('class="content-summary-shell"');
+    expect(response.body).toContain('class="content-title-link"');
+    expect(response.body).toContain('title="AI Weekly Insight"');
+    expect(response.body).toContain('class="content-score-pill"');
     expect(response.body).toContain('data-role="content-score"');
-    expect(response.body).toContain("91/100");
+    expect(response.body).toContain('data-role="content-score">91</span>');
+    expect(response.body).not.toContain("系统分");
+    expect(response.body).not.toContain("/100");
+    expect(response.body).toContain('class="content-score-badges"');
+    expect(response.body).toContain('class="content-score-badge"');
     expect(response.body).toContain("24h 内");
     expect(response.body).toContain("官方源");
     expect(response.body).toContain("正文完整");
-    expect(response.body).toContain('class="action-status"');
+    expect(response.body).not.toContain('data-role="action-status"');
+    expect(response.body).not.toContain('content-card-region--status');
     expect(response.body).toContain('href="https://example.com/ai-weekly"');
     expect(response.body).not.toContain('href="javascript:alert(1)"');
     expect(response.body).toContain("Unsafe Link Item");
@@ -146,6 +155,9 @@ describe("content routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).not.toContain('"/actions/content/${contentId}/ratings"');
     expect(response.body).not.toContain("handleRatings");
+    expect(response.body).toContain("global-status-toast");
+    expect(response.body).toContain("ensureGlobalStatusToast");
+    expect(response.body).toContain("document.body.appendChild(toast)");
   });
 
   it("calls saveFavorite for favorite action", async () => {

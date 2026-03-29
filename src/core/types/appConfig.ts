@@ -1,9 +1,26 @@
+export type CollectionScheduleConfig = {
+  enabled: boolean;
+  intervalMinutes: number;
+};
+
+export type MailScheduleConfig = {
+  enabled: boolean;
+  dailyTime: string;
+  timezone: string;
+};
+
+export type ManualActionsConfig = {
+  collectEnabled: boolean;
+  sendLatestEmailEnabled: boolean;
+};
+
 export type RuntimeConfig = {
   server: { port: number };
-  schedule: { enabled: boolean; dailyTime: string; timezone: string };
+  collectionSchedule: CollectionScheduleConfig;
+  mailSchedule: MailScheduleConfig;
+  manualActions: ManualActionsConfig;
   report: { topN: number; dataDir: string; allowDegraded: boolean };
   source: { rssUrl: string };
-  manualRun: { enabled: boolean };
   database: { file: string };
   smtp: {
     host: string;

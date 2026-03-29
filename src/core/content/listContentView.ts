@@ -1,6 +1,7 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
 import { scoreContentItem, type ContentScoreBreakdown } from "./contentScoring.js";
 import { getViewRuleConfig } from "../viewRules/viewRuleRepository.js";
+import { BUILTIN_SOURCES } from "../source/sourceCatalog.js";
 import type { ViewRuleConfigValues } from "../viewRules/viewRuleConfig.js";
 
 export type ContentViewKey = "hot" | "articles" | "ai";
@@ -22,6 +23,8 @@ type RankedContentCardView = ContentCardView & {
   rankingScore: number;
   rankingTimestamp: string | null;
 };
+
+const matchingSourceViewBonus = 120;
 
 type ContentCardRow = {
   id: number;
@@ -117,7 +120,14 @@ export function listContentView(db: SqliteDatabase, viewKey: ContentViewKey): Co
         reaction: normalizeReaction(row.reactionValue),
         contentScore: score.contentScore,
         scoreBadges: score.badges,
-        rankingScore: calculateViewRankingScore(viewRuleConfig, score, row.rankingTimestamp, referenceTime),
+        rankingScore: calculateViewRankingScore(
+          viewKey,
+          viewRuleConfig,
+          score,
+          row.sourceKind,
+          row.rankingTimestamp,
+          referenceTime
+        ),
         rankingTimestamp: row.rankingTimestamp
       };
     })
@@ -148,8 +158,10 @@ function normalizeReaction(value: string | null): "like" | "dislike" | "none" {
 }
 
 function calculateViewRankingScore(
+  viewKey: ContentViewKey,
   viewRuleConfig: ViewRuleConfigValues,
   score: ContentScoreBreakdown,
+  sourceKind: string,
   rankingTimestamp: string | null,
   referenceTime: Date
 ): number {
@@ -161,8 +173,21 @@ function calculateViewRankingScore(
     score.sourceScore * viewRuleConfig.sourceWeight +
     score.completenessScore * viewRuleConfig.completenessWeight +
     score.aiScore * viewRuleConfig.aiWeight +
-    score.heatScore * viewRuleConfig.heatWeight
+    score.heatScore * viewRuleConfig.heatWeight +
+    calculateMatchingSourceViewBonus(viewKey, sourceKind)
   );
+}
+
+function calculateMatchingSourceViewBonus(viewKey: ContentViewKey, sourceKind: string): number {
+  // Navigation pages keep a unified content pool, but matching sources receive a strong bonus so
+  // domestic hot/news/AI feeds surface in the tabs they were introduced for.
+  const source = BUILTIN_SOURCES[sourceKind as keyof typeof BUILTIN_SOURCES];
+
+  if (!source) {
+    return 0;
+  }
+
+  return source.navigationViews.includes(viewKey) ? matchingSourceViewBonus : 0;
 }
 
 function calculateFreshnessWindowScore(

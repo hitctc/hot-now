@@ -24,7 +24,11 @@ const sourceTypeByKind: Record<string, SourceType> = {
   juya: "aggregator",
   openai: "official",
   google_ai: "official",
-  techcrunch_ai: "media"
+  kr36: "media",
+  kr36_newsflash: "media",
+  techcrunch_ai: "media",
+  aifanr: "media",
+  ithome: "media"
 };
 
 const aiKeywords = [

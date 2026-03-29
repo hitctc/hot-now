@@ -28,10 +28,34 @@ const builtinSources = [
     rssUrl: "https://blog.google/technology/ai/rss/"
   },
   {
+    kind: "kr36",
+    name: "36氪",
+    siteUrl: "https://36kr.com/",
+    rssUrl: "https://36kr.com/feed"
+  },
+  {
+    kind: "kr36_newsflash",
+    name: "36氪快讯",
+    siteUrl: "https://36kr.com/newsflashes/catalog/2",
+    rssUrl: "https://36kr.com/feed-newsflash"
+  },
+  {
     kind: "techcrunch_ai",
     name: "TechCrunch AI",
     siteUrl: "https://techcrunch.com/category/artificial-intelligence/",
     rssUrl: "https://techcrunch.com/category/artificial-intelligence/feed/"
+  },
+  {
+    kind: "aifanr",
+    name: "爱范儿",
+    siteUrl: "https://www.ifanr.com/",
+    rssUrl: "https://www.ifanr.com/feed"
+  },
+  {
+    kind: "ithome",
+    name: "IT之家",
+    siteUrl: "https://www.ithome.com/",
+    rssUrl: "https://www.ithome.com/rss/"
   }
 ] as const;
 

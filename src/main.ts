@@ -7,11 +7,12 @@ import { seedInitialData } from "./core/db/seedInitialData.js";
 import { saveFavorite, saveReaction } from "./core/feedback/feedbackRepository.js";
 import { fetchAndExtractArticle } from "./core/fetch/extractArticle.js";
 import { sendDailyEmail } from "./core/mail/sendDailyEmail.js";
-import { runDailyDigest } from "./core/pipeline/runDailyDigest.js";
+import { LatestReportEmailError, sendLatestReportEmail } from "./core/pipeline/sendLatestReportEmail.js";
+import { runCollectionCycle } from "./core/pipeline/runCollectionCycle.js";
 import { listRatingDimensions, saveRatings } from "./core/ratings/ratingRepository.js";
 import type { DailyReportTrigger } from "./core/report/buildDailyReport.js";
 import { createRunLock } from "./core/runtime/runLock.js";
-import { startScheduler } from "./core/scheduler/startScheduler.js";
+import { startCollectionScheduler, startMailScheduler } from "./core/scheduler/startScheduler.js";
 import { listSourceCards } from "./core/source/listSourceCards.js";
 import { loadEnabledSourceIssues } from "./core/source/loadEnabledSourceIssues.js";
 import { listReportDates, readTextFile } from "./core/storage/reportStore.js";
@@ -79,15 +80,20 @@ const setSourceEnabledStatement = db.prepare(
   `
 );
 
-// This runs the full digest under a single-process lock so manual and scheduled runs never overlap.
-async function triggerDigest(triggerType: DailyReportTrigger) {
-  return await lock.runExclusive(async () => {
-    return await runDailyDigest(config, triggerType, {
-      db,
-      loadEnabledSourceIssues: async () => await loadEnabledSourceIssues(db),
-      fetchArticle: fetchAndExtractArticle,
-      sendDailyEmail
-    });
+// Collection runs now stop after report generation so recurring fetches no longer send mail as a side effect.
+async function runCollectionTask(triggerType: DailyReportTrigger) {
+  return await runCollectionCycle(config, triggerType, {
+    db,
+    loadEnabledSourceIssues: async () => await loadEnabledSourceIssues(db),
+    fetchArticle: fetchAndExtractArticle
+  });
+}
+
+// Latest-email runs reuse the most recent report artifact and keep SMTP concerns out of the collection cadence.
+async function runLatestEmailTask() {
+  return await sendLatestReportEmail(config, {
+    db,
+    sendDailyEmail
   });
 }
 
@@ -175,6 +181,35 @@ function getCurrentUserProfile() {
   };
 }
 
+// Manual collection stays lock-guarded so button clicks share the same exclusion rules as scheduled jobs.
+const triggerManualCollect = config.manualActions.collectEnabled
+  ? async () => {
+      await lock.runExclusive(async () => {
+        await runCollectionTask("manual");
+      });
+
+      return { accepted: true as const, action: "collect" as const };
+    }
+  : undefined;
+
+// Manual resend normalizes known pipeline failures into machine-readable reasons for the HTTP layer.
+const triggerManualSendLatestEmail = config.manualActions.sendLatestEmailEnabled
+  ? async () => {
+      return await lock.runExclusive(async () => {
+        try {
+          await runLatestEmailTask();
+          return { accepted: true as const, action: "send-latest-email" as const };
+        } catch (error) {
+          if (error instanceof LatestReportEmailError) {
+            return { accepted: false as const, reason: error.reason };
+          }
+
+          throw error;
+        }
+      });
+    }
+  : undefined;
+
 const app = createServer({
   config,
   auth: {
@@ -196,17 +231,26 @@ const app = createServer({
   listReportSummaries: listStoredReportSummaries,
   latestReportDate: async () => (await listReportDates(config.report.dataDir))[0] ?? null,
   readReportHtml: async (date: string) => await readTextFile(config.report.dataDir, date, "report.html"),
-  triggerManualRun: config.manualRun.enabled
-    ? async () => {
-        await triggerDigest("manual");
-        return { accepted: true };
-      }
-    : undefined
+  triggerManualCollect,
+  triggerManualSendLatestEmail,
+  triggerManualRun: triggerManualCollect
 });
 
-startScheduler(config, async () => {
+startCollectionScheduler(config, async () => {
   try {
-    await triggerDigest("scheduled");
+    await lock.runExclusive(async () => {
+      await runCollectionTask("scheduled");
+    });
+  } catch (error) {
+    app.log.error(error);
+  }
+});
+
+startMailScheduler(config, async () => {
+  try {
+    await lock.runExclusive(async () => {
+      await runLatestEmailTask();
+    });
   } catch (error) {
     app.log.error(error);
   }

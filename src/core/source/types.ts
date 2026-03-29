@@ -1,10 +1,19 @@
-export type SourceKind = "juya" | "openai" | "google_ai" | "techcrunch_ai";
+export type SourceKind =
+  | "juya"
+  | "openai"
+  | "google_ai"
+  | "techcrunch_ai"
+  | "kr36"
+  | "kr36_newsflash"
+  | "aifanr"
+  | "ithome";
 
 export type SourceDefinition = {
   kind: SourceKind;
   name: string;
   siteUrl: string;
   rssUrl: string;
+  navigationViews: Array<"hot" | "articles" | "ai">;
   category: string;
   sourceType: "official" | "media" | "aggregator";
   sourcePriority: number;

@@ -1,31 +1,38 @@
 {
   "meta": {
     "date": "2026-03-29",
-    "generatedAt": "2026-03-29T02:04:45.484Z",
-    "trigger": "manual",
-    "issueUrl": "https://imjuya.github.io/juya-ai-daily/issue-43/",
+    "generatedAt": "2026-03-29T15:50:06.074Z",
+    "trigger": "scheduled",
+    "issueUrl": "https://www.ifanr.com?utm_source=rss&utm_medium=rss&utm_campaign=",
     "issueUrls": [
       "https://blog.google/innovation-and-ai/technology/ai/",
       "https://techcrunch.com/category/artificial-intelligence/",
+      "https://www.ifanr.com?utm_source=rss&utm_medium=rss&utm_campaign=",
+      "https://www.ithome.com/",
       "https://imjuya.github.io/juya-ai-daily/issue-43/"
     ],
     "sourceKinds": [
       "google_ai",
       "techcrunch_ai",
+      "aifanr",
+      "ithome",
       "juya"
     ],
     "topicCount": 10,
     "degraded": true,
-    "mailStatus": "sent",
-    "sourceFailureCount": 0,
-    "failedSourceKinds": []
+    "mailStatus": "not-sent-by-collection",
+    "sourceFailureCount": 2,
+    "failedSourceKinds": [
+      "kr36",
+      "kr36_newsflash"
+    ]
   },
   "topics": [
     {
       "rank": 1,
       "title": "Bluesky leans into AI with Attie, an app for building custom feeds",
       "category": "热门文章",
-      "whyItMatters": "该主题当前聚合了 5 条候选信息，且最高源内排序为 #1。",
+      "whyItMatters": "该主题当前聚合了 9 条候选信息，且最高源内排序为 #1。",
       "summary": "The team from Bluesky has built another app — and this time, it’s not a social network, but an AI assistant that allows you to design your o",
       "keywords": [
         "Bluesky",
@@ -34,7 +41,7 @@
         "AI",
         "with"
       ],
-      "relatedCount": 5,
+      "relatedCount": 9,
       "relatedItems": [
         {
           "sourceRank": 1,
@@ -80,6 +87,42 @@
           "articleOk": true,
           "articleTitle": "A ‘pound of flesh’ from data centers: one senator’s answer to AI job losses",
           "articleSummary": "The signs that AI could lead to mass job displacement are already piling up: Entry-level job postings in the U.S. have sunk 35% since 2023, mass layoffs have swept across Big Tech, and even AI leaders are warning about what’s coming. \n\nBack"
+        },
+        {
+          "sourceRank": 2,
+          "sourceCategory": "AI 科技",
+          "sourceTitle": "早报｜防挖角，苹果给设计师发高额奖金/曝Claude最强新模型代号「卡皮巴拉」/小鹏汽车将改名小鹏集团",
+          "sourceUrl": "https://www.ifanr.com/1660125?utm_source=rss&utm_medium=rss&utm_campaign=",
+          "articleOk": true,
+          "articleTitle": "早报｜防挖角，苹果给设计师发高额奖金/曝Claude最强新模型代号「卡皮巴拉」/小鹏汽车将改名小鹏集团",
+          "articleSummary": "🌚\nNeurIPS 道歉：禁止中国机构投稿系「沟通误解」，已更新规则\n\n\n🍎\n防止人才被挖，苹果向设计师发放高额奖金\n\n\n🧠\nGemini 推出记忆导入功能\n\n\n🤖\nClaude 新模型曝光，官方称「将带来前所未有的安全风险」\n\n\n🎮\n索尼宣布 PS5 全线涨价\n\n\n🚗\n小鹏汽车将改名「小鹏集团」\n\n\n🚙\n乐道重启轿车和 SUV 研发，定位 20 万级市场\n\n\n☁️\n腾讯云发布「养虾产品全景图」\n\n\n💬\n智谱 CEO 张鹏：大模型低价竞争不可持续，提价是「回归"
+        },
+        {
+          "sourceRank": 6,
+          "sourceCategory": "AI 科技",
+          "sourceTitle": "林俊旸离职后首发长文：反思千问得失，预判 AI 下半场需要「智能体思维」",
+          "sourceUrl": "https://www.ifanr.com/1659950?utm_source=rss&utm_medium=rss&utm_campaign=",
+          "articleOk": true,
+          "articleTitle": "从「想更久」，到「为了行动而思考」。",
+          "articleSummary": "带队发布 Qwen 3.5 小模型系列、获马斯克公开点赞，20 小时后在社交媒体宣告离职。林俊旸离开阿里的方式，本身就是 2026 年 AI 行业最戏剧性的一幕。\n32 岁，阿里最年轻的 P10，一手将千问做到全球下载量超 10 亿次、衍生模型超 20 万款，成为全球开源模型的新王。他的离开源于一次组织架构调整的分歧：\n阿里希望将 Qwen 团队按预训练、后训练、视觉、语音等维度水平拆分，与通义实验室其他团队合并；林俊旸则坚信预训练、后训练乃至基础设施团队应该更紧密地垂直整合"
+        },
+        {
+          "sourceRank": 7,
+          "sourceCategory": "AI 科技",
+          "sourceTitle": "杨植麟、罗福莉、夏立雪、张鹏、黄超，五个AI圈顶流把龙虾、Token 、开源聊透了",
+          "sourceUrl": "https://www.ifanr.com/1659954?utm_source=rss&utm_medium=rss&utm_campaign=",
+          "articleOk": true,
+          "articleTitle": "生态、自进化、可持续 Token 与算力",
+          "articleSummary": "龙虾，是最近 AI 圈出现频率最高的词汇。\n它指的是 OpenClaw，一个近期在AI圈迅速蔓延的开源智能体框架。有人觉得它像贾维斯，有人觉得它像脚手架，有人觉得它像轻量级操作系统，所有人都在用，而且越用越停不下来。\n围绕它的讨论也随之而来：龙虾能干什么，干不了什么，下一步往哪走，算力够不够，谁在受益，谁在焦虑。\n\n现在，行业里最靠近前线的一批人坐下来，认真聊了聊这件事。就在刚刚，月之暗面创始人杨植麟在北京中关村论坛年会的开源主题圆桌中主持了一场五人谈话，智谱创始人张鹏、无问"
+        },
+        {
+          "sourceRank": 10,
+          "sourceCategory": "AI 科技",
+          "sourceTitle": "早报｜苹果下架「刨丝器」Mac Pro/小米遭老头乐起诉，后者称已和解/微信官方解读「正在输入」背后原理",
+          "sourceUrl": "https://www.ifanr.com/1659953?utm_source=rss&utm_medium=rss&utm_campaign=",
+          "articleOk": true,
+          "articleTitle": "早报｜苹果下架「刨丝器」Mac Pro/小米遭老头乐起诉，后者称已和解/微信官方解读「正在输入」背后原理",
+          "articleSummary": "📱\n苹果或允许第三方 AI 接入 Siri\n\n\n🛑\n真我将于 4 月关停官方商城\n\n\n🚗\n小米汽车遭「老头乐」公司起诉\n\n\n🚗\n本田和索尼叫停电动汽车合资项目\n\n\n🤔\n林俊旸离职后首发长文：反思千问得失\n\n\n🔍\nxAI 被曝再走一名联创，11 人仅剩 1 位\n\n\n💰\n微信官方解读「正在输入」背后原理\n\n\n🧠\n曝 Kimi 考虑赴港 IPO，估值约 180 亿美元\n\n\n🍔\nGoogle 发布新型 AI 内存压缩技术，存储股集体下跌\n\n\n⚓\n美团公布「外卖大战」"
         }
       ]
     },
@@ -129,6 +172,85 @@
     },
     {
       "rank": 3,
+      "title": "广汽丰田铂智 7 轿车真实大定数据超 3100 台，限时补贴权益价 14.78 万元起",
+      "category": "科技热点",
+      "whyItMatters": "该主题当前聚合了 3 条候选信息，且最高源内排序为 #7。",
+      "summary": "IT之家 3 月 29 日消息，广汽丰田销售副总彭宝林刚刚公布了铂智 7 纯电轿车的最新销量数据 —— 实单已超 3100 台。他表示，这不是“意向”也不是“预订”，是真实的大定数据。据IT之家今日早些时候报道，广汽丰田铂智 7 纯电轿车今日正式上市，限时补贴权益价 14.78 ",
+      "keywords": [
+        "广汽",
+        "丰田",
+        "铂智",
+        "轿车",
+        "真实"
+      ],
+      "relatedCount": 3,
+      "relatedItems": [
+        {
+          "sourceRank": 7,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "广汽丰田铂智 7 轿车真实大定数据超 3100 台，限时补贴权益价 14.78 万元起",
+          "sourceUrl": "https://www.ithome.com/0/933/896.htm",
+          "articleOk": true,
+          "articleTitle": "广汽丰田铂智 7 轿车真实大定数据超 3100 台，限时补贴权益价 14.78 万元起",
+          "articleSummary": "IT之家 3 月 29 日消息，广汽丰田销售副总彭宝林刚刚公布了铂智 7 纯电轿车的最新销量数据 —— 实单已超 3100 台。他表示，这不是“意向”也不是“预订”，是真实的大定数据。据IT之家今日早些时候报道，广汽丰田铂智 7 纯电轿车今日正式上市，限时补贴权益价 14.78 万元起。其是丰田史上最宽纯电轿车、首款搭载双腔空悬的纯电旗舰，将大型轿车尺寸、华为鸿蒙座舱、激光雷达智驾、双腔空悬驾控等配置全面下放。600 Pro 版：建议零售价 16.98 万元、限时补贴权益价 "
+        },
+        {
+          "sourceRank": 42,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "广汽丰田铂智 7 轿车上市：鸿蒙座舱 + Momenta 智驾 + 小米车载生态，限时补贴权益价 14.78 万元起",
+          "sourceUrl": "https://www.ithome.com/0/933/816.htm",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        },
+        {
+          "sourceRank": 48,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "广汽丰田铂智 7 汽车预售订单超 1 万台：鸿蒙座舱 + 小米车载生态，预售价 15.68 万元起",
+          "sourceUrl": "https://www.ithome.com/0/933/806.htm",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        }
+      ]
+    },
+    {
+      "rank": 4,
+      "title": "古尔曼：苹果试图通过发放奖金，阻止 iPhone 产品设计工程师跳槽至 OpenAI",
+      "category": "科技热点",
+      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #1。",
+      "summary": "IT之家 3 月 29 日消息，今天，彭博社的马克 · 古尔曼在《Power On》通讯谈到了苹果对员工跳槽至 OpenAI 的情况。他透露，苹果公司试图通过发放奖金，阻止 iPhone 产品设计工程师跳槽至 OpenAI。近几个月来，苹果高管们对工程师纷纷跳槽至 OpenAI ",
+      "keywords": [
+        "古尔",
+        "苹果",
+        "试图",
+        "通过",
+        "发放"
+      ],
+      "relatedCount": 2,
+      "relatedItems": [
+        {
+          "sourceRank": 1,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "古尔曼：苹果试图通过发放奖金，阻止 iPhone 产品设计工程师跳槽至 OpenAI",
+          "sourceUrl": "https://www.ithome.com/0/933/904.htm",
+          "articleOk": true,
+          "articleTitle": "古尔曼：苹果试图通过发放奖金，阻止 iPhone 产品设计工程师跳槽至 OpenAI - IT之家",
+          "articleSummary": "IT之家 3 月 29 日消息，今天，彭博社的马克 · 古尔曼在《Power On》通讯谈到了苹果对员工跳槽至 OpenAI 的情况。他透露，苹果公司试图通过发放奖金，阻止 iPhone 产品设计工程师跳槽至 OpenAI。近几个月来，苹果高管们对工程师纷纷跳槽至 OpenAI 的状况愈发感到沮丧。这家初创公司的硬件部门由前苹果设计主管埃文斯 · 汉基和资深工程高管唐坦领导，正积极从 iPhone 制造商的工程团队中挖人。他提到，OpenAI 对以人工智能为核心的产品有着雄心"
+        },
+        {
+          "sourceRank": 2,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "古尔曼：苹果 iOS 27 将允许安装 ChatGPT 以外的第三方 AI 聊天机器人，拥有独立的 App Store 专区",
+          "sourceUrl": "https://www.ithome.com/0/933/903.htm",
+          "articleOk": true,
+          "articleTitle": "古尔曼：苹果 iOS 27 将允许安装 ChatGPT 以外的第三方 AI 聊天机器人，拥有独立的 App Store 专区",
+          "articleSummary": "感谢IT之家网友 風見暉一 的线索投递！\n            IT之家 3 月 29 日消息，彭博社的马克 · 古尔曼在今天的《Power On》通讯中详细地讨论了苹果即将到来的人工智能计划，将于 6 月 8 日（北京时间 6 月 9 日）在全球开发者大会上揭晓。他表示，苹果正采取一种双管齐下的策略：在操作系统中嵌入恰到好处的人工智能，以防止用户转向安卓；同时向第三方服务开放 Siri 和 Apple Intelligence。这一做法充分利用了苹果的硬件优势，使产品更具"
+        }
+      ]
+    },
+    {
+      "rank": 5,
       "title": "Gemini 3.1 Flash Live: Making audio AI more natural and reliable",
       "category": "最新 AI 消息",
       "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #3。",
@@ -163,7 +285,112 @@
       ]
     },
     {
-      "rank": 4,
+      "rank": 6,
+      "title": "鸿蒙智行尚界 Z7 / Z7T 新车内饰亮点揭秘：首搭水离子空调、零重力座椅支持一键躺平等",
+      "category": "科技热点",
+      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #18。",
+      "summary": "鸿蒙智行尚界 Z7 / Z7T 新车内饰亮点揭秘：首搭水离子空调、零重力座椅支持一键躺平等",
+      "keywords": [
+        "鸿蒙",
+        "智行",
+        "尚界",
+        "Z7",
+        "Z7T"
+      ],
+      "relatedCount": 2,
+      "relatedItems": [
+        {
+          "sourceRank": 18,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "鸿蒙智行尚界 Z7 / Z7T 新车内饰亮点揭秘：首搭水离子空调、零重力座椅支持一键躺平等",
+          "sourceUrl": "https://www.ithome.com/0/933/877.htm",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        },
+        {
+          "sourceRank": 24,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "鸿蒙智行问界 M6 汽车全系标配配置公布，含华为途灵平台、巨鲸电池等",
+          "sourceUrl": "https://www.ithome.com/0/933/870.htm",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        }
+      ]
+    },
+    {
+      "rank": 7,
+      "title": "华为乾崑 | 启境 GT7 新一代智能猎装车预计 7 月开启交付，动态试驾体验 6 月开启",
+      "category": "科技热点",
+      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #23。",
+      "summary": "IT之家 3 月 29 日消息，启境汽车官方微博昨日发布了答网友问（第 7 期），针对华为乾崑 | 启境 GT7 新一代智能猎装车上市交付时间、所处价位、何时可以试驾等问题进行了解答。IT之家附启境汽车本期答网友问重点内容如下：启境 GT7 什么时候上市？什么时间交付？启境 GT",
+      "keywords": [
+        "华为",
+        "乾崑",
+        "启境",
+        "GT7",
+        "新一"
+      ],
+      "relatedCount": 2,
+      "relatedItems": [
+        {
+          "sourceRank": 23,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "华为乾崑 | 启境 GT7 新一代智能猎装车预计 7 月开启交付，动态试驾体验 6 月开启",
+          "sourceUrl": "https://www.ithome.com/0/933/871.htm",
+          "articleOk": true,
+          "articleTitle": "华为乾崑 | 启境 GT7 新一代智能猎装车预计 7 月开启交付，动态试驾体验 6 月开启",
+          "articleSummary": "IT之家 3 月 29 日消息，启境汽车官方微博昨日发布了答网友问（第 7 期），针对华为乾崑 | 启境 GT7 新一代智能猎装车上市交付时间、所处价位、何时可以试驾等问题进行了解答。IT之家附启境汽车本期答网友问重点内容如下：启境 GT7 什么时候上市？什么时间交付？启境 GT7 定于 6 月举办上市发布会，届时公布正式售价、配置及交付细则；新车预计 7 月开启交付，交付周期会因车型配置、锁单及确认交付方案时间的变化而变化，具体情况请以启境汽车向您发出的交付邀请函为准。启境"
+        },
+        {
+          "sourceRank": 55,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "华为乾崑 | 启境 GT7 智能猎装车「普罗旺斯紫」车色亮相，新车 6 月上市",
+          "sourceUrl": "https://www.ithome.com/0/933/799.htm",
+          "articleOk": true,
+          "articleTitle": "华为乾崑 | 启境 GT7 智能猎装车「普罗旺斯紫」车色亮相，新车 6 月上市",
+          "articleSummary": "IT之家 3 月 29 日消息，启境汽车 CEO 刘嘉铭今日分享了华为乾崑 | 启境 GT7 智能猎装车的「普罗旺斯紫」车色外观图，并介绍了背后的设计理念。这款紫色，是在日出时分，法国普罗旺斯薰衣草花田上，那层被阳光染透的薄雾紫色。我们选用镜面车漆，以浅紫为基调，加入高配比铝粉，通过精准工艺让金属粒子平行排布，呈现流动通透，“云中倒影”的镜面质感。据IT之家此前报道，在 3 月 24 日，启境汽车公司名与品牌名完成统一。刘嘉铭透露，启境首款车型 —— GT7 将在 6 月上市"
+        }
+      ]
+    },
+    {
+      "rank": 8,
+      "title": "宇树科技王兴兴：具身智能“ChatGPT 时刻”大概还要需两到三年",
+      "category": "科技热点",
+      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #37。",
+      "summary": "感谢IT之家网友 不一样的体验 的线索投递！ IT之家 3 月 29 日消息，宇树科技创始人、CEO 王兴兴亮相 2026 中国网络媒体论坛，发表《当机器人刷屏》主题演讲，IT之家附上演讲片段视频如下：王兴兴在演讲中表示，当下机器人、具身智能确实还没有达到临界点，他还将具身智能的",
+      "keywords": [
+        "宇树",
+        "科技",
+        "王兴",
+        "具身",
+        "智能"
+      ],
+      "relatedCount": 2,
+      "relatedItems": [
+        {
+          "sourceRank": 37,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "宇树科技王兴兴：具身智能“ChatGPT 时刻”大概还要需两到三年",
+          "sourceUrl": "https://www.ithome.com/0/933/850.htm",
+          "articleOk": true,
+          "articleTitle": "宇树科技王兴兴：具身智能“ChatGPT 时刻”大概还要需两到三年 - IT之家",
+          "articleSummary": "感谢IT之家网友 不一样的体验 的线索投递！\n            IT之家 3 月 29 日消息，宇树科技创始人、CEO 王兴兴亮相 2026 中国网络媒体论坛，发表《当机器人刷屏》主题演讲，IT之家附上演讲片段视频如下：王兴兴在演讲中表示，当下机器人、具身智能确实还没有达到临界点，他还将具身智能的“ChatGPT 时刻”定义为以下情景：如果未来有一天，我带一台机器人到这个会场，它到 80% 左右的陌生场景中都能通过语音、语言指令实现 80% 左右的任务。我觉得就已经实现"
+        },
+        {
+          "sourceRank": 46,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "宇树科技具身智能体验馆亚洲首店 5 月底落地上海静安久光百货，面积超 100 平方米",
+          "sourceUrl": "https://www.ithome.com/0/933/811.htm",
+          "articleOk": true,
+          "articleTitle": "宇树科技具身智能体验馆亚洲首店 5 月底落地上海静安久光百货，面积超 100 平方米",
+          "articleSummary": "IT之家 3 月 29 日消息，据“上海静安”公众号今日发文，宇树科技具身智能体验馆亚洲首店，将于 5 月底落地上海市静安区南京西路商圈的久光百货，门店面积超 100 平方米，将展出品牌全线最新产品。宇树科技高级副总裁李斌杰在“首发上海”系列活动发布仪式上表示，该门店将成为沉浸式体验中心，以具身智能科技打造沉浸式消费新场景，通过前沿具身智能技术拉近科技与大众的距离，进一步让机器人科技走进城市生活场景。值得注意的是，宇树科技的全尺寸具身机器人新品 H2 也在会中发布，该机器人身"
+        }
+      ]
+    },
+    {
+      "rank": 9,
       "title": "OpenAI 推出 Codex 用例库，展示 Codex 应用场景与使用技巧",
       "category": "开发生态",
       "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #1。",
@@ -189,7 +416,7 @@
       ]
     },
     {
-      "rank": 5,
+      "rank": 10,
       "title": "飞书开源 lark-cli，支持 AI Agent，覆盖 11 个业务域",
       "category": "开发生态",
       "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #2。",
@@ -211,136 +438,6 @@
           "articleOk": true,
           "articleTitle": "GitHub - larksuite/cli: A command-line tool for Lark/Feishu Open Platform — built for humans and AI Agents. Covers core business domains including Messenger, Docs, Base, Sheets, Calendar, Mail, Tasks, Meetings, and more, with 200+ commands and 19 AI Agent Skills.",
           "articleSummary": "中文版 | English\nA command-line tool for Lark/Feishu Open Platform — built for humans and AI Agents. Covers core business domains including Messenger, Docs, Base, Sheets, Calendar, Mail, Tasks, Meetings, and more, with 200+ commands and 19 AI "
-        }
-      ]
-    },
-    {
-      "rank": 6,
-      "title": "Watch James Manyika talk AI and creativity with LL COOL J.",
-      "category": "最新 AI 消息",
-      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #1。",
-      "summary": "In the latest episode of our Dialogues on Technology and Society series, legendary artist LL COOL J sits down with James Manyika, Google's S",
-      "keywords": [
-        "Watch",
-        "James",
-        "Manyika",
-        "talk",
-        "AI"
-      ],
-      "relatedCount": 1,
-      "relatedItems": [
-        {
-          "sourceRank": 1,
-          "sourceCategory": "最新 AI 消息",
-          "sourceTitle": "Watch James Manyika talk AI and creativity with LL COOL J.",
-          "sourceUrl": "https://blog.google/innovation-and-ai/technology/ai/ll-cool-j-dialogues/",
-          "articleOk": true,
-          "articleTitle": "Watch James Manyika talk AI and creativity with LL COOL J.",
-          "articleSummary": "In the latest episode of our Dialogues on Technology and Society series, legendary artist LL COOL J sits down with James Manyika, Google's Senior Vice President of Research, Labs, Technology & Society. They have a wide-ranging conversation "
-        }
-      ]
-    },
-    {
-      "rank": 7,
-      "title": "Transform your headphones into a live personal translator on iOS.",
-      "category": "最新 AI 消息",
-      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #2。",
-      "summary": "Google Translate’s Live translate with headphones is officially arriving on iOS! And we're expanding the capability for both iOS and Android",
-      "keywords": [
-        "Transform",
-        "your",
-        "headphones",
-        "into",
-        "live"
-      ],
-      "relatedCount": 1,
-      "relatedItems": [
-        {
-          "sourceRank": 2,
-          "sourceCategory": "最新 AI 消息",
-          "sourceTitle": "Transform your headphones into a live personal translator on iOS.",
-          "sourceUrl": "https://blog.google/products-and-platforms/products/translate/live-translate-with-headphones/",
-          "articleOk": true,
-          "articleTitle": "Transform your headphones into a live personal translator on iOS.",
-          "articleSummary": "Google Translate’s Live translate with headphones is officially arriving on iOS! And we're expanding the capability for both iOS and Android users to even more countries, including France, Germany, Italy, Japan, Spain, Thailand, and the U.K"
-        }
-      ]
-    },
-    {
-      "rank": 8,
-      "title": "Elon Musk’s last co-founder reportedly leaves xAI",
-      "category": "热门文章",
-      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #3。",
-      "summary": "In Brief Posted: 9:11 AM PDT · March 28, 2026 Image Credits:Krisztian Bocsi/Bloomberg / Getty Images Earlier this month, it looked like all ",
-      "keywords": [
-        "Elon",
-        "Musk",
-        "last",
-        "co",
-        "founder"
-      ],
-      "relatedCount": 1,
-      "relatedItems": [
-        {
-          "sourceRank": 3,
-          "sourceCategory": "热门文章",
-          "sourceTitle": "Elon Musk’s last co-founder reportedly leaves xAI",
-          "sourceUrl": "https://techcrunch.com/2026/03/28/elon-musks-last-co-founder-reportedly-leaves-xai/",
-          "articleOk": true,
-          "articleTitle": "Elon Musk’s last co-founder reportedly leaves xAI",
-          "articleSummary": "In Brief\nPosted:\n\n\n9:11 AM PDT · March 28, 2026\n\n\n\nImage Credits:Krisztian Bocsi/Bloomberg / Getty Images\n\n\n\n\t\t\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\n\t\t\n\t\n\n\n\n\n\nEarlier this month, it looked like all but two of Elon Musk’s 11 co-founders at hi"
-        }
-      ]
-    },
-    {
-      "rank": 9,
-      "title": "OpenAI 明确：Sora 应用 4 月停止服务， API 9月下线",
-      "category": "产品应用",
-      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #3。",
-      "summary": "OpenAI 明确：Sora 应用 4 月停止服务， API 9月下线",
-      "keywords": [
-        "OpenAI",
-        "明确",
-        "Sora",
-        "应用",
-        "月停"
-      ],
-      "relatedCount": 1,
-      "relatedItems": [
-        {
-          "sourceRank": 3,
-          "sourceCategory": "产品应用",
-          "sourceTitle": "OpenAI 明确：Sora 应用 4 月停止服务， API 9月下线",
-          "sourceUrl": "https://help.openai.com/en/articles/20001152-what-to-know-about-the-sora-discontinuation",
-          "articleOk": false,
-          "articleTitle": "",
-          "articleSummary": ""
-        }
-      ]
-    },
-    {
-      "rank": 10,
-      "title": "Search Live is expanding globally",
-      "category": "最新 AI 消息",
-      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #4。",
-      "summary": "Mar 26, 2026 When you go Live with Search, you can have an interactive, multimodal conversation in AI Mode. Liza Ma Director, Product Manage",
-      "keywords": [
-        "Search",
-        "Live",
-        "is",
-        "expanding",
-        "globally"
-      ],
-      "relatedCount": 1,
-      "relatedItems": [
-        {
-          "sourceRank": 4,
-          "sourceCategory": "最新 AI 消息",
-          "sourceTitle": "Search Live is expanding globally",
-          "sourceUrl": "https://blog.google/products-and-platforms/products/search/search-live-global-expansion/",
-          "articleOk": true,
-          "articleTitle": "Search Live is expanding globally",
-          "articleSummary": "Mar 26, 2026\n          \n          \n            \n          \n        \n      \n        \n          When you go Live with Search, you can have an interactive, multimodal conversation in AI Mode.\n        \n      \n    \n  \n  \n    \n  Liza Ma\n  \n    \n "
         }
       ]
     }

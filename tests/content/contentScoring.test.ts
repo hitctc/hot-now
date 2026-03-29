@@ -46,4 +46,20 @@ describe("scoreContentItem", () => {
     expect(fresh.contentScore).toBeGreaterThan(stale.contentScore);
     expect(stale.badges).not.toContain("24h 内");
   });
+
+  it("treats newly added domestic media feeds as media sources instead of generic aggregators", () => {
+    const result = scoreContentItem(
+      {
+        title: "36氪快讯：国产 AI 公司发布新模型",
+        summary: "这是一条来自国内科技媒体的热点快讯。",
+        bodyMarkdown: "文章正文给出了模型定位、发布时间和行业影响。",
+        publishedAt: "2026-03-29T08:00:00.000Z",
+        sourceKind: "kr36_newsflash"
+      },
+      { now: "2026-03-29T12:00:00.000Z" }
+    );
+
+    expect(result.badges).toContain("媒体源");
+    expect(result.badges).not.toContain("聚合源");
+  });
 });

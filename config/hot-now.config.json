@@ -1,8 +1,9 @@
 {
   "server": { "port": 3030 },
-  "schedule": { "enabled": true, "dailyTime": "08:00", "timezone": "Asia/Shanghai" },
+  "collectionSchedule": { "enabled": true, "intervalMinutes": 10 },
+  "mailSchedule": { "enabled": true, "dailyTime": "10:00", "timezone": "Asia/Shanghai" },
+  "manualActions": { "collectEnabled": true, "sendLatestEmailEnabled": true },
   "report": { "topN": 10, "dataDir": "../data/reports", "allowDegraded": true },
   "source": { "rssUrl": "https://imjuya.github.io/juya-ai-daily/rss.xml" },
-  "manualRun": { "enabled": true },
   "database": { "file": "../data/hot-now.sqlite" }
 }

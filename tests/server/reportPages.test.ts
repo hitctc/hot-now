@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { LatestReportEmailError } from "../../src/core/pipeline/sendLatestReportEmail.js";
 import { createServer } from "../../src/server/createServer.js";
 
 describe("report pages", () => {
@@ -15,17 +16,19 @@ describe("report pages", () => {
     expect(response.body).toContain(".legacy-card button {");
   });
 
-  it("renders the control page with config summary", async () => {
+  it("renders the control page with separate collect and send-latest-email actions", async () => {
     const app = createServer({
       config: {
         report: { dataDir: "./data/reports", topN: 10, allowDegraded: true },
-        schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
-        manualRun: { enabled: true },
+        collectionSchedule: { enabled: true, intervalMinutes: 10 },
+        mailSchedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
+        manualActions: { collectEnabled: true, sendLatestEmailEnabled: true },
         smtp: { user: "sender@qq.com", to: "receiver@example.com" }
       },
       listReportSummaries: vi.fn().mockResolvedValue([]),
       readReportHtml: vi.fn(),
-      triggerManualRun: vi.fn().mockResolvedValue({ accepted: true }),
+      triggerManualCollect: vi.fn().mockResolvedValue({ accepted: true, action: "collect" }),
+      triggerManualSendLatestEmail: vi.fn().mockResolvedValue({ accepted: true, action: "send-latest-email" }),
       latestReportDate: vi.fn().mockResolvedValue(null)
     } as never);
 
@@ -33,7 +36,13 @@ describe("report pages", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("HotNow 控制台");
+    expect(response.body).toContain("采集周期：每 10 分钟");
+    expect(response.body).toContain("发信时间：08:00");
     expect(response.body).toContain("08:00");
+    expect(response.body).toContain('action="/actions/collect"');
+    expect(response.body).toContain(">手动执行采集<");
+    expect(response.body).toContain('action="/actions/send-latest-email"');
+    expect(response.body).toContain(">手动发送最新报告<");
     expect(response.body).toContain('data-theme="dark"');
     expect(response.body).toContain('<link rel="stylesheet" href="/assets/site.css" />');
     expect(response.body).toContain('<script src="/assets/site.js" defer></script>');
@@ -93,16 +102,96 @@ describe("report pages", () => {
     expect(response.body).toContain("日报");
   });
 
-  it("accepts a manual run request", async () => {
+  it("accepts a manual collect request", async () => {
     const app = createServer({
       config: { report: { topN: 10 }, schedule: { dailyTime: "08:00" }, smtp: { to: "receiver@example.com" } },
-      triggerManualRun: vi.fn().mockResolvedValue({ accepted: true })
+      triggerManualCollect: vi.fn().mockResolvedValue({ accepted: true, action: "collect" })
+    } as never);
+
+    const response = await app.inject({ method: "POST", url: "/actions/collect" });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toEqual({ accepted: true, action: "collect" });
+  });
+
+  it("keeps /actions/collect compatible with legacy triggerManualRun wiring", async () => {
+    const triggerManualRun = vi.fn().mockResolvedValue({ accepted: true, action: "collect" });
+    const app = createServer({
+      config: { report: { topN: 10 }, schedule: { dailyTime: "08:00" }, smtp: { to: "receiver@example.com" } },
+      triggerManualRun
+    } as never);
+
+    const response = await app.inject({ method: "POST", url: "/actions/collect" });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toEqual({ accepted: true, action: "collect" });
+    expect(triggerManualRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps /actions/run as a manual collect alias", async () => {
+    const app = createServer({
+      config: { report: { topN: 10 }, schedule: { dailyTime: "08:00" }, smtp: { to: "receiver@example.com" } },
+      triggerManualCollect: vi.fn().mockResolvedValue({ accepted: true, action: "collect" })
     } as never);
 
     const response = await app.inject({ method: "POST", url: "/actions/run" });
 
     expect(response.statusCode).toBe(202);
-    expect(response.json()).toEqual({ accepted: true });
+    expect(response.json()).toEqual({ accepted: true, action: "collect" });
+  });
+
+  it("accepts sending the latest report email", async () => {
+    const app = createServer({
+      config: { report: { topN: 10 }, schedule: { dailyTime: "08:00" }, smtp: { to: "receiver@example.com" } },
+      triggerManualSendLatestEmail: vi.fn().mockResolvedValue({ accepted: true, action: "send-latest-email" })
+    } as never);
+
+    const response = await app.inject({ method: "POST", url: "/actions/send-latest-email" });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toEqual({ accepted: true, action: "send-latest-email" });
+  });
+
+  it("maps missing latest report email artifacts to 404", async () => {
+    const app = createServer({
+      config: { report: { topN: 10 }, schedule: { dailyTime: "08:00" }, smtp: { to: "receiver@example.com" } },
+      triggerManualSendLatestEmail: vi.fn().mockRejectedValue(
+        new LatestReportEmailError("not-found", "No digest report is available to send")
+      )
+    } as never);
+
+    const response = await app.inject({ method: "POST", url: "/actions/send-latest-email" });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({ accepted: false, reason: "not-found" });
+  });
+
+  it("maps unavailable latest report artifacts to 503", async () => {
+    const app = createServer({
+      config: { report: { topN: 10 }, schedule: { dailyTime: "08:00" }, smtp: { to: "receiver@example.com" } },
+      triggerManualSendLatestEmail: vi.fn().mockRejectedValue(
+        new LatestReportEmailError("report-unavailable", "Failed to read latest digest report for 2026-03-26")
+      )
+    } as never);
+
+    const response = await app.inject({ method: "POST", url: "/actions/send-latest-email" });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({ accepted: false, reason: "report-unavailable" });
+  });
+
+  it("maps latest report email delivery failures to 502", async () => {
+    const app = createServer({
+      config: { report: { topN: 10 }, schedule: { dailyTime: "08:00" }, smtp: { to: "receiver@example.com" } },
+      triggerManualSendLatestEmail: vi.fn().mockRejectedValue(
+        new LatestReportEmailError("send-failed", "Failed to send latest digest report for 2026-03-26")
+      )
+    } as never);
+
+    const response = await app.inject({ method: "POST", url: "/actions/send-latest-email" });
+
+    expect(response.statusCode).toBe(502);
+    expect(response.json()).toEqual({ accepted: false, reason: "send-failed" });
   });
 
   it("rejects a manual run when another job is running", async () => {

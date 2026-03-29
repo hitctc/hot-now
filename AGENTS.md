@@ -14,8 +14,10 @@
 
 - 项目名称：`hot-now`
 - 目标：本地单机运行的每日热点应用
-- 当前主链路：`定时 / 手动触发 -> 拉取 enabled RSS sources -> 抓取原文 -> 规则聚类 -> 生成 JSON/HTML 报告 -> 网页查看 -> SMTP 发邮件`
-- 当前数据源：`https://imjuya.github.io/juya-ai-daily/rss.xml`、`https://openai.com/news/rss.xml`、`https://blog.google/technology/ai/rss/`、`https://techcrunch.com/category/artificial-intelligence/feed/`
+- 当前主链路：
+  - `采集链路`：`定时 / 手动采集 -> 拉取 enabled RSS sources -> 抓取原文 -> 规则聚类 -> 生成 JSON/HTML 报告 -> 网页查看`
+  - `发信链路`：`定时 / 手动发信 -> 读取最新一份已生成报告 -> SMTP 发邮件`
+- 当前数据源：`https://imjuya.github.io/juya-ai-daily/rss.xml`、`https://openai.com/news/rss.xml`、`https://blog.google/technology/ai/rss/`、`https://36kr.com/feed`、`https://36kr.com/feed-newsflash`、`https://techcrunch.com/category/artificial-intelligence/feed/`、`https://www.ifanr.com/feed`、`https://www.ithome.com/rss/`
 - 当前采集语义：以 `is_enabled` 为准决定是否参与采集；`is_active` 仅保留兼容，不再作为系统菜单主语义
 - 当前技术栈：`Node.js + TypeScript + Fastify + Vitest`
 
@@ -35,8 +37,12 @@
   负责热点归并、排序和摘要整理。
 - `src/core/report/`
   负责生成结构化报告和 HTML 报告。
+- `src/core/pipeline/runCollectionCycle.ts`
+  负责执行“采集 + 聚类 + 生成报告 + 写入存储”的 collection-only 流水线。
+- `src/core/pipeline/sendLatestReportEmail.ts`
+  负责读取最新报告并单独执行发信。
 - `src/core/pipeline/runDailyDigest.ts`
-  负责把整条日报流水线串起来。
+  保留旧的一体化日报流水线实现，新增功能优先复用拆分后的 collection / mail pipeline。
 - `src/core/mail/`
   负责 QQ SMTP 邮件发送。
 - `src/core/storage/`
@@ -64,22 +70,25 @@
 - `/articles`：统一站点文章页（登录后）
 - `/ai`：统一站点 AI 页（登录后）
 - `/settings/view-rules`：统一站点筛选策略页（登录后）
-- `/settings/sources`：统一站点数据迭代收集页（登录后，可启用/停用 source，并手动执行一次全量采集）
+- `/settings/sources`：统一站点数据迭代收集页（登录后，可启用/停用 source，并分别手动执行采集 / 手动发送最新报告）
 - `/settings/profile`：统一站点当前登录用户页（登录后）
 - 统一站点左侧导航底部支持深色 / 浅色主题切换，偏好写入浏览器本地 `localStorage` 并在刷新后保持
 - `unified shell` 页面（`/`、`/articles`、`/ai`、`/settings/*`）已完整接入赛博双主题
+- 内容导航保持统一内容池，但会给匹配导航语义的内置 source 显式加权：`36氪` / `36氪快讯` 优先进入 `/` 热点页，`爱范儿` 优先进入 `/ai`，`36氪` / `爱范儿` / `IT之家` 优先进入 `/articles`
 - `/history`：历史报告（legacy，当前仍保留）
 - `/reports/:date`：指定日期报告（legacy，当前仍保留）
 - `/control`：控制台（legacy，当前仍保留）
 - legacy `/history`、`/control` 与 `/reports/:date` 的 fallback notice 轻量跟随共享主题资源
-- `POST /actions/run`：手动触发一次日报任务（会对所有 enabled sources 执行采集；legacy，当前仍保留）
+- `POST /actions/collect`：手动触发一次采集任务（会对所有 enabled sources 执行采集）
+- `POST /actions/send-latest-email`：手动发送最新一份已生成报告
+- `POST /actions/run`：`/actions/collect` 的兼容别名（legacy，当前仍保留）
 - 兼容约定：真实应用默认启用 `requireLogin=true` 的 unified shell；auth 开启时 legacy 路由也需要登录；测试或未注入 auth 的场景仍可保持 legacy `/ -> 最新报告` 与 legacy 路由公开行为
 
 当前报告产物目录：
 
 - `data/reports/<YYYY-MM-DD>/report.json`：包含 `sourceKinds`、`issueUrls`、`sourceFailureCount`、`failedSourceKinds`
 - `data/reports/<YYYY-MM-DD>/report.html`：多源热点汇总 HTML 报告
-- `data/reports/<YYYY-MM-DD>/run-meta.json`
+- `data/reports/<YYYY-MM-DD>/run-meta.json`：包含 `mailStatus`；collection-only 任务会写入 `not-sent-by-collection`
 
 当前仓库允许把示例报告产物提交进版本库，用来直观看到阶段性成果；如果后续重新改回忽略策略，必须同步更新本文档、`README.md` 和 `.gitignore`。
 
@@ -97,6 +106,8 @@
 - 类型构建：`npm run build`
 - 测试：`npm run test`
 
+`npm run dev:local` 现在会在启动前检查本地 `3030` 端口；如果已有旧的监听进程占着这个端口，会先停止旧进程，再启动新的本地开发服务。`npm run dev` 保持原样，不会主动杀进程。
+
 推荐验证顺序：
 
 1. 只改了局部逻辑时，先跑最相关的单测文件。
@@ -108,7 +119,7 @@
 1. 准备 `SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_USER`、`SMTP_PASS`、`MAIL_TO`、`BASE_URL`、`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET`
 2. 启动 `npm run dev`
 3. 打开 `/login` 并完成登录
-4. 进入 `/settings/sources` 或 legacy `/control` 手动触发一次任务
+4. 进入 `/settings/sources` 或 legacy `/control`，先手动执行一次采集；需要验证发信时，再单独触发一次“发送最新报告”
 5. 检查是否生成报告目录与 `report.json`、`report.html`、`run-meta.json`
 6. 检查 `/`、`/settings/sources`、`/history`、`/reports/:date` 是否正常显示
 
@@ -168,17 +179,19 @@
 - 已有主体实现与测试文件
 - Git 主分支已建立并同步远端
 - 当前工作区已完成 unified site 与多源采集阶段的最终验证：
-  - `npm run test` 通过，结果为 `23` 个测试文件、`120` 个测试全部通过
+  - `npm run test` 通过，结果为 `25` 个测试文件、`144` 个测试全部通过
   - `npm run build` 通过
   - Playwright MCP 本地验收已跑通：`/login` 登录成功；`/`、`/articles`、`/ai`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常
   - 浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持
-- 真实 SMTP 发信已验证通过：最近一次手动采集写回的 `run-meta.json` 显示 `mailStatus: sent`
+- 真实 SMTP 发信已验证通过；当前采集链路与发信链路已拆开，采集只生成报告，发信单独读取最新报告
 - 原文抓取过程中出现过一次 `jsdom` 的 `Could not parse CSS stylesheet` 日志噪音，未阻断本轮任务完成；如果后续要收口发布质量，可以继续评估是否需要单独治理
 - Task4（single-user login + unified app shell）已落地：新增 `passwords/session` auth helper、登录页与统一壳层菜单路由，且保留 legacy 报告路由兼容
-- 真实入口已收紧：`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 现在是必填；auth 开启时 legacy 路由也要求登录，`POST /actions/run` 未登录返回未授权
+- 真实入口已收紧：`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 现在是必填；auth 开启时 legacy 路由也要求登录，`POST /actions/collect`、`POST /actions/send-latest-email` 与 `POST /actions/run` 未登录都返回未授权
 - 内容页评分已切为系统自动百分制，页面保留收藏 / 点赞 / 点踩，不再提供手工评分表单
 - 多源采集后端已完成：`loadEnabledSourceIssues` / `runDailyDigest` 已接入多源并行汇总，单个 feed 失败不会阻断整次日报，只有全部 enabled sources 都失败时才会硬失败
-- 系统菜单已收口到多源语义：`/settings/sources` 支持 source 启用/停用、逐 source 最近抓取状态展示和统一站点内手动执行采集；`/settings/view-rules` 支持按字段表单保存权重规则；当前登录用户信息已并到侧边栏底部
+- 内置 RSS 源已扩展到 8 个，覆盖聚合日报、国际官方 AI 博客、国内热点资讯 / 快讯与科技媒体；新增国内源默认作为 built-in source 写入 `content_sources`
+- 采集和发信已拆成两个独立功能：默认配置下采集每 `10` 分钟执行一次，发信每天 `10:00` 执行一次；两者都支持手动触发，并共用同一把运行锁
+- 系统菜单已收口到多源语义：`/settings/sources` 支持 source 启用/停用、逐 source 最近抓取状态展示，以及统一站点内手动执行采集 / 手动发送最新报告；`/settings/view-rules` 支持按字段表单保存权重规则；当前登录用户信息已并到侧边栏底部
 - unified shell 已去掉顶部 header，页面信息和账号区都收进左侧侧边栏；主题切换与 localStorage 持久化已落地
 - 报告层已切到多源语义：`report.json` / `report.html` / 邮件正文会保留 `sourceKinds`、`issueUrls`、失败 source 数量等信息，不再把输出描述成单一日报
 - legacy `/history`、`/reports/:date`、`/control` 与 unified shell 共存，且相关测试和文档已同步

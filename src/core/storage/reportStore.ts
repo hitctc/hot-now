@@ -18,6 +18,12 @@ export async function writeTextFile(rootDir: string, reportDate: string, fileNam
   await writeFile(resolveWithinRoot(dayDir, fileName), content, "utf8");
 }
 
+// JSON report artifacts use the same safe path resolution as text files so callers can load typed payloads
+// without re-implementing directory traversal checks in each pipeline.
+export async function readJsonFile<T>(rootDir: string, reportDate: string, fileName: string): Promise<T> {
+  return JSON.parse(await readTextFile(rootDir, reportDate, fileName)) as T;
+}
+
 export async function readTextFile(rootDir: string, reportDate: string, fileName: string) {
   return readFile(resolveWithinRoot(reportDayDir(rootDir, reportDate), fileName), "utf8");
 }
@@ -45,6 +51,23 @@ export type UpsertDigestReportInput = {
   reportHtmlPath?: string;
   mailStatus: string;
 };
+
+// Mail resend and future admin actions only need the newest mirrored report date, so the query stays
+// intentionally narrow and returns null when SQLite has no digest report rows yet.
+export function findLatestDigestReportDate(db: SqliteDatabase): string | null {
+  const row = db
+    .prepare(
+      `
+        SELECT report_date
+        FROM digest_reports
+        ORDER BY report_date DESC
+        LIMIT 1
+      `
+    )
+    .get() as { report_date: string } | undefined;
+
+  return row?.report_date ?? null;
+}
 
 // Digest reports stay mirrored in SQLite so future UI work can query metadata without replacing
 // the existing file-based report pages in this phase.

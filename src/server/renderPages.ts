@@ -6,6 +6,9 @@ type ReportSummary = {
 };
 
 type RenderConfig = {
+  collectionSchedule?: { enabled?: boolean; intervalMinutes?: number };
+  mailSchedule?: { enabled?: boolean; dailyTime?: string; timezone?: string };
+  manualActions?: { collectEnabled?: boolean; sendLatestEmailEnabled?: boolean };
   report?: { topN?: number; dataDir?: string; allowDegraded?: boolean };
   schedule?: { enabled?: boolean; dailyTime?: string; timezone?: string };
   manualRun?: { enabled?: boolean };
@@ -26,23 +29,28 @@ export function renderNoticePage(title: string, message: string) {
 
 // The control page only needs a compact snapshot of the active schedule and SMTP target.
 export function renderControlPage(config: RenderConfig = {}, running: boolean) {
-  const dailyTime = config.schedule?.dailyTime ?? "未配置";
-  const topN = config.report?.topN ?? "未配置";
+  const collectionInterval = formatCollectionInterval(config);
+  const mailTime = config.mailSchedule?.dailyTime ?? config.schedule?.dailyTime ?? "未配置";
   const recipient = config.smtp?.to ?? "未配置";
   const dataDir = config.report?.dataDir ?? "未配置";
+  const canTriggerManualCollect = config.manualActions?.collectEnabled ?? config.manualRun?.enabled ?? false;
+  const canTriggerManualSendLatestEmail = config.manualActions?.sendLatestEmailEnabled ?? false;
 
   return renderLegacyDocument({
     pageKind: "control",
     title: "HotNow 控制台",
     bodyHtml: `
       <h1>HotNow 控制台</h1>
-      <p>每日执行时间：${escapeHtml(String(dailyTime))}</p>
-      <p>Top N：${escapeHtml(String(topN))}</p>
+      <p>采集周期：${escapeHtml(collectionInterval)}</p>
+      <p>发信时间：${escapeHtml(String(mailTime))}</p>
       <p>报告目录：${escapeHtml(String(dataDir))}</p>
       <p>收件邮箱：${escapeHtml(String(recipient))}</p>
       <p>任务状态：${running ? "执行中" : "空闲"}</p>
-      <form method="post" action="/actions/run">
-        <button type="submit"${running ? " disabled" : ""}>立即生成一次</button>
+      <form method="post" action="/actions/collect">
+        <button type="submit"${canTriggerManualCollect && !running ? "" : " disabled"}>手动执行采集</button>
+      </form>
+      <form method="post" action="/actions/send-latest-email">
+        <button type="submit"${canTriggerManualSendLatestEmail && !running ? "" : " disabled"}>手动发送最新报告</button>
       </form>
     `
   });
@@ -101,6 +109,17 @@ function renderLegacyDocument(config: LegacyDocumentConfig) {
     </main>
   </body>
 </html>`;
+}
+
+function formatCollectionInterval(config: RenderConfig) {
+  // Legacy control keeps reading both old and new config names so page copy can shift without breaking partial migrations.
+  const intervalMinutes = config.collectionSchedule?.intervalMinutes;
+
+  if (typeof intervalMinutes === "number" && Number.isFinite(intervalMinutes) && intervalMinutes > 0) {
+    return `每 ${intervalMinutes} 分钟`;
+  }
+
+  return "未配置";
 }
 
 // HTML escapes are centralized so the route layer can render raw report content safely.

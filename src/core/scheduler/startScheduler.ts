@@ -3,16 +3,28 @@ import type { RuntimeConfig } from "../types/appConfig.js";
 
 type ScheduledTask = ReturnType<typeof cron.schedule>;
 
-// This only starts the cron job when scheduling is enabled in config.
-export function startScheduler(config: RuntimeConfig, run: () => Promise<void>): ScheduledTask | null {
-  if (!config.schedule.enabled) {
+// The collection scheduler drives the data fetch cadence without waiting for the mail window.
+export function startCollectionScheduler(
+  config: RuntimeConfig,
+  run: () => Promise<void>
+): ScheduledTask | null {
+  if (!config.collectionSchedule.enabled) {
     return null;
   }
 
-  const { hour, minute } = parseDailyTime(config.schedule.dailyTime);
+  return cron.schedule(`*/${config.collectionSchedule.intervalMinutes} * * * *`, run);
+}
+
+// The mail scheduler stays separate so delivery can run on a different daily clock.
+export function startMailScheduler(config: RuntimeConfig, run: () => Promise<void>): ScheduledTask | null {
+  if (!config.mailSchedule.enabled) {
+    return null;
+  }
+
+  const { hour, minute } = parseDailyTime(config.mailSchedule.dailyTime);
 
   return cron.schedule(`${minute} ${hour} * * *`, run, {
-    timezone: config.schedule.timezone
+    timezone: config.mailSchedule.timezone
   });
 }
 
@@ -21,7 +33,7 @@ function parseDailyTime(dailyTime: string) {
   const match = dailyTime.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
 
   if (!match) {
-    throw new Error(`Invalid schedule.dailyTime: ${dailyTime}`);
+    throw new Error(`Invalid mailSchedule.dailyTime: ${dailyTime}`);
   }
 
   return {

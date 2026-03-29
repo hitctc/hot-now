@@ -7,5 +7,9 @@ export const sourceAdapters = {
   juya: parseJuyaIssue,
   openai: (feedXml: string) => parseArticleFeed(feedXml, BUILTIN_SOURCES.openai),
   google_ai: (feedXml: string) => parseArticleFeed(feedXml, BUILTIN_SOURCES.google_ai),
-  techcrunch_ai: (feedXml: string) => parseArticleFeed(feedXml, BUILTIN_SOURCES.techcrunch_ai)
+  kr36: (feedXml: string) => parseArticleFeed(feedXml, BUILTIN_SOURCES.kr36),
+  kr36_newsflash: (feedXml: string) => parseArticleFeed(feedXml, BUILTIN_SOURCES.kr36_newsflash),
+  techcrunch_ai: (feedXml: string) => parseArticleFeed(feedXml, BUILTIN_SOURCES.techcrunch_ai),
+  aifanr: (feedXml: string) => parseArticleFeed(feedXml, BUILTIN_SOURCES.aifanr),
+  ithome: (feedXml: string) => parseArticleFeed(feedXml, BUILTIN_SOURCES.ithome)
 } satisfies Record<SourceKind, SourceAdapter>;

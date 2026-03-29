@@ -26,6 +26,19 @@ describe("loadRuntimeConfig", () => {
     });
 
     expect(config.report.dataDir).toBe(path.resolve("data/reports"));
+    expect(config.collectionSchedule).toEqual({
+      enabled: true,
+      intervalMinutes: 10
+    });
+    expect(config.mailSchedule).toEqual({
+      enabled: true,
+      dailyTime: "10:00",
+      timezone: "Asia/Shanghai"
+    });
+    expect(config.manualActions).toEqual({
+      collectEnabled: true,
+      sendLatestEmailEnabled: true
+    });
   });
 
   it("throws when AUTH env values are missing", async () => {
@@ -36,10 +49,12 @@ describe("loadRuntimeConfig", () => {
       configPath,
       JSON.stringify({
         server: { port: 3030 },
-        schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
+        collectionSchedule: { enabled: true, intervalMinutes: 10 },
+        mailSchedule: { enabled: true, dailyTime: "10:00", timezone: "Asia/Shanghai" },
+        manualActions: { collectEnabled: true, sendLatestEmailEnabled: true },
         report: { topN: 10, dataDir: "./data/reports", allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
-        manualRun: { enabled: true }
+        database: { file: "./data/hot-now.sqlite" }
       })
     );
 
@@ -85,10 +100,11 @@ describe("loadRuntimeConfig", () => {
       configPath,
       JSON.stringify({
         server: { port: 3030 },
-        schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
+        collectionSchedule: { enabled: true, intervalMinutes: 10 },
+        mailSchedule: { enabled: true, dailyTime: "10:00", timezone: "Asia/Shanghai" },
+        manualActions: { collectEnabled: true, sendLatestEmailEnabled: true },
         report: { topN: 10, dataDir: path.join(tempDir, "reports"), allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
-        manualRun: { enabled: true },
         database: { file: "./data/hot-now.sqlite" }
       })
     );
@@ -104,6 +120,19 @@ describe("loadRuntimeConfig", () => {
     expect(config.smtp.user).toBe("sender@qq.com");
     expect(config.report.dataDir).toContain("reports");
     expect(config.database.file).toBe(path.resolve(tempDir, "data/hot-now.sqlite"));
+    expect(config.collectionSchedule).toEqual({
+      enabled: true,
+      intervalMinutes: 10
+    });
+    expect(config.mailSchedule).toEqual({
+      enabled: true,
+      dailyTime: "10:00",
+      timezone: "Asia/Shanghai"
+    });
+    expect(config.manualActions).toEqual({
+      collectEnabled: true,
+      sendLatestEmailEnabled: true
+    });
     expect(config.auth).toEqual({
       username: "admin",
       password: "super-secret",
@@ -119,10 +148,11 @@ describe("loadRuntimeConfig", () => {
       configPath,
       JSON.stringify({
         server: { port: 3030 },
-        schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
+        collectionSchedule: { enabled: true, intervalMinutes: 10 },
+        mailSchedule: { enabled: true, dailyTime: "10:00", timezone: "Asia/Shanghai" },
+        manualActions: { collectEnabled: true, sendLatestEmailEnabled: true },
         report: { topN: 10, dataDir: "./data/reports", allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
-        manualRun: { enabled: true },
         database: { file: "./data/hot-now.sqlite" }
       })
     );
@@ -146,10 +176,11 @@ describe("loadRuntimeConfig", () => {
       configPath,
       JSON.stringify({
         server: { port: 3030 },
-        schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
+        collectionSchedule: { enabled: true, intervalMinutes: 10 },
+        mailSchedule: { enabled: true, dailyTime: "10:00", timezone: "Asia/Shanghai" },
+        manualActions: { collectEnabled: true, sendLatestEmailEnabled: true },
         report: { topN: 10, dataDir: "./data/reports", allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
-        manualRun: { enabled: true },
         database: { file: "./data/hot-now.sqlite" }
       })
     );
@@ -173,10 +204,11 @@ describe("loadRuntimeConfig", () => {
       configPath,
       JSON.stringify({
         server: { port: 3030 },
-        schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
+        collectionSchedule: { enabled: true, intervalMinutes: 10 },
+        mailSchedule: { enabled: true, dailyTime: "10:00", timezone: "Asia/Shanghai" },
+        manualActions: { collectEnabled: true, sendLatestEmailEnabled: true },
         report: { topN: 10, dataDir: "./data/reports", allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
-        manualRun: { enabled: true },
         database: { file: "./data/hot-now.sqlite" }
       })
     );
@@ -200,10 +232,11 @@ describe("loadRuntimeConfig", () => {
       configPath,
       JSON.stringify({
         server: { port: 3030 },
-        schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
+        collectionSchedule: { enabled: true, intervalMinutes: 10 },
+        mailSchedule: { enabled: true, dailyTime: "10:00", timezone: "Asia/Shanghai" },
+        manualActions: { collectEnabled: true, sendLatestEmailEnabled: true },
         report: { topN: 10, allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
-        manualRun: { enabled: true },
         database: { file: "./data/hot-now.sqlite" }
       })
     );
@@ -221,10 +254,11 @@ describe("loadRuntimeConfig", () => {
       configPath,
       JSON.stringify({
         server: { port: 70000 },
-        schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
+        collectionSchedule: { enabled: true, intervalMinutes: 10 },
+        mailSchedule: { enabled: true, dailyTime: "10:00", timezone: "Asia/Shanghai" },
+        manualActions: { collectEnabled: true, sendLatestEmailEnabled: true },
         report: { topN: 10, dataDir: "../data/reports", allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
-        manualRun: { enabled: true },
         database: { file: "./data/hot-now.sqlite" }
       })
     );
@@ -242,16 +276,105 @@ describe("loadRuntimeConfig", () => {
       configPath,
       JSON.stringify({
         server: { port: 3030 },
-        schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
+        collectionSchedule: { enabled: true, intervalMinutes: 10 },
+        mailSchedule: { enabled: true, dailyTime: "10:00", timezone: "Asia/Shanghai" },
+        manualActions: { collectEnabled: true, sendLatestEmailEnabled: true },
         report: { topN: 0, dataDir: "../data/reports", allowDegraded: true },
         source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
-        manualRun: { enabled: true },
         database: { file: "./data/hot-now.sqlite" }
       })
     );
 
     await expect(loadRuntimeConfig({ configPath, env: baseEnv })).rejects.toThrow(
       "Invalid report.topN: 0"
+    );
+  });
+
+  it("throws when collectionSchedule.intervalMinutes is 60", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-config-"));
+    const configPath = path.join(tempDir, "hot-now.config.json");
+
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        server: { port: 3030 },
+        collectionSchedule: { enabled: true, intervalMinutes: 60 },
+        mailSchedule: { enabled: true, dailyTime: "10:00", timezone: "Asia/Shanghai" },
+        manualActions: { collectEnabled: true, sendLatestEmailEnabled: true },
+        report: { topN: 10, dataDir: "../data/reports", allowDegraded: true },
+        source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
+        database: { file: "./data/hot-now.sqlite" }
+      })
+    );
+
+    await expect(loadRuntimeConfig({ configPath, env: baseEnv })).rejects.toThrow(
+      "Invalid collectionSchedule.intervalMinutes: 60"
+    );
+  });
+
+  it("throws when collectionSchedule.intervalMinutes is 7", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-config-"));
+    const configPath = path.join(tempDir, "hot-now.config.json");
+
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        server: { port: 3030 },
+        collectionSchedule: { enabled: true, intervalMinutes: 7 },
+        mailSchedule: { enabled: true, dailyTime: "10:00", timezone: "Asia/Shanghai" },
+        manualActions: { collectEnabled: true, sendLatestEmailEnabled: true },
+        report: { topN: 10, dataDir: "../data/reports", allowDegraded: true },
+        source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
+        database: { file: "./data/hot-now.sqlite" }
+      })
+    );
+
+    await expect(loadRuntimeConfig({ configPath, env: baseEnv })).rejects.toThrow(
+      "Invalid collectionSchedule.intervalMinutes: 7"
+    );
+  });
+
+  it("throws when collectionSchedule.intervalMinutes is 59", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-config-"));
+    const configPath = path.join(tempDir, "hot-now.config.json");
+
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        server: { port: 3030 },
+        collectionSchedule: { enabled: true, intervalMinutes: 59 },
+        mailSchedule: { enabled: true, dailyTime: "10:00", timezone: "Asia/Shanghai" },
+        manualActions: { collectEnabled: true, sendLatestEmailEnabled: true },
+        report: { topN: 10, dataDir: "../data/reports", allowDegraded: true },
+        source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
+        database: { file: "./data/hot-now.sqlite" }
+      })
+    );
+
+    await expect(loadRuntimeConfig({ configPath, env: baseEnv })).rejects.toThrow(
+      "Invalid collectionSchedule.intervalMinutes: 59"
+    );
+  });
+
+  it("throws when mailSchedule.dailyTime is invalid", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-config-"));
+    const configPath = path.join(tempDir, "hot-now.config.json");
+
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        server: { port: 3030 },
+        collectionSchedule: { enabled: true, intervalMinutes: 10 },
+        mailSchedule: { enabled: true, dailyTime: "25:61", timezone: "Asia/Shanghai" },
+        manualActions: { collectEnabled: true, sendLatestEmailEnabled: true },
+        report: { topN: 10, dataDir: "../data/reports", allowDegraded: true },
+        source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
+        database: { file: "./data/hot-now.sqlite" }
+      })
+    );
+
+    await expect(loadRuntimeConfig({ configPath, env: baseEnv })).rejects.toThrow(
+      "Invalid mailSchedule.dailyTime: 25:61"
     );
   });
 });

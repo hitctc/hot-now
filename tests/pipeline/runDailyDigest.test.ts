@@ -6,7 +6,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { openDatabase } from "../../src/core/db/openDatabase.js";
 import { runDailyDigest } from "../../src/core/pipeline/runDailyDigest.js";
 import { createRunLock } from "../../src/core/runtime/runLock.js";
-import { startScheduler } from "../../src/core/scheduler/startScheduler.js";
+import {
+  startCollectionScheduler,
+  startMailScheduler
+} from "../../src/core/scheduler/startScheduler.js";
 import { runMigrations } from "../../src/core/db/runMigrations.js";
 import { seedInitialData } from "../../src/core/db/seedInitialData.js";
 import type { RuntimeConfig } from "../../src/core/types/appConfig.js";
@@ -24,10 +27,11 @@ afterEach(() => {
 function makeConfig(rootDir: string): RuntimeConfig {
   return {
     server: { port: 3030 },
-    schedule: { enabled: true, dailyTime: "08:00", timezone: "Asia/Shanghai" },
+    collectionSchedule: { enabled: true, intervalMinutes: 10 },
+    mailSchedule: { enabled: true, dailyTime: "10:00", timezone: "Asia/Shanghai" },
+    manualActions: { collectEnabled: true, sendLatestEmailEnabled: true },
     report: { topN: 10, dataDir: rootDir, allowDegraded: true },
     source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
-    manualRun: { enabled: true },
     database: { file: path.join(rootDir, "hot-now.sqlite") },
     smtp: {
       host: "smtp.qq.com",
@@ -62,12 +66,33 @@ describe("createRunLock", () => {
   });
 });
 
-describe("startScheduler", () => {
-  it("returns null when scheduling is disabled", () => {
+describe("startCollectionScheduler", () => {
+  it("returns null when collection scheduling is disabled", () => {
     const config = makeConfig("/tmp");
-    config.schedule.enabled = false;
+    config.collectionSchedule.enabled = false;
 
-    expect(startScheduler(config, vi.fn())).toBeNull();
+    expect(startCollectionScheduler(config, vi.fn())).toBeNull();
+  });
+
+  it("registers a cron job with the configured interval", () => {
+    const scheduleMock = vi.mocked(cron.schedule);
+    const task = { stop: vi.fn() } as never;
+    scheduleMock.mockReturnValue(task);
+
+    const config = makeConfig("/tmp");
+    const result = startCollectionScheduler(config, vi.fn());
+
+    expect(scheduleMock).toHaveBeenCalledWith("*/10 * * * *", expect.any(Function));
+    expect(result).toBe(task);
+  });
+});
+
+describe("startMailScheduler", () => {
+  it("returns null when mail scheduling is disabled", () => {
+    const config = makeConfig("/tmp");
+    config.mailSchedule.enabled = false;
+
+    expect(startMailScheduler(config, vi.fn())).toBeNull();
   });
 
   it("registers a cron job with the configured time and timezone", () => {
@@ -76,9 +101,9 @@ describe("startScheduler", () => {
     scheduleMock.mockReturnValue(task);
 
     const config = makeConfig("/tmp");
-    const result = startScheduler(config, vi.fn());
+    const result = startMailScheduler(config, vi.fn());
 
-    expect(scheduleMock).toHaveBeenCalledWith("0 8 * * *", expect.any(Function), {
+    expect(scheduleMock).toHaveBeenCalledWith("0 10 * * *", expect.any(Function), {
       timezone: "Asia/Shanghai"
     });
     expect(result).toBe(task);

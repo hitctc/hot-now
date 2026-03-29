@@ -81,6 +81,32 @@ describe("parseArticleFeed", () => {
     ]);
   });
 
+  it("normalizes domestic article feeds with the configured source metadata", async () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>IT之家</title><link>https://www.ithome.com/</link><item><title>国内 AI 芯片公司发布新产品</title><link>https://www.ithome.com/0/999/999.htm</link><guid isPermaLink="false">ithome-ai-chip</guid><pubDate>Sun, 29 Mar 2026 02:30:00 GMT</pubDate><description><![CDATA[<p>新产品面向边缘推理场景。</p>]]></description></item></channel></rss>`;
+
+    const issue = await parseArticleFeed(xml, BUILTIN_SOURCES.ithome);
+
+    expect(issue).toEqual({
+      date: "2026-03-29",
+      issueUrl: "https://www.ithome.com/",
+      sourceKind: "ithome",
+      sourceType: "media",
+      sourcePriority: 78,
+      items: [
+        {
+          rank: 1,
+          category: "科技热点",
+          title: "国内 AI 芯片公司发布新产品",
+          sourceUrl: "https://www.ithome.com/0/999/999.htm",
+          sourceName: "IT之家",
+          externalId: "ithome-ai-chip",
+          publishedAt: "2026-03-29T02:30:00.000Z",
+          summary: "新产品面向边缘推理场景。"
+        }
+      ]
+    });
+  });
+
   it("derives the issue date from the freshest valid published item", async () => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Example</title><link>https://example.com/feed</link><item><title>Older but first</title><link>https://example.com/post-1</link><pubDate>Wed, 26 Mar 2026 08:00:00 GMT</pubDate></item><item><title>Newest but second</title><link>https://example.com/post-2</link><pubDate>Fri, 28 Mar 2026 05:30:00 GMT</pubDate></item></channel></rss>`;
 
@@ -113,8 +139,12 @@ describe("parseArticleFeed", () => {
 describe("sourceAdapters", () => {
   it("registers all built-in source kinds", () => {
     expect(Object.keys(sourceAdapters).sort()).toEqual([
+      "aifanr",
       "google_ai",
+      "ithome",
       "juya",
+      "kr36",
+      "kr36_newsflash",
       "openai",
       "techcrunch_ai"
     ]);

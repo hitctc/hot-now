@@ -46,8 +46,12 @@ describe("seedInitialData", () => {
       .all() as Array<{ kind: string; is_enabled: number }>;
 
     expect(enabledRows).toEqual([
+      { kind: "aifanr", is_enabled: 1 },
       { kind: "google_ai", is_enabled: 1 },
+      { kind: "ithome", is_enabled: 1 },
       { kind: "juya", is_enabled: 1 },
+      { kind: "kr36", is_enabled: 1 },
+      { kind: "kr36_newsflash", is_enabled: 1 },
       { kind: "openai", is_enabled: 1 },
       { kind: "techcrunch_ai", is_enabled: 1 }
     ]);

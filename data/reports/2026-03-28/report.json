@@ -1,0 +1,374 @@
+{
+  "meta": {
+    "date": "2026-03-28",
+    "generatedAt": "2026-03-29T00:00:08.661Z",
+    "trigger": "scheduled",
+    "issueUrl": "https://techcrunch.com/category/artificial-intelligence/",
+    "issueUrls": [
+      "https://blog.google/innovation-and-ai/technology/ai/",
+      "https://techcrunch.com/category/artificial-intelligence/",
+      "https://imjuya.github.io/juya-ai-daily/issue-42/"
+    ],
+    "sourceKinds": [
+      "google_ai",
+      "techcrunch_ai",
+      "juya"
+    ],
+    "topicCount": 10,
+    "degraded": true,
+    "mailStatus": "sent",
+    "sourceFailureCount": 0,
+    "failedSourceKinds": []
+  },
+  "topics": [
+    {
+      "rank": 1,
+      "title": "Bluesky leans into AI with Attie, an app for building custom feeds",
+      "category": "热门文章",
+      "whyItMatters": "该主题当前聚合了 8 条候选信息，且最高源内排序为 #1。",
+      "summary": "The team from Bluesky has built another app — and this time, it’s not a social network, but an AI assistant that allows you to design your o",
+      "keywords": [
+        "Bluesky",
+        "leans",
+        "into",
+        "AI",
+        "with"
+      ],
+      "relatedCount": 8,
+      "relatedItems": [
+        {
+          "sourceRank": 1,
+          "sourceCategory": "热门文章",
+          "sourceTitle": "Bluesky leans into AI with Attie, an app for building custom feeds",
+          "sourceUrl": "https://techcrunch.com/2026/03/28/bluesky-leans-into-ai-with-attie-an-app-for-building-custom-feeds/",
+          "articleOk": true,
+          "articleTitle": "Bluesky leans into AI with Attie, an app for building custom feeds",
+          "articleSummary": "The team from Bluesky has built another app — and this time, it’s not a social network, but an AI assistant that allows you to design your own algorithm, create custom feeds, and, one day, vibe-code your own app. \n\nAt the Atmosphere confere"
+        },
+        {
+          "sourceRank": 2,
+          "sourceCategory": "热门文章",
+          "sourceTitle": "Stanford study outlines dangers of asking AI chatbots for personal advice",
+          "sourceUrl": "https://techcrunch.com/2026/03/28/stanford-study-outlines-dangers-of-asking-ai-chatbots-for-personal-advice/",
+          "articleOk": true,
+          "articleTitle": "Stanford study outlines dangers of asking AI chatbots for personal advice",
+          "articleSummary": "While there’s been plenty of debate about the tendency of AI chatbots to flatter users and confirm their existing beliefs — also known as AI sycophancy — a new study by Stanford computer scientists attempts to measure how harmful that tende"
+        },
+        {
+          "sourceRank": 4,
+          "sourceCategory": "热门文章",
+          "sourceTitle": "Anthropic’s Claude popularity with paying consumers is skyrocketing",
+          "sourceUrl": "https://techcrunch.com/2026/03/28/anthropics-claude-popularity-with-paying-consumers-is-skyrocketing/",
+          "articleOk": true,
+          "articleTitle": "Anthropic’s Claude popularity with paying consumers is skyrocketing",
+          "articleSummary": "Whatever the final outcome for Anthropic from its feud with the Department of Defense, the attention it has generated — coupled with the company’s funny Super Bowl ads taking aim at OpenAI and the surging popularity of Claude Code — has mad"
+        },
+        {
+          "sourceRank": 11,
+          "sourceCategory": "热门文章",
+          "sourceTitle": "You can now transfer your chats and personal information from other chatbots directly into Gemini",
+          "sourceUrl": "https://techcrunch.com/2026/03/26/you-can-now-transfer-your-chats-and-personal-information-from-other-chatbots-directly-into-gemini/",
+          "articleOk": true,
+          "articleTitle": "You can now transfer your chats and personal information from other chatbots directly into Gemini",
+          "articleSummary": "When it comes to AI chatbots, there’s currently a war on for consumer attention. All the big chatbot providers are looking to increase their user count and, in a minor coup for itself, Google just made it significantly easier for users of t"
+        },
+        {
+          "sourceRank": 18,
+          "sourceCategory": "热门文章",
+          "sourceTitle": "A ‘pound of flesh’ from data centers: one senator’s answer to AI job losses",
+          "sourceUrl": "https://techcrunch.com/2026/03/26/a-pound-of-flesh-from-data-centers-one-senators-answer-to-ai-job-losses/",
+          "articleOk": true,
+          "articleTitle": "A ‘pound of flesh’ from data centers: one senator’s answer to AI job losses",
+          "articleSummary": "The signs that AI could lead to mass job displacement are already piling up: Entry-level job postings in the U.S. have sunk 35% since 2023, mass layoffs have swept across Big Tech, and even AI leaders are warning about what’s coming. \n\nBack"
+        },
+        {
+          "sourceRank": 4,
+          "sourceCategory": "开发生态",
+          "sourceTitle": "Claude Code 上线 Windows PowerShell 原生运行支持",
+          "sourceUrl": "https://code.claude.com/docs/en/tools-reference#powershell-tool",
+          "articleOk": true,
+          "articleTitle": "Tools reference - Claude Code Docs",
+          "articleSummary": "Claude Code has access to a set of tools that help it understand and modify your codebase. The tool names below are the exact strings you use in permission rules, subagent tool lists, and hook matchers.ToolDescriptionPermission RequiredAgen"
+        },
+        {
+          "sourceRank": 5,
+          "sourceCategory": "开发生态",
+          "sourceTitle": "OpenRouter 限制多地用户调用部分模型，称遵上游要求",
+          "sourceUrl": "https://www.landiannews.com/archives/112371.html",
+          "articleOk": true,
+          "articleTitle": "慎重充值！OpenRouter阻止中/港/新用户使用部分模型 官方称是合规要求 - 蓝点网",
+          "articleSummary": "#人工智能 API 平台 OpenRouter 开始阻止中 / 港 / 新用户使用部分模型，使用这些地区发行的银行卡进行支付有更高概率触发封禁。值得注意的是 OpenRouter 并非封号，而是禁止用户调用特定模型，该平台解释称必须根据上游模型提供商要求执行封禁政策，用户调用时会看到 403 Author Banned 等提示。查看全文：https://ourl.co/112371知名模型中转站 OpenRouter 近期被不少用户吐槽封禁模型访问，需要强调的是 OpenRo"
+        },
+        {
+          "sourceRank": 12,
+          "sourceCategory": "前瞻与传闻",
+          "sourceTitle": "Anthropic 泄露未发布模型 Claude Mythos",
+          "sourceUrl": "https://fortune.com/2026/03/26/anthropic-says-testing-mythos-powerful-new-ai-model-after-data-leak-reveals-its-existence-step-change-in-capabilities/",
+          "articleOk": true,
+          "articleTitle": "Exclusive: Anthropic is testing ‘Mythos,’ its ‘most powerful AI model ever developed’ | Fortune",
+          "articleSummary": "AI company Anthropic is developing, and has begun testing with early access customers, a new AI model more capable than any it has released previously, the company said, following a data leak that revealed the model’s existence. \n\n\n\nAn Anth"
+        }
+      ]
+    },
+    {
+      "rank": 2,
+      "title": "Build with Lyria 3, our newest music generation model",
+      "category": "最新 AI 消息",
+      "whyItMatters": "该主题当前聚合了 3 条候选信息，且最高源内排序为 #5。",
+      "summary": "Mar 25, 2026 Our newest music generation model is now available to developers in public preview. Alisa Fortin Product Manager, Google DeepMi",
+      "keywords": [
+        "Build",
+        "with",
+        "Lyria",
+        "our",
+        "newest"
+      ],
+      "relatedCount": 3,
+      "relatedItems": [
+        {
+          "sourceRank": 5,
+          "sourceCategory": "最新 AI 消息",
+          "sourceTitle": "Build with Lyria 3, our newest music generation model",
+          "sourceUrl": "https://blog.google/innovation-and-ai/technology/developers-tools/lyria-3-developers/",
+          "articleOk": true,
+          "articleTitle": "Build with Lyria 3, our newest music generation model",
+          "articleSummary": "Mar 25, 2026\n          \n          \n            \n          \n        \n      \n        \n          Our newest music generation model is now available to developers in public preview.\n        \n      \n    \n  \n  \n    \n      \n        \n\n\n  \n  \n    \n "
+        },
+        {
+          "sourceRank": 6,
+          "sourceCategory": "最新 AI 消息",
+          "sourceTitle": "Lyria 3 Pro: Create longer tracks in more Google products",
+          "sourceUrl": "https://blog.google/innovation-and-ai/technology/ai/lyria-3-pro/",
+          "articleOk": true,
+          "articleTitle": "Lyria 3 Pro: Create longer tracks in more Google products",
+          "articleSummary": "Your browser does not support the audio element.\n  \n        \n          Listen to article\n          \n            This content is generated by Google AI. Generative AI is experimental\n            \n  \n\n\n          \n        [[duration]] minutes\n"
+        },
+        {
+          "sourceRank": 13,
+          "sourceCategory": "最新 AI 消息",
+          "sourceTitle": "The latest AI news we announced in February",
+          "sourceUrl": "https://blog.google/innovation-and-ai/products/google-ai-updates-february-2026/",
+          "articleOk": true,
+          "articleTitle": "The latest AI news we announced in February",
+          "articleSummary": "Here’s a recap of our biggest AI updates from February, including highlights from the AI Impact Summit in India, the release of Gemini 3.1 Pro and Nano Banana 2.\n        \n      \n    \n  \n  \n    \n      \n  \n    \n        \n            \n\n\n    \n\n "
+        }
+      ]
+    },
+    {
+      "rank": 3,
+      "title": "Gemini 3.1 Flash Live: Making audio AI more natural and reliable",
+      "category": "最新 AI 消息",
+      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #3。",
+      "summary": "Mar 26, 2026 Our latest voice model has improved precision and lower latency to make voice interactions more fluid, natural and precise. Val",
+      "keywords": [
+        "Gemini",
+        "Flash",
+        "Live",
+        "Making",
+        "audio"
+      ],
+      "relatedCount": 2,
+      "relatedItems": [
+        {
+          "sourceRank": 3,
+          "sourceCategory": "最新 AI 消息",
+          "sourceTitle": "Gemini 3.1 Flash Live: Making audio AI more natural and reliable",
+          "sourceUrl": "https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-3-1-flash-live/",
+          "articleOk": true,
+          "articleTitle": "Gemini 3.1 Flash Live: Making audio AI more natural and reliable",
+          "articleSummary": "Mar 26, 2026\n          \n          \n            \n          \n        \n      \n        \n          Our latest voice model has improved precision and lower latency to make voice interactions more fluid, natural and precise.\n        \n      \n    \n "
+        },
+        {
+          "sourceRank": 16,
+          "sourceCategory": "最新 AI 消息",
+          "sourceTitle": "Gemini 3.1 Flash-Lite: Built for intelligence at scale",
+          "sourceUrl": "https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-3-1-flash-lite/",
+          "articleOk": true,
+          "articleTitle": "Gemini 3.1 Flash-Lite: Built for intelligence at scale",
+          "articleSummary": "Mar 03, 2026\n          \n          \n            \n          \n        \n      \n        \n          Get best-in-class intelligence for your highest-volume workloads.\n        \n      \n    \n  \n  \n    \n  The Gemini Team\n  \n  \n\n    \n      \n        \n\n\n"
+        }
+      ]
+    },
+    {
+      "rank": 4,
+      "title": "智谱向 GLM Coding Plan 用户开放 GLM-5.1 模型使用",
+      "category": "要闻",
+      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #1。",
+      "summary": "环境异常 当前环境异常，完成验证后即可继续访问。 去验证",
+      "keywords": [
+        "智谱",
+        "GLM",
+        "Coding",
+        "Plan",
+        "用户"
+      ],
+      "relatedCount": 1,
+      "relatedItems": [
+        {
+          "sourceRank": 1,
+          "sourceCategory": "要闻",
+          "sourceTitle": "智谱向 GLM Coding Plan 用户开放 GLM-5.1 模型使用",
+          "sourceUrl": "https://mp.weixin.qq.com/s/5g5-cJSuQumzZDVgiCaTuQ",
+          "articleOk": true,
+          "articleTitle": "",
+          "articleSummary": "环境异常\n        当前环境异常，完成验证后即可继续访问。\n    \n    \n      \n        去验证"
+        }
+      ]
+    },
+    {
+      "rank": 5,
+      "title": "KwaiKAT 发布 KAT-Coder-Pro V2 模型",
+      "category": "模型发布",
+      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #2。",
+      "summary": "环境异常 当前环境异常，完成验证后即可继续访问。 去验证",
+      "keywords": [
+        "KwaiKAT",
+        "发布",
+        "KAT",
+        "Coder",
+        "Pro"
+      ],
+      "relatedCount": 1,
+      "relatedItems": [
+        {
+          "sourceRank": 2,
+          "sourceCategory": "模型发布",
+          "sourceTitle": "KwaiKAT 发布 KAT-Coder-Pro V2 模型",
+          "sourceUrl": "https://mp.weixin.qq.com/s/5JpX2UxW-SKpyPR4yWOVEw",
+          "articleOk": true,
+          "articleTitle": "",
+          "articleSummary": "环境异常\n        当前环境异常，完成验证后即可继续访问。\n    \n    \n      \n        去验证"
+        }
+      ]
+    },
+    {
+      "rank": 6,
+      "title": "Meta 发布 SAM 3.1，支持单次追踪 16 个目标",
+      "category": "模型发布",
+      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #3。",
+      "summary": "SAM 3.1 SAM 3 (Segment Anything with Concepts) is a unified foundation model from Meta for promptable segmentation in images and videos. It ",
+      "keywords": [
+        "Meta",
+        "发布",
+        "SAM",
+        "支持",
+        "单次"
+      ],
+      "relatedCount": 1,
+      "relatedItems": [
+        {
+          "sourceRank": 3,
+          "sourceCategory": "模型发布",
+          "sourceTitle": "Meta 发布 SAM 3.1，支持单次追踪 16 个目标",
+          "sourceUrl": "https://go.meta.me/8dd321",
+          "articleOk": true,
+          "articleTitle": "facebook/sam3.1 · Hugging Face",
+          "articleSummary": "SAM 3.1\n\t\n\nSAM 3 (Segment Anything with Concepts) is a unified foundation model from Meta for promptable segmentation in images and videos. It detects, segments, and tracks objects using text or visual prompts such as points, boxes, and mas"
+        }
+      ]
+    },
+    {
+      "rank": 7,
+      "title": "OpenAI 重置 Codex 限额",
+      "category": "开发生态",
+      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #6。",
+      "summary": "Something went wrong, but don’t fret — let’s give it another shot. Some privacy related extensions may cause issues on x.com. Please disable",
+      "keywords": [
+        "OpenAI",
+        "重置",
+        "Codex",
+        "限额"
+      ],
+      "relatedCount": 1,
+      "relatedItems": [
+        {
+          "sourceRank": 6,
+          "sourceCategory": "开发生态",
+          "sourceTitle": "OpenAI 重置 Codex 限额",
+          "sourceUrl": "https://x.com/OpenAIDevs/status/2037354021787439197",
+          "articleOk": true,
+          "articleTitle": "",
+          "articleSummary": "Something went wrong, but don’t fret — let’s give it another shot. Some privacy related extensions may cause issues on x.com. Please disable them and try again."
+        }
+      ]
+    },
+    {
+      "rank": 8,
+      "title": "Watch James Manyika talk AI and creativity with LL COOL J.",
+      "category": "最新 AI 消息",
+      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #1。",
+      "summary": "In the latest episode of our Dialogues on Technology and Society series, legendary artist LL COOL J sits down with James Manyika, Google's S",
+      "keywords": [
+        "Watch",
+        "James",
+        "Manyika",
+        "talk",
+        "AI"
+      ],
+      "relatedCount": 1,
+      "relatedItems": [
+        {
+          "sourceRank": 1,
+          "sourceCategory": "最新 AI 消息",
+          "sourceTitle": "Watch James Manyika talk AI and creativity with LL COOL J.",
+          "sourceUrl": "https://blog.google/innovation-and-ai/technology/ai/ll-cool-j-dialogues/",
+          "articleOk": true,
+          "articleTitle": "Watch James Manyika talk AI and creativity with LL COOL J.",
+          "articleSummary": "In the latest episode of our Dialogues on Technology and Society series, legendary artist LL COOL J sits down with James Manyika, Google's Senior Vice President of Research, Labs, Technology & Society. They have a wide-ranging conversation "
+        }
+      ]
+    },
+    {
+      "rank": 9,
+      "title": "Transform your headphones into a live personal translator on iOS.",
+      "category": "最新 AI 消息",
+      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #2。",
+      "summary": "Google Translate’s Live translate with headphones is officially arriving on iOS! And we're expanding the capability for both iOS and Android",
+      "keywords": [
+        "Transform",
+        "your",
+        "headphones",
+        "into",
+        "live"
+      ],
+      "relatedCount": 1,
+      "relatedItems": [
+        {
+          "sourceRank": 2,
+          "sourceCategory": "最新 AI 消息",
+          "sourceTitle": "Transform your headphones into a live personal translator on iOS.",
+          "sourceUrl": "https://blog.google/products-and-platforms/products/translate/live-translate-with-headphones/",
+          "articleOk": true,
+          "articleTitle": "Transform your headphones into a live personal translator on iOS.",
+          "articleSummary": "Google Translate’s Live translate with headphones is officially arriving on iOS! And we're expanding the capability for both iOS and Android users to even more countries, including France, Germany, Italy, Japan, Spain, Thailand, and the U.K"
+        }
+      ]
+    },
+    {
+      "rank": 10,
+      "title": "Elon Musk’s last co-founder reportedly leaves xAI",
+      "category": "热门文章",
+      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #3。",
+      "summary": "In Brief Posted: 9:11 AM PDT · March 28, 2026 Image Credits:Krisztian Bocsi/Bloomberg / Getty Images Earlier this month, it looked like all ",
+      "keywords": [
+        "Elon",
+        "Musk",
+        "last",
+        "co",
+        "founder"
+      ],
+      "relatedCount": 1,
+      "relatedItems": [
+        {
+          "sourceRank": 3,
+          "sourceCategory": "热门文章",
+          "sourceTitle": "Elon Musk’s last co-founder reportedly leaves xAI",
+          "sourceUrl": "https://techcrunch.com/2026/03/28/elon-musks-last-co-founder-reportedly-leaves-xai/",
+          "articleOk": true,
+          "articleTitle": "Elon Musk’s last co-founder reportedly leaves xAI",
+          "articleSummary": "In Brief\nPosted:\n\n\n9:11 AM PDT · March 28, 2026\n\n\n\nImage Credits:Krisztian Bocsi/Bloomberg / Getty Images\n\n\n\n\t\t\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\n\t\t\n\t\n\n\n\n\n\nEarlier this month, it looked like all but two of Elon Musk’s 11 co-founders at hi"
+        }
+      ]
+    }
+  ]
+}

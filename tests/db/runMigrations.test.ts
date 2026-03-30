@@ -59,7 +59,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(1);
+    expect(schemaVersion).toBe(2);
 
     const appliedMigrations = db
       .prepare(
@@ -71,7 +71,20 @@ describe("runMigrations", () => {
       )
       .all() as Array<{ version: number; name: string }>;
 
-    expect(appliedMigrations).toEqual([{ version: 1, name: "001_unified_site_baseline" }]);
+    expect(appliedMigrations).toEqual([
+      { version: 1, name: "001_unified_site_baseline" },
+      { version: 2, name: "002_digest_report_mail_attempts" }
+    ]);
+
+    const digestReportColumns = db
+      .prepare(
+        `
+          PRAGMA table_info(digest_reports)
+        `
+      )
+      .all() as Array<{ name: string }>;
+
+    expect(digestReportColumns.map((column) => column.name)).toContain("last_email_attempted_at");
 
     const sourceRows = db
       .prepare(

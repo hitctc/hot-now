@@ -31,10 +31,11 @@ describe("system routes", () => {
     expect(response.body).toContain('class="sidebar-page-summary"');
     expect(response.body).toContain("这里会配置各内容菜单的筛选规则与展示偏好。");
     expect(response.body).not.toContain('class="shell-header"');
-    expect(response.body).toContain('class="system-stack system-stack--control"');
+    expect(response.body).toContain('class="system-section system-section--workbench"');
+    expect(response.body).toContain('class="system-stack system-stack--control system-stack--workbench"');
     expect(response.body).toContain("热点策略");
     expect(response.body).toMatch(/class="[^"]*\bsystem-card\b[^"]*"/);
-    expect(response.body).toContain('class="system-card system-card--control system-card--view-rule"');
+    expect(response.body).toContain('class="system-card system-card--control system-card--view-rule system-card--panel system-card--form-panel"');
     expect(response.body).toContain('class="action-status system-status"');
     expect(response.body).toContain("hot");
     expect(response.body).toContain('name="limit"');
@@ -67,6 +68,10 @@ describe("system routes", () => {
           lastCollectionStatus: null
         }
       ]),
+      getSourcesOperationSummary: vi.fn().mockResolvedValue({
+        lastCollectionRunAt: "2026-03-29T15:12:00.000Z",
+        lastSendLatestEmailAt: "2026-03-29T15:18:00.000Z"
+      }),
       triggerManualRun: vi.fn().mockResolvedValue({ accepted: true }),
       triggerManualSendLatestEmail: vi.fn().mockResolvedValue({ accepted: true, action: "send-latest-email" }),
       isRunning: () => false
@@ -77,19 +82,22 @@ describe("system routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("数据迭代收集");
     expect(response.body).toContain('class="content-intro content-intro--system"');
-    expect(response.body).toContain('data-system-section="operations"');
-    expect(response.body).toContain('data-system-section="sources"');
+    expect(response.body).toContain('class="system-section system-section--operations system-section--workbench" data-system-section="operations"');
+    expect(response.body).toContain('class="system-section system-section--sources system-section--inventory" data-system-section="sources"');
     expect(response.body).toContain("即时操作");
     expect(response.body).toContain("数据源状态");
     expect(response.body).toContain("先执行动作，再查看结果");
     expect(response.body).toContain("查看当前接入和启用情况");
-    expect(response.body).toContain('class="system-stack system-stack--control system-stack--operations"');
-    expect(response.body).toContain('class="system-stack system-stack--control system-stack--sources"');
+    expect(response.body).toContain('class="system-stack system-stack--control system-stack--operations system-stack--workbench"');
+    expect(response.body).toContain('class="system-stack system-stack--control system-stack--sources system-stack--inventory"');
     expect(response.body).toContain("手动执行采集");
     expect(response.body).toContain("手动发送最新报告");
-    expect(response.body).toContain('class="system-card system-card--control system-card--manual-collection system-card--operation system-card--operation-primary"');
-    expect(response.body).toContain('class="system-card system-card--control system-card--manual-send-latest-email system-card--operation system-card--operation-secondary"');
-    expect(response.body).toContain('class="system-card system-card--control system-card--source system-card--inventory"');
+    expect(response.body).toContain("最后执行时间");
+    expect(response.body).toContain("2026-03-29 23:12");
+    expect(response.body).toContain("2026-03-29 23:18");
+    expect(response.body).toContain('class="system-card system-card--control system-card--manual-collection system-card--operation system-card--operation-primary system-card--workbench"');
+    expect(response.body).toContain('class="system-card system-card--control system-card--manual-send-latest-email system-card--operation system-card--operation-secondary system-card--workbench"');
+    expect(response.body).toContain('class="system-card system-card--control system-card--source system-card--inventory system-card--panel"');
     expect(response.body).toContain('class="system-detail-list system-detail-list--source"');
     expect(response.body).toContain('class="system-card-actions system-card-actions--source"');
     expect(response.body).toContain('class="system-form system-form--source-action"');
@@ -123,6 +131,10 @@ describe("system routes", () => {
           lastCollectionStatus: "running"
         }
       ]),
+      getSourcesOperationSummary: vi.fn().mockResolvedValue({
+        lastCollectionRunAt: "2026-03-29T15:12:00.000Z",
+        lastSendLatestEmailAt: null
+      }),
       triggerManualRun: vi.fn().mockResolvedValue({ accepted: true }),
       triggerManualSendLatestEmail: vi.fn().mockResolvedValue({ accepted: true, action: "send-latest-email" }),
       isRunning: () => true
@@ -131,11 +143,13 @@ describe("system routes", () => {
     const response = await app.inject({ method: "GET", url: "/settings/sources" });
 
     expect(response.statusCode).toBe(200);
-    expect(response.body).toContain('data-system-section="operations"');
+    expect(response.body).toContain('class="system-section system-section--operations system-section--workbench" data-system-section="operations"');
     expect(response.body).toContain("采集中...");
-    expect(response.body).toContain('class="system-card system-card--control system-card--manual-collection system-card--operation system-card--operation-primary"');
-    expect(response.body).toContain('class="system-card system-card--control system-card--manual-send-latest-email system-card--operation system-card--operation-secondary"');
+    expect(response.body).toContain('class="system-card system-card--control system-card--manual-collection system-card--operation system-card--operation-primary system-card--workbench"');
+    expect(response.body).toContain('class="system-card system-card--control system-card--manual-send-latest-email system-card--operation system-card--operation-secondary system-card--workbench"');
     expect(response.body).toContain("当前已有任务执行中，请稍后再试。");
+    expect(response.body).toContain("2026-03-29 23:12");
+    expect(response.body).toContain("未记录");
     expect(response.body).toContain('data-role="manual-collection-button" disabled');
     expect(response.body).toContain('data-role="manual-send-latest-email-button" disabled');
   });
@@ -157,7 +171,8 @@ describe("system routes", () => {
     expect(response.body).toContain('class="content-intro content-intro--system"');
     expect(response.body).toContain('class="sidebar-page-summary"');
     expect(response.body).not.toContain('class="shell-header"');
-    expect(response.body).toContain('class="system-card system-card--control system-card--profile"');
+    expect(response.body).toContain('class="system-section system-section--workbench"');
+    expect(response.body).toContain('class="system-card system-card--control system-card--profile system-card--panel"');
     expect(response.body).toContain("系统管理员");
     expect(response.body).toContain("admin@example.com");
   });

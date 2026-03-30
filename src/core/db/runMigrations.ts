@@ -1,7 +1,8 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 1;
+const schemaVersion = 2;
 const baselineMigrationName = "001_unified_site_baseline";
+const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 
 const migrationStatements = [
   `
@@ -117,6 +118,7 @@ const migrationStatements = [
       report_json_path TEXT,
       report_html_path TEXT,
       mail_status TEXT,
+      last_email_attempted_at TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (collection_run_id) REFERENCES collection_runs(id) ON DELETE SET NULL
@@ -125,22 +127,41 @@ const migrationStatements = [
 ] as const;
 
 export function runMigrations(db: SqliteDatabase): void {
-  // Phase 1 only needs a predictable bootstrap path, so migrations stay as idempotent SQL
-  // statements plus one recorded baseline marker that later tasks can extend safely.
+  // Migrations stay idempotent because existing local SQLite files must be upgraded in place
+  // without forcing developers to rebuild data or drop historical reports.
   const migrate = db.transaction(() => {
     for (const statement of migrationStatements) {
       db.exec(statement);
     }
 
-    db.pragma(`user_version = ${schemaVersion}`);
     db.prepare(
       `
         INSERT INTO schema_migrations (version, name)
         VALUES (?, ?)
         ON CONFLICT(version) DO NOTHING
       `
-    ).run(schemaVersion, baselineMigrationName);
+    ).run(1, baselineMigrationName);
+
+    if (!hasColumn(db, "digest_reports", "last_email_attempted_at")) {
+      db.exec(`ALTER TABLE digest_reports ADD COLUMN last_email_attempted_at TEXT`);
+    }
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(schemaVersion, digestReportMailAttemptMigrationName);
+
+    db.pragma(`user_version = ${schemaVersion}`);
   });
 
   migrate();
+}
+
+function hasColumn(db: SqliteDatabase, tableName: string, columnName: string): boolean {
+  // PRAGMA table_info is the safest way to detect additive SQLite migrations without relying on exception flow.
+  const rows = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
+  return rows.some((row) => row.name === columnName);
 }

@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import { sessionCookieName } from "../../src/core/auth/session.js";
 import { createServer } from "../../src/server/createServer.js";
 
 function makeAppEnv() {
@@ -181,7 +182,28 @@ describe("createServer", () => {
     }
   });
 
-  it("redirects anonymous users to login when unified shell auth is enabled", async () => {
+  it("keeps content pages public when unified shell auth is enabled", async () => {
+    const app = createServer({
+      auth: {
+        requireLogin: true,
+        sessionSecret: "test-secret",
+        verifyLogin: vi.fn().mockResolvedValue(null)
+      },
+      listContentView: vi.fn().mockResolvedValue([]),
+      listRatingDimensions: vi.fn().mockResolvedValue([])
+    });
+
+    const response = await app.inject({ method: "GET", url: "/articles" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain("热门文章");
+    expect(response.body).toContain("当前为内容公开访问模式");
+    expect(response.body).toContain('href="/login"');
+    expect(response.body).not.toContain('class="nav-group nav-group--system"');
+    expect(response.body).not.toContain("/settings/view-rules");
+  });
+
+  it("redirects anonymous users to login for unified shell system pages when auth is enabled", async () => {
     const app = createServer({
       auth: {
         requireLogin: true,
@@ -190,7 +212,7 @@ describe("createServer", () => {
       }
     });
 
-    const response = await app.inject({ method: "GET", url: "/articles" });
+    const response = await app.inject({ method: "GET", url: "/settings/profile" });
 
     expect(response.statusCode).toBe(302);
     expect(response.headers.location).toBe("/login");
@@ -291,6 +313,52 @@ describe("createServer", () => {
     expect(response.statusCode).toBe(302);
     expect(response.headers.location).toBe("/login");
     expect(setCookie).toContain("Max-Age=0");
+  });
+
+  it("accepts the browser logout form content type and redirects the cleared session back to login", async () => {
+    const app = createServer({
+      auth: {
+        requireLogin: true,
+        sessionSecret: "test-secret",
+        verifyLogin: vi.fn().mockResolvedValue({
+          username: "admin",
+          displayName: "系统管理员",
+          role: "admin"
+        })
+      }
+    });
+
+    const loginResponse = await app.inject({
+      method: "POST",
+      url: "/login",
+      payload: { username: "admin", password: "admin" }
+    });
+    const loginCookie = pickCookieValue(loginResponse.headers["set-cookie"]);
+
+    const logoutResponse = await app.inject({
+      method: "POST",
+      url: "/logout",
+      headers: {
+        cookie: loginCookie ?? "",
+        "content-type": "text/plain;charset=UTF-8"
+      },
+      payload: ""
+    });
+    const clearedCookie = pickCookieValue(logoutResponse.headers["set-cookie"]);
+
+    const protectedResponse = await app.inject({
+      method: "GET",
+      url: "/settings/profile",
+      headers: {
+        cookie: clearedCookie ?? `${sessionCookieName}=`
+      }
+    });
+
+    expect(logoutResponse.statusCode).toBe(302);
+    expect(logoutResponse.headers.location).toBe("/login");
+    expect(clearedCookie).toBe(`${sessionCookieName}=`);
+    expect(protectedResponse.statusCode).toBe(302);
+    expect(protectedResponse.headers.location).toBe("/login");
   });
 
   it("redirects anonymous legacy page routes to login when auth is enabled", async () => {

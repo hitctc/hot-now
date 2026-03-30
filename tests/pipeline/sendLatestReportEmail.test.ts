@@ -33,11 +33,22 @@ describe("sendLatestReportEmail", () => {
     });
 
     const result = await sendLatestReportEmail(config, { db, sendDailyEmail });
+    const digestRow = db
+      .prepare(
+        `
+          SELECT mail_status, last_email_attempted_at
+          FROM digest_reports
+          WHERE report_date = ?
+        `
+      )
+      .get("2026-03-28") as { mail_status: string; last_email_attempted_at: string | null } | undefined;
 
     expect(result.reportDate).toBe("2026-03-28");
     expect(result.mailStatus).toBe("sent");
     expect(result.report.meta.date).toBe("2026-03-28");
     expect(result.report.meta.mailStatus).toBe("sent");
+    expect(digestRow?.mail_status).toBe("sent");
+    expect(digestRow?.last_email_attempted_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(sendDailyEmail).toHaveBeenCalledWith(config, expect.objectContaining({ meta: expect.objectContaining({ date: "2026-03-28" }) }));
 
     db.close();
@@ -53,9 +64,23 @@ describe("sendLatestReportEmail", () => {
     await writeReport(rootDir, makeReport("2026-03-29"));
 
     const result = await sendLatestReportEmail(config, { db, sendDailyEmail });
+    const digestRow = db
+      .prepare(
+        `
+          SELECT report_date, mail_status, last_email_attempted_at
+          FROM digest_reports
+          WHERE report_date = ?
+        `
+      )
+      .get("2026-03-29") as
+      | { report_date: string; mail_status: string; last_email_attempted_at: string | null }
+      | undefined;
 
     expect(result.reportDate).toBe("2026-03-29");
     expect(result.mailStatus).toBe("sent");
+    expect(digestRow?.report_date).toBe("2026-03-29");
+    expect(digestRow?.mail_status).toBe("sent");
+    expect(digestRow?.last_email_attempted_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(sendDailyEmail).toHaveBeenCalledWith(config, expect.objectContaining({ meta: expect.objectContaining({ date: "2026-03-29" }) }));
 
     db.close();
@@ -153,6 +178,18 @@ describe("sendLatestReportEmail", () => {
         reportDate: "2026-03-29"
       })
     );
+    const digestRow = db
+      .prepare(
+        `
+          SELECT mail_status, last_email_attempted_at
+          FROM digest_reports
+          WHERE report_date = ?
+        `
+      )
+      .get("2026-03-29") as { mail_status: string; last_email_attempted_at: string | null } | undefined;
+
+    expect(digestRow?.mail_status).toBe("failed:send-failed");
+    expect(digestRow?.last_email_attempted_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
     db.close();
   });

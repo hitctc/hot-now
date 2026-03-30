@@ -66,15 +66,16 @@
 - `/login`：登录页（GET）与登录提交（POST）
 - `/logout`：退出登录（POST）
 - `/assets/site.css`：统一站点样式
-- `/`：统一站点首页（登录后）
-- `/articles`：统一站点文章页（登录后）
-- `/ai`：统一站点 AI 页（登录后）
+- `/`：统一站点首页（未登录也可访问）
+- `/articles`：统一站点文章页（未登录也可访问）
+- `/ai`：统一站点 AI 页（未登录也可访问）
 - `/settings/view-rules`：统一站点筛选策略页（登录后）
 - `/settings/sources`：统一站点数据迭代收集页（登录后，可启用/停用 source，并分别手动执行采集 / 手动发送最新报告）
 - `/settings/profile`：统一站点当前登录用户页（登录后）
 - 统一站点左侧导航底部支持深色 / 浅色主题切换，偏好写入浏览器本地 `localStorage` 并在刷新后保持
-- `unified shell` 页面（`/`、`/articles`、`/ai`、`/settings/*`）已完整接入赛博双主题
+- `unified shell` 页面（`/`、`/articles`、`/ai`、`/settings/*`）已完整切换到 `Editorial Signal Desk` 双主题
 - 内容导航保持统一内容池，但会给匹配导航语义的内置 source 显式加权：`36氪` / `36氪快讯` 优先进入 `/` 热点页，`爱范儿` 优先进入 `/ai`，`36氪` / `爱范儿` / `IT之家` 优先进入 `/articles`
+- 如果本地 `data/hot-now.sqlite` 内容库损坏，内容页会降级显示提示，不再直接以 `500` 打断 unified shell
 - `/history`：历史报告（legacy，当前仍保留）
 - `/reports/:date`：指定日期报告（legacy，当前仍保留）
 - `/control`：控制台（legacy，当前仍保留）
@@ -82,7 +83,7 @@
 - `POST /actions/collect`：手动触发一次采集任务（会对所有 enabled sources 执行采集）
 - `POST /actions/send-latest-email`：手动发送最新一份已生成报告
 - `POST /actions/run`：`/actions/collect` 的兼容别名（legacy，当前仍保留）
-- 兼容约定：真实应用默认启用 `requireLogin=true` 的 unified shell；auth 开启时 legacy 路由也需要登录；测试或未注入 auth 的场景仍可保持 legacy `/ -> 最新报告` 与 legacy 路由公开行为
+- 兼容约定：真实应用默认启用 `requireLogin=true` 的 unified shell；auth 开启时内容菜单仍允许匿名查看，但系统菜单、legacy 路由和所有写操作都需要登录；测试或未注入 auth 的场景仍可保持 legacy `/ -> 最新报告` 与 legacy 路由公开行为
 
 当前报告产物目录：
 
@@ -173,26 +174,28 @@
 
 ## 9. 当前阶段快照
 
-截至 `2026-03-29`，仓库状态可按下面理解：
+截至 `2026-03-30`，仓库状态可按下面理解：
 
 - 已有设计文档和实现计划
 - 已有主体实现与测试文件
 - Git 主分支已建立并同步远端
 - 当前工作区已完成 unified site 与多源采集阶段的最终验证：
-  - `npm run test` 通过，结果为 `25` 个测试文件、`144` 个测试全部通过
+  - `npm run test` 通过，结果为 `25` 个测试文件、`146` 个测试全部通过
   - `npm run build` 通过
   - Playwright MCP 本地验收已跑通：`/login` 登录成功；`/`、`/articles`、`/ai`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常
   - 浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持
 - 真实 SMTP 发信已验证通过；当前采集链路与发信链路已拆开，采集只生成报告，发信单独读取最新报告
 - 原文抓取过程中出现过一次 `jsdom` 的 `Could not parse CSS stylesheet` 日志噪音，未阻断本轮任务完成；如果后续要收口发布质量，可以继续评估是否需要单独治理
 - Task4（single-user login + unified app shell）已落地：新增 `passwords/session` auth helper、登录页与统一壳层菜单路由，且保留 legacy 报告路由兼容
-- 真实入口已收紧：`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 现在是必填；auth 开启时 legacy 路由也要求登录，`POST /actions/collect`、`POST /actions/send-latest-email` 与 `POST /actions/run` 未登录都返回未授权
+- 真实入口已收口为“内容公开、系统受保护”：`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 现在是必填；auth 开启时 `/`、`/articles`、`/ai` 允许匿名查看，但 `/settings/*`、legacy 路由和 `POST /actions/collect`、`POST /actions/send-latest-email`、`POST /actions/run` 都要求登录
 - 内容页评分已切为系统自动百分制，页面保留收藏 / 点赞 / 点踩，不再提供手工评分表单
 - 多源采集后端已完成：`loadEnabledSourceIssues` / `runDailyDigest` 已接入多源并行汇总，单个 feed 失败不会阻断整次日报，只有全部 enabled sources 都失败时才会硬失败
 - 内置 RSS 源已扩展到 8 个，覆盖聚合日报、国际官方 AI 博客、国内热点资讯 / 快讯与科技媒体；新增国内源默认作为 built-in source 写入 `content_sources`
 - 采集和发信已拆成两个独立功能：默认配置下采集每 `10` 分钟执行一次，发信每天 `10:00` 执行一次；两者都支持手动触发，并共用同一把运行锁
 - 系统菜单已收口到多源语义：`/settings/sources` 支持 source 启用/停用、逐 source 最近抓取状态展示，以及统一站点内手动执行采集 / 手动发送最新报告；`/settings/view-rules` 支持按字段表单保存权重规则；当前登录用户信息已并到侧边栏底部
-- unified shell 已去掉顶部 header，页面信息和账号区都收进左侧侧边栏；主题切换与 localStorage 持久化已落地
+- unified shell 已去掉顶部 header，页面信息和账号区都收进左侧侧边栏；视觉母版已从赛博控制台切换为浅色纸感的 `Editorial Signal Desk`，主题切换与 localStorage 持久化已落地
+- unified shell 内容页已切到“首页主卡 + 标准卡”的混合卡片体系；系统页卡片则统一收口为 workbench / inventory panel 语义
+- 内容页现在对本地内容库损坏做了降级兜底：检测到 `SQLITE_CORRUPT` / `SQLITE_NOTADB` 时继续渲染统一站点，并提示修复或重建 `data/hot-now.sqlite`
 - 报告层已切到多源语义：`report.json` / `report.html` / 邮件正文会保留 `sourceKinds`、`issueUrls`、失败 source 数量等信息，不再把输出描述成单一日报
 - legacy `/history`、`/reports/:date`、`/control` 与 unified shell 共存，且相关测试和文档已同步
 

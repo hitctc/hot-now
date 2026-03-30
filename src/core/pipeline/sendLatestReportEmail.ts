@@ -1,6 +1,7 @@
 import { sendDailyEmail as sendDailyEmailDefault } from "../mail/sendDailyEmail.js";
 import type { DailyReport } from "../report/buildDailyReport.js";
 import {
+  recordDigestReportMailAttempt,
   findLatestDigestReportDate,
   listReportDates,
   readJsonFile
@@ -47,17 +48,30 @@ export async function sendLatestReportEmail(
     throw new LatestReportEmailError("not-found", "No digest report is available to send");
   }
 
-  const report = await readLatestReport(config, reportDate);
+  const attemptedAt = new Date().toISOString();
+  let report: DailyReport;
+
+  try {
+    report = await readLatestReport(config, reportDate);
+  } catch (error) {
+    if (error instanceof LatestReportEmailError && error.reason === "report-unavailable") {
+      persistMailAttempt(deps.db, reportDate, attemptedAt, "failed:report-unavailable");
+    }
+
+    throw error;
+  }
 
   try {
     await (deps.sendDailyEmail ?? sendDailyEmailDefault)(config, report);
   } catch (error) {
+    persistMailAttempt(deps.db, reportDate, attemptedAt, "failed:send-failed");
     throw new LatestReportEmailError("send-failed", `Failed to send latest digest report for ${reportDate}`, reportDate, {
       cause: error
     });
   }
 
   report.meta.mailStatus = "sent";
+  persistMailAttempt(deps.db, reportDate, attemptedAt, "sent");
 
   return {
     report,
@@ -89,5 +103,27 @@ async function readLatestReport(config: RuntimeConfig, reportDate: string): Prom
       reportDate,
       { cause: error }
     );
+  }
+}
+
+function persistMailAttempt(
+  db: SqliteDatabase | undefined,
+  reportDate: string,
+  attemptedAt: string,
+  mailStatus: string
+) {
+  // This timestamp only feeds UI context, so DB mirror failures must never block the actual SMTP attempt.
+  if (!db) {
+    return;
+  }
+
+  try {
+    recordDigestReportMailAttempt(db, {
+      reportDate,
+      attemptedAt,
+      mailStatus
+    });
+  } catch {
+    return;
   }
 }

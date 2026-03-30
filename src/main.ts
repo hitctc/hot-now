@@ -12,8 +12,10 @@ import { runCollectionCycle } from "./core/pipeline/runCollectionCycle.js";
 import { listRatingDimensions, saveRatings } from "./core/ratings/ratingRepository.js";
 import type { DailyReportTrigger } from "./core/report/buildDailyReport.js";
 import { createRunLock } from "./core/runtime/runLock.js";
+import { installGracefulShutdown } from "./core/runtime/installGracefulShutdown.js";
 import { startCollectionScheduler, startMailScheduler } from "./core/scheduler/startScheduler.js";
 import { listSourceCards } from "./core/source/listSourceCards.js";
+import { readSourcesOperationSummary } from "./core/source/readSourcesOperationSummary.js";
 import { loadEnabledSourceIssues } from "./core/source/loadEnabledSourceIssues.js";
 import { listReportDates, readTextFile } from "./core/storage/reportStore.js";
 import { listViewRules, saveViewRuleConfig } from "./core/viewRules/viewRuleRepository.js";
@@ -226,6 +228,7 @@ const app = createServer({
   listViewRules: async () => listViewRules(db),
   saveViewRuleConfig: async (ruleKey, config) => saveViewRuleConfig(db, ruleKey, config),
   listSources: async () => listSourceCards(db),
+  getSourcesOperationSummary: async () => readSourcesOperationSummary(db),
   toggleSource: async (kind, enable) => toggleSource(kind, enable),
   getCurrentUserProfile: async () => getCurrentUserProfile(),
   listReportSummaries: listStoredReportSummaries,
@@ -236,7 +239,7 @@ const app = createServer({
   triggerManualRun: triggerManualCollect
 });
 
-startCollectionScheduler(config, async () => {
+const collectionScheduler = startCollectionScheduler(config, async () => {
   try {
     await lock.runExclusive(async () => {
       await runCollectionTask("scheduled");
@@ -246,7 +249,7 @@ startCollectionScheduler(config, async () => {
   }
 });
 
-startMailScheduler(config, async () => {
+const mailScheduler = startMailScheduler(config, async () => {
   try {
     await lock.runExclusive(async () => {
       await runLatestEmailTask();
@@ -257,6 +260,31 @@ startMailScheduler(config, async () => {
 });
 
 await app.listen({ host: "127.0.0.1", port: resolveListenPort(process.env.PORT, config.server.port) });
+installGracefulShutdown({
+  process,
+  exit: (code) => process.exit(code),
+  logger: {
+    info: (context, message) => app.log.info(context, message),
+    error: (context, message) => app.log.error(context, message)
+  },
+  scheduledTasks: [collectionScheduler, mailScheduler],
+  waitForIdle: async () => {
+    // A running collection or mail task should finish before we checkpoint and close SQLite.
+    while (lock.isRunning()) {
+      await wait(100);
+    }
+  },
+  closeServer: async () => {
+    await app.close();
+  },
+  checkpointDatabase: () => undefined,
+  closeDatabase: () => {
+    if (db.open) {
+      db.close();
+    }
+  },
+  signals: ["SIGINT", "SIGTERM", "SIGUSR2"]
+});
 
 function resolveListenPort(envPort: string | undefined, fallbackPort: number): number {
   // Tests can bind to an ephemeral port with PORT=0 while production keeps the configured fixed port.
@@ -271,4 +299,9 @@ function resolveListenPort(envPort: string | undefined, fallbackPort: number): n
   }
 
   return port;
+}
+
+function wait(ms: number) {
+  // Polling is enough here because shutdown happens rarely and only needs a small idle wait.
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

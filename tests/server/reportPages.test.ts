@@ -3,17 +3,41 @@ import { LatestReportEmailError } from "../../src/core/pipeline/sendLatestReport
 import { createServer } from "../../src/server/createServer.js";
 
 describe("report pages", () => {
-  it("ships legacy wrapper styles in the shared CSS asset", async () => {
+  it("ships editorial desk theme tokens in the shared CSS asset", async () => {
     const app = createServer({} as never);
 
     const response = await app.inject({ method: "GET", url: "/assets/site.css" });
 
     expect(response.statusCode).toBe(200);
+    expect(response.body).toContain("--paper-base: #f4ede3;");
+    expect(response.body).toContain("--paper-elevated: #fbf7f1;");
+    expect(response.body).toContain("--signal-blue: #2352ff;");
+    expect(response.body).toContain("--signal-orange: #ff6a2a;");
+    expect(response.body).not.toContain("--accent-strong: #53f3c3;");
     expect(response.body).toContain(".legacy-page {");
     expect(response.body).toContain(".legacy-shell {");
     expect(response.body).toContain(".legacy-card {");
     expect(response.body).toContain(".legacy-card ul {");
     expect(response.body).toContain(".legacy-card button {");
+    expect(response.body).toContain(".mobile-top-nav {");
+    expect(response.body).toContain(".mobile-top-nav-bar {");
+    expect(response.body).toContain(".mobile-top-nav-tabs {");
+    expect(response.body).toContain(".mobile-top-tab--content {");
+    expect(response.body).toContain(".mobile-top-system-toggle {");
+    expect(response.body).toContain(".mobile-system-drawer {");
+    expect(response.body).toContain(".mobile-system-drawer[hidden] {");
+    expect(response.body).toContain("var(--bg-header)");
+    expect(response.body).toContain("var(--bg-sidebar-panel)");
+    expect(response.body).toContain(".shell-sidebar .nav-group {");
+    expect(response.body).toContain(".shell-main {");
+    expect(response.body).toContain("order: 1;");
+    expect(response.body).toContain("order: 2;");
+    expect(response.body).toContain("display: none;");
+    expect(response.body).toContain("position: sticky;");
+    expect(response.body).toContain("top: 88px;");
+    expect(response.body).toContain("z-index: 34;");
+    expect(response.body).toContain("padding: 8px 10px 8px 28px;");
+    expect(response.body).toContain("left: 14px;");
   });
 
   it("renders the control page with separate collect and send-latest-email actions", async () => {

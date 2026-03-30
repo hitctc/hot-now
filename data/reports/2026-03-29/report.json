@@ -1,11 +1,12 @@
 {
   "meta": {
     "date": "2026-03-29",
-    "generatedAt": "2026-03-29T16:00:08.255Z",
+    "generatedAt": "2026-03-29T16:10:10.388Z",
     "trigger": "scheduled",
-    "issueUrl": "https://www.ifanr.com?utm_source=rss&utm_medium=rss&utm_campaign=",
+    "issueUrl": "http://36kr.com",
     "issueUrls": [
       "https://blog.google/innovation-and-ai/technology/ai/",
+      "http://36kr.com",
       "https://techcrunch.com/category/artificial-intelligence/",
       "https://www.ifanr.com?utm_source=rss&utm_medium=rss&utm_campaign=",
       "https://www.ithome.com/",
@@ -13,6 +14,8 @@
     ],
     "sourceKinds": [
       "google_ai",
+      "kr36",
+      "kr36_newsflash",
       "techcrunch_ai",
       "aifanr",
       "ithome",
@@ -21,11 +24,8 @@
     "topicCount": 10,
     "degraded": true,
     "mailStatus": "not-sent-by-collection",
-    "sourceFailureCount": 2,
-    "failedSourceKinds": [
-      "kr36",
-      "kr36_newsflash"
-    ]
+    "sourceFailureCount": 0,
+    "failedSourceKinds": []
   },
   "topics": [
     {
@@ -128,6 +128,58 @@
     },
     {
       "rank": 2,
+      "title": "宇树科技王兴兴：具身智能GPT时刻大概还需两到三年",
+      "category": "热点新闻",
+      "whyItMatters": "该主题当前聚合了 4 条候选信息，且最高源内排序为 #13。",
+      "summary": "2026-03-29 14:59分享至宇树科技创始人、CEO王兴兴亮相2026中国网络媒体论坛，以《当机器人刷屏》为题发表演讲。他个人定义具身智能的“GPT时刻”为：带一台机器人到陌生场景，通过语音指令，机器人能完成80%到90%的任务。王兴兴表示，具身智能的“GPT时刻大概还要",
+      "keywords": [
+        "宇树",
+        "科技",
+        "王兴",
+        "具身智能GPT时刻大概还需两到三年"
+      ],
+      "relatedCount": 4,
+      "relatedItems": [
+        {
+          "sourceRank": 23,
+          "sourceCategory": "热点资讯",
+          "sourceTitle": "宇树科技王兴兴：具身智能GPT时刻大概还需两到三年",
+          "sourceUrl": "https://36kr.com/newsflashes/3743644863889416?f=rss",
+          "articleOk": true,
+          "articleTitle": "宇树科技王兴兴：具身智能GPT时刻大概还需两到三年-36氪",
+          "articleSummary": "2026-03-29 14:59分享至宇树科技创始人、CEO王兴兴亮相2026中国网络媒体论坛，以《当机器人刷屏》为题发表演讲。他个人定义具身智能的“GPT时刻”为：带一台机器人到陌生场景，通过语音指令，机器人能完成80%到90%的任务。王兴兴表示，具身智能的“GPT时刻大概还要两到三年到来。“可能很快，也可能慢一点，但今年或明年一定会有非常大的技术进步在等待着大家。” （大河财立方）原文链接下一篇外卖平台Just Eat母公司：目标在2030年前实现年订单量增长20%。（新"
+        },
+        {
+          "sourceRank": 13,
+          "sourceCategory": "热点新闻",
+          "sourceTitle": "宇树科技王兴兴：具身智能GPT时刻大概还需两到三年",
+          "sourceUrl": "https://36kr.com/newsflashes/3743644863889416?f=rss",
+          "articleOk": true,
+          "articleTitle": "宇树科技王兴兴：具身智能GPT时刻大概还需两到三年-36氪",
+          "articleSummary": "2026-03-29 14:59分享至宇树科技创始人、CEO王兴兴亮相2026中国网络媒体论坛，以《当机器人刷屏》为题发表演讲。他个人定义具身智能的“GPT时刻”为：带一台机器人到陌生场景，通过语音指令，机器人能完成80%到90%的任务。王兴兴表示，具身智能的“GPT时刻大概还要两到三年到来。“可能很快，也可能慢一点，但今年或明年一定会有非常大的技术进步在等待着大家。” （大河财立方）原文链接下一篇外卖平台Just Eat母公司：目标在2030年前实现年订单量增长20%。（新"
+        },
+        {
+          "sourceRank": 37,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "宇树科技王兴兴：具身智能“ChatGPT 时刻”大概还要需两到三年",
+          "sourceUrl": "https://www.ithome.com/0/933/850.htm",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        },
+        {
+          "sourceRank": 46,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "宇树科技具身智能体验馆亚洲首店 5 月底落地上海静安久光百货，面积超 100 平方米",
+          "sourceUrl": "https://www.ithome.com/0/933/811.htm",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        }
+      ]
+    },
+    {
+      "rank": 3,
       "title": "Build with Lyria 3, our newest music generation model",
       "category": "最新 AI 消息",
       "whyItMatters": "该主题当前聚合了 3 条候选信息，且最高源内排序为 #5。",
@@ -171,7 +223,95 @@
       ]
     },
     {
-      "rank": 3,
+      "rank": 4,
+      "title": "北京启动智能网联新能源汽车商业保险开发应用",
+      "category": "热点新闻",
+      "whyItMatters": "该主题当前聚合了 3 条候选信息，且最高源内排序为 #6。",
+      "summary": "北京启动智能网联新能源汽车商业保险开发应用2026-03-29 16:59分享至记者今天（29日）从北京金融监管局了解到，北京已在全国率先启动智能网联新能源汽车商业保险产品开发应用。据介绍，近年来随着智能网联汽车产业发展迅速，智能驾驶等前沿技术广泛应用，改变了交通事故风险因素、场",
+      "keywords": [
+        "北京",
+        "启动",
+        "智能",
+        "网联",
+        "新能"
+      ],
+      "relatedCount": 3,
+      "relatedItems": [
+        {
+          "sourceRank": 16,
+          "sourceCategory": "热点资讯",
+          "sourceTitle": "北京启动智能网联新能源汽车商业保险开发应用",
+          "sourceUrl": "https://36kr.com/newsflashes/3743771820490752?f=rss",
+          "articleOk": true,
+          "articleTitle": "北京启动智能网联新能源汽车商业保险开发应用-36氪",
+          "articleSummary": "北京启动智能网联新能源汽车商业保险开发应用2026-03-29 16:59分享至记者今天（29日）从北京金融监管局了解到，北京已在全国率先启动智能网联新能源汽车商业保险产品开发应用。据介绍，近年来随着智能网联汽车产业发展迅速，智能驾驶等前沿技术广泛应用，改变了交通事故风险因素、场景及损失形态等，现有商业机动车辆保险难以精准适配智能网联汽车独有的特定致损原因、使用场景和特有的软硬件设备损失等情况。为适应产业发展和消费者的新需求，北京金融监管局在金融监管总局的指导和北京市委市政府"
+        },
+        {
+          "sourceRank": 6,
+          "sourceCategory": "热点新闻",
+          "sourceTitle": "北京启动智能网联新能源汽车商业保险开发应用",
+          "sourceUrl": "https://36kr.com/newsflashes/3743771820490752?f=rss",
+          "articleOk": true,
+          "articleTitle": "北京启动智能网联新能源汽车商业保险开发应用-36氪",
+          "articleSummary": "北京启动智能网联新能源汽车商业保险开发应用2026-03-29 16:59分享至记者今天（29日）从北京金融监管局了解到，北京已在全国率先启动智能网联新能源汽车商业保险产品开发应用。据介绍，近年来随着智能网联汽车产业发展迅速，智能驾驶等前沿技术广泛应用，改变了交通事故风险因素、场景及损失形态等，现有商业机动车辆保险难以精准适配智能网联汽车独有的特定致损原因、使用场景和特有的软硬件设备损失等情况。为适应产业发展和消费者的新需求，北京金融监管局在金融监管总局的指导和北京市委市政府"
+        },
+        {
+          "sourceRank": 28,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "北京启动智能网联新能源汽车商业保险开发应用，统一适配 L2 至 L4 全级别",
+          "sourceUrl": "https://www.ithome.com/0/933/860.htm",
+          "articleOk": true,
+          "articleTitle": "北京启动智能网联新能源汽车商业保险开发应用，统一适配 L2 至 L4 全级别",
+          "articleSummary": "IT之家 3 月 29 日消息，据央视新闻今天报道，北京已在全国率先启动智能网联新能源汽车保险产品开发应用，以先行先试的方式在全国率先开发应用专属产品。IT之家在此援引央视新闻，新产品将基本沿用现有的新能源商业车险体系，按照“总体稳定、部分优化”的原则，主要为消费者和车企关心的特定智驾场景、软硬件损失提供风险保障，能够统一适配 L2 至 L4 全级别智能网联新能源汽车。例如，现有车险产品对驾驶人的定义主要在“人驾”基本场景，对 L3、L4 级别的“人机共驾”或“机驾”情景不能"
+        }
+      ]
+    },
+    {
+      "rank": 5,
+      "title": "中国石油：2025年净利润同比下降4.5%，拟每股派发现金红利0.25元",
+      "category": "热点新闻",
+      "whyItMatters": "该主题当前聚合了 3 条候选信息，且最高源内排序为 #10。",
+      "summary": "2026-03-29 15:53分享至36氪获悉，中国石油披露年报，2025年实现营业收入28644.69亿元，同比下降2.5%；实现归属于母公司股东的净利润1573亿元，同比下降4.5%；基本每股收益0.86元。公司拟向全体股东每股派发现金红利0.25元（含税），合计拟派发现金",
+      "keywords": [
+        "中国",
+        "石油",
+        "2025年净利润同比下降4",
+        "拟每股派发现金红利0",
+        "25元"
+      ],
+      "relatedCount": 3,
+      "relatedItems": [
+        {
+          "sourceRank": 20,
+          "sourceCategory": "热点资讯",
+          "sourceTitle": "中国石油：2025年净利润同比下降4.5%，拟每股派发现金红利0.25元",
+          "sourceUrl": "https://36kr.com/newsflashes/3743724403884290?f=rss",
+          "articleOk": true,
+          "articleTitle": "中国石油：2025年净利润同比下降4.5%，拟每股派发现金红利0.25元-36氪",
+          "articleSummary": "2026-03-29 15:53分享至36氪获悉，中国石油披露年报，2025年实现营业收入28644.69亿元，同比下降2.5%；实现归属于母公司股东的净利润1573亿元，同比下降4.5%；基本每股收益0.86元。公司拟向全体股东每股派发现金红利0.25元（含税），合计拟派发现金红利457.6亿元（含税）原文链接下一篇安居客上海监测数据显示，3月28日（周六），上海二手房（含商业）单日网签成交量达1585套，不仅刷新今年年内单日成交纪录，更是一举打破2025年3月15日147"
+        },
+        {
+          "sourceRank": 10,
+          "sourceCategory": "热点新闻",
+          "sourceTitle": "中国石油：2025年净利润同比下降4.5%，拟每股派发现金红利0.25元",
+          "sourceUrl": "https://36kr.com/newsflashes/3743724403884290?f=rss",
+          "articleOk": true,
+          "articleTitle": "中国石油：2025年净利润同比下降4.5%，拟每股派发现金红利0.25元-36氪",
+          "articleSummary": "2026-03-29 15:53分享至36氪获悉，中国石油披露年报，2025年实现营业收入28644.69亿元，同比下降2.5%；实现归属于母公司股东的净利润1573亿元，同比下降4.5%；基本每股收益0.86元。公司拟向全体股东每股派发现金红利0.25元（含税），合计拟派发现金红利457.6亿元（含税）原文链接下一篇安居客上海监测数据显示，3月28日（周六），上海二手房（含商业）单日网签成交量达1585套，不仅刷新今年年内单日成交纪录，更是一举打破2025年3月15日147"
+        },
+        {
+          "sourceRank": 32,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "中国石油：2025 年营收 2.86 万亿同比下降 2.5%，净利润 1573.18 亿同比下降 4.5%",
+          "sourceUrl": "https://www.ithome.com/0/933/856.htm",
+          "articleOk": true,
+          "articleTitle": "中国石油：2025 年营收 2.86 万亿同比下降 2.5%，净利润 1573.18 亿同比下降 4.5%",
+          "articleSummary": "IT之家 3 月 29 日消息，中国石油今日公告，2025 年，集团实现营业收入人民币 28,644.69 亿元，比上年同期的人民币 29,379.81 亿元下降 2.5%；实现归属于母公司股东的净利润人民币 1,573.18 亿元，比上年同期的人民币 1,646.84 亿元下降 4.5%；实现每股基本收益人民币 0.86 元，比上年同期的人民币 0.90 元减少人民币 0.04 元。其中，2025 年，油气和新能源分部实现营业收入人民币 8,248.08 亿元，比上年同期的"
+        }
+      ]
+    },
+    {
+      "rank": 6,
       "title": "广汽丰田铂智 7 轿车真实大定数据超 3100 台，限时补贴权益价 14.78 万元起",
       "category": "科技热点",
       "whyItMatters": "该主题当前聚合了 3 条候选信息，且最高源内排序为 #7。",
@@ -199,9 +339,9 @@
           "sourceCategory": "科技热点",
           "sourceTitle": "广汽丰田铂智 7 轿车上市：鸿蒙座舱 + Momenta 智驾 + 小米车载生态，限时补贴权益价 14.78 万元起",
           "sourceUrl": "https://www.ithome.com/0/933/816.htm",
-          "articleOk": false,
-          "articleTitle": "",
-          "articleSummary": ""
+          "articleOk": true,
+          "articleTitle": "广汽丰田铂智 7 轿车上市：鸿蒙座舱 + Momenta 智驾 + 小米车载生态，限时补贴权益价 14.78 万元起",
+          "articleSummary": "感谢IT之家网友 王慢慢 的线索投递！\n            IT之家 3 月 29 日消息，广汽丰田铂智 7 纯电轿车今日正式上市，新车是丰田首款鸿蒙座舱豪华旗舰大型纯电轿车，搭载 Momenta 智驾 + 小米车载生态，共推出 600km 和 700km 两种续航 5 款配置，限时补贴权益价 14.78 万元起。广汽丰田铂智 7 纯电轿车各版本售价如下（限时补贴权益价时间为即日起至 2026 年 4 月 30 日）：600 Pro 版：建议零售价 16.98 万元、限时"
         },
         {
           "sourceRank": 48,
@@ -215,7 +355,7 @@
       ]
     },
     {
-      "rank": 4,
+      "rank": 7,
       "title": "古尔曼：苹果试图通过发放奖金，阻止 iPhone 产品设计工程师跳槽至 OpenAI",
       "category": "科技热点",
       "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #1。",
@@ -250,194 +390,103 @@
       ]
     },
     {
-      "rank": 5,
-      "title": "Gemini 3.1 Flash Live: Making audio AI more natural and reliable",
-      "category": "最新 AI 消息",
-      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #3。",
-      "summary": "Mar 26, 2026 Our latest voice model has improved precision and lower latency to make voice interactions more fluid, natural and precise. Val",
-      "keywords": [
-        "Gemini",
-        "Flash",
-        "Live",
-        "Making",
-        "audio"
-      ],
-      "relatedCount": 2,
-      "relatedItems": [
-        {
-          "sourceRank": 3,
-          "sourceCategory": "最新 AI 消息",
-          "sourceTitle": "Gemini 3.1 Flash Live: Making audio AI more natural and reliable",
-          "sourceUrl": "https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-3-1-flash-live/",
-          "articleOk": true,
-          "articleTitle": "Gemini 3.1 Flash Live: Making audio AI more natural and reliable",
-          "articleSummary": "Mar 26, 2026\n          \n          \n            \n          \n        \n      \n        \n          Our latest voice model has improved precision and lower latency to make voice interactions more fluid, natural and precise.\n        \n      \n    \n "
-        },
-        {
-          "sourceRank": 16,
-          "sourceCategory": "最新 AI 消息",
-          "sourceTitle": "Gemini 3.1 Flash-Lite: Built for intelligence at scale",
-          "sourceUrl": "https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-3-1-flash-lite/",
-          "articleOk": true,
-          "articleTitle": "Gemini 3.1 Flash-Lite: Built for intelligence at scale",
-          "articleSummary": "Mar 03, 2026\n          \n          \n            \n          \n        \n      \n        \n          Get best-in-class intelligence for your highest-volume workloads.\n        \n      \n    \n  \n  \n    \n  The Gemini Team\n  \n  \n\n    \n      \n        \n\n\n"
-        }
-      ]
-    },
-    {
-      "rank": 6,
-      "title": "鸿蒙智行尚界 Z7 / Z7T 新车内饰亮点揭秘：首搭水离子空调、零重力座椅支持一键躺平等",
-      "category": "科技热点",
-      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #18。",
-      "summary": "IT之家 3 月 29 日消息，鸿蒙智行官方昨日发布视频，揭秘了尚界 Z7 / Z7T 新车内饰亮点。据介绍，尚界 Z7 及 Z7T 双车将有全新车色：Z7 提供超凡粉搭配内饰缥云杏方案、Z7T 提供晚山新绿搭配内饰闪金黑方案。尚界 Z7 / Z7T 全系搭载鸿蒙 ALPS 健康",
-      "keywords": [
-        "鸿蒙",
-        "智行",
-        "尚界",
-        "Z7",
-        "Z7T"
-      ],
-      "relatedCount": 2,
-      "relatedItems": [
-        {
-          "sourceRank": 18,
-          "sourceCategory": "科技热点",
-          "sourceTitle": "鸿蒙智行尚界 Z7 / Z7T 新车内饰亮点揭秘：首搭水离子空调、零重力座椅支持一键躺平等",
-          "sourceUrl": "https://www.ithome.com/0/933/877.htm",
-          "articleOk": true,
-          "articleTitle": "鸿蒙智行尚界 Z7 / Z7T 新车内饰亮点揭秘：首搭水离子空调、零重力座椅支持一键躺平等",
-          "articleSummary": "IT之家 3 月 29 日消息，鸿蒙智行官方昨日发布视频，揭秘了尚界 Z7 / Z7T 新车内饰亮点。据介绍，尚界 Z7 及 Z7T 双车将有全新车色：Z7 提供超凡粉搭配内饰缥云杏方案、Z7T 提供晚山新绿搭配内饰闪金黑方案。尚界 Z7 / Z7T 全系搭载鸿蒙 ALPS 健康座舱 2.0，采用 MOFs 材质；首搭水离子空调，支持保湿效果。尚界 Z7 / Z7T 还拥有零重力座椅（副驾），支持一键躺平和座椅按摩。此外，鸿蒙智行官方还展示了尚界 Z7 智能交互随动屏和灵感橱"
-        },
-        {
-          "sourceRank": 24,
-          "sourceCategory": "科技热点",
-          "sourceTitle": "鸿蒙智行问界 M6 汽车全系标配配置公布，含华为途灵平台、巨鲸电池等",
-          "sourceUrl": "https://www.ithome.com/0/933/870.htm",
-          "articleOk": true,
-          "articleTitle": "鸿蒙智行问界 M6 汽车全系标配配置公布，含华为途灵平台、巨鲸电池等 - IT之家",
-          "articleSummary": "IT之家 3 月 29 日消息，鸿蒙智行官方昨晚公布了问界 M6 汽车全系标配的配置，包括华为途灵平台、巨鲸电池等。IT之家整理鸿蒙智行问界 M6 汽车标配配置如下：「硬核科技」华为乾崑智驾 ADS 4 高阶版896 线双光路图像级激光雷达华为途灵平台空气悬架 + 连续可变阻尼减震器华为巨鲸电池平台鸿蒙座舱「趣玩舒享」灵感橱窗（官方精品附件需单独购买）全车 21 处拓展点（含磁吸、卡接、螺孔）超大化妆镜纯电版标配电动前备箱随动屏26.1 英寸 W-HUD 抬头显示主驾零重力座"
-        }
-      ]
-    },
-    {
-      "rank": 7,
-      "title": "华为乾崑 | 启境 GT7 新一代智能猎装车预计 7 月开启交付，动态试驾体验 6 月开启",
-      "category": "科技热点",
-      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #23。",
-      "summary": "IT之家 3 月 29 日消息，启境汽车官方微博昨日发布了答网友问（第 7 期），针对华为乾崑 | 启境 GT7 新一代智能猎装车上市交付时间、所处价位、何时可以试驾等问题进行了解答。IT之家附启境汽车本期答网友问重点内容如下：启境 GT7 什么时候上市？什么时间交付？启境 GT",
-      "keywords": [
-        "华为",
-        "乾崑",
-        "启境",
-        "GT7",
-        "新一"
-      ],
-      "relatedCount": 2,
-      "relatedItems": [
-        {
-          "sourceRank": 23,
-          "sourceCategory": "科技热点",
-          "sourceTitle": "华为乾崑 | 启境 GT7 新一代智能猎装车预计 7 月开启交付，动态试驾体验 6 月开启",
-          "sourceUrl": "https://www.ithome.com/0/933/871.htm",
-          "articleOk": true,
-          "articleTitle": "华为乾崑 | 启境 GT7 新一代智能猎装车预计 7 月开启交付，动态试驾体验 6 月开启",
-          "articleSummary": "IT之家 3 月 29 日消息，启境汽车官方微博昨日发布了答网友问（第 7 期），针对华为乾崑 | 启境 GT7 新一代智能猎装车上市交付时间、所处价位、何时可以试驾等问题进行了解答。IT之家附启境汽车本期答网友问重点内容如下：启境 GT7 什么时候上市？什么时间交付？启境 GT7 定于 6 月举办上市发布会，届时公布正式售价、配置及交付细则；新车预计 7 月开启交付，交付周期会因车型配置、锁单及确认交付方案时间的变化而变化，具体情况请以启境汽车向您发出的交付邀请函为准。启境"
-        },
-        {
-          "sourceRank": 55,
-          "sourceCategory": "科技热点",
-          "sourceTitle": "华为乾崑 | 启境 GT7 智能猎装车「普罗旺斯紫」车色亮相，新车 6 月上市",
-          "sourceUrl": "https://www.ithome.com/0/933/799.htm",
-          "articleOk": false,
-          "articleTitle": "",
-          "articleSummary": ""
-        }
-      ]
-    },
-    {
       "rank": 8,
-      "title": "宇树科技王兴兴：具身智能“ChatGPT 时刻”大概还要需两到三年",
-      "category": "科技热点",
-      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #37。",
-      "summary": "感谢IT之家网友 不一样的体验 的线索投递！ IT之家 3 月 29 日消息，宇树科技创始人、CEO 王兴兴亮相 2026 中国网络媒体论坛，发表《当机器人刷屏》主题演讲，IT之家附上演讲片段视频如下：王兴兴在演讲中表示，当下机器人、具身智能确实还没有达到临界点，他还将具身智能的",
+      "title": "“AI未来论坛”在京举办，红杉中国、高瓴创投等6家投资机构集中签约",
+      "category": "热点新闻",
+      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #1。",
+      "summary": "2026-03-29 18:05分享至36氪获悉，3月29日，2026中关村论坛年会“人工智能主题日”特色专题论坛“AI未来论坛：跃迁·投资·共生”成功举办。活动现场，中关村科学城国际创新服务集聚区迎来重要时刻，红杉中国、高瓴创投、经纬创投、五源资本、金沙江创投、真知创投6家投资",
       "keywords": [
-        "宇树",
-        "科技",
-        "王兴",
-        "具身",
-        "智能"
+        "AI未来论坛",
+        "在京",
+        "举办",
+        "红杉",
+        "中国"
       ],
       "relatedCount": 2,
       "relatedItems": [
         {
-          "sourceRank": 37,
-          "sourceCategory": "科技热点",
-          "sourceTitle": "宇树科技王兴兴：具身智能“ChatGPT 时刻”大概还要需两到三年",
-          "sourceUrl": "https://www.ithome.com/0/933/850.htm",
+          "sourceRank": 11,
+          "sourceCategory": "热点资讯",
+          "sourceTitle": "“AI未来论坛”在京举办，红杉中国、高瓴创投等6家投资机构集中签约",
+          "sourceUrl": "https://36kr.com/newsflashes/3743854538899714?f=rss",
           "articleOk": true,
-          "articleTitle": "宇树科技王兴兴：具身智能“ChatGPT 时刻”大概还要需两到三年 - IT之家",
-          "articleSummary": "感谢IT之家网友 不一样的体验 的线索投递！\n            IT之家 3 月 29 日消息，宇树科技创始人、CEO 王兴兴亮相 2026 中国网络媒体论坛，发表《当机器人刷屏》主题演讲，IT之家附上演讲片段视频如下：王兴兴在演讲中表示，当下机器人、具身智能确实还没有达到临界点，他还将具身智能的“ChatGPT 时刻”定义为以下情景：如果未来有一天，我带一台机器人到这个会场，它到 80% 左右的陌生场景中都能通过语音、语言指令实现 80% 左右的任务。我觉得就已经实现"
+          "articleTitle": "“AI未来论坛”在京举办，红杉中国、高瓴创投等6家投资机构集中签约-36氪",
+          "articleSummary": "2026-03-29 18:05分享至36氪获悉，3月29日，2026中关村论坛年会“人工智能主题日”特色专题论坛“AI未来论坛：跃迁·投资·共生”成功举办。活动现场，中关村科学城国际创新服务集聚区迎来重要时刻，红杉中国、高瓴创投、经纬创投、五源资本、金沙江创投、真知创投6家投资机构作为投资生态伙伴集中签约。集聚区是海淀区为系统性集聚全球顶尖创投与科创服务资源而建，旨在打造全球前沿科技的创投中心，构建“人才-技术-场景-资本”高效协同生态，最大化加速创新。下一篇36氪获悉，中"
         },
         {
-          "sourceRank": 46,
-          "sourceCategory": "科技热点",
-          "sourceTitle": "宇树科技具身智能体验馆亚洲首店 5 月底落地上海静安久光百货，面积超 100 平方米",
-          "sourceUrl": "https://www.ithome.com/0/933/811.htm",
-          "articleOk": false,
-          "articleTitle": "",
-          "articleSummary": ""
+          "sourceRank": 1,
+          "sourceCategory": "热点新闻",
+          "sourceTitle": "“AI未来论坛”在京举办，红杉中国、高瓴创投等6家投资机构集中签约",
+          "sourceUrl": "https://36kr.com/newsflashes/3743854538899714?f=rss",
+          "articleOk": true,
+          "articleTitle": "“AI未来论坛”在京举办，红杉中国、高瓴创投等6家投资机构集中签约-36氪",
+          "articleSummary": "2026-03-29 18:05分享至36氪获悉，3月29日，2026中关村论坛年会“人工智能主题日”特色专题论坛“AI未来论坛：跃迁·投资·共生”成功举办。活动现场，中关村科学城国际创新服务集聚区迎来重要时刻，红杉中国、高瓴创投、经纬创投、五源资本、金沙江创投、真知创投6家投资机构作为投资生态伙伴集中签约。集聚区是海淀区为系统性集聚全球顶尖创投与科创服务资源而建，旨在打造全球前沿科技的创投中心，构建“人才-技术-场景-资本”高效协同生态，最大化加速创新。下一篇36氪获悉，中"
         }
       ]
     },
     {
       "rank": 9,
-      "title": "OpenAI 推出 Codex 用例库，展示 Codex 应用场景与使用技巧",
-      "category": "开发生态",
-      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #1。",
-      "summary": "Understand large codebases Trace request flows, map unfamiliar modules, and find the right files fast. Engineering Analysis",
+      "title": "中信证券：配置上建议继续坚守中国优势制造业，静待4月决断",
+      "category": "热点新闻",
+      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #2。",
+      "summary": "2026-03-29 17:43分享至36氪获悉，中信证券研报认为，短期资本市场仍然处于情绪降温期，损失规避的心态可能产生一些减仓需求。在配置上，建议继续坚守中国优势制造业，静待4月决断。目前的底仓建议仍然是中国有份额优势、海外产能重置成本高难度大、且供应弹性容易被政策影响的行业",
       "keywords": [
-        "OpenAI",
-        "推出",
-        "Codex",
-        "用例",
-        "展示"
+        "中信",
+        "证券",
+        "配置",
+        "上建",
+        "议继"
       ],
-      "relatedCount": 1,
+      "relatedCount": 2,
       "relatedItems": [
         {
-          "sourceRank": 1,
-          "sourceCategory": "开发生态",
-          "sourceTitle": "OpenAI 推出 Codex 用例库，展示 Codex 应用场景与使用技巧",
-          "sourceUrl": "https://developers.openai.com/codex/use-cases",
+          "sourceRank": 12,
+          "sourceCategory": "热点资讯",
+          "sourceTitle": "中信证券：配置上建议继续坚守中国优势制造业，静待4月决断",
+          "sourceUrl": "https://36kr.com/newsflashes/3743825887248645?f=rss",
           "articleOk": true,
-          "articleTitle": "Codex use cases",
-          "articleSummary": "Understand large codebases   Trace request flows, map unfamiliar modules, and find the right files fast.   Engineering  Analysis"
+          "articleTitle": "中信证券：配置上建议继续坚守中国优势制造业，静待4月决断-36氪",
+          "articleSummary": "2026-03-29 17:43分享至36氪获悉，中信证券研报认为，短期资本市场仍然处于情绪降温期，损失规避的心态可能产生一些减仓需求。在配置上，建议继续坚守中国优势制造业，静待4月决断。目前的底仓建议仍然是中国有份额优势、海外产能重置成本高难度大、且供应弹性容易被政策影响的行业，以化工、有色、电力设备和新能源为基础。在以上底仓的基础上，建议继续增加对低估值因子的敞口暴露，重点关注保险、券商和电力。从短期景气信号驱动的框架来考虑，涨价仍然是最“锋利的矛”，PPI交易成为全年主"
+        },
+        {
+          "sourceRank": 2,
+          "sourceCategory": "热点新闻",
+          "sourceTitle": "中信证券：配置上建议继续坚守中国优势制造业，静待4月决断",
+          "sourceUrl": "https://36kr.com/newsflashes/3743825887248645?f=rss",
+          "articleOk": true,
+          "articleTitle": "中信证券：配置上建议继续坚守中国优势制造业，静待4月决断-36氪",
+          "articleSummary": "2026-03-29 17:43分享至36氪获悉，中信证券研报认为，短期资本市场仍然处于情绪降温期，损失规避的心态可能产生一些减仓需求。在配置上，建议继续坚守中国优势制造业，静待4月决断。目前的底仓建议仍然是中国有份额优势、海外产能重置成本高难度大、且供应弹性容易被政策影响的行业，以化工、有色、电力设备和新能源为基础。在以上底仓的基础上，建议继续增加对低估值因子的敞口暴露，重点关注保险、券商和电力。从短期景气信号驱动的框架来考虑，涨价仍然是最“锋利的矛”，PPI交易成为全年主"
         }
       ]
     },
     {
       "rank": 10,
-      "title": "飞书开源 lark-cli，支持 AI Agent，覆盖 11 个业务域",
-      "category": "开发生态",
-      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #2。",
-      "summary": "中文版 | English A command-line tool for Lark/Feishu Open Platform — built for humans and AI Agents. Covers core business domains including Mes",
+      "title": "广汽丰田铂智7正式上市",
+      "category": "热点新闻",
+      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #3。",
+      "summary": "2026-03-29 17:34分享至36氪获悉，3月29日，丰田首款鸿蒙座舱豪华旗舰大型纯电轿车铂智7正式上市，新车共推出600km和700km两种续航5款配置，限时补贴权益价14.78万-19.98万元。下一篇三安光电：董事长及总经理拟增持公司股份36氪获悉，三安光电公告，公",
       "keywords": [
-        "飞书",
-        "开源",
-        "lark",
-        "cli",
-        "支持"
+        "广汽丰田铂智7正式上市"
       ],
-      "relatedCount": 1,
+      "relatedCount": 2,
       "relatedItems": [
         {
-          "sourceRank": 2,
-          "sourceCategory": "开发生态",
-          "sourceTitle": "飞书开源 lark-cli，支持 AI Agent，覆盖 11 个业务域",
-          "sourceUrl": "https://github.com/larksuite/cli",
+          "sourceRank": 13,
+          "sourceCategory": "热点资讯",
+          "sourceTitle": "广汽丰田铂智7正式上市",
+          "sourceUrl": "https://36kr.com/newsflashes/3743823660138760?f=rss",
           "articleOk": true,
-          "articleTitle": "GitHub - larksuite/cli: A command-line tool for Lark/Feishu Open Platform — built for humans and AI Agents. Covers core business domains including Messenger, Docs, Base, Sheets, Calendar, Mail, Tasks, Meetings, and more, with 200+ commands and 19 AI Agent Skills.",
-          "articleSummary": "中文版 | English\nA command-line tool for Lark/Feishu Open Platform — built for humans and AI Agents. Covers core business domains including Messenger, Docs, Base, Sheets, Calendar, Mail, Tasks, Meetings, and more, with 200+ commands and 19 AI "
+          "articleTitle": "广汽丰田铂智7正式上市-36氪",
+          "articleSummary": "2026-03-29 17:34分享至36氪获悉，3月29日，丰田首款鸿蒙座舱豪华旗舰大型纯电轿车铂智7正式上市，新车共推出600km和700km两种续航5款配置，限时补贴权益价14.78万-19.98万元。下一篇三安光电：董事长及总经理拟增持公司股份36氪获悉，三安光电公告，公司董事长林志强和副董事长、总经理林科闯拟自3月31日起的6个月内，通过上海证券交易所系统以集中竞价方式增持公司股份，林志强拟增持金额2000万元—4000万元，林科闯拟增持金额500万元—1000万元"
+        },
+        {
+          "sourceRank": 3,
+          "sourceCategory": "热点新闻",
+          "sourceTitle": "广汽丰田铂智7正式上市",
+          "sourceUrl": "https://36kr.com/newsflashes/3743823660138760?f=rss",
+          "articleOk": true,
+          "articleTitle": "广汽丰田铂智7正式上市-36氪",
+          "articleSummary": "2026-03-29 17:34分享至36氪获悉，3月29日，丰田首款鸿蒙座舱豪华旗舰大型纯电轿车铂智7正式上市，新车共推出600km和700km两种续航5款配置，限时补贴权益价14.78万-19.98万元。下一篇三安光电：董事长及总经理拟增持公司股份36氪获悉，三安光电公告，公司董事长林志强和副董事长、总经理林科闯拟自3月31日起的6个月内，通过上海证券交易所系统以集中竞价方式增持公司股份，林志强拟增持金额2000万元—4000万元，林科闯拟增持金额500万元—1000万元"
         }
       ]
     }

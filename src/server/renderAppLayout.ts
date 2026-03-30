@@ -15,6 +15,8 @@ type AppShellView = {
   currentPath: string;
   page: AppShellPage;
   user?: AppShellUser;
+  showSystemMenu?: boolean;
+  loginHref?: string;
   contentHtml?: string;
 };
 
@@ -46,9 +48,11 @@ export function findAppShellPage(pathname: string): AppShellPage | null {
 export function renderAppLayout(view: AppShellView): string {
   const contentLinks = renderNavGroup(appShellPages.filter((page) => page.section === "content"), view.currentPath);
   const systemLinks = renderNavGroup(appShellPages.filter((page) => page.section === "system"), view.currentPath);
+  const showSystemMenu = view.showSystemMenu ?? true;
   const pageContent = view.contentHtml ?? renderPlaceholder(view.page.description);
   const sidebarPageSummary = renderSidebarPageSummary(view.page);
-  const sidebarAccount = renderSidebarAccount(view.user);
+  const sidebarAccount = renderSidebarAccount(view.user, view.loginHref);
+  const mobileTopNav = renderMobileTopNav(view.currentPath, showSystemMenu);
   const themeControl = `
   <section class="theme-dock" data-theme-toggle>
     <p class="theme-dock-title">界面主题</p>
@@ -69,22 +73,23 @@ export function renderAppLayout(view: AppShellView): string {
     <script src="/assets/site.js" defer></script>
   </head>
   <body class="shell-page">
+    ${mobileTopNav}
     <div class="shell-root">
-      <aside class="shell-sidebar">
-        <div class="brand-block">
-          <p class="brand-kicker">HotNow Signal Grid</p>
-          <h1 class="brand-title">Cyber Intelligence Console</h1>
-          <p class="brand-description">科技内容、采集状态与操作控制在同一控制台内完成。</p>
+      <aside class="shell-sidebar shell-sidebar--editorial">
+        <div class="brand-block brand-block--masthead">
+          <p class="brand-kicker">HotNow Editorial Desk</p>
+          <h1 class="brand-title">HotNow</h1>
+          <p class="brand-description">多源热点、筛选策略与投递动作在同一编辑台内完成。</p>
         </div>
-        <nav class="nav-group">
+        ${sidebarPageSummary}
+        <nav class="nav-group nav-group--content">
           <p class="nav-title">内容菜单</p>
           ${contentLinks}
         </nav>
-        <nav class="nav-group">
+        ${showSystemMenu ? `<nav class="nav-group nav-group--system">
           <p class="nav-title">系统菜单</p>
           ${systemLinks}
-        </nav>
-        ${sidebarPageSummary}
+        </nav>` : ""}
         <div class="sidebar-footer">
           ${themeControl}
           ${sidebarAccount}
@@ -121,12 +126,17 @@ function renderSidebarPageSummary(page: AppShellPage) {
   `;
 }
 
-function renderSidebarAccount(user?: AppShellUser) {
-  // The sidebar account block keeps identity and logout controls anchored beside the theme switcher.
+function renderSidebarAccount(user?: AppShellUser, loginHref?: string) {
+  // The sidebar account block keeps identity, login entry, and logout controls anchored beside the theme switcher.
   if (!user) {
+    const loginAction = loginHref
+      ? `<a href="${escapeHtml(loginHref)}" class="ghost-button">登录后访问系统菜单</a>`
+      : "";
+
     return `
       <section class="sidebar-account" aria-label="账号信息">
-        <p class="user-meta">公开访问模式</p>
+        <p class="user-meta">${loginHref ? "当前为内容公开访问模式" : "公开访问模式"}</p>
+        ${loginAction}
       </section>
     `;
   }
@@ -137,11 +147,61 @@ function renderSidebarAccount(user?: AppShellUser) {
         <p class="user-name">${escapeHtml(user.displayName)}</p>
         <p class="user-meta">@${escapeHtml(user.username)} · ${escapeHtml(user.role)}</p>
       </div>
-      <form method="post" action="/logout" class="sidebar-account-actions">
+      <form method="post" action="/logout" enctype="text/plain" class="sidebar-account-actions">
         <button type="submit" class="ghost-button">退出登录</button>
       </form>
     </section>
   `;
+}
+
+function renderMobileTopNav(currentPath: string, showSystemMenu: boolean) {
+  // Mobile keeps a compact top bar so content tabs stay visible and the system drawer can be wired later.
+  const contentTabs = renderMobileTopTabs(
+    appShellPages.filter((page) => page.section === "content"),
+    currentPath
+  );
+  const systemDrawer = showSystemMenu
+    ? `
+      <nav id="mobile-system-drawer" class="mobile-system-drawer" hidden aria-label="系统菜单">
+        ${renderNavGroup(appShellPages.filter((page) => page.section === "system"), currentPath)}
+      </nav>
+    `
+    : "";
+  const systemToggle = showSystemMenu
+    ? `
+      <button
+        type="button"
+        class="mobile-top-system-toggle"
+        data-mobile-system-toggle
+        aria-expanded="false"
+        aria-controls="mobile-system-drawer"
+      >
+        系统菜单
+      </button>
+    `
+    : "";
+
+  return `
+    <div class="mobile-top-nav" aria-label="移动端顶部导航">
+      <div class="mobile-top-nav-bar">
+        <div class="mobile-top-nav-tabs" aria-label="内容菜单">
+          ${contentTabs}
+        </div>
+        ${systemToggle}
+      </div>
+      ${systemDrawer}
+    </div>
+  `;
+}
+
+function renderMobileTopTabs(pages: AppShellPage[], currentPath: string): string {
+  // Content tabs keep the same route metadata but use a compact active pill treatment on mobile.
+  return pages
+    .map((page) => {
+      const activeClass = page.path === currentPath ? " is-active" : "";
+      return `<a class="mobile-top-tab mobile-top-tab--content${activeClass}" data-shell-nav href="${escapeHtml(page.path)}">${escapeHtml(page.title)}</a>`;
+    })
+    .join("");
 }
 
 function renderNavGroup(pages: AppShellPage[], currentPath: string): string {
@@ -149,7 +209,7 @@ function renderNavGroup(pages: AppShellPage[], currentPath: string): string {
   return pages
     .map((page) => {
       const activeClass = page.path === currentPath ? " is-active" : "";
-      return `<a class="nav-link${activeClass}" href="${escapeHtml(page.path)}">${escapeHtml(page.title)}</a>`;
+      return `<a class="nav-link nav-link--${page.section}${activeClass}" data-shell-nav href="${escapeHtml(page.path)}">${escapeHtml(page.title)}</a>`;
     })
     .join("");
 }

@@ -1,6 +1,6 @@
 # hot-now
 
-本地单机运行的科技资讯控制台。它会按固定周期拉取多个已启用的 RSS 源、抓取原文、做规则聚类、按系统百分制评分排序内容、生成多源汇总的 HTML/JSON 报告；邮件发送与采集解耦，可按每日固定时间或手动触发，对最新一份报告单独发信。
+本地单机运行的科技资讯编辑台。它会按固定周期拉取多个已启用的 RSS 源、抓取原文、做规则聚类、按系统百分制评分排序内容、生成多源汇总的 HTML/JSON 报告；邮件发送与采集解耦，可按每日固定时间或手动触发，对最新一份报告单独发信。
 
 ## 本地启动
 
@@ -46,10 +46,13 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 
 - 健康检查：`/health`
 - 登录页：`/login`
-- 统一站点菜单（登录后访问）：`/`、`/articles`、`/ai`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`
+- 统一站点内容菜单（未登录也可访问）：`/`、`/articles`、`/ai`
+- 统一站点系统菜单（登录后访问）：`/settings/view-rules`、`/settings/sources`、`/settings/profile`
 - 内容页统一展示系统自动分数（`0-100`）和解释标签，不再提供手工评分表单
+- 如果本地 `data/hot-now.sqlite` 内容库损坏，内容页会降级显示错误提示，而不是直接返回 `500`
 - 统一站点左侧导航底部支持深色 / 浅色主题切换，主题偏好保存在浏览器本地 `localStorage`，刷新后保持
-- `unified shell` 页面已完整接入赛博双主题：`/`、`/articles`、`/ai`、`/settings/*`
+- `unified shell` 页面已完整接入以浅色为母版的 `Editorial Signal Desk` 双主题：`/`、`/articles`、`/ai`、`/settings/*`
+- 统一站点保留左侧品牌块、浅深主题切换和本地 `localStorage` 持久化
 - Legacy 报告页（当前仍保留）：`/history`、`/reports/:date`、`/control`
 - legacy `/history`、`/control` 与 `/reports/:date` 的 fallback notice 轻量跟随共享主题资源
 - 手动采集：`POST /actions/collect`
@@ -57,7 +60,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 兼容别名：`POST /actions/run`（等价于手动采集）
 - 内容导航保持统一内容池，但会对匹配导航语义的 source 做优先展示：`36氪` / `36氪快讯` 优先进入热点页，`爱范儿` 优先进入 AI 页，`36氪` / `爱范儿` / `IT之家` 优先进入文章页
 
-统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。`content_sources.is_enabled` 决定哪些 source 参与采集，`/settings/sources` 现在可以直接启用/停用 source，并分别手动执行一次采集或手动发送最新报告；legacy `/control` 也同步提供这两个动作。
+统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。auth 开启后，内容菜单保持公开可读，但系统菜单和所有写操作仍然要求登录；`content_sources.is_enabled` 决定哪些 source 参与采集，`/settings/sources` 现在可以直接启用/停用 source，并分别手动执行一次采集或手动发送最新报告；legacy `/control` 也同步提供这两个动作。
 
 当前内置 RSS 源包括：
 

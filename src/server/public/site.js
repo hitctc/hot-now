@@ -13,9 +13,12 @@
   ];
   const globalStatusDisplayDurationMs = 3000;
   const globalErrorStatusDisplayDurationMs = 7000;
+  const shellNavigationHeader = "x-hot-now-shell-nav";
   let globalStatusTimerId = null;
+  let shellNavigationInFlight = false;
 
   applyInitialTheme();
+  closeMobileSystemDrawer();
 
   root.addEventListener("click", async (event) => {
     const target = event.target;
@@ -24,17 +27,36 @@
       return;
     }
 
+    const shellNavLink = target.closest("[data-shell-nav]");
+
+    if (shellNavLink instanceof HTMLAnchorElement && shouldHandleShellNavigation(event, shellNavLink)) {
+      event.preventDefault();
+      closeMobileSystemDrawer();
+      await navigateShellPage(shellNavLink.href);
+      return;
+    }
+
+    const mobileSystemToggle = target.closest("[data-mobile-system-toggle]");
+
+    if (mobileSystemToggle instanceof HTMLButtonElement) {
+      event.preventDefault();
+      toggleMobileSystemDrawer();
+      return;
+    }
+
     const themeButton = target.closest("[data-theme-choice]");
 
     if (themeButton instanceof HTMLButtonElement) {
       event.preventDefault();
       setTheme(themeButton.dataset.themeChoice || "dark");
+      closeMobileSystemDrawer();
       return;
     }
 
     const button = target.closest("[data-content-action]");
 
     if (!(button instanceof HTMLButtonElement)) {
+      closeMobileSystemDrawer();
       return;
     }
 
@@ -55,13 +77,18 @@
     if (action === "favorite") {
       event.preventDefault();
       await handleFavorite(button, contentId);
+      closeMobileSystemDrawer();
       return;
     }
 
     if (action === "reaction") {
       event.preventDefault();
       await handleReaction(card, button, contentId);
+      closeMobileSystemDrawer();
+      return;
     }
+
+    closeMobileSystemDrawer();
   });
 
   root.addEventListener("submit", async (event) => {
@@ -94,6 +121,14 @@
       await handleManualSendLatestEmail(target);
       return;
     }
+  });
+
+  window.addEventListener("popstate", () => {
+    if (!isShellNavigationEnabled()) {
+      return;
+    }
+
+    void navigateShellPage(window.location.pathname + window.location.search, { pushHistory: false });
   });
 
   async function handleFavorite(button, contentId) {
@@ -465,6 +500,206 @@
     // Theme boot reads persisted preference first and falls back to the shell's dark default.
     const savedTheme = readStoredTheme();
     setTheme(savedTheme || "dark", false);
+  }
+
+  function isShellNavigationEnabled() {
+    return Boolean(getShellRoot() && getShellSidebar() && getShellContent());
+  }
+
+  function getShellRoot() {
+    const shellRoot = root.querySelector(".shell-root");
+
+    return shellRoot instanceof HTMLElement ? shellRoot : null;
+  }
+
+  function getShellSidebar() {
+    const shellSidebar = root.querySelector(".shell-sidebar");
+
+    return shellSidebar instanceof HTMLElement ? shellSidebar : null;
+  }
+
+  function getShellContent() {
+    const shellContent = root.querySelector(".shell-content");
+
+    return shellContent instanceof HTMLElement ? shellContent : null;
+  }
+
+  function getMobileTopNav() {
+    const mobileTopNav = root.querySelector(".mobile-top-nav");
+
+    return mobileTopNav instanceof HTMLElement ? mobileTopNav : null;
+  }
+
+  function shouldHandleShellNavigation(event, link) {
+    if (!isShellNavigationEnabled()) {
+      return false;
+    }
+
+    if (link.target && link.target !== "_self") {
+      return false;
+    }
+
+    if (link.hasAttribute("download")) {
+      return false;
+    }
+
+    if (event instanceof MouseEvent && (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)) {
+      return false;
+    }
+
+    try {
+      const targetUrl = new URL(link.href, window.location.href);
+      return targetUrl.origin === window.location.origin;
+    } catch {
+      return false;
+    }
+  }
+
+  async function navigateShellPage(nextHref, options = { pushHistory: true }) {
+    if (shellNavigationInFlight) {
+      return;
+    }
+
+    const targetUrl = new URL(nextHref, window.location.href);
+    const currentUrl = new URL(window.location.href);
+
+    if (targetUrl.pathname === currentUrl.pathname && targetUrl.search === currentUrl.search) {
+      return;
+    }
+
+    const shellSidebar = getShellSidebar();
+
+    if (!(shellSidebar instanceof HTMLElement)) {
+      window.location.assign(targetUrl.toString());
+      return;
+    }
+
+    shellNavigationInFlight = true;
+    const sidebarScrollTop = shellSidebar.scrollTop;
+
+    try {
+      const response = await fetch(targetUrl.pathname + targetUrl.search, {
+        headers: {
+          accept: "text/html",
+          [shellNavigationHeader]: "1"
+        },
+        credentials: "same-origin"
+      });
+
+      if (!response.ok) {
+        window.location.assign(targetUrl.toString());
+        return;
+      }
+
+      const nextHtml = await response.text();
+      const nextDocument = new DOMParser().parseFromString(nextHtml, "text/html");
+
+      if (!patchShellDocument(nextDocument)) {
+        window.location.assign(targetUrl.toString());
+        return;
+      }
+
+      if (options.pushHistory !== false) {
+        window.history.pushState({ path: targetUrl.pathname + targetUrl.search }, "", targetUrl.toString());
+      }
+
+      document.title = nextDocument.title || document.title;
+      syncThemeButtons(themeRoot.dataset.theme || "dark");
+      shellSidebar.scrollTop = sidebarScrollTop;
+      window.scrollTo({ top: 0, behavior: "auto" });
+    } catch {
+      window.location.assign(targetUrl.toString());
+    } finally {
+      shellNavigationInFlight = false;
+    }
+  }
+
+  function patchShellDocument(nextDocument) {
+    const currentShellContent = getShellContent();
+    const currentShellSidebar = getShellSidebar();
+    const nextShellContent = nextDocument.querySelector(".shell-content");
+    const nextShellSidebar = nextDocument.querySelector(".shell-sidebar");
+
+    if (!(currentShellContent instanceof HTMLElement) || !(currentShellSidebar instanceof HTMLElement)) {
+      return false;
+    }
+
+    if (!(nextShellContent instanceof HTMLElement) || !(nextShellSidebar instanceof HTMLElement)) {
+      return false;
+    }
+
+    currentShellContent.innerHTML = nextShellContent.innerHTML;
+    currentShellSidebar.innerHTML = nextShellSidebar.innerHTML;
+    patchMobileTopNav(nextDocument);
+    return true;
+  }
+
+  function patchMobileTopNav(nextDocument) {
+    const currentMobileTopNav = getMobileTopNav();
+    const nextMobileTopNav = nextDocument.querySelector(".mobile-top-nav");
+
+    if (currentMobileTopNav instanceof HTMLElement && nextMobileTopNav instanceof HTMLElement) {
+      currentMobileTopNav.replaceWith(nextMobileTopNav);
+      closeMobileSystemDrawer();
+      return;
+    }
+
+    if (currentMobileTopNav instanceof HTMLElement) {
+      currentMobileTopNav.remove();
+      return;
+    }
+
+    if (nextMobileTopNav instanceof HTMLElement) {
+      const shellRoot = getShellRoot();
+
+      if (shellRoot instanceof HTMLElement) {
+        shellRoot.before(nextMobileTopNav);
+      }
+    }
+  }
+
+  function getMobileSystemToggle() {
+    const toggle = root.querySelector("[data-mobile-system-toggle]");
+
+    return toggle instanceof HTMLButtonElement ? toggle : null;
+  }
+
+  function getMobileSystemDrawer() {
+    const drawer = root.querySelector("#mobile-system-drawer");
+
+    return drawer instanceof HTMLElement ? drawer : null;
+  }
+
+  function isMobileSystemDrawerOpen() {
+    const toggle = getMobileSystemToggle();
+    const drawer = getMobileSystemDrawer();
+
+    if (toggle instanceof HTMLButtonElement) {
+      return toggle.getAttribute("aria-expanded") === "true";
+    }
+
+    return drawer instanceof HTMLElement && !drawer.hasAttribute("hidden");
+  }
+
+  function setMobileSystemDrawerOpen(isOpen) {
+    const toggle = getMobileSystemToggle();
+    const drawer = getMobileSystemDrawer();
+
+    if (toggle instanceof HTMLButtonElement) {
+      toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    }
+
+    if (drawer instanceof HTMLElement) {
+      drawer.toggleAttribute("hidden", !isOpen);
+    }
+  }
+
+  function toggleMobileSystemDrawer() {
+    setMobileSystemDrawerOpen(!isMobileSystemDrawerOpen());
+  }
+
+  function closeMobileSystemDrawer() {
+    setMobileSystemDrawerOpen(false);
   }
 
   function readStoredTheme() {

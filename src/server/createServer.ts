@@ -47,6 +47,10 @@ type SourceCard = {
   lastCollectedAt: string | null;
   lastCollectionStatus: string | null;
 };
+type SourcesOperationSummary = {
+  lastCollectionRunAt: string | null;
+  lastSendLatestEmailAt: string | null;
+};
 type CurrentUserProfile = {
   username: string;
   displayName: string;
@@ -75,6 +79,7 @@ type ServerDeps = {
   listViewRules?: () => Promise<ViewRuleCard[]> | ViewRuleCard[];
   saveViewRuleConfig?: (ruleKey: string, config: Record<string, unknown>) => Promise<SaveViewRuleResult> | SaveViewRuleResult;
   listSources?: () => Promise<SourceCard[]> | SourceCard[];
+  getSourcesOperationSummary?: () => Promise<SourcesOperationSummary> | SourcesOperationSummary;
   toggleSource?: (kind: string, enable: boolean) => Promise<ToggleSourceResult> | ToggleSourceResult;
   getCurrentUserProfile?: () => Promise<CurrentUserProfile | null> | CurrentUserProfile | null;
   auth?: {
@@ -170,32 +175,37 @@ export function createServer(deps: ServerDeps = {}) {
 
     for (const page of getAppShellPages()) {
       app.get(page.path, async (request, reply) => {
-        const session = readAuthenticatedSession(request.headers.cookie, authConfig?.sessionSecret ?? "");
-
-        if (!session) {
-          return reply.redirect("/login");
-        }
-
         const currentPage = findAppShellPage(page.path);
 
         if (!currentPage) {
           return reply.code(404).type("text/html").send(renderNoticePage("HotNow", "页面不存在"));
         }
 
+        const session = readAuthenticatedSession(request.headers.cookie, authConfig?.sessionSecret ?? "");
+
+        // Content pages stay readable without a session, but system pages still require an authenticated user.
+        if (!session && currentPage.section === "system") {
+          return reply.redirect("/login");
+        }
+
         const contentViewKey = mapPathToContentViewKey(currentPage.path);
         const contentHtml = contentViewKey
           ? await renderContentForView(deps, contentViewKey)
-          : await renderSystemPageForPath(deps, currentPage.path, true);
+          : await renderSystemPageForPath(deps, currentPage.path, Boolean(session));
 
         return reply.type("text/html").send(
           renderAppLayout({
             currentPath: currentPage.path,
             page: currentPage,
-            user: {
-              username: session.username,
-              displayName: session.displayName,
-              role: session.role
-            },
+            user: session
+              ? {
+                  username: session.username,
+                  displayName: session.displayName,
+                  role: session.role
+                }
+              : undefined,
+            showSystemMenu: Boolean(session),
+            loginHref: session ? undefined : "/login",
             contentHtml
           })
         );
@@ -546,9 +556,25 @@ async function renderContentForView(deps: ServerDeps, viewKey: ContentViewKey): 
     return undefined;
   }
 
-  const cards = await deps.listContentView(viewKey);
+  try {
+    const cards = await deps.listContentView(viewKey);
 
-  return renderContentPage({ viewKey, cards });
+    return renderContentPage({ viewKey, cards });
+  } catch (error) {
+    if (!isMalformedContentStoreError(error)) {
+      throw error;
+    }
+
+    return renderContentPage({
+      viewKey,
+      cards: [],
+      emptyState: {
+        title: "内容暂不可用",
+        description: "检测到本地内容库读取失败，请修复或重建 data/hot-now.sqlite 后再刷新。",
+        tone: "degraded"
+      }
+    });
+  }
 }
 
 async function renderSystemPageForPath(deps: ServerDeps, pathname: string, loggedIn: boolean): Promise<string | undefined> {
@@ -568,10 +594,16 @@ async function renderSystemPageForPath(deps: ServerDeps, pathname: string, logge
     }
 
     const sources = await deps.listSources();
+    const operationSummary = deps.getSourcesOperationSummary
+      ? await deps.getSourcesOperationSummary()
+      : { lastCollectionRunAt: null, lastSendLatestEmailAt: null };
+
     return renderSourcesPage(sources, {
       canTriggerManualCollect: typeof (deps.triggerManualCollect ?? deps.triggerManualRun) === "function",
       canTriggerManualSendLatestEmail: typeof deps.triggerManualSendLatestEmail === "function",
-      isRunning: deps.isRunning?.() ?? false
+      isRunning: deps.isRunning?.() ?? false,
+      lastCollectionRunAt: operationSummary.lastCollectionRunAt,
+      lastSendLatestEmailAt: operationSummary.lastSendLatestEmailAt
     });
   }
 
@@ -617,6 +649,23 @@ function ensureStateActionAuthorized(
   }
 
   return true;
+}
+
+function isMalformedContentStoreError(error: unknown): boolean {
+  // Only known SQLite file-shape errors degrade to an empty state; other exceptions must still surface for debugging.
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const errorCode = "code" in error && typeof error.code === "string" ? error.code : "";
+  const errorMessage = "message" in error && typeof error.message === "string" ? error.message : "";
+
+  return (
+    errorCode === "SQLITE_CORRUPT" ||
+    errorCode === "SQLITE_NOTADB" ||
+    /database disk image is malformed/i.test(errorMessage) ||
+    /file is not a database/i.test(errorMessage)
+  );
 }
 
 async function handleManualCollectAction(

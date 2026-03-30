@@ -52,6 +52,14 @@ export type UpsertDigestReportInput = {
   mailStatus: string;
 };
 
+export type RecordDigestReportMailAttemptInput = {
+  reportDate: string;
+  mailStatus: string;
+  attemptedAt: string;
+  reportJsonPath?: string;
+  reportHtmlPath?: string;
+};
+
 // Mail resend and future admin actions only need the newest mirrored report date, so the query stays
 // intentionally narrow and returns null when SQLite has no digest report rows yet.
 export function findLatestDigestReportDate(db: SqliteDatabase): string | null {
@@ -97,6 +105,54 @@ export function upsertDigestReport(db: SqliteDatabase, input: UpsertDigestReport
     input.reportHtmlPath ?? null,
     input.mailStatus
   );
+}
+
+// Mail resend flows need their own persisted timestamp because report generation time is not the same as
+// the latest delivery attempt time, especially once scheduled and manual resends coexist.
+export function recordDigestReportMailAttempt(db: SqliteDatabase, input: RecordDigestReportMailAttemptInput): void {
+  db.prepare(
+    `
+      INSERT INTO digest_reports (
+        report_date,
+        report_json_path,
+        report_html_path,
+        mail_status,
+        last_email_attempted_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(report_date) DO UPDATE SET
+        report_json_path = COALESCE(excluded.report_json_path, digest_reports.report_json_path),
+        report_html_path = COALESCE(excluded.report_html_path, digest_reports.report_html_path),
+        mail_status = excluded.mail_status,
+        last_email_attempted_at = excluded.last_email_attempted_at,
+        updated_at = CURRENT_TIMESTAMP
+    `
+  ).run(
+    input.reportDate,
+    input.reportJsonPath ?? null,
+    input.reportHtmlPath ?? null,
+    input.mailStatus,
+    input.attemptedAt
+  );
+}
+
+// The source settings workbench only needs the latest known email attempt across reports,
+// so this query stays narrow and returns null when no resend has happened yet.
+export function findLatestDigestReportMailAttemptAt(db: SqliteDatabase): string | null {
+  const row = db
+    .prepare(
+      `
+        SELECT last_email_attempted_at
+        FROM digest_reports
+        WHERE last_email_attempted_at IS NOT NULL
+        ORDER BY datetime(last_email_attempted_at) DESC, id DESC
+        LIMIT 1
+      `
+    )
+    .get() as { last_email_attempted_at: string | null } | undefined;
+
+  return row?.last_email_attempted_at ?? null;
 }
 
 function resolveWithinRoot(rootDir: string, ...segments: string[]) {

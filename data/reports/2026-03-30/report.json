@@ -1,0 +1,510 @@
+{
+  "meta": {
+    "date": "2026-03-30",
+    "generatedAt": "2026-03-30T10:00:07.137Z",
+    "trigger": "scheduled",
+    "issueUrl": "http://36kr.com",
+    "issueUrls": [
+      "https://blog.google/innovation-and-ai/technology/ai/",
+      "http://36kr.com",
+      "https://techcrunch.com/category/artificial-intelligence/",
+      "https://www.ifanr.com?utm_source=rss&utm_medium=rss&utm_campaign=",
+      "https://www.ithome.com/",
+      "https://imjuya.github.io/juya-ai-daily/issue-44/"
+    ],
+    "sourceKinds": [
+      "google_ai",
+      "kr36",
+      "kr36_newsflash",
+      "techcrunch_ai",
+      "aifanr",
+      "ithome",
+      "juya"
+    ],
+    "topicCount": 10,
+    "degraded": true,
+    "mailStatus": "not-sent-by-collection",
+    "sourceFailureCount": 0,
+    "failedSourceKinds": []
+  },
+  "topics": [
+    {
+      "rank": 1,
+      "title": "Why OpenAI really shut down Sora",
+      "category": "热门文章",
+      "whyItMatters": "该主题当前聚合了 11 条候选信息，且最高源内排序为 #1。",
+      "summary": "In Brief Posted: 8:09 PM PDT · March 29, 2026 Image Credits:Robert Way (opens in a new window) / Getty Images OpenAI’s decision last week to",
+      "keywords": [
+        "Why",
+        "OpenAI",
+        "really",
+        "shut",
+        "down"
+      ],
+      "relatedCount": 11,
+      "relatedItems": [
+        {
+          "sourceRank": 1,
+          "sourceCategory": "热门文章",
+          "sourceTitle": "Why OpenAI really shut down Sora",
+          "sourceUrl": "https://techcrunch.com/2026/03/29/why-openai-really-shut-down-sora/",
+          "articleOk": true,
+          "articleTitle": "Why OpenAI really shut down Sora",
+          "articleSummary": "In Brief\nPosted:\n\n\n8:09 PM PDT · March 29, 2026\n\n\n\nImage Credits:Robert Way (opens in a new window) / Getty Images\n\n\n\n\t\t\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\n\t\t\n\t\n\n\n\n\n\nOpenAI’s decision last week to shut down Sora, its AI video-generation to"
+        },
+        {
+          "sourceRank": 3,
+          "sourceCategory": "热门文章",
+          "sourceTitle": "Bluesky leans into AI with Attie, an app for building custom feeds",
+          "sourceUrl": "https://techcrunch.com/2026/03/28/bluesky-leans-into-ai-with-attie-an-app-for-building-custom-feeds/",
+          "articleOk": true,
+          "articleTitle": "Bluesky leans into AI with Attie, an app for building custom feeds",
+          "articleSummary": "The team from Bluesky has built another app — and this time, it’s not a social network, but an AI assistant that allows you to design your own algorithm, create custom feeds, and, one day, vibe-code your own app. \n\nAt the Atmosphere confere"
+        },
+        {
+          "sourceRank": 4,
+          "sourceCategory": "热门文章",
+          "sourceTitle": "Stanford study outlines dangers of asking AI chatbots for personal advice",
+          "sourceUrl": "https://techcrunch.com/2026/03/28/stanford-study-outlines-dangers-of-asking-ai-chatbots-for-personal-advice/",
+          "articleOk": true,
+          "articleTitle": "Stanford study outlines dangers of asking AI chatbots for personal advice",
+          "articleSummary": "While there’s been plenty of debate about the tendency of AI chatbots to flatter users and confirm their existing beliefs — also known as AI sycophancy — a new study by Stanford computer scientists attempts to measure how harmful that tende"
+        },
+        {
+          "sourceRank": 6,
+          "sourceCategory": "热门文章",
+          "sourceTitle": "Anthropic’s Claude popularity with paying consumers is skyrocketing",
+          "sourceUrl": "https://techcrunch.com/2026/03/28/anthropics-claude-popularity-with-paying-consumers-is-skyrocketing/",
+          "articleOk": true,
+          "articleTitle": "Anthropic’s Claude popularity with paying consumers is skyrocketing",
+          "articleSummary": "Whatever the final outcome for Anthropic from its feud with the Department of Defense, the attention it has generated — coupled with the company’s funny Super Bowl ads taking aim at OpenAI and the surging popularity of Claude Code — has mad"
+        },
+        {
+          "sourceRank": 13,
+          "sourceCategory": "热门文章",
+          "sourceTitle": "You can now transfer your chats and personal information from other chatbots directly into Gemini",
+          "sourceUrl": "https://techcrunch.com/2026/03/26/you-can-now-transfer-your-chats-and-personal-information-from-other-chatbots-directly-into-gemini/",
+          "articleOk": true,
+          "articleTitle": "You can now transfer your chats and personal information from other chatbots directly into Gemini",
+          "articleSummary": "When it comes to AI chatbots, there’s currently a war on for consumer attention. All the big chatbot providers are looking to increase their user count and, in a minor coup for itself, Google just made it significantly easier for users of t"
+        },
+        {
+          "sourceRank": 20,
+          "sourceCategory": "热门文章",
+          "sourceTitle": "A ‘pound of flesh’ from data centers: one senator’s answer to AI job losses",
+          "sourceUrl": "https://techcrunch.com/2026/03/26/a-pound-of-flesh-from-data-centers-one-senators-answer-to-ai-job-losses/",
+          "articleOk": true,
+          "articleTitle": "A ‘pound of flesh’ from data centers: one senator’s answer to AI job losses",
+          "articleSummary": "The signs that AI could lead to mass job displacement are already piling up: Entry-level job postings in the U.S. have sunk 35% since 2023, mass layoffs have swept across Big Tech, and even AI leaders are warning about what’s coming. \n\nBack"
+        },
+        {
+          "sourceRank": 4,
+          "sourceCategory": "AI 科技",
+          "sourceTitle": "早报｜苹果高管：未来50年iPhone仍是AI时代的核心/xAI联合创始人全数离职/智驾车专属保险率先落地北京，覆盖L2~L4",
+          "sourceUrl": "https://www.ifanr.com/1660172?utm_source=rss&utm_medium=rss&utm_campaign=",
+          "articleOk": true,
+          "articleTitle": "早报｜苹果高管：未来50年iPhone仍是AI时代的核心/xAI联合创始人全数离职/智驾车专属保险率先落地北京，覆盖L2~L4",
+          "articleSummary": "🍎\n苹果承认 AI 落后，用「AI App Store」换一条活路\n\n\n🦿\n宇树科技亚洲首店五月落地上海\n\n\n🤯\n引发存储股暴跌的 Google 论文遭学术不端指控\n\n\n🤖\nOpenAI 一周砍掉三款产品，成人聊天功能无限期搁置\n\n\n🚶\nxAI 联合创始人全数离职，马斯克「从零重建」AI 公司\n\n\n🚗\n智驾车专属保险率先落地北京，覆盖 L2 ~ L4\n\n\n📷\nDNG 正式成为相机 RAW 格式国际标准\n\n\n✈️\n国产 60kW 增程式混动航空发动机完成飞行验证\n"
+        },
+        {
+          "sourceRank": 6,
+          "sourceCategory": "AI 科技",
+          "sourceTitle": "早报｜防挖角，苹果给设计师发高额奖金/曝Claude最强新模型代号「卡皮巴拉」/小鹏汽车将改名小鹏集团",
+          "sourceUrl": "https://www.ifanr.com/1660125?utm_source=rss&utm_medium=rss&utm_campaign=",
+          "articleOk": true,
+          "articleTitle": "早报｜防挖角，苹果给设计师发高额奖金/曝Claude最强新模型代号「卡皮巴拉」/小鹏汽车将改名小鹏集团",
+          "articleSummary": "🌚\nNeurIPS 道歉：禁止中国机构投稿系「沟通误解」，已更新规则\n\n\n🍎\n防止人才被挖，苹果向设计师发放高额奖金\n\n\n🧠\nGemini 推出记忆导入功能\n\n\n🤖\nClaude 新模型曝光，官方称「将带来前所未有的安全风险」\n\n\n🎮\n索尼宣布 PS5 全线涨价\n\n\n🚗\n小鹏汽车将改名「小鹏集团」\n\n\n🚙\n乐道重启轿车和 SUV 研发，定位 20 万级市场\n\n\n☁️\n腾讯云发布「养虾产品全景图」\n\n\n💬\n智谱 CEO 张鹏：大模型低价竞争不可持续，提价是「回归"
+        },
+        {
+          "sourceRank": 10,
+          "sourceCategory": "AI 科技",
+          "sourceTitle": "林俊旸离职后首发长文：反思千问得失，预判 AI 下半场需要「智能体思维」",
+          "sourceUrl": "https://www.ifanr.com/1659950?utm_source=rss&utm_medium=rss&utm_campaign=",
+          "articleOk": true,
+          "articleTitle": "从「想更久」，到「为了行动而思考」。",
+          "articleSummary": "带队发布 Qwen 3.5 小模型系列、获马斯克公开点赞，20 小时后在社交媒体宣告离职。林俊旸离开阿里的方式，本身就是 2026 年 AI 行业最戏剧性的一幕。\n32 岁，阿里最年轻的 P10，一手将千问做到全球下载量超 10 亿次、衍生模型超 20 万款，成为全球开源模型的新王。他的离开源于一次组织架构调整的分歧：\n阿里希望将 Qwen 团队按预训练、后训练、视觉、语音等维度水平拆分，与通义实验室其他团队合并；林俊旸则坚信预训练、后训练乃至基础设施团队应该更紧密地垂直整合"
+        },
+        {
+          "sourceRank": 11,
+          "sourceCategory": "AI 科技",
+          "sourceTitle": "杨植麟、罗福莉、夏立雪、张鹏、黄超，五个AI圈顶流把龙虾、Token 、开源聊透了",
+          "sourceUrl": "https://www.ifanr.com/1659954?utm_source=rss&utm_medium=rss&utm_campaign=",
+          "articleOk": true,
+          "articleTitle": "生态、自进化、可持续 Token 与算力",
+          "articleSummary": "龙虾，是最近 AI 圈出现频率最高的词汇。\n它指的是 OpenClaw，一个近期在AI圈迅速蔓延的开源智能体框架。有人觉得它像贾维斯，有人觉得它像脚手架，有人觉得它像轻量级操作系统，所有人都在用，而且越用越停不下来。\n围绕它的讨论也随之而来：龙虾能干什么，干不了什么，下一步往哪走，算力够不够，谁在受益，谁在焦虑。\n\n现在，行业里最靠近前线的一批人坐下来，认真聊了聊这件事。就在刚刚，月之暗面创始人杨植麟在北京中关村论坛年会的开源主题圆桌中主持了一场五人谈话，智谱创始人张鹏、无问"
+        },
+        {
+          "sourceRank": 14,
+          "sourceCategory": "AI 科技",
+          "sourceTitle": "早报｜苹果下架「刨丝器」Mac Pro/小米遭老头乐起诉，后者称已和解/微信官方解读「正在输入」背后原理",
+          "sourceUrl": "https://www.ifanr.com/1659953?utm_source=rss&utm_medium=rss&utm_campaign=",
+          "articleOk": true,
+          "articleTitle": "早报｜苹果下架「刨丝器」Mac Pro/小米遭老头乐起诉，后者称已和解/微信官方解读「正在输入」背后原理",
+          "articleSummary": "📱\n苹果或允许第三方 AI 接入 Siri\n\n\n🛑\n真我将于 4 月关停官方商城\n\n\n🚗\n小米汽车遭「老头乐」公司起诉\n\n\n🚗\n本田和索尼叫停电动汽车合资项目\n\n\n🤔\n林俊旸离职后首发长文：反思千问得失\n\n\n🔍\nxAI 被曝再走一名联创，11 人仅剩 1 位\n\n\n💰\n微信官方解读「正在输入」背后原理\n\n\n🧠\n曝 Kimi 考虑赴港 IPO，估值约 180 亿美元\n\n\n🍔\nGoogle 发布新型 AI 内存压缩技术，存储股集体下跌\n\n\n⚓\n美团公布「外卖大战」"
+        }
+      ]
+    },
+    {
+      "rank": 2,
+      "title": "赛力斯：拟10亿元-20亿元回购股份，用于减少公司注册资本",
+      "category": "热点新闻",
+      "whyItMatters": "该主题当前聚合了 5 条候选信息，且最高源内排序为 #1。",
+      "summary": "赛力斯：拟10亿元-20亿元回购股份，用于减少公司注册资本",
+      "keywords": [
+        "赛力",
+        "拟10亿元",
+        "20亿元回购股份",
+        "用于",
+        "减少"
+      ],
+      "relatedCount": 5,
+      "relatedItems": [
+        {
+          "sourceRank": 11,
+          "sourceCategory": "热点资讯",
+          "sourceTitle": "赛力斯：拟10亿元-20亿元回购股份，用于减少公司注册资本",
+          "sourceUrl": "https://36kr.com/newsflashes/3745262075428864?f=rss",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        },
+        {
+          "sourceRank": 26,
+          "sourceCategory": "热点资讯",
+          "sourceTitle": "赛力斯：2025年营业收入1648.88亿元，同比增长13.63%。",
+          "sourceUrl": "https://36kr.com/newsflashes/3745195946803457?f=rss",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        },
+        {
+          "sourceRank": 1,
+          "sourceCategory": "热点新闻",
+          "sourceTitle": "赛力斯：拟10亿元-20亿元回购股份，用于减少公司注册资本",
+          "sourceUrl": "https://36kr.com/newsflashes/3745262075428864?f=rss",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        },
+        {
+          "sourceRank": 16,
+          "sourceCategory": "热点新闻",
+          "sourceTitle": "赛力斯：2025年营业收入1648.88亿元，同比增长13.63%。",
+          "sourceUrl": "https://36kr.com/newsflashes/3745195946803457?f=rss",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        },
+        {
+          "sourceRank": 6,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "赛力斯：2025 年营业收入 1648.88 亿元，同比增长 13.63%",
+          "sourceUrl": "https://www.ithome.com/0/934/168.htm",
+          "articleOk": true,
+          "articleTitle": "赛力斯：2025 年营业收入 1648.88 亿元，同比增长 13.63%",
+          "articleSummary": "感谢IT之家网友 HH_KK、西窗、斯文当不了饭吃 的线索投递！\n            IT之家 3 月 30 日消息，赛力斯今日发布公告，2025 年营业收入 1648.88 亿元，同比增长 13.63%。全年归属于股东净利润 59.57 亿元，同比增长 0.18%。IT之家从公告获悉，2025 年，该公司加大研发投入与营销服务体系建设，全年实现总销量 51.69 万辆。公司 2025 年实现新能源汽车销量 47.23 万辆，同比增长 10.63%；报告期内，该公司研发投"
+        }
+      ]
+    },
+    {
+      "rank": 3,
+      "title": "海信视像：2025年归母净利润24.54亿元，同比增长9.24%",
+      "category": "热点新闻",
+      "whyItMatters": "该主题当前聚合了 3 条候选信息，且最高源内排序为 #2。",
+      "summary": "海信视像：2025年归母净利润24.54亿元，同比增长9.24%",
+      "keywords": [
+        "海信",
+        "视像",
+        "2025年归母净利润24",
+        "54亿元",
+        "同比增长9"
+      ],
+      "relatedCount": 3,
+      "relatedItems": [
+        {
+          "sourceRank": 12,
+          "sourceCategory": "热点资讯",
+          "sourceTitle": "海信视像：2025年归母净利润24.54亿元，同比增长9.24%",
+          "sourceUrl": "https://36kr.com/newsflashes/3745256578121987?f=rss",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        },
+        {
+          "sourceRank": 2,
+          "sourceCategory": "热点新闻",
+          "sourceTitle": "海信视像：2025年归母净利润24.54亿元，同比增长9.24%",
+          "sourceUrl": "https://36kr.com/newsflashes/3745256578121987?f=rss",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        },
+        {
+          "sourceRank": 4,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "海信视像：2025 年营收 576.79 亿，净利润 24.54 亿同比增长 9.24%",
+          "sourceUrl": "https://www.ithome.com/0/934/171.htm",
+          "articleOk": true,
+          "articleTitle": "海信视像：2025 年营收 576.79 亿，净利润 24.54 亿同比增长 9.24%",
+          "articleSummary": "IT之家 3 月 30 日消息，海信视像今日披露 2025 年报。2025 年，该公司实现营业收入 576.79 亿元，同比下降 1.45%；归母净利润 24.54 亿元，同比增长 9.24%。IT之家从公告获悉，公司高端大屏战略成效显著，2022 年至 2025 年，电视产品平均尺寸从 50.44 英寸增长到 53.63 英寸，65+ 产品销售额内占比从 44% 提升至 56%，75+ 产品销售额内占比从 21% 提升至 39%，98+ 产品销售额内占比从 1% 提升至 7"
+        }
+      ]
+    },
+    {
+      "rank": 4,
+      "title": "Build with Lyria 3, our newest music generation model",
+      "category": "最新 AI 消息",
+      "whyItMatters": "该主题当前聚合了 3 条候选信息，且最高源内排序为 #5。",
+      "summary": "Mar 25, 2026 Our newest music generation model is now available to developers in public preview. Alisa Fortin Product Manager, Google DeepMi",
+      "keywords": [
+        "Build",
+        "with",
+        "Lyria",
+        "our",
+        "newest"
+      ],
+      "relatedCount": 3,
+      "relatedItems": [
+        {
+          "sourceRank": 5,
+          "sourceCategory": "最新 AI 消息",
+          "sourceTitle": "Build with Lyria 3, our newest music generation model",
+          "sourceUrl": "https://blog.google/innovation-and-ai/technology/developers-tools/lyria-3-developers/",
+          "articleOk": true,
+          "articleTitle": "Build with Lyria 3, our newest music generation model",
+          "articleSummary": "Mar 25, 2026\n          \n          \n            \n          \n        \n      \n        \n          Our newest music generation model is now available to developers in public preview.\n        \n      \n    \n  \n  \n    \n      \n        \n\n\n  \n  \n    \n "
+        },
+        {
+          "sourceRank": 6,
+          "sourceCategory": "最新 AI 消息",
+          "sourceTitle": "Lyria 3 Pro: Create longer tracks in more Google products",
+          "sourceUrl": "https://blog.google/innovation-and-ai/technology/ai/lyria-3-pro/",
+          "articleOk": true,
+          "articleTitle": "Lyria 3 Pro: Create longer tracks in more Google products",
+          "articleSummary": "Your browser does not support the audio element.\n  \n        \n          Listen to article\n          \n            This content is generated by Google AI. Generative AI is experimental\n            \n  \n\n\n          \n        [[duration]] minutes\n"
+        },
+        {
+          "sourceRank": 13,
+          "sourceCategory": "最新 AI 消息",
+          "sourceTitle": "The latest AI news we announced in February",
+          "sourceUrl": "https://blog.google/innovation-and-ai/products/google-ai-updates-february-2026/",
+          "articleOk": true,
+          "articleTitle": "The latest AI news we announced in February",
+          "articleSummary": "Here’s a recap of our biggest AI updates from February, including highlights from the AI Impact Summit in India, the release of Gemini 3.1 Pro and Nano Banana 2.\n        \n      \n    \n  \n  \n    \n      \n  \n    \n        \n            \n\n\n    \n\n "
+        }
+      ]
+    },
+    {
+      "rank": 5,
+      "title": "极兔速递：2025 年营业收入 121.58 亿美元，同比增长 18.5%",
+      "category": "科技热点",
+      "whyItMatters": "该主题当前聚合了 3 条候选信息，且最高源内排序为 #12。",
+      "summary": "感谢IT之家网友 若怡 的线索投递！ IT之家 3 月 30 日消息，极兔速递今日公告，2025 年营业收入 121.58 亿美元，同比增长 18.5%；经调整利润净额 4.25 亿美元，同比增长 112.3%。IT之家从公告获悉，极兔速递快递业务覆盖 13 个国家，包括东南亚七",
+      "keywords": [
+        "极兔",
+        "速递",
+        "2025",
+        "年营",
+        "业收"
+      ],
+      "relatedCount": 3,
+      "relatedItems": [
+        {
+          "sourceRank": 29,
+          "sourceCategory": "热点资讯",
+          "sourceTitle": "极兔速递：2025年年内利润2.25亿美元，同比增长98.20%",
+          "sourceUrl": "https://36kr.com/newsflashes/3745190511722752?f=rss",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        },
+        {
+          "sourceRank": 19,
+          "sourceCategory": "热点新闻",
+          "sourceTitle": "极兔速递：2025年年内利润2.25亿美元，同比增长98.20%",
+          "sourceUrl": "https://36kr.com/newsflashes/3745190511722752?f=rss",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        },
+        {
+          "sourceRank": 12,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "极兔速递：2025 年营业收入 121.58 亿美元，同比增长 18.5%",
+          "sourceUrl": "https://www.ithome.com/0/934/156.htm",
+          "articleOk": true,
+          "articleTitle": "极兔速递：2025 年营业收入 121.58 亿美元，同比增长 18.5%",
+          "articleSummary": "感谢IT之家网友 若怡 的线索投递！\n            IT之家 3 月 30 日消息，极兔速递今日公告，2025 年营业收入 121.58 亿美元，同比增长 18.5%；经调整利润净额 4.25 亿美元，同比增长 112.3%。IT之家从公告获悉，极兔速递快递业务覆盖 13 个国家，包括东南亚七个国家（印度尼西亚、越南、马来西亚、菲律宾、泰国、柬埔寨和新加坡）、中国，以及五个新市场国家（沙特阿拉伯、阿联酋、墨西哥、巴西和埃及）。该公司于 2015 年在印度尼西亚首次开"
+        }
+      ]
+    },
+    {
+      "rank": 6,
+      "title": "赛诺医疗：筹划发行H股并在香港联交所主板上市",
+      "category": "热点新闻",
+      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #3。",
+      "summary": "赛诺医疗：筹划发行H股并在香港联交所主板上市",
+      "keywords": [
+        "赛诺",
+        "医疗",
+        "筹划发行H股并在香港联交所主板上市"
+      ],
+      "relatedCount": 2,
+      "relatedItems": [
+        {
+          "sourceRank": 13,
+          "sourceCategory": "热点资讯",
+          "sourceTitle": "赛诺医疗：筹划发行H股并在香港联交所主板上市",
+          "sourceUrl": "https://36kr.com/newsflashes/3745251126083586?f=rss",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        },
+        {
+          "sourceRank": 3,
+          "sourceCategory": "热点新闻",
+          "sourceTitle": "赛诺医疗：筹划发行H股并在香港联交所主板上市",
+          "sourceUrl": "https://36kr.com/newsflashes/3745251126083586?f=rss",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        }
+      ]
+    },
+    {
+      "rank": 7,
+      "title": "景旺电子：1.6T光模块PCB已开始出货",
+      "category": "热点新闻",
+      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #4。",
+      "summary": "景旺电子：1.6T光模块PCB已开始出货",
+      "keywords": [
+        "景旺",
+        "电子",
+        "6T光模块PCB已开始出货"
+      ],
+      "relatedCount": 2,
+      "relatedItems": [
+        {
+          "sourceRank": 14,
+          "sourceCategory": "热点资讯",
+          "sourceTitle": "景旺电子：1.6T光模块PCB已开始出货",
+          "sourceUrl": "https://36kr.com/newsflashes/3745250608398598?f=rss",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        },
+        {
+          "sourceRank": 4,
+          "sourceCategory": "热点新闻",
+          "sourceTitle": "景旺电子：1.6T光模块PCB已开始出货",
+          "sourceUrl": "https://36kr.com/newsflashes/3745250608398598?f=rss",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        }
+      ]
+    },
+    {
+      "rank": 8,
+      "title": "Gemini 3.1 Flash Live: Making audio AI more natural and reliable",
+      "category": "最新 AI 消息",
+      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #3。",
+      "summary": "Mar 26, 2026 Our latest voice model has improved precision and lower latency to make voice interactions more fluid, natural and precise. Val",
+      "keywords": [
+        "Gemini",
+        "Flash",
+        "Live",
+        "Making",
+        "audio"
+      ],
+      "relatedCount": 2,
+      "relatedItems": [
+        {
+          "sourceRank": 3,
+          "sourceCategory": "最新 AI 消息",
+          "sourceTitle": "Gemini 3.1 Flash Live: Making audio AI more natural and reliable",
+          "sourceUrl": "https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-3-1-flash-live/",
+          "articleOk": true,
+          "articleTitle": "Gemini 3.1 Flash Live: Making audio AI more natural and reliable",
+          "articleSummary": "Mar 26, 2026\n          \n          \n            \n          \n        \n      \n        \n          Our latest voice model has improved precision and lower latency to make voice interactions more fluid, natural and precise.\n        \n      \n    \n "
+        },
+        {
+          "sourceRank": 16,
+          "sourceCategory": "最新 AI 消息",
+          "sourceTitle": "Gemini 3.1 Flash-Lite: Built for intelligence at scale",
+          "sourceUrl": "https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-3-1-flash-lite/",
+          "articleOk": true,
+          "articleTitle": "Gemini 3.1 Flash-Lite: Built for intelligence at scale",
+          "articleSummary": "Mar 03, 2026\n          \n          \n            \n          \n        \n      \n        \n          Get best-in-class intelligence for your highest-volume workloads.\n        \n      \n    \n  \n  \n    \n  The Gemini Team\n  \n  \n\n    \n      \n        \n\n\n"
+        }
+      ]
+    },
+    {
+      "rank": 9,
+      "title": "盈富基金遭南向资金净卖出38.46亿港元",
+      "category": "热点新闻",
+      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #5。",
+      "summary": "盈富基金遭南向资金净卖出38.46亿港元",
+      "keywords": [
+        "盈富基金遭南向资金净卖出38",
+        "46亿港元"
+      ],
+      "relatedCount": 2,
+      "relatedItems": [
+        {
+          "sourceRank": 15,
+          "sourceCategory": "热点资讯",
+          "sourceTitle": "盈富基金遭南向资金净卖出38.46亿港元",
+          "sourceUrl": "https://36kr.com/newsflashes/3745250023080199?f=rss",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        },
+        {
+          "sourceRank": 5,
+          "sourceCategory": "热点新闻",
+          "sourceTitle": "盈富基金遭南向资金净卖出38.46亿港元",
+          "sourceUrl": "https://36kr.com/newsflashes/3745250023080199?f=rss",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        }
+      ]
+    },
+    {
+      "rank": 10,
+      "title": "光明乳业：2025年归母净亏损1.49亿元，同比由盈转亏",
+      "category": "热点新闻",
+      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #6。",
+      "summary": "光明乳业：2025年归母净亏损1.49亿元，同比由盈转亏",
+      "keywords": [
+        "光明",
+        "乳业",
+        "2025年归母净亏损1",
+        "49亿元",
+        "同比"
+      ],
+      "relatedCount": 2,
+      "relatedItems": [
+        {
+          "sourceRank": 16,
+          "sourceCategory": "热点资讯",
+          "sourceTitle": "光明乳业：2025年归母净亏损1.49亿元，同比由盈转亏",
+          "sourceUrl": "https://36kr.com/newsflashes/3745245996204036?f=rss",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        },
+        {
+          "sourceRank": 6,
+          "sourceCategory": "热点新闻",
+          "sourceTitle": "光明乳业：2025年归母净亏损1.49亿元，同比由盈转亏",
+          "sourceUrl": "https://36kr.com/newsflashes/3745245996204036?f=rss",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        }
+      ]
+    }
+  ]
+}

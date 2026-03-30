@@ -1,12 +1,11 @@
 {
   "meta": {
     "date": "2026-03-30",
-    "generatedAt": "2026-03-30T15:20:16.268Z",
+    "generatedAt": "2026-03-30T15:50:04.958Z",
     "trigger": "scheduled",
-    "issueUrl": "http://36kr.com",
+    "issueUrl": "https://techcrunch.com/category/artificial-intelligence/",
     "issueUrls": [
       "https://blog.google/innovation-and-ai/technology/ai/",
-      "http://36kr.com",
       "https://techcrunch.com/category/artificial-intelligence/",
       "https://www.ifanr.com?utm_source=rss&utm_medium=rss&utm_campaign=",
       "https://www.ithome.com/",
@@ -14,8 +13,6 @@
     ],
     "sourceKinds": [
       "google_ai",
-      "kr36",
-      "kr36_newsflash",
       "techcrunch_ai",
       "aifanr",
       "ithome",
@@ -24,8 +21,11 @@
     "topicCount": 10,
     "degraded": true,
     "mailStatus": "not-sent-by-collection",
-    "sourceFailureCount": 0,
-    "failedSourceKinds": []
+    "sourceFailureCount": 2,
+    "failedSourceKinds": [
+      "kr36",
+      "kr36_newsflash"
+    ]
   },
   "topics": [
     {
@@ -190,188 +190,6 @@
     },
     {
       "rank": 3,
-      "title": "美的集团：拟65亿元至130亿元回购A股股份",
-      "category": "热点新闻",
-      "whyItMatters": "该主题当前聚合了 3 条候选信息，且最高源内排序为 #6。",
-      "summary": "2026-03-30 20:20分享至36氪获悉，美的集团公告，公司董事会审议通过回购方案，拟以集中竞价方式回购A股股份，回购金额不低于65亿元且不超过130亿元，回购价格不超过100元/股。回购资金来源于公司自有资金及中国银行顺德分行提供的专项贷款(贷款不超过回购金额90%)。",
-      "keywords": [
-        "美的",
-        "集团",
-        "拟65亿元至130亿元回购A股股份"
-      ],
-      "relatedCount": 3,
-      "relatedItems": [
-        {
-          "sourceRank": 16,
-          "sourceCategory": "热点资讯",
-          "sourceTitle": "美的集团：拟65亿元至130亿元回购A股股份",
-          "sourceUrl": "https://36kr.com/newsflashes/3745402673316613?f=rss",
-          "articleOk": true,
-          "articleTitle": "美的集团：拟65亿元至130亿元回购A股股份-36氪",
-          "articleSummary": "2026-03-30 20:20分享至36氪获悉，美的集团公告，公司董事会审议通过回购方案，拟以集中竞价方式回购A股股份，回购金额不低于65亿元且不超过130亿元，回购价格不超过100元/股。回购资金来源于公司自有资金及中国银行顺德分行提供的专项贷款(贷款不超过回购金额90%)。回购股份将用于实施股权激励计划及/或员工持股计划，期限自董事会通过之日起12个月内。下一篇36氪获悉，顺丰控股公告，公司董事会同意将2025年第1期A股回购股份方案的回购资金总额由“不低于人民币15亿"
-        },
-        {
-          "sourceRank": 6,
-          "sourceCategory": "热点新闻",
-          "sourceTitle": "美的集团：拟65亿元至130亿元回购A股股份",
-          "sourceUrl": "https://36kr.com/newsflashes/3745402673316613?f=rss",
-          "articleOk": true,
-          "articleTitle": "美的集团：拟65亿元至130亿元回购A股股份-36氪",
-          "articleSummary": "2026-03-30 20:20分享至36氪获悉，美的集团公告，公司董事会审议通过回购方案，拟以集中竞价方式回购A股股份，回购金额不低于65亿元且不超过130亿元，回购价格不超过100元/股。回购资金来源于公司自有资金及中国银行顺德分行提供的专项贷款(贷款不超过回购金额90%)。回购股份将用于实施股权激励计划及/或员工持股计划，期限自董事会通过之日起12个月内。下一篇36氪获悉，顺丰控股公告，公司董事会同意将2025年第1期A股回购股份方案的回购资金总额由“不低于人民币15亿"
-        },
-        {
-          "sourceRank": 33,
-          "sourceCategory": "科技热点",
-          "sourceTitle": "美的集团：2025 年净利润 439.5 亿元，同比增长 14%",
-          "sourceUrl": "https://www.ithome.com/0/934/232.htm",
-          "articleOk": false,
-          "articleTitle": "",
-          "articleSummary": ""
-        }
-      ]
-    },
-    {
-      "rank": 4,
-      "title": "天数智芯：2025公司全年实现营收10.34亿元，同比增长91.6%；",
-      "category": "热点新闻",
-      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #1。",
-      "summary": "2026-03-30 20:59分享至36氪获悉，天数智芯发布港股上市后首份2025年业绩报告，公司全年实现营收10.34亿元，同比增长91.6%；毛利5.58亿元，同比增长110.5%，毛利增速高于营收增速，产品盈利能力稳步提升。经调整净亏损同比收窄32.1%，研发与经营效率同",
-      "keywords": [
-        "天数",
-        "智芯",
-        "2025公司全年实现营收10",
-        "34亿元",
-        "同比增长91"
-      ],
-      "relatedCount": 2,
-      "relatedItems": [
-        {
-          "sourceRank": 11,
-          "sourceCategory": "热点资讯",
-          "sourceTitle": "天数智芯：2025公司全年实现营收10.34亿元，同比增长91.6%；",
-          "sourceUrl": "https://36kr.com/newsflashes/3745441341162248?f=rss",
-          "articleOk": true,
-          "articleTitle": "天数智芯：2025公司全年实现营收10.34亿元，同比增长91.6%；-36氪",
-          "articleSummary": "2026-03-30 20:59分享至36氪获悉，天数智芯发布港股上市后首份2025年业绩报告，公司全年实现营收10.34亿元，同比增长91.6%；毛利5.58亿元，同比增长110.5%，毛利增速高于营收增速，产品盈利能力稳步提升。经调整净亏损同比收窄32.1%，研发与经营效率同步改善，财务结构稳健，业绩实现高质量增长。下一篇36氪获悉，三一重工发布2025年业绩报告。报告显示，2025年实现营业收入892.31亿元，同比增长14.73%；归属于上市公司股东的净利润84.08"
-        },
-        {
-          "sourceRank": 1,
-          "sourceCategory": "热点新闻",
-          "sourceTitle": "天数智芯：2025公司全年实现营收10.34亿元，同比增长91.6%；",
-          "sourceUrl": "https://36kr.com/newsflashes/3745441341162248?f=rss",
-          "articleOk": true,
-          "articleTitle": "天数智芯：2025公司全年实现营收10.34亿元，同比增长91.6%；-36氪",
-          "articleSummary": "2026-03-30 20:59分享至36氪获悉，天数智芯发布港股上市后首份2025年业绩报告，公司全年实现营收10.34亿元，同比增长91.6%；毛利5.58亿元，同比增长110.5%，毛利增速高于营收增速，产品盈利能力稳步提升。经调整净亏损同比收窄32.1%，研发与经营效率同步改善，财务结构稳健，业绩实现高质量增长。下一篇36氪获悉，三一重工发布2025年业绩报告。报告显示，2025年实现营业收入892.31亿元，同比增长14.73%；归属于上市公司股东的净利润84.08"
-        }
-      ]
-    },
-    {
-      "rank": 5,
-      "title": "三一重工：2025年归母净利润同比增长41.18%，拟10派1.8元",
-      "category": "热点新闻",
-      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #2。",
-      "summary": "2026-03-30 20:54分享至36氪获悉，三一重工发布2025年业绩报告。报告显示，2025年实现营业收入892.31亿元，同比增长14.73%；归属于上市公司股东的净利润84.08亿元，同比增长41.18%；基本每股收益0.9834元。董事会同意以公告实施2025年年度",
-      "keywords": [
-        "三一",
-        "重工",
-        "2025年归母净利润同比增长41",
-        "18",
-        "拟10派1"
-      ],
-      "relatedCount": 2,
-      "relatedItems": [
-        {
-          "sourceRank": 12,
-          "sourceCategory": "热点资讯",
-          "sourceTitle": "三一重工：2025年归母净利润同比增长41.18%，拟10派1.8元",
-          "sourceUrl": "https://36kr.com/newsflashes/3745435495121417?f=rss",
-          "articleOk": true,
-          "articleTitle": "三一重工：2025年归母净利润同比增长41.18%，拟10派1.8元-36氪",
-          "articleSummary": "2026-03-30 20:54分享至36氪获悉，三一重工发布2025年业绩报告。报告显示，2025年实现营业收入892.31亿元，同比增长14.73%；归属于上市公司股东的净利润84.08亿元，同比增长41.18%；基本每股收益0.9834元。董事会同意以公告实施2025年年度利润分配的股权登记日当天的总股本，在扣除回购专用账户中的回购股份数后为基数，向股权登记日在册全体股东每10股派发1.8元现金红利（含税）。本利润分配预案尚须提交股东会审议。原文链接下一篇36氪获悉，热"
-        },
-        {
-          "sourceRank": 2,
-          "sourceCategory": "热点新闻",
-          "sourceTitle": "三一重工：2025年归母净利润同比增长41.18%，拟10派1.8元",
-          "sourceUrl": "https://36kr.com/newsflashes/3745435495121417?f=rss",
-          "articleOk": true,
-          "articleTitle": "三一重工：2025年归母净利润同比增长41.18%，拟10派1.8元-36氪",
-          "articleSummary": "2026-03-30 20:54分享至36氪获悉，三一重工发布2025年业绩报告。报告显示，2025年实现营业收入892.31亿元，同比增长14.73%；归属于上市公司股东的净利润84.08亿元，同比增长41.18%；基本每股收益0.9834元。董事会同意以公告实施2025年年度利润分配的股权登记日当天的总股本，在扣除回购专用账户中的回购股份数后为基数，向股权登记日在册全体股东每10股派发1.8元现金红利（含税）。本利润分配预案尚须提交股东会审议。原文链接下一篇36氪获悉，热"
-        }
-      ]
-    },
-    {
-      "rank": 6,
-      "title": "热门中概股美股盘前多数走强，爱奇艺涨超11%",
-      "category": "热点新闻",
-      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #3。",
-      "summary": "2026-03-30 20:47分享至36氪获悉，热门中概股美股盘前多数走强，截至发稿，爱奇艺涨超11%，蔚来涨超3%，小鹏汽车涨超1%，京东、网易涨近1%，拼多多涨0.54%，理想汽车涨0.4%，百度涨0.05%；B站跌0.54%。下一篇36氪获悉，美股大型科技股盘前多数上涨，",
-      "keywords": [
-        "热门",
-        "中概",
-        "股美",
-        "股盘",
-        "前多"
-      ],
-      "relatedCount": 2,
-      "relatedItems": [
-        {
-          "sourceRank": 13,
-          "sourceCategory": "热点资讯",
-          "sourceTitle": "热门中概股美股盘前多数走强，爱奇艺涨超11%",
-          "sourceUrl": "https://36kr.com/newsflashes/3745429469872897?f=rss",
-          "articleOk": true,
-          "articleTitle": "热门中概股美股盘前多数走强，爱奇艺涨超11%-36氪",
-          "articleSummary": "2026-03-30 20:47分享至36氪获悉，热门中概股美股盘前多数走强，截至发稿，爱奇艺涨超11%，蔚来涨超3%，小鹏汽车涨超1%，京东、网易涨近1%，拼多多涨0.54%，理想汽车涨0.4%，百度涨0.05%；B站跌0.54%。下一篇36氪获悉，美股大型科技股盘前多数上涨，截至发稿，亚马逊、Meta、特斯拉涨超1%，英伟达、谷歌、微软涨近1%，Arm涨0.61%，苹果涨0.26%；奈飞跌0.37%。2小时前"
-        },
-        {
-          "sourceRank": 3,
-          "sourceCategory": "热点新闻",
-          "sourceTitle": "热门中概股美股盘前多数走强，爱奇艺涨超11%",
-          "sourceUrl": "https://36kr.com/newsflashes/3745429469872897?f=rss",
-          "articleOk": true,
-          "articleTitle": "热门中概股美股盘前多数走强，爱奇艺涨超11%-36氪",
-          "articleSummary": "2026-03-30 20:47分享至36氪获悉，热门中概股美股盘前多数走强，截至发稿，爱奇艺涨超11%，蔚来涨超3%，小鹏汽车涨超1%，京东、网易涨近1%，拼多多涨0.54%，理想汽车涨0.4%，百度涨0.05%；B站跌0.54%。下一篇36氪获悉，美股大型科技股盘前多数上涨，截至发稿，亚马逊、Meta、特斯拉涨超1%，英伟达、谷歌、微软涨近1%，Arm涨0.61%，苹果涨0.26%；奈飞跌0.37%。2小时前"
-        }
-      ]
-    },
-    {
-      "rank": 7,
-      "title": "美股大型科技股盘前多数上涨，亚马逊涨超1%",
-      "category": "热点新闻",
-      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #4。",
-      "summary": "2026-03-30 20:45分享至36氪获悉，美股大型科技股盘前多数上涨，截至发稿，亚马逊、Meta、特斯拉涨超1%，英伟达、谷歌、微软涨近1%，Arm涨0.61%，苹果涨0.26%；奈飞跌0.37%。下一篇领湃科技：拟1元转让全资子公司100%股权36氪获悉，领湃科技公告，",
-      "keywords": [
-        "美股",
-        "大型",
-        "科技",
-        "股盘",
-        "前多"
-      ],
-      "relatedCount": 2,
-      "relatedItems": [
-        {
-          "sourceRank": 14,
-          "sourceCategory": "热点资讯",
-          "sourceTitle": "美股大型科技股盘前多数上涨，亚马逊涨超1%",
-          "sourceUrl": "https://36kr.com/newsflashes/3745427225149952?f=rss",
-          "articleOk": true,
-          "articleTitle": "美股大型科技股盘前多数上涨，亚马逊涨超1%-36氪",
-          "articleSummary": "2026-03-30 20:45分享至36氪获悉，美股大型科技股盘前多数上涨，截至发稿，亚马逊、Meta、特斯拉涨超1%，英伟达、谷歌、微软涨近1%，Arm涨0.61%，苹果涨0.26%；奈飞跌0.37%。下一篇领湃科技：拟1元转让全资子公司100%股权36氪获悉，领湃科技公告，公司拟向衡阳五强动力有限公司转让全资子公司湖南领湃新能源研究院有限公司100%股权，本次股权转让价格为人民币1元。以2026年1月31日为评估基准日，领湃研究院于评估基准日股东全部权益价值为人民币-9"
-        },
-        {
-          "sourceRank": 4,
-          "sourceCategory": "热点新闻",
-          "sourceTitle": "美股大型科技股盘前多数上涨，亚马逊涨超1%",
-          "sourceUrl": "https://36kr.com/newsflashes/3745427225149952?f=rss",
-          "articleOk": true,
-          "articleTitle": "美股大型科技股盘前多数上涨，亚马逊涨超1%-36氪",
-          "articleSummary": "2026-03-30 20:45分享至36氪获悉，美股大型科技股盘前多数上涨，截至发稿，亚马逊、Meta、特斯拉涨超1%，英伟达、谷歌、微软涨近1%，Arm涨0.61%，苹果涨0.26%；奈飞跌0.37%。下一篇领湃科技：拟1元转让全资子公司100%股权36氪获悉，领湃科技公告，公司拟向衡阳五强动力有限公司转让全资子公司湖南领湃新能源研究院有限公司100%股权，本次股权转让价格为人民币1元。以2026年1月31日为评估基准日，领湃研究院于评估基准日股东全部权益价值为人民币-9"
-        }
-      ]
-    },
-    {
-      "rank": 8,
       "title": "Gemini 3.1 Flash Live: Making audio AI more natural and reliable",
       "category": "最新 AI 消息",
       "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #3。",
@@ -406,69 +224,199 @@
       ]
     },
     {
-      "rank": 9,
-      "title": "领湃科技：拟1元转让全资子公司100%股权",
-      "category": "热点新闻",
-      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #5。",
-      "summary": "2026-03-30 20:35分享至36氪获悉，领湃科技公告，公司拟向衡阳五强动力有限公司转让全资子公司湖南领湃新能源研究院有限公司100%股权，本次股权转让价格为人民币1元。以2026年1月31日为评估基准日，领湃研究院于评估基准日股东全部权益价值为人民币-9.45万元。双方",
+      "rank": 4,
+      "title": "vivo X300 Ultra 影像评测：影像手机，终于成为相机",
+      "category": "AI 科技",
+      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #2。",
+      "summary": "今天，vivo 一口气交出了两份旗舰手机的答卷：除了主打全能的 X300s，更重磅的看点，是当家影像旗舰 X300 Ultra。 在移动影像卷生卷死的时代，一台被官方冠以「影像灭霸」和「V 单」称号的手机，拿出了它打磨三代后的版本答案：两颗 2 亿像素摄像头，翻倍到 400mm ",
       "keywords": [
-        "领湃",
-        "科技",
-        "拟1元转让全资子公司100",
-        "股权"
+        "vivo",
+        "X300",
+        "Ultra",
+        "影像",
+        "评测"
       ],
       "relatedCount": 2,
       "relatedItems": [
         {
-          "sourceRank": 15,
-          "sourceCategory": "热点资讯",
-          "sourceTitle": "领湃科技：拟1元转让全资子公司100%股权",
-          "sourceUrl": "https://36kr.com/newsflashes/3745416881242631?f=rss",
+          "sourceRank": 2,
+          "sourceCategory": "AI 科技",
+          "sourceTitle": "vivo X300 Ultra 影像评测：影像手机，终于成为相机",
+          "sourceUrl": "https://www.ifanr.com/1660217?utm_source=rss&utm_medium=rss&utm_campaign=",
           "articleOk": true,
-          "articleTitle": "领湃科技：拟1元转让全资子公司100%股权-36氪",
-          "articleSummary": "2026-03-30 20:35分享至36氪获悉，领湃科技公告，公司拟向衡阳五强动力有限公司转让全资子公司湖南领湃新能源研究院有限公司100%股权，本次股权转让价格为人民币1元。以2026年1月31日为评估基准日，领湃研究院于评估基准日股东全部权益价值为人民币-9.45万元。双方经公平、友好协商，以领湃研究院实际资产负债状况为基础，并根据评估价值，最终确定本次股权转让价格为人民币1元。原文链接下一篇36氪获悉，美的集团公告，公司董事会审议通过回购方案，拟以集中竞价方式回购A股"
+          "articleTitle": "vivo Camera 登场",
+          "articleSummary": "今天，vivo 一口气交出了两份旗舰手机的答卷：除了主打全能的 X300s，更重磅的看点，是当家影像旗舰 X300 Ultra。\n在移动影像卷生卷死的时代，一台被官方冠以「影像灭霸」和「V 单」称号的手机，拿出了它打磨三代后的版本答案：两颗 2 亿像素摄像头，翻倍到 400mm 的增距镜，和前所未有的专业视频模式。\n过去一段时间里，爱范儿深度体验了 vivo X300 Ultra，我们试图从一个摄影师的视角，去理解 vivo 关于移动影像的最新答案。\n\n比 2 亿像素更好的，"
         },
         {
-          "sourceRank": 5,
-          "sourceCategory": "热点新闻",
-          "sourceTitle": "领湃科技：拟1元转让全资子公司100%股权",
-          "sourceUrl": "https://36kr.com/newsflashes/3745416881242631?f=rss",
+          "sourceRank": 38,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "vivo X300 Ultra 手机发布：第五代骁龙 8 至尊版、3+2 蔡司大师镜头群，6999 元起",
+          "sourceUrl": "https://www.ithome.com/0/934/230.htm",
           "articleOk": true,
-          "articleTitle": "领湃科技：拟1元转让全资子公司100%股权-36氪",
-          "articleSummary": "2026-03-30 20:35分享至36氪获悉，领湃科技公告，公司拟向衡阳五强动力有限公司转让全资子公司湖南领湃新能源研究院有限公司100%股权，本次股权转让价格为人民币1元。以2026年1月31日为评估基准日，领湃研究院于评估基准日股东全部权益价值为人民币-9.45万元。双方经公平、友好协商，以领湃研究院实际资产负债状况为基础，并根据评估价值，最终确定本次股权转让价格为人民币1元。原文链接下一篇36氪获悉，美的集团公告，公司董事会审议通过回购方案，拟以集中竞价方式回购A股"
+          "articleTitle": "vivo X300 Ultra 手机发布：第五代骁龙 8 至尊版、3+2 蔡司大师镜头群，6999 元起",
+          "articleSummary": "IT之家 3 月 30 日消息，在今天的 vivo X 系列春季新品发布会上，vivo X300 Ultra 手机正式发布。新机号称「专业 V 单」，搭载第五代骁龙 8 至尊版处理器、拥有 3+2 蔡司大师镜头群，售价 6999 元起。12GB+256GB 规格：6999 元（送 200GB 两年云空间）12GB+512GB 规格：7499 元（送 200GB 两年云空间）16GB+512GB 规格：7999 元（送 200GB 两年云空间）16GB+1TB 规格「卫星通信版"
         }
       ]
     },
     {
-      "rank": 10,
-      "title": "顺丰控股：回购资金总额调整为不低于30亿元且不超过60亿元",
-      "category": "热点新闻",
-      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #7。",
-      "summary": "2026-03-30 20:07分享至36氪获悉，顺丰控股公告，公司董事会同意将2025年第1期A股回购股份方案的回购资金总额由“不低于人民币15亿元且不超过人民币30亿元”调整为“不低于人民币30亿元且不超过人民币60亿元”，将回购实施期限延长至董事会审议通过变更回购方案之日起",
+      "rank": 5,
+      "title": "小米推出米家智能宠物喂食器 2 可视版：自带 500 万像素摄像头，449 元",
+      "category": "科技热点",
+      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #17。",
+      "summary": "感谢IT之家网友 不一样的体验 的线索投递！ IT之家 3 月 30 日消息，小米旗下米家智能宠物喂食器 2 可视版现已在有品开启众筹（点此访问），该喂食器提供 5L 大容量设计，自带 500 万像素摄像头，能够记录宠物吃饭状态，建议零售价 549 元，众筹价 449 元。IT之",
       "keywords": [
-        "顺丰",
-        "控股",
-        "回购资金总额调整为不低于30亿元且不超过60亿元"
+        "小米",
+        "推出",
+        "米家",
+        "智能",
+        "宠物"
       ],
       "relatedCount": 2,
       "relatedItems": [
         {
           "sourceRank": 17,
-          "sourceCategory": "热点资讯",
-          "sourceTitle": "顺丰控股：回购资金总额调整为不低于30亿元且不超过60亿元",
-          "sourceUrl": "https://36kr.com/newsflashes/3745389728530950?f=rss",
+          "sourceCategory": "科技热点",
+          "sourceTitle": "小米推出米家智能宠物喂食器 2 可视版：自带 500 万像素摄像头，449 元",
+          "sourceUrl": "https://www.ithome.com/0/934/256.htm",
           "articleOk": true,
-          "articleTitle": "顺丰控股：回购资金总额调整为不低于30亿元且不超过60亿元-36氪",
-          "articleSummary": "2026-03-30 20:07分享至36氪获悉，顺丰控股公告，公司董事会同意将2025年第1期A股回购股份方案的回购资金总额由“不低于人民币15亿元且不超过人民币30亿元”调整为“不低于人民币30亿元且不超过人民币60亿元”，将回购实施期限延长至董事会审议通过变更回购方案之日起12个月止，同时将回购股份用途从“用于员工持股计划或股权激励”变更为“用于注销并减少注册资本”。下一篇Mistral筹集8.3亿美元在欧洲建设英伟达芯片驱动的AI中心3月30日，法国人工智能初创公司M"
+          "articleTitle": "小米推出米家智能宠物喂食器 2 可视版：自带 500 万像素摄像头，449 元",
+          "articleSummary": "感谢IT之家网友 不一样的体验 的线索投递！\n            IT之家 3 月 30 日消息，小米旗下米家智能宠物喂食器 2 可视版现已在有品开启众筹（点此访问），该喂食器提供 5L 大容量设计，自带 500 万像素摄像头，能够记录宠物吃饭状态，建议零售价 549 元，众筹价 449 元。IT之家了解到，这款产品自带 500 万像素高清摄像头，能够记录宠物吃饭玩耍的可爱模样，覆盖 150° 超广角，带有 940nm 红外补光灯，可以记录夜间影像，配备小米摄像头 AI "
         },
         {
-          "sourceRank": 7,
-          "sourceCategory": "热点新闻",
-          "sourceTitle": "顺丰控股：回购资金总额调整为不低于30亿元且不超过60亿元",
-          "sourceUrl": "https://36kr.com/newsflashes/3745389728530950?f=rss",
+          "sourceRank": 32,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "小米推出米家智能 IH 电饭煲 P1 4L 款：1.2 倍压力精煮米饭，1099 元",
+          "sourceUrl": "https://www.ithome.com/0/934/237.htm",
           "articleOk": true,
-          "articleTitle": "顺丰控股：回购资金总额调整为不低于30亿元且不超过60亿元-36氪",
-          "articleSummary": "2026-03-30 20:07分享至36氪获悉，顺丰控股公告，公司董事会同意将2025年第1期A股回购股份方案的回购资金总额由“不低于人民币15亿元且不超过人民币30亿元”调整为“不低于人民币30亿元且不超过人民币60亿元”，将回购实施期限延长至董事会审议通过变更回购方案之日起12个月止，同时将回购股份用途从“用于员工持股计划或股权激励”变更为“用于注销并减少注册资本”。下一篇Mistral筹集8.3亿美元在欧洲建设英伟达芯片驱动的AI中心3月30日，法国人工智能初创公司M"
+          "articleTitle": "小米推出米家智能 IH 电饭煲 P1 4L 款：1.2 倍压力精煮米饭，1099 元",
+          "articleSummary": "感谢IT之家网友 很宅很怕生 的线索投递！\n            IT之家 3 月 30 日消息，小米现已在京东上架米家智能 IH 电饭煲 P1 4L 款，该电饭煲主打 IH 立体均火烹饪技术，可实现 1.2 倍压力精煮，定价为 1099 元。该电饭煲延续小米家族式白色机身设计，顶部带有 LED 数显，电饭煲内使用不锈钢内盖板，其 IH 电磁锅胆自热技术可实现 1.2 倍 Q 弹压力，提供 4L 容量 0 氟涂层 2.5mm 厚度钛釜，可至多盛装 16 碗饭。同时电饭煲支持"
+        }
+      ]
+    },
+    {
+      "rank": 6,
+      "title": "DeepSeek 网页端与APP服务屡现异常",
+      "category": "要闻",
+      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #1。",
+      "summary": "Resolved - This incident has been resolved. Mar 30, 10:33 CST Update - We are continuing to monitor for any further issues. Mar 30, 10:33 CS",
+      "keywords": [
+        "DeepSeek",
+        "网页端与APP服务屡现异常"
+      ],
+      "relatedCount": 1,
+      "relatedItems": [
+        {
+          "sourceRank": 1,
+          "sourceCategory": "要闻",
+          "sourceTitle": "DeepSeek 网页端与APP服务屡现异常",
+          "sourceUrl": "https://status.deepseek.com/",
+          "articleOk": true,
+          "articleTitle": "DeepSeek Service Status",
+          "articleSummary": "Resolved -\n      \tThis incident has been resolved.\n\n        \n\n        \n            Mar 30, 10:33 CST\n        \n      \n      Update -\n      \tWe are continuing to monitor for any further issues.\n\n        \n\n        \n            Mar 30, 10:33 CS"
+        }
+      ]
+    },
+    {
+      "rank": 7,
+      "title": "Mantis Biotech is making ‘digital twins’ of humans to help solve medicine’s data availability problem",
+      "category": "热门文章",
+      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #1。",
+      "summary": "Large language models trained on vast datasets could speed genomics research, streamline clinical documentation, improve real-time diagnosti",
+      "keywords": [
+        "Mantis",
+        "Biotech",
+        "is",
+        "making",
+        "digital"
+      ],
+      "relatedCount": 1,
+      "relatedItems": [
+        {
+          "sourceRank": 1,
+          "sourceCategory": "热门文章",
+          "sourceTitle": "Mantis Biotech is making ‘digital twins’ of humans to help solve medicine’s data availability problem",
+          "sourceUrl": "https://techcrunch.com/2026/03/30/mantis-biotech-is-making-digital-twins-of-humans-to-help-solve-medicines-data-availability-problem/",
+          "articleOk": true,
+          "articleTitle": "Mantis Biotech is making ‘digital twins’ of humans to help solve medicine’s data availability problem",
+          "articleSummary": "Large language models trained on vast datasets could speed genomics research, streamline clinical documentation, improve real-time diagnostics, support clinical decision-making, accelerate drug discovery, and even generate synthetic data to"
+        }
+      ]
+    },
+    {
+      "rank": 8,
+      "title": "OPPO Pad 5 Pro 平板现身官网，消息称新机将搭载第五代骁龙 8 至尊版处理器",
+      "category": "科技热点",
+      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #1。",
+      "summary": "IT之家 3 月 30 日消息，OPPO Pad 5 Pro 平板已现身 OPPO 官网开启预约。官方剪影海报显示，新机将拥有悬浮式支架键盘，并支持手写笔。博主 @体验more 今日发文，透露了该平板更多信息。据称，OPPO Pad 5 Pro 的 Slogan 是“是平板，也是",
+      "keywords": [
+        "OPPO",
+        "Pad",
+        "Pro",
+        "平板",
+        "现身"
+      ],
+      "relatedCount": 1,
+      "relatedItems": [
+        {
+          "sourceRank": 1,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "OPPO Pad 5 Pro 平板现身官网，消息称新机将搭载第五代骁龙 8 至尊版处理器",
+          "sourceUrl": "https://www.ithome.com/0/934/271.htm",
+          "articleOk": true,
+          "articleTitle": "OPPO Pad 5 Pro 平板现身官网，消息称新机将搭载第五代骁龙 8 至尊版处理器",
+          "articleSummary": "IT之家 3 月 30 日消息，OPPO Pad 5 Pro 平板已现身 OPPO 官网开启预约。官方剪影海报显示，新机将拥有悬浮式支架键盘，并支持手写笔。博主 @体验more 今日发文，透露了该平板更多信息。据称，OPPO Pad 5 Pro 的 Slogan 是“是平板，也是电脑”。该机将搭载第五代骁龙 8 至尊版处理器、配备 13.2 英寸 3K LCD 大屏。IT之家整理 OPPO Pad 5 Pro 平板已曝光配置如下（实际以官方最终发布信息为准）：性能：第五代骁龙"
+        }
+      ]
+    },
+    {
+      "rank": 9,
+      "title": "Watch James Manyika talk AI and creativity with LL COOL J.",
+      "category": "最新 AI 消息",
+      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #1。",
+      "summary": "In the latest episode of our Dialogues on Technology and Society series, legendary artist LL COOL J sits down with James Manyika, Google's S",
+      "keywords": [
+        "Watch",
+        "James",
+        "Manyika",
+        "talk",
+        "AI"
+      ],
+      "relatedCount": 1,
+      "relatedItems": [
+        {
+          "sourceRank": 1,
+          "sourceCategory": "最新 AI 消息",
+          "sourceTitle": "Watch James Manyika talk AI and creativity with LL COOL J.",
+          "sourceUrl": "https://blog.google/innovation-and-ai/technology/ai/ll-cool-j-dialogues/",
+          "articleOk": true,
+          "articleTitle": "Watch James Manyika talk AI and creativity with LL COOL J.",
+          "articleSummary": "In the latest episode of our Dialogues on Technology and Society series, legendary artist LL COOL J sits down with James Manyika, Google's Senior Vice President of Research, Labs, Technology & Society. They have a wide-ranging conversation "
+        }
+      ]
+    },
+    {
+      "rank": 10,
+      "title": "大众 ID. ERA 9X 预售 32.98 万元起，曾经质疑增程的它，带来了「地表最强增程」",
+      "category": "AI 科技",
+      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #1。",
+      "summary": "在理想、问界、蔚来等品牌不断改写中国新能源 SUV 市场格局的时候，燃油车时代长期占据主导位置的大众，实际上错过了这一轮行业切换中最关键的几年。 问题不在于大众完全没有察觉趋势，而在于它始终没能把判断快速转化为稳定的产品节奏。战略摇摆、决策迟缓，再加上 CARIAD 长期拖住软件",
+      "keywords": [
+        "大众",
+        "ID",
+        "ERA",
+        "9X",
+        "预售"
+      ],
+      "relatedCount": 1,
+      "relatedItems": [
+        {
+          "sourceRank": 1,
+          "sourceCategory": "AI 科技",
+          "sourceTitle": "大众 ID. ERA 9X 预售 32.98 万元起，曾经质疑增程的它，带来了「地表最强增程」",
+          "sourceUrl": "https://www.ifanr.com/1660243?utm_source=rss&utm_medium=rss&utm_campaign=",
+          "articleOk": true,
+          "articleTitle": "最大的大众，也是最强的大众。",
+          "articleSummary": "在理想、问界、蔚来等品牌不断改写中国新能源 SUV 市场格局的时候，燃油车时代长期占据主导位置的大众，实际上错过了这一轮行业切换中最关键的几年。\n问题不在于大众完全没有察觉趋势，而在于它始终没能把判断快速转化为稳定的产品节奏。战略摇摆、决策迟缓，再加上 CARIAD 长期拖住软件与电子电气架构的落地进度，让大众一次次错过本该抓住的窗口。\n等它还在解决体系内部的问题时，中国新能源市场已经进入了新的竞争阶段。用户看重的不只是品牌、机械素质和制造体系，还加上了产品定义、智能化体验，"
         }
       ]
     }

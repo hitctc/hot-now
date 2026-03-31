@@ -15,7 +15,16 @@ vi.mock("../../src/client/services/settingsApi", () => ({
     loggedIn: true
   }),
   readSettingsViewRules: vi.fn(),
-  readSettingsSources: vi.fn()
+  readSettingsSources: vi.fn(),
+  saveViewRuleConfig: vi.fn(),
+  saveProviderSettings: vi.fn(),
+  deleteProviderSettings: vi.fn(),
+  saveNlRules: vi.fn(),
+  createDraftFromFeedback: vi.fn(),
+  deleteFeedbackEntry: vi.fn(),
+  clearFeedbackPool: vi.fn(),
+  saveStrategyDraft: vi.fn(),
+  deleteStrategyDraft: vi.fn()
 }));
 
 describe("client app shell", () => {

@@ -91,6 +91,8 @@ describe("SourcesPage", () => {
     await flushPromises();
 
     expect(wrapper.get("[data-sources-section='manual-collect']").text()).toContain("手动执行采集");
+    expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 新讯入池 / 展示");
+    expect(wrapper.get("[data-sources-section='analytics']").text()).not.toContain("Articles 入池 / 展示");
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("OpenAI");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("completed");
   });

@@ -70,10 +70,11 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - `unified shell` 页面已完整接入以浅色为母版的 `Editorial Signal Desk` 双主题：`/`、`/ai-new`、`/ai-hot`、`/settings/*`
 - 统一站点保留左侧品牌块、浅深主题切换和本地 `localStorage` 持久化
 - `/settings/*` 现在通过 Fastify 返回统一客户端入口，再由 `Vue 3 + Ant Design Vue` 接管页面渲染
+- `/`、`/ai-new`、`/ai-hot` 现在也通过 Fastify 返回统一客户端入口，再由 `Vue 3 + Ant Design Vue` 内容页读取 `/api/content/ai-new`、`/api/content/ai-hot` 渲染
 - `/settings/view-rules` 已升级为策略工作台：数值权重、LLM 厂商设置、正式自然语言策略、反馈池、草稿池都收进同一页
-- `/settings/sources` 现在会展示即时操作卡、来源统计概览表和 source 库存表，包含总条数、今天发布、今天抓取，以及 Hot / Articles / AI 的入池与展示统计
+- `/settings/sources` 现在会展示即时操作卡、来源统计概览表和 source 库存表，包含总条数、今天发布、今天抓取，以及 `AI 新讯 / AI 热点` 的入池与展示统计
 - `/settings/profile` 现在会展示会话状态、用户名、角色和联系邮箱，不再停留在占位页
-- 正式自然语言策略支持 `global / hot / articles / ai` 四个 scope；保存后会立即对当前内容库发起一次全量 LLM 重算，日常采集完成后会对新增内容做增量重算
+- 正式自然语言策略当前仍以 `global / hot / articles / ai` 四个内部 scope 落库；页面只展示 `全局 / AI 热点 / AI 新讯` 三个可见范围，`articles` 仅作为兼容保留。保存后会立即对当前内容库发起一次全量 LLM 重算，日常采集完成后会对新增内容做增量重算
 - 当前支持的 LLM 厂商是 `DeepSeek`、`MiniMax`、`Kimi`；用户在页面里录入 API key，本地只保存加密后的密文；未配置 `LLM_SETTINGS_MASTER_KEY` 时页面仍可保存规则文本，但不会启用自然语言匹配
 - Legacy 报告页（当前仍保留）：`/history`、`/reports/:date`、`/control`
 - legacy `/history`、`/control` 与 `/reports/:date` 的 fallback notice 轻量跟随共享主题资源

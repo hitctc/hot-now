@@ -78,12 +78,13 @@
 - `/ai-new`：统一站点 AI 新讯页（未登录也可访问）
 - `/ai-hot`：统一站点 AI 热点页（未登录也可访问）
 - `/settings/view-rules`：统一站点筛选策略工作台（登录后，由 `Vue 3 + Ant Design Vue` 驱动，支持数值权重、LLM 设置、正式自然语言策略、反馈池、草稿池）
-- `/settings/sources`：统一站点数据迭代收集页（登录后，由 `Vue 3 + Ant Design Vue` 驱动，可启用/停用 source，并分别手动执行采集 / 手动发送最新报告；页面会展示总条数、今天发布、今天抓取，以及 Hot / Articles / AI 入池与展示统计）
+- `/settings/sources`：统一站点数据迭代收集页（登录后，由 `Vue 3 + Ant Design Vue` 驱动，可启用/停用 source，并分别手动执行采集 / 手动发送最新报告；页面会展示总条数、今天发布、今天抓取，以及 `AI 新讯 / AI 热点` 入池与展示统计）
 - `/settings/profile`：统一站点当前登录用户页（登录后，由 `Vue 3 + Ant Design Vue` 驱动，展示会话状态、账号摘要和联系邮箱）
 - 统一站点左侧导航底部支持深色 / 浅色主题切换，偏好写入浏览器本地 `localStorage` 并在刷新后保持
 - `unified shell` 页面（`/`、`/ai-new`、`/ai-hot`、`/settings/*`）已完整切换到 `Editorial Signal Desk` 双主题
 - 内容导航已收口为 AI-first：`/` 与 `/ai-new` 等同 `AI 新讯`，`/ai-hot` 承接 `AI 热点`，`/articles` 已移除
 - `/`、`/ai-new`、`/ai-hot` 顶部新增共享 source 复选过滤条，支持 `全选 / 全不选`，浏览偏好写入浏览器本地 `localStorage['hot-now-content-sources']`
+- `/`、`/ai-new`、`/ai-hot` 现在通过 Fastify 返回统一客户端入口，再由 `Vue 3 + Vite + Ant Design Vue` 内容页读取 `/api/content/ai-new`、`/api/content/ai-hot` 渲染
 - 内容卡片保留 `收藏 / 点赞 / 点踩`，并新增局部 `补充反馈` 面板；点赞 / 点踩后自动展开，反馈进入反馈池，不会直接修改正式策略
 - 如果本地 `data/hot-now.sqlite` 内容库损坏，内容页会降级显示提示，不再直接以 `500` 打断 unified shell
 - `/history`：历史报告（legacy，当前仍保留）
@@ -95,7 +96,7 @@
 - `POST /actions/run`：`/actions/collect` 的兼容别名（legacy，当前仍保留）
 - `POST /actions/content/:id/feedback-pool`：保存或覆盖当前内容卡片的反馈池条目
 - `POST /actions/view-rules/provider-settings`、`POST /actions/view-rules/provider-settings/delete`：保存 / 删除单活 LLM 厂商配置
-- `POST /actions/view-rules/nl-rules`：保存 `global / hot / articles / ai` 正式自然语言策略，并立即触发当前内容库全量重算
+- `POST /actions/view-rules/nl-rules`：保存 `global / hot / articles / ai` 正式自然语言策略，并立即触发当前内容库全量重算；页面当前只展示 `全局 / AI 热点 / AI 新讯` 三个可见范围，`articles` 仅作兼容保留
 - `POST /actions/feedback-pool/:id/create-draft`、`POST /actions/feedback-pool/:id/delete`、`POST /actions/feedback-pool/clear`：反馈池转草稿、删单条、清空全部
 - `POST /actions/strategy-drafts/:id/save`、`POST /actions/strategy-drafts/:id/delete`：草稿池保存与删除
 - 兼容约定：真实应用默认启用 `requireLogin=true` 的 unified shell；auth 开启时内容菜单仍允许匿名查看，但系统菜单、legacy 路由和所有写操作都需要登录；测试或未注入 auth 的场景仍可保持 legacy `/ -> 最新报告` 与 legacy 路由公开行为
@@ -212,7 +213,7 @@ SQLite 可靠性约定：
 - 已有主体实现与测试文件
 - Git 主分支已建立并同步远端
 - 当前工作区已完成 unified site 与多源采集阶段的最终验证：
-  - `npm run test` 通过，结果为 `44` 个测试文件、`208` 个测试全部通过
+  - `npm run test` 通过，结果为 `49` 个测试文件、`214` 个测试全部通过
   - `npm run build` 通过
   - Playwright MCP 本地验收已跑通：`/login` 登录成功；`/`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常
   - 浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持
@@ -225,11 +226,12 @@ SQLite 可靠性约定：
 - 内置 RSS 源已扩展到 8 个，覆盖聚合日报、国际官方 AI 博客、国内热点资讯 / 快讯与科技媒体；新增国内源默认作为 built-in source 写入 `content_sources`
 - 采集和发信已拆成两个独立功能：默认配置下采集每 `10` 分钟执行一次，发信每天 `10:00` 执行一次；两者都支持手动触发，并共用同一把运行锁
 - 系统菜单已收口到多源语义：`/settings/sources` 支持 source 启用/停用、逐 source 最近抓取状态展示，以及统一站点内手动执行采集 / 手动发送最新报告；`/settings/view-rules` 现在是完整策略工作台，支持按字段表单保存权重规则、LLM 厂商配置、正式自然语言策略、反馈池和草稿池；当前登录用户信息已并到侧边栏底部
-- `/settings/sources` 现在会基于共享内容选择器实时展示 source 工作台总览表，口径包含总条数、今天发布、今天抓取，以及 Hot / Articles / AI 的入池与展示统计
+- `/settings/sources` 现在会基于共享内容选择器实时展示 source 工作台总览表，口径包含总条数、今天发布、今天抓取，以及 `AI 新讯 / AI 热点` 的入池与展示统计
 - unified shell 已去掉顶部 header，页面信息和账号区都收进左侧侧边栏；视觉母版已从赛博控制台切换为浅色纸感的 `Editorial Signal Desk`，主题切换与 localStorage 持久化已落地
 - `/settings/*` 现在统一走 Fastify 返回的客户端入口，由 `src/client/` 下的 `Vue 3 + Vite + Ant Design Vue` 页面接管，不再继续叠加新的服务端拼表单 HTML
+- `/`、`/ai-new`、`/ai-hot` 现在也统一走 Fastify 返回的客户端入口，由 `src/client/pages/content/` 下的 Vue 页面读取内容 API 渲染；`/articles` 已移除
 - unified shell 内容页已切到“首页主卡 + 标准卡”的混合卡片体系；系统页卡片则统一收口为 workbench / inventory panel 语义
-- 内容页顶部现在会渲染共享 source 过滤条，勾选结果通过 `localStorage + x-hot-now-source-filter` header 驱动服务端重渲染，只影响当前浏览结果，不参与系统页统计口径
+- 内容页顶部现在会渲染共享 source 过滤条，勾选结果通过 `localStorage + x-hot-now-source-filter` header 驱动内容 API 过滤，只影响当前浏览结果，不参与系统页统计口径
 - 内容页现在会把当前反馈池条目回填到局部反馈面板，内容交互形成 `点赞/点踩 -> 反馈池 -> 草稿池 -> 正式自然语言策略 -> 全量 / 增量重算` 的闭环
 - 正式自然语言策略保存后会立即触发当前内容库全量重算；采集链路在落库后会自动触发增量自然语言评估
 - 内容页现在对本地内容库损坏做了降级兜底：检测到 `SQLITE_CORRUPT` / `SQLITE_NOTADB` 时继续渲染统一站点，并提示修复或重建 `data/hot-now.sqlite`

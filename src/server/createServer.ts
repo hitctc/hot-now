@@ -171,8 +171,6 @@ export function createServer(deps: ServerDeps = {}) {
   const siteJs = readSiteJs();
   const clientBuildRoot = path.resolve(process.cwd(), "dist/client");
   const clientIndexPath = path.join(clientBuildRoot, "index.html");
-  const clientEntryHtml = readClientEntryHtml(clientIndexPath);
-
   app.get("/health", async () => ({ ok: true }));
   app.get("/assets/site.css", async (_request, reply) => reply.type("text/css; charset=utf-8").send(siteCss));
   app.get("/assets/site.js", async (_request, reply) => reply.type("application/javascript; charset=utf-8").send(siteJs));
@@ -321,11 +319,11 @@ export function createServer(deps: ServerDeps = {}) {
         }
 
         if (isClientSettingsPath(currentPage.path)) {
-          return serveClientSettingsShell(reply, clientEntryHtml);
+          return serveClientSettingsShell(reply, clientIndexPath);
         }
 
         if (currentPage.section === "content") {
-          return serveClientContentShell(reply, clientEntryHtml);
+          return serveClientContentShell(reply, clientIndexPath);
         }
 
         const contentHtml = await renderSystemPageForPath(deps, currentPage.path, Boolean(session));
@@ -358,11 +356,11 @@ export function createServer(deps: ServerDeps = {}) {
         }
 
         if (isClientSettingsPath(currentPage.path)) {
-          return serveClientSettingsShell(reply, clientEntryHtml);
+          return serveClientSettingsShell(reply, clientIndexPath);
         }
 
         if (currentPage.section === "content") {
-          return serveClientContentShell(reply, clientEntryHtml);
+          return serveClientContentShell(reply, clientIndexPath);
         }
 
         const contentHtml = await renderSystemPageForPath(deps, currentPage.path, false);
@@ -987,22 +985,56 @@ async function readSettingsProfileApiData(
 }
 
 function readClientEntryHtml(clientIndexPath: string): string {
-  // System pages prefer the built client entry, but still need a stable mount shell when the frontend bundle is absent.
+  // The shell rereads the latest built entry so a new client build is picked up without restarting the server.
   try {
     return readFileSync(clientIndexPath, "utf8");
   } catch {
-    // The server can still boot before the client build exists, but system pages need a predictable mount point.
+    // Missing frontend assets should fail loudly with a readable hint instead of referencing fake bundle names.
     return `<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>HotNow 系统页</title>
-    <script type="module" crossorigin src="/client/assets/index.js"></script>
-    <link rel="stylesheet" crossorigin href="/client/assets/index.css">
+    <title>HotNow 客户端资源未准备好</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: #eef3ff;
+        background: #111722;
+      }
+      main {
+        max-width: 560px;
+        padding: 24px 28px;
+        border: 1px solid rgba(126, 162, 255, 0.28);
+        border-radius: 18px;
+        background: rgba(23, 31, 44, 0.92);
+        box-shadow: 0 24px 48px rgba(3, 8, 18, 0.48);
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 24px;
+      }
+      p {
+        margin: 0;
+        line-height: 1.7;
+        color: #c4cedf;
+      }
+      code {
+        font-family: "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+        color: #7ea2ff;
+      }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <main>
+      <h1>客户端资源未准备好</h1>
+      <p>请先运行 <code>npm run build:client</code>，或者重新执行 <code>npm run dev</code> / <code>npm run dev:local</code> 后再刷新。</p>
+    </main>
   </body>
 </html>
 `;
@@ -1014,14 +1046,14 @@ function isClientSettingsPath(pathname: string) {
   return pathname.startsWith("/settings/");
 }
 
-function serveClientSettingsShell(reply: FastifyReply, clientEntryHtml: string) {
-  // The Vue client owns the full system-page shell now, so the server only needs to return one HTML entry document.
-  return reply.type("text/html; charset=utf-8").send(clientEntryHtml);
+function serveClientSettingsShell(reply: FastifyReply, clientIndexPath: string) {
+  // System pages should always render the latest available client entry.
+  return reply.type("text/html; charset=utf-8").send(readClientEntryHtml(clientIndexPath));
 }
 
-function serveClientContentShell(reply: FastifyReply, clientEntryHtml: string) {
-  // Content routes now use the same real client entry as the settings shell so the browser boots the Vue app directly.
-  return reply.type("text/html; charset=utf-8").send(clientEntryHtml);
+function serveClientContentShell(reply: FastifyReply, clientIndexPath: string) {
+  // Content routes use the same live client entry and recover as soon as a client build exists.
+  return reply.type("text/html; charset=utf-8").send(readClientEntryHtml(clientIndexPath));
 }
 
 function normalizeClientAssetPath(rawAssetPath: string): string | null {

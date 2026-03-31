@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/main.ts",
+    "dev": "npm run build:client && tsx watch src/main.ts",
     "dev:local": "zsh ./scripts/dev-local.sh",
     "dev:client": "vite --config vite.config.ts",
     "start": "node dist/server/main.js",

@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { sessionCookieName } from "../../src/core/auth/session.js";
@@ -202,14 +204,13 @@ describe("createServer", () => {
       listRatingDimensions: vi.fn().mockResolvedValue([])
     });
 
-    const response = await app.inject({ method: "GET", url: "/articles" });
+    const response = await app.inject({ method: "GET", url: "/ai-new" });
 
     expect(response.statusCode).toBe(200);
-    expect(response.body).toContain("热门文章");
-    expect(response.body).toContain("当前为内容公开访问模式");
-    expect(response.body).toContain('href="/login"');
-    expect(response.body).not.toContain('class="nav-group nav-group--system"');
-    expect(response.body).not.toContain("/settings/view-rules");
+    expect(response.body).toContain('<div id="app"></div>');
+    expect(response.body).toContain("/client/assets/");
+    expect(response.body).not.toContain("当前为内容公开访问模式");
+    expect(response.body).not.toContain("/login");
   });
 
   it("redirects anonymous users to login for unified shell system pages when auth is enabled", async () => {
@@ -328,6 +329,29 @@ describe("createServer", () => {
     expect(cssResponse.headers["content-type"]).toContain("text/css");
     expect(cssResponse.body.length).toBeGreaterThan(0);
     expect(traversalResponse.statusCode).toBe(404);
+  });
+
+  it("returns a readable fallback shell instead of fake asset paths when the client build is missing", async () => {
+    const originalCwd = process.cwd();
+    const tempCwd = mkdtempSync(path.join(tmpdir(), "hot-now-missing-client-"));
+
+    process.chdir(tempCwd);
+
+    try {
+      const app = createServer({
+        getCurrentUserProfile: vi.fn().mockResolvedValue(null)
+      });
+
+      const response = await app.inject({ method: "GET", url: "/settings/profile" });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toContain("客户端资源未准备好");
+      expect(response.body).toContain("npm run build:client");
+      expect(response.body).not.toContain("/client/assets/index.js");
+      expect(response.body).not.toContain("/client/assets/index.css");
+    } finally {
+      process.chdir(originalCwd);
+    }
   });
 
   it("clears the session cookie on logout", async () => {

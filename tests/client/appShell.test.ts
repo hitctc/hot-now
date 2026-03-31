@@ -4,7 +4,7 @@ import Antd from "ant-design-vue";
 
 import { APP_ROUTE_BASE, CLIENT_ASSET_BASE } from "../../src/client/appBases";
 import App from "../../src/client/App.vue";
-import { createAppRouter, shellPageMetas } from "../../src/client/router";
+import { createAppRouter } from "../../src/client/router";
 
 vi.mock("../../src/client/services/settingsApi", () => ({
   readSettingsProfile: vi.fn().mockResolvedValue({

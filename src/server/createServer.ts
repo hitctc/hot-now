@@ -26,7 +26,6 @@ import {
   renderNoticePage
 } from "./renderPages.js";
 import { findAppShellPage, getAppShellPages, renderAppLayout } from "./renderAppLayout.js";
-import { renderContentPage } from "./renderContentPages.js";
 import {
   renderProfilePage,
   renderSourcesPage,
@@ -88,6 +87,21 @@ type CreateDraftFromFeedbackResult = { ok: true; draftId: number } | { ok: false
 type DeleteFeedbackResult = boolean;
 type ClearFeedbackResult = number;
 type DeleteDraftResult = boolean;
+type ContentPageKey = "ai-new" | "ai-hot";
+type ContentPageModel = {
+  pageKey: ContentPageKey;
+  sourceFilter?: {
+    options: { kind: string; name: string }[];
+    selectedSourceKinds: string[];
+  };
+  featuredCard: ContentCardView | null;
+  cards: ContentCardView[];
+  emptyState: {
+    title: string;
+    description: string;
+    tone: "default" | "degraded" | "filtered";
+  } | null;
+};
 
 type ServerDeps = {
   config?: Partial<RuntimeConfig>;
@@ -126,6 +140,10 @@ type ServerDeps = {
   getSourcesOperationSummary?: () => Promise<SourcesOperationSummary> | SourcesOperationSummary;
   toggleSource?: (kind: string, enable: boolean) => Promise<ToggleSourceResult> | ToggleSourceResult;
   getCurrentUserProfile?: () => Promise<CurrentUserProfile | null> | CurrentUserProfile | null;
+  getContentPageModel?: (
+    pageKey: ContentPageKey,
+    options?: Pick<ContentViewSelectionOptions, "selectedSourceKinds">
+  ) => Promise<ContentPageModel> | ContentPageModel;
   auth?: {
     requireLogin: boolean;
     sessionSecret: string;
@@ -218,6 +236,14 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.send({ profile: await readSettingsProfileApiData(deps, session) });
   });
 
+  app.get("/api/content/ai-new", async (request, reply) => {
+    return reply.send(await readContentPageModelApiData(deps, request, "ai-new"));
+  });
+
+  app.get("/api/content/ai-hot", async (request, reply) => {
+    return reply.send(await readContentPageModelApiData(deps, request, "ai-hot"));
+  });
+
   if (authEnabled) {
     app.get("/login", async (request, reply) => {
       const existingSession = readAuthenticatedSession(request.headers.cookie, authConfig?.sessionSecret ?? "");
@@ -298,10 +324,11 @@ export function createServer(deps: ServerDeps = {}) {
           return serveClientSettingsShell(reply, clientEntryHtml);
         }
 
-        const contentViewKey = mapPathToContentViewKey(currentPage.path);
-        const contentHtml = contentViewKey
-          ? await renderContentForView(deps, request, contentViewKey)
-          : await renderSystemPageForPath(deps, currentPage.path, Boolean(session));
+        if (currentPage.section === "content") {
+          return serveClientContentShell(reply, clientEntryHtml);
+        }
+
+        const contentHtml = await renderSystemPageForPath(deps, currentPage.path, Boolean(session));
 
         return reply.type("text/html").send(
           renderAppLayout({
@@ -334,10 +361,11 @@ export function createServer(deps: ServerDeps = {}) {
           return serveClientSettingsShell(reply, clientEntryHtml);
         }
 
-        const contentViewKey = mapPathToContentViewKey(currentPage.path);
-        const contentHtml = contentViewKey
-          ? await renderContentForView(deps, _request, contentViewKey)
-          : await renderSystemPageForPath(deps, currentPage.path, false);
+        if (currentPage.section === "content") {
+          return serveClientContentShell(reply, clientEntryHtml);
+        }
+
+        const contentHtml = await renderSystemPageForPath(deps, currentPage.path, false);
 
         return reply.type("text/html").send(
           renderAppLayout({
@@ -991,6 +1019,11 @@ function serveClientSettingsShell(reply: FastifyReply, clientEntryHtml: string) 
   return reply.type("text/html; charset=utf-8").send(clientEntryHtml);
 }
 
+function serveClientContentShell(reply: FastifyReply, clientEntryHtml: string) {
+  // Content routes now use the same real client entry as the settings shell so the browser boots the Vue app directly.
+  return reply.type("text/html; charset=utf-8").send(clientEntryHtml);
+}
+
 function normalizeClientAssetPath(rawAssetPath: string): string | null {
   // Static asset requests are normalized once so path traversal checks can operate on a clean relative path.
   const trimmedPath = rawAssetPath.trim().replace(/\\/g, "/");
@@ -1045,50 +1078,67 @@ function readSiteJs() {
 
 function mapPathToContentViewKey(pathname: string): ContentViewKey | null {
   // Content menu paths map to one canonical view key so ranking logic stays inside content modules.
-  if (pathname === "/") {
-    return "hot";
-  }
-
-  if (pathname === "/articles") {
-    return "articles";
-  }
-
-  if (pathname === "/ai") {
+  if (pathname === "/" || pathname === "/ai-new") {
     return "ai";
+  }
+
+  if (pathname === "/ai-hot") {
+    return "hot";
   }
 
   return null;
 }
 
-async function renderContentForView(
+async function readContentPageModelApiData(
   deps: ServerDeps,
   request: FastifyRequest,
-  viewKey: ContentViewKey
-): Promise<string | undefined> {
-  // Rendering stays data-only now: the page consumes scored cards and no longer needs rating dimensions.
+  pageKey: ContentPageKey
+): Promise<ContentPageModel> {
+  if (deps.getContentPageModel) {
+    const selectedSourceKinds = readSelectedSourceKindsHeader(request.headers["x-hot-now-source-filter"]);
+    return deps.getContentPageModel(pageKey, selectedSourceKinds === undefined ? undefined : { selectedSourceKinds });
+  }
+
+  return buildContentPageModelFromDependencies(deps, request, pageKey);
+}
+
+async function buildContentPageModelFromDependencies(
+  deps: ServerDeps,
+  request: FastifyRequest,
+  pageKey: ContentPageKey
+): Promise<ContentPageModel> {
+  const viewKey = pageKey === "ai-hot" ? "hot" : "ai";
+
   if (!deps.listContentView) {
-    return undefined;
+    return {
+      pageKey,
+      featuredCard: null,
+      cards: [],
+      emptyState: {
+        title: pageKey === "ai-hot" ? "暂无 AI 热点" : "暂无 AI 新讯",
+        description: "可以稍后刷新，或先检查数据源采集状态。",
+        tone: "default"
+      }
+    };
   }
 
   try {
     const sourceOptions = ((await deps.listContentSources?.()) ?? []).filter((source) => source.isEnabled);
-    const selectedSourceKinds = normalizeSelectedSourceKindsForOptions(
-      readSelectedSourceKindsHeader(request.headers["x-hot-now-source-filter"]),
-      sourceOptions
-    );
+    const selectedSourceKinds = readContentPageSelectedSourceKinds(request.headers["x-hot-now-source-filter"], sourceOptions);
     const cards = selectedSourceKinds === undefined
       ? await deps.listContentView(viewKey)
       : await deps.listContentView(viewKey, { selectedSourceKinds });
 
-    return renderContentPage({
-      viewKey,
-      cards,
+    return {
+      pageKey,
       sourceFilter: sourceOptions.length > 0
         ? {
             options: sourceOptions.map((source) => ({ kind: source.kind, name: source.name })),
             selectedSourceKinds: selectedSourceKinds ?? sourceOptions.map((source) => source.kind)
           }
         : undefined,
+      featuredCard: pageKey === "ai-new" ? cards[0] ?? null : null,
+      cards: pageKey === "ai-new" ? cards.slice(1) : cards,
       emptyState:
         selectedSourceKinds?.length === 0
           ? {
@@ -1096,23 +1146,43 @@ async function renderContentForView(
               description: "重新全选后即可恢复内容结果。",
               tone: "filtered"
             }
-          : undefined
-    });
+          : cards.length === 0
+            ? {
+                title: pageKey === "ai-new" ? "暂无 AI 新讯" : "暂无 AI 热点",
+                description: "可以稍后刷新，或先检查数据源采集状态。",
+                tone: "default"
+              }
+            : null
+    };
   } catch (error) {
     if (!isMalformedContentStoreError(error)) {
       throw error;
     }
 
-    return renderContentPage({
-      viewKey,
+    return {
+      pageKey,
+      featuredCard: null,
       cards: [],
       emptyState: {
         title: "内容暂不可用",
         description: "检测到本地内容库读取失败，请修复或重建 data/hot-now.sqlite 后再刷新。",
         tone: "degraded"
       }
-    });
+    };
   }
+}
+
+function readContentPageSelectedSourceKinds(
+  headerValue: string | string[] | undefined,
+  sourceOptions: ContentSourceOption[]
+) {
+  const selectedSourceKinds = readSelectedSourceKindsHeader(headerValue);
+
+  if (selectedSourceKinds === undefined) {
+    return undefined;
+  }
+
+  return normalizeSelectedSourceKindsForOptions(selectedSourceKinds, sourceOptions);
 }
 
 function readSelectedSourceKindsHeader(headerValue: string | string[] | undefined) {

@@ -56,7 +56,6 @@ export function renderAppLayout(view: AppShellView): string {
   const sidebarPageSummary = renderSidebarPageSummary(view.page);
   const sidebarAccount = renderSidebarAccount(view.user, view.loginHref);
   const mobileTopNav = renderMobileTopNav(view.currentPath, showSystemMenu);
-  const contentClientEntryMarker = renderContentClientEntryMarker();
   const themeControl = `
   <section class="theme-dock" data-theme-toggle>
     <p class="theme-dock-title">界面主题</p>
@@ -78,7 +77,6 @@ export function renderAppLayout(view: AppShellView): string {
   </head>
   <body class="shell-page">
     ${mobileTopNav}
-    ${contentClientEntryMarker}
     <div class="shell-root">
       <aside class="shell-sidebar shell-sidebar--editorial">
         <div class="brand-block brand-block--masthead">
@@ -117,14 +115,6 @@ function renderPlaceholder(description: string) {
       <h3>模块占位</h3>
       <p>${escapeHtml(description)}</p>
     </section>
-  `;
-}
-
-function renderContentClientEntryMarker() {
-  // Content pages keep a Vue entry marker around so the new shell contract stays discoverable in tests and in the browser.
-  return `
-    <div id="app"></div>
-    <!-- /client/assets/ -->
   `;
 }
 

@@ -325,10 +325,11 @@ export function createServer(deps: ServerDeps = {}) {
           return serveClientSettingsShell(reply, clientEntryHtml);
         }
 
-        const contentViewKey = mapPathToContentViewKey(currentPage.path);
-        const contentHtml = contentViewKey
-          ? await renderContentForView(deps, request, contentViewKey)
-          : await renderSystemPageForPath(deps, currentPage.path, Boolean(session));
+        if (currentPage.section === "content") {
+          return serveClientContentShell(reply, clientEntryHtml);
+        }
+
+        const contentHtml = await renderSystemPageForPath(deps, currentPage.path, Boolean(session));
 
         return reply.type("text/html").send(
           renderAppLayout({
@@ -361,10 +362,11 @@ export function createServer(deps: ServerDeps = {}) {
           return serveClientSettingsShell(reply, clientEntryHtml);
         }
 
-        const contentViewKey = mapPathToContentViewKey(currentPage.path);
-        const contentHtml = contentViewKey
-          ? await renderContentForView(deps, request, contentViewKey)
-          : await renderSystemPageForPath(deps, currentPage.path, false);
+        if (currentPage.section === "content") {
+          return serveClientContentShell(reply, clientEntryHtml);
+        }
+
+        const contentHtml = await renderSystemPageForPath(deps, currentPage.path, false);
 
         return reply.type("text/html").send(
           renderAppLayout({
@@ -1015,6 +1017,11 @@ function isClientSettingsPath(pathname: string) {
 
 function serveClientSettingsShell(reply: FastifyReply, clientEntryHtml: string) {
   // The Vue client owns the full system-page shell now, so the server only needs to return one HTML entry document.
+  return reply.type("text/html; charset=utf-8").send(clientEntryHtml);
+}
+
+function serveClientContentShell(reply: FastifyReply, clientEntryHtml: string) {
+  // AI-first 内容页已经切到同一份 Vue entry，服务端只保留页面级鉴权和静态资源分发。
   return reply.type("text/html; charset=utf-8").send(clientEntryHtml);
 }
 

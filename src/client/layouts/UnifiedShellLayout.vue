@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { RouterLink, RouterView, useRoute } from "vue-router";
 
 import { useTheme, type ThemeMode } from "../composables/useTheme";
+import { HttpError } from "../services/http";
 import { readSettingsProfile, type SettingsProfile } from "../services/settingsApi";
 import { shellPageMetas } from "../router";
 
@@ -27,6 +28,7 @@ const currentPageDescription = computed(
 const activeNavKey = computed(() => route.meta.shellKey ?? shellPageMetas[0]?.key ?? "view-rules");
 const contentNavPages = shellPageMetas.filter((page) => page.section === "content");
 const systemNavPages = shellPageMetas.filter((page) => page.section === "system");
+const canUseClientSystemNavigation = computed(() => profile.value?.loggedIn === true);
 
 // 当前页面标题和描述直接读路由元数据，这样后续新增页面时只需补 route record。
 function handleThemeModeChange(nextValue: string | number): void {
@@ -45,6 +47,18 @@ async function loadProfileSummary(): Promise<void> {
     profile.value = nextProfile;
     profileLoadState.value = nextProfile ? "loaded" : "empty";
   } catch (error) {
+    if (error instanceof HttpError && error.status === 401) {
+      profile.value = {
+        username: "guest",
+        displayName: "公开访问",
+        role: "viewer",
+        email: null,
+        loggedIn: false
+      };
+      profileLoadState.value = "loaded";
+      return;
+    }
+
     profile.value = null;
     profileLoadState.value = "error";
     profileError.value = error instanceof Error ? error.message : "读取当前登录用户失败";
@@ -55,7 +69,6 @@ onMounted(() => {
   void loadProfileSummary();
 });
 
-// 内容页还没整体迁进 Vue 前，侧边栏内容菜单统一用真实链接跳回服务端内容页，避免落到占位路由。
 function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPageKey {
   return key === "view-rules" || key === "sources" || key === "profile";
 }
@@ -78,10 +91,10 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
         <p class="unified-shell__nav-kicker">内容菜单</p>
         <a-menu class="unified-shell__nav" mode="inline" :selected-keys="[]">
           <a-menu-item v-for="page in contentNavPages" :key="page.path" :data-shell-nav="page.key">
-            <a class="unified-shell__nav-link" :href="page.path">
+            <RouterLink class="unified-shell__nav-link" :to="page.path">
               <span class="unified-shell__nav-label">{{ page.navLabel }}</span>
               <span class="unified-shell__nav-description">{{ page.description }}</span>
-            </a>
+            </RouterLink>
           </a-menu-item>
         </a-menu>
       </section>
@@ -90,10 +103,14 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
         <p class="unified-shell__nav-kicker">系统菜单</p>
         <a-menu class="unified-shell__nav" mode="inline" :selected-keys="isSystemPageKey(activeNavKey) ? [activeNavKey] : []">
           <a-menu-item v-for="page in systemNavPages" :key="page.key" :data-shell-nav="page.key">
-            <RouterLink class="unified-shell__nav-link" :to="page.path">
+            <RouterLink v-if="canUseClientSystemNavigation" class="unified-shell__nav-link" :to="page.path">
               <span class="unified-shell__nav-label">{{ page.navLabel }}</span>
               <span class="unified-shell__nav-description">{{ page.description }}</span>
             </RouterLink>
+            <a v-else class="unified-shell__nav-link" :href="page.path">
+              <span class="unified-shell__nav-label">{{ page.navLabel }}</span>
+              <span class="unified-shell__nav-description">{{ page.description }}</span>
+            </a>
           </a-menu-item>
         </a-menu>
       </section>

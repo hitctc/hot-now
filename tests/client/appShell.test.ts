@@ -94,7 +94,7 @@ describe("client app shell", () => {
     ]);
   });
 
-  it("keeps the /client/ asset base separate from the /settings/ route base while leaving content routes on the server", async () => {
+  it("keeps the /client/ asset base separate from the /settings/ route base while mounting AI content routes in the same app", async () => {
     const router = createAppRouter();
 
     await router.push("/settings/profile");
@@ -106,8 +106,8 @@ describe("client app shell", () => {
     expect(router.resolve("/settings/profile").href).toBe("/settings/profile");
     expect(router.getRoutes().some((route) => route.path === "/client/settings/profile")).toBe(false);
     expect(router.getRoutes().some((route) => route.path === "/")).toBe(true);
-    expect(router.getRoutes().some((route) => route.path === "/ai-new")).toBe(false);
-    expect(router.getRoutes().some((route) => route.path === "/ai-hot")).toBe(false);
+    expect(router.getRoutes().some((route) => route.path === "/ai-new")).toBe(true);
+    expect(router.getRoutes().some((route) => route.path === "/ai-hot")).toBe(true);
     expect(router.getRoutes().some((route) => route.path === "/articles")).toBe(false);
   });
 });

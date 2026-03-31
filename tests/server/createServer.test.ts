@@ -205,11 +205,9 @@ describe("createServer", () => {
     const response = await app.inject({ method: "GET", url: "/ai-new" });
 
     expect(response.statusCode).toBe(200);
-    expect(response.body).toContain("AI 新讯");
-    expect(response.body).toContain("当前为内容公开访问模式");
-    expect(response.body).toContain('href="/login"');
-    expect(response.body).not.toContain('class="nav-group nav-group--system"');
-    expect(response.body).not.toContain("/settings/view-rules");
+    expect(response.body).toContain('<div id="app"></div>');
+    expect(response.body).toContain('/client/assets/');
+    expect(response.body).not.toContain('class="shell-root"');
   });
 
   it("redirects anonymous users to login for unified shell system pages when auth is enabled", async () => {

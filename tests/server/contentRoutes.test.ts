@@ -3,154 +3,22 @@ import { createSessionToken } from "../../src/core/auth/session.js";
 import { createServer } from "../../src/server/createServer.js";
 
 describe("content routes", () => {
-  it("renders AI 新讯 cards on / and /ai-new with the shared AI-first shell", async () => {
-    const listContentView = vi.fn().mockResolvedValue([
-      {
-        id: 101,
-        title: "AI Weekly Insight",
-        summary: "Roundup of recent AI and product updates.",
-        sourceName: "Juya AI Daily",
-        canonicalUrl: "https://example.com/ai-weekly",
-        publishedAt: "2026-03-28T10:00:00.000Z",
-        isFavorited: false,
-        reaction: "none",
-        feedbackEntry: {
-          freeText: "保留 agent workflow 内容",
-          suggestedEffect: "boost",
-          strengthLevel: "high",
-          positiveKeywords: ["agent", "workflow"],
-          negativeKeywords: ["融资"]
-        },
-        contentScore: 91,
-        scoreBadges: ["24h 内", "官方源", "正文完整"]
-      },
-      {
-        id: 102,
-        title: "Unsafe Link Item",
-        summary: "Entry containing an unsafe link value.",
-        sourceName: "Juya AI Daily",
-        canonicalUrl: "javascript:alert(1)",
-        publishedAt: "2026-03-28T09:00:00.000Z",
-        isFavorited: false,
-        reaction: "none",
-        contentScore: 64,
-        scoreBadges: ["3 天内", "聚合源"]
-      }
-    ]);
+  it("serves the Vue client entry on /, /ai-new and /ai-hot, and removes /articles", async () => {
     const app = createServer({
-      listContentView,
-      listRatingDimensions: vi.fn().mockResolvedValue([])
+      listContentView: vi.fn().mockResolvedValue([])
     } as never);
 
-    for (const pathname of ["/", "/ai-new"]) {
+    for (const pathname of ["/", "/ai-new", "/ai-hot"]) {
       const response = await app.inject({ method: "GET", url: pathname });
 
       expect(response.statusCode).toBe(200);
-      expect(response.body).toContain("AI Weekly Insight");
-      expect(response.body).toContain('class="content-intro content-intro--signal content-intro--ai"');
-      expect(response.body).toContain('class="content-grid content-grid--ai"');
-      expect(response.body).toContain('data-content-id="101"');
-      expect(response.body).toContain('class="content-card content-card--featured"');
-      expect(response.body).toContain('data-card-variant="featured"');
-      expect(response.body).toContain('class="content-card content-card--compact"');
-      expect(response.body).toContain('href="https://example.com/ai-weekly"');
-      expect(response.body).not.toContain('href="javascript:alert(1)"');
-      expect(response.body).toContain("Unsafe Link Item");
-      expect(response.body).toContain("AI 新讯");
-      expect(response.body).toContain('class="nav-link nav-link--content is-active" data-shell-nav href="/ai-new"');
-      expect(response.body).toContain('class="mobile-top-tab mobile-top-tab--content is-active" data-shell-nav href="/ai-new"');
-      expect(response.body).not.toContain('href="/articles"');
-      expect(response.body).not.toContain('href="/ai"');
+      expect(response.body).toContain('id="app"');
+      expect(response.body).not.toContain('class="shell-root"');
+      expect(response.body).not.toContain('data-shell-nav');
     }
 
-    expect(listContentView).toHaveBeenNthCalledWith(1, "ai");
-    expect(listContentView).toHaveBeenNthCalledWith(2, "ai");
-  });
-
-  it("renders AI 热点 cards on /ai-hot and removes /articles", async () => {
-    const listContentView = vi.fn().mockResolvedValue([
-      {
-        id: 201,
-        title: "AI Heat Watch",
-        summary: "Signals that already look like emerging hotspots.",
-        sourceName: "OpenAI",
-        canonicalUrl: "https://example.com/ai-heat",
-        publishedAt: "2026-03-30T08:00:00.000Z",
-        isFavorited: false,
-        reaction: "none",
-        contentScore: 88,
-        scoreBadges: ["24h 内", "官方源"]
-      }
-    ]);
-    const app = createServer({
-      listContentView,
-      listRatingDimensions: vi.fn().mockResolvedValue([])
-    } as never);
-
-    const response = await app.inject({ method: "GET", url: "/ai-hot" });
-    const removedResponse = await app.inject({ method: "GET", url: "/articles" });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.body).toContain('class="content-intro content-intro--signal content-intro--hot"');
-    expect(response.body).toContain('class="content-grid content-grid--hot"');
-    expect(response.body).toContain('class="content-card content-card--featured"');
-    expect(response.body).toContain('data-card-variant="featured"');
-    expect(response.body).toContain('class="nav-link nav-link--content is-active" data-shell-nav href="/ai-hot"');
-    expect(response.body).toContain('class="mobile-top-tab mobile-top-tab--content is-active" data-shell-nav href="/ai-hot"');
-    expect(listContentView).toHaveBeenCalledWith("hot");
-    expect(removedResponse.statusCode).toBe(404);
-  });
-
-  it("renders a compact source filter bar on AI-first content pages", async () => {
-    const listContentView = vi.fn().mockResolvedValue([
-      {
-        id: 101,
-        title: "AI Weekly Insight",
-        summary: "Roundup of recent AI and product updates.",
-        sourceName: "OpenAI",
-        sourceKind: "openai",
-        canonicalUrl: "https://example.com/ai-weekly",
-        publishedAt: "2026-03-31T01:00:00.000Z",
-        isFavorited: false,
-        reaction: "none",
-        contentScore: 91,
-        scoreBadges: ["24h 内"]
-      }
-    ]);
-    const app = createServer({
-      listContentView,
-      listContentSources: vi.fn().mockResolvedValue([
-        { kind: "openai", name: "OpenAI", isEnabled: true },
-        { kind: "ithome", name: "IT之家", isEnabled: true }
-      ])
-    } as never);
-
-    const response = await app.inject({ method: "GET", url: "/ai-new" });
-
-    expect(response.body).toContain('class="content-source-filter"');
-    expect(response.body).toContain('data-content-source-filter');
-    expect(response.body).toContain("来源筛选");
-    expect(response.body).toContain("全选");
-    expect(response.body).toContain("全不选");
-    expect(response.body).toContain('data-source-kind="openai"');
-  });
-
-  it("passes selected source kinds from shell header into the AI 热点 view", async () => {
-    const listContentView = vi.fn().mockResolvedValue([]);
-    const app = createServer({
-      listContentView,
-      listContentSources: vi.fn().mockResolvedValue([{ kind: "openai", name: "OpenAI", isEnabled: true }])
-    } as never);
-
-    await app.inject({
-      method: "GET",
-      url: "/ai-hot",
-      headers: {
-        "x-hot-now-source-filter": "openai"
-      }
-    });
-
-    expect(listContentView).toHaveBeenCalledWith("hot", { selectedSourceKinds: ["openai"] });
+    const articlesResponse = await app.inject({ method: "GET", url: "/articles" });
+    expect(articlesResponse.statusCode).toBe(404);
   });
 
   it("returns AI 新讯 and AI 热点 models through dedicated JSON APIs", async () => {
@@ -241,7 +109,7 @@ describe("content routes", () => {
     expect(listContentView).toHaveBeenCalledWith("hot");
   });
 
-  it("degrades content pages when the local content store is malformed", async () => {
+  it("degrades content APIs when the local content store is malformed", async () => {
     const listContentView = vi.fn().mockImplementation(() => {
       const error = new Error("database disk image is malformed");
       (error as Error & { code?: string }).code = "SQLITE_CORRUPT";
@@ -252,13 +120,21 @@ describe("content routes", () => {
       listRatingDimensions: vi.fn().mockResolvedValue([])
     } as never);
 
-    const response = await app.inject({ method: "GET", url: "/ai-new" });
+    const response = await app.inject({ method: "GET", url: "/api/content/ai-new" });
+    const payload = response.json() as {
+      featuredCard: unknown;
+      cards: unknown[];
+      emptyState: { title: string; description: string; tone: string } | null;
+    };
 
     expect(response.statusCode).toBe(200);
-    expect(response.body).toContain("内容暂不可用");
-    expect(response.body).toContain("检测到本地内容库读取失败");
-    expect(response.body).toContain("data/hot-now.sqlite");
-    expect(response.body).toContain('class="content-empty content-empty--signal content-empty--degraded"');
+    expect(payload.featuredCard).toBeNull();
+    expect(payload.cards).toEqual([]);
+    expect(payload.emptyState).toEqual({
+      title: "内容暂不可用",
+      description: "检测到本地内容库读取失败，请修复或重建 data/hot-now.sqlite 后再刷新。",
+      tone: "degraded"
+    });
   });
 
   it("keeps content pages public while auth-enabled system pages still redirect anonymous visitors", async () => {
@@ -275,9 +151,8 @@ describe("content routes", () => {
     const systemResponse = await app.inject({ method: "GET", url: "/settings/profile" });
 
     expect(contentResponse.statusCode).toBe(200);
-    expect(contentResponse.body).toContain("AI 新讯");
-    expect(contentResponse.body).toContain("当前为内容公开访问模式");
-    expect(contentResponse.body).toContain('href="/login"');
+    expect(contentResponse.body).toContain('id="app"');
+    expect(contentResponse.body).not.toContain('class="shell-root"');
     expect(systemResponse.statusCode).toBe(302);
     expect(systemResponse.headers.location).toBe("/login");
   });

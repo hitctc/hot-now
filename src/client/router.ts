@@ -2,6 +2,8 @@ import { type Component } from "vue";
 import { createRouter, createWebHistory, type RouteRecordRaw, type RouterHistory } from "vue-router";
 
 import { APP_ROUTE_BASE } from "./appBases";
+import AiHotPage from "./pages/content/AiHotPage.vue";
+import AiNewPage from "./pages/content/AiNewPage.vue";
 import ProfilePage from "./pages/settings/ProfilePage.vue";
 import SourcesPage from "./pages/settings/SourcesPage.vue";
 import ViewRulesPage from "./pages/settings/ViewRulesPage.vue";
@@ -24,6 +26,11 @@ const aiNewPageMeta = {
   navLabel: "AI 新讯",
   title: "AI 新讯工作台",
   description: "这里会展示最新 AI 新闻、模型、事件与智能体信号。"
+} as const satisfies ShellPageMeta;
+
+const aiNewRootPageMeta = {
+  ...aiNewPageMeta,
+  path: "/"
 } as const satisfies ShellPageMeta;
 
 const aiHotPageMeta = {
@@ -101,12 +108,13 @@ function createRouteMeta(meta: ShellPageMeta) {
 const viewRulesPage = ViewRulesPage;
 const sourcesPage = SourcesPage;
 const profilePage = ProfilePage;
+const aiNewPage = AiNewPage;
+const aiHotPage = AiHotPage;
 
 const routes: RouteRecordRaw[] = [
-  {
-    path: "/",
-    redirect: "/settings/view-rules"
-  },
+  createShellRoute(aiNewRootPageMeta, aiNewPage),
+  createShellRoute(aiNewPageMeta, aiNewPage),
+  createShellRoute(aiHotPageMeta, aiHotPage),
   createShellRoute(viewRulesPageMeta, viewRulesPage),
   createShellRoute(sourcesPageMeta, sourcesPage),
   createShellRoute(profilePageMeta, profilePage)

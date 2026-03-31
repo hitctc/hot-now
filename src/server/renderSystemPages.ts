@@ -87,6 +87,14 @@ type SourceItem = {
   isEnabled: boolean;
   lastCollectedAt: string | null;
   lastCollectionStatus: string | null;
+  totalCount?: number;
+  publishedTodayCount?: number;
+  collectedTodayCount?: number;
+  viewStats?: {
+    hot: { candidateCount: number; visibleCount: number };
+    articles: { candidateCount: number; visibleCount: number };
+    ai: { candidateCount: number; visibleCount: number };
+  };
 };
 
 type SourcesPageOptions = {
@@ -144,6 +152,7 @@ export function renderSourcesPage(sources: SourceItem[], options: SourcesPageOpt
   }
 
   const enabledSources = sources.filter((source) => source.isEnabled);
+  const overviewTableHtml = renderSourcesOverviewTable(sources);
   const cardsHtml = sources.map((source) => renderSourceCard(source)).join("");
 
   return `
@@ -169,9 +178,51 @@ export function renderSourcesPage(sources: SourceItem[], options: SourcesPageOpt
         <p class="system-section-description">这里展示每个 source 的启用状态、最近抓取时间和最近抓取结果，便于逐项管理。</p>
       </header>
       <div class="system-stack system-stack--control system-stack--sources system-stack--inventory">
+        ${overviewTableHtml}
         ${cardsHtml}
       </div>
     </section>
+  `;
+}
+
+function renderSourcesOverviewTable(sources: SourceItem[]) {
+  return `
+    <div class="source-analytics-shell">
+      <table class="source-analytics-table">
+        <thead>
+          <tr>
+            <th>来源</th>
+            <th>总条数</th>
+            <th>今天发布</th>
+            <th>今天抓取</th>
+            <th>Hot 入池 / 展示</th>
+            <th>Articles 入池 / 展示</th>
+            <th>AI 入池 / 展示</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${sources.map((source) => renderSourcesOverviewRow(source)).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderSourcesOverviewRow(source: SourceItem) {
+  const hotStats = source.viewStats?.hot ?? { candidateCount: 0, visibleCount: 0 };
+  const articleStats = source.viewStats?.articles ?? { candidateCount: 0, visibleCount: 0 };
+  const aiStats = source.viewStats?.ai ?? { candidateCount: 0, visibleCount: 0 };
+
+  return `
+    <tr>
+      <th scope="row">${escapeHtml(source.name)}</th>
+      <td>${source.totalCount ?? 0}</td>
+      <td>${source.publishedTodayCount ?? 0}</td>
+      <td>${source.collectedTodayCount ?? 0}</td>
+      <td>${hotStats.candidateCount} / ${hotStats.visibleCount}</td>
+      <td>${articleStats.candidateCount} / ${articleStats.visibleCount}</td>
+      <td>${aiStats.candidateCount} / ${aiStats.visibleCount}</td>
+    </tr>
   `;
 }
 

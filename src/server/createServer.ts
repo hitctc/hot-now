@@ -2,11 +2,13 @@ import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { LatestReportEmailError, type LatestReportEmailErrorReason } from "../core/pipeline/sendLatestReportEmail.js";
+import type { ContentViewSelectionOptions } from "../core/content/buildContentViewSelection.js";
 import type { ContentCardView, ContentViewKey } from "../core/content/listContentView.js";
 import type { FeedbackSaveResult, ReactionValue } from "../core/feedback/feedbackRepository.js";
 import type { SaveFeedbackPoolEntryInput, SaveFeedbackPoolEntryResult } from "../core/feedback/feedbackPoolRepository.js";
 import type { SaveProviderSettingsInput, SaveProviderSettingsResult } from "../core/llm/providerSettingsRepository.js";
 import type { RatingDimension, SaveRatingsResult } from "../core/ratings/ratingRepository.js";
+import type { ContentSourceOption } from "../core/source/listContentSources.js";
 import type { NlRuleScope } from "../core/strategy/nlRuleRepository.js";
 import type { RunNlEvaluationCycleResult } from "../core/strategy/runNlEvaluationCycle.js";
 import type { UpdateStrategyDraftInput, UpdateStrategyDraftResult } from "../core/strategy/strategyDraftRepository.js";
@@ -51,6 +53,14 @@ type SourceCard = {
   isEnabled: boolean;
   lastCollectedAt: string | null;
   lastCollectionStatus: string | null;
+  totalCount?: number;
+  publishedTodayCount?: number;
+  collectedTodayCount?: number;
+  viewStats?: {
+    hot: { candidateCount: number; visibleCount: number };
+    articles: { candidateCount: number; visibleCount: number };
+    ai: { candidateCount: number; visibleCount: number };
+  };
 };
 type SourcesOperationSummary = {
   lastCollectionRunAt: string | null;
@@ -81,7 +91,11 @@ type ServerDeps = {
   triggerManualCollect?: () => Promise<ManualCollectResult>;
   triggerManualSendLatestEmail?: () => Promise<ManualSendLatestEmailResult>;
   isRunning?: () => boolean;
-  listContentView?: (viewKey: ContentViewKey) => Promise<ContentCardView[]> | ContentCardView[];
+  listContentView?: (
+    viewKey: ContentViewKey,
+    options?: Pick<ContentViewSelectionOptions, "selectedSourceKinds">
+  ) => Promise<ContentCardView[]> | ContentCardView[];
+  listContentSources?: () => Promise<ContentSourceOption[]> | ContentSourceOption[];
   saveFavorite?: (contentItemId: number, isFavorited: boolean) => Promise<FeedbackSaveResult> | FeedbackSaveResult;
   saveReaction?: (contentItemId: number, reaction: ReactionValue) => Promise<FeedbackSaveResult> | FeedbackSaveResult;
   saveContentFeedback?: (
@@ -213,7 +227,7 @@ export function createServer(deps: ServerDeps = {}) {
 
         const contentViewKey = mapPathToContentViewKey(currentPage.path);
         const contentHtml = contentViewKey
-          ? await renderContentForView(deps, contentViewKey)
+          ? await renderContentForView(deps, request, contentViewKey)
           : await renderSystemPageForPath(deps, currentPage.path, Boolean(session));
 
         return reply.type("text/html").send(
@@ -245,7 +259,7 @@ export function createServer(deps: ServerDeps = {}) {
 
         const contentViewKey = mapPathToContentViewKey(currentPage.path);
         const contentHtml = contentViewKey
-          ? await renderContentForView(deps, contentViewKey)
+          ? await renderContentForView(deps, _request, contentViewKey)
           : await renderSystemPageForPath(deps, currentPage.path, false);
 
         return reply.type("text/html").send(
@@ -813,16 +827,44 @@ function mapPathToContentViewKey(pathname: string): ContentViewKey | null {
   return null;
 }
 
-async function renderContentForView(deps: ServerDeps, viewKey: ContentViewKey): Promise<string | undefined> {
+async function renderContentForView(
+  deps: ServerDeps,
+  request: FastifyRequest,
+  viewKey: ContentViewKey
+): Promise<string | undefined> {
   // Rendering stays data-only now: the page consumes scored cards and no longer needs rating dimensions.
   if (!deps.listContentView) {
     return undefined;
   }
 
   try {
-    const cards = await deps.listContentView(viewKey);
+    const sourceOptions = ((await deps.listContentSources?.()) ?? []).filter((source) => source.isEnabled);
+    const selectedSourceKinds = normalizeSelectedSourceKindsForOptions(
+      readSelectedSourceKindsHeader(request.headers["x-hot-now-source-filter"]),
+      sourceOptions
+    );
+    const cards = selectedSourceKinds === undefined
+      ? await deps.listContentView(viewKey)
+      : await deps.listContentView(viewKey, { selectedSourceKinds });
 
-    return renderContentPage({ viewKey, cards });
+    return renderContentPage({
+      viewKey,
+      cards,
+      sourceFilter: sourceOptions.length > 0
+        ? {
+            options: sourceOptions.map((source) => ({ kind: source.kind, name: source.name })),
+            selectedSourceKinds: selectedSourceKinds ?? sourceOptions.map((source) => source.kind)
+          }
+        : undefined,
+      emptyState:
+        selectedSourceKinds?.length === 0
+          ? {
+              title: "当前未选择任何数据源",
+              description: "重新全选后即可恢复内容结果。",
+              tone: "filtered"
+            }
+          : undefined
+    });
   } catch (error) {
     if (!isMalformedContentStoreError(error)) {
       throw error;
@@ -838,6 +880,38 @@ async function renderContentForView(deps: ServerDeps, viewKey: ContentViewKey): 
       }
     });
   }
+}
+
+function readSelectedSourceKindsHeader(headerValue: string | string[] | undefined) {
+  if (typeof headerValue === "undefined") {
+    return undefined;
+  }
+
+  const rawValue = Array.isArray(headerValue) ? headerValue.join(",") : headerValue ?? "";
+
+  if (rawValue === "") {
+    return [];
+  }
+
+  return rawValue
+    .split(",")
+    .map((kind) => kind.trim())
+    .filter(Boolean);
+}
+
+function normalizeSelectedSourceKindsForOptions(
+  selectedSourceKinds: string[] | undefined,
+  sourceOptions: ContentSourceOption[]
+) {
+  if (selectedSourceKinds === undefined) {
+    return undefined;
+  }
+
+  const enabledSourceKinds = new Set(sourceOptions.map((source) => source.kind));
+
+  return selectedSourceKinds.filter((kind, index, array) => {
+    return enabledSourceKinds.has(kind) && array.indexOf(kind) === index;
+  });
 }
 
 async function renderSystemPageForPath(deps: ServerDeps, pathname: string, loggedIn: boolean): Promise<string | undefined> {

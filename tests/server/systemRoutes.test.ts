@@ -229,6 +229,48 @@ describe("system routes", () => {
     expect(response.body).toContain("completed");
   });
 
+  it("renders the sources overview table before source cards", async () => {
+    const app = createServer({
+      listSources: vi.fn().mockResolvedValue([
+        {
+          kind: "openai",
+          name: "OpenAI",
+          rssUrl: "https://openai.com/news/rss.xml",
+          isEnabled: true,
+          lastCollectedAt: "2026-03-31T01:05:00.000Z",
+          lastCollectionStatus: "completed",
+          totalCount: 24,
+          publishedTodayCount: 6,
+          collectedTodayCount: 5,
+          viewStats: {
+            hot: { candidateCount: 4, visibleCount: 2 },
+            articles: { candidateCount: 3, visibleCount: 2 },
+            ai: { candidateCount: 5, visibleCount: 3 }
+          }
+        }
+      ]),
+      getSourcesOperationSummary: vi.fn().mockResolvedValue({
+        lastCollectionRunAt: "2026-03-31T03:00:00.000Z",
+        lastSendLatestEmailAt: "2026-03-31T03:10:00.000Z"
+      }),
+      isRunning: () => false
+    } as never);
+
+    const response = await app.inject({ method: "GET", url: "/settings/sources" });
+
+    expect(response.body).toContain('class="source-analytics-table"');
+    expect(response.body).toContain("Hot 入池 / 展示");
+    expect(response.body).toContain("Articles 入池 / 展示");
+    expect(response.body).toContain("AI 入池 / 展示");
+    expect(response.body).toContain("24");
+    expect(response.body).toContain("6");
+    expect(response.body).toContain("5");
+    expect(response.body).toContain("4 / 2");
+    expect(response.body.indexOf('class="source-analytics-table"')).toBeLessThan(
+      response.body.indexOf('data-system-card="source"')
+    );
+  });
+
   it("renders disabled state on both manual action cards when a job is already running", async () => {
     const app = createServer({
       listSources: vi.fn().mockResolvedValue([

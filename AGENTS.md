@@ -76,11 +76,12 @@
 - `/articles`：统一站点文章页（未登录也可访问）
 - `/ai`：统一站点 AI 页（未登录也可访问）
 - `/settings/view-rules`：统一站点筛选策略工作台（登录后，支持数值权重、LLM 设置、正式自然语言策略、反馈池、草稿池）
-- `/settings/sources`：统一站点数据迭代收集页（登录后，可启用/停用 source，并分别手动执行采集 / 手动发送最新报告）
+- `/settings/sources`：统一站点数据迭代收集页（登录后，可启用/停用 source，并分别手动执行采集 / 手动发送最新报告；source 卡片上方会展示总条数、今天发布、今天抓取，以及 Hot / Articles / AI 入池与展示统计）
 - `/settings/profile`：统一站点当前登录用户页（登录后）
 - 统一站点左侧导航底部支持深色 / 浅色主题切换，偏好写入浏览器本地 `localStorage` 并在刷新后保持
 - `unified shell` 页面（`/`、`/articles`、`/ai`、`/settings/*`）已完整切换到 `Editorial Signal Desk` 双主题
 - 内容导航保持统一内容池，但会给匹配导航语义的内置 source 显式加权：`36氪` / `36氪快讯` 优先进入 `/` 热点页，`爱范儿` 优先进入 `/ai`，`36氪` / `爱范儿` / `IT之家` 优先进入 `/articles`
+- `/`、`/articles`、`/ai` 顶部新增共享 source 复选过滤条，支持 `全选 / 全不选`，浏览偏好写入浏览器本地 `localStorage['hot-now-content-sources']`
 - 内容卡片保留 `收藏 / 点赞 / 点踩`，并新增局部 `补充反馈` 面板；点赞 / 点踩后自动展开，反馈进入反馈池，不会直接修改正式策略
 - 如果本地 `data/hot-now.sqlite` 内容库损坏，内容页会降级显示提示，不再直接以 `500` 打断 unified shell
 - `/history`：历史报告（legacy，当前仍保留）
@@ -147,7 +148,7 @@ SQLite 可靠性约定：
 4. 如需验证自然语言链路，先进入 `/settings/view-rules` 保存厂商设置和正式规则，确认页面出现最新重算结果
 5. 进入 `/settings/sources` 或 legacy `/control`，先手动执行一次采集；需要验证发信时，再单独触发一次“发送最新报告”
 6. 检查是否生成报告目录与 `report.json`、`report.html`、`run-meta.json`
-7. 检查 `/`、`/settings/view-rules`、`/settings/sources`、`/history`、`/reports/:date` 是否正常显示，并验证内容卡片反馈面板、反馈池、草稿池和正式规则编辑区
+7. 检查 `/`、`/articles`、`/ai`、`/settings/view-rules`、`/settings/sources`、`/history`、`/reports/:date` 是否正常显示，并验证内容页 source 过滤条、内容卡片反馈面板、反馈池、草稿池和正式规则编辑区
 
 ## 6. 配置与安全约束
 
@@ -220,8 +221,10 @@ SQLite 可靠性约定：
 - 内置 RSS 源已扩展到 8 个，覆盖聚合日报、国际官方 AI 博客、国内热点资讯 / 快讯与科技媒体；新增国内源默认作为 built-in source 写入 `content_sources`
 - 采集和发信已拆成两个独立功能：默认配置下采集每 `10` 分钟执行一次，发信每天 `10:00` 执行一次；两者都支持手动触发，并共用同一把运行锁
 - 系统菜单已收口到多源语义：`/settings/sources` 支持 source 启用/停用、逐 source 最近抓取状态展示，以及统一站点内手动执行采集 / 手动发送最新报告；`/settings/view-rules` 现在是完整策略工作台，支持按字段表单保存权重规则、LLM 厂商配置、正式自然语言策略、反馈池和草稿池；当前登录用户信息已并到侧边栏底部
+- `/settings/sources` 现在会基于共享内容选择器实时展示 source 工作台总览表，口径包含总条数、今天发布、今天抓取，以及 Hot / Articles / AI 的入池与展示统计
 - unified shell 已去掉顶部 header，页面信息和账号区都收进左侧侧边栏；视觉母版已从赛博控制台切换为浅色纸感的 `Editorial Signal Desk`，主题切换与 localStorage 持久化已落地
 - unified shell 内容页已切到“首页主卡 + 标准卡”的混合卡片体系；系统页卡片则统一收口为 workbench / inventory panel 语义
+- 内容页顶部现在会渲染共享 source 过滤条，勾选结果通过 `localStorage + x-hot-now-source-filter` header 驱动服务端重渲染，只影响当前浏览结果，不参与系统页统计口径
 - 内容页现在会把当前反馈池条目回填到局部反馈面板，内容交互形成 `点赞/点踩 -> 反馈池 -> 草稿池 -> 正式自然语言策略 -> 全量 / 增量重算` 的闭环
 - 正式自然语言策略保存后会立即触发当前内容库全量重算；采集链路在落库后会自动触发增量自然语言评估
 - 内容页现在对本地内容库损坏做了降级兜底：检测到 `SQLITE_CORRUPT` / `SQLITE_NOTADB` 时继续渲染统一站点，并提示修复或重建 `data/hot-now.sqlite`

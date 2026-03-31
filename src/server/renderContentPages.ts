@@ -15,10 +15,14 @@ type ContentCardViewWithFeedback = ContentCardView & {
 type ContentPageView = {
   viewKey: ContentViewKey;
   cards: ContentCardViewWithFeedback[];
+  sourceFilter?: {
+    options: { kind: string; name: string }[];
+    selectedSourceKinds: string[];
+  };
   emptyState?: {
     title: string;
     description: string;
-    tone?: "default" | "degraded";
+    tone?: "default" | "degraded" | "filtered";
   };
 };
 
@@ -40,6 +44,7 @@ export function renderContentPage(view: ContentPageView): string {
     <section class="content-intro content-intro--signal content-intro--${view.viewKey}">
       <p class="content-kicker">内容菜单</p>
       <p class="content-description">${escapeHtml(pageSubtitle[view.viewKey])}</p>
+      ${renderContentSourceFilter(view.sourceFilter)}
     </section>
     <section class="content-grid content-grid--${view.viewKey}">
       ${cardsHtml}
@@ -51,9 +56,43 @@ function renderEmptyState(emptyState?: ContentPageView["emptyState"]): string {
   // Content tabs reuse one empty-state renderer so normal no-data and degraded-storage copy stay visually consistent.
   const title = emptyState?.title ?? "今天还没有可展示的内容";
   const description = emptyState?.description ?? "可以先去控制台手动触发一次抓取。";
-  const toneClass = emptyState?.tone === "degraded" ? " content-empty--degraded" : "";
+  const toneClass = emptyState?.tone === "degraded"
+    ? " content-empty--degraded"
+    : emptyState?.tone === "filtered"
+      ? " content-empty--filtered"
+      : "";
 
   return `<section class="content-empty content-empty--signal${toneClass}"><h3>${escapeHtml(title)}</h3><p>${escapeHtml(description)}</p></section>`;
+}
+
+function renderContentSourceFilter(sourceFilter?: ContentPageView["sourceFilter"]) {
+  if (!sourceFilter || sourceFilter.options.length === 0) {
+    return "";
+  }
+
+  const selectedKinds = new Set(sourceFilter.selectedSourceKinds);
+
+  return `
+    <form class="content-source-filter" data-content-source-filter data-selected-source-kinds="${escapeHtml(sourceFilter.selectedSourceKinds.join(","))}">
+      <span class="content-source-filter-label">来源筛选</span>
+      <div class="content-source-filter-options">
+        ${sourceFilter.options
+          .map(
+            (source) => `
+              <label class="content-source-filter-option">
+                <input type="checkbox" data-source-kind="${escapeHtml(source.kind)}" ${selectedKinds.has(source.kind) ? "checked" : ""} />
+                <span>${escapeHtml(source.name)}</span>
+              </label>
+            `
+          )
+          .join("")}
+      </div>
+      <div class="content-source-filter-actions">
+        <button type="button" class="secondary-mini-button" data-source-filter-action="all">全选</button>
+        <button type="button" class="secondary-mini-button" data-source-filter-action="clear">全不选</button>
+      </div>
+    </form>
+  `;
 }
 
 function renderContentCard(viewKey: ContentViewKey, card: ContentCardViewWithFeedback, index: number): string {
@@ -66,7 +105,7 @@ function renderContentCard(viewKey: ContentViewKey, card: ContentCardViewWithFee
   const feedbackEntry = card.feedbackEntry;
 
   return `
-    <article class="content-card content-card--${variant}" data-card-variant="${variant}" data-content-id="${card.id}">
+    <article class="content-card content-card--${variant}" data-card-variant="${variant}" data-content-id="${card.id}" data-source-kind="${escapeHtml(card.sourceKind || "")}">
       <div class="content-score-pill" aria-label="评分 ${escapeHtml(contentScoreLabel)}" title="评分 ${escapeHtml(contentScoreLabel)}">
         <span data-role="content-score">${escapeHtml(contentScoreLabel)}</span>
       </div>

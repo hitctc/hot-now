@@ -14,11 +14,30 @@
   const globalStatusDisplayDurationMs = 3000;
   const globalErrorStatusDisplayDurationMs = 7000;
   const shellNavigationHeader = "x-hot-now-shell-nav";
+  const contentSourceStorageKey = "hot-now-content-sources";
   let globalStatusTimerId = null;
   let shellNavigationInFlight = false;
 
   applyInitialTheme();
+  hydrateContentSourceFilter();
   closeMobileSystemDrawer();
+
+  root.addEventListener("change", async (event) => {
+    const target = event.target;
+
+    if (!(target instanceof HTMLInputElement) || target.type !== "checkbox") {
+      return;
+    }
+
+    const filter = target.closest("[data-content-source-filter]");
+
+    if (!(filter instanceof HTMLFormElement)) {
+      return;
+    }
+
+    persistContentSourceSelection(filter);
+    await refreshCurrentContentSourceView();
+  });
 
   root.addEventListener("click", async (event) => {
     const target = event.target;
@@ -49,6 +68,31 @@
     if (themeButton instanceof HTMLButtonElement) {
       event.preventDefault();
       setTheme(themeButton.dataset.themeChoice || "dark");
+      closeMobileSystemDrawer();
+      return;
+    }
+
+    const sourceFilterAction = target.closest("[data-source-filter-action]");
+
+    if (sourceFilterAction instanceof HTMLButtonElement) {
+      const filter = sourceFilterAction.closest("[data-content-source-filter]");
+
+      if (!(filter instanceof HTMLFormElement)) {
+        return;
+      }
+
+      event.preventDefault();
+
+      if (sourceFilterAction.dataset.sourceFilterAction === "all") {
+        syncContentSourceCheckboxes(filter, readRenderedSourceKinds(filter));
+      }
+
+      if (sourceFilterAction.dataset.sourceFilterAction === "clear") {
+        syncContentSourceCheckboxes(filter, []);
+      }
+
+      persistContentSourceSelection(filter);
+      await refreshCurrentContentSourceView();
       closeMobileSystemDrawer();
       return;
     }
@@ -745,6 +789,140 @@
     window.location.reload();
   }
 
+  function buildShellFetchHeaders(targetUrl) {
+    const headers = {
+      accept: "text/html",
+      [shellNavigationHeader]: "1"
+    };
+
+    if (isContentPathname(targetUrl.pathname)) {
+      const storedKinds = readStoredContentSourceKinds();
+
+      if (storedKinds !== null) {
+        headers["x-hot-now-source-filter"] = storedKinds.join(",");
+      }
+    }
+
+    return headers;
+  }
+
+  function hydrateContentSourceFilter() {
+    const filter = root.querySelector("[data-content-source-filter]");
+
+    if (!(filter instanceof HTMLFormElement)) {
+      return;
+    }
+
+    const availableKinds = readRenderedSourceKinds(filter);
+    const storedKinds = readStoredContentSourceKinds(availableKinds);
+
+    if (storedKinds === null) {
+      return;
+    }
+
+    syncContentSourceCheckboxes(filter, storedKinds);
+
+    if (shouldRefreshHydratedContentSourceView(filter, storedKinds)) {
+      void refreshCurrentContentSourceView();
+    }
+  }
+
+  function shouldRefreshHydratedContentSourceView(filter, storedKinds) {
+    if (!isContentPathname(window.location.pathname)) {
+      return false;
+    }
+
+    return readSelectedSourceKindsFromFilter(filter).join(",") !== storedKinds.join(",");
+  }
+
+  function persistContentSourceSelection(filter) {
+    writeStoredContentSourceKinds(readCheckedSourceKinds(filter));
+  }
+
+  function readCheckedSourceKinds(filter) {
+    return [...filter.querySelectorAll("input[type='checkbox'][data-source-kind]")]
+      .filter((checkbox) => checkbox instanceof HTMLInputElement && checkbox.checked)
+      .map((checkbox) => checkbox.dataset.sourceKind)
+      .filter((value) => typeof value === "string" && value.length > 0);
+  }
+
+  function readStoredContentSourceKinds(availableKinds = readRenderedSourceKinds()) {
+    const parsed = readStringArrayStorage(contentSourceStorageKey);
+
+    if (parsed === null) {
+      return null;
+    }
+
+    const availableSet = new Set(availableKinds);
+    return parsed.filter((kind, index, array) => availableSet.has(kind) && array.indexOf(kind) === index);
+  }
+
+  function writeStoredContentSourceKinds(selectedKinds) {
+    writeStringArrayStorage(contentSourceStorageKey, selectedKinds);
+  }
+
+  function readStringArrayStorage(key) {
+    try {
+      const rawValue = localStorage.getItem(key);
+
+      if (rawValue === null) {
+        return null;
+      }
+
+      const parsed = JSON.parse(rawValue);
+      return Array.isArray(parsed) ? parsed.filter((value) => typeof value === "string") : [];
+    } catch {
+      return null;
+    }
+  }
+
+  function writeStringArrayStorage(key, values) {
+    try {
+      localStorage.setItem(key, JSON.stringify(values));
+    } catch {
+      // Storage write failures should not block the shell from continuing to work.
+    }
+  }
+
+  function refreshCurrentContentSourceView() {
+    return navigateShellPage(window.location.pathname + window.location.search, { pushHistory: false, force: true });
+  }
+
+  function isContentPathname(pathname) {
+    return pathname === "/" || pathname === "/articles" || pathname === "/ai";
+  }
+
+  function syncContentSourceCheckboxes(filter, selectedKinds) {
+    const selectedSet = new Set(selectedKinds);
+
+    for (const checkbox of filter.querySelectorAll("input[type='checkbox'][data-source-kind]")) {
+      if (!(checkbox instanceof HTMLInputElement)) {
+        continue;
+      }
+
+      checkbox.checked = selectedSet.has(checkbox.dataset.sourceKind || "");
+    }
+  }
+
+  function readRenderedSourceKinds(filter = root.querySelector("[data-content-source-filter]")) {
+    if (!(filter instanceof HTMLElement)) {
+      return [];
+    }
+
+    return [...filter.querySelectorAll("input[type='checkbox'][data-source-kind]")]
+      .map((checkbox) => checkbox.getAttribute("data-source-kind") || "")
+      .filter(Boolean);
+  }
+
+  function readSelectedSourceKindsFromFilter(filter) {
+    const rawValue = filter.dataset.selectedSourceKinds || "";
+
+    return rawValue
+      .split(",")
+      .map((kind) => kind.trim())
+      .filter(Boolean);
+  }
+
   function ensureGlobalStatusToast() {
     // The toast host is created lazily so pages without content actions do not render any extra chrome.
     const existingToast = root.querySelector('[data-role="global-status-toast"]');
@@ -979,10 +1157,7 @@
 
     try {
       const response = await fetch(targetUrl.pathname + targetUrl.search, {
-        headers: {
-          accept: "text/html",
-          [shellNavigationHeader]: "1"
-        },
+        headers: buildShellFetchHeaders(targetUrl),
         credentials: "same-origin"
       });
 

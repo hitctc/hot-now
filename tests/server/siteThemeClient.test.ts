@@ -256,6 +256,53 @@ describe("site theme runtime", () => {
     expect(scrollToMock).toHaveBeenCalledWith({ top: 0, behavior: "auto" });
   });
 
+  it("persists source filter selection and injects the header into shell fetches", async () => {
+    const dom = new JSDOM(
+      `<!doctype html>
+<html data-theme="light">
+  <body>
+    <div class="shell-root">
+      <aside class="shell-sidebar"></aside>
+      <div class="shell-main">
+        <main class="shell-content">
+          <section class="content-intro content-intro--signal content-intro--hot">
+            <form class="content-source-filter" data-content-source-filter data-selected-source-kinds="openai,ithome">
+              <label><input type="checkbox" data-source-kind="openai" checked />OpenAI</label>
+              <label><input type="checkbox" data-source-kind="ithome" checked />IT之家</label>
+              <button type="button" data-source-filter-action="clear">全不选</button>
+            </form>
+          </section>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>`,
+      { url: "https://example.test/", runScripts: "outside-only" }
+    );
+
+    const nextHtml = `<!doctype html><html data-theme="light"><body><div class="shell-root"><aside class="shell-sidebar"></aside><div class="shell-main"><main class="shell-content"><section class="content-empty">当前未选择任何数据源</section></main></div></div></body></html>`;
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => nextHtml });
+    dom.window.fetch = fetchMock as typeof dom.window.fetch;
+    dom.window.scrollTo = vi.fn() as typeof dom.window.scrollTo;
+    dom.window.eval(siteScript);
+
+    dom.window.document
+      .querySelector('[data-source-filter-action="clear"]')
+      ?.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true, cancelable: true }));
+
+    await new Promise((resolve) => dom.window.setTimeout(resolve, 0));
+
+    expect(dom.window.localStorage.getItem("hot-now-content-sources")).toBe("[]");
+    expect(fetchMock).toHaveBeenCalledWith("/", {
+      headers: {
+        accept: "text/html",
+        "x-hot-now-shell-nav": "1",
+        "x-hot-now-source-filter": ""
+      },
+      credentials: "same-origin"
+    });
+  });
+
   it("opens the local feedback panel after reaction clicks and submits feedback form payloads", async () => {
     const dom = new JSDOM(
       `<!doctype html>

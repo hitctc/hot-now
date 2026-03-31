@@ -29,7 +29,8 @@ import type { DailyReportTrigger } from "./core/report/buildDailyReport.js";
 import { createRunLock } from "./core/runtime/runLock.js";
 import { installGracefulShutdown } from "./core/runtime/installGracefulShutdown.js";
 import { startCollectionScheduler, startMailScheduler } from "./core/scheduler/startScheduler.js";
-import { listSourceCards } from "./core/source/listSourceCards.js";
+import { listContentSources } from "./core/source/listContentSources.js";
+import { listSourceWorkbench } from "./core/source/listSourceWorkbench.js";
 import { readSourcesOperationSummary } from "./core/source/readSourcesOperationSummary.js";
 import { loadEnabledSourceIssues } from "./core/source/loadEnabledSourceIssues.js";
 import { listNlEvaluationRuns } from "./core/strategy/nlEvaluationRepository.js";
@@ -465,7 +466,12 @@ const app = createServer({
     verifyLogin
   },
   isRunning: () => lock.isRunning(),
-  listContentView: async (viewKey) => listContentCards(db, viewKey, { includeNlEvaluations: isNlFeatureAvailable() }),
+  listContentView: async (viewKey, options) =>
+    listContentCards(db, viewKey, {
+      ...options,
+      includeNlEvaluations: isNlFeatureAvailable()
+    }),
+  listContentSources: async () => listContentSources(db),
   saveFavorite: async (contentItemId, isFavorited) => saveFavorite(db, contentItemId, isFavorited),
   saveReaction: async (contentItemId, reaction) => saveReaction(db, contentItemId, reaction),
   saveContentFeedback: async (contentItemId, input) => saveFeedbackPoolEntry(db, { contentItemId, ...input }),
@@ -505,7 +511,7 @@ const app = createServer({
     });
   },
   deleteStrategyDraft: async (draftId) => deleteStrategyDraft(db, draftId),
-  listSources: async () => listSourceCards(db),
+  listSources: async () => listSourceWorkbench(db),
   getSourcesOperationSummary: async () => readSourcesOperationSummary(db),
   toggleSource: async (kind, enable) => toggleSource(kind, enable),
   getCurrentUserProfile: async () => getCurrentUserProfile(),

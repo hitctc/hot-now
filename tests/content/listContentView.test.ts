@@ -68,6 +68,7 @@ describe("listContentView", () => {
       id: itemId,
       title: "Breaking quick blurb",
       sourceName: "OpenAI",
+      sourceKind: "openai",
       canonicalUrl: "https://example.com/breaking",
       isFavorited: true,
       reaction: "dislike",
@@ -83,6 +84,7 @@ describe("listContentView", () => {
     expect(card?.contentScore).toBeLessThanOrEqual(100);
     expect(card?.scoreBadges).toEqual(expect.arrayContaining(["24h 内", "官方源", "正文完整"]));
     expect(card).not.toHaveProperty("averageRating");
+    expect(card).not.toHaveProperty("rankingScore");
   });
 
   it("keeps one content pool but orders at least one view differently", async () => {

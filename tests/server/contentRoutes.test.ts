@@ -122,6 +122,58 @@ describe("content routes", () => {
     expect(listContentView).toHaveBeenCalledWith("articles");
   });
 
+  it("renders a compact source filter bar on content pages", async () => {
+    const listContentView = vi.fn().mockResolvedValue([
+      {
+        id: 101,
+        title: "AI Weekly Insight",
+        summary: "Roundup of recent AI and product updates.",
+        sourceName: "OpenAI",
+        sourceKind: "openai",
+        canonicalUrl: "https://example.com/ai-weekly",
+        publishedAt: "2026-03-31T01:00:00.000Z",
+        isFavorited: false,
+        reaction: "none",
+        contentScore: 91,
+        scoreBadges: ["24h 内"]
+      }
+    ]);
+    const app = createServer({
+      listContentView,
+      listContentSources: vi.fn().mockResolvedValue([
+        { kind: "openai", name: "OpenAI", isEnabled: true },
+        { kind: "ithome", name: "IT之家", isEnabled: true }
+      ])
+    } as never);
+
+    const response = await app.inject({ method: "GET", url: "/" });
+
+    expect(response.body).toContain('class="content-source-filter"');
+    expect(response.body).toContain('data-content-source-filter');
+    expect(response.body).toContain("来源筛选");
+    expect(response.body).toContain("全选");
+    expect(response.body).toContain("全不选");
+    expect(response.body).toContain('data-source-kind="openai"');
+  });
+
+  it("passes selected source kinds from shell header into listContentView", async () => {
+    const listContentView = vi.fn().mockResolvedValue([]);
+    const app = createServer({
+      listContentView,
+      listContentSources: vi.fn().mockResolvedValue([{ kind: "openai", name: "OpenAI", isEnabled: true }])
+    } as never);
+
+    await app.inject({
+      method: "GET",
+      url: "/articles",
+      headers: {
+        "x-hot-now-source-filter": "openai"
+      }
+    });
+
+    expect(listContentView).toHaveBeenCalledWith("articles", { selectedSourceKinds: ["openai"] });
+  });
+
   it("degrades content pages when the local content store is malformed", async () => {
     const listContentView = vi.fn().mockImplementation(() => {
       const error = new Error("database disk image is malformed");

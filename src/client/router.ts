@@ -35,6 +35,7 @@ const routes: RouteRecordRaw[] = [
 ];
 
 export function createAppRouter(history: RouterHistory = createWebHistory(APP_ROUTE_BASE)) {
+  // The client router stays mounted on real app URLs like /settings/*, while static assets are served from /client/.
   return createRouter({
     history,
     routes

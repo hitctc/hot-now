@@ -26,15 +26,21 @@
 ## 3. 关键目录与职责
 
 - `src/main.ts`
-  负责启动配置加载、运行锁、Fastify 服务和定时任务，是应用入口。
+  负责启动配置加载、运行锁、Fastify 服务和定时任务，并装配反馈工作台与自然语言重算链路，是应用入口。
 - `src/core/config/`
   负责读取 `config/hot-now.config.json` 和环境变量，组装运行时配置。
 - `src/core/source/`
   负责拉取并解析最新 RSS 日报。
 - `src/core/fetch/`
   负责抓取原文和正文提取。
+- `src/core/feedback/`
+  负责内容收藏 / 点赞 / 点踩，以及反馈池的读写。
+- `src/core/llm/`
+  负责厂商配置加密存储、provider 适配与自然语言评估调用。
 - `src/core/topics/`
   负责热点归并、排序和摘要整理。
+- `src/core/strategy/`
+  负责正式自然语言策略、草稿池、评估结果和评估运行记录。
 - `src/core/report/`
   负责生成结构化报告和 HTML 报告。
 - `src/core/pipeline/runCollectionCycle.ts`
@@ -69,12 +75,13 @@
 - `/`：统一站点首页（未登录也可访问）
 - `/articles`：统一站点文章页（未登录也可访问）
 - `/ai`：统一站点 AI 页（未登录也可访问）
-- `/settings/view-rules`：统一站点筛选策略页（登录后）
+- `/settings/view-rules`：统一站点筛选策略工作台（登录后，支持数值权重、LLM 设置、正式自然语言策略、反馈池、草稿池）
 - `/settings/sources`：统一站点数据迭代收集页（登录后，可启用/停用 source，并分别手动执行采集 / 手动发送最新报告）
 - `/settings/profile`：统一站点当前登录用户页（登录后）
 - 统一站点左侧导航底部支持深色 / 浅色主题切换，偏好写入浏览器本地 `localStorage` 并在刷新后保持
 - `unified shell` 页面（`/`、`/articles`、`/ai`、`/settings/*`）已完整切换到 `Editorial Signal Desk` 双主题
 - 内容导航保持统一内容池，但会给匹配导航语义的内置 source 显式加权：`36氪` / `36氪快讯` 优先进入 `/` 热点页，`爱范儿` 优先进入 `/ai`，`36氪` / `爱范儿` / `IT之家` 优先进入 `/articles`
+- 内容卡片保留 `收藏 / 点赞 / 点踩`，并新增局部 `补充反馈` 面板；点赞 / 点踩后自动展开，反馈进入反馈池，不会直接修改正式策略
 - 如果本地 `data/hot-now.sqlite` 内容库损坏，内容页会降级显示提示，不再直接以 `500` 打断 unified shell
 - `/history`：历史报告（legacy，当前仍保留）
 - `/reports/:date`：指定日期报告（legacy，当前仍保留）
@@ -83,6 +90,11 @@
 - `POST /actions/collect`：手动触发一次采集任务（会对所有 enabled sources 执行采集）
 - `POST /actions/send-latest-email`：手动发送最新一份已生成报告
 - `POST /actions/run`：`/actions/collect` 的兼容别名（legacy，当前仍保留）
+- `POST /actions/content/:id/feedback-pool`：保存或覆盖当前内容卡片的反馈池条目
+- `POST /actions/view-rules/provider-settings`、`POST /actions/view-rules/provider-settings/delete`：保存 / 删除单活 LLM 厂商配置
+- `POST /actions/view-rules/nl-rules`：保存 `global / hot / articles / ai` 正式自然语言策略，并立即触发当前内容库全量重算
+- `POST /actions/feedback-pool/:id/create-draft`、`POST /actions/feedback-pool/:id/delete`、`POST /actions/feedback-pool/clear`：反馈池转草稿、删单条、清空全部
+- `POST /actions/strategy-drafts/:id/save`、`POST /actions/strategy-drafts/:id/delete`：草稿池保存与删除
 - 兼容约定：真实应用默认启用 `requireLogin=true` 的 unified shell；auth 开启时内容菜单仍允许匿名查看，但系统菜单、legacy 路由和所有写操作都需要登录；测试或未注入 auth 的场景仍可保持 legacy `/ -> 最新报告` 与 legacy 路由公开行为
 
 当前报告产物目录：
@@ -129,12 +141,13 @@ SQLite 可靠性约定：
 
 推荐 smoke test：
 
-1. 准备 `SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_USER`、`SMTP_PASS`、`MAIL_TO`、`BASE_URL`、`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET`
+1. 准备 `SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_USER`、`SMTP_PASS`、`MAIL_TO`、`BASE_URL`、`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET`；如需验证自然语言匹配，再额外准备 `LLM_SETTINGS_MASTER_KEY`
 2. 启动 `npm run dev`
 3. 打开 `/login` 并完成登录
-4. 进入 `/settings/sources` 或 legacy `/control`，先手动执行一次采集；需要验证发信时，再单独触发一次“发送最新报告”
-5. 检查是否生成报告目录与 `report.json`、`report.html`、`run-meta.json`
-6. 检查 `/`、`/settings/sources`、`/history`、`/reports/:date` 是否正常显示
+4. 如需验证自然语言链路，先进入 `/settings/view-rules` 保存厂商设置和正式规则，确认页面出现最新重算结果
+5. 进入 `/settings/sources` 或 legacy `/control`，先手动执行一次采集；需要验证发信时，再单独触发一次“发送最新报告”
+6. 检查是否生成报告目录与 `report.json`、`report.html`、`run-meta.json`
+7. 检查 `/`、`/settings/view-rules`、`/settings/sources`、`/history`、`/reports/:date` 是否正常显示，并验证内容卡片反馈面板、反馈池、草稿池和正式规则编辑区
 
 ## 6. 配置与安全约束
 
@@ -155,6 +168,7 @@ SQLite 可靠性约定：
 - `AUTH_USERNAME`
 - `AUTH_PASSWORD`
 - `SESSION_SECRET`
+- `LLM_SETTINGS_MASTER_KEY`
 
 如果新增、删除或重命名环境变量，必须同步更新：
 
@@ -193,7 +207,7 @@ SQLite 可靠性约定：
 - 已有主体实现与测试文件
 - Git 主分支已建立并同步远端
 - 当前工作区已完成 unified site 与多源采集阶段的最终验证：
-  - `npm run test` 通过，结果为 `26` 个测试文件、`153` 个测试全部通过
+  - `npm run test` 通过，结果为 `35` 个测试文件、`186` 个测试全部通过
   - `npm run build` 通过
   - Playwright MCP 本地验收已跑通：`/login` 登录成功；`/`、`/articles`、`/ai`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常
   - 浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持
@@ -205,14 +219,17 @@ SQLite 可靠性约定：
 - 多源采集后端已完成：`loadEnabledSourceIssues` / `runDailyDigest` 已接入多源并行汇总，单个 feed 失败不会阻断整次日报，只有全部 enabled sources 都失败时才会硬失败
 - 内置 RSS 源已扩展到 8 个，覆盖聚合日报、国际官方 AI 博客、国内热点资讯 / 快讯与科技媒体；新增国内源默认作为 built-in source 写入 `content_sources`
 - 采集和发信已拆成两个独立功能：默认配置下采集每 `10` 分钟执行一次，发信每天 `10:00` 执行一次；两者都支持手动触发，并共用同一把运行锁
-- 系统菜单已收口到多源语义：`/settings/sources` 支持 source 启用/停用、逐 source 最近抓取状态展示，以及统一站点内手动执行采集 / 手动发送最新报告；`/settings/view-rules` 支持按字段表单保存权重规则；当前登录用户信息已并到侧边栏底部
+- 系统菜单已收口到多源语义：`/settings/sources` 支持 source 启用/停用、逐 source 最近抓取状态展示，以及统一站点内手动执行采集 / 手动发送最新报告；`/settings/view-rules` 现在是完整策略工作台，支持按字段表单保存权重规则、LLM 厂商配置、正式自然语言策略、反馈池和草稿池；当前登录用户信息已并到侧边栏底部
 - unified shell 已去掉顶部 header，页面信息和账号区都收进左侧侧边栏；视觉母版已从赛博控制台切换为浅色纸感的 `Editorial Signal Desk`，主题切换与 localStorage 持久化已落地
 - unified shell 内容页已切到“首页主卡 + 标准卡”的混合卡片体系；系统页卡片则统一收口为 workbench / inventory panel 语义
+- 内容页现在会把当前反馈池条目回填到局部反馈面板，内容交互形成 `点赞/点踩 -> 反馈池 -> 草稿池 -> 正式自然语言策略 -> 全量 / 增量重算` 的闭环
+- 正式自然语言策略保存后会立即触发当前内容库全量重算；采集链路在落库后会自动触发增量自然语言评估
 - 内容页现在对本地内容库损坏做了降级兜底：检测到 `SQLITE_CORRUPT` / `SQLITE_NOTADB` 时继续渲染统一站点，并提示修复或重建 `data/hot-now.sqlite`
 - 启动入口现在会对 `data/hot-now.sqlite` 做 SQLite 健康检查；如果主库损坏，会提示最近的 verified snapshot 和 `npm run db:restore -- <snapshot-file>` 恢复命令
 - graceful shutdown 现在会执行真实的 `wal_checkpoint(TRUNCATE)`，减少把 live 库直接当普通文件同步时产生坏快照的风险
 - 已新增 `npm run db:check`、`npm run db:snapshot`、`npm run db:restore -- <snapshot-file>`，并把 verified snapshot 目录收口为 `data/recovery-backups/<timestamp>/`
 - live `data/hot-now.sqlite` 已收口为运行时文件，不再作为常规 git 产物；跨设备和服务器只流转 verified snapshot
+- 自然语言匹配目前走预计算模式，只支持单活厂商；已接入 `DeepSeek`、`MiniMax`、`Kimi`，API key 通过页面录入并用 `LLM_SETTINGS_MASTER_KEY` 加密后落库
 - 报告层已切到多源语义：`report.json` / `report.html` / 邮件正文会保留 `sourceKinds`、`issueUrls`、失败 source 数量等信息，不再把输出描述成单一日报
 - legacy `/history`、`/reports/:date`、`/control` 与 unified shell 共存，且相关测试和文档已同步
 

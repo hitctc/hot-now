@@ -97,7 +97,7 @@ type SourceItem = {
   };
 };
 
-type SourcesPageOptions = {
+export type SourcesSettingsOperationsView = {
   canTriggerManualCollect: boolean;
   canTriggerManualSendLatestEmail: boolean;
   isRunning: boolean;
@@ -105,7 +105,12 @@ type SourcesPageOptions = {
   lastSendLatestEmailAt: string | null;
 };
 
-type ProfileView = {
+export type SourcesSettingsView = {
+  sources: SourceItem[];
+  operations: SourcesSettingsOperationsView;
+};
+
+export type ProfileView = {
   username: string;
   displayName: string;
   role: string;
@@ -145,7 +150,7 @@ export function renderViewRulesPage(rules: ViewRuleItem[] | ViewRulesWorkbenchVi
   `;
 }
 
-export function renderSourcesPage(sources: SourceItem[], options: SourcesPageOptions): string {
+export function renderSourcesPage(sources: SourceItem[], options: SourcesSettingsOperationsView): string {
   // Source cards expose enable state and latest collection hints so operators can manage multi-source intake.
   if (sources.length === 0) {
     return renderEmptyState("数据迭代收集", "尚未发现数据源，请先执行种子初始化。");
@@ -599,7 +604,7 @@ function renderSourceCard(source: SourceItem): string {
   `;
 }
 
-function renderManualCollectionCard(sources: SourceItem[], options: SourcesPageOptions): string {
+function renderManualCollectionCard(sources: SourceItem[], options: SourcesSettingsOperationsView): string {
   // Manual collection is its own control card so operators can see enabled sources and the action scope before they click.
   const enabledSourceNames = formatEnabledSourceNames(sources);
   const buttonText = options.isRunning ? "采集中..." : "手动执行采集";
@@ -633,7 +638,7 @@ function renderManualCollectionCard(sources: SourceItem[], options: SourcesPageO
   `;
 }
 
-function renderManualSendLatestEmailCard(options: SourcesPageOptions): string {
+function renderManualSendLatestEmailCard(options: SourcesSettingsOperationsView): string {
   // Latest-email is separated from collection so operators can resend the newest report without re-running the whole pipeline.
   const buttonText = options.isRunning ? "发送中..." : "发送最新报告";
   const disabledAttr = options.canTriggerManualSendLatestEmail && !options.isRunning ? "" : " disabled";

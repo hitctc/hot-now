@@ -27,7 +27,14 @@ import {
 } from "./renderPages.js";
 import { findAppShellPage, getAppShellPages, renderAppLayout } from "./renderAppLayout.js";
 import { renderContentPage } from "./renderContentPages.js";
-import { renderProfilePage, renderSourcesPage, renderViewRulesPage, type ViewRulesWorkbenchView } from "./renderSystemPages.js";
+import {
+  renderProfilePage,
+  renderSourcesPage,
+  renderViewRulesPage,
+  type ProfileView,
+  type SourcesSettingsView,
+  type ViewRulesWorkbenchView
+} from "./renderSystemPages.js";
 
 type ReportSummary = {
   date: string;
@@ -179,6 +186,36 @@ export function createServer(deps: ServerDeps = {}) {
     } catch {
       return reply.code(404).type("text/plain; charset=utf-8").send("Not Found");
     }
+  });
+
+  app.get("/api/settings/view-rules", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+
+    if (session === undefined) {
+      return;
+    }
+
+    return reply.send(await readSettingsViewRulesApiData(deps));
+  });
+
+  app.get("/api/settings/sources", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+
+    if (session === undefined) {
+      return;
+    }
+
+    return reply.send(await readSettingsSourcesApiData(deps));
+  });
+
+  app.get("/api/settings/profile", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+
+    if (session === undefined) {
+      return;
+    }
+
+    return reply.send({ profile: await readSettingsProfileApiData(deps, session) });
   });
 
   if (authEnabled) {
@@ -822,6 +859,103 @@ function readAuthenticatedSession(cookieHeader: string | undefined, sessionSecre
   }
 
   return readSessionToken(sessionToken, sessionSecret);
+}
+
+function readSettingsApiSession(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  authEnabled: boolean,
+  sessionSecret: string
+) {
+  // The read API mirrors the page-level auth rule, but API callers receive JSON 401 instead of a redirect.
+  const session = readAuthenticatedSession(request.headers.cookie, sessionSecret);
+
+  if (authEnabled && !session) {
+    reply.code(401).send({ ok: false, reason: "unauthorized" });
+    return undefined;
+  }
+
+  return session;
+}
+
+async function readSettingsViewRulesApiData(deps: ServerDeps): Promise<ViewRulesWorkbenchView> {
+  // The API reuses the exact workbench model the page renderer consumes so the Vue client does not need duplicate mapping.
+  const workbench = deps.getViewRulesWorkbenchData ? await deps.getViewRulesWorkbenchData() : await deps.listViewRules?.();
+
+  if (!workbench) {
+    return {
+      numericRules: [],
+      providerSettings: null,
+      providerCapability: {
+        hasMasterKey: false,
+        featureAvailable: false,
+        message: "当前没有可读取的策略工作台数据。"
+      },
+      nlRules: [],
+      feedbackPool: [],
+      strategyDrafts: [],
+      latestEvaluationRun: null,
+      isEvaluationRunning: false
+    };
+  }
+
+  if (Array.isArray(workbench)) {
+    return {
+      numericRules: workbench,
+      providerSettings: null,
+      providerCapability: {
+        hasMasterKey: false,
+        featureAvailable: false,
+        message: "当前没有可读取的策略工作台数据。"
+      },
+      nlRules: [],
+      feedbackPool: [],
+      strategyDrafts: [],
+      latestEvaluationRun: null,
+      isEvaluationRunning: false
+    };
+  }
+
+  return workbench;
+}
+
+async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSettingsView> {
+  // Sources keeps a stable wrapper object so future client fields can be added without reshaping the endpoint.
+  const sources = ((await deps.listSources?.()) ?? []) as SourceCard[];
+  const operationSummary = deps.getSourcesOperationSummary
+    ? await deps.getSourcesOperationSummary()
+    : { lastCollectionRunAt: null, lastSendLatestEmailAt: null };
+
+  return {
+    sources,
+    operations: {
+      lastCollectionRunAt: operationSummary.lastCollectionRunAt,
+      lastSendLatestEmailAt: operationSummary.lastSendLatestEmailAt,
+      canTriggerManualCollect: typeof (deps.triggerManualCollect ?? deps.triggerManualRun) === "function",
+      canTriggerManualSendLatestEmail: typeof deps.triggerManualSendLatestEmail === "function",
+      isRunning: deps.isRunning?.() ?? false
+    }
+  };
+}
+
+async function readSettingsProfileApiData(
+  deps: ServerDeps,
+  session: ReturnType<typeof readAuthenticatedSession> | null
+): Promise<ProfileView | null> {
+  // Profile uses the same single-user DB row as the page renderer, but strips HTML concerns out of the response.
+  const profile = deps.getCurrentUserProfile ? await deps.getCurrentUserProfile() : null;
+
+  if (!profile) {
+    return null;
+  }
+
+  return {
+    username: profile.username,
+    displayName: profile.displayName,
+    role: profile.role,
+    email: profile.email,
+    loggedIn: Boolean(session)
+  };
 }
 
 function readClientEntryHtml(clientIndexPath: string): string {

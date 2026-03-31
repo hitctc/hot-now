@@ -19,6 +19,7 @@ export BASE_URL="http://127.0.0.1:3030"
 export AUTH_USERNAME="admin"
 export AUTH_PASSWORD="replace-with-strong-password"
 export SESSION_SECRET="replace-with-long-random-secret"
+export LLM_SETTINGS_MASTER_KEY="replace-with-local-master-key"
 ```
 
 4. 启动开发服务：
@@ -61,15 +62,22 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 统一站点内容菜单（未登录也可访问）：`/`、`/articles`、`/ai`
 - 统一站点系统菜单（登录后访问）：`/settings/view-rules`、`/settings/sources`、`/settings/profile`
 - 内容页统一展示系统自动分数（`0-100`）和解释标签，不再提供手工评分表单
+- 内容卡片保留 `收藏 / 点赞 / 点踩`，并新增局部 `补充反馈` 面板；点赞 / 点踩后会自动展开反馈面板，反馈会先进入反馈池，不会直接改正式策略
 - 如果本地 `data/hot-now.sqlite` 内容库损坏，内容页会降级显示错误提示，而不是直接返回 `500`
 - 统一站点左侧导航底部支持深色 / 浅色主题切换，主题偏好保存在浏览器本地 `localStorage`，刷新后保持
 - `unified shell` 页面已完整接入以浅色为母版的 `Editorial Signal Desk` 双主题：`/`、`/articles`、`/ai`、`/settings/*`
 - 统一站点保留左侧品牌块、浅深主题切换和本地 `localStorage` 持久化
+- `/settings/view-rules` 已升级为策略工作台：数值权重、LLM 厂商设置、正式自然语言策略、反馈池、草稿池都收进同一页
+- 正式自然语言策略支持 `global / hot / articles / ai` 四个 scope；保存后会立即对当前内容库发起一次全量 LLM 重算，日常采集完成后会对新增内容做增量重算
+- 当前支持的 LLM 厂商是 `DeepSeek`、`MiniMax`、`Kimi`；用户在页面里录入 API key，本地只保存加密后的密文；未配置 `LLM_SETTINGS_MASTER_KEY` 时页面仍可保存规则文本，但不会启用自然语言匹配
 - Legacy 报告页（当前仍保留）：`/history`、`/reports/:date`、`/control`
 - legacy `/history`、`/control` 与 `/reports/:date` 的 fallback notice 轻量跟随共享主题资源
 - 手动采集：`POST /actions/collect`
 - 手动发送最新报告：`POST /actions/send-latest-email`
 - 兼容别名：`POST /actions/run`（等价于手动采集）
+- 内容反馈写入：`POST /actions/content/:id/feedback-pool`
+- LLM / 规则工作台动作：`POST /actions/view-rules/provider-settings`、`POST /actions/view-rules/provider-settings/delete`、`POST /actions/view-rules/nl-rules`
+- 反馈池与草稿池动作：`POST /actions/feedback-pool/:id/create-draft`、`POST /actions/feedback-pool/:id/delete`、`POST /actions/feedback-pool/clear`、`POST /actions/strategy-drafts/:id/save`、`POST /actions/strategy-drafts/:id/delete`
 - 内容导航保持统一内容池，但会对匹配导航语义的 source 做优先展示：`36氪` / `36氪快讯` 优先进入热点页，`爱范儿` 优先进入 AI 页，`36氪` / `爱范儿` / `IT之家` 优先进入文章页
 
 统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。auth 开启后，内容菜单保持公开可读，但系统菜单和所有写操作仍然要求登录；`content_sources.is_enabled` 决定哪些 source 参与采集，`/settings/sources` 现在可以直接启用/停用 source，并分别手动执行一次采集或手动发送最新报告；legacy `/control` 也同步提供这两个动作。
@@ -88,7 +96,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 ## 配置
 
 - `config/hot-now.config.json`：服务端口、`collectionSchedule` 采集周期、`mailSchedule` 发信时间、`manualActions` 手动动作开关、报告目录，以及兼容旧逻辑的 `source.rssUrl`
-- 环境变量：SMTP 主机、端口、发件人、授权码、收件人、网页基础地址，以及统一站点登录凭据与会话密钥
+- 环境变量：SMTP 主机、端口、发件人、授权码、收件人、网页基础地址、统一站点登录凭据与会话密钥，以及可选的 `LLM_SETTINGS_MASTER_KEY`
 
 默认配置下：
 
@@ -112,3 +120,4 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 相关测试：已通过
 - 类型构建：已通过
 - Playwright MCP 本地验收通过：`/login` 登录成功；`/`、`/articles`、`/ai`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常；浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持
+- 如果要手动验证新的自然语言策略链路，先配置 `LLM_SETTINGS_MASTER_KEY`，再在 `/settings/view-rules` 保存厂商设置和正式规则，确认页面出现最新重算结果；然后到内容页验证反馈面板、反馈池和草稿池的联动

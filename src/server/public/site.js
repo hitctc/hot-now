@@ -53,6 +53,24 @@
       return;
     }
 
+    const systemActionButton = target.closest("button[data-system-action]");
+
+    if (systemActionButton instanceof HTMLButtonElement) {
+      if (systemActionButton.dataset.systemAction === "copy-text") {
+        event.preventDefault();
+        await copyTextToClipboard(systemActionButton.dataset.copyText || "");
+        closeMobileSystemDrawer();
+        return;
+      }
+
+      if (systemActionButton.dataset.systemAction === "draft-apply") {
+        event.preventDefault();
+        applyDraftToNlRuleEditor(systemActionButton);
+        closeMobileSystemDrawer();
+        return;
+      }
+    }
+
     const button = target.closest("[data-content-action]");
 
     if (!(button instanceof HTMLButtonElement)) {
@@ -88,6 +106,13 @@
       return;
     }
 
+    if (action === "feedback-panel-toggle") {
+      event.preventDefault();
+      toggleFeedbackPanel(card, button);
+      closeMobileSystemDrawer();
+      return;
+    }
+
     closeMobileSystemDrawer();
   });
 
@@ -95,6 +120,12 @@
     const target = event.target;
 
     if (!(target instanceof HTMLFormElement)) {
+      return;
+    }
+
+    if (target.hasAttribute("data-content-feedback-form")) {
+      event.preventDefault();
+      await handleContentFeedbackSave(target);
       return;
     }
 
@@ -119,6 +150,54 @@
     if (target.dataset.systemAction === "manual-send-latest-email") {
       event.preventDefault();
       await handleManualSendLatestEmail(target);
+      return;
+    }
+
+    if (target.dataset.systemAction === "provider-settings-save") {
+      event.preventDefault();
+      await handleProviderSettingsSave(target);
+      return;
+    }
+
+    if (target.dataset.systemAction === "provider-settings-delete") {
+      event.preventDefault();
+      await handleProviderSettingsDelete(target);
+      return;
+    }
+
+    if (target.dataset.systemAction === "nl-rules-save") {
+      event.preventDefault();
+      await handleNlRulesSave(target);
+      return;
+    }
+
+    if (target.dataset.systemAction === "feedback-draft-create") {
+      event.preventDefault();
+      await handleFeedbackDraftCreate(target);
+      return;
+    }
+
+    if (target.dataset.systemAction === "feedback-delete") {
+      event.preventDefault();
+      await handleFeedbackDelete(target);
+      return;
+    }
+
+    if (target.dataset.systemAction === "feedback-clear-all") {
+      event.preventDefault();
+      await handleFeedbackClearAll(target);
+      return;
+    }
+
+    if (target.dataset.systemAction === "draft-save") {
+      event.preventDefault();
+      await handleDraftSave(target);
+      return;
+    }
+
+    if (target.dataset.systemAction === "draft-delete") {
+      event.preventDefault();
+      await handleDraftDelete(target);
       return;
     }
   });
@@ -177,7 +256,34 @@
       actionButton.setAttribute("aria-pressed", isPressed ? "true" : "false");
     }
 
+    setFeedbackPanelOpen(card, true);
     showStatus(nextReaction === "none" ? "已清除反馈。" : "反馈已保存。", "success");
+  }
+
+  async function handleContentFeedbackSave(form) {
+    const card = form.closest("[data-content-id]");
+
+    if (!(card instanceof HTMLElement)) {
+      showFormStatus(form, "未找到内容卡片，无法保存反馈。", "error");
+      return;
+    }
+
+    const contentId = Number(card.dataset.contentId);
+
+    if (!Number.isInteger(contentId) || contentId <= 0) {
+      showFormStatus(form, "内容标识不合法，无法保存反馈。", "error");
+      return;
+    }
+
+    const payload = readContentFeedbackPayload(form, card);
+    const response = await postJson(`/actions/content/${contentId}/feedback-pool`, payload);
+
+    if (!response.ok) {
+      showFormStatus(form, await readSystemActionError(response, "反馈保存失败，请稍后再试。"), "error");
+      return;
+    }
+
+    showFormStatus(form, "反馈已写入反馈池。", "success");
   }
 
   async function handleViewRuleSave(form) {
@@ -303,6 +409,158 @@
     showFormStatus(form, "已开始发送最新报告邮件，请稍后检查投递结果。", "success");
   }
 
+  async function handleProviderSettingsSave(form) {
+    const formData = new FormData(form);
+    const providerKind = String(formData.get("providerKind") || "").trim();
+    const apiKey = String(formData.get("apiKey") || "").trim();
+
+    if (!providerKind || !apiKey) {
+      showFormStatus(form, "请先填写厂商和 API Key。", "error");
+      return;
+    }
+
+    const response = await postJson("/actions/view-rules/provider-settings", {
+      providerKind,
+      apiKey,
+      isEnabled: true
+    });
+
+    if (!response.ok) {
+      showFormStatus(form, await readSystemActionError(response, "厂商配置保存失败，请稍后再试。"), "error");
+      return;
+    }
+
+    showFormStatus(form, "厂商配置已保存。", "success");
+    await refreshCurrentShellPage();
+  }
+
+  async function handleProviderSettingsDelete(form) {
+    if (!window.confirm("确认删除当前厂商配置吗？")) {
+      return;
+    }
+
+    const response = await postJson("/actions/view-rules/provider-settings/delete", {});
+
+    if (!response.ok) {
+      showFormStatus(form, await readSystemActionError(response, "厂商配置删除失败，请稍后再试。"), "error");
+      return;
+    }
+
+    showFormStatus(form, "厂商配置已删除。", "success");
+    await refreshCurrentShellPage();
+  }
+
+  async function handleNlRulesSave(form) {
+    const formData = new FormData(form);
+    const response = await postJson("/actions/view-rules/nl-rules", {
+      rules: {
+        global: String(formData.get("globalRuleText") || ""),
+        hot: String(formData.get("hotRuleText") || ""),
+        articles: String(formData.get("articlesRuleText") || ""),
+        ai: String(formData.get("aiRuleText") || "")
+      }
+    });
+
+    if (!response.ok) {
+      showFormStatus(form, await readSystemActionError(response, "正式规则保存失败，请稍后再试。"), "error");
+      return;
+    }
+
+    const payload = await safeJson(response);
+    const runStatus = payload?.run?.status;
+    const message =
+      runStatus === "completed"
+        ? "正式规则已保存，当前内容库已完成重算。"
+        : runStatus === "skipped"
+          ? "正式规则已保存，但当前未执行自然语言重算。"
+          : "正式规则已保存。";
+
+    showFormStatus(form, message, "success");
+    await refreshCurrentShellPage();
+  }
+
+  async function handleFeedbackDraftCreate(form) {
+    const feedbackId = form.dataset.feedbackId;
+    const response = await postJson(`/actions/feedback-pool/${encodeURIComponent(feedbackId || "")}/create-draft`, {});
+
+    if (!response.ok) {
+      showFormStatus(form, await readSystemActionError(response, "转草稿失败，请稍后再试。"), "error");
+      return;
+    }
+
+    showFormStatus(form, "已转成草稿。", "success");
+    await refreshCurrentShellPage();
+  }
+
+  async function handleFeedbackDelete(form) {
+    if (!window.confirm("确认删除这条反馈吗？")) {
+      return;
+    }
+
+    const feedbackId = form.dataset.feedbackId;
+    const response = await postJson(`/actions/feedback-pool/${encodeURIComponent(feedbackId || "")}/delete`, {});
+
+    if (!response.ok) {
+      showFormStatus(form, await readSystemActionError(response, "删除反馈失败，请稍后再试。"), "error");
+      return;
+    }
+
+    showFormStatus(form, "反馈已删除。", "success");
+    await refreshCurrentShellPage();
+  }
+
+  async function handleFeedbackClearAll(form) {
+    if (!window.confirm("确认清空全部反馈吗？")) {
+      return;
+    }
+
+    const response = await postJson("/actions/feedback-pool/clear", {});
+
+    if (!response.ok) {
+      showFormStatus(form, await readSystemActionError(response, "清空反馈失败，请稍后再试。"), "error");
+      return;
+    }
+
+    showFormStatus(form, "反馈池已清空。", "success");
+    await refreshCurrentShellPage();
+  }
+
+  async function handleDraftSave(form) {
+    const draftId = form.dataset.draftId;
+    const formData = new FormData(form);
+    const response = await postJson(`/actions/strategy-drafts/${encodeURIComponent(draftId || "")}/save`, {
+      suggestedScope: String(formData.get("suggestedScope") || "unspecified"),
+      draftText: String(formData.get("draftText") || ""),
+      draftEffectSummary: String(formData.get("draftEffectSummary") || ""),
+      positiveKeywords: parseKeywordInput(String(formData.get("positiveKeywords") || "")),
+      negativeKeywords: parseKeywordInput(String(formData.get("negativeKeywords") || ""))
+    });
+
+    if (!response.ok) {
+      showFormStatus(form, await readSystemActionError(response, "保存草稿失败，请稍后再试。"), "error");
+      return;
+    }
+
+    showFormStatus(form, "草稿已保存。", "success");
+  }
+
+  async function handleDraftDelete(form) {
+    if (!window.confirm("确认删除这条草稿吗？")) {
+      return;
+    }
+
+    const draftId = form.dataset.draftId;
+    const response = await postJson(`/actions/strategy-drafts/${encodeURIComponent(draftId || "")}/delete`, {});
+
+    if (!response.ok) {
+      showFormStatus(form, await readSystemActionError(response, "删除草稿失败，请稍后再试。"), "error");
+      return;
+    }
+
+    showFormStatus(form, "草稿已删除。", "success");
+    await refreshCurrentShellPage();
+  }
+
   async function postJson(url, body) {
     // Network failures return a shape with `ok: false` so callers can share one error branch.
     try {
@@ -419,6 +677,74 @@
     showStatus(message, tone);
   }
 
+  async function copyTextToClipboard(text) {
+    if (!text) {
+      showStatus("没有可复制的内容。", "error");
+      return;
+    }
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        textarea.remove();
+      }
+
+      showStatus("内容已复制。", "success");
+    } catch {
+      showStatus("复制失败，请手动复制。", "error");
+    }
+  }
+
+  function applyDraftToNlRuleEditor(button) {
+    const form = button.closest("[data-system-action='draft-save']");
+
+    if (!(form instanceof HTMLFormElement)) {
+      showStatus("未找到草稿表单。", "error");
+      return;
+    }
+
+    const formData = new FormData(form);
+    const suggestedScope = String(formData.get("suggestedScope") || "unspecified");
+    const draftText = String(formData.get("draftText") || "").trim();
+
+    if (!draftText) {
+      showStatus("草稿内容为空，无法写入。", "error");
+      return;
+    }
+
+    if (suggestedScope === "unspecified") {
+      showStatus("请先选择目标范围，再写入正式策略编辑器。", "error");
+      return;
+    }
+
+    const target = root.querySelector(`[data-nl-rule-scope="${escapeCssAttributeValue(suggestedScope)}"]`);
+
+    if (!(target instanceof HTMLTextAreaElement)) {
+      showStatus("未找到对应的正式策略编辑框。", "error");
+      return;
+    }
+
+    target.value = target.value.trim() ? `${target.value.trim()}\n\n${draftText}` : draftText;
+    showStatus("草稿已写入正式策略编辑器，记得保存正式规则。", "success");
+  }
+
+  async function refreshCurrentShellPage() {
+    const currentHref = window.location.pathname + window.location.search;
+
+    if (isShellNavigationEnabled()) {
+      await navigateShellPage(currentHref, { pushHistory: false, force: true });
+      return;
+    }
+
+    window.location.reload();
+  }
+
   function ensureGlobalStatusToast() {
     // The toast host is created lazily so pages without content actions do not render any extra chrome.
     const existingToast = root.querySelector('[data-role="global-status-toast"]');
@@ -470,6 +796,80 @@
     } catch {
       return null;
     }
+  }
+
+  function readContentFeedbackPayload(form, card) {
+    const formData = new FormData(form);
+
+    return {
+      reactionSnapshot: readCurrentReactionSnapshot(card),
+      freeText: String(formData.get("freeText") || ""),
+      suggestedEffect: normalizeNullableValue(formData.get("suggestedEffect")),
+      strengthLevel: normalizeNullableValue(formData.get("strengthLevel")),
+      positiveKeywords: parseKeywordInput(String(formData.get("positiveKeywords") || "")),
+      negativeKeywords: parseKeywordInput(String(formData.get("negativeKeywords") || ""))
+    };
+  }
+
+  function readCurrentReactionSnapshot(card) {
+    const reactionButtons = card.querySelectorAll('[data-content-action="reaction"]');
+
+    for (const button of reactionButtons) {
+      if (!(button instanceof HTMLButtonElement)) {
+        continue;
+      }
+
+      if (button.getAttribute("aria-pressed") === "true") {
+        return button.dataset.reaction === "dislike" ? "dislike" : "like";
+      }
+    }
+
+    return "none";
+  }
+
+  function parseKeywordInput(value) {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  function normalizeNullableValue(value) {
+    return typeof value === "string" && value.trim() ? value.trim() : null;
+  }
+
+  function findFeedbackPanel(card) {
+    const panel = card.querySelector("[data-role='feedback-panel']");
+
+    if (panel instanceof HTMLElement) {
+      return panel;
+    }
+
+    const inlineForm = card.querySelector("[data-content-feedback-form]");
+    return inlineForm instanceof HTMLElement ? inlineForm : null;
+  }
+
+  function setFeedbackPanelOpen(card, shouldOpen) {
+    const panel = findFeedbackPanel(card);
+    const toggleButton = card.querySelector('[data-content-action="feedback-panel-toggle"]');
+
+    if (panel instanceof HTMLElement) {
+      panel.toggleAttribute("hidden", !shouldOpen);
+    }
+
+    if (toggleButton instanceof HTMLButtonElement) {
+      toggleButton.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+    }
+  }
+
+  function toggleFeedbackPanel(card) {
+    const panel = findFeedbackPanel(card);
+
+    if (!(panel instanceof HTMLElement)) {
+      return;
+    }
+
+    setFeedbackPanelOpen(card, panel.hasAttribute("hidden"));
   }
 
   function readViewRuleConfig(form) {
@@ -555,7 +955,7 @@
     }
   }
 
-  async function navigateShellPage(nextHref, options = { pushHistory: true }) {
+  async function navigateShellPage(nextHref, options = { pushHistory: true, force: false }) {
     if (shellNavigationInFlight) {
       return;
     }
@@ -563,7 +963,7 @@
     const targetUrl = new URL(nextHref, window.location.href);
     const currentUrl = new URL(window.location.href);
 
-    if (targetUrl.pathname === currentUrl.pathname && targetUrl.search === currentUrl.search) {
+    if (options.force !== true && targetUrl.pathname === currentUrl.pathname && targetUrl.search === currentUrl.search) {
       return;
     }
 
@@ -700,6 +1100,15 @@
 
   function closeMobileSystemDrawer() {
     setMobileSystemDrawerOpen(false);
+  }
+
+  function escapeCssAttributeValue(value) {
+    // Draft scope values are controlled, but the fallback keeps the selector valid in older runtimes without CSS.escape.
+    if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+      return CSS.escape(value);
+    }
+
+    return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   }
 
   function readStoredTheme() {

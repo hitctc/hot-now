@@ -4,7 +4,12 @@ import path from "node:path";
 import { LatestReportEmailError, type LatestReportEmailErrorReason } from "../core/pipeline/sendLatestReportEmail.js";
 import type { ContentCardView, ContentViewKey } from "../core/content/listContentView.js";
 import type { FeedbackSaveResult, ReactionValue } from "../core/feedback/feedbackRepository.js";
+import type { SaveFeedbackPoolEntryInput, SaveFeedbackPoolEntryResult } from "../core/feedback/feedbackPoolRepository.js";
+import type { SaveProviderSettingsInput, SaveProviderSettingsResult } from "../core/llm/providerSettingsRepository.js";
 import type { RatingDimension, SaveRatingsResult } from "../core/ratings/ratingRepository.js";
+import type { NlRuleScope } from "../core/strategy/nlRuleRepository.js";
+import type { RunNlEvaluationCycleResult } from "../core/strategy/runNlEvaluationCycle.js";
+import type { UpdateStrategyDraftInput, UpdateStrategyDraftResult } from "../core/strategy/strategyDraftRepository.js";
 import type { RuntimeConfig } from "../core/types/appConfig.js";
 import {
   createSessionToken,
@@ -20,7 +25,7 @@ import {
 } from "./renderPages.js";
 import { findAppShellPage, getAppShellPages, renderAppLayout } from "./renderAppLayout.js";
 import { renderContentPage } from "./renderContentPages.js";
-import { renderProfilePage, renderSourcesPage, renderViewRulesPage } from "./renderSystemPages.js";
+import { renderProfilePage, renderSourcesPage, renderViewRulesPage, type ViewRulesWorkbenchView } from "./renderSystemPages.js";
 
 type ReportSummary = {
   date: string;
@@ -61,6 +66,11 @@ type ManualCollectResult = { accepted: true; action: "collect" };
 type ManualSendLatestEmailResult =
   | { accepted: true; action: "send-latest-email" }
   | { accepted: false; reason: LatestReportEmailErrorReason };
+type SaveNlRulesResult = { ok: true; run: RunNlEvaluationCycleResult } | { ok: false; reason: string };
+type CreateDraftFromFeedbackResult = { ok: true; draftId: number } | { ok: false; reason: "not-found" };
+type DeleteFeedbackResult = boolean;
+type ClearFeedbackResult = number;
+type DeleteDraftResult = boolean;
 
 type ServerDeps = {
   config?: Partial<RuntimeConfig>;
@@ -74,10 +84,23 @@ type ServerDeps = {
   listContentView?: (viewKey: ContentViewKey) => Promise<ContentCardView[]> | ContentCardView[];
   saveFavorite?: (contentItemId: number, isFavorited: boolean) => Promise<FeedbackSaveResult> | FeedbackSaveResult;
   saveReaction?: (contentItemId: number, reaction: ReactionValue) => Promise<FeedbackSaveResult> | FeedbackSaveResult;
+  saveContentFeedback?: (
+    contentItemId: number,
+    input: Omit<SaveFeedbackPoolEntryInput, "contentItemId">
+  ) => Promise<SaveFeedbackPoolEntryResult> | SaveFeedbackPoolEntryResult;
   listRatingDimensions?: () => Promise<RatingDimension[]> | RatingDimension[];
   saveRatings?: (contentItemId: number, scores: Record<string, number>) => Promise<SaveRatingsResult> | SaveRatingsResult;
   listViewRules?: () => Promise<ViewRuleCard[]> | ViewRuleCard[];
+  getViewRulesWorkbenchData?: () => Promise<ViewRulesWorkbenchView> | ViewRulesWorkbenchView;
   saveViewRuleConfig?: (ruleKey: string, config: Record<string, unknown>) => Promise<SaveViewRuleResult> | SaveViewRuleResult;
+  saveProviderSettings?: (input: SaveProviderSettingsInput) => Promise<SaveProviderSettingsResult> | SaveProviderSettingsResult;
+  deleteProviderSettings?: () => Promise<boolean> | boolean;
+  saveNlRules?: (rules: Record<NlRuleScope, string>) => Promise<SaveNlRulesResult> | SaveNlRulesResult;
+  createDraftFromFeedback?: (feedbackId: number) => Promise<CreateDraftFromFeedbackResult> | CreateDraftFromFeedbackResult;
+  deleteFeedbackEntry?: (feedbackId: number) => Promise<DeleteFeedbackResult> | DeleteFeedbackResult;
+  clearAllFeedback?: () => Promise<ClearFeedbackResult> | ClearFeedbackResult;
+  saveStrategyDraft?: (input: UpdateStrategyDraftInput) => Promise<UpdateStrategyDraftResult> | UpdateStrategyDraftResult;
+  deleteStrategyDraft?: (draftId: number) => Promise<DeleteDraftResult> | DeleteDraftResult;
   listSources?: () => Promise<SourceCard[]> | SourceCard[];
   getSourcesOperationSummary?: () => Promise<SourcesOperationSummary> | SourcesOperationSummary;
   toggleSource?: (kind: string, enable: boolean) => Promise<ToggleSourceResult> | ToggleSourceResult;
@@ -103,7 +126,7 @@ export function createServer(deps: ServerDeps = {}) {
   const authConfig = deps.auth;
   const authEnabled = authConfig?.requireLogin === true;
   const hasUnifiedShellDeps = Boolean(
-    deps.listContentView || deps.listViewRules || deps.listSources || deps.getCurrentUserProfile
+    deps.listContentView || deps.listViewRules || deps.getViewRulesWorkbenchData || deps.listSources || deps.getCurrentUserProfile
   );
   const siteCss = readSiteCss();
   const siteJs = readSiteJs();
@@ -388,6 +411,47 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.send({ ok: true, contentItemId, reaction: body.reaction });
   });
 
+  app.post("/actions/content/:id/feedback-pool", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.saveContentFeedback) {
+      return reply.code(503).send({ ok: false, reason: "content-feedback-disabled" });
+    }
+
+    const contentItemId = parseContentItemId(request.params);
+
+    if (!contentItemId) {
+      return reply.code(400).send({ ok: false, reason: "invalid-content-id" });
+    }
+
+    const body = request.body as Record<string, unknown> | undefined;
+    const positiveKeywords = parseStringArray(body?.positiveKeywords);
+    const negativeKeywords = parseStringArray(body?.negativeKeywords);
+
+    if (!positiveKeywords.ok || !negativeKeywords.ok) {
+      return reply.code(400).send({ ok: false, reason: "invalid-feedback-payload" });
+    }
+
+    const input = {
+      reactionSnapshot: isReactionSnapshot(body?.reactionSnapshot) ? body?.reactionSnapshot : "none",
+      freeText: typeof body?.freeText === "string" ? body.freeText : null,
+      suggestedEffect: isSuggestedEffect(body?.suggestedEffect) ? body.suggestedEffect : null,
+      strengthLevel: isStrengthLevel(body?.strengthLevel) ? body.strengthLevel : null,
+      positiveKeywords: positiveKeywords.values,
+      negativeKeywords: negativeKeywords.values
+    } satisfies Omit<SaveFeedbackPoolEntryInput, "contentItemId">;
+
+    const result = await deps.saveContentFeedback(contentItemId, input);
+
+    if (!result.ok) {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+
+    return reply.send({ ok: true, contentItemId, entryId: result.entryId });
+  });
+
   app.post("/actions/content/:id/ratings", async (request, reply) => {
     if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
       return;
@@ -461,6 +525,205 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     return reply.send({ ok: true, ruleKey });
+  });
+
+  app.post("/actions/view-rules/provider-settings", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.saveProviderSettings) {
+      return reply.code(503).send({ ok: false, reason: "provider-settings-disabled" });
+    }
+
+    const body = request.body as Record<string, unknown> | undefined;
+    const providerKind = typeof body?.providerKind === "string" ? body.providerKind.trim() : "";
+    const apiKey = typeof body?.apiKey === "string" ? body.apiKey.trim() : "";
+    const isEnabled = typeof body?.isEnabled === "boolean" ? body.isEnabled : true;
+
+    if (!isProviderKind(providerKind) || !apiKey) {
+      return reply.code(400).send({ ok: false, reason: "invalid-provider-settings" });
+    }
+
+    const result = await deps.saveProviderSettings({
+      providerKind,
+      apiKey,
+      isEnabled
+    });
+
+    if (!result.ok && result.reason === "master-key-required") {
+      return reply.code(409).send({ ok: false, reason: "master-key-required" });
+    }
+
+    return reply.send({ ok: true, providerKind });
+  });
+
+  app.post("/actions/view-rules/provider-settings/delete", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.deleteProviderSettings) {
+      return reply.code(503).send({ ok: false, reason: "provider-settings-disabled" });
+    }
+
+    await deps.deleteProviderSettings();
+    return reply.send({ ok: true });
+  });
+
+  app.post("/actions/view-rules/nl-rules", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.saveNlRules) {
+      return reply.code(503).send({ ok: false, reason: "nl-rules-disabled" });
+    }
+
+    const body = request.body as { rules?: unknown } | undefined;
+
+    if (!isPlainObject(body?.rules)) {
+      return reply.code(400).send({ ok: false, reason: "invalid-nl-rules-payload" });
+    }
+
+    const rules = {
+      global: typeof body.rules.global === "string" ? body.rules.global : "",
+      hot: typeof body.rules.hot === "string" ? body.rules.hot : "",
+      articles: typeof body.rules.articles === "string" ? body.rules.articles : "",
+      ai: typeof body.rules.ai === "string" ? body.rules.ai : ""
+    } satisfies Record<NlRuleScope, string>;
+
+    const result = await deps.saveNlRules(rules);
+
+    if (!result.ok) {
+      return reply.code(409).send({ ok: false, reason: result.reason });
+    }
+
+    return reply.send({ ok: true, run: result.run });
+  });
+
+  app.post("/actions/feedback-pool/:id/create-draft", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.createDraftFromFeedback) {
+      return reply.code(503).send({ ok: false, reason: "feedback-pool-disabled" });
+    }
+
+    const feedbackId = parseNumericRouteId(request.params, "id");
+
+    if (!feedbackId) {
+      return reply.code(400).send({ ok: false, reason: "invalid-feedback-id" });
+    }
+
+    const result = await deps.createDraftFromFeedback(feedbackId);
+
+    if (!result.ok) {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+
+    return reply.send({ ok: true, draftId: result.draftId });
+  });
+
+  app.post("/actions/feedback-pool/:id/delete", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.deleteFeedbackEntry) {
+      return reply.code(503).send({ ok: false, reason: "feedback-pool-disabled" });
+    }
+
+    const feedbackId = parseNumericRouteId(request.params, "id");
+
+    if (!feedbackId) {
+      return reply.code(400).send({ ok: false, reason: "invalid-feedback-id" });
+    }
+
+    const deleted = await deps.deleteFeedbackEntry(feedbackId);
+
+    if (!deleted) {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+
+    return reply.send({ ok: true, feedbackId });
+  });
+
+  app.post("/actions/feedback-pool/clear", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.clearAllFeedback) {
+      return reply.code(503).send({ ok: false, reason: "feedback-pool-disabled" });
+    }
+
+    const cleared = await deps.clearAllFeedback();
+    return reply.send({ ok: true, cleared });
+  });
+
+  app.post("/actions/strategy-drafts/:id/save", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.saveStrategyDraft) {
+      return reply.code(503).send({ ok: false, reason: "strategy-drafts-disabled" });
+    }
+
+    const draftId = parseNumericRouteId(request.params, "id");
+
+    if (!draftId) {
+      return reply.code(400).send({ ok: false, reason: "invalid-draft-id" });
+    }
+
+    const body = request.body as Record<string, unknown> | undefined;
+    const positiveKeywords = parseStringArray(body?.positiveKeywords);
+    const negativeKeywords = parseStringArray(body?.negativeKeywords);
+
+    if (!positiveKeywords.ok || !negativeKeywords.ok || typeof body?.draftText !== "string") {
+      return reply.code(400).send({ ok: false, reason: "invalid-draft-payload" });
+    }
+
+    const result = await deps.saveStrategyDraft({
+      id: draftId,
+      draftText: body.draftText,
+      suggestedScope: isStrategyDraftScope(body?.suggestedScope) ? body.suggestedScope : "unspecified",
+      draftEffectSummary: typeof body?.draftEffectSummary === "string" ? body.draftEffectSummary : null,
+      positiveKeywords: positiveKeywords.values,
+      negativeKeywords: negativeKeywords.values
+    });
+
+    if (!result.ok) {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+
+    return reply.send({ ok: true, draftId });
+  });
+
+  app.post("/actions/strategy-drafts/:id/delete", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.deleteStrategyDraft) {
+      return reply.code(503).send({ ok: false, reason: "strategy-drafts-disabled" });
+    }
+
+    const draftId = parseNumericRouteId(request.params, "id");
+
+    if (!draftId) {
+      return reply.code(400).send({ ok: false, reason: "invalid-draft-id" });
+    }
+
+    const deleted = await deps.deleteStrategyDraft(draftId);
+
+    if (!deleted) {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+
+    return reply.send({ ok: true, draftId });
   });
 
   app.post("/actions/sources/toggle", async (request, reply) => {
@@ -580,12 +843,12 @@ async function renderContentForView(deps: ServerDeps, viewKey: ContentViewKey): 
 async function renderSystemPageForPath(deps: ServerDeps, pathname: string, loggedIn: boolean): Promise<string | undefined> {
   // System pages keep callback wiring in main; routes only decide which renderer to call for the current path.
   if (pathname === "/settings/view-rules") {
-    if (!deps.listViewRules) {
+    if (!deps.getViewRulesWorkbenchData && !deps.listViewRules) {
       return undefined;
     }
 
-    const rules = await deps.listViewRules();
-    return renderViewRulesPage(rules);
+    const workbench = deps.getViewRulesWorkbenchData ? await deps.getViewRulesWorkbenchData() : await deps.listViewRules!();
+    return renderViewRulesPage(workbench);
   }
 
   if (pathname === "/settings/sources") {
@@ -780,9 +1043,40 @@ function parseContentItemId(params: unknown): number | null {
   return parsedId;
 }
 
+function parseNumericRouteId(params: unknown, key: string): number | null {
+  const value = (params as Record<string, unknown> | undefined)?.[key];
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
 function isReactionValue(value: unknown): value is ReactionValue {
   // Only the three explicit reaction values are accepted to avoid writing arbitrary feedback strings.
   return value === "like" || value === "dislike" || value === "none";
+}
+
+function isReactionSnapshot(value: unknown): value is NonNullable<SaveFeedbackPoolEntryInput["reactionSnapshot"]> {
+  return value === "like" || value === "dislike" || value === "none";
+}
+
+function isSuggestedEffect(value: unknown): value is NonNullable<SaveFeedbackPoolEntryInput["suggestedEffect"]> {
+  return value === "boost" || value === "penalize" || value === "block" || value === "neutral";
+}
+
+function isStrengthLevel(value: unknown): value is NonNullable<SaveFeedbackPoolEntryInput["strengthLevel"]> {
+  return value === "low" || value === "medium" || value === "high";
+}
+
+function isProviderKind(value: unknown): value is SaveProviderSettingsInput["providerKind"] {
+  return value === "deepseek" || value === "minimax" || value === "kimi";
+}
+
+function isStrategyDraftScope(value: unknown): value is NonNullable<UpdateStrategyDraftInput["suggestedScope"]> {
+  return value === "unspecified" || value === "global" || value === "hot" || value === "articles" || value === "ai";
 }
 
 function parseRatingScores(value: unknown): ParseRatingScoresResult {
@@ -817,6 +1111,15 @@ function parseRatingScores(value: unknown): ParseRatingScoresResult {
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   // System action payloads currently rely on JSON object shapes and reject arrays/primitives.
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseStringArray(value: unknown): { ok: true; values: string[] } | { ok: false } {
+  if (!Array.isArray(value)) {
+    return { ok: false };
+  }
+
+  const values = value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean);
+  return values.length === value.length ? { ok: true, values } : { ok: false };
 }
 
 function renderLoginPage() {

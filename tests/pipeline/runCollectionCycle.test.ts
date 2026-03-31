@@ -43,6 +43,7 @@ describe("runCollectionCycle", () => {
     const config = makeConfig(rootDir);
     const db = createTestDatabase(path.join(rootDir, "hot-now.sqlite"));
     expect(collectionCycleAcceptsMailDep).toBe(false);
+    const runNlEvaluationCycle = vi.fn().mockResolvedValue(undefined);
 
     const result = await runCollectionCycle(config, "manual", {
       db,
@@ -103,7 +104,8 @@ describe("runCollectionCycle", () => {
           text: "",
           error: "403"
         };
-      })
+      }),
+      runNlEvaluationCycle
     });
 
     const reportJson = JSON.parse(
@@ -214,6 +216,58 @@ describe("runCollectionCycle", () => {
       report_html_path: path.join(rootDir, "2026-03-29", "report.html"),
       mail_status: "not-sent-by-collection",
       collection_run_id: 1
+    });
+    expect(runNlEvaluationCycle).toHaveBeenCalledTimes(1);
+    expect(runNlEvaluationCycle).toHaveBeenCalledWith({
+      mode: "incremental-after-collect",
+      contentItemIds: [1, 2]
+    });
+
+    db.close();
+  });
+
+  it("triggers incremental nl evaluation after persisting mirrored content", async () => {
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-collection-"));
+    const config = makeConfig(rootDir);
+    const db = createTestDatabase(path.join(rootDir, "hot-now.sqlite"));
+    const runNlEvaluationCycle = vi.fn().mockResolvedValue(undefined);
+
+    await runCollectionCycle(config, "manual", {
+      db,
+      loadEnabledSourceIssues: vi.fn().mockResolvedValue([
+        {
+          date: "2026-03-29",
+          issueUrl: "https://openai.com/news/",
+          sourceKind: "openai",
+          sourceType: "official",
+          sourcePriority: 95,
+          items: [
+            {
+              rank: 1,
+              category: "最新 AI 消息",
+              title: "OpenAI 发布 GPT-Next",
+              sourceUrl: "https://openai.com/index/gpt-next",
+              sourceName: "OpenAI",
+              externalId: "openai-1",
+              summary: "OpenAI 发布新模型摘要",
+              publishedAt: "2026-03-29T08:00:00.000Z"
+            }
+          ]
+        }
+      ]),
+      fetchArticle: vi.fn(async (url: string) => ({
+        ok: true,
+        url,
+        title: "GPT-Next",
+        text: "OpenAI 发布新的模型与 API 更新。"
+      })),
+      runNlEvaluationCycle
+    });
+
+    expect(runNlEvaluationCycle).toHaveBeenCalledTimes(1);
+    expect(runNlEvaluationCycle).toHaveBeenCalledWith({
+      mode: "incremental-after-collect",
+      contentItemIds: [1]
     });
 
     db.close();

@@ -140,6 +140,24 @@ describe("loadRuntimeConfig", () => {
     });
   });
 
+  it("loads optional llm master key when provided", async () => {
+    const config = await loadRuntimeConfig({
+      configPath: path.resolve("config/hot-now.config.json"),
+      env: { ...baseEnv, LLM_SETTINGS_MASTER_KEY: "master-key-123" }
+    });
+
+    expect(config.llm).toEqual({ settingsMasterKey: "master-key-123" });
+  });
+
+  it("keeps llm master key nullable when env is missing", async () => {
+    const config = await loadRuntimeConfig({
+      configPath: path.resolve("config/hot-now.config.json"),
+      env: baseEnv
+    });
+
+    expect(config.llm).toEqual({ settingsMasterKey: null });
+  });
+
   it("throws when a required SMTP env value is missing", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-config-"));
     const configPath = path.join(tempDir, "hot-now.config.json");

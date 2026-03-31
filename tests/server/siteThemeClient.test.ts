@@ -255,4 +255,104 @@ describe("site theme runtime", () => {
     expect(sidebar.scrollTop).toBe(136);
     expect(scrollToMock).toHaveBeenCalledWith({ top: 0, behavior: "auto" });
   });
+
+  it("opens the local feedback panel after reaction clicks and submits feedback form payloads", async () => {
+    const dom = new JSDOM(
+      `<!doctype html>
+<html data-theme="dark">
+  <body>
+    <button type="button" data-theme-choice="dark" aria-pressed="true">深色模式</button>
+    <button type="button" data-theme-choice="light" aria-pressed="false">浅色模式</button>
+    <article data-content-id="42">
+      <button type="button" data-content-action="reaction" data-reaction="like" aria-pressed="false">点赞</button>
+      <button type="button" data-content-action="feedback-panel-toggle" aria-expanded="false">补充反馈</button>
+      <div data-role="feedback-panel" hidden>
+        <form data-content-feedback-form>
+          <textarea name="freeText"></textarea>
+          <select name="suggestedEffect">
+            <option value="">未设置</option>
+            <option value="boost">加分</option>
+          </select>
+          <select name="strengthLevel">
+            <option value="">未设置</option>
+            <option value="high">高</option>
+          </select>
+          <input name="positiveKeywords" />
+          <input name="negativeKeywords" />
+          <button type="submit">保存反馈</button>
+        </form>
+      </div>
+    </article>
+  </body>
+</html>`,
+      {
+        url: "https://example.test/",
+        runScripts: "outside-only"
+      }
+    );
+
+    const { window } = dom;
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ok: true })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ok: true, entryId: 9 })
+      });
+    window.fetch = fetchMock as typeof window.fetch;
+    window.eval(siteScript);
+
+    const likeButton = window.document.querySelector('[data-content-action="reaction"][data-reaction="like"]');
+    const feedbackPanel = window.document.querySelector("[data-role='feedback-panel']");
+    const feedbackForm = window.document.querySelector("[data-content-feedback-form]");
+    const freeText = feedbackForm?.querySelector('[name="freeText"]') as HTMLTextAreaElement | null;
+    const suggestedEffect = feedbackForm?.querySelector('[name="suggestedEffect"]') as HTMLSelectElement | null;
+    const strengthLevel = feedbackForm?.querySelector('[name="strengthLevel"]') as HTMLSelectElement | null;
+    const positiveKeywords = feedbackForm?.querySelector('[name="positiveKeywords"]') as HTMLInputElement | null;
+    const negativeKeywords = feedbackForm?.querySelector('[name="negativeKeywords"]') as HTMLInputElement | null;
+
+    likeButton?.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+    expect(feedbackPanel?.hasAttribute("hidden")).toBe(false);
+
+    if (!freeText || !suggestedEffect || !strengthLevel || !positiveKeywords || !negativeKeywords || !feedbackForm) {
+      throw new Error("feedback form setup failed");
+    }
+
+    freeText.value = "保留 agent workflow 内容";
+    suggestedEffect.value = "boost";
+    strengthLevel.value = "high";
+    positiveKeywords.value = "agent, workflow";
+    negativeKeywords.value = "融资";
+
+    feedbackForm.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/actions/content/42/reaction",
+      expect.objectContaining({
+        method: "POST"
+      })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/actions/content/42/feedback-pool",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          reactionSnapshot: "like",
+          freeText: "保留 agent workflow 内容",
+          suggestedEffect: "boost",
+          strengthLevel: "high",
+          positiveKeywords: ["agent", "workflow"],
+          negativeKeywords: ["融资"]
+        })
+      })
+    );
+  });
 });

@@ -2,6 +2,114 @@ import { describe, expect, it, vi } from "vitest";
 import { createServer } from "../../src/server/createServer.js";
 
 describe("system routes", () => {
+  it("renders the view-rules workbench with llm settings, feedback pool, drafts, and nl rule editors", async () => {
+    const app = createServer({
+      getViewRulesWorkbenchData: vi.fn().mockResolvedValue({
+        numericRules: [
+          {
+            ruleKey: "hot",
+            displayName: "热点策略",
+            config: {
+              limit: 20,
+              freshnessWindowDays: 3,
+              freshnessWeight: 0.35,
+              sourceWeight: 0.1,
+              completenessWeight: 0.1,
+              aiWeight: 0.05,
+              heatWeight: 0.4
+            },
+            isEnabled: true
+          }
+        ],
+        providerSettings: {
+          providerKind: "deepseek",
+          apiKeyLast4: "1234",
+          isEnabled: true,
+          updatedAt: "2026-03-31T09:00:00.000Z"
+        },
+        providerCapability: {
+          hasMasterKey: true,
+          featureAvailable: true,
+          message: "已配置可用厂商"
+        },
+        nlRules: [
+          { scope: "global", ruleText: "暂不展示融资快讯。", createdAt: "", updatedAt: "" },
+          { scope: "hot", ruleText: "", createdAt: "", updatedAt: "" },
+          { scope: "articles", ruleText: "", createdAt: "", updatedAt: "" },
+          { scope: "ai", ruleText: "优先展示 agent workflow。", createdAt: "", updatedAt: "" }
+        ],
+        feedbackPool: [
+          {
+            id: 7,
+            contentItemId: 42,
+            contentTitle: "Agent workflow report",
+            canonicalUrl: "https://example.com/agent-workflow-report",
+            sourceName: "OpenAI",
+            reactionSnapshot: "like",
+            freeText: "这类内容继续加分",
+            suggestedEffect: "boost",
+            strengthLevel: "high",
+            positiveKeywords: ["agent", "workflow"],
+            negativeKeywords: ["融资"],
+            createdAt: "2026-03-31T08:00:00.000Z",
+            updatedAt: "2026-03-31T08:05:00.000Z"
+          }
+        ],
+        strategyDrafts: [
+          {
+            id: 11,
+            sourceFeedbackId: 7,
+            draftText: "AI 页优先展示 agent workflow 内容。",
+            suggestedScope: "ai",
+            draftEffectSummary: "AI 页高优先",
+            positiveKeywords: ["agent"],
+            negativeKeywords: ["融资"],
+            createdAt: "2026-03-31T08:10:00.000Z",
+            updatedAt: "2026-03-31T08:10:00.000Z"
+          }
+        ],
+        latestEvaluationRun: {
+          id: 5,
+          runType: "full-recompute",
+          status: "completed",
+          providerKind: "deepseek",
+          startedAt: "2026-03-31T09:00:00.000Z",
+          finishedAt: "2026-03-31T09:05:00.000Z",
+          itemCount: 12,
+          successCount: 12,
+          failureCount: 0,
+          notes: null,
+          createdAt: "2026-03-31T09:00:00.000Z"
+        },
+        isEvaluationRunning: false
+      })
+    } as never);
+
+    const response = await app.inject({ method: "GET", url: "/settings/view-rules" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain("LLM 设置");
+    expect(response.body).toContain("正式自然语言策略");
+    expect(response.body).toContain("反馈池");
+    expect(response.body).toContain("草稿池");
+    expect(response.body).toContain("DeepSeek");
+    expect(response.body).toContain("1234");
+    expect(response.body).toContain('data-system-action="provider-settings-save"');
+    expect(response.body).toContain('data-system-action="provider-settings-delete"');
+    expect(response.body).toContain('data-system-action="nl-rules-save"');
+    expect(response.body).toContain('data-system-action="feedback-draft-create"');
+    expect(response.body).toContain('data-system-action="feedback-delete"');
+    expect(response.body).toContain('data-system-action="feedback-clear-all"');
+    expect(response.body).toContain('data-system-action="draft-save"');
+    expect(response.body).toContain('data-system-action="draft-delete"');
+    expect(response.body).toContain('data-system-action="draft-apply"');
+    expect(response.body).toContain("Agent workflow report");
+    expect(response.body).toContain("AI 页优先展示 agent workflow 内容。");
+    expect(response.body).toContain('textarea name="globalRuleText"');
+    expect(response.body).toContain('textarea name="aiRuleText"');
+    expect(response.body).toContain("上次重算");
+  });
+
   it("renders view-rules page with persisted rule content", async () => {
     const app = createServer({
       listViewRules: vi.fn().mockResolvedValue([
@@ -45,7 +153,9 @@ describe("system routes", () => {
     expect(response.body).toContain('name="completenessWeight"');
     expect(response.body).toContain('name="aiWeight"');
     expect(response.body).toContain('name="heatWeight"');
-    expect(response.body).not.toContain("<textarea");
+    expect(response.body).toContain("LLM 设置");
+    expect(response.body).toContain("正式自然语言策略");
+    expect(response.body).toContain('textarea name="globalRuleText"');
   });
 
   it("renders sources page with separate collect and send-latest-email control cards", async () => {
@@ -256,6 +366,77 @@ describe("system routes", () => {
       completenessWeight: 0.1,
       aiWeight: 0.05,
       heatWeight: 0.35
+    });
+  });
+
+  it("calls saveProviderSettings for llm provider configuration", async () => {
+    const saveProviderSettings = vi.fn().mockResolvedValue({ ok: true });
+    const app = createServer({
+      saveProviderSettings
+    } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/view-rules/provider-settings",
+      payload: {
+        providerKind: "deepseek",
+        apiKey: "sk-live-secret-1234",
+        isEnabled: true
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(saveProviderSettings).toHaveBeenCalledWith({
+      providerKind: "deepseek",
+      apiKey: "sk-live-secret-1234",
+      isEnabled: true
+    });
+  });
+
+  it("calls saveNlRules and returns the recompute result", async () => {
+    const saveNlRules = vi.fn().mockResolvedValue({
+      ok: true,
+      run: {
+        runId: 5,
+        status: "completed",
+        itemCount: 10,
+        successCount: 10,
+        failureCount: 0
+      }
+    });
+    const app = createServer({
+      saveNlRules
+    } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/view-rules/nl-rules",
+      payload: {
+        rules: {
+          global: "暂不展示融资快讯。",
+          hot: "",
+          articles: "",
+          ai: "优先展示 agent workflow。"
+        }
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(saveNlRules).toHaveBeenCalledWith({
+      global: "暂不展示融资快讯。",
+      hot: "",
+      articles: "",
+      ai: "优先展示 agent workflow。"
+    });
+    expect(response.json()).toEqual({
+      ok: true,
+      run: {
+        runId: 5,
+        status: "completed",
+        itemCount: 10,
+        successCount: 10,
+        failureCount: 0
+      }
     });
   });
 

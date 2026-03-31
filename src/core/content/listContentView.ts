@@ -17,11 +17,19 @@ export type ContentCardView = {
   reaction: "like" | "dislike" | "none";
   contentScore: number;
   scoreBadges: string[];
+  feedbackEntry?: {
+    freeText: string | null;
+    suggestedEffect: "boost" | "penalize" | "block" | "neutral" | null;
+    strengthLevel: "low" | "medium" | "high" | null;
+    positiveKeywords: string[];
+    negativeKeywords: string[];
+  };
 };
 
 type RankedContentCardView = ContentCardView & {
   rankingScore: number;
   rankingTimestamp: string | null;
+  isBlocked: boolean;
 };
 
 const matchingSourceViewBonus = 120;
@@ -37,7 +45,17 @@ type ContentCardRow = {
   publishedAt: string | null;
   favoriteValue: string | null;
   reactionValue: string | null;
+  feedbackEntryId: number | null;
+  feedbackFreeText: string | null;
+  feedbackSuggestedEffect: string | null;
+  feedbackStrengthLevel: string | null;
+  feedbackPositiveKeywordsJson: string | null;
+  feedbackNegativeKeywordsJson: string | null;
   rankingTimestamp: string | null;
+  globalDecision: string | null;
+  globalScoreDelta: number | null;
+  viewDecision: string | null;
+  viewScoreDelta: number | null;
 };
 
 const contentSelectSql = `
@@ -82,19 +100,41 @@ const contentSelectSql = `
     ci.published_at AS publishedAt,
     latest_favorite.feedback_value AS favoriteValue,
     latest_reaction.feedback_value AS reactionValue,
+    fp.id AS feedbackEntryId,
+    fp.free_text AS feedbackFreeText,
+    fp.suggested_effect AS feedbackSuggestedEffect,
+    fp.strength_level AS feedbackStrengthLevel,
+    fp.positive_keywords_json AS feedbackPositiveKeywordsJson,
+    fp.negative_keywords_json AS feedbackNegativeKeywordsJson,
+    global_eval.decision AS globalDecision,
+    global_eval.score_delta AS globalScoreDelta,
+    view_eval.decision AS viewDecision,
+    view_eval.score_delta AS viewScoreDelta,
     COALESCE(ci.published_at, ci.fetched_at, ci.created_at) AS rankingTimestamp
   FROM content_items ci
   JOIN content_sources cs ON cs.id = ci.source_id
   LEFT JOIN latest_favorite ON latest_favorite.content_item_id = ci.id
   LEFT JOIN latest_reaction ON latest_reaction.content_item_id = ci.id
+  LEFT JOIN feedback_pool fp ON fp.content_item_id = ci.id
+  LEFT JOIN content_nl_evaluations global_eval
+    ON global_eval.content_item_id = ci.id
+   AND global_eval.scope = 'global'
+  LEFT JOIN content_nl_evaluations view_eval
+    ON view_eval.content_item_id = ci.id
+   AND view_eval.scope = @viewScope
   ORDER BY datetime(COALESCE(ci.published_at, ci.fetched_at, ci.created_at)) DESC, ci.id DESC
 `;
 
-export function listContentView(db: SqliteDatabase, viewKey: ContentViewKey): ContentCardView[] {
+export function listContentView(
+  db: SqliteDatabase,
+  viewKey: ContentViewKey,
+  options: { includeNlEvaluations?: boolean } = {}
+): ContentCardView[] {
   const viewRuleConfig = getViewRuleConfig(db, viewKey);
   // Every tab reads the same candidate pool; the saved rule weights decide which cards rise and how many survive.
-  const rows = db.prepare(contentSelectSql).all() as ContentCardRow[];
+  const rows = db.prepare(contentSelectSql).all({ viewScope: viewKey }) as ContentCardRow[];
   const referenceTime = new Date();
+  const includeNlEvaluations = options.includeNlEvaluations ?? true;
 
   return rows
     .map((row) => {
@@ -120,17 +160,33 @@ export function listContentView(db: SqliteDatabase, viewKey: ContentViewKey): Co
         reaction: normalizeReaction(row.reactionValue),
         contentScore: score.contentScore,
         scoreBadges: score.badges,
+        feedbackEntry: row.feedbackEntryId
+          ? {
+              freeText: row.feedbackFreeText,
+              suggestedEffect: normalizeSuggestedEffect(row.feedbackSuggestedEffect),
+              strengthLevel: normalizeStrengthLevel(row.feedbackStrengthLevel),
+              positiveKeywords: parseKeywordJson(row.feedbackPositiveKeywordsJson),
+              negativeKeywords: parseKeywordJson(row.feedbackNegativeKeywordsJson)
+            }
+          : undefined,
         rankingScore: calculateViewRankingScore(
           viewKey,
           viewRuleConfig,
           score,
           row.sourceKind,
           row.rankingTimestamp,
-          referenceTime
+          referenceTime,
+          includeNlEvaluations
+            ? (row.globalScoreDelta ?? 0) + (row.viewScoreDelta ?? 0)
+            : 0
         ),
-        rankingTimestamp: row.rankingTimestamp
+        rankingTimestamp: row.rankingTimestamp,
+        isBlocked:
+          includeNlEvaluations &&
+          (normalizeNlDecision(row.globalDecision) === "block" || normalizeNlDecision(row.viewDecision) === "block")
       };
     })
+    .filter((card) => !card.isBlocked)
     .sort((left, right) => {
       const leftRank = left.rankingScore;
       const rightRank = right.rankingScore;
@@ -149,12 +205,20 @@ export function listContentView(db: SqliteDatabase, viewKey: ContentViewKey): Co
       return right.id - left.id;
     })
     .slice(0, viewRuleConfig.limit)
-    .map(({ rankingScore: _rankingScore, rankingTimestamp: _rankingTimestamp, ...card }) => card as ContentCardView);
+    .map(({ rankingScore: _rankingScore, rankingTimestamp: _rankingTimestamp, isBlocked: _isBlocked, ...card }) => card as ContentCardView);
 }
 
 function normalizeReaction(value: string | null): "like" | "dislike" | "none" {
   // Unknown legacy values degrade to `none` so view rendering stays stable.
   return value === "like" || value === "dislike" ? value : "none";
+}
+
+function normalizeSuggestedEffect(value: string | null): "boost" | "penalize" | "block" | "neutral" | null {
+  return value === "boost" || value === "penalize" || value === "block" || value === "neutral" ? value : null;
+}
+
+function normalizeStrengthLevel(value: string | null): "low" | "medium" | "high" | null {
+  return value === "low" || value === "medium" || value === "high" ? value : null;
 }
 
 function calculateViewRankingScore(
@@ -163,7 +227,8 @@ function calculateViewRankingScore(
   score: ContentScoreBreakdown,
   sourceKind: string,
   rankingTimestamp: string | null,
-  referenceTime: Date
+  referenceTime: Date,
+  nlScoreDelta: number
 ): number {
   // The saved rule config now controls both the ranking mix and the freshness window.
   const freshnessScore = calculateFreshnessWindowScore(rankingTimestamp, referenceTime, viewRuleConfig.freshnessWindowDays, score.freshnessScore);
@@ -174,8 +239,13 @@ function calculateViewRankingScore(
     score.completenessScore * viewRuleConfig.completenessWeight +
     score.aiScore * viewRuleConfig.aiWeight +
     score.heatScore * viewRuleConfig.heatWeight +
+    nlScoreDelta +
     calculateMatchingSourceViewBonus(viewKey, sourceKind)
   );
+}
+
+function normalizeNlDecision(value: string | null): "boost" | "penalize" | "block" | "neutral" {
+  return value === "boost" || value === "penalize" || value === "block" ? value : "neutral";
 }
 
 function calculateMatchingSourceViewBonus(viewKey: ContentViewKey, sourceKind: string): number {
@@ -225,4 +295,17 @@ function toTimestampMs(value: string | null): number {
 
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseKeywordJson(rawValue: string | null): string[] {
+  if (!rawValue) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
 }

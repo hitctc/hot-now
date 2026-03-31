@@ -46,6 +46,11 @@ export async function loadRuntimeConfig(options: Options = {}): Promise<RuntimeC
       username: required(env.AUTH_USERNAME, "AUTH_USERNAME"),
       password: required(env.AUTH_PASSWORD, "AUTH_PASSWORD"),
       sessionSecret: required(env.SESSION_SECRET, "SESSION_SECRET")
+    },
+    llm: {
+      // The LLM settings master key gates encrypted provider storage only, so missing env
+      // should disable that feature instead of preventing the whole app from starting.
+      settingsMasterKey: env.LLM_SETTINGS_MASTER_KEY ?? null
     }
   };
 }

@@ -110,4 +110,35 @@ describe("client app shell", () => {
     expect(router.getRoutes().some((route) => route.path === "/ai-hot")).toBe(true);
     expect(router.getRoutes().some((route) => route.path === "/articles")).toBe(false);
   });
+
+  it("renders the mobile AI-first tabs and closes the system drawer after navigation", async () => {
+    const router = createAppRouter();
+
+    await router.push("/settings/profile");
+    await router.isReady();
+
+    const wrapper = mount(App, {
+      global: {
+        plugins: [Antd, router]
+      }
+    });
+
+    await flushPromises();
+
+    expect(wrapper.find("[data-mobile-shell-nav]").exists()).toBe(true);
+    expect(
+      wrapper.findAll("[data-mobile-content-tab]").map((node) => node.text().trim())
+    ).toEqual(["AI 新讯", "AI 热点"]);
+
+    await wrapper.get("[data-mobile-system-toggle]").trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find("[data-mobile-system-drawer]").exists()).toBe(true);
+
+    await wrapper.get('[data-mobile-drawer-link="/settings/view-rules"]').trigger("click");
+    await flushPromises();
+
+    expect(router.currentRoute.value.fullPath).toBe("/settings/view-rules");
+    expect(wrapper.find("[data-mobile-system-drawer]").exists()).toBe(false);
+  });
 });

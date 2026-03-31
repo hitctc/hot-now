@@ -65,7 +65,8 @@ describe("client app shell", () => {
 
     await flushPromises();
 
-    expect(wrapper.text()).toContain("系统页前端底座");
+    expect(wrapper.text()).toContain("HotNow Editorial Desk");
+    expect(wrapper.text()).toContain("AI-first 工作台壳层");
     expect(wrapper.text()).toContain("当前登录用户页");
     expect(wrapper.text()).toContain("当前会展示登录用户摘要和会话上下文");
     expect(wrapper.find("[data-shell-page-title]").text()).toBe("当前登录用户页");

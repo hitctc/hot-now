@@ -65,12 +65,12 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
   <a-layout class="unified-shell" data-shell-root>
     <a-layout-sider class="unified-shell__sider" width="280" :theme="isDarkMode ? 'dark' : 'light'">
       <div class="unified-shell__brand">
-        <a-typography-text class="unified-shell__eyebrow" type="secondary">HotNow</a-typography-text>
+        <a-typography-text class="unified-shell__eyebrow" type="secondary">HotNow Editorial Desk</a-typography-text>
         <a-typography-title :level="3" class="unified-shell__brand-title">
-          系统页前端底座
+          AI-first 工作台壳层
         </a-typography-title>
         <a-typography-paragraph class="unified-shell__brand-description">
-          Vue 3 + Ant Design Vue 的统一壳层，后续系统页都会沿着同一套组件基线扩展。
+          AI 新讯、AI 热点和系统工作台共享同一套 Editorial Desk 主题 token 与导航语义。
         </a-typography-paragraph>
       </div>
 

@@ -127,6 +127,35 @@ describe("site theme runtime", () => {
     expect(drawer?.hasAttribute("hidden")).toBe(true);
   });
 
+  it("keeps mobile content tabs in AI-first order while restoring the persisted theme", () => {
+    const dom = new JSDOM(
+      `<!doctype html>
+<html data-theme="dark">
+  <body>
+    <div class="mobile-top-nav-tabs" aria-label="内容菜单">
+      <a class="mobile-top-tab mobile-top-tab--content is-active" data-shell-nav href="/ai-new">AI 新讯</a>
+      <a class="mobile-top-tab mobile-top-tab--content" data-shell-nav href="/ai-hot">AI 热点</a>
+    </div>
+    <button type="button" data-theme-choice="dark" aria-pressed="true">深色模式</button>
+    <button type="button" data-theme-choice="light" aria-pressed="false">浅色模式</button>
+  </body>
+</html>`,
+      {
+        url: "https://example.test/ai-new",
+        runScripts: "outside-only"
+      }
+    );
+
+    const { window } = dom;
+    window.localStorage.setItem("hot-now-theme", "light");
+    window.eval(siteScript);
+
+    const tabs = [...window.document.querySelectorAll(".mobile-top-tab")].map((node) => node.textContent?.trim());
+
+    expect(tabs).toEqual(["AI 新讯", "AI 热点"]);
+    expect(window.document.documentElement.dataset.theme).toBe("light");
+  });
+
   it("navigates shell links without reloading and keeps sidebar scroll position", async () => {
     const nextHtml = `<!doctype html>
 <html data-theme="dark">

@@ -1,16 +1,28 @@
-import { mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
+import { describe, expect, it, vi } from "vitest";
 import Antd from "ant-design-vue";
 
 import { APP_ROUTE_BASE, CLIENT_ASSET_BASE } from "../../src/client/appBases";
 import App from "../../src/client/App.vue";
-import { createAppRouter } from "../../src/client/router";
+import { createAppRouter, shellPageMetas } from "../../src/client/router";
+
+vi.mock("../../src/client/services/settingsApi", () => ({
+  readSettingsProfile: vi.fn().mockResolvedValue({
+    username: "admin",
+    displayName: "系统管理员",
+    role: "admin",
+    email: "admin@example.com",
+    loggedIn: true
+  }),
+  readSettingsViewRules: vi.fn(),
+  readSettingsSources: vi.fn()
+}));
 
 describe("client app shell", () => {
-  it("renders the system shell and the view-rules route", async () => {
+  it("renders the unified shell, current route title, navigation links and theme control", async () => {
     const router = createAppRouter();
 
-    await router.push("/settings/view-rules");
+    await router.push("/settings/profile");
     await router.isReady();
 
     const wrapper = mount(App, {
@@ -19,9 +31,19 @@ describe("client app shell", () => {
       }
     });
 
-    expect(wrapper.text()).toContain("HotNow 系统页");
-    expect(wrapper.text()).toContain("筛选策略工作台");
-    expect(wrapper.get("[data-shell-nav='view-rules']").text()).toContain("筛选策略");
+    await flushPromises();
+
+    expect(wrapper.text()).toContain("系统页前端底座");
+    expect(wrapper.text()).toContain("当前登录用户页");
+    expect(wrapper.text()).toContain("当前会展示登录用户摘要和会话上下文");
+    expect(wrapper.find("[data-shell-page-title]").text()).toBe("当前登录用户页");
+    expect(wrapper.find("[data-shell-page-description]").text()).toContain("登录用户摘要");
+    expect(wrapper.find("[data-shell-theme-toggle]").exists()).toBe(true);
+
+    for (const page of shellPageMetas) {
+      const navLink = wrapper.get(`[data-shell-nav='${page.key}']`);
+      expect(navLink.text()).toContain(page.navLabel);
+    }
   });
 
   it("keeps the /client/ asset base separate from the /settings/ route base", async () => {

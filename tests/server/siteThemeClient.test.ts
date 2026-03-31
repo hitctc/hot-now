@@ -49,7 +49,7 @@ describe("site theme runtime", () => {
     <div class="mobile-top-nav">
       <div class="mobile-top-nav-bar">
         <div class="mobile-top-nav-tabs" aria-label="内容菜单">
-          <a class="mobile-top-tab mobile-top-tab--content" href="/"><span>热点</span></a>
+          <a class="mobile-top-tab mobile-top-tab--content" href="/ai-new"><span>AI 新讯</span></a>
         </div>
         <button
           type="button"
@@ -131,15 +131,14 @@ describe("site theme runtime", () => {
     const nextHtml = `<!doctype html>
 <html data-theme="dark">
   <head>
-    <title>热门文章 | HotNow</title>
+    <title>AI 热点 | HotNow</title>
   </head>
   <body class="shell-page">
     <div class="mobile-top-nav">
       <div class="mobile-top-nav-bar">
         <div class="mobile-top-nav-tabs" aria-label="内容菜单">
-          <a class="mobile-top-tab mobile-top-tab--content" data-shell-nav href="/">热点资讯</a>
-          <a class="mobile-top-tab mobile-top-tab--content is-active" data-shell-nav href="/articles">热门文章</a>
-          <a class="mobile-top-tab mobile-top-tab--content" data-shell-nav href="/ai">最新 AI 消息</a>
+          <a class="mobile-top-tab mobile-top-tab--content" data-shell-nav href="/ai-new">AI 新讯</a>
+          <a class="mobile-top-tab mobile-top-tab--content is-active" data-shell-nav href="/ai-hot">AI 热点</a>
         </div>
       </div>
     </div>
@@ -147,13 +146,12 @@ describe("site theme runtime", () => {
       <aside class="shell-sidebar shell-sidebar--editorial">
         <section class="sidebar-page-summary">
           <p class="sidebar-page-summary-kicker">当前页面</p>
-          <h2 class="sidebar-page-summary-title">热门文章</h2>
-          <p class="sidebar-page-summary-description">这里会承载适合深读、完整度更高的文章内容。</p>
+          <h2 class="sidebar-page-summary-title">AI 热点</h2>
+          <p class="sidebar-page-summary-description">这里会展示更值得优先阅读的 AI 热点内容。</p>
         </section>
         <nav class="nav-group nav-group--content">
-          <a class="nav-link nav-link--content" data-shell-nav href="/">热点资讯</a>
-          <a class="nav-link nav-link--content is-active" data-shell-nav href="/articles">热门文章</a>
-          <a class="nav-link nav-link--content" data-shell-nav href="/ai">最新 AI 消息</a>
+          <a class="nav-link nav-link--content" data-shell-nav href="/ai-new">AI 新讯</a>
+          <a class="nav-link nav-link--content is-active" data-shell-nav href="/ai-hot">AI 热点</a>
         </nav>
         <div class="sidebar-footer">
           <button type="button" data-theme-choice="dark" aria-pressed="true">深色模式</button>
@@ -162,7 +160,7 @@ describe("site theme runtime", () => {
       </aside>
       <div class="shell-main">
         <main class="shell-content">
-          <section data-view-key="articles">新的文章内容</section>
+          <section data-view-key="hot">新的 AI 热点内容</section>
         </main>
       </div>
     </div>
@@ -172,15 +170,14 @@ describe("site theme runtime", () => {
       `<!doctype html>
 <html data-theme="dark">
   <head>
-    <title>热点资讯 | HotNow</title>
+    <title>AI 新讯 | HotNow</title>
   </head>
   <body class="shell-page">
     <div class="mobile-top-nav">
       <div class="mobile-top-nav-bar">
         <div class="mobile-top-nav-tabs" aria-label="内容菜单">
-          <a class="mobile-top-tab mobile-top-tab--content is-active" data-shell-nav href="/">热点资讯</a>
-          <a class="mobile-top-tab mobile-top-tab--content" data-shell-nav href="/articles">热门文章</a>
-          <a class="mobile-top-tab mobile-top-tab--content" data-shell-nav href="/ai">最新 AI 消息</a>
+          <a class="mobile-top-tab mobile-top-tab--content is-active" data-shell-nav href="/ai-new">AI 新讯</a>
+          <a class="mobile-top-tab mobile-top-tab--content" data-shell-nav href="/ai-hot">AI 热点</a>
         </div>
       </div>
     </div>
@@ -188,13 +185,12 @@ describe("site theme runtime", () => {
       <aside class="shell-sidebar shell-sidebar--editorial">
         <section class="sidebar-page-summary">
           <p class="sidebar-page-summary-kicker">当前页面</p>
-          <h2 class="sidebar-page-summary-title">热点资讯</h2>
-          <p class="sidebar-page-summary-description">这里会展示统一内容池中的热点内容与时效优先结果。</p>
+          <h2 class="sidebar-page-summary-title">AI 新讯</h2>
+          <p class="sidebar-page-summary-description">这里会展示最新 AI 新讯与新鲜信号。</p>
         </section>
         <nav class="nav-group nav-group--content">
-          <a class="nav-link nav-link--content is-active" data-shell-nav href="/">热点资讯</a>
-          <a class="nav-link nav-link--content" data-shell-nav href="/articles">热门文章</a>
-          <a class="nav-link nav-link--content" data-shell-nav href="/ai">最新 AI 消息</a>
+          <a class="nav-link nav-link--content is-active" data-shell-nav href="/ai-new">AI 新讯</a>
+          <a class="nav-link nav-link--content" data-shell-nav href="/ai-hot">AI 热点</a>
         </nav>
         <div class="sidebar-footer">
           <button type="button" data-theme-choice="dark" aria-pressed="true">深色模式</button>
@@ -203,14 +199,14 @@ describe("site theme runtime", () => {
       </aside>
       <div class="shell-main">
         <main class="shell-content">
-          <section data-view-key="hot">旧的热点内容</section>
+          <section data-view-key="ai">旧的 AI 新讯内容</section>
         </main>
       </div>
     </div>
   </body>
 </html>`,
       {
-        url: "https://example.test/",
+        url: "https://example.test/ai-new",
         runScripts: "outside-only"
       }
     );
@@ -227,30 +223,30 @@ describe("site theme runtime", () => {
     window.eval(siteScript);
 
     const sidebar = window.document.querySelector(".shell-sidebar");
-    const articlesLink = window.document.querySelector('.nav-link[data-shell-nav][href="/articles"]');
+    const hotLink = window.document.querySelector('.nav-link[data-shell-nav][href="/ai-hot"]');
 
     expect(sidebar instanceof window.HTMLElement).toBe(true);
 
-    if (!(sidebar instanceof window.HTMLElement) || !(articlesLink instanceof window.HTMLAnchorElement)) {
+    if (!(sidebar instanceof window.HTMLElement) || !(hotLink instanceof window.HTMLAnchorElement)) {
       throw new Error("test setup failed");
     }
 
     sidebar.scrollTop = 136;
-    articlesLink.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+    hotLink.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
     await new Promise((resolve) => window.setTimeout(resolve, 0));
 
-    expect(fetchMock).toHaveBeenCalledWith("/articles", {
+    expect(fetchMock).toHaveBeenCalledWith("/ai-hot", {
       headers: {
         accept: "text/html",
         "x-hot-now-shell-nav": "1"
       },
       credentials: "same-origin"
     });
-    expect(window.location.pathname).toBe("/articles");
-    expect(window.document.title).toBe("热门文章 | HotNow");
-    expect(window.document.querySelector(".shell-content")?.textContent).toContain("新的文章内容");
-    expect(window.document.querySelector(".sidebar-page-summary-title")?.textContent).toBe("热门文章");
-    expect(window.document.querySelector('.nav-link[data-shell-nav][href="/articles"]')?.className).toContain("is-active");
+    expect(window.location.pathname).toBe("/ai-hot");
+    expect(window.document.title).toBe("AI 热点 | HotNow");
+    expect(window.document.querySelector(".shell-content")?.textContent).toContain("新的 AI 热点内容");
+    expect(window.document.querySelector(".sidebar-page-summary-title")?.textContent).toBe("AI 热点");
+    expect(window.document.querySelector('.nav-link[data-shell-nav][href="/ai-hot"]')?.className).toContain("is-active");
     expect(window.document.querySelector('[data-theme-choice="light"]')?.getAttribute("aria-pressed")).toBe("true");
     expect(sidebar.scrollTop).toBe(136);
     expect(scrollToMock).toHaveBeenCalledWith({ top: 0, behavior: "auto" });

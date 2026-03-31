@@ -1,9 +1,11 @@
+import path from "node:path";
 import { loadRuntimeConfig } from "./core/config/loadRuntimeConfig.js";
 import { verifyPassword } from "./core/auth/passwords.js";
 import { listContentView as listContentCards } from "./core/content/listContentView.js";
-import { openDatabase } from "./core/db/openDatabase.js";
+import { createRuntimeDatabase } from "./core/db/createRuntimeDatabase.js";
 import { runMigrations } from "./core/db/runMigrations.js";
 import { seedInitialData } from "./core/db/seedInitialData.js";
+import { checkpointWal } from "./core/db/sqliteHealth.js";
 import { saveFavorite, saveReaction } from "./core/feedback/feedbackRepository.js";
 import { fetchAndExtractArticle } from "./core/fetch/extractArticle.js";
 import { sendDailyEmail } from "./core/mail/sendDailyEmail.js";
@@ -43,7 +45,11 @@ type UserProfileRow = {
 type ToggleSourceResult = { ok: true } | { ok: false; reason: "not-found" };
 
 const config = await loadRuntimeConfig();
-const db = openDatabase(config.database.file);
+const recoveryDir = path.join(path.dirname(config.database.file), "recovery-backups");
+const db = createRuntimeDatabase({
+  databaseFile: config.database.file,
+  recoveryDir
+});
 runMigrations(db);
 seedInitialData(db, {
   username: config.auth.username,
@@ -277,7 +283,9 @@ installGracefulShutdown({
   closeServer: async () => {
     await app.close();
   },
-  checkpointDatabase: () => undefined,
+  checkpointDatabase: () => {
+    checkpointWal(db);
+  },
   closeDatabase: () => {
     if (db.open) {
       db.close();

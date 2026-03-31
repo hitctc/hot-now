@@ -106,4 +106,32 @@ describe("installGracefulShutdown", () => {
     expect(closeDatabase).toHaveBeenCalledTimes(1);
     expect(exit).toHaveBeenCalledTimes(1);
   });
+
+  it("returns exit code 1 when checkpointing fails but still closes the database", async () => {
+    const signalProcess = new EventEmitter() as FakeSignalProcess;
+    const closeDatabase = vi.fn(() => undefined);
+    const exit = vi.fn();
+
+    installGracefulShutdown({
+      process: signalProcess,
+      exit,
+      logger: {
+        info: vi.fn(),
+        error: vi.fn()
+      },
+      scheduledTasks: [],
+      waitForIdle: vi.fn(async () => undefined),
+      closeServer: vi.fn(async () => undefined),
+      checkpointDatabase: vi.fn(() => {
+        throw new Error("checkpoint failed");
+      }),
+      closeDatabase
+    });
+
+    signalProcess.emit("SIGTERM");
+    await flushMicrotasks();
+
+    expect(closeDatabase).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledWith(1);
+  });
 });

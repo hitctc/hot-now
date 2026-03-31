@@ -1,22 +1,19 @@
 {
   "meta": {
     "date": "2026-03-31",
-    "generatedAt": "2026-03-31T10:10:12.026Z",
+    "generatedAt": "2026-03-31T14:20:16.226Z",
     "trigger": "scheduled",
-    "issueUrl": "http://36kr.com",
+    "issueUrl": "https://www.ifanr.com?utm_source=rss&utm_medium=rss&utm_campaign=",
     "issueUrls": [
+      "https://openai.com/news",
       "https://blog.google/innovation-and-ai/technology/ai/",
-      "http://36kr.com",
-      "https://techcrunch.com/category/artificial-intelligence/",
       "https://www.ifanr.com?utm_source=rss&utm_medium=rss&utm_campaign=",
       "https://www.ithome.com/",
       "https://imjuya.github.io/juya-ai-daily/issue-45/"
     ],
     "sourceKinds": [
+      "openai",
       "google_ai",
-      "kr36",
-      "kr36_newsflash",
-      "techcrunch_ai",
       "aifanr",
       "ithome",
       "juya"
@@ -24,15 +21,19 @@
     "topicCount": 10,
     "degraded": true,
     "mailStatus": "not-sent-by-collection",
-    "sourceFailureCount": 0,
-    "failedSourceKinds": []
+    "sourceFailureCount": 3,
+    "failedSourceKinds": [
+      "kr36",
+      "kr36_newsflash",
+      "techcrunch_ai"
+    ]
   },
   "topics": [
     {
       "rank": 1,
       "title": "凌晨三点，我在排队等一个 AI",
       "category": "AI 科技",
-      "whyItMatters": "该主题当前聚合了 19 条候选信息，且最高源内排序为 #1。",
+      "whyItMatters": "该主题当前聚合了 12 条候选信息，且最高源内排序为 #1。",
       "summary": "「你见过凌晨四点的洛杉矶吗？」 这本是一句用来兜售自律的鸡汤文，可在 AI 浪潮漫过各行各业的今天，深夜走进一家 AI 漫剧制作公司，你可能会看到一群眼圈发黑的打工人在工位上使用 AI 来处理他们本该在白天完成的工作。 AI 能提升效率、解放劳动力的故事，我们听了太多年，不能说全",
       "keywords": [
         "凌晨",
@@ -41,62 +42,8 @@
         "排队",
         "等一"
       ],
-      "relatedCount": 19,
+      "relatedCount": 12,
       "relatedItems": [
-        {
-          "sourceRank": 9,
-          "sourceCategory": "热点资讯",
-          "sourceTitle": "8点1氪丨伊朗议会批准对海峡征收通行费；多品牌电动车将涨价；名创优品回应买盲盒需要会员",
-          "sourceUrl": "https://36kr.com/p/3746104816943617?f=rss",
-          "articleOk": true,
-          "articleTitle": "8点1氪丨伊朗议会批准对海峡征收通行费；多品牌电动车将涨价；名创优品回应买盲盒需要会员-36氪",
-          "articleSummary": "今日热点导览\n  曝iPhoneFold将成史上最大改款，有媒体称其设计革新超iPhone X  \n  泡泡玛特乐园迎来新区域开放，门票将涨价\n  蚂蚁集团安全团队发现OpenClaw多个高危漏洞并协助快速修复\n  DeepSeek公告服务出现重大中断，12小时未修复引发热议\n  俞敏洪：东方甄选首家线下门店将于4月在北京中关村开业\n  TOP3大新闻\n  伊朗议会批准对海峡征收通行费，需以伊朗本币支付 \n  当地时间周一，伊朗议会通过一项法案，拟对通过霍尔木兹海峡的船只征收"
-        },
-        {
-          "sourceRank": 8,
-          "sourceCategory": "热门文章",
-          "sourceTitle": "Qodo raises $70M for code verification as AI coding scales",
-          "sourceUrl": "https://techcrunch.com/2026/03/30/qodo-bets-on-code-verification-as-ai-coding-scales-raises-70m/",
-          "articleOk": true,
-          "articleTitle": "Qodo raises $70M for code verification as AI coding scales",
-          "articleSummary": "As AI coding tools generate billions of lines of code each month, a new bottleneck is emerging: ensuring that software works as intended. Qodo, a startup building AI agents for code review, testing, and governance, is betting that verificat"
-        },
-        {
-          "sourceRank": 10,
-          "sourceCategory": "热门文章",
-          "sourceTitle": "Why OpenAI really shut down Sora",
-          "sourceUrl": "https://techcrunch.com/2026/03/29/why-openai-really-shut-down-sora/",
-          "articleOk": true,
-          "articleTitle": "Why OpenAI really shut down Sora",
-          "articleSummary": "In Brief\nPosted:\n\n\n8:09 PM PDT · March 29, 2026\n\n\n\nImage Credits:Robert Way (opens in a new window) / Getty Images\n\n\n\n\t\t\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\n\t\t\n\t\n\n\n\n\n\nOpenAI’s decision last week to shut down Sora, its AI video-generation to"
-        },
-        {
-          "sourceRank": 12,
-          "sourceCategory": "热门文章",
-          "sourceTitle": "Bluesky leans into AI with Attie, an app for building custom feeds",
-          "sourceUrl": "https://techcrunch.com/2026/03/28/bluesky-leans-into-ai-with-attie-an-app-for-building-custom-feeds/",
-          "articleOk": true,
-          "articleTitle": "Bluesky leans into AI with Attie, an app for building custom feeds",
-          "articleSummary": "The team from Bluesky has built another app — and this time, it’s not a social network but an AI assistant that allows you to design your own algorithm, create custom feeds, and, one day, vibe-code your own app.\n\nAt the Atmosphere conferenc"
-        },
-        {
-          "sourceRank": 13,
-          "sourceCategory": "热门文章",
-          "sourceTitle": "Stanford study outlines dangers of asking AI chatbots for personal advice",
-          "sourceUrl": "https://techcrunch.com/2026/03/28/stanford-study-outlines-dangers-of-asking-ai-chatbots-for-personal-advice/",
-          "articleOk": true,
-          "articleTitle": "Stanford study outlines dangers of asking AI chatbots for personal advice",
-          "articleSummary": "While there’s been plenty of debate about the tendency of AI chatbots to flatter users and confirm their existing beliefs — also known as AI sycophancy — a new study by Stanford computer scientists attempts to measure how harmful that tende"
-        },
-        {
-          "sourceRank": 15,
-          "sourceCategory": "热门文章",
-          "sourceTitle": "Anthropic’s Claude popularity with paying consumers is skyrocketing",
-          "sourceUrl": "https://techcrunch.com/2026/03/28/anthropics-claude-popularity-with-paying-consumers-is-skyrocketing/",
-          "articleOk": true,
-          "articleTitle": "Anthropic’s Claude popularity with paying consumers is skyrocketing",
-          "articleSummary": "Whatever the final outcome for Anthropic from its feud with the Department of Defense, the attention it has generated — coupled with the company’s funny Super Bowl ads taking aim at OpenAI and the surging popularity of Claude Code — has mad"
-        },
         {
           "sourceRank": 1,
           "sourceCategory": "AI 科技",
@@ -152,22 +99,13 @@
           "articleSummary": "带队发布 Qwen 3.5 小模型系列、获马斯克公开点赞，20 小时后在社交媒体宣告离职。林俊旸离开阿里的方式，本身就是 2026 年 AI 行业最戏剧性的一幕。\n32 岁，阿里最年轻的 P10，一手将千问做到全球下载量超 10 亿次、衍生模型超 20 万款，成为全球开源模型的新王。他的离开源于一次组织架构调整的分歧：\n阿里希望将 Qwen 团队按预训练、后训练、视觉、语音等维度水平拆分，与通义实验室其他团队合并；林俊旸则坚信预训练、后训练乃至基础设施团队应该更紧密地垂直整合"
         },
         {
-          "sourceRank": 46,
+          "sourceRank": 7,
           "sourceCategory": "科技热点",
-          "sourceTitle": "AI 写 BIOS 立功： Z790 消费级主板点亮英特尔酷睿 9 273PQE 处理器",
-          "sourceUrl": "https://www.ithome.com/0/934/545.htm",
-          "articleOk": true,
-          "articleTitle": "AI 写 BIOS 立功： Z790 消费级主板点亮英特尔酷睿 9 273PQE 处理器",
-          "articleSummary": "IT之家 3 月 31 日消息，网友 kryptonfly 于 3 月 29 日在 overclock 论坛发帖，称其借助 AI 大模型 Claude，成功编写出定制 BIOS，在华硕 Z790 消费级主板上，成功点亮酷睿 9 273PQE 处理器。IT之家注：英特尔酷睿 9 273PQE 处理器隶属 Bartlett Lake 系列，专为边缘计算设备打造，官方并未开放消费级市场支持。作为 Bartlett Lake Refresh 架构的衍生版本，酷睿 9 273PQE 抛"
-        },
-        {
-          "sourceRank": 59,
-          "sourceCategory": "科技热点",
-          "sourceTitle": "支付宝发布国内首个支付集成 Skill：三步即可快速接入，利好 Vibe Coding 开发者",
-          "sourceUrl": "https://www.ithome.com/0/934/517.htm",
-          "articleOk": true,
-          "articleTitle": "支付宝发布国内首个支付集成 Skill：三步即可快速接入，利好 Vibe Coding 开发者",
-          "articleSummary": "IT之家 3 月 31 日消息，支付宝今天宣布推出全国首个支付集成 Skill，三步即可“使唤”AI，在应用开发中快速接入支付宝支付功能，利好 Vibe Coding 开发者。据介绍，目前该工具支持企业 / 个人支付宝账号，采用SKILL.md 开放标准，兼容 Claude Code 等工具，跨平台通用。开发者可通过以下指令下载 Skill：npx @alipay/alipay-payment-integration install也可以通过魔搭 Skill 中心下载，然后将"
+          "sourceTitle": "Claude Code 刚刚被开源：51 万行代码，全网狂欢",
+          "sourceUrl": "https://www.ithome.com/0/934/677.htm",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
         },
         {
           "sourceRank": 7,
@@ -218,50 +156,6 @@
     },
     {
       "rank": 2,
-      "title": "国内航线燃油附加费上涨通知被撤回",
-      "category": "热点新闻",
-      "whyItMatters": "该主题当前聚合了 3 条候选信息，且最高源内排序为 #2。",
-      "summary": "国内航线燃油附加费上涨通知被撤回2026-03-31 18:09分享至多彩贵州航空今日下午向机票代理发布国内航线燃油附加费将在4月5日上涨5倍的通告，其中800公里(含)以下航段从目前的10元上调到60元，800公里以上航段从目前的20元上调到120元。记者刚刚获悉，该航司又向代",
-      "keywords": [
-        "国内",
-        "航线",
-        "燃油",
-        "附加",
-        "费上"
-      ],
-      "relatedCount": 3,
-      "relatedItems": [
-        {
-          "sourceRank": 12,
-          "sourceCategory": "热点资讯",
-          "sourceTitle": "国内航线燃油附加费上涨通知被撤回",
-          "sourceUrl": "https://36kr.com/newsflashes/3746688864502530?f=rss",
-          "articleOk": true,
-          "articleTitle": "国内航线燃油附加费上涨通知被撤回-36氪",
-          "articleSummary": "国内航线燃油附加费上涨通知被撤回2026-03-31 18:09分享至多彩贵州航空今日下午向机票代理发布国内航线燃油附加费将在4月5日上涨5倍的通告，其中800公里(含)以下航段从目前的10元上调到60元，800公里以上航段从目前的20元上调到120元。记者刚刚获悉，该航司又向代理发通知称，因民航局撤回已发布的4月燃油信息，公司下午发布的通告作废，待局方发出新通知后再另行下发业务通告。（第一财经）原文链接下一篇2025年我国保险行业承保新能源汽车同比增长40.1%今天（3月3"
-        },
-        {
-          "sourceRank": 2,
-          "sourceCategory": "热点新闻",
-          "sourceTitle": "国内航线燃油附加费上涨通知被撤回",
-          "sourceUrl": "https://36kr.com/newsflashes/3746688864502530?f=rss",
-          "articleOk": true,
-          "articleTitle": "国内航线燃油附加费上涨通知被撤回-36氪",
-          "articleSummary": "国内航线燃油附加费上涨通知被撤回2026-03-31 18:09分享至多彩贵州航空今日下午向机票代理发布国内航线燃油附加费将在4月5日上涨5倍的通告，其中800公里(含)以下航段从目前的10元上调到60元，800公里以上航段从目前的20元上调到120元。记者刚刚获悉，该航司又向代理发通知称，因民航局撤回已发布的4月燃油信息，公司下午发布的通告作废，待局方发出新通知后再另行下发业务通告。（第一财经）原文链接下一篇2025年我国保险行业承保新能源汽车同比增长40.1%今天（3月3"
-        },
-        {
-          "sourceRank": 4,
-          "sourceCategory": "科技热点",
-          "sourceTitle": "国内航线燃油附加费 4 月 5 日起大幅上调，最高涨 5 倍",
-          "sourceUrl": "https://www.ithome.com/0/934/623.htm",
-          "articleOk": true,
-          "articleTitle": "国内航线燃油附加费 4 月 5 日起大幅上调，最高涨 5 倍",
-          "articleSummary": "IT之家 3 月 31 日消息，据第一财经，多彩贵州航空公司已向机票代理发布通知，确认自 2026 年 4 月 5 日起调整国内航线燃油附加费征收标准。调整后，800 公里（含）以下航段每位旅客收取的燃油附加费为 60 元人民币，800 公里以上航段则为 120 元人民币。与现行标准相比，此次调整幅度显著。目前，800 公里（含）以下航段燃油附加费为 10 元，800 公里以上航段为 20 元。这意味着 4 月 5 日后，800 公里以下和以上航段的燃油附加费将分别上调 50"
-        }
-      ]
-    },
-    {
-      "rank": 3,
       "title": "Build with Lyria 3, our newest music generation model",
       "category": "最新 AI 消息",
       "whyItMatters": "该主题当前聚合了 3 条候选信息，且最高源内排序为 #5。",
@@ -305,6 +199,50 @@
       ]
     },
     {
+      "rank": 3,
+      "title": "捷豹路虎 × 奇瑞：硬派越野神行者 97 概念车确认今年投产，6 月公布详情",
+      "category": "科技热点",
+      "whyItMatters": "该主题当前聚合了 3 条候选信息，且最高源内排序为 #18。",
+      "summary": "IT之家 3 月 31 日消息，捷豹路虎 × 奇瑞联手打造的神行者品牌今日正式发布，期间还展示了下半年将推出的神行者 97 概念车（FREELANDER Concept 97），后续将于 6 月份带来更详细的信息。原为路虎旗下经典车型的神行者，此次升级为独立品牌，并在协作分工上采",
+      "keywords": [
+        "捷豹",
+        "路虎",
+        "奇瑞",
+        "硬派",
+        "越野"
+      ],
+      "relatedCount": 3,
+      "relatedItems": [
+        {
+          "sourceRank": 18,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "捷豹路虎 × 奇瑞：硬派越野神行者 97 概念车确认今年投产，6 月公布详情",
+          "sourceUrl": "https://www.ithome.com/0/934/661.htm",
+          "articleOk": true,
+          "articleTitle": "捷豹路虎 × 奇瑞：硬派越野神行者 97 概念车确认今年投产，6 月公布详情",
+          "articleSummary": "IT之家 3 月 31 日消息，捷豹路虎 × 奇瑞联手打造的神行者品牌今日正式发布，期间还展示了下半年将推出的神行者 97 概念车（FREELANDER Concept 97），后续将于 6 月份带来更详细的信息。原为路虎旗下经典车型的神行者，此次升级为独立品牌，并在协作分工上采用了新模式：由中方团队主导整车产品定义、新能源与智能化技术开发、供应链整合，以及品牌运营、市场营销、渠道建设和用户运营等核心环节；捷豹路虎团队则聚焦豪华品牌基因塑造、设计美学调性及豪华格调传承，同时参"
+        },
+        {
+          "sourceRank": 22,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "捷豹路虎 × 奇瑞：神行者全球首批搭载高通骁龙 8397 车机芯片，全球首发宁德时代全地形专用骁遥增混电池、全系标配华为乾崑 ADS 4.1",
+          "sourceUrl": "https://www.ithome.com/0/934/657.htm",
+          "articleOk": true,
+          "articleTitle": "捷豹路虎 × 奇瑞：神行者全球首批搭载高通骁龙 8397 车机芯片，全球首发宁德时代全地形专用骁遥增混电池、全系标配华为乾崑 ADS 4.1",
+          "articleSummary": "IT之家 3 月 31 日消息，在今晚举行的 FREELANDER 神行者全球首秀发布会上，官方宣布神行者将全球首批搭载高通骁龙 8397 座舱芯片、全球首发宁德时代全地形专用骁遥增 · 混电池。此外，神行者全系标配华为乾崑 ADS V4.1，具备持续更新能力，即将推出的全地形 SUV 全球首搭华为 896 线激光雷达，此外还与华为联合开发了 i-ATS 智能全地形系统。高通于 2024 年 10 月发布了其最先进的汽车平台 —— 骁龙 8397（Snapdragon Coc"
+        },
+        {
+          "sourceRank": 27,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "捷豹路虎 & 奇瑞合作“神行者”品牌正式亮相，CEO 文飞宣布将新增规划投资 30 亿升级新能源产线",
+          "sourceUrl": "https://www.ithome.com/0/934/651.htm",
+          "articleOk": true,
+          "articleTitle": "捷豹路虎 & 奇瑞合作“神行者”品牌正式亮相，CEO 文飞宣布将新增规划投资 30 亿升级新能源产线",
+          "articleSummary": "IT之家 3 月 31 日消息，在今晚举行的 FREELANDER 神行者全球首秀发布会上，奇瑞捷豹路虎董事、常务副总裁文飞宣布，捷豹路虎与奇瑞开启在华价值创造新模式，迈入电动化时代。文飞表示，合资 1.0 时代是跟随者，合资 2.0 时代进入赋能期，合资 3.0 时代则迎来重构。在此背景下，原为单一爆款车型的 FREELANDER 神行者正式升级为独立品牌。文飞阐述了该品牌的新定位：经典车型升级为全新独立品牌，聚焦新能源时代豪华科技全地形 SUV，探索后合资时代的合资模式创"
+        }
+      ]
+    },
+    {
       "rank": 4,
       "title": "阿里千问上线 Qwen3.6 Plus Preview 模型",
       "category": "模型发布",
@@ -341,102 +279,6 @@
     },
     {
       "rank": 5,
-      "title": "东方电气集团国际合作公司增资至约10亿元",
-      "category": "热点新闻",
-      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #1。",
-      "summary": "2026-03-31 18:09分享至36氪获悉，爱企查App显示，东方电气集团国际合作有限公司日前发生工商变更，注册资本由约7.6亿元人民币增至约10亿元人民币。该公司成立于1985年5月，法定代表人为陈强，经营范围包括对外承包工程、电力行业高效节能技术研发、风力发电技术服务等",
-      "keywords": [
-        "东方电气集团国际合作公司增资至约10亿元"
-      ],
-      "relatedCount": 2,
-      "relatedItems": [
-        {
-          "sourceRank": 11,
-          "sourceCategory": "热点资讯",
-          "sourceTitle": "东方电气集团国际合作公司增资至约10亿元",
-          "sourceUrl": "https://36kr.com/newsflashes/3746689587692292?f=rss",
-          "articleOk": true,
-          "articleTitle": "东方电气集团国际合作公司增资至约10亿元-36氪",
-          "articleSummary": "2026-03-31 18:09分享至36氪获悉，爱企查App显示，东方电气集团国际合作有限公司日前发生工商变更，注册资本由约7.6亿元人民币增至约10亿元人民币。该公司成立于1985年5月，法定代表人为陈强，经营范围包括对外承包工程、电力行业高效节能技术研发、风力发电技术服务等，由东方电气股份有限公司全资持股。原文链接下一篇多彩贵州航空今日下午向机票代理发布国内航线燃油附加费将在4月5日上涨5倍的通告，其中800公里(含)以下航段从目前的10元上调到60元，800公里以上航"
-        },
-        {
-          "sourceRank": 1,
-          "sourceCategory": "热点新闻",
-          "sourceTitle": "东方电气集团国际合作公司增资至约10亿元",
-          "sourceUrl": "https://36kr.com/newsflashes/3746689587692292?f=rss",
-          "articleOk": true,
-          "articleTitle": "东方电气集团国际合作公司增资至约10亿元-36氪",
-          "articleSummary": "2026-03-31 18:09分享至36氪获悉，爱企查App显示，东方电气集团国际合作有限公司日前发生工商变更，注册资本由约7.6亿元人民币增至约10亿元人民币。该公司成立于1985年5月，法定代表人为陈强，经营范围包括对外承包工程、电力行业高效节能技术研发、风力发电技术服务等，由东方电气股份有限公司全资持股。原文链接下一篇多彩贵州航空今日下午向机票代理发布国内航线燃油附加费将在4月5日上涨5倍的通告，其中800公里(含)以下航段从目前的10元上调到60元，800公里以上航"
-        }
-      ]
-    },
-    {
-      "rank": 6,
-      "title": "2025年我国保险行业承保新能源汽车同比增长40.1%",
-      "category": "热点新闻",
-      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #3。",
-      "summary": "2026-03-31 18:05分享至今天（3月31日）中国精算师协会、中国银行保险信息技术管理有限公司发布我国新能源车险2025年有关赔付信息。数据显示：2025年，我国保险行业承保新能源汽车4358万辆（其中客车4181万辆，货车177万辆），比上年增加1248万辆，增长40",
-      "keywords": [
-        "2025年我国保险行业承保新能源汽车同比增长40"
-      ],
-      "relatedCount": 2,
-      "relatedItems": [
-        {
-          "sourceRank": 13,
-          "sourceCategory": "热点资讯",
-          "sourceTitle": "2025年我国保险行业承保新能源汽车同比增长40.1%",
-          "sourceUrl": "https://36kr.com/newsflashes/3746685371007749?f=rss",
-          "articleOk": true,
-          "articleTitle": "2025年我国保险行业承保新能源汽车同比增长40.1%-36氪",
-          "articleSummary": "2026-03-31 18:05分享至今天（3月31日）中国精算师协会、中国银行保险信息技术管理有限公司发布我国新能源车险2025年有关赔付信息。数据显示：2025年，我国保险行业承保新能源汽车4358万辆（其中客车4181万辆，货车177万辆），比上年增加1248万辆，增长40.1%；保费收入1900亿元，提供风险保障金额159万亿元；承保亏损56亿元，同比减亏1亿元；综合成本率同比下降1.3个百分点。新能源汽车规模车系数量429个，其中客车370个、货车59个。（央视新闻"
-        },
-        {
-          "sourceRank": 3,
-          "sourceCategory": "热点新闻",
-          "sourceTitle": "2025年我国保险行业承保新能源汽车同比增长40.1%",
-          "sourceUrl": "https://36kr.com/newsflashes/3746685371007749?f=rss",
-          "articleOk": true,
-          "articleTitle": "2025年我国保险行业承保新能源汽车同比增长40.1%-36氪",
-          "articleSummary": "2026-03-31 18:05分享至今天（3月31日）中国精算师协会、中国银行保险信息技术管理有限公司发布我国新能源车险2025年有关赔付信息。数据显示：2025年，我国保险行业承保新能源汽车4358万辆（其中客车4181万辆，货车177万辆），比上年增加1248万辆，增长40.1%；保费收入1900亿元，提供风险保障金额159万亿元；承保亏损56亿元，同比减亏1亿元；综合成本率同比下降1.3个百分点。新能源汽车规模车系数量429个，其中客车370个、货车59个。（央视新闻"
-        }
-      ]
-    },
-    {
-      "rank": 7,
-      "title": "美图RoboNeo上线动作迁移、批量设计等功能",
-      "category": "热点新闻",
-      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #4。",
-      "summary": "2026-03-31 18:04分享至36氪获悉，美图旗下影像AI Agent RoboNeo正式上线动作迁移、批量设计/作图、海报智能排版等功能。RoboNeo相关负责人表示，未来会围绕视频、设计等内容创作场景持续探索更多实用、高效的Skills。下一篇安德利：参与投资私募股权",
-      "keywords": [
-        "美图RoboNeo上线动作迁移",
-        "批量",
-        "设计",
-        "等功"
-      ],
-      "relatedCount": 2,
-      "relatedItems": [
-        {
-          "sourceRank": 14,
-          "sourceCategory": "热点资讯",
-          "sourceTitle": "美图RoboNeo上线动作迁移、批量设计等功能",
-          "sourceUrl": "https://36kr.com/newsflashes/3746684887794177?f=rss",
-          "articleOk": true,
-          "articleTitle": "美图RoboNeo上线动作迁移、批量设计等功能-36氪",
-          "articleSummary": "2026-03-31 18:04分享至36氪获悉，美图旗下影像AI Agent RoboNeo正式上线动作迁移、批量设计/作图、海报智能排版等功能。RoboNeo相关负责人表示，未来会围绕视频、设计等内容创作场景持续探索更多实用、高效的Skills。下一篇安德利：参与投资私募股权投资基金，聚焦电子信息等行业发展机遇36氪获悉，安德利公告，公司拟作为有限合伙人以自有资金出资5000万元认购四川鼎兴未来创业投资基金（有限合伙）约16.67%的基金份额，本合伙企业将主要聚焦电子信息"
-        },
-        {
-          "sourceRank": 4,
-          "sourceCategory": "热点新闻",
-          "sourceTitle": "美图RoboNeo上线动作迁移、批量设计等功能",
-          "sourceUrl": "https://36kr.com/newsflashes/3746684887794177?f=rss",
-          "articleOk": true,
-          "articleTitle": "美图RoboNeo上线动作迁移、批量设计等功能-36氪",
-          "articleSummary": "2026-03-31 18:04分享至36氪获悉，美图旗下影像AI Agent RoboNeo正式上线动作迁移、批量设计/作图、海报智能排版等功能。RoboNeo相关负责人表示，未来会围绕视频、设计等内容创作场景持续探索更多实用、高效的Skills。下一篇安德利：参与投资私募股权投资基金，聚焦电子信息等行业发展机遇36氪获悉，安德利公告，公司拟作为有限合伙人以自有资金出资5000万元认购四川鼎兴未来创业投资基金（有限合伙）约16.67%的基金份额，本合伙企业将主要聚焦电子信息"
-        }
-      ]
-    },
-    {
-      "rank": 8,
       "title": "Gemini 3.1 Flash Live: Making audio AI more natural and reliable",
       "category": "最新 AI 消息",
       "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #3。",
@@ -471,72 +313,158 @@
       ]
     },
     {
-      "rank": 9,
-      "title": "安德利：参与投资私募股权投资基金，聚焦电子信息等行业发展机遇",
-      "category": "热点新闻",
-      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #5。",
-      "summary": "安德利：参与投资私募股权投资基金，聚焦电子信息等行业发展机遇2026-03-31 18:01分享至36氪获悉，安德利公告，公司拟作为有限合伙人以自有资金出资5000万元认购四川鼎兴未来创业投资基金（有限合伙）约16.67%的基金份额，本合伙企业将主要聚焦电子信息行业，坚持“投早、",
+      "rank": 6,
+      "title": "OpenAI to acquire Astral",
+      "category": "最新 AI 消息",
+      "whyItMatters": "该主题当前聚合了 3 条候选信息，且最高源内排序为 #10。",
+      "summary": "OpenAI to acquire Astral",
       "keywords": [
-        "安德",
-        "参与",
-        "投资",
-        "私募",
-        "股权"
+        "OpenAI",
+        "to",
+        "acquire",
+        "Astral"
+      ],
+      "relatedCount": 3,
+      "relatedItems": [
+        {
+          "sourceRank": 10,
+          "sourceCategory": "最新 AI 消息",
+          "sourceTitle": "OpenAI to acquire Astral",
+          "sourceUrl": "https://openai.com/index/openai-to-acquire-astral",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        },
+        {
+          "sourceRank": 21,
+          "sourceCategory": "最新 AI 消息",
+          "sourceTitle": "OpenAI to acquire Promptfoo",
+          "sourceUrl": "https://openai.com/index/openai-to-acquire-promptfoo",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        },
+        {
+          "sourceRank": 148,
+          "sourceCategory": "最新 AI 消息",
+          "sourceTitle": "OpenAI to acquire Neptune",
+          "sourceUrl": "https://openai.com/index/openai-to-acquire-neptune",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        }
+      ]
+    },
+    {
+      "rank": 7,
+      "title": "一汽-大众迈腾“35 周年严选款”汽车上市：15 英寸中控屏、配电动尾门，17.99 万元",
+      "category": "科技热点",
+      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #29。",
+      "summary": "IT之家 3 月 31 日消息，一汽-大众宣布为旗下迈腾车型推出“35 周年严选款”，定价为 17.99 万元。该车前脸采用矩阵式大灯，内部灯带与前格栅灯带融为一体，车身使用传统造型门把手，配有上下双腰线设计，车尾使用贯穿式尾灯组，采用隐藏式排气，同时带有电动尾门。座舱方面，该车",
+      "keywords": [
+        "一汽",
+        "大众",
+        "迈腾",
+        "35",
+        "周年"
       ],
       "relatedCount": 2,
       "relatedItems": [
         {
-          "sourceRank": 15,
-          "sourceCategory": "热点资讯",
-          "sourceTitle": "安德利：参与投资私募股权投资基金，聚焦电子信息等行业发展机遇",
-          "sourceUrl": "https://36kr.com/newsflashes/3746681593020930?f=rss",
+          "sourceRank": 29,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "一汽-大众迈腾“35 周年严选款”汽车上市：15 英寸中控屏、配电动尾门，17.99 万元",
+          "sourceUrl": "https://www.ithome.com/0/934/649.htm",
           "articleOk": true,
-          "articleTitle": "安德利：参与投资私募股权投资基金，聚焦电子信息等行业发展机遇-36氪",
-          "articleSummary": "安德利：参与投资私募股权投资基金，聚焦电子信息等行业发展机遇2026-03-31 18:01分享至36氪获悉，安德利公告，公司拟作为有限合伙人以自有资金出资5000万元认购四川鼎兴未来创业投资基金（有限合伙）约16.67%的基金份额，本合伙企业将主要聚焦电子信息行业，坚持“投早、投小、投硬科技”，重点投资于天使期及初创期科技型企业不少于认缴出资总额百分之七十（70%）。原文链接下一篇36氪获悉，阿里巴巴通义实验室宣布发布CoPaw 1.0新版本，围绕四大方面升级CoPaw的能"
+          "articleTitle": "一汽-大众迈腾“35 周年严选款”汽车上市：15 英寸中控屏、配电动尾门，17.99 万元 - IT之家",
+          "articleSummary": "IT之家 3 月 31 日消息，一汽-大众宣布为旗下迈腾车型推出“35 周年严选款”，定价为 17.99 万元。该车前脸采用矩阵式大灯，内部灯带与前格栅灯带融为一体，车身使用传统造型门把手，配有上下双腰线设计，车尾使用贯穿式尾灯组，采用隐藏式排气，同时带有电动尾门。座舱方面，该车搭载 15 英寸中控屏及 11.6 英寸副驾娱乐屏，应用 L2 级驾驶辅助系统，涵盖 ACC 自适应巡航、车道保持、驾驶状态监控等功能。规格方面，新车搭载 2.0T 高功率发动机，最大功率为 220 "
         },
         {
-          "sourceRank": 5,
-          "sourceCategory": "热点新闻",
-          "sourceTitle": "安德利：参与投资私募股权投资基金，聚焦电子信息等行业发展机遇",
-          "sourceUrl": "https://36kr.com/newsflashes/3746681593020930?f=rss",
+          "sourceRank": 52,
+          "sourceCategory": "科技热点",
+          "sourceTitle": "一汽-大众迈腾 PHEV 将于今年第二季度上市，搭载卓驭增强驾驶辅助系统",
+          "sourceUrl": "https://www.ithome.com/0/934/606.htm",
+          "articleOk": false,
+          "articleTitle": "",
+          "articleSummary": ""
+        }
+      ]
+    },
+    {
+      "rank": 8,
+      "title": "美团龙猫团队发布并开源 LongCat-AudioDiT 模型",
+      "category": "模型发布",
+      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #3。",
+      "summary": "LongCat-AudioDiT: High-Fidelity Diffusion Text-to-Speech in the Waveform Latent Space Introduction LongCat-AudioDiT is a state-of-the-art (S",
+      "keywords": [
+        "美团",
+        "龙猫",
+        "团队",
+        "发布",
+        "并开"
+      ],
+      "relatedCount": 1,
+      "relatedItems": [
+        {
+          "sourceRank": 3,
+          "sourceCategory": "模型发布",
+          "sourceTitle": "美团龙猫团队发布并开源 LongCat-AudioDiT 模型",
+          "sourceUrl": "https://github.com/meituan-longcat/LongCat-AudioDiT",
           "articleOk": true,
-          "articleTitle": "安德利：参与投资私募股权投资基金，聚焦电子信息等行业发展机遇-36氪",
-          "articleSummary": "安德利：参与投资私募股权投资基金，聚焦电子信息等行业发展机遇2026-03-31 18:01分享至36氪获悉，安德利公告，公司拟作为有限合伙人以自有资金出资5000万元认购四川鼎兴未来创业投资基金（有限合伙）约16.67%的基金份额，本合伙企业将主要聚焦电子信息行业，坚持“投早、投小、投硬科技”，重点投资于天使期及初创期科技型企业不少于认缴出资总额百分之七十（70%）。原文链接下一篇36氪获悉，阿里巴巴通义实验室宣布发布CoPaw 1.0新版本，围绕四大方面升级CoPaw的能"
+          "articleTitle": "GitHub - meituan-longcat/LongCat-AudioDiT",
+          "articleSummary": "LongCat-AudioDiT: High-Fidelity Diffusion Text-to-Speech in the Waveform Latent Space\n\n\n\n\n      \n    \n    \n        \n    \n\n\n        \n    \n    \n        \n    \n\n\n    \n  \n  \n    \n  \n    \n    \n  \n\nIntroduction\nLongCat-AudioDiT is a state-of-the-a"
+        }
+      ]
+    },
+    {
+      "rank": 9,
+      "title": "爱诗科技发布视频生成模 PixVerse V6",
+      "category": "模型发布",
+      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #4。",
+      "summary": "Something went wrong, but don’t fret — let’s give it another shot. Some privacy related extensions may cause issues on x.com. Please disable",
+      "keywords": [
+        "爱诗",
+        "科技",
+        "发布",
+        "视频",
+        "生成"
+      ],
+      "relatedCount": 1,
+      "relatedItems": [
+        {
+          "sourceRank": 4,
+          "sourceCategory": "模型发布",
+          "sourceTitle": "爱诗科技发布视频生成模 PixVerse V6",
+          "sourceUrl": "https://x.com/PixVerse_/status/2038711108119281671",
+          "articleOk": true,
+          "articleTitle": "",
+          "articleSummary": "Something went wrong, but don’t fret — let’s give it another shot. Some privacy related extensions may cause issues on x.com. Please disable them and try again."
         }
       ]
     },
     {
       "rank": 10,
-      "title": "Mistral AI raises $830M in debt to set up a data center near Paris",
-      "category": "热门文章",
-      "whyItMatters": "该主题当前聚合了 2 条候选信息，且最高源内排序为 #7。",
-      "summary": "In Brief Posted: 5:49 AM PDT · March 30, 2026 Image Credits:Chesnot / Getty Images French lab Mistral AI has raised $830 million in debt to ",
+      "title": "微软发布 Harrier-OSS-v1 多语言嵌入模型",
+      "category": "模型发布",
+      "whyItMatters": "该主题当前聚合了 1 条候选信息，且最高源内排序为 #5。",
+      "summary": "harrier-oss-v1 is a family of multilingual text embedding models developed by Microsoft. The models use decoder-only architectures with last",
       "keywords": [
-        "Mistral",
-        "AI",
-        "raises",
-        "830M",
-        "in"
+        "微软",
+        "发布",
+        "Harrier",
+        "OSS",
+        "v1"
       ],
-      "relatedCount": 2,
+      "relatedCount": 1,
       "relatedItems": [
         {
-          "sourceRank": 7,
-          "sourceCategory": "热门文章",
-          "sourceTitle": "Mistral AI raises $830M in debt to set up a data center near Paris",
-          "sourceUrl": "https://techcrunch.com/2026/03/30/mistral-ai-raises-830m-in-debt-to-set-up-a-data-center-near-paris/",
+          "sourceRank": 5,
+          "sourceCategory": "模型发布",
+          "sourceTitle": "微软发布 Harrier-OSS-v1 多语言嵌入模型",
+          "sourceUrl": "https://huggingface.co/microsoft/harrier-oss-v1-27b",
           "articleOk": true,
-          "articleTitle": "Mistral AI raises $830M in debt to set up a data center near Paris",
-          "articleSummary": "In Brief\nPosted:\n\n\n5:49 AM PDT · March 30, 2026\n\n\n\nImage Credits:Chesnot / Getty Images\n\n\n\n\t\t\n\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\n\t\t\n\t\n\n\n\n\n\nFrench lab Mistral AI has raised $830 million in debt to build a new data center near Paris that wil"
-        },
-        {
-          "sourceRank": 15,
-          "sourceCategory": "行业动态",
-          "sourceTitle": "Mistral AI 筹集 8.3 亿美元融资 采购13800块 Nvidia GPU",
-          "sourceUrl": "https://www.reuters.com/business/finance/frances-mistral-raises-830-million-debt-ai-data-centre-build-up-2026-03-30/",
-          "articleOk": false,
-          "articleTitle": "",
-          "articleSummary": ""
+          "articleTitle": "microsoft/harrier-oss-v1-27b · Hugging Face",
+          "articleSummary": "harrier-oss-v1 is a family of multilingual text embedding models developed by Microsoft.\nThe models use decoder-only architectures with last-token pooling and L2 normalization to produce dense text embeddings.\nThey can be applied to a wide "
         }
       ]
     }

@@ -21,17 +21,17 @@ type AppShellView = {
 };
 
 const appShellPages: AppShellPage[] = [
-  { path: "/", title: "热点资讯", section: "content", description: "这里会展示统一内容池中的热点内容与时效优先结果。" },
-  { path: "/articles", title: "热门文章", section: "content", description: "这里会承载适合深读、完整度更高的文章内容。" },
-  { path: "/ai", title: "最新 AI 消息", section: "content", description: "这里会展示 AI 相关性更高、发布时间更近的内容。" },
+  { path: "/", title: "AI 新讯", section: "content", description: "这里会展示最新 AI 新讯与新鲜信号。" },
+  { path: "/ai-new", title: "AI 新讯", section: "content", description: "这里会承接 AI 新讯的主入口内容。" },
+  { path: "/ai-hot", title: "AI 热点", section: "content", description: "这里会展示更值得优先阅读的 AI 热点内容。" },
   {
     path: "/settings/view-rules",
     title: "筛选策略",
     section: "system",
-    description: "这里会配置各内容菜单的筛选规则与展示偏好。"
+    description: "这里会配置 AI 新讯与 AI 热点的筛选规则与展示偏好。"
   },
-  { path: "/settings/sources", title: "数据迭代收集", section: "system", description: "这里会管理 RSS 数据源的启用状态、抓取结果和手动采集。" },
-  { path: "/settings/profile", title: "当前登录用户", section: "system", description: "这里会展示当前账号资料、角色和登录状态。" }
+  { path: "/settings/sources", title: "数据收集", section: "system", description: "这里会管理 RSS 数据源的启用状态、抓取结果和手动采集。" },
+  { path: "/settings/profile", title: "当前用户", section: "system", description: "这里会展示当前账号资料、角色和登录状态。" }
 ];
 
 // The server resolves shell pages from one canonical list so route registration and navigation stay in sync.
@@ -46,13 +46,17 @@ export function findAppShellPage(pathname: string): AppShellPage | null {
 
 // App shell rendering keeps one stable layout contract that later tasks can fill with real feature modules.
 export function renderAppLayout(view: AppShellView): string {
-  const contentLinks = renderNavGroup(appShellPages.filter((page) => page.section === "content"), view.currentPath);
+  const contentLinks = renderNavGroup(
+    appShellPages.filter((page) => page.section === "content" && page.path !== "/"),
+    view.currentPath
+  );
   const systemLinks = renderNavGroup(appShellPages.filter((page) => page.section === "system"), view.currentPath);
   const showSystemMenu = view.showSystemMenu ?? true;
   const pageContent = view.contentHtml ?? renderPlaceholder(view.page.description);
   const sidebarPageSummary = renderSidebarPageSummary(view.page);
   const sidebarAccount = renderSidebarAccount(view.user, view.loginHref);
   const mobileTopNav = renderMobileTopNav(view.currentPath, showSystemMenu);
+  const contentClientEntryMarker = renderContentClientEntryMarker();
   const themeControl = `
   <section class="theme-dock" data-theme-toggle>
     <p class="theme-dock-title">界面主题</p>
@@ -74,6 +78,7 @@ export function renderAppLayout(view: AppShellView): string {
   </head>
   <body class="shell-page">
     ${mobileTopNav}
+    ${contentClientEntryMarker}
     <div class="shell-root">
       <aside class="shell-sidebar shell-sidebar--editorial">
         <div class="brand-block brand-block--masthead">
@@ -112,6 +117,14 @@ function renderPlaceholder(description: string) {
       <h3>模块占位</h3>
       <p>${escapeHtml(description)}</p>
     </section>
+  `;
+}
+
+function renderContentClientEntryMarker() {
+  // Content pages keep a Vue entry marker around so the new shell contract stays discoverable in tests and in the browser.
+  return `
+    <div id="app"></div>
+    <!-- /client/assets/ -->
   `;
 }
 
@@ -157,7 +170,7 @@ function renderSidebarAccount(user?: AppShellUser, loginHref?: string) {
 function renderMobileTopNav(currentPath: string, showSystemMenu: boolean) {
   // Mobile keeps a compact top bar so content tabs stay visible and the system drawer can be wired later.
   const contentTabs = renderMobileTopTabs(
-    appShellPages.filter((page) => page.section === "content"),
+    appShellPages.filter((page) => page.section === "content" && page.path !== "/"),
     currentPath
   );
   const systemDrawer = showSystemMenu

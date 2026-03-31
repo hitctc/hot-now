@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { sessionCookieName } from "../../src/core/auth/session.js";
@@ -133,6 +134,14 @@ async function waitForListeningPort(child: ReturnType<typeof spawn>) {
   });
 }
 
+function readClientIndexHtml() {
+  return readFileSync(fileURLToPath(new URL("../../dist/client/index.html", import.meta.url)), "utf8");
+}
+
+function extractClientAssetPaths(html: string) {
+  return [...html.matchAll(/\/client\/assets\/[^"' >]+\.(?:js|css)/g)].map((match) => match[0]);
+}
+
 describe("createServer", () => {
   beforeAll(async () => {
     // Build first so the smoke check always exercises the emitted entry point.
@@ -250,7 +259,7 @@ describe("createServer", () => {
     expect(response.json()).toEqual({ accepted: false, reason: "unauthorized" });
   });
 
-  it("logs in and renders unified shell pages with user info", async () => {
+  it("logs in and serves the Vue client entry HTML for system pages", async () => {
     const app = createServer({
       auth: {
         requireLogin: true,
@@ -283,17 +292,42 @@ describe("createServer", () => {
       }
     });
 
+    const clientIndexHtml = readClientIndexHtml();
+
     expect(shellResponse.statusCode).toBe(200);
-    expect(shellResponse.body).toContain("系统管理员");
-    expect(shellResponse.body).toContain("/articles");
-    expect(shellResponse.body).toContain("/settings/profile");
-    expect(shellResponse.body).toContain("热点资讯");
-    expect(shellResponse.body).toContain("热门文章");
-    expect(shellResponse.body).toContain("最新 AI 消息");
-    expect(shellResponse.body).toContain("筛选策略");
-    expect(shellResponse.body).toContain("数据迭代收集");
-    expect(shellResponse.body).toContain("当前登录用户");
-    expect(shellResponse.body).toContain("退出登录");
+    expect(shellResponse.body).toContain('<div id="app"></div>');
+    expect(shellResponse.body).toContain('/client/assets/');
+    expect(shellResponse.body).toContain('<script type="module" crossorigin src="/client/assets/');
+    expect(shellResponse.body).toContain('<link rel="stylesheet" crossorigin href="/client/assets/');
+    expect(shellResponse.body).not.toContain("系统管理员");
+    expect(shellResponse.body).not.toContain("当前登录用户");
+    expect(shellResponse.body).toBe(clientIndexHtml);
+  });
+
+  it("serves built client assets under /client/assets and blocks path traversal", async () => {
+    const app = createServer();
+    const clientIndexHtml = readClientIndexHtml();
+    const assetPaths = extractClientAssetPaths(clientIndexHtml);
+
+    expect(assetPaths.length).toBeGreaterThan(0);
+
+    const jsAsset = assetPaths.find((assetPath) => assetPath.endsWith(".js"));
+    const cssAsset = assetPaths.find((assetPath) => assetPath.endsWith(".css"));
+
+    expect(jsAsset).toBeTruthy();
+    expect(cssAsset).toBeTruthy();
+
+    const jsResponse = await app.inject({ method: "GET", url: jsAsset ?? "" });
+    const cssResponse = await app.inject({ method: "GET", url: cssAsset ?? "" });
+    const traversalResponse = await app.inject({ method: "GET", url: "/client/assets/../index.html" });
+
+    expect(jsResponse.statusCode).toBe(200);
+    expect(jsResponse.headers["content-type"]).toContain("application/javascript");
+    expect(jsResponse.body.length).toBeGreaterThan(0);
+    expect(cssResponse.statusCode).toBe(200);
+    expect(cssResponse.headers["content-type"]).toContain("text/css");
+    expect(cssResponse.body.length).toBeGreaterThan(0);
+    expect(traversalResponse.statusCode).toBe(404);
   });
 
   it("clears the session cookie on logout", async () => {

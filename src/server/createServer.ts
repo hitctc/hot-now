@@ -144,10 +144,42 @@ export function createServer(deps: ServerDeps = {}) {
   );
   const siteCss = readSiteCss();
   const siteJs = readSiteJs();
+  const clientBuildRoot = path.resolve(process.cwd(), "dist/client");
+  const clientIndexPath = path.join(clientBuildRoot, "index.html");
+  const clientEntryHtml = readClientEntryHtml(clientIndexPath);
 
   app.get("/health", async () => ({ ok: true }));
   app.get("/assets/site.css", async (_request, reply) => reply.type("text/css; charset=utf-8").send(siteCss));
   app.get("/assets/site.js", async (_request, reply) => reply.type("application/javascript; charset=utf-8").send(siteJs));
+  app.get("/client/*", async (request, reply) => {
+    const { "*": rawAssetPath = "" } = request.params as { "*": string };
+    const normalizedAssetPath = normalizeClientAssetPath(rawAssetPath);
+
+    if (!normalizedAssetPath) {
+      return reply.code(404).type("text/plain; charset=utf-8").send("Not Found");
+    }
+
+    const resolvedAssetPath = path.resolve(clientBuildRoot, normalizedAssetPath);
+    const clientBuildRootWithSeparator = `${clientBuildRoot}${path.sep}`;
+
+    // The static client endpoint only serves files that remain under dist/client.
+    if (!resolvedAssetPath.startsWith(clientBuildRootWithSeparator) && resolvedAssetPath !== clientBuildRoot) {
+      return reply.code(404).type("text/plain; charset=utf-8").send("Not Found");
+    }
+
+    const extension = path.extname(resolvedAssetPath).toLowerCase();
+
+    if (extension !== ".js" && extension !== ".css") {
+      return reply.code(404).type("text/plain; charset=utf-8").send("Not Found");
+    }
+
+    try {
+      const assetBody = readFileSync(resolvedAssetPath, "utf8");
+      return reply.type(resolveClientAssetMimeType(extension)).send(assetBody);
+    } catch {
+      return reply.code(404).type("text/plain; charset=utf-8").send("Not Found");
+    }
+  });
 
   if (authEnabled) {
     app.get("/login", async (request, reply) => {
@@ -225,6 +257,10 @@ export function createServer(deps: ServerDeps = {}) {
           return reply.redirect("/login");
         }
 
+        if (isClientSettingsPath(currentPage.path)) {
+          return serveClientSettingsShell(reply, clientEntryHtml);
+        }
+
         const contentViewKey = mapPathToContentViewKey(currentPage.path);
         const contentHtml = contentViewKey
           ? await renderContentForView(deps, request, contentViewKey)
@@ -255,6 +291,10 @@ export function createServer(deps: ServerDeps = {}) {
 
         if (!currentPage) {
           return reply.code(404).type("text/html").send(renderNoticePage("HotNow", "页面不存在"));
+        }
+
+        if (isClientSettingsPath(currentPage.path)) {
+          return serveClientSettingsShell(reply, clientEntryHtml);
         }
 
         const contentViewKey = mapPathToContentViewKey(currentPage.path);
@@ -782,6 +822,65 @@ function readAuthenticatedSession(cookieHeader: string | undefined, sessionSecre
   }
 
   return readSessionToken(sessionToken, sessionSecret);
+}
+
+function readClientEntryHtml(clientIndexPath: string): string {
+  // System pages prefer the built client entry, but still need a stable mount shell when the frontend bundle is absent.
+  try {
+    return readFileSync(clientIndexPath, "utf8");
+  } catch {
+    // The server can still boot before the client build exists, but system pages need a predictable mount point.
+    return `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HotNow 系统页</title>
+    <script type="module" crossorigin src="/client/assets/index.js"></script>
+    <link rel="stylesheet" crossorigin href="/client/assets/index.css">
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>
+`;
+  }
+}
+
+function isClientSettingsPath(pathname: string) {
+  // Only /settings/* routes move to the Vue entry in phase 1; content pages and legacy pages stay on the old server render path.
+  return pathname.startsWith("/settings/");
+}
+
+function serveClientSettingsShell(reply: FastifyReply, clientEntryHtml: string) {
+  // The Vue client owns the full system-page shell now, so the server only needs to return one HTML entry document.
+  return reply.type("text/html; charset=utf-8").send(clientEntryHtml);
+}
+
+function normalizeClientAssetPath(rawAssetPath: string): string | null {
+  // Static asset requests are normalized once so path traversal checks can operate on a clean relative path.
+  const trimmedPath = rawAssetPath.trim().replace(/\\/g, "/");
+
+  if (!trimmedPath) {
+    return null;
+  }
+
+  const normalizedPath = path.posix.normalize(trimmedPath).replace(/^\/+/, "");
+
+  if (!normalizedPath || normalizedPath === "." || normalizedPath.startsWith("..")) {
+    return null;
+  }
+
+  return normalizedPath;
+}
+
+function resolveClientAssetMimeType(extension: string): string {
+  // The client bundle only exposes CSS and JS in this phase, so a two-branch mime map is enough.
+  if (extension === ".css") {
+    return "text/css; charset=utf-8";
+  }
+
+  return "application/javascript; charset=utf-8";
 }
 
 function readSiteCss() {

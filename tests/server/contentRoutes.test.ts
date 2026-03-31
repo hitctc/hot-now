@@ -283,11 +283,11 @@ describe("content routes", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.body).toContain('class="sidebar-account"');
-    expect(response.body).toContain("系统管理员");
-    expect(response.body).toContain("退出登录");
-    expect(response.body).toContain('form method="post" action="/logout" enctype="text/plain"');
-    expect(response.body).not.toContain('class="shell-header"');
+    expect(response.body).toContain('<div id="app"></div>');
+    expect(response.body).toContain('/client/assets/');
+    expect(response.body).not.toContain('class="sidebar-account"');
+    expect(response.body).not.toContain("系统管理员");
+    expect(response.body).not.toContain("退出登录");
   });
 
   it("hides system navigation for anonymous visitors when auth-enabled content pages stay public", async () => {
@@ -323,8 +323,10 @@ describe("content routes", () => {
     const response = await app.inject({ method: "GET", url: "/settings/profile" });
 
     expect(response.statusCode).toBe(200);
-    expect(response.body).toContain("当前登录用户");
-    expect(response.body).toContain("模块占位");
+    expect(response.body).toContain('<div id="app"></div>');
+    expect(response.body).toContain('/client/assets/');
+    expect(response.body).not.toContain("当前登录用户");
+    expect(response.body).not.toContain("模块占位");
   });
 
   it("serves site.js without ratings submit logic", async () => {

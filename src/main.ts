@@ -1,4 +1,5 @@
 import path from "node:path";
+import { existsSync } from "node:fs";
 import { loadRuntimeConfig } from "./core/config/loadRuntimeConfig.js";
 import { verifyPassword } from "./core/auth/passwords.js";
 import { listContentView as listContentCards } from "./core/content/listContentView.js";
@@ -522,6 +523,15 @@ const app = createServer({
   triggerManualSendLatestEmail,
   triggerManualRun: triggerManualCollect
 });
+
+const clientIndexPath = path.resolve(process.cwd(), "dist/client/index.html");
+
+if (!existsSync(clientIndexPath)) {
+  app.log.warn(
+    { clientIndexPath },
+    "未找到客户端入口文件，/settings/* 将回退到最小 HTML 兜底，请先执行 npm run build:client"
+  );
+}
 
 const collectionScheduler = startCollectionScheduler(config, async () => {
   try {

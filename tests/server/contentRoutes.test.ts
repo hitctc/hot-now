@@ -5,8 +5,7 @@ import { createServer } from "../../src/server/createServer.js";
 describe("content routes", () => {
   it("serves the Vue client entry on /, /ai-new and /ai-hot, and removes /articles", async () => {
     const app = createServer({
-      listContentView: vi.fn().mockResolvedValue([]),
-      listRatingDimensions: vi.fn().mockResolvedValue([])
+      listContentView: vi.fn().mockResolvedValue([])
     } as never);
 
     for (const pathname of ["/", "/ai-new", "/ai-hot"]) {
@@ -19,7 +18,6 @@ describe("content routes", () => {
     }
 
     const articlesResponse = await app.inject({ method: "GET", url: "/articles" });
-
     expect(articlesResponse.statusCode).toBe(404);
   });
 
@@ -149,11 +147,12 @@ describe("content routes", () => {
       listRatingDimensions: vi.fn().mockResolvedValue([])
     } as never);
 
-    const contentResponse = await app.inject({ method: "GET", url: "/" });
+    const contentResponse = await app.inject({ method: "GET", url: "/ai-new" });
     const systemResponse = await app.inject({ method: "GET", url: "/settings/profile" });
 
     expect(contentResponse.statusCode).toBe(200);
     expect(contentResponse.body).toContain('id="app"');
+    expect(contentResponse.body).not.toContain('class="shell-root"');
     expect(systemResponse.statusCode).toBe(302);
     expect(systemResponse.headers.location).toBe("/login");
   });

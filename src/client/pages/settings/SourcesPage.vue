@@ -21,9 +21,8 @@ const analyticsColumns = [
   { title: "总条数", key: "totalCount", align: "right" as const },
   { title: "今天发布", key: "publishedTodayCount", align: "right" as const },
   { title: "今天抓取", key: "collectedTodayCount", align: "right" as const },
-  { title: "Hot 入池 / 展示", key: "hotStats", align: "right" as const },
-  { title: "Articles 入池 / 展示", key: "articlesStats", align: "right" as const },
-  { title: "AI 入池 / 展示", key: "aiStats", align: "right" as const }
+  { title: "AI 热点入池 / 展示", key: "hotStats", align: "right" as const },
+  { title: "AI 新讯入池 / 展示", key: "aiStats", align: "right" as const }
 ];
 const inventoryColumns = [
   { title: "来源", key: "name" },
@@ -83,11 +82,7 @@ function formatDateTime(value: string | null | undefined): string {
 
 // 三个内容视图的候选 / 展示统计都用同一格式输出，便于在表格里横向比较。
 function formatViewStats(
-  stats: SettingsSourceItem["viewStats"] extends infer T
-    ? T extends { hot: infer U; articles: infer V; ai: infer W }
-      ? U | V | W
-      : never
-    : never
+  stats: { candidateCount: number; visibleCount: number } | undefined
 ): string {
   if (!stats) {
     return "0 / 0";
@@ -361,9 +356,6 @@ onMounted(() => {
               </template>
               <template v-else-if="column.key === 'hotStats'">
                 {{ formatViewStats(record.viewStats?.hot) }}
-              </template>
-              <template v-else-if="column.key === 'articlesStats'">
-                {{ formatViewStats(record.viewStats?.articles) }}
               </template>
               <template v-else-if="column.key === 'aiStats'">
                 {{ formatViewStats(record.viewStats?.ai) }}

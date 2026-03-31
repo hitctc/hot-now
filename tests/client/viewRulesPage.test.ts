@@ -148,6 +148,9 @@ describe("ViewRulesPage", () => {
     expect(settingsApi.readSettingsViewRules).toHaveBeenCalledTimes(1);
     expect(wrapper.get("[data-view-rules-section='provider-settings']").text()).toContain("DeepSeek");
     expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("正式自然语言策略");
+    expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("AI 热点规则");
+    expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("AI 新讯规则");
+    expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).not.toContain("Articles 规则");
     expect(wrapper.get("[data-view-rules-section='feedback-pool']").text()).toContain("Agent 工作流总结");
     expect(
       (wrapper.get("[data-draft-form='301'] textarea").element as HTMLTextAreaElement).value

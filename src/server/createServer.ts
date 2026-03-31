@@ -26,6 +26,7 @@ import {
   renderNoticePage
 } from "./renderPages.js";
 import { findAppShellPage, getAppShellPages, renderAppLayout } from "./renderAppLayout.js";
+import { renderContentPage } from "./renderContentPages.js";
 import {
   renderProfilePage,
   renderSourcesPage,
@@ -104,6 +105,7 @@ type ContentPageModel = {
 };
 
 type ServerDeps = {
+  clientBuildRoot?: string;
   config?: Partial<RuntimeConfig>;
   listReportSummaries?: () => Promise<ReportSummary[]>;
   latestReportDate?: () => Promise<string | null>;
@@ -169,8 +171,10 @@ export function createServer(deps: ServerDeps = {}) {
   );
   const siteCss = readSiteCss();
   const siteJs = readSiteJs();
-  const clientBuildRoot = path.resolve(process.cwd(), "dist/client");
+  // Tests can override the client build root so missing-bundle scenarios do not mutate the process cwd.
+  const clientBuildRoot = deps.clientBuildRoot ?? path.resolve(process.cwd(), "dist/client");
   const clientIndexPath = path.join(clientBuildRoot, "index.html");
+
   app.get("/health", async () => ({ ok: true }));
   app.get("/assets/site.css", async (_request, reply) => reply.type("text/css; charset=utf-8").send(siteCss));
   app.get("/assets/site.js", async (_request, reply) => reply.type("application/javascript; charset=utf-8").send(siteJs));
@@ -348,7 +352,7 @@ export function createServer(deps: ServerDeps = {}) {
     }
   } else if (hasUnifiedShellDeps) {
     for (const page of getAppShellPages()) {
-      app.get(page.path, async (_request, reply) => {
+      app.get(page.path, async (request, reply) => {
         const currentPage = findAppShellPage(page.path);
 
         if (!currentPage) {
@@ -985,7 +989,7 @@ async function readSettingsProfileApiData(
 }
 
 function readClientEntryHtml(clientIndexPath: string): string {
-  // The shell rereads the latest built entry so a new client build is picked up without restarting the server.
+  // Unified shell routes prefer the built client entry, but still need a readable fallback when the frontend bundle is absent.
   try {
     return readFileSync(clientIndexPath, "utf8");
   } catch {
@@ -1042,7 +1046,7 @@ function readClientEntryHtml(clientIndexPath: string): string {
 }
 
 function isClientSettingsPath(pathname: string) {
-  // Only /settings/* routes move to the Vue entry in phase 1; content pages and legacy pages stay on the old server render path.
+  // Settings routes still need a dedicated branch because legacy pages remain server-rendered.
   return pathname.startsWith("/settings/");
 }
 
@@ -1201,6 +1205,58 @@ async function buildContentPageModelFromDependencies(
         tone: "degraded"
       }
     };
+  }
+}
+
+async function renderContentForView(
+  deps: ServerDeps,
+  request: FastifyRequest,
+  viewKey: ContentViewKey
+): Promise<string | undefined> {
+  // Task 1 only changes route semantics, so content pages keep the existing SSR body until the Vue modules land in Task 3.
+  if (!deps.listContentView) {
+    return undefined;
+  }
+
+  try {
+    const sourceOptions = ((await deps.listContentSources?.()) ?? []).filter((source) => source.isEnabled);
+    const selectedSourceKinds = readContentPageSelectedSourceKinds(request.headers["x-hot-now-source-filter"], sourceOptions);
+    const cards = selectedSourceKinds === undefined
+      ? await deps.listContentView(viewKey)
+      : await deps.listContentView(viewKey, { selectedSourceKinds });
+
+    return renderContentPage({
+      viewKey,
+      cards,
+      sourceFilter: sourceOptions.length > 0
+        ? {
+            options: sourceOptions.map((source) => ({ kind: source.kind, name: source.name })),
+            selectedSourceKinds: selectedSourceKinds ?? sourceOptions.map((source) => source.kind)
+          }
+        : undefined,
+      emptyState:
+        selectedSourceKinds?.length === 0
+          ? {
+              title: "当前未选择任何数据源",
+              description: "重新全选后即可恢复内容结果。",
+              tone: "filtered"
+            }
+          : undefined
+    });
+  } catch (error) {
+    if (!isMalformedContentStoreError(error)) {
+      throw error;
+    }
+
+    return renderContentPage({
+      viewKey,
+      cards: [],
+      emptyState: {
+        title: "内容暂不可用",
+        description: "检测到本地内容库读取失败，请修复或重建 data/hot-now.sqlite 后再刷新。",
+        tone: "degraded"
+      }
+    });
   }
 }
 

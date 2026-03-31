@@ -21,9 +21,9 @@ type AppShellView = {
 };
 
 const appShellPages: AppShellPage[] = [
-  { path: "/", title: "AI 新讯", section: "content", description: "这里会展示最新 AI 新讯与新鲜信号。" },
-  { path: "/ai-new", title: "AI 新讯", section: "content", description: "这里会承接 AI 新讯的主入口内容。" },
-  { path: "/ai-hot", title: "AI 热点", section: "content", description: "这里会展示更值得优先阅读的 AI 热点内容。" },
+  { path: "/", title: "AI 新讯", section: "content", description: "这里会展示最新 AI 新闻、模型、事件与智能体信号。" },
+  { path: "/ai-new", title: "AI 新讯", section: "content", description: "这里会展示最新 AI 新闻、模型、事件与智能体信号。" },
+  { path: "/ai-hot", title: "AI 热点", section: "content", description: "这里会承接已经开始形成热度的 AI 热点内容。" },
   {
     path: "/settings/view-rules",
     title: "筛选策略",
@@ -201,7 +201,7 @@ function renderMobileTopTabs(pages: AppShellPage[], currentPath: string): string
   // Content tabs keep the same route metadata but use a compact active pill treatment on mobile.
   return pages
     .map((page) => {
-      const activeClass = page.path === currentPath ? " is-active" : "";
+      const activeClass = isCurrentNavPath(page.path, currentPath) ? " is-active" : "";
       return `<a class="mobile-top-tab mobile-top-tab--content${activeClass}" data-shell-nav href="${escapeHtml(page.path)}">${escapeHtml(page.title)}</a>`;
     })
     .join("");
@@ -211,10 +211,15 @@ function renderNavGroup(pages: AppShellPage[], currentPath: string): string {
   // Navigation links are generated from page metadata so menu labels never drift from routes.
   return pages
     .map((page) => {
-      const activeClass = page.path === currentPath ? " is-active" : "";
+      const activeClass = isCurrentNavPath(page.path, currentPath) ? " is-active" : "";
       return `<a class="nav-link nav-link--${page.section}${activeClass}" data-shell-nav href="${escapeHtml(page.path)}">${escapeHtml(page.title)}</a>`;
     })
     .join("");
+}
+
+function isCurrentNavPath(pagePath: string, currentPath: string): boolean {
+  // "/" is just the public alias of "/ai-new", so both paths should highlight the same navigation item.
+  return pagePath === currentPath || (pagePath === "/ai-new" && currentPath === "/");
 }
 
 function escapeHtml(value: string): string {

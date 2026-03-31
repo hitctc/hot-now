@@ -25,6 +25,13 @@ describe("useTheme", () => {
     expect(theme.isDarkMode.value).toBe(false);
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("light");
     expect(document.documentElement.dataset.theme).toBe("light");
+    expect(document.documentElement.style.getPropertyValue("--editorial-bg-page")).toBe("#f4ede3");
+    expect(document.documentElement.style.getPropertyValue("--editorial-accent")).toBe("#2352ff");
+    expect(theme.themeConfig.value.token?.colorPrimary).toBe("#2352ff");
+    expect(theme.themeConfig.value.token?.colorBgLayout).toBe("#f4ede3");
+    expect(theme.themeConfig.value.token?.colorBgContainer).toBe("rgba(255, 252, 247, 0.98)");
+    expect(theme.themeConfig.value.token?.colorText).toBe("#13233c");
+    expect(theme.themeConfig.value.token?.borderRadius).toBe(14);
 
     theme.setThemeMode("dark");
     await nextTick();
@@ -33,6 +40,13 @@ describe("useTheme", () => {
     expect(theme.isDarkMode.value).toBe(true);
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
     expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(document.documentElement.style.getPropertyValue("--editorial-bg-page")).toBe("#111722");
+    expect(document.documentElement.style.getPropertyValue("--editorial-accent")).toBe("#7ea2ff");
+    expect(theme.themeConfig.value.token?.colorPrimary).toBe("#7ea2ff");
+    expect(theme.themeConfig.value.token?.colorBgLayout).toBe("#111722");
+    expect(theme.themeConfig.value.token?.colorBgContainer).toBe("rgba(29, 38, 53, 0.98)");
+    expect(theme.themeConfig.value.token?.colorText).toBe("#eef3ff");
+    expect(theme.themeConfig.value.token?.borderRadius).toBe(14);
 
     theme.toggleTheme();
     await nextTick();
@@ -40,5 +54,6 @@ describe("useTheme", () => {
     expect(theme.themeMode.value).toBe("light");
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("light");
     expect(document.documentElement.dataset.theme).toBe("light");
+    expect(document.documentElement.style.getPropertyValue("--editorial-bg-page")).toBe("#f4ede3");
   });
 });

@@ -1,7 +1,13 @@
 import { computed, ref, watch, type ComputedRef, type Ref } from "vue";
-import { theme as antTheme, type ConfigProviderProps } from "ant-design-vue";
+import type { ConfigProviderProps } from "ant-design-vue";
 
-export type ThemeMode = "dark" | "light";
+import {
+  applyEditorialThemeCssVariables,
+  createEditorialProviderTheme,
+  type EditorialThemeMode
+} from "../theme/editorialTheme";
+
+export type ThemeMode = EditorialThemeMode;
 
 export const THEME_STORAGE_KEY = "hot-now-theme";
 
@@ -43,6 +49,7 @@ function syncThemeModeToDocument(nextThemeMode: ThemeMode): void {
   }
 
   document.documentElement.dataset.theme = nextThemeMode;
+  applyEditorialThemeCssVariables(nextThemeMode, document.documentElement);
 }
 
 // 将主题偏好持久化到 localStorage，失败时静默回退，不阻断页面启动。
@@ -73,18 +80,7 @@ function createThemeController(): ThemeController {
   );
 
   const isDarkMode = computed(() => themeMode.value === "dark");
-  const themeConfig = computed<ProviderThemeConfig>(() => ({
-    algorithm: isDarkMode.value ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
-    token: {
-      colorBgLayout: isDarkMode.value ? "#0f1115" : "#f5f7fb",
-      colorBgContainer: isDarkMode.value ? "#171a22" : "#ffffff",
-      colorPrimary: isDarkMode.value ? "#7aa2ff" : "#1d4ed8",
-      colorText: isDarkMode.value ? "rgba(255, 255, 255, 0.92)" : "rgba(15, 23, 42, 0.92)",
-      colorTextSecondary: isDarkMode.value ? "rgba(226, 232, 240, 0.72)" : "rgba(71, 85, 105, 0.82)",
-      borderRadius: 12,
-      fontSize: 14
-    }
-  }));
+  const themeConfig = computed<ProviderThemeConfig>(() => createEditorialProviderTheme(themeMode.value));
 
   // 主题切换只修改唯一状态源，后续同步动作交给 watcher 统一处理。
   function setThemeMode(nextThemeMode: ThemeMode): void {

@@ -44,16 +44,16 @@ const providerKindOptions = [
 const draftScopeOptions = [
   { label: "未指定", value: "unspecified" },
   { label: "全局", value: "global" },
-  { label: "Hot", value: "hot" },
-  { label: "Articles", value: "articles" },
-  { label: "AI", value: "ai" }
+  { label: "AI 热点", value: "hot" },
+  { label: "旧 Articles（已移除）", value: "articles", disabled: true },
+  { label: "AI 新讯", value: "ai" }
 ] as const;
 const scopeLabels: Record<SettingsStrategyDraftScope, string> = {
   unspecified: "未指定",
   global: "全局",
-  hot: "Hot",
-  articles: "Articles",
-  ai: "AI"
+  hot: "AI 热点",
+  articles: "旧 Articles（已移除）",
+  ai: "AI 新讯"
 };
 
 const isLoading = ref(true);
@@ -580,6 +580,12 @@ function handleDraftApply(draftId: number): void {
     return;
   }
 
+  // Articles 入口已经移除，旧草稿需要先改到新范围后才能继续写入正式规则。
+  if (form.suggestedScope === "articles") {
+    showNotice("warning", "Articles 范围已移除，请先改成 AI 新讯或 AI 热点。");
+    return;
+  }
+
   const currentValue = nlRuleForm[form.suggestedScope].trim();
   nlRuleForm[form.suggestedScope] = currentValue ? `${currentValue}\n\n${draftText}` : draftText;
   showNotice("success", "草稿已写入正式策略编辑器，记得保存正式规则。");
@@ -736,21 +742,14 @@ onMounted(() => {
                     data-nl-rule-scope="global"
                   />
                 </a-form-item>
-                <a-form-item label="Hot 规则">
+                <a-form-item label="AI 热点规则">
                   <a-textarea
                     v-model:value="nlRuleForm.hot"
                     :rows="3"
                     data-nl-rule-scope="hot"
                   />
                 </a-form-item>
-                <a-form-item label="Articles 规则">
-                  <a-textarea
-                    v-model:value="nlRuleForm.articles"
-                    :rows="3"
-                    data-nl-rule-scope="articles"
-                  />
-                </a-form-item>
-                <a-form-item label="AI 规则">
+                <a-form-item label="AI 新讯规则">
                   <a-textarea
                     v-model:value="nlRuleForm.ai"
                     :rows="3"

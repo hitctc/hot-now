@@ -65,7 +65,8 @@ describe("client app shell", () => {
 
     await flushPromises();
 
-    expect(wrapper.text()).toContain("系统页前端底座");
+    expect(wrapper.text()).toContain("HotNow Editorial Desk");
+    expect(wrapper.text()).toContain("AI-first 工作台壳层");
     expect(wrapper.text()).toContain("当前登录用户页");
     expect(wrapper.text()).toContain("当前会展示登录用户摘要和会话上下文");
     expect(wrapper.find("[data-shell-page-title]").text()).toBe("当前登录用户页");
@@ -75,7 +76,7 @@ describe("client app shell", () => {
     const navLinks = wrapper.findAll(".unified-shell__nav-link");
 
     expect(navLinks.map((node) => node.attributes("href"))).toEqual([
-      "/",
+      "/ai-new",
       "/ai-hot",
       "/settings/view-rules",
       "/settings/sources",
@@ -93,7 +94,7 @@ describe("client app shell", () => {
     ]);
   });
 
-  it("keeps the /client/ asset base separate from the /settings/ route base", async () => {
+  it("keeps the /client/ asset base separate from the /settings/ route base while mounting AI content routes in the same app", async () => {
     const router = createAppRouter();
 
     await router.push("/settings/profile");
@@ -108,5 +109,36 @@ describe("client app shell", () => {
     expect(router.getRoutes().some((route) => route.path === "/ai-new")).toBe(true);
     expect(router.getRoutes().some((route) => route.path === "/ai-hot")).toBe(true);
     expect(router.getRoutes().some((route) => route.path === "/articles")).toBe(false);
+  });
+
+  it("renders the mobile AI-first tabs and closes the system drawer after navigation", async () => {
+    const router = createAppRouter();
+
+    await router.push("/settings/profile");
+    await router.isReady();
+
+    const wrapper = mount(App, {
+      global: {
+        plugins: [Antd, router]
+      }
+    });
+
+    await flushPromises();
+
+    expect(wrapper.find("[data-mobile-shell-nav]").exists()).toBe(true);
+    expect(
+      wrapper.findAll("[data-mobile-content-tab]").map((node) => node.text().trim())
+    ).toEqual(["AI 新讯", "AI 热点"]);
+
+    await wrapper.get("[data-mobile-system-toggle]").trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find("[data-mobile-system-drawer]").exists()).toBe(true);
+
+    await wrapper.get('[data-mobile-drawer-link="/settings/view-rules"]').trigger("click");
+    await flushPromises();
+
+    expect(router.currentRoute.value.fullPath).toBe("/settings/view-rules");
+    expect(wrapper.find("[data-mobile-system-drawer]").exists()).toBe(false);
   });
 });

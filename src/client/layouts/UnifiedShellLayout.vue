@@ -7,6 +7,7 @@ import { readSettingsProfile, type SettingsProfile } from "../services/settingsA
 import { shellPageMetas } from "../router";
 
 type ProfileLoadState = "idle" | "loading" | "loaded" | "empty" | "error";
+type SystemShellPageKey = "view-rules" | "sources" | "profile";
 
 const route = useRoute();
 const { themeMode, isDarkMode, setThemeMode } = useTheme();
@@ -24,6 +25,8 @@ const currentPageDescription = computed(
   () => route.meta.description ?? "承接系统页的统一布局、主题和导航。"
 );
 const activeNavKey = computed(() => route.meta.shellKey ?? shellPageMetas[0]?.key ?? "view-rules");
+const contentNavPages = shellPageMetas.filter((page) => page.section === "content");
+const systemNavPages = shellPageMetas.filter((page) => page.section === "system");
 
 // 当前页面标题和描述直接读路由元数据，这样后续新增页面时只需补 route record。
 function handleThemeModeChange(nextValue: string | number): void {
@@ -51,6 +54,11 @@ async function loadProfileSummary(): Promise<void> {
 onMounted(() => {
   void loadProfileSummary();
 });
+
+// 内容页还没整体迁进 Vue 前，侧边栏内容菜单统一用真实链接跳回服务端内容页，避免落到占位路由。
+function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPageKey {
+  return key === "view-rules" || key === "sources" || key === "profile";
+}
 </script>
 
 <template>
@@ -66,8 +74,15 @@ onMounted(() => {
         </a-typography-paragraph>
       </div>
 
-      <a-menu class="unified-shell__nav" mode="inline" :selected-keys="[activeNavKey]">
-        <a-menu-item v-for="page in shellPageMetas" :key="page.key" :data-shell-nav="page.key">
+      <a-menu class="unified-shell__nav" mode="inline" :selected-keys="isSystemPageKey(activeNavKey) ? [activeNavKey] : []">
+        <a-menu-item v-for="page in contentNavPages" :key="page.path" :data-shell-nav="page.key">
+          <a class="unified-shell__nav-link" :href="page.path">
+            <span class="unified-shell__nav-label">{{ page.navLabel }}</span>
+            <span class="unified-shell__nav-description">{{ page.description }}</span>
+          </a>
+        </a-menu-item>
+
+        <a-menu-item v-for="page in systemNavPages" :key="page.key" :data-shell-nav="page.key">
           <RouterLink class="unified-shell__nav-link" :to="page.path">
             <span class="unified-shell__nav-label">{{ page.navLabel }}</span>
             <span class="unified-shell__nav-description">{{ page.description }}</span>

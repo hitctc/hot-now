@@ -202,10 +202,10 @@ describe("createServer", () => {
       listRatingDimensions: vi.fn().mockResolvedValue([])
     });
 
-    const response = await app.inject({ method: "GET", url: "/articles" });
+    const response = await app.inject({ method: "GET", url: "/ai-new" });
 
     expect(response.statusCode).toBe(200);
-    expect(response.body).toContain("热门文章");
+    expect(response.body).toContain("AI 新讯");
     expect(response.body).toContain("当前为内容公开访问模式");
     expect(response.body).toContain('href="/login"');
     expect(response.body).not.toContain('class="nav-group nav-group--system"');

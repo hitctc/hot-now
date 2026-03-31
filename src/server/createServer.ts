@@ -26,6 +26,7 @@ import {
   renderNoticePage
 } from "./renderPages.js";
 import { findAppShellPage, getAppShellPages, renderAppLayout } from "./renderAppLayout.js";
+import { renderContentPage } from "./renderContentPages.js";
 import {
   renderProfilePage,
   renderSourcesPage,
@@ -324,11 +325,10 @@ export function createServer(deps: ServerDeps = {}) {
           return serveClientSettingsShell(reply, clientEntryHtml);
         }
 
-        if (currentPage.section === "content") {
-          return serveClientContentShell(reply, clientEntryHtml);
-        }
-
-        const contentHtml = await renderSystemPageForPath(deps, currentPage.path, Boolean(session));
+        const contentViewKey = mapPathToContentViewKey(currentPage.path);
+        const contentHtml = contentViewKey
+          ? await renderContentForView(deps, request, contentViewKey)
+          : await renderSystemPageForPath(deps, currentPage.path, Boolean(session));
 
         return reply.type("text/html").send(
           renderAppLayout({
@@ -350,7 +350,7 @@ export function createServer(deps: ServerDeps = {}) {
     }
   } else if (hasUnifiedShellDeps) {
     for (const page of getAppShellPages()) {
-      app.get(page.path, async (_request, reply) => {
+      app.get(page.path, async (request, reply) => {
         const currentPage = findAppShellPage(page.path);
 
         if (!currentPage) {
@@ -361,11 +361,10 @@ export function createServer(deps: ServerDeps = {}) {
           return serveClientSettingsShell(reply, clientEntryHtml);
         }
 
-        if (currentPage.section === "content") {
-          return serveClientContentShell(reply, clientEntryHtml);
-        }
-
-        const contentHtml = await renderSystemPageForPath(deps, currentPage.path, false);
+        const contentViewKey = mapPathToContentViewKey(currentPage.path);
+        const contentHtml = contentViewKey
+          ? await renderContentForView(deps, request, contentViewKey)
+          : await renderSystemPageForPath(deps, currentPage.path, false);
 
         return reply.type("text/html").send(
           renderAppLayout({
@@ -1019,11 +1018,6 @@ function serveClientSettingsShell(reply: FastifyReply, clientEntryHtml: string) 
   return reply.type("text/html; charset=utf-8").send(clientEntryHtml);
 }
 
-function serveClientContentShell(reply: FastifyReply, clientEntryHtml: string) {
-  // Content routes now use the same real client entry as the settings shell so the browser boots the Vue app directly.
-  return reply.type("text/html; charset=utf-8").send(clientEntryHtml);
-}
-
 function normalizeClientAssetPath(rawAssetPath: string): string | null {
   // Static asset requests are normalized once so path traversal checks can operate on a clean relative path.
   const trimmedPath = rawAssetPath.trim().replace(/\\/g, "/");
@@ -1169,6 +1163,58 @@ async function buildContentPageModelFromDependencies(
         tone: "degraded"
       }
     };
+  }
+}
+
+async function renderContentForView(
+  deps: ServerDeps,
+  request: FastifyRequest,
+  viewKey: ContentViewKey
+): Promise<string | undefined> {
+  // Task 1 only changes route semantics, so content pages keep the existing SSR body until the Vue modules land in Task 3.
+  if (!deps.listContentView) {
+    return undefined;
+  }
+
+  try {
+    const sourceOptions = ((await deps.listContentSources?.()) ?? []).filter((source) => source.isEnabled);
+    const selectedSourceKinds = readContentPageSelectedSourceKinds(request.headers["x-hot-now-source-filter"], sourceOptions);
+    const cards = selectedSourceKinds === undefined
+      ? await deps.listContentView(viewKey)
+      : await deps.listContentView(viewKey, { selectedSourceKinds });
+
+    return renderContentPage({
+      viewKey,
+      cards,
+      sourceFilter: sourceOptions.length > 0
+        ? {
+            options: sourceOptions.map((source) => ({ kind: source.kind, name: source.name })),
+            selectedSourceKinds: selectedSourceKinds ?? sourceOptions.map((source) => source.kind)
+          }
+        : undefined,
+      emptyState:
+        selectedSourceKinds?.length === 0
+          ? {
+              title: "当前未选择任何数据源",
+              description: "重新全选后即可恢复内容结果。",
+              tone: "filtered"
+            }
+          : undefined
+    });
+  } catch (error) {
+    if (!isMalformedContentStoreError(error)) {
+      throw error;
+    }
+
+    return renderContentPage({
+      viewKey,
+      cards: [],
+      emptyState: {
+        title: "内容暂不可用",
+        description: "检测到本地内容库读取失败，请修复或重建 data/hot-now.sqlite 后再刷新。",
+        tone: "degraded"
+      }
+    });
   }
 }
 

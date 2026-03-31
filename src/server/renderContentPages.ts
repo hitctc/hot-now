@@ -29,9 +29,9 @@ type ContentPageView = {
 type ContentCardVariant = "featured" | "compact";
 
 const pageSubtitle: Record<ContentViewKey, string> = {
-  hot: "按最近时间优先展示统一内容池中的热点条目。",
+  hot: "这里会承接已经开始形成热度的 AI 相关热点内容。",
   articles: "优先展示摘要和正文更完整、适合深读的内容。",
-  ai: "优先展示 AI 关键词命中更高，同时兼顾时效性。"
+  ai: "优先展示最新 AI 新闻、模型、事件与智能体信号。"
 };
 
 export function renderContentPage(view: ContentPageView): string {
@@ -124,8 +124,8 @@ function renderContentCard(viewKey: ContentViewKey, card: ContentCardViewWithFee
 }
 
 function getCardVariant(viewKey: ContentViewKey, index: number): ContentCardVariant {
-  // Home keeps one leading feature card while the other content menus stay on the denser compact layout.
-  return viewKey === "hot" && index === 0 ? "featured" : "compact";
+  // AI 新讯和 AI 热点都保留首条主卡，后续 Vue 迁移时可以在同一语义上继续细化版式。
+  return (viewKey === "hot" || viewKey === "ai") && index === 0 ? "featured" : "compact";
 }
 
 function renderContentBody(

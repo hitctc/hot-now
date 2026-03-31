@@ -36,4 +36,9 @@ export type RuntimeConfig = {
     password: string;
     sessionSecret: string;
   };
+  llm?: {
+    // The workbench can persist provider API keys only when a local master key is available,
+    // so runtime config keeps this value nullable instead of making startup depend on it.
+    settingsMasterKey: string | null;
+  };
 };

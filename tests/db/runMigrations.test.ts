@@ -11,10 +11,16 @@ const expectedTables = [
   "collection_runs",
   "content_feedback",
   "content_items",
+  "content_nl_evaluations",
   "content_ratings",
   "content_sources",
   "digest_reports",
+  "feedback_pool",
+  "llm_provider_settings",
+  "nl_evaluation_runs",
+  "nl_rule_sets",
   "rating_dimensions",
+  "strategy_drafts",
   "user_profile",
   "view_rule_configs"
 ];
@@ -59,7 +65,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(2);
+    expect(schemaVersion).toBe(3);
 
     const appliedMigrations = db
       .prepare(
@@ -73,7 +79,8 @@ describe("runMigrations", () => {
 
     expect(appliedMigrations).toEqual([
       { version: 1, name: "001_unified_site_baseline" },
-      { version: 2, name: "002_digest_report_mail_attempts" }
+      { version: 2, name: "002_digest_report_mail_attempts" },
+      { version: 3, name: "003_feedback_and_llm_strategy_workbench" }
     ]);
 
     const digestReportColumns = db

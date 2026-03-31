@@ -26,6 +26,10 @@ export type RunCollectionCycleDeps = {
   db?: SqliteDatabase;
   loadEnabledSourceIssues?: () => Promise<LoadedSourceIssues>;
   fetchArticle?: (url: string) => Promise<ArticleResult>;
+  runNlEvaluationCycle?: (input: {
+    mode: "incremental-after-collect";
+    contentItemIds: number[];
+  }) => Promise<unknown>;
 };
 
 export type RunCollectionCycleResult = {
@@ -76,13 +80,17 @@ export async function runCollectionCycle(
     const enrichedIssues = await Promise.all(issues.map((issue) => enrichIssue(issue, runtimeDeps.fetchArticle)));
     const enrichedItems = enrichedIssues.flatMap((issue) => issue.items);
 
-    if (runtimeDeps.db) {
-      runDbMirrorStep(() => {
-        for (const issue of enrichedIssues) {
-          persistCollectedItems(runtimeDeps.db!, issue, issue.items);
-        }
-      });
-    }
+    const persistedContentItemIds = runtimeDeps.db
+      ? runDbMirrorStep(() => {
+          const ids: number[] = [];
+
+          for (const issue of enrichedIssues) {
+            ids.push(...persistCollectedItems(runtimeDeps.db!, issue, issue.items));
+          }
+
+          return ids;
+        }) ?? []
+      : [];
 
     const topics = clusterTopics(enrichedItems);
     const report = buildDailyReport({
@@ -140,6 +148,18 @@ export async function runCollectionCycle(
       });
     }
 
+    if (deps.runNlEvaluationCycle && persistedContentItemIds.length > 0) {
+      try {
+        await deps.runNlEvaluationCycle({
+          mode: "incremental-after-collect",
+          contentItemIds: uniqueNumbers(persistedContentItemIds)
+        });
+      } catch {
+        // LLM matching is additive to collection-only runs, so provider or eval failures must not
+        // prevent reports from being generated and mirrored locally.
+      }
+    }
+
     return { report, mailStatus: collectionMailStatus };
   } catch (error) {
     if (runtimeDeps.db && collectionRunId != null) {
@@ -188,7 +208,7 @@ async function enrichIssue(
 
 // Persisted content keeps the raw collected article text and source metadata together so later
 // query work can read from SQLite without changing the report-generation shape.
-function persistCollectedItems(db: SqliteDatabase, issue: LoadedIssue, items: EnrichedCollectedItem[]): void {
+function persistCollectedItems(db: SqliteDatabase, issue: LoadedIssue, items: EnrichedCollectedItem[]): number[] {
   const source = resolveSourceByKind(db, issue.sourceKind);
 
   if (!source) {
@@ -207,6 +227,21 @@ function persistCollectedItems(db: SqliteDatabase, issue: LoadedIssue, items: En
       publishedAt: item.publishedAt,
       fetchedAt
     }))
+  });
+
+  const readContentId = db.prepare(
+    `
+      SELECT id
+      FROM content_items
+      WHERE source_id = ?
+        AND canonical_url = ?
+      LIMIT 1
+    `
+  );
+
+  return items.flatMap((item) => {
+    const row = readContentId.get(source.id, item.sourceUrl) as { id: number } | undefined;
+    return row ? [row.id] : [];
   });
 }
 
@@ -228,6 +263,10 @@ function runDbMirrorStep<T>(operation: () => T): T | undefined {
   } catch {
     return undefined;
   }
+}
+
+function uniqueNumbers(values: number[]): number[] {
+  return [...new Set(values.filter((value) => Number.isInteger(value) && value > 0))];
 }
 
 function pickReportIssue(issues: LoadedIssue[]): LoadedIssue {

@@ -8,6 +8,7 @@ import { openDatabase } from "../../src/core/db/openDatabase.js";
 import { runMigrations } from "../../src/core/db/runMigrations.js";
 import { seedInitialData } from "../../src/core/db/seedInitialData.js";
 import { saveFavorite, saveReaction } from "../../src/core/feedback/feedbackRepository.js";
+import { saveNlEvaluations } from "../../src/core/strategy/nlEvaluationRepository.js";
 import { saveViewRuleConfig } from "../../src/core/viewRules/viewRuleRepository.js";
 
 describe("listContentView", () => {
@@ -419,6 +420,138 @@ describe("listContentView", () => {
       expect.arrayContaining(["36氪", "爱范儿", "IT之家"])
     );
     expect(aiCards[0]?.sourceName).toBe("爱范儿");
+  });
+
+  it("filters blocked content from the global scope and the matching navigation scope", async () => {
+    const db = await createTestDatabase();
+    const source = resolveSourceByKind(db, "openai");
+
+    expect(source).toBeDefined();
+
+    upsertContentItems(db, {
+      sourceId: source!.id,
+      items: [
+        {
+          title: "Globally blocked content",
+          canonicalUrl: "https://example.com/globally-blocked",
+          summary: "Short summary",
+          bodyMarkdown: "Compact body text.",
+          publishedAt: "2026-03-29T11:00:00.000Z",
+          fetchedAt: "2026-03-29T11:05:00.000Z"
+        },
+        {
+          title: "AI blocked content",
+          canonicalUrl: "https://example.com/ai-blocked",
+          summary: "Short summary",
+          bodyMarkdown: "Compact body text about AI.",
+          publishedAt: "2026-03-29T10:00:00.000Z",
+          fetchedAt: "2026-03-29T10:05:00.000Z"
+        },
+        {
+          title: "Visible content",
+          canonicalUrl: "https://example.com/visible",
+          summary: "Short summary",
+          bodyMarkdown: "Compact body text about AI.",
+          publishedAt: "2026-03-29T09:00:00.000Z",
+          fetchedAt: "2026-03-29T09:05:00.000Z"
+        }
+      ]
+    });
+
+    const globalBlockedId = findContentIdByTitle(db, "Globally blocked content");
+    const aiBlockedId = findContentIdByTitle(db, "AI blocked content");
+    const visibleId = findContentIdByTitle(db, "Visible content");
+
+    saveNlEvaluations(db, {
+      contentItemId: globalBlockedId,
+      evaluations: [
+        {
+          scope: "global",
+          decision: "block",
+          strengthLevel: "medium",
+          scoreDelta: 0,
+          matchedKeywords: ["融资"],
+          reason: "全局屏蔽",
+          providerKind: "deepseek",
+          evaluatedAt: "2026-03-29T12:00:00.000Z"
+        }
+      ]
+    });
+    saveNlEvaluations(db, {
+      contentItemId: aiBlockedId,
+      evaluations: [
+        {
+          scope: "ai",
+          decision: "block",
+          strengthLevel: "medium",
+          scoreDelta: 0,
+          matchedKeywords: ["AI"],
+          reason: "AI 页屏蔽",
+          providerKind: "deepseek",
+          evaluatedAt: "2026-03-29T12:00:00.000Z"
+        }
+      ]
+    });
+
+    expect(listContentView(db, "hot").map((card) => card.id)).toEqual(expect.arrayContaining([aiBlockedId, visibleId]));
+    expect(listContentView(db, "hot").map((card) => card.id)).not.toContain(globalBlockedId);
+    expect(listContentView(db, "ai").map((card) => card.id)).toEqual([visibleId]);
+  });
+
+  it("adds natural language score deltas on top of the saved numeric ranking", async () => {
+    const db = await createTestDatabase();
+    const source = resolveSourceByKind(db, "openai");
+
+    expect(source).toBeDefined();
+
+    upsertContentItems(db, {
+      sourceId: source!.id,
+      items: [
+        {
+          title: "Fresh neutral content",
+          canonicalUrl: "https://example.com/fresh-neutral-content",
+          summary: "Short summary.",
+          bodyMarkdown: "Compact body text.",
+          publishedAt: "2026-03-29T11:00:00.000Z",
+          fetchedAt: "2026-03-29T11:05:00.000Z"
+        },
+        {
+          title: "Older boosted content",
+          canonicalUrl: "https://example.com/older-boosted-content",
+          summary: "Longer summary with AI context.",
+          bodyMarkdown: "Longer body text with agent workflow and model engineering context.",
+          publishedAt: "2026-03-25T11:00:00.000Z",
+          fetchedAt: "2026-03-25T11:05:00.000Z"
+        }
+      ]
+    });
+
+    const freshId = findContentIdByTitle(db, "Fresh neutral content");
+    const boostedId = findContentIdByTitle(db, "Older boosted content");
+    const defaultHotCards = listContentView(db, "hot");
+
+    expect(defaultHotCards[0]?.id).toBe(freshId);
+
+    saveNlEvaluations(db, {
+      contentItemId: boostedId,
+      evaluations: [
+        {
+          scope: "global",
+          decision: "boost",
+          strengthLevel: "high",
+          scoreDelta: 42,
+          matchedKeywords: ["agent", "workflow"],
+          reason: "强命中",
+          providerKind: "deepseek",
+          evaluatedAt: "2026-03-29T12:00:00.000Z"
+        }
+      ]
+    });
+
+    const boostedHotCards = listContentView(db, "hot");
+
+    expect(boostedHotCards[0]?.id).toBe(boostedId);
+    expect(boostedHotCards[1]?.id).toBe(freshId);
   });
 
   async function createTestDatabase() {

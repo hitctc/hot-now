@@ -1,5 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Antd from "ant-design-vue";
 
 import { APP_ROUTE_BASE, CLIENT_ASSET_BASE } from "../../src/client/appBases";
@@ -24,10 +24,33 @@ vi.mock("../../src/client/services/settingsApi", () => ({
   deleteFeedbackEntry: vi.fn(),
   clearFeedbackPool: vi.fn(),
   saveStrategyDraft: vi.fn(),
-  deleteStrategyDraft: vi.fn()
+  deleteStrategyDraft: vi.fn(),
+  toggleSource: vi.fn(),
+  triggerManualCollect: vi.fn(),
+  triggerManualSendLatestEmail: vi.fn()
 }));
 
 describe("client app shell", () => {
+  beforeEach(() => {
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn()
+      }))
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("renders the unified shell, current route title, navigation links and theme control", async () => {
     const router = createAppRouter();
 

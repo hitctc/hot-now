@@ -96,7 +96,35 @@ export type SettingsViewRulesResponse = {
   latestEvaluationRun: SettingsNlEvaluationRun | null;
   isEvaluationRunning: boolean;
 };
-export type SettingsSourcesResponse = Record<string, unknown>;
+export type SettingsSourceItem = {
+  kind: string;
+  name: string;
+  rssUrl: string | null;
+  isEnabled: boolean;
+  lastCollectedAt: string | null;
+  lastCollectionStatus: string | null;
+  totalCount?: number;
+  publishedTodayCount?: number;
+  collectedTodayCount?: number;
+  viewStats?: {
+    hot: { candidateCount: number; visibleCount: number };
+    articles: { candidateCount: number; visibleCount: number };
+    ai: { candidateCount: number; visibleCount: number };
+  };
+};
+
+export type SettingsSourcesOperations = {
+  lastCollectionRunAt: string | null;
+  lastSendLatestEmailAt: string | null;
+  canTriggerManualCollect: boolean;
+  canTriggerManualSendLatestEmail: boolean;
+  isRunning: boolean;
+};
+
+export type SettingsSourcesResponse = {
+  sources: SettingsSourceItem[];
+  operations: SettingsSourcesOperations;
+};
 
 export type SaveProviderSettingsPayload = {
   providerKind: SettingsProviderKind | string;
@@ -157,6 +185,24 @@ export type SaveStrategyDraftResponse = {
 export type DeleteStrategyDraftResponse = {
   ok: true;
   draftId: number;
+};
+
+export type ToggleSourceResponse = {
+  ok: true;
+  kind: string;
+  enable: boolean;
+};
+
+export type ManualCollectResponse = {
+  accepted: boolean;
+  action?: "collect";
+  reason?: string;
+};
+
+export type ManualSendLatestEmailResponse = {
+  accepted: boolean;
+  action?: "send-latest-email";
+  reason?: string;
 };
 
 // 读取当前登录用户摘要，401 代表匿名访问或会话失效，调用方可以把它当作“未登录”。
@@ -262,4 +308,19 @@ export function deleteStrategyDraft(
     `/actions/strategy-drafts/${encodeURIComponent(String(draftId))}/delete`,
     {}
   );
+}
+
+// source 切换使用显式 enable 布尔值，避免前端和后端对“下一状态”产生歧义。
+export function toggleSource(kind: string, enable: boolean): Promise<ToggleSourceResponse> {
+  return postSettingsAction<ToggleSourceResponse>("/actions/sources/toggle", { kind, enable });
+}
+
+// 手动采集走独立动作接口，保持和旧系统页一致的任务语义。
+export function triggerManualCollect(): Promise<ManualCollectResponse> {
+  return postSettingsAction<ManualCollectResponse>("/actions/collect", {});
+}
+
+// 手动发送最新报告沿用现有后端接口，错误原因由调用方再翻译成用户提示。
+export function triggerManualSendLatestEmail(): Promise<ManualSendLatestEmailResponse> {
+  return postSettingsAction<ManualSendLatestEmailResponse>("/actions/send-latest-email", {});
 }

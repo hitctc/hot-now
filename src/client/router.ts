@@ -2,6 +2,8 @@ import { defineComponent, h } from "vue";
 import { createRouter, createWebHistory, type RouteRecordRaw, type RouterHistory } from "vue-router";
 
 import { APP_ROUTE_BASE } from "./appBases";
+import ProfilePage from "./pages/settings/ProfilePage.vue";
+import SourcesPage from "./pages/settings/SourcesPage.vue";
 import ViewRulesPage from "./pages/settings/ViewRulesPage.vue";
 
 export type ShellPageKey = "view-rules" | "sources" | "profile";
@@ -65,7 +67,14 @@ function createShellRoute(meta: ShellPageMeta): RouteRecordRaw {
   return {
     path: meta.path,
     name: meta.key,
-    component: meta.key === "view-rules" ? ViewRulesPage : createRoutePage(meta),
+    component:
+      meta.key === "view-rules"
+        ? ViewRulesPage
+        : meta.key === "sources"
+          ? SourcesPage
+          : meta.key === "profile"
+            ? ProfilePage
+            : createRoutePage(meta),
     meta: {
       shellKey: meta.key,
       navLabel: meta.navLabel,

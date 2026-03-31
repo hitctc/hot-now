@@ -4,5 +4,7 @@ dist
 .env.local
 *.sqlite-shm
 *.sqlite-wal
+data/hot-now.sqlite
+data/recovery-backups/*/*.original*
 
 .DS_Store

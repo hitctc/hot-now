@@ -90,8 +90,10 @@
 - `data/reports/<YYYY-MM-DD>/report.json`：包含 `sourceKinds`、`issueUrls`、`sourceFailureCount`、`failedSourceKinds`
 - `data/reports/<YYYY-MM-DD>/report.html`：多源热点汇总 HTML 报告
 - `data/reports/<YYYY-MM-DD>/run-meta.json`：包含 `mailStatus`；collection-only 任务会写入 `not-sent-by-collection`
+- `data/recovery-backups/<YYYYMMDD-HHmmss>/hot-now.sqlite`：已通过完整性校验的 verified snapshot
+- `data/recovery-backups/<YYYYMMDD-HHmmss>/manifest.json`：快照时间、源库路径、完整性结果和表计数摘要
 
-当前仓库允许把示例报告产物提交进版本库，用来直观看到阶段性成果；如果后续重新改回忽略策略，必须同步更新本文档、`README.md` 和 `.gitignore`。
+当前仓库允许把示例报告产物提交进版本库，用来直观看到阶段性成果；live `data/hot-now.sqlite` 不再作为常规 git 产物提交，跨设备和服务器初始化统一使用 verified snapshot。如果后续重新改回忽略策略，必须同步更新本文档、`README.md` 和 `.gitignore`。
 
 如果你改了页面入口、路由、产物路径或产物格式，必须同步更新本文档和 `README.md`。
 
@@ -104,10 +106,20 @@
 - 安装依赖：`npm install`
 - 开发启动：`npm run dev`
 - 本地便捷启动：`npm run dev:local`
+- 数据库检查：`npm run db:check`
+- 生成 verified snapshot：`npm run db:snapshot`
+- 从快照恢复主库：`npm run db:restore -- <snapshot-file>`
 - 类型构建：`npm run build`
 - 测试：`npm run test`
 
 `npm run dev:local` 现在会在启动前检查本地 `3030` 端口；如果已有旧的监听进程占着这个端口，会先停止旧进程，再启动新的本地开发服务。`npm run dev` 保持原样，不会主动杀进程。
+
+SQLite 可靠性约定：
+
+1. `data/hot-now.sqlite` 是运行中的 live 库，只给当前设备本地运行使用，不再直接跨设备同步或常规提交。
+2. 跨设备开发、服务器初始化和坏库恢复，统一使用 `data/recovery-backups/<timestamp>/hot-now.sqlite + manifest.json`。
+3. `.sqlite-wal` 与 `.sqlite-shm` 继续保持忽略，不纳入 git。
+4. 启动报损坏时，先跑 `npm run db:check`，再用 `npm run db:restore -- <snapshot-file>` 恢复。
 
 推荐验证顺序：
 
@@ -174,13 +186,13 @@
 
 ## 9. 当前阶段快照
 
-截至 `2026-03-30`，仓库状态可按下面理解：
+截至 `2026-03-31`，仓库状态可按下面理解：
 
 - 已有设计文档和实现计划
 - 已有主体实现与测试文件
 - Git 主分支已建立并同步远端
 - 当前工作区已完成 unified site 与多源采集阶段的最终验证：
-  - `npm run test` 通过，结果为 `25` 个测试文件、`146` 个测试全部通过
+  - `npm run test` 通过，结果为 `26` 个测试文件、`153` 个测试全部通过
   - `npm run build` 通过
   - Playwright MCP 本地验收已跑通：`/login` 登录成功；`/`、`/articles`、`/ai`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常
   - 浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持
@@ -196,6 +208,10 @@
 - unified shell 已去掉顶部 header，页面信息和账号区都收进左侧侧边栏；视觉母版已从赛博控制台切换为浅色纸感的 `Editorial Signal Desk`，主题切换与 localStorage 持久化已落地
 - unified shell 内容页已切到“首页主卡 + 标准卡”的混合卡片体系；系统页卡片则统一收口为 workbench / inventory panel 语义
 - 内容页现在对本地内容库损坏做了降级兜底：检测到 `SQLITE_CORRUPT` / `SQLITE_NOTADB` 时继续渲染统一站点，并提示修复或重建 `data/hot-now.sqlite`
+- 启动入口现在会对 `data/hot-now.sqlite` 做 SQLite 健康检查；如果主库损坏，会提示最近的 verified snapshot 和 `npm run db:restore -- <snapshot-file>` 恢复命令
+- graceful shutdown 现在会执行真实的 `wal_checkpoint(TRUNCATE)`，减少把 live 库直接当普通文件同步时产生坏快照的风险
+- 已新增 `npm run db:check`、`npm run db:snapshot`、`npm run db:restore -- <snapshot-file>`，并把 verified snapshot 目录收口为 `data/recovery-backups/<timestamp>/`
+- live `data/hot-now.sqlite` 已收口为运行时文件，不再作为常规 git 产物；跨设备和服务器只流转 verified snapshot
 - 报告层已切到多源语义：`report.json` / `report.html` / 邮件正文会保留 `sourceKinds`、`issueUrls`、失败 source 数量等信息，不再把输出描述成单一日报
 - legacy `/history`、`/reports/:date`、`/control` 与 unified shell 共存，且相关测试和文档已同步
 

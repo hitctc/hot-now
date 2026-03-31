@@ -1,6 +1,6 @@
 # hot-now
 
-本地单机运行的科技资讯编辑台。它会按固定周期拉取多个已启用的 RSS 源、抓取原文、做规则聚类、按系统百分制评分排序内容、生成多源汇总的 HTML/JSON 报告；邮件发送与采集解耦，可按每日固定时间或手动触发，对最新一份报告单独发信。
+本地单机运行的科技资讯编辑台。它会按固定周期拉取多个已启用的 RSS 源、抓取原文、做规则聚类、按系统百分制评分排序内容、生成多源汇总的 HTML/JSON 报告；邮件发送与采集解耦，可按每日固定时间或手动触发，对最新一份报告单独发信。统一站点继续由 Fastify 托管路由和登录态，但 `/settings/*` 系统页现在已经切到 `Vue 3 + Vite + Ant Design Vue`。
 
 ## 本地启动
 
@@ -22,7 +22,8 @@ export SESSION_SECRET="replace-with-long-random-secret"
 export LLM_SETTINGS_MASTER_KEY="replace-with-local-master-key"
 ```
 
-4. 启动开发服务：
+4. 如果这次改动涉及 `/settings/*` 系统页，先构建最新客户端资源：`npm run build:client`
+5. 启动开发服务：
 
 - 标准方式：
 
@@ -68,8 +69,10 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 统一站点左侧导航底部支持深色 / 浅色主题切换，主题偏好保存在浏览器本地 `localStorage`，刷新后保持
 - `unified shell` 页面已完整接入以浅色为母版的 `Editorial Signal Desk` 双主题：`/`、`/articles`、`/ai`、`/settings/*`
 - 统一站点保留左侧品牌块、浅深主题切换和本地 `localStorage` 持久化
+- `/settings/*` 现在通过 Fastify 返回统一客户端入口，再由 `Vue 3 + Ant Design Vue` 接管页面渲染
 - `/settings/view-rules` 已升级为策略工作台：数值权重、LLM 厂商设置、正式自然语言策略、反馈池、草稿池都收进同一页
-- `/settings/sources` 现在会在 source 卡片上方展示工作台总览表，包含总条数、今天发布、今天抓取，以及 Hot / Articles / AI 的入池与展示统计
+- `/settings/sources` 现在会展示即时操作卡、来源统计概览表和 source 库存表，包含总条数、今天发布、今天抓取，以及 Hot / Articles / AI 的入池与展示统计
+- `/settings/profile` 现在会展示会话状态、用户名、角色和联系邮箱，不再停留在占位页
 - 正式自然语言策略支持 `global / hot / articles / ai` 四个 scope；保存后会立即对当前内容库发起一次全量 LLM 重算，日常采集完成后会对新增内容做增量重算
 - 当前支持的 LLM 厂商是 `DeepSeek`、`MiniMax`、`Kimi`；用户在页面里录入 API key，本地只保存加密后的密文；未配置 `LLM_SETTINGS_MASTER_KEY` 时页面仍可保存规则文本，但不会启用自然语言匹配
 - Legacy 报告页（当前仍保留）：`/history`、`/reports/:date`、`/control`
@@ -121,5 +124,6 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 
 - 相关测试：已通过
 - 类型构建：已通过
+- 系统页客户端构建：已通过
 - Playwright MCP 本地验收通过：`/login` 登录成功；`/`、`/articles`、`/ai`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常；浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持；内容页来源筛选写入 `localStorage['hot-now-content-sources']` 后刷新仍保留
 - 如果要手动验证新的自然语言策略链路，先配置 `LLM_SETTINGS_MASTER_KEY`，再在 `/settings/view-rules` 保存厂商设置和正式规则，确认页面出现最新重算结果；然后到内容页验证反馈面板、反馈池和草稿池的联动

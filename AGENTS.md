@@ -19,7 +19,7 @@
   - `发信链路`：`定时 / 手动发信 -> 读取最新一份已生成报告 -> SMTP 发邮件`
 - 当前数据源：`https://imjuya.github.io/juya-ai-daily/rss.xml`、`https://openai.com/news/rss.xml`、`https://blog.google/technology/ai/rss/`、`https://36kr.com/feed`、`https://36kr.com/feed-newsflash`、`https://techcrunch.com/category/artificial-intelligence/feed/`、`https://www.ifanr.com/feed`、`https://www.ithome.com/rss/`
 - 当前采集语义：以 `is_enabled` 为准决定是否参与采集；`is_active` 仅保留兼容，不再作为系统菜单主语义
-- 当前技术栈：`Node.js + TypeScript + Fastify + Vitest`
+- 当前技术栈：`Node.js + TypeScript + Fastify + Vue 3 + Vite + Ant Design Vue + Vitest`
 
 当前仓库已经有较完整的实现、配置模板、测试和设计/计划文档，不要把它当成从零开始的脚手架项目处理。
 
@@ -27,6 +27,8 @@
 
 - `src/main.ts`
   负责启动配置加载、运行锁、Fastify 服务和定时任务，并装配反馈工作台与自然语言重算链路，是应用入口。
+- `src/client/`
+  负责 `/settings/*` 系统页的 Vue 3 客户端入口、路由、页面组件、主题和前端 service 封装。
 - `src/core/config/`
   负责读取 `config/hot-now.config.json` 和环境变量，组装运行时配置。
 - `src/core/source/`
@@ -56,7 +58,7 @@
 - `src/core/scheduler/`
   负责按配置启动每日定时任务。
 - `src/server/`
-  负责页面路由和服务端渲染 HTML。
+  负责页面路由、legacy 服务端渲染 HTML，以及 `/settings/*` 的客户端入口分发和系统页读模型 API。
 - `tests/`
   负责单元测试与轻量集成测试。
 - `config/hot-now.config.json`
@@ -75,9 +77,9 @@
 - `/`：统一站点首页（未登录也可访问）
 - `/articles`：统一站点文章页（未登录也可访问）
 - `/ai`：统一站点 AI 页（未登录也可访问）
-- `/settings/view-rules`：统一站点筛选策略工作台（登录后，支持数值权重、LLM 设置、正式自然语言策略、反馈池、草稿池）
-- `/settings/sources`：统一站点数据迭代收集页（登录后，可启用/停用 source，并分别手动执行采集 / 手动发送最新报告；source 卡片上方会展示总条数、今天发布、今天抓取，以及 Hot / Articles / AI 入池与展示统计）
-- `/settings/profile`：统一站点当前登录用户页（登录后）
+- `/settings/view-rules`：统一站点筛选策略工作台（登录后，由 `Vue 3 + Ant Design Vue` 驱动，支持数值权重、LLM 设置、正式自然语言策略、反馈池、草稿池）
+- `/settings/sources`：统一站点数据迭代收集页（登录后，由 `Vue 3 + Ant Design Vue` 驱动，可启用/停用 source，并分别手动执行采集 / 手动发送最新报告；页面会展示总条数、今天发布、今天抓取，以及 Hot / Articles / AI 入池与展示统计）
+- `/settings/profile`：统一站点当前登录用户页（登录后，由 `Vue 3 + Ant Design Vue` 驱动，展示会话状态、账号摘要和联系邮箱）
 - 统一站点左侧导航底部支持深色 / 浅色主题切换，偏好写入浏览器本地 `localStorage` 并在刷新后保持
 - `unified shell` 页面（`/`、`/articles`、`/ai`、`/settings/*`）已完整切换到 `Editorial Signal Desk` 双主题
 - 内容导航保持统一内容池，但会给匹配导航语义的内置 source 显式加权：`36氪` / `36氪快讯` 优先进入 `/` 热点页，`爱范儿` 优先进入 `/ai`，`36氪` / `爱范儿` / `IT之家` 优先进入 `/articles`
@@ -117,6 +119,7 @@
 常用命令：
 
 - 安装依赖：`npm install`
+- 系统页客户端构建：`npm run build:client`
 - 开发启动：`npm run dev`
 - 本地便捷启动：`npm run dev:local`
 - 数据库检查：`npm run db:check`
@@ -137,8 +140,9 @@ SQLite 可靠性约定：
 推荐验证顺序：
 
 1. 只改了局部逻辑时，先跑最相关的单测文件。
-2. 改动影响运行时类型或入口时，再跑 `npm run build`。
-3. 改动影响任务链路、页面或配置时，最后做一次手动 smoke test。
+2. 改动涉及 `/settings/*` 客户端页面时，先跑最相关的前端单测，再跑 `npm run build:client`。
+3. 改动影响运行时类型或入口时，再跑 `npm run build`。
+4. 改动影响任务链路、页面或配置时，最后做一次手动 smoke test。
 
 推荐 smoke test：
 
@@ -208,7 +212,7 @@ SQLite 可靠性约定：
 - 已有主体实现与测试文件
 - Git 主分支已建立并同步远端
 - 当前工作区已完成 unified site 与多源采集阶段的最终验证：
-  - `npm run test` 通过，结果为 `35` 个测试文件、`186` 个测试全部通过
+  - `npm run test` 通过，结果为 `44` 个测试文件、`208` 个测试全部通过
   - `npm run build` 通过
   - Playwright MCP 本地验收已跑通：`/login` 登录成功；`/`、`/articles`、`/ai`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常
   - 浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持
@@ -223,6 +227,7 @@ SQLite 可靠性约定：
 - 系统菜单已收口到多源语义：`/settings/sources` 支持 source 启用/停用、逐 source 最近抓取状态展示，以及统一站点内手动执行采集 / 手动发送最新报告；`/settings/view-rules` 现在是完整策略工作台，支持按字段表单保存权重规则、LLM 厂商配置、正式自然语言策略、反馈池和草稿池；当前登录用户信息已并到侧边栏底部
 - `/settings/sources` 现在会基于共享内容选择器实时展示 source 工作台总览表，口径包含总条数、今天发布、今天抓取，以及 Hot / Articles / AI 的入池与展示统计
 - unified shell 已去掉顶部 header，页面信息和账号区都收进左侧侧边栏；视觉母版已从赛博控制台切换为浅色纸感的 `Editorial Signal Desk`，主题切换与 localStorage 持久化已落地
+- `/settings/*` 现在统一走 Fastify 返回的客户端入口，由 `src/client/` 下的 `Vue 3 + Vite + Ant Design Vue` 页面接管，不再继续叠加新的服务端拼表单 HTML
 - unified shell 内容页已切到“首页主卡 + 标准卡”的混合卡片体系；系统页卡片则统一收口为 workbench / inventory panel 语义
 - 内容页顶部现在会渲染共享 source 过滤条，勾选结果通过 `localStorage + x-hot-now-source-filter` header 驱动服务端重渲染，只影响当前浏览结果，不参与系统页统计口径
 - 内容页现在会把当前反馈池条目回填到局部反馈面板，内容交互形成 `点赞/点踩 -> 反馈池 -> 草稿池 -> 正式自然语言策略 -> 全量 / 增量重算` 的闭环

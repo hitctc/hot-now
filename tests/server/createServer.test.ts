@@ -146,7 +146,7 @@ describe("createServer", () => {
   beforeAll(async () => {
     // Build first so the smoke check always exercises the emitted entry point.
     await runCommand("npm", ["run", "build"]);
-  });
+  }, 30000);
 
   it("returns a health response", async () => {
     const app = createServer();

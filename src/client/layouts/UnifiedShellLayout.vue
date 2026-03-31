@@ -74,21 +74,29 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
         </a-typography-paragraph>
       </div>
 
-      <a-menu class="unified-shell__nav" mode="inline" :selected-keys="isSystemPageKey(activeNavKey) ? [activeNavKey] : []">
-        <a-menu-item v-for="page in contentNavPages" :key="page.path" :data-shell-nav="page.key">
-          <a class="unified-shell__nav-link" :href="page.path">
-            <span class="unified-shell__nav-label">{{ page.navLabel }}</span>
-            <span class="unified-shell__nav-description">{{ page.description }}</span>
-          </a>
-        </a-menu-item>
+      <section class="unified-shell__nav-group">
+        <p class="unified-shell__nav-kicker">内容菜单</p>
+        <a-menu class="unified-shell__nav" mode="inline" :selected-keys="[]">
+          <a-menu-item v-for="page in contentNavPages" :key="page.path" :data-shell-nav="page.key">
+            <a class="unified-shell__nav-link" :href="page.path">
+              <span class="unified-shell__nav-label">{{ page.navLabel }}</span>
+              <span class="unified-shell__nav-description">{{ page.description }}</span>
+            </a>
+          </a-menu-item>
+        </a-menu>
+      </section>
 
-        <a-menu-item v-for="page in systemNavPages" :key="page.key" :data-shell-nav="page.key">
-          <RouterLink class="unified-shell__nav-link" :to="page.path">
-            <span class="unified-shell__nav-label">{{ page.navLabel }}</span>
-            <span class="unified-shell__nav-description">{{ page.description }}</span>
-          </RouterLink>
-        </a-menu-item>
-      </a-menu>
+      <section class="unified-shell__nav-group">
+        <p class="unified-shell__nav-kicker">系统菜单</p>
+        <a-menu class="unified-shell__nav" mode="inline" :selected-keys="isSystemPageKey(activeNavKey) ? [activeNavKey] : []">
+          <a-menu-item v-for="page in systemNavPages" :key="page.key" :data-shell-nav="page.key">
+            <RouterLink class="unified-shell__nav-link" :to="page.path">
+              <span class="unified-shell__nav-label">{{ page.navLabel }}</span>
+              <span class="unified-shell__nav-description">{{ page.description }}</span>
+            </RouterLink>
+          </a-menu-item>
+        </a-menu>
+      </section>
     </a-layout-sider>
 
     <a-layout class="unified-shell__main">
@@ -172,29 +180,64 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
 <style scoped>
 .unified-shell {
   min-height: 100vh;
+  color: var(--editorial-text-main);
+  background: transparent;
 }
 
 .unified-shell__sider {
-  padding: 24px 16px;
+  padding: 24px 18px;
+  background: var(--editorial-bg-sidebar) !important;
+  border-right: 1px solid var(--editorial-border-strong);
+  box-shadow: var(--editorial-shadow-page);
+  backdrop-filter: blur(18px);
+}
+
+:deep(.unified-shell__sider .ant-layout-sider-children) {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  height: 100%;
 }
 
 .unified-shell__brand {
-  margin-bottom: 24px;
+  padding: 20px 18px;
+  border: 1px solid var(--editorial-border);
+  border-radius: var(--editorial-radius-xl);
+  background: var(--editorial-bg-sidebar-panel);
+  box-shadow: var(--editorial-shadow-card);
 }
 
 .unified-shell__eyebrow {
   display: inline-block;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  color: var(--editorial-text-sidebar-muted);
 }
 
 .unified-shell__brand-title {
   margin: 0;
+  color: var(--editorial-text-sidebar) !important;
 }
 
 .unified-shell__brand-description {
   margin-bottom: 0;
+  color: var(--editorial-text-body);
+}
+
+.unified-shell__nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.unified-shell__nav-kicker {
+  margin: 0;
+  padding-left: 4px;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--editorial-text-sidebar-muted);
 }
 
 .unified-shell__nav {
@@ -202,10 +245,55 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
   background: transparent;
 }
 
+:deep(.unified-shell__nav .ant-menu-item) {
+  height: auto;
+  margin: 0 0 10px;
+  padding: 0 !important;
+  line-height: 1.4;
+  border-radius: var(--editorial-radius-lg);
+}
+
+:deep(.unified-shell__nav .ant-menu-item::after) {
+  display: none;
+}
+
+:deep(.unified-shell__nav .ant-menu-item-selected) {
+  background: var(--editorial-bg-link-active);
+  box-shadow: var(--editorial-shadow-accent);
+}
+
+:deep(.unified-shell__nav .ant-menu-item-selected .unified-shell__nav-link) {
+  color: var(--editorial-text-on-accent);
+  border-color: transparent;
+  background: transparent;
+}
+
+:deep(.unified-shell__nav .ant-menu-item-selected .unified-shell__nav-description) {
+  color: inherit;
+}
+
 .unified-shell__nav-link {
   display: flex;
   flex-direction: column;
+  gap: 4px;
   line-height: 1.4;
+  padding: 14px 16px;
+  border: 1px solid var(--editorial-border);
+  border-radius: var(--editorial-radius-lg);
+  background: var(--editorial-bg-link);
+  color: var(--editorial-text-sidebar);
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.unified-shell__nav-link:hover {
+  transform: translateY(-1px);
+  border-color: var(--editorial-border-strong);
+  box-shadow: var(--editorial-shadow-floating);
+  text-decoration: none;
 }
 
 .unified-shell__nav-label {
@@ -214,7 +302,7 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
 
 .unified-shell__nav-description {
   font-size: 12px;
-  opacity: 0.75;
+  color: var(--editorial-text-sidebar-muted);
 }
 
 .unified-shell__main {
@@ -223,8 +311,13 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
 
 .unified-shell__header {
   height: auto;
-  padding: 24px 32px 12px;
-  background: transparent;
+  margin: 24px 24px 0;
+  padding: 24px 28px 18px;
+  border: 1px solid var(--editorial-border);
+  border-radius: var(--editorial-radius-xl);
+  background: var(--editorial-bg-panel);
+  box-shadow: var(--editorial-shadow-card);
+  backdrop-filter: blur(16px);
   display: flex;
   justify-content: space-between;
   gap: 24px;
@@ -234,12 +327,18 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
   min-width: 0;
 }
 
+.unified-shell__header-kicker {
+  color: var(--editorial-text-muted);
+}
+
 .unified-shell__page-title {
   margin: 4px 0 6px;
+  color: var(--editorial-text-main) !important;
 }
 
 .unified-shell__page-description {
   margin-bottom: 0;
+  color: var(--editorial-text-body);
 }
 
 .unified-shell__header-controls {
@@ -249,7 +348,7 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
 }
 
 .unified-shell__content {
-  padding: 0 32px 32px;
+  padding: 24px;
 }
 
 .unified-shell__stack {
@@ -259,9 +358,50 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
 .unified-shell__profile-card,
 .unified-shell__view-port {
   width: 100%;
+  border-radius: var(--editorial-radius-xl);
+  background: var(--editorial-bg-panel-strong);
+  box-shadow: var(--editorial-shadow-card);
+}
+
+:deep(.unified-shell__profile-card .ant-card-head),
+:deep(.unified-shell__view-port .ant-card-head) {
+  border-bottom-color: var(--editorial-border);
+}
+
+:deep(.unified-shell__profile-card .ant-card-body),
+:deep(.unified-shell__view-port .ant-card-body) {
+  padding: 20px 22px;
 }
 
 .unified-shell__profile-summary {
   width: 100%;
+}
+
+@media (max-width: 1080px) {
+  .unified-shell__sider {
+    width: 248px !important;
+    min-width: 248px !important;
+    max-width: 248px !important;
+  }
+
+  .unified-shell__header {
+    margin: 18px 18px 0;
+    padding: 20px 22px 16px;
+  }
+
+  .unified-shell__content {
+    padding: 18px;
+  }
+}
+
+@media (max-width: 900px) {
+  .unified-shell__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .unified-shell__header-controls {
+    justify-content: space-between;
+  }
 }
 </style>

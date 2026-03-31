@@ -1,8 +1,20 @@
 import type { ContentCardView, ContentViewKey } from "../core/content/listContentView.js";
 
+type ContentFeedbackEntryView = {
+  freeText: string | null;
+  suggestedEffect: string | null;
+  strengthLevel: string | null;
+  positiveKeywords: string[];
+  negativeKeywords: string[];
+};
+
+type ContentCardViewWithFeedback = ContentCardView & {
+  feedbackEntry?: ContentFeedbackEntryView;
+};
+
 type ContentPageView = {
   viewKey: ContentViewKey;
-  cards: ContentCardView[];
+  cards: ContentCardViewWithFeedback[];
   emptyState?: {
     title: string;
     description: string;
@@ -44,13 +56,14 @@ function renderEmptyState(emptyState?: ContentPageView["emptyState"]): string {
   return `<section class="content-empty content-empty--signal${toneClass}"><h3>${escapeHtml(title)}</h3><p>${escapeHtml(description)}</p></section>`;
 }
 
-function renderContentCard(viewKey: ContentViewKey, card: ContentCardView, index: number): string {
+function renderContentCard(viewKey: ContentViewKey, card: ContentCardViewWithFeedback, index: number): string {
   // Each card carries its content id in data attributes so site.js can post interaction updates.
   const variant = getCardVariant(viewKey, index);
   const summaryText = card.summary?.trim() || "暂无摘要";
   const publishedText = formatPublishedAt(card.publishedAt);
   const contentScoreLabel = String(card.contentScore);
   const titleHtml = renderTitleLink(card.title, card.canonicalUrl);
+  const feedbackEntry = card.feedbackEntry;
 
   return `
     <article class="content-card content-card--${variant}" data-card-variant="${variant}" data-content-id="${card.id}">
@@ -66,7 +79,7 @@ function renderContentCard(viewKey: ContentViewKey, card: ContentCardView, index
           ${titleHtml}
         </h3>
       </header>
-      ${renderContentBody(card, summaryText, variant)}
+      ${renderContentBody(card, summaryText, variant, feedbackEntry)}
     </article>
   `;
 }
@@ -76,7 +89,12 @@ function getCardVariant(viewKey: ContentViewKey, index: number): ContentCardVari
   return viewKey === "hot" && index === 0 ? "featured" : "compact";
 }
 
-function renderContentBody(card: ContentCardView, summaryText: string, variant: ContentCardVariant): string {
+function renderContentBody(
+  card: ContentCardView,
+  summaryText: string,
+  variant: ContentCardVariant,
+  feedbackEntry?: ContentFeedbackEntryView
+): string {
   // The body helper keeps both card variants on one action contract while allowing density changes in CSS.
   const favoritePressed = card.isFavorited ? "true" : "false";
   const likePressed = card.reaction === "like" ? "true" : "false";
@@ -117,8 +135,68 @@ function renderContentBody(card: ContentCardView, summaryText: string, variant: 
           >
             点踩
           </button>
+          <button
+            type="button"
+            class="action-chip"
+            data-content-action="feedback-panel-toggle"
+            aria-expanded="false"
+          >
+            补充反馈
+          </button>
         </div>
+        ${renderFeedbackPanel(feedbackEntry)}
       </div>
+    </div>
+  `;
+}
+
+function renderFeedbackPanel(feedbackEntry?: ContentFeedbackEntryView): string {
+  const freeText = feedbackEntry?.freeText?.trim() || "";
+  const suggestedEffect = feedbackEntry?.suggestedEffect ?? "";
+  const strengthLevel = feedbackEntry?.strengthLevel ?? "";
+  const positiveKeywords = (feedbackEntry?.positiveKeywords ?? []).join(", ");
+  const negativeKeywords = (feedbackEntry?.negativeKeywords ?? []).join(", ");
+
+  return `
+    <div class="content-feedback-panel" data-role="feedback-panel" hidden>
+      <form class="content-feedback-form" data-content-feedback-form>
+        <label class="content-feedback-field">
+          <span>反馈说明</span>
+          <textarea name="freeText" rows="3" placeholder="这里可以补充为什么点赞 / 点踩，或给管理员留策略建议。">${escapeHtml(freeText)}</textarea>
+        </label>
+        <div class="content-feedback-grid">
+          <label class="content-feedback-field">
+            <span>建议动作</span>
+            <select name="suggestedEffect">
+              ${renderSelectOption("", "未设置", suggestedEffect)}
+              ${renderSelectOption("boost", "加分", suggestedEffect)}
+              ${renderSelectOption("penalize", "减分", suggestedEffect)}
+              ${renderSelectOption("block", "屏蔽", suggestedEffect)}
+              ${renderSelectOption("neutral", "无影响", suggestedEffect)}
+            </select>
+          </label>
+          <label class="content-feedback-field">
+            <span>强度</span>
+            <select name="strengthLevel">
+              ${renderSelectOption("", "未设置", strengthLevel)}
+              ${renderSelectOption("low", "低", strengthLevel)}
+              ${renderSelectOption("medium", "中", strengthLevel)}
+              ${renderSelectOption("high", "高", strengthLevel)}
+            </select>
+          </label>
+          <label class="content-feedback-field">
+            <span>关键词加分</span>
+            <input type="text" name="positiveKeywords" value="${escapeHtml(positiveKeywords)}" placeholder="agent, workflow" />
+          </label>
+          <label class="content-feedback-field">
+            <span>关键词减分</span>
+            <input type="text" name="negativeKeywords" value="${escapeHtml(negativeKeywords)}" placeholder="融资, 快讯" />
+          </label>
+        </div>
+        <div class="content-feedback-actions">
+          <button type="submit" class="primary-mini-button">保存反馈池建议</button>
+        </div>
+      </form>
     </div>
   `;
 }
@@ -146,6 +224,11 @@ function renderTitleLink(title: string, canonicalUrl: string): string {
   }
 
   return `<a class="content-title-link" href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer" title="${escapedTitle}">${escapedTitle}</a>`;
+}
+
+function renderSelectOption(value: string, label: string, selectedValue: string): string {
+  const selected = value === selectedValue ? ' selected="selected"' : "";
+  return `<option value="${escapeHtml(value)}"${selected}>${escapeHtml(label)}</option>`;
 }
 
 function toSafeHttpUrl(rawValue: string): string | null {

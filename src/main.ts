@@ -6,8 +6,21 @@ import { createRuntimeDatabase } from "./core/db/createRuntimeDatabase.js";
 import { runMigrations } from "./core/db/runMigrations.js";
 import { seedInitialData } from "./core/db/seedInitialData.js";
 import { checkpointWal } from "./core/db/sqliteHealth.js";
+import {
+  clearFeedbackPool,
+  deleteFeedbackPoolEntry,
+  listFeedbackPoolEntries,
+  saveFeedbackPoolEntry
+} from "./core/feedback/feedbackPoolRepository.js";
 import { saveFavorite, saveReaction } from "./core/feedback/feedbackRepository.js";
 import { fetchAndExtractArticle } from "./core/fetch/extractArticle.js";
+import { createLlmProvider, type ResolveLlmProviderResult } from "./core/llm/createLlmProvider.js";
+import {
+  deleteProviderSettings as removeProviderSettings,
+  getProviderSettingsSummary,
+  readProviderSettings,
+  saveProviderSettings as persistProviderSettings
+} from "./core/llm/providerSettingsRepository.js";
 import { sendDailyEmail } from "./core/mail/sendDailyEmail.js";
 import { LatestReportEmailError, sendLatestReportEmail } from "./core/pipeline/sendLatestReportEmail.js";
 import { runCollectionCycle } from "./core/pipeline/runCollectionCycle.js";
@@ -19,6 +32,15 @@ import { startCollectionScheduler, startMailScheduler } from "./core/scheduler/s
 import { listSourceCards } from "./core/source/listSourceCards.js";
 import { readSourcesOperationSummary } from "./core/source/readSourcesOperationSummary.js";
 import { loadEnabledSourceIssues } from "./core/source/loadEnabledSourceIssues.js";
+import { listNlEvaluationRuns } from "./core/strategy/nlEvaluationRepository.js";
+import { listNlRuleSets, saveNlRuleSet, type NlRuleScope } from "./core/strategy/nlRuleRepository.js";
+import { runNlEvaluationCycle, type RunNlEvaluationCycleInput } from "./core/strategy/runNlEvaluationCycle.js";
+import {
+  createStrategyDraft,
+  deleteStrategyDraft,
+  listStrategyDrafts,
+  updateStrategyDraft
+} from "./core/strategy/strategyDraftRepository.js";
 import { listReportDates, readTextFile } from "./core/storage/reportStore.js";
 import { listViewRules, saveViewRuleConfig } from "./core/viewRules/viewRuleRepository.js";
 import { createServer } from "./server/createServer.js";
@@ -57,6 +79,7 @@ seedInitialData(db, {
   juyaRssUrl: config.source.rssUrl
 });
 const lock = createRunLock();
+const nlEvaluationLock = createRunLock();
 const readAdminProfile = db.prepare(
   `
     SELECT username, password_hash, role, display_name
@@ -93,7 +116,8 @@ async function runCollectionTask(triggerType: DailyReportTrigger) {
   return await runCollectionCycle(config, triggerType, {
     db,
     loadEnabledSourceIssues: async () => await loadEnabledSourceIssues(db),
-    fetchArticle: fetchAndExtractArticle
+    fetchArticle: fetchAndExtractArticle,
+    runNlEvaluationCycle: async (input) => await runNlEvaluationTask(input)
   });
 }
 
@@ -189,6 +213,221 @@ function getCurrentUserProfile() {
   };
 }
 
+function getViewRulesWorkbenchData() {
+  // The strategy workbench reads all four layers together so the settings page can stay fully server-rendered.
+  const latestEvaluationRun = listNlEvaluationRuns(db)[0] ?? null;
+
+  return {
+    numericRules: listViewRules(db),
+    providerSettings: getProviderSettingsSummary(db),
+    providerCapability: readProviderCapability(),
+    nlRules: listNlRuleSets(db),
+    feedbackPool: listFeedbackPoolEntries(db),
+    strategyDrafts: listStrategyDrafts(db),
+    latestEvaluationRun,
+    isEvaluationRunning: nlEvaluationLock.isRunning() || latestEvaluationRun?.status === "running"
+  };
+}
+
+function readProviderCapability() {
+  // Natural language matching stays opt-in: missing master key or provider config should disable only this feature.
+  const settingsMasterKey = config.llm?.settingsMasterKey ?? null;
+
+  if (!settingsMasterKey) {
+    return {
+      hasMasterKey: false,
+      featureAvailable: false,
+      message: "未配置 LLM_SETTINGS_MASTER_KEY，无法保存厂商 API key。"
+    };
+  }
+
+  const providerSummary = getProviderSettingsSummary(db);
+
+  if (!providerSummary || !providerSummary.isEnabled) {
+    return {
+      hasMasterKey: true,
+      featureAvailable: false,
+      message: "已保存正式规则，但当前未配置可用厂商，暂不启用自然语言匹配。"
+    };
+  }
+
+  const resolvedSettings = readProviderSettings(db, { settingsMasterKey });
+
+  if (!resolvedSettings.ok) {
+    return {
+      hasMasterKey: true,
+      featureAvailable: false,
+      message:
+        resolvedSettings.reason === "decrypt-failed"
+          ? "当前厂商配置无法解密，请重新保存 API key。"
+          : "已保存正式规则，但当前未配置可用厂商，暂不启用自然语言匹配。"
+    };
+  }
+
+  if (!resolvedSettings.settings || !resolvedSettings.settings.isEnabled) {
+    return {
+      hasMasterKey: true,
+      featureAvailable: false,
+      message: "已保存正式规则，但当前未配置可用厂商，暂不启用自然语言匹配。"
+    };
+  }
+
+  return {
+    hasMasterKey: true,
+    featureAvailable: true,
+    message: `当前已启用 ${formatProviderLabel(resolvedSettings.settings.providerKind)}，保存正式规则后会自动重算内容库。`
+  };
+}
+
+function isNlFeatureAvailable(): boolean {
+  return readProviderCapability().featureAvailable;
+}
+
+async function resolveConfiguredLlmProvider(): Promise<ResolveLlmProviderResult> {
+  // Provider resolution is centralized here so collection and settings-triggered recomputes reuse one rule set.
+  const resolvedSettings = readProviderSettings(db, {
+    settingsMasterKey: config.llm?.settingsMasterKey ?? null
+  });
+
+  if (!resolvedSettings.ok) {
+    return resolvedSettings;
+  }
+
+  if (!resolvedSettings.settings || !resolvedSettings.settings.isEnabled) {
+    return { ok: false, reason: "missing-provider-settings" };
+  }
+
+  return {
+    ok: true,
+    provider: createLlmProvider(resolvedSettings.settings)
+  };
+}
+
+async function runNlEvaluationTask(input: RunNlEvaluationCycleInput) {
+  // Recomputes share one local single-flight lock so full and incremental runs do not overwrite each other mid-flight.
+  if (nlEvaluationLock.isRunning()) {
+    const latestRun = listNlEvaluationRuns(db)[0];
+
+    return {
+      runId: latestRun?.id ?? 0,
+      status: "skipped" as const,
+      itemCount: input.contentItemIds?.length ?? 0,
+      successCount: 0,
+      failureCount: 0
+    };
+  }
+
+  return await nlEvaluationLock.runExclusive(async () => {
+    return await runNlEvaluationCycle(db, input, {
+      resolveProvider: async () => await resolveConfiguredLlmProvider()
+    });
+  });
+}
+
+function createDraftFromFeedback(feedbackId: number) {
+  // Draft creation keeps the original feedback row intact and turns it into an editable starting point for admins.
+  const feedbackEntry = listFeedbackPoolEntries(db).find((entry) => entry.id === feedbackId);
+
+  if (!feedbackEntry) {
+    return { ok: false as const, reason: "not-found" as const };
+  }
+
+  const draftId = createStrategyDraft(db, {
+    sourceFeedbackId: feedbackEntry.id,
+    draftText: buildDraftTextFromFeedback(feedbackEntry),
+    suggestedScope: "unspecified",
+    draftEffectSummary: buildDraftEffectSummary(feedbackEntry),
+    positiveKeywords: feedbackEntry.positiveKeywords,
+    negativeKeywords: feedbackEntry.negativeKeywords
+  });
+
+  return { ok: true as const, draftId };
+}
+
+function buildDraftTextFromFeedback(entry: ReturnType<typeof listFeedbackPoolEntries>[number]): string {
+  const lines = [
+    `来源反馈：${entry.contentTitle}`,
+    `参考链接：${entry.canonicalUrl}`
+  ];
+
+  if (entry.freeText?.trim()) {
+    lines.push(entry.freeText.trim());
+  }
+
+  if (entry.suggestedEffect) {
+    const strengthText = entry.strengthLevel ? `，强度 ${formatStrengthLabel(entry.strengthLevel)}` : "";
+    lines.push(`建议动作：${formatEffectLabel(entry.suggestedEffect)}${strengthText}`);
+  }
+
+  if (entry.positiveKeywords.length > 0) {
+    lines.push(`优先考虑关键词：${entry.positiveKeywords.join("、")}`);
+  }
+
+  if (entry.negativeKeywords.length > 0) {
+    lines.push(`降低或屏蔽关键词：${entry.negativeKeywords.join("、")}`);
+  }
+
+  return lines.join("\n");
+}
+
+function buildDraftEffectSummary(entry: ReturnType<typeof listFeedbackPoolEntries>[number]): string | null {
+  const parts = [];
+
+  if (entry.suggestedEffect) {
+    parts.push(formatEffectLabel(entry.suggestedEffect));
+  }
+
+  if (entry.strengthLevel) {
+    parts.push(`强度 ${formatStrengthLabel(entry.strengthLevel)}`);
+  }
+
+  return parts.length > 0 ? parts.join(" / ") : null;
+}
+
+function formatProviderLabel(providerKind: string): string {
+  if (providerKind === "deepseek") {
+    return "DeepSeek";
+  }
+
+  if (providerKind === "minimax") {
+    return "MiniMax";
+  }
+
+  if (providerKind === "kimi") {
+    return "Kimi";
+  }
+
+  return providerKind;
+}
+
+function formatEffectLabel(effect: string): string {
+  if (effect === "boost") {
+    return "加分";
+  }
+
+  if (effect === "penalize") {
+    return "减分";
+  }
+
+  if (effect === "block") {
+    return "屏蔽";
+  }
+
+  return "无影响";
+}
+
+function formatStrengthLabel(strengthLevel: string): string {
+  if (strengthLevel === "high") {
+    return "高";
+  }
+
+  if (strengthLevel === "medium") {
+    return "中";
+  }
+
+  return "低";
+}
+
 // Manual collection stays lock-guarded so button clicks share the same exclusion rules as scheduled jobs.
 const triggerManualCollect = config.manualActions.collectEnabled
   ? async () => {
@@ -226,13 +465,46 @@ const app = createServer({
     verifyLogin
   },
   isRunning: () => lock.isRunning(),
-  listContentView: async (viewKey) => listContentCards(db, viewKey),
+  listContentView: async (viewKey) => listContentCards(db, viewKey, { includeNlEvaluations: isNlFeatureAvailable() }),
   saveFavorite: async (contentItemId, isFavorited) => saveFavorite(db, contentItemId, isFavorited),
   saveReaction: async (contentItemId, reaction) => saveReaction(db, contentItemId, reaction),
+  saveContentFeedback: async (contentItemId, input) => saveFeedbackPoolEntry(db, { contentItemId, ...input }),
   listRatingDimensions: async () => listRatingDimensions(db),
   saveRatings: async (contentItemId, scores) => saveRatings(db, contentItemId, scores),
   listViewRules: async () => listViewRules(db),
+  getViewRulesWorkbenchData: async () => getViewRulesWorkbenchData(),
   saveViewRuleConfig: async (ruleKey, config) => saveViewRuleConfig(db, ruleKey, config),
+  saveProviderSettings: async (input) =>
+    persistProviderSettings(db, input, {
+      settingsMasterKey: config.llm?.settingsMasterKey ?? null
+    }),
+  deleteProviderSettings: async () => removeProviderSettings(db),
+  saveNlRules: async (rules: Record<NlRuleScope, string>) => {
+    for (const scope of Object.keys(rules) as NlRuleScope[]) {
+      saveNlRuleSet(db, scope, rules[scope]);
+    }
+
+    return {
+      ok: true as const,
+      run: await runNlEvaluationTask({ mode: "full-recompute" })
+    };
+  },
+  createDraftFromFeedback: async (feedbackId) => createDraftFromFeedback(feedbackId),
+  deleteFeedbackEntry: async (feedbackId) => deleteFeedbackPoolEntry(db, feedbackId),
+  clearAllFeedback: async () => clearFeedbackPool(db),
+  saveStrategyDraft: async (input) => {
+    const existingDraft = listStrategyDrafts(db).find((draft) => draft.id === input.id);
+
+    if (!existingDraft) {
+      return { ok: false as const, reason: "not-found" as const };
+    }
+
+    return updateStrategyDraft(db, {
+      ...input,
+      sourceFeedbackId: existingDraft.sourceFeedbackId
+    });
+  },
+  deleteStrategyDraft: async (draftId) => deleteStrategyDraft(db, draftId),
   listSources: async () => listSourceCards(db),
   getSourcesOperationSummary: async () => readSourcesOperationSummary(db),
   toggleSource: async (kind, enable) => toggleSource(kind, enable),
@@ -275,8 +547,8 @@ installGracefulShutdown({
   },
   scheduledTasks: [collectionScheduler, mailScheduler],
   waitForIdle: async () => {
-    // A running collection or mail task should finish before we checkpoint and close SQLite.
-    while (lock.isRunning()) {
+    // A running collection, mail, or NL recompute task should finish before we checkpoint and close SQLite.
+    while (lock.isRunning() || nlEvaluationLock.isRunning()) {
       await wait(100);
     }
   },

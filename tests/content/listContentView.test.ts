@@ -7,6 +7,7 @@ import { listContentView } from "../../src/core/content/listContentView.js";
 import { openDatabase } from "../../src/core/db/openDatabase.js";
 import { runMigrations } from "../../src/core/db/runMigrations.js";
 import { seedInitialData } from "../../src/core/db/seedInitialData.js";
+import { saveFeedbackPoolEntry } from "../../src/core/feedback/feedbackPoolRepository.js";
 import { saveFavorite, saveReaction } from "../../src/core/feedback/feedbackRepository.js";
 import { saveNlEvaluations } from "../../src/core/strategy/nlEvaluationRepository.js";
 import { saveViewRuleConfig } from "../../src/core/viewRules/viewRuleRepository.js";
@@ -50,6 +51,15 @@ describe("listContentView", () => {
     const itemId = findContentIdByTitle(db, "Breaking quick blurb");
     saveFavorite(db, itemId, true);
     saveReaction(db, itemId, "dislike");
+    saveFeedbackPoolEntry(db, {
+      contentItemId: itemId,
+      reactionSnapshot: "dislike",
+      freeText: "保留 agent workflow 内容",
+      suggestedEffect: "boost",
+      strengthLevel: "high",
+      positiveKeywords: ["agent", "workflow"],
+      negativeKeywords: ["融资"]
+    });
 
     const cards = listContentView(db, "hot");
     const card = cards.find((entry) => entry.id === itemId);
@@ -60,7 +70,14 @@ describe("listContentView", () => {
       sourceName: "OpenAI",
       canonicalUrl: "https://example.com/breaking",
       isFavorited: true,
-      reaction: "dislike"
+      reaction: "dislike",
+      feedbackEntry: {
+        freeText: "保留 agent workflow 内容",
+        suggestedEffect: "boost",
+        strengthLevel: "high",
+        positiveKeywords: ["agent", "workflow"],
+        negativeKeywords: ["融资"]
+      }
     });
     expect(card?.contentScore).toBeGreaterThan(0);
     expect(card?.contentScore).toBeLessThanOrEqual(100);

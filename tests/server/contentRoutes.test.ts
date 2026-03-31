@@ -14,6 +14,13 @@ describe("content routes", () => {
         publishedAt: "2026-03-28T10:00:00.000Z",
         isFavorited: false,
         reaction: "none",
+        feedbackEntry: {
+          freeText: "保留 agent workflow 内容",
+          suggestedEffect: "boost",
+          strengthLevel: "high",
+          positiveKeywords: ["agent", "workflow"],
+          negativeKeywords: ["融资"]
+        },
         contentScore: 91,
         scoreBadges: ["24h 内", "官方源", "正文完整"]
       },
@@ -65,6 +72,15 @@ describe("content routes", () => {
     expect(response.body).toContain("24h 内");
     expect(response.body).toContain("官方源");
     expect(response.body).toContain("正文完整");
+    expect(response.body).toContain('data-content-action="feedback-panel-toggle"');
+    expect(response.body).toContain('data-content-feedback-form');
+    expect(response.body).toContain('name="freeText"');
+    expect(response.body).toContain('name="suggestedEffect"');
+    expect(response.body).toContain('name="strengthLevel"');
+    expect(response.body).toContain('name="positiveKeywords"');
+    expect(response.body).toContain('name="negativeKeywords"');
+    expect(response.body).toContain("补充反馈");
+    expect(response.body).toContain("保留 agent workflow 内容");
     expect(response.body).not.toContain('data-role="action-status"');
     expect(response.body).not.toContain('content-card-region--status');
     expect(response.body).toContain('href="https://example.com/ai-weekly"');
@@ -304,6 +320,41 @@ describe("content routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(saveReaction).toHaveBeenCalledWith(42, "dislike");
+  });
+
+  it("calls saveContentFeedback for feedback pool action", async () => {
+    const saveContentFeedback = vi.fn().mockResolvedValue({ ok: true, entryId: 9 });
+    const app = createServer({
+      saveContentFeedback
+    } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/content/42/feedback-pool",
+      payload: {
+        reactionSnapshot: "like",
+        freeText: "保留 agent workflow 内容",
+        suggestedEffect: "boost",
+        strengthLevel: "high",
+        positiveKeywords: ["agent", "workflow"],
+        negativeKeywords: ["融资"]
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(saveContentFeedback).toHaveBeenCalledWith(42, {
+      reactionSnapshot: "like",
+      freeText: "保留 agent workflow 内容",
+      suggestedEffect: "boost",
+      strengthLevel: "high",
+      positiveKeywords: ["agent", "workflow"],
+      negativeKeywords: ["融资"]
+    });
+    expect(response.json()).toEqual({
+      ok: true,
+      contentItemId: 42,
+      entryId: 9
+    });
   });
 
   it("returns latest average rating in ratings action response", async () => {

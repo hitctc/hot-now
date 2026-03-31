@@ -1,4 +1,4 @@
-import { defineComponent, h } from "vue";
+import { defineComponent, h, type Component } from "vue";
 import { createRouter, createWebHistory, type RouteRecordRaw, type RouterHistory } from "vue-router";
 
 import { APP_ROUTE_BASE } from "./appBases";
@@ -75,7 +75,7 @@ declare module "vue-router" {
   }
 }
 
-function createRoutePage(meta: ShellPageMeta) {
+function createRoutePage(meta: ShellPageMeta): Component {
   return defineComponent({
     name: `${meta.key}RoutePage`,
     setup() {
@@ -95,7 +95,7 @@ function createRouteName(meta: ShellPageMeta): string {
   return `${meta.key}-${pathSegment}`;
 }
 
-function createShellRoute(meta: ShellPageMeta, component: ReturnType<typeof createRoutePage>): RouteRecordRaw {
+function createShellRoute(meta: ShellPageMeta, component: Component): RouteRecordRaw {
   return {
     path: meta.path,
     name: createRouteName(meta),

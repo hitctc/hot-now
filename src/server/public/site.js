@@ -889,7 +889,7 @@
   }
 
   function isContentPathname(pathname) {
-    return pathname === "/" || pathname === "/articles" || pathname === "/ai";
+    return pathname === "/" || pathname === "/ai-new" || pathname === "/ai-hot";
   }
 
   function syncContentSourceCheckboxes(filter, selectedKinds) {

@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { sessionCookieName } from "../../src/core/auth/session.js";
@@ -208,6 +210,66 @@ describe("createServer", () => {
     expect(response.body).toContain('<div id="app"></div>');
     expect(response.body).toContain('/client/assets/');
     expect(response.body).not.toContain('class="shell-root"');
+  });
+
+  it("returns a readable fallback shell instead of fake asset paths when the client build is missing", async () => {
+    const originalCwd = process.cwd();
+    const tempWorkspace = mkdtempSync(path.join(tmpdir(), "hot-now-missing-client-build-"));
+
+    process.chdir(tempWorkspace);
+
+    try {
+      const app = createServer({
+        auth: {
+          requireLogin: true,
+          sessionSecret: "test-secret",
+          verifyLogin: vi.fn().mockResolvedValue({
+            username: "admin",
+            displayName: "管理员",
+            role: "owner"
+          })
+        },
+        getCurrentUserProfile: vi.fn().mockResolvedValue({
+          username: "admin",
+          displayName: "管理员",
+          role: "owner",
+          email: "admin@example.com"
+        })
+      });
+
+      const response = await app.inject({ method: "GET", url: "/settings/profile" });
+
+      expect(response.statusCode).toBe(302);
+      expect(response.headers.location).toBe("/login");
+
+      const loginResponse = await app.inject({
+        method: "POST",
+        url: "/login",
+        payload: { username: "admin", password: "admin" }
+      });
+
+      expect(loginResponse.statusCode).toBe(302);
+
+      const sessionCookie = pickCookieValue(loginResponse.headers["set-cookie"]);
+
+      expect(sessionCookie).toBeTruthy();
+
+      const shellResponse = await app.inject({
+        method: "GET",
+        url: "/settings/profile",
+        headers: {
+          cookie: sessionCookie ?? ""
+        }
+      });
+
+      expect(shellResponse.statusCode).toBe(200);
+      expect(shellResponse.body).toContain("客户端资源未准备好");
+      expect(shellResponse.body).toContain("npm run build:client");
+      expect(shellResponse.body).not.toContain("/client/assets/index.js");
+      expect(shellResponse.body).not.toContain("/client/assets/index.css");
+    } finally {
+      process.chdir(originalCwd);
+    }
   });
 
   it("redirects anonymous users to login for unified shell system pages when auth is enabled", async () => {

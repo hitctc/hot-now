@@ -129,7 +129,7 @@
 - 类型构建：`npm run build`
 - 测试：`npm run test`
 
-`npm run dev:local` 现在会在启动前检查本地 `3030` 端口；如果已有旧的监听进程占着这个端口，会先停止旧进程，再启动新的本地开发服务。`npm run dev` 保持原样，不会主动杀进程。
+`npm run dev` 和 `npm run dev:local` 现在都会在启动前准备最新 client bundle。`npm run dev:local` 还会检查本地 `3030` 端口；如果已有旧的监听进程占着这个端口，会先停止旧进程，再启动新的本地开发服务。
 
 SQLite 可靠性约定：
 

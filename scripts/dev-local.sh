@@ -11,6 +11,9 @@ set -a
 . ./.env.local
 set +a
 
+echo "Preparing client bundle..."
+npm run build:client
+
 port="${PORT:-3030}"
 listen_pids="$(lsof -tiTCP:${port} -sTCP:LISTEN 2>/dev/null || true)"
 

@@ -22,7 +22,7 @@ export SESSION_SECRET="replace-with-long-random-secret"
 export LLM_SETTINGS_MASTER_KEY="replace-with-local-master-key"
 ```
 
-4. 如果这次改动涉及 `/settings/*` 系统页，先构建最新客户端资源：`npm run build:client`
+4. 如果这次改动涉及 unified shell 客户端页面，先构建最新客户端资源：`npm run build:client`
 5. 启动开发服务：
 
 - 标准方式：
@@ -40,7 +40,7 @@ npm run dev
 npm run dev:local
 ```
 
-`dev:local` 会先检查本地 `3030` 端口；如果已有旧的开发监听进程占着这个端口，它会先停掉旧进程，再启动新的服务。
+`dev` 和 `dev:local` 现在都会先准备最新 client bundle，再启动 Fastify。`dev:local` 还会先检查本地 `3030` 端口；如果已有旧的开发监听进程占着这个端口，它会先停掉旧进程，再启动新的服务。
 
 QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 

@@ -72,10 +72,25 @@ describe("client app shell", () => {
     expect(wrapper.find("[data-shell-page-description]").text()).toContain("登录用户摘要");
     expect(wrapper.find("[data-shell-theme-toggle]").exists()).toBe(true);
 
-    for (const page of shellPageMetas) {
-      const navLink = wrapper.get(`[data-shell-nav='${page.key}']`);
-      expect(navLink.text()).toContain(page.navLabel);
-    }
+    const navLinks = wrapper.findAll(".unified-shell__nav-link");
+
+    expect(navLinks.map((node) => node.attributes("href"))).toEqual([
+      "/",
+      "/ai-hot",
+      "/settings/view-rules",
+      "/settings/sources",
+      "/settings/profile"
+    ]);
+
+    expect(
+      navLinks.map((node) => node.find(".unified-shell__nav-label").text().trim())
+    ).toEqual([
+      "AI 新讯",
+      "AI 热点",
+      "筛选策略",
+      "数据收集",
+      "当前用户"
+    ]);
   });
 
   it("keeps the /client/ asset base separate from the /settings/ route base", async () => {
@@ -89,5 +104,9 @@ describe("client app shell", () => {
     expect(router.currentRoute.value.fullPath).toBe("/settings/profile");
     expect(router.resolve("/settings/profile").href).toBe("/settings/profile");
     expect(router.getRoutes().some((route) => route.path === "/client/settings/profile")).toBe(false);
+    expect(router.getRoutes().some((route) => route.path === "/")).toBe(true);
+    expect(router.getRoutes().some((route) => route.path === "/ai-new")).toBe(true);
+    expect(router.getRoutes().some((route) => route.path === "/ai-hot")).toBe(true);
+    expect(router.getRoutes().some((route) => route.path === "/articles")).toBe(false);
   });
 });

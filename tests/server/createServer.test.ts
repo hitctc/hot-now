@@ -148,7 +148,7 @@ describe("createServer", () => {
   });
 
   it("starts the built entry point and returns health", async () => {
-    const child = spawn(process.execPath, [fileURLToPath(new URL("../../dist/main.js", import.meta.url))], {
+    const child = spawn(process.execPath, [fileURLToPath(new URL("../../dist/server/main.js", import.meta.url))], {
       // The built entry now boots the real digest app, so the smoke test has to provide the required runtime env.
       env: makeAppEnv(),
       stdio: ["ignore", "pipe", "pipe"]

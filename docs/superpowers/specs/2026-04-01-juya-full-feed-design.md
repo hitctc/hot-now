@@ -1,5 +1,8 @@
 # HotNow Juya Full Feed Visibility Design
 
+> Superseded on 2026-04-01 by [2026-04-01-source-display-mode-and-sort-design.md](/Users/tc-nihao/100-tc/700-code/100-center/hot-now/docs/superpowers/specs/2026-04-01-source-display-mode-and-sort-design.md).
+> Do not use this document for implementation. It reflects an earlier `Juya-only` direction that was later replaced by a source-level configurable display-mode design.
+
 ## 背景
 
 当前内容页的展示链路是统一内容池模型：

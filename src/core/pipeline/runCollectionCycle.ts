@@ -84,9 +84,9 @@ export async function runCollectionCycle(
       ? runDbMirrorStep(() => {
           const ids: number[] = [];
 
-          for (const issue of enrichedIssues) {
-            ids.push(...persistCollectedItems(runtimeDeps.db!, issue, issue.items));
-          }
+      for (const issue of enrichedIssues) {
+        ids.push(...persistCollectedItems(runtimeDeps.db!, issue, issue.items));
+      }
 
           return ids;
         }) ?? []
@@ -220,7 +220,7 @@ function persistCollectedItems(db: SqliteDatabase, issue: LoadedIssue, items: En
     sourceId: source.id,
     items: items.map((item) => ({
       externalId: item.externalId,
-      title: pickPersistedTitle(item.title, item.article),
+      title: pickPersistedTitle(issue.sourceKind, item.title, item.article),
       canonicalUrl: item.sourceUrl,
       summary: item.summary,
       bodyMarkdown: item.article.ok ? item.article.text : "",
@@ -247,7 +247,12 @@ function persistCollectedItems(db: SqliteDatabase, issue: LoadedIssue, items: En
 
 // Feed titles are the default because they are stable across sources, but a successful extracted
 // article title can replace them when it clearly adds more specific page-level wording.
-function pickPersistedTitle(feedTitle: string, article: ArticleResult): string {
+function pickPersistedTitle(sourceKind: LoadedIssue["sourceKind"], feedTitle: string, article: ArticleResult): string {
+  // Juya's digest titles are already curated at the issue level, so page titles must not overwrite them.
+  if (sourceKind === "juya") {
+    return feedTitle;
+  }
+
   if (article.ok && article.title.trim().length > 0) {
     return article.title.trim();
   }

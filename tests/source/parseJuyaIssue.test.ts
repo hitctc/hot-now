@@ -65,6 +65,43 @@ describe("parseJuyaIssue", () => {
 
     expect(issue.items).toEqual([]);
   });
+
+  it("assigns the issue date as publishedAt when the feed item only exposes the date in the title", async () => {
+    const xml = `<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><item><title>2026-04-01</title><link>https://example.com/issue</link><content:encoded><![CDATA[<h3>要闻</h3><ul><li>示例 <a href="https://example.com/a">↗</a><code>#1</code></li></ul>]]></content:encoded></item></channel></rss>`;
+
+    const issue = await parseJuyaIssue(xml);
+
+    expect(issue.items[0]).toEqual(
+      expect.objectContaining({
+        publishedAt: "2026-04-01T00:00:00.000Z"
+      })
+    );
+  });
+
+  it("extracts per-item summaries from the detailed article sections", async () => {
+    const xml = `<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><item><title>2026-04-01</title><link>https://example.com/issue</link><content:encoded><![CDATA[
+      <h2>概览</h2>
+      <h3>要闻</h3>
+      <ul>
+        <li>OpenAI 完成 1220 亿美元融资 <a href="https://example.com/openai">↗</a> <code>#1</code></li>
+      </ul>
+      <hr>
+      <h2><a href="https://example.com/openai">OpenAI 完成 1220 亿美元融资</a> <code>#1</code></h2>
+      <blockquote>
+        <p>OpenAI 宣布完成新一轮融资，并继续扩张算力基础设施。</p>
+        <p>摘要第二句。</p>
+      </blockquote>
+      <p>这里是后续正文。</p>
+    ]]></content:encoded></item></channel></rss>`;
+
+    const issue = await parseJuyaIssue(xml);
+
+    expect(issue.items[0]).toEqual(
+      expect.objectContaining({
+        summary: "OpenAI 宣布完成新一轮融资，并继续扩张算力基础设施。 摘要第二句。"
+      })
+    );
+  });
 });
 
 describe("loadLatestIssue", () => {

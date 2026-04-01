@@ -111,6 +111,62 @@ describe("startMailScheduler", () => {
 });
 
 describe("runDailyDigest", () => {
+  it("keeps the juya feed title even when article extraction returns a different page title", async () => {
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-run-"));
+    const config = makeConfig(rootDir);
+    const db = createTestDatabase(path.join(rootDir, "hot-now.sqlite"));
+
+    await runDailyDigest(config, "manual", {
+      db,
+      loadEnabledSourceIssues: vi.fn().mockResolvedValue([
+        {
+          date: "2026-04-01",
+          issueUrl: "https://imjuya.github.io/juya-ai-daily/issue-46/",
+          sourceKind: "juya",
+          sourceType: "aggregator",
+          sourcePriority: 70,
+          items: [
+            {
+              rank: 1,
+              category: "要闻",
+              title: "OpenAI 完成 1220 亿美元融资，官宣打造超级应用",
+              sourceUrl: "https://openai.com/index/accelerating-the-next-phase-ai/",
+              sourceName: "Juya AI Daily",
+              externalId: "juya-1",
+              summary: "OpenAI 融资摘要",
+              publishedAt: "2026-04-01T01:02:39.000Z"
+            }
+          ]
+        }
+      ]),
+      fetchArticle: vi.fn().mockResolvedValue({
+        ok: true,
+        url: "https://openai.com/index/accelerating-the-next-phase-ai/",
+        title: "Accelerating the next phase of AI",
+        text: "OpenAI 官方页面正文。"
+      }),
+      sendDailyEmail: vi.fn().mockResolvedValue(undefined)
+    });
+
+    const contentItem = db
+      .prepare(
+        `
+          SELECT title, canonical_url
+          FROM content_items
+          WHERE canonical_url = 'https://openai.com/index/accelerating-the-next-phase-ai/'
+          LIMIT 1
+        `
+      )
+      .get() as { title: string; canonical_url: string } | undefined;
+
+    expect(contentItem).toEqual({
+      title: "OpenAI 完成 1220 亿美元融资，官宣打造超级应用",
+      canonical_url: "https://openai.com/index/accelerating-the-next-phase-ai/"
+    });
+
+    db.close();
+  });
+
   it("writes report files and mirrors content from multiple enabled sources", async () => {
     const rootDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-run-"));
     const config = makeConfig(rootDir);

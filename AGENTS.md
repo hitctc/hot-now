@@ -19,7 +19,7 @@
   - `发信链路`：`定时 / 手动发信 -> 读取最新一份已生成报告 -> SMTP 发邮件`
 - 当前数据源：`https://imjuya.github.io/juya-ai-daily/rss.xml`、`https://openai.com/news/rss.xml`、`https://blog.google/technology/ai/rss/`、`https://36kr.com/feed`、`https://36kr.com/feed-newsflash`、`https://techcrunch.com/category/artificial-intelligence/feed/`、`https://www.ifanr.com/feed`、`https://www.ithome.com/rss/`
 - 当前采集语义：以 `is_enabled` 为准决定是否参与采集；`is_active` 仅保留兼容，不再作为系统菜单主语义
-- 当前技术栈：`Node.js + TypeScript + Fastify + Vue 3 + Vite + Ant Design Vue + Vitest`
+- 当前技术栈：`Node.js + TypeScript + Fastify + Vue 3 + Vite + Ant Design Vue + Tailwind CSS + Vitest`
 
 当前仓库已经有较完整的实现、配置模板、测试和设计/计划文档，不要把它当成从零开始的脚手架项目处理。
 
@@ -29,6 +29,7 @@
   负责启动配置加载、运行锁、Fastify 服务和定时任务，并装配反馈工作台与自然语言重算链路，是应用入口。
 - `src/client/`
   负责 `/settings/*` 系统页的 Vue 3 客户端入口、路由、页面组件、主题和前端 service 封装。
+  客户端样式栈固定为 `Vue 3 + Vite + Ant Design Vue + Tailwind CSS`；统一主题源收口到 `src/client/theme/editorialTokens.ts`，`src/client/styles/tailwind.css` 只保留基础样式、主题变量和少量 AntD 深层覆写，不要再长出新的大型 CSS 皮肤文件。
 - `src/core/config/`
   负责读取 `config/hot-now.config.json` 和环境变量，组装运行时配置。
 - `src/core/source/`

@@ -1,6 +1,6 @@
 # hot-now
 
-本地单机运行的科技资讯编辑台。它会按固定周期拉取多个已启用的 RSS 源、抓取原文、做规则聚类、按系统百分制评分排序内容、生成多源汇总的 HTML/JSON 报告；邮件发送与采集解耦，可按每日固定时间或手动触发，对最新一份报告单独发信。统一站点继续由 Fastify 托管路由和登录态，但 `/settings/*` 系统页现在已经切到 `Vue 3 + Vite + Ant Design Vue`。
+本地单机运行的科技资讯编辑台。它会按固定周期拉取多个已启用的 RSS 源、抓取原文、做规则聚类、按系统百分制评分排序内容、生成多源汇总的 HTML/JSON 报告；邮件发送与采集解耦，可按每日固定时间或手动触发，对最新一份报告单独发信。统一站点继续由 Fastify 托管路由和登录态，但 `/settings/*` 系统页现在已经切到 `Vue 3 + Vite + Ant Design Vue + Tailwind CSS`。
 
 ## 本地启动
 
@@ -68,6 +68,8 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 如果本地 `data/hot-now.sqlite` 内容库损坏，内容页会降级显示错误提示，而不是直接返回 `500`
 - 统一站点左侧导航底部支持深色 / 浅色主题切换，主题偏好保存在浏览器本地 `localStorage`，刷新后保持
 - `unified shell` 页面已完整接入以浅色为母版的 `Editorial Signal Desk` 双主题：`/`、`/ai-new`、`/ai-hot`、`/settings/*`
+- Vue 客户端样式栈现在是 `Vue 3 + Vite + Ant Design Vue + Tailwind CSS`；统一主题源收口到 `src/client/theme/editorialTokens.ts`
+- `src/client/styles/tailwind.css` 只保留基础样式、主题变量和少量 AntD 深层覆写，不再新增大型 CSS 皮肤文件
 - 统一站点保留左侧品牌块、浅深主题切换和本地 `localStorage` 持久化
 - `/settings/*` 现在通过 Fastify 返回统一客户端入口，再由 `Vue 3 + Ant Design Vue` 接管页面渲染
 - `/`、`/ai-new`、`/ai-hot` 现在也通过 Fastify 返回统一客户端入口，再由 `Vue 3 + Ant Design Vue` 内容页读取 `/api/content/ai-new`、`/api/content/ai-hot` 渲染

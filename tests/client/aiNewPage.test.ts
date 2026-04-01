@@ -7,7 +7,9 @@ import AiNewPage from "../../src/client/pages/content/AiNewPage.vue";
 const contentApiMocks = vi.hoisted(() => ({
   readAiNewPage: vi.fn(),
   readStoredContentSourceKinds: vi.fn(),
-  writeStoredContentSourceKinds: vi.fn()
+  writeStoredContentSourceKinds: vi.fn(),
+  readStoredContentSortMode: vi.fn(),
+  writeStoredContentSortMode: vi.fn()
 }));
 
 vi.mock("../../src/client/services/contentApi", async () => {
@@ -19,7 +21,9 @@ vi.mock("../../src/client/services/contentApi", async () => {
     ...actual,
     readAiNewPage: contentApiMocks.readAiNewPage,
     readStoredContentSourceKinds: contentApiMocks.readStoredContentSourceKinds,
-    writeStoredContentSourceKinds: contentApiMocks.writeStoredContentSourceKinds
+    writeStoredContentSourceKinds: contentApiMocks.writeStoredContentSourceKinds,
+    readStoredContentSortMode: contentApiMocks.readStoredContentSortMode,
+    writeStoredContentSortMode: contentApiMocks.writeStoredContentSortMode
   };
 });
 
@@ -27,8 +31,8 @@ const baseModel = {
   pageKey: "ai-new" as const,
   sourceFilter: {
     options: [
-      { kind: "openai", name: "OpenAI" },
-      { kind: "ithome", name: "IT之家" }
+      { kind: "openai", name: "OpenAI", showAllWhenSelected: false },
+      { kind: "ithome", name: "IT之家", showAllWhenSelected: true }
     ],
     selectedSourceKinds: ["openai"]
   },
@@ -88,6 +92,7 @@ describe("AiNewPage", () => {
     vi.resetAllMocks();
     window.localStorage.clear();
     contentApiMocks.readStoredContentSourceKinds.mockReturnValue(["openai"]);
+    contentApiMocks.readStoredContentSortMode.mockReturnValue(null);
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: vi.fn().mockImplementation((query: string) => ({
@@ -114,7 +119,7 @@ describe("AiNewPage", () => {
 
     await flushPromises();
 
-    expect(contentApiMocks.readAiNewPage).toHaveBeenCalledWith(["openai"]);
+    expect(contentApiMocks.readAiNewPage).toHaveBeenCalledWith(["openai"], "published_at");
     expect(wrapper.get("[data-content-page='ai-new']").text()).toContain("AI 新讯");
     expect(wrapper.get("[data-content-page='ai-new']").classes()).toEqual(
       expect.arrayContaining(["flex", "flex-col", "gap-6"])
@@ -162,8 +167,8 @@ describe("AiNewPage", () => {
           ],
           sourceFilter: {
             options: [
-              { kind: "openai", name: "OpenAI" },
-              { kind: "ithome", name: "IT之家" }
+              { kind: "openai", name: "OpenAI", showAllWhenSelected: false },
+              { kind: "ithome", name: "IT之家", showAllWhenSelected: true }
             ],
             selectedSourceKinds: ["openai", "ithome"]
           }
@@ -184,7 +189,26 @@ describe("AiNewPage", () => {
     expect(contentApiMocks.writeStoredContentSourceKinds).toHaveBeenCalledWith(["openai"]);
     expect(contentApiMocks.writeStoredContentSourceKinds).toHaveBeenCalledWith(["openai", "ithome"]);
     expect(contentApiMocks.readAiNewPage).toHaveBeenCalledTimes(2);
-    expect(contentApiMocks.readAiNewPage).toHaveBeenLastCalledWith(["openai", "ithome"]);
+    expect(contentApiMocks.readAiNewPage).toHaveBeenLastCalledWith(["openai", "ithome"], "published_at");
     expect(wrapper.get("[data-content-section='featured']").text()).toContain("New OpenAI Model");
+  });
+
+  it("persists sort mode changes and reloads with the shared sort preference", async () => {
+    contentApiMocks.readAiNewPage
+      .mockResolvedValueOnce(createModel())
+      .mockResolvedValueOnce(createModel());
+
+    const wrapper = mount(AiNewPage, {
+      global: {
+        plugins: [Antd]
+      }
+    });
+
+    await flushPromises();
+    await wrapper.get("[data-content-sort-mode='content_score']").trigger("click");
+    await flushPromises();
+
+    expect(contentApiMocks.writeStoredContentSortMode).toHaveBeenCalledWith("content_score");
+    expect(contentApiMocks.readAiNewPage).toHaveBeenLastCalledWith(["openai"], "content_score");
   });
 });

@@ -10,7 +10,10 @@ export type ContentViewSelectionOptions = {
   selectedSourceKinds?: string[];
   referenceTime?: Date;
   limitOverride?: number;
+  sortMode?: ContentSortMode;
 };
+
+export type ContentSortMode = "published_at" | "content_score";
 
 export type RankedContentCardView = ContentCardView & {
   rankingScore: number;
@@ -24,6 +27,7 @@ export type ContentViewSelection = {
 
 type RankedContentCardCandidate = RankedContentCardView & {
   isBlocked: boolean;
+  showAllWhenSelected: boolean;
 };
 
 type ContentCardRow = {
@@ -33,6 +37,7 @@ type ContentCardRow = {
   bodyMarkdown: string | null;
   sourceName: string;
   sourceKind: string;
+  showAllWhenSelected: number;
   canonicalUrl: string;
   publishedAt: string | null;
   favoriteValue: string | null;
@@ -90,6 +95,7 @@ const contentSelectSql = `
     ci.body_markdown AS bodyMarkdown,
     cs.name AS sourceName,
     cs.kind AS sourceKind,
+    cs.show_all_when_selected AS showAllWhenSelected,
     ci.canonical_url AS canonicalUrl,
     ci.published_at AS publishedAt,
     latest_favorite.feedback_value AS favoriteValue,
@@ -128,6 +134,7 @@ export function buildContentViewSelection(
   const viewRuleConfig = getViewRuleConfig(db, viewKey);
   const referenceTime = options.referenceTime ?? new Date();
   const includeNlEvaluations = options.includeNlEvaluations ?? true;
+  const sortMode = options.sortMode ?? "published_at";
   const selectedSourceKinds = normalizeSelectedSourceKinds(options.selectedSourceKinds);
   const rows = db.prepare(contentSelectSql).all({ viewScope: viewKey }) as ContentCardRow[];
   const rankedCards = rows
@@ -141,26 +148,26 @@ export function buildContentViewSelection(
     )
     .filter((card) => !card.isBlocked)
     .filter((card) => selectedSourceKinds === null || selectedSourceKinds.has(card.sourceKind))
-    .sort((left, right) => {
-      if (right.rankingScore !== left.rankingScore) {
-        return right.rankingScore - left.rankingScore;
-      }
-
-      const rightTimestamp = toTimestampMs(right.rankingTimestamp);
-      const leftTimestamp = toTimestampMs(left.rankingTimestamp);
-
-      if (rightTimestamp !== leftTimestamp) {
-        return rightTimestamp - leftTimestamp;
-      }
-
-      return right.id - left.id;
-    })
-    .map(({ isBlocked: _isBlocked, ...card }) => card);
+    .sort(compareByRanking);
   const limit = options.limitOverride ?? viewRuleConfig.limit;
+  const fullDisplaySourceKinds =
+    selectedSourceKinds === null
+      ? new Set<string>()
+      : new Set(
+          rankedCards
+            .filter((card) => card.showAllWhenSelected && selectedSourceKinds.has(card.sourceKind))
+            .map((card) => card.sourceKind)
+        );
+  const visibleCards = [
+    ...rankedCards.filter((card) => fullDisplaySourceKinds.has(card.sourceKind)),
+    ...rankedCards.filter((card) => !fullDisplaySourceKinds.has(card.sourceKind)).slice(0, limit)
+  ]
+    .sort((left, right) => compareVisibleCards(sortMode, left, right))
+    .map(({ isBlocked: _isBlocked, showAllWhenSelected: _showAllWhenSelected, ...card }) => card);
 
   return {
-    candidateCards: rankedCards,
-    visibleCards: rankedCards.slice(0, limit)
+    candidateCards: rankedCards.map(({ isBlocked: _isBlocked, showAllWhenSelected: _showAllWhenSelected, ...card }) => card),
+    visibleCards
   };
 }
 
@@ -190,6 +197,7 @@ function buildRankedCardCandidate(
     summary: row.summary?.trim() || "暂无摘要",
     sourceName: row.sourceName,
     sourceKind: row.sourceKind,
+    showAllWhenSelected: row.showAllWhenSelected === 1,
     canonicalUrl: row.canonicalUrl,
     publishedAt: row.publishedAt,
     isFavorited: row.favoriteValue === "1",
@@ -227,6 +235,21 @@ function normalizeSelectedSourceKinds(selectedSourceKinds?: string[]) {
   }
 
   return new Set(selectedSourceKinds.map((kind) => kind.trim()).filter(Boolean));
+}
+
+function compareByRanking(left: RankedContentCardCandidate, right: RankedContentCardCandidate): number {
+  if (right.rankingScore !== left.rankingScore) {
+    return right.rankingScore - left.rankingScore;
+  }
+
+  const rightTimestamp = toTimestampMs(right.rankingTimestamp);
+  const leftTimestamp = toTimestampMs(left.rankingTimestamp);
+
+  if (rightTimestamp !== leftTimestamp) {
+    return rightTimestamp - leftTimestamp;
+  }
+
+  return right.id - left.id;
 }
 
 function normalizeReaction(value: string | null): "like" | "dislike" | "none" {
@@ -310,6 +333,34 @@ function calculateFreshnessWindowScore(
   }
 
   return Math.max(0, Math.min(100, 100 - (ageDays / windowDays) * 100));
+}
+
+function compareVisibleCards(sortMode: ContentSortMode, left: RankedContentCardCandidate, right: RankedContentCardCandidate): number {
+  if (sortMode === "content_score") {
+    if (right.contentScore !== left.contentScore) {
+      return right.contentScore - left.contentScore;
+    }
+
+    const publishedDelta = toTimestampMs(right.publishedAt ?? right.rankingTimestamp) - toTimestampMs(left.publishedAt ?? left.rankingTimestamp);
+
+    if (publishedDelta !== 0) {
+      return publishedDelta;
+    }
+
+    return compareByRanking(left, right);
+  }
+
+  const publishedDelta = toTimestampMs(right.publishedAt ?? right.rankingTimestamp) - toTimestampMs(left.publishedAt ?? left.rankingTimestamp);
+
+  if (publishedDelta !== 0) {
+    return publishedDelta;
+  }
+
+  if (right.contentScore !== left.contentScore) {
+    return right.contentScore - left.contentScore;
+  }
+
+  return compareByRanking(left, right);
 }
 
 function toTimestampMs(value: string | null): number {

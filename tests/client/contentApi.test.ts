@@ -16,7 +16,7 @@ describe("contentApi", () => {
     requestJson.mockResolvedValue({
       pageKey: "ai-new",
       sourceFilter: {
-        options: [{ kind: "openai", name: "OpenAI" }],
+        options: [{ kind: "openai", name: "OpenAI", showAllWhenSelected: false }],
         selectedSourceKinds: ["openai"]
       },
       featuredCard: null,
@@ -26,20 +26,23 @@ describe("contentApi", () => {
 
     const { readAiNewPage, readAiHotPage } = await import("../../src/client/services/contentApi");
 
-    await readAiNewPage([" openai ", "openai", "ithome"]);
-    await readAiHotPage(undefined);
+    await readAiNewPage([" openai ", "openai", "ithome"], "content_score");
+    await readAiHotPage(undefined, "published_at");
 
     expect(requestJson).toHaveBeenNthCalledWith(
       1,
       "/api/content/ai-new",
       expect.objectContaining({
         headers: {
-          "x-hot-now-source-filter": "openai,ithome"
+          "x-hot-now-source-filter": "openai,ithome",
+          "x-hot-now-content-sort": "content_score"
         }
       })
     );
     expect(requestJson).toHaveBeenNthCalledWith(2, "/api/content/ai-hot", {
-      headers: undefined
+      headers: {
+        "x-hot-now-content-sort": "published_at"
+      }
     });
   });
 
@@ -52,6 +55,38 @@ describe("contentApi", () => {
 
     expect(window.localStorage.getItem(CONTENT_SOURCE_STORAGE_KEY)).toBe('["openai","ithome"]');
     expect(readStoredContentSourceKinds()).toEqual(["openai", "ithome"]);
+  });
+
+  it("persists sort mode and derives first-visit source defaults", async () => {
+    const {
+      CONTENT_SORT_STORAGE_KEY,
+      readStoredContentSortMode,
+      writeStoredContentSortMode,
+      deriveInitialSelectedSourceKinds
+    } = await import("../../src/client/services/contentApi");
+
+    writeStoredContentSortMode("content_score");
+
+    expect(window.localStorage.getItem(CONTENT_SORT_STORAGE_KEY)).toBe("content_score");
+    expect(readStoredContentSortMode()).toBe("content_score");
+    expect(
+      deriveInitialSelectedSourceKinds(
+        [
+          { kind: "openai", name: "OpenAI", showAllWhenSelected: false },
+          { kind: "juya", name: "Juya AI Daily", showAllWhenSelected: true }
+        ],
+        null
+      )
+    ).toEqual(["openai"]);
+    expect(
+      deriveInitialSelectedSourceKinds(
+        [
+          { kind: "openai", name: "OpenAI", showAllWhenSelected: false },
+          { kind: "juya", name: "Juya AI Daily", showAllWhenSelected: true }
+        ],
+        ["juya"]
+      )
+    ).toEqual(["juya"]);
   });
 
   it("posts content actions to dedicated endpoints", async () => {

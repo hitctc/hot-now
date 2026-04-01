@@ -7,7 +7,9 @@ import AiHotPage from "../../src/client/pages/content/AiHotPage.vue";
 const contentApiMocks = vi.hoisted(() => ({
   readAiHotPage: vi.fn(),
   readStoredContentSourceKinds: vi.fn(),
-  writeStoredContentSourceKinds: vi.fn()
+  writeStoredContentSourceKinds: vi.fn(),
+  readStoredContentSortMode: vi.fn(),
+  writeStoredContentSortMode: vi.fn()
 }));
 
 vi.mock("../../src/client/services/contentApi", async () => {
@@ -19,7 +21,9 @@ vi.mock("../../src/client/services/contentApi", async () => {
     ...actual,
     readAiHotPage: contentApiMocks.readAiHotPage,
     readStoredContentSourceKinds: contentApiMocks.readStoredContentSourceKinds,
-    writeStoredContentSourceKinds: contentApiMocks.writeStoredContentSourceKinds
+    writeStoredContentSourceKinds: contentApiMocks.writeStoredContentSourceKinds,
+    readStoredContentSortMode: contentApiMocks.readStoredContentSortMode,
+    writeStoredContentSortMode: contentApiMocks.writeStoredContentSortMode
   };
 });
 
@@ -27,8 +31,8 @@ const baseModel = {
   pageKey: "ai-hot" as const,
   sourceFilter: {
     options: [
-      { kind: "openai", name: "OpenAI" },
-      { kind: "ithome", name: "IT之家" }
+      { kind: "openai", name: "OpenAI", showAllWhenSelected: false },
+      { kind: "ithome", name: "IT之家", showAllWhenSelected: true }
     ],
     selectedSourceKinds: ["openai"]
   },
@@ -63,6 +67,7 @@ describe("AiHotPage", () => {
     vi.resetAllMocks();
     window.localStorage.clear();
     contentApiMocks.readStoredContentSourceKinds.mockReturnValue(["openai"]);
+    contentApiMocks.readStoredContentSortMode.mockReturnValue("content_score");
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: vi.fn().mockImplementation((query: string) => ({
@@ -89,7 +94,7 @@ describe("AiHotPage", () => {
 
     await flushPromises();
 
-    expect(contentApiMocks.readAiHotPage).toHaveBeenCalledWith(["openai"]);
+    expect(contentApiMocks.readAiHotPage).toHaveBeenCalledWith(["openai"], "content_score");
     expect(wrapper.get("[data-content-page='ai-hot']").text()).toContain("AI 热点");
     expect(wrapper.get("[data-content-page='ai-hot']").classes()).toEqual(
       expect.arrayContaining(["flex", "flex-col", "gap-6"])

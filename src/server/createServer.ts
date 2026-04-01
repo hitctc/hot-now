@@ -2,7 +2,7 @@ import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { LatestReportEmailError, type LatestReportEmailErrorReason } from "../core/pipeline/sendLatestReportEmail.js";
-import type { ContentViewSelectionOptions } from "../core/content/buildContentViewSelection.js";
+import type { ContentSortMode, ContentViewSelectionOptions } from "../core/content/buildContentViewSelection.js";
 import type { ContentCardView, ContentViewKey } from "../core/content/listContentView.js";
 import type { FeedbackSaveResult, ReactionValue } from "../core/feedback/feedbackRepository.js";
 import type { SaveFeedbackPoolEntryInput, SaveFeedbackPoolEntryResult } from "../core/feedback/feedbackPoolRepository.js";
@@ -94,7 +94,7 @@ type ContentPageKey = "ai-new" | "ai-hot";
 type ContentPageModel = {
   pageKey: ContentPageKey;
   sourceFilter?: {
-    options: { kind: string; name: string }[];
+    options: { kind: string; name: string; showAllWhenSelected: boolean }[];
     selectedSourceKinds: string[];
   };
   featuredCard: ContentCardView | null;
@@ -118,7 +118,7 @@ type ServerDeps = {
   isRunning?: () => boolean;
   listContentView?: (
     viewKey: ContentViewKey,
-    options?: Pick<ContentViewSelectionOptions, "selectedSourceKinds">
+    options?: Pick<ContentViewSelectionOptions, "selectedSourceKinds" | "sortMode">
   ) => Promise<ContentCardView[]> | ContentCardView[];
   listContentSources?: () => Promise<ContentSourceOption[]> | ContentSourceOption[];
   saveFavorite?: (contentItemId: number, isFavorited: boolean) => Promise<FeedbackSaveResult> | FeedbackSaveResult;
@@ -150,7 +150,7 @@ type ServerDeps = {
   getCurrentUserProfile?: () => Promise<CurrentUserProfile | null> | CurrentUserProfile | null;
   getContentPageModel?: (
     pageKey: ContentPageKey,
-    options?: Pick<ContentViewSelectionOptions, "selectedSourceKinds">
+    options?: Pick<ContentViewSelectionOptions, "selectedSourceKinds" | "sortMode">
   ) => Promise<ContentPageModel> | ContentPageModel;
   auth?: {
     requireLogin: boolean;
@@ -1168,7 +1168,16 @@ async function readContentPageModelApiData(
 ): Promise<ContentPageModel> {
   if (deps.getContentPageModel) {
     const selectedSourceKinds = readSelectedSourceKindsHeader(request.headers["x-hot-now-source-filter"]);
-    return deps.getContentPageModel(pageKey, selectedSourceKinds === undefined ? undefined : { selectedSourceKinds });
+    const sortMode = readContentSortModeHeader(request.headers["x-hot-now-content-sort"]);
+    return deps.getContentPageModel(
+      pageKey,
+      selectedSourceKinds === undefined && sortMode === undefined
+        ? undefined
+        : {
+            selectedSourceKinds,
+            sortMode
+          }
+    );
   }
 
   return buildContentPageModelFromDependencies(deps, request, pageKey);
@@ -1197,22 +1206,29 @@ async function buildContentPageModelFromDependencies(
   try {
     const sourceOptions = ((await deps.listContentSources?.()) ?? []).filter((source) => source.isEnabled);
     const selectedSourceKinds = readContentPageSelectedSourceKinds(request.headers["x-hot-now-source-filter"], sourceOptions);
-    const cards = selectedSourceKinds === undefined
-      ? await deps.listContentView(viewKey)
-      : await deps.listContentView(viewKey, { selectedSourceKinds });
+    const effectiveSelectedSourceKinds = selectedSourceKinds ?? deriveDefaultSelectedSourceKinds(sourceOptions);
+    const sortMode = readContentSortModeHeader(request.headers["x-hot-now-content-sort"]) ?? "published_at";
+    const cards = await deps.listContentView(viewKey, {
+      selectedSourceKinds: effectiveSelectedSourceKinds,
+      sortMode
+    });
 
     return {
       pageKey,
       sourceFilter: sourceOptions.length > 0
         ? {
-            options: sourceOptions.map((source) => ({ kind: source.kind, name: source.name })),
-            selectedSourceKinds: selectedSourceKinds ?? sourceOptions.map((source) => source.kind)
+            options: sourceOptions.map((source) => ({
+              kind: source.kind,
+              name: source.name,
+              showAllWhenSelected: source.showAllWhenSelected
+            })),
+            selectedSourceKinds: effectiveSelectedSourceKinds
           }
         : undefined,
       featuredCard: pageKey === "ai-new" ? cards[0] ?? null : null,
       cards: pageKey === "ai-new" ? cards.slice(1) : cards,
       emptyState:
-        selectedSourceKinds?.length === 0
+        effectiveSelectedSourceKinds.length === 0
           ? {
               title: "当前未选择任何数据源",
               description: "重新全选后即可恢复内容结果。",
@@ -1257,21 +1273,28 @@ async function renderContentForView(
   try {
     const sourceOptions = ((await deps.listContentSources?.()) ?? []).filter((source) => source.isEnabled);
     const selectedSourceKinds = readContentPageSelectedSourceKinds(request.headers["x-hot-now-source-filter"], sourceOptions);
-    const cards = selectedSourceKinds === undefined
-      ? await deps.listContentView(viewKey)
-      : await deps.listContentView(viewKey, { selectedSourceKinds });
+    const effectiveSelectedSourceKinds = selectedSourceKinds ?? deriveDefaultSelectedSourceKinds(sourceOptions);
+    const sortMode = readContentSortModeHeader(request.headers["x-hot-now-content-sort"]) ?? "published_at";
+    const cards = await deps.listContentView(viewKey, {
+      selectedSourceKinds: effectiveSelectedSourceKinds,
+      sortMode
+    });
 
     return renderContentPage({
       viewKey,
       cards,
       sourceFilter: sourceOptions.length > 0
         ? {
-            options: sourceOptions.map((source) => ({ kind: source.kind, name: source.name })),
-            selectedSourceKinds: selectedSourceKinds ?? sourceOptions.map((source) => source.kind)
+            options: sourceOptions.map((source) => ({
+              kind: source.kind,
+              name: source.name,
+              showAllWhenSelected: source.showAllWhenSelected
+            })),
+            selectedSourceKinds: effectiveSelectedSourceKinds
           }
         : undefined,
       emptyState:
-        selectedSourceKinds?.length === 0
+        effectiveSelectedSourceKinds.length === 0
           ? {
               title: "当前未选择任何数据源",
               description: "重新全选后即可恢复内容结果。",
@@ -1339,6 +1362,22 @@ function normalizeSelectedSourceKindsForOptions(
   return selectedSourceKinds.filter((kind, index, array) => {
     return enabledSourceKinds.has(kind) && array.indexOf(kind) === index;
   });
+}
+
+function deriveDefaultSelectedSourceKinds(sourceOptions: ContentSourceOption[]): string[] {
+  // First-visit defaults intentionally leave full-display sources unchecked so users do not land on
+  // an unexpectedly long feed before opting into that behavior.
+  return sourceOptions.filter((source) => !source.showAllWhenSelected).map((source) => source.kind);
+}
+
+function readContentSortModeHeader(headerValue: string | string[] | undefined): ContentSortMode | undefined {
+  const rawValue = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+
+  if (rawValue === "published_at" || rawValue === "content_score") {
+    return rawValue;
+  }
+
+  return undefined;
 }
 
 async function renderSystemPageForPath(deps: ServerDeps, pathname: string, loggedIn: boolean): Promise<string | undefined> {

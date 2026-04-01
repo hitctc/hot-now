@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 
 import ContentEmptyState from "../../components/content/ContentEmptyState.vue";
 import ContentSourceFilterBar from "../../components/content/ContentSourceFilterBar.vue";
+import ContentSortControl from "../../components/content/ContentSortControl.vue";
 import ContentStandardCard from "../../components/content/ContentStandardCard.vue";
 import {
   editorialContentIntroSectionClass,
@@ -11,10 +12,14 @@ import {
 } from "../../components/content/contentCardShared";
 import { HttpError } from "../../services/http";
 import {
+  deriveInitialSelectedSourceKinds,
   readAiHotPage,
+  readStoredContentSortMode,
   readStoredContentSourceKinds,
+  writeStoredContentSortMode,
   writeStoredContentSourceKinds,
   type ContentCard,
+  type ContentSortMode,
   type ContentPageModel
 } from "../../services/contentApi";
 
@@ -23,6 +28,7 @@ const isRefreshing = ref(false);
 const loadError = ref<string | null>(null);
 const pageModel = ref<ContentPageModel | null>(null);
 const selectedSourceKinds = ref<string[] | null>(readStoredContentSourceKinds());
+const sortMode = ref<ContentSortMode>(readStoredContentSortMode() ?? "published_at");
 
 function readPageSourceKinds(): string[] | undefined {
   return selectedSourceKinds.value === null ? undefined : selectedSourceKinds.value;
@@ -57,11 +63,13 @@ async function loadPage(options: { selectedKinds?: string[]; silent?: boolean } 
   }
 
   try {
-    const nextModel = await readAiHotPage(options.selectedKinds ?? readPageSourceKinds());
+    const nextModel = await readAiHotPage(options.selectedKinds ?? readPageSourceKinds(), sortMode.value);
     pageModel.value = nextModel;
 
     if (selectedSourceKinds.value === null) {
-      const nextKinds = nextModel.sourceFilter?.selectedSourceKinds ?? [];
+      const nextKinds = nextModel.sourceFilter
+        ? deriveInitialSelectedSourceKinds(nextModel.sourceFilter.options, selectedSourceKinds.value)
+        : [];
       selectedSourceKinds.value = nextKinds;
       writeStoredContentSourceKinds(nextKinds);
     }
@@ -84,6 +92,12 @@ async function handleSourceKindsChange(nextKinds: string[]): Promise<void> {
   selectedSourceKinds.value = nextKinds;
   writeStoredContentSourceKinds(nextKinds);
   await loadPage({ selectedKinds: nextKinds, silent: true });
+}
+
+async function handleSortModeChange(nextSortMode: ContentSortMode): Promise<void> {
+  sortMode.value = nextSortMode;
+  writeStoredContentSortMode(nextSortMode);
+  await loadPage({ selectedKinds: readPageSourceKinds(), silent: true });
 }
 
 function isDuplicatedFeaturedCard(card: ContentCard | null, cards: ContentCard[]): boolean {
@@ -142,11 +156,14 @@ onMounted(() => {
     <a-alert v-if="hasLoadError && pageModel" type="warning" show-icon :message="loadError" banner />
 
     <div v-if="sourceFilter" class="sticky top-[4.25rem] z-10" data-content-filter-shell>
-      <ContentSourceFilterBar
-        :options="sourceFilter.options"
-        :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
-        @change="handleSourceKindsChange"
-      />
+      <div class="flex flex-col gap-3">
+        <ContentSourceFilterBar
+          :options="sourceFilter.options"
+          :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
+          @change="handleSourceKindsChange"
+        />
+        <ContentSortControl :sort-mode="sortMode" @change="handleSortModeChange" />
+      </div>
     </div>
 
     <a-skeleton v-if="isLoading" active :paragraph="{ rows: 6 }" />

@@ -58,8 +58,8 @@ describe("content routes", () => {
     const app = createServer({
       listContentView,
       listContentSources: vi.fn().mockResolvedValue([
-        { kind: "openai", name: "OpenAI", isEnabled: true },
-        { kind: "ithome", name: "IT之家", isEnabled: true }
+        { kind: "openai", name: "OpenAI", isEnabled: true, showAllWhenSelected: false },
+        { kind: "ithome", name: "IT之家", isEnabled: true, showAllWhenSelected: true }
       ])
     } as never);
 
@@ -67,14 +67,18 @@ describe("content routes", () => {
       method: "GET",
       url: "/api/content/ai-new",
       headers: {
-        "x-hot-now-source-filter": "openai,missing"
+        "x-hot-now-source-filter": "openai,missing",
+        "x-hot-now-content-sort": "content_score"
       }
     });
     const aiNewPayload = aiNewResponse.json() as {
       pageKey: string;
       featuredCard: { id: number } | null;
       cards: { id: number }[];
-      sourceFilter?: { options: { kind: string; name: string }[]; selectedSourceKinds: string[] };
+      sourceFilter?: {
+        options: { kind: string; name: string; showAllWhenSelected: boolean }[];
+        selectedSourceKinds: string[];
+      };
       emptyState: { title: string; tone: string } | null;
     };
 
@@ -83,8 +87,8 @@ describe("content routes", () => {
     expect(aiNewPayload.featuredCard?.id).toBe(101);
     expect(aiNewPayload.cards.map((card) => card.id)).toEqual([102]);
     expect(aiNewPayload.sourceFilter?.options).toEqual([
-      { kind: "openai", name: "OpenAI" },
-      { kind: "ithome", name: "IT之家" }
+      { kind: "openai", name: "OpenAI", showAllWhenSelected: false },
+      { kind: "ithome", name: "IT之家", showAllWhenSelected: true }
     ]);
     expect(aiNewPayload.sourceFilter?.selectedSourceKinds).toEqual(["openai"]);
     expect(aiNewPayload.emptyState).toBeNull();
@@ -105,8 +109,14 @@ describe("content routes", () => {
     expect(aiHotPayload.featuredCard).toBeNull();
     expect(aiHotPayload.cards.map((card) => card.id)).toEqual([101, 102]);
     expect(aiHotPayload.emptyState).toBeNull();
-    expect(listContentView).toHaveBeenCalledWith("ai", { selectedSourceKinds: ["openai"] });
-    expect(listContentView).toHaveBeenCalledWith("hot");
+    expect(listContentView).toHaveBeenCalledWith("ai", {
+      selectedSourceKinds: ["openai"],
+      sortMode: "content_score"
+    });
+    expect(listContentView).toHaveBeenCalledWith("hot", {
+      selectedSourceKinds: ["openai"],
+      sortMode: "published_at"
+    });
   });
 
   it("degrades content APIs when the local content store is malformed", async () => {

@@ -66,6 +66,110 @@ describe("buildContentViewSelection", () => {
     expect(selection.visibleCards.map((card) => card.title)).toEqual(["IT之家 only"]);
     expect(listContentView(db, "articles", { selectedSourceKinds: ["ithome"] })).toHaveLength(1);
   });
+
+  it("keeps full-display sources untrimmed while limiting normal sources", async () => {
+    const db = await createTestDatabase(databasesToClose);
+    const openai = resolveSourceByKind(db, "openai");
+    const ithome = resolveSourceByKind(db, "ithome");
+
+    db.prepare(
+      `
+        UPDATE content_sources
+        SET show_all_when_selected = 1
+        WHERE kind = 'openai'
+      `
+    ).run();
+
+    upsertContentItems(db, {
+      sourceId: openai!.id,
+      items: [
+        buildItem("OpenAI Full A", "2026-03-31T03:00:00.000Z"),
+        buildItem("OpenAI Full B", "2026-03-31T02:00:00.000Z"),
+        buildItem("OpenAI Full C", "2026-03-31T01:00:00.000Z")
+      ]
+    });
+    upsertContentItems(db, {
+      sourceId: ithome!.id,
+      items: [
+        buildItem("ITHome Limited", "2026-03-30T01:00:00.000Z"),
+        buildItem("ITHome Trimmed", "2026-03-30T00:00:00.000Z")
+      ]
+    });
+
+    const selection = buildContentViewSelection(db, "articles", {
+      selectedSourceKinds: ["openai", "ithome"],
+      limitOverride: 1
+    });
+
+    expect(selection.candidateCards).toHaveLength(5);
+    expect(selection.visibleCards.map((card) => card.title)).toEqual([
+      "OpenAI Full A",
+      "OpenAI Full B",
+      "OpenAI Full C",
+      "ITHome Limited"
+    ]);
+  });
+
+  it("supports published-at and content-score sorts on the final visible set", async () => {
+    const db = await createTestDatabase(databasesToClose);
+    const openai = resolveSourceByKind(db, "openai");
+    const ithome = resolveSourceByKind(db, "ithome");
+
+    db.prepare(
+      `
+        UPDATE content_sources
+        SET show_all_when_selected = 1
+        WHERE kind IN ('openai', 'ithome')
+      `
+    ).run();
+
+    upsertContentItems(db, {
+      sourceId: openai!.id,
+      items: [
+        {
+          title: "Older High Score",
+          canonicalUrl: "https://example.com/older-high-score",
+          summary: "launch report analysis agent workflow summary with enough detail to score high",
+          bodyMarkdown: "launch report analysis agent workflow ".repeat(24),
+          publishedAt: "2026-03-28T02:00:00.000Z",
+          fetchedAt: "2026-03-28T02:00:00.000Z"
+        }
+      ]
+    });
+    upsertContentItems(db, {
+      sourceId: ithome!.id,
+      items: [
+        {
+          title: "Newer Low Score",
+          canonicalUrl: "https://example.com/newer-low-score",
+          summary: "brief",
+          bodyMarkdown: "",
+          publishedAt: "2026-03-31T03:00:00.000Z",
+          fetchedAt: "2026-03-31T03:00:00.000Z"
+        }
+      ]
+    });
+
+    const publishedSelection = buildContentViewSelection(db, "articles", {
+      selectedSourceKinds: ["openai", "ithome"],
+      limitOverride: 1,
+      sortMode: "published_at"
+    });
+    const scoreSelection = buildContentViewSelection(db, "articles", {
+      selectedSourceKinds: ["openai", "ithome"],
+      limitOverride: 1,
+      sortMode: "content_score"
+    });
+
+    expect(publishedSelection.visibleCards.map((card) => card.title)).toEqual([
+      "Newer Low Score",
+      "Older High Score"
+    ]);
+    expect(scoreSelection.visibleCards.map((card) => card.title)).toEqual([
+      "Older High Score",
+      "Newer Low Score"
+    ]);
+  });
 });
 
 async function createTestDatabase(databasesToClose: ReturnType<typeof openDatabase>[]) {

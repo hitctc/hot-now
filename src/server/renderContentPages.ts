@@ -16,7 +16,7 @@ type ContentPageView = {
   viewKey: ContentViewKey;
   cards: ContentCardViewWithFeedback[];
   sourceFilter?: {
-    options: { kind: string; name: string }[];
+    options: { kind: string; name: string; showAllWhenSelected?: boolean }[];
     selectedSourceKinds: string[];
   };
   emptyState?: {

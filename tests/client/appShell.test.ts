@@ -72,13 +72,22 @@ describe("client app shell", () => {
     expect(wrapper.text()).toContain("AI-first 工作台壳层");
     expect(wrapper.text()).toContain("当前登录用户页");
     expect(wrapper.text()).toContain("当前会展示登录用户摘要和会话上下文");
-    expect(wrapper.find("[data-shell-page-summary]").exists()).toBe(true);
+    expect(wrapper.get("[data-shell-root]").classes()).toEqual(
+      expect.arrayContaining(["min-h-screen", "text-editorial-text-main"])
+    );
+    expect(wrapper.get("[data-mobile-shell-nav]").classes()).toEqual(
+      expect.arrayContaining(["sticky", "top-0", "z-30", "hidden", "max-[900px]:block"])
+    );
+    expect(wrapper.get("[data-shell-page-summary]").classes()).toEqual(
+      expect.arrayContaining(["rounded-editorial-xl"])
+    );
     expect(wrapper.find("[data-shell-page-title]").text()).toBe("当前登录用户页");
     expect(wrapper.find("[data-shell-page-description]").text()).toContain("登录用户摘要");
     expect(wrapper.find("[data-shell-theme-toggle]").exists()).toBe(true);
-    expect(wrapper.find(".unified-shell__header").exists()).toBe(false);
 
-    const navLinks = wrapper.findAll(".unified-shell__nav-link");
+    const navLinks = wrapper.findAll("[data-shell-nav-link]");
+    const activeNavLink = wrapper.get('[data-shell-nav-link="/settings/profile"]');
+    const sidebar = wrapper.get("aside");
 
     expect(navLinks.map((node) => node.attributes("href"))).toEqual([
       "/ai-new",
@@ -89,7 +98,7 @@ describe("client app shell", () => {
     ]);
 
     expect(
-      navLinks.map((node) => node.find(".unified-shell__nav-label").text().trim())
+      navLinks.map((node) => node.find("span.text-sm").text().trim())
     ).toEqual([
       "AI 新讯",
       "AI 热点",
@@ -97,6 +106,21 @@ describe("client app shell", () => {
       "数据收集",
       "当前用户"
     ]);
+
+    expect(sidebar.classes()).toEqual(
+      expect.arrayContaining(["min-[901px]:flex", "min-[901px]:w-[248px]", "min-[1081px]:w-[280px]"])
+    );
+
+    expect(activeNavLink.classes()).toEqual(
+      expect.arrayContaining([
+        "bg-editorial-link-active",
+        "text-editorial-text-on-accent",
+        "shadow-editorial-accent"
+      ])
+    );
+    expect(activeNavLink.find("span.text-xs").classes()).toEqual(
+      expect.arrayContaining(["text-inherit"])
+    );
   });
 
   it("keeps the /client/ asset base separate from the /settings/ route base while mounting AI content routes in the same app", async () => {

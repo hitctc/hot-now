@@ -8,7 +8,6 @@ import { readSettingsProfile, type SettingsProfile } from "../services/settingsA
 import { shellPageMetas } from "../router";
 
 type ProfileLoadState = "idle" | "loading" | "loaded" | "empty" | "error";
-type SystemShellPageKey = "view-rules" | "sources" | "profile";
 
 const route = useRoute();
 const { themeMode, isDarkMode, setThemeMode } = useTheme();
@@ -22,22 +21,13 @@ const themeOptions = [
   { label: "深色", value: "dark" }
 ];
 
+const contentNavPages = shellPageMetas.filter((page) => page.section === "content");
+const systemNavPages = shellPageMetas.filter((page) => page.section === "system");
+
 const currentPageTitle = computed(() => route.meta.title ?? "系统页底座");
 const currentPageDescription = computed(
   () => route.meta.description ?? "承接系统页的统一布局、主题和导航。"
 );
-const activeNavKey = computed(() => route.meta.shellKey ?? shellPageMetas[0]?.key ?? "view-rules");
-const contentNavPages = shellPageMetas.filter((page) => page.section === "content");
-const systemNavPages = shellPageMetas.filter((page) => page.section === "system");
-const canUseClientSystemNavigation = computed(() => profile.value?.loggedIn === true);
-const activeContentNavKeys = computed(() => {
-  if (isSystemPageKey(activeNavKey.value)) {
-    return [];
-  }
-
-  return [route.path === "/" ? "/ai-new" : route.path];
-});
-const activeSystemNavKeys = computed(() => (isSystemPageKey(activeNavKey.value) ? [activeNavKey.value] : []));
 const loggedInProfile = computed(() => (profile.value?.loggedIn ? profile.value : null));
 const guestProfile = computed(() => (profile.value && !profile.value.loggedIn ? profile.value : null));
 
@@ -55,7 +45,32 @@ function isActiveContentPath(path: string): boolean {
   return route.path === path || (path === "/ai-new" && route.path === "/");
 }
 
-// 当前页面标题和描述直接读路由元数据，这样后续新增页面时只需补 route record。
+// 导航选中态直接靠 Tailwind class 切换，不再依赖 a-menu 的内部选中结构。
+function getShellNavLinkClasses(isActive: boolean): string[] {
+  return [
+    "group flex min-w-0 flex-col gap-1 rounded-editorial-lg border px-4 py-3 text-left no-underline transition duration-150 ease-out",
+    isActive
+      ? "border-transparent bg-editorial-link-active text-editorial-text-on-accent shadow-editorial-accent"
+      : "border-editorial-border bg-editorial-link text-editorial-text-sidebar hover:-translate-y-px hover:border-editorial-border-strong hover:bg-editorial-control-hover hover:shadow-editorial-floating hover:no-underline"
+  ];
+}
+
+// 移动端顶部 tab 只保留更紧凑的 pill 形态， active 态依旧从同一份路由判断里拿。
+function getMobileTabClasses(isActive: boolean): string[] {
+  return [
+    "flex shrink-0 items-center rounded-editorial-pill border px-3 py-2 text-[13px] font-semibold leading-5 no-underline transition duration-150 ease-out whitespace-nowrap",
+    isActive
+      ? "border-transparent bg-editorial-link-active text-editorial-text-on-accent shadow-editorial-accent"
+      : "border-editorial-border bg-editorial-link text-editorial-text-sidebar hover:-translate-y-px hover:border-editorial-border-strong hover:bg-editorial-control-hover hover:shadow-editorial-floating hover:no-underline"
+  ];
+}
+
+// 激活态描述文案直接继承链接前景色，这样对比度会和高亮背景一起走，不会退回成 muted。
+function getShellNavDescriptionClasses(isActive: boolean): string {
+  return isActive ? "text-inherit" : "text-editorial-text-sidebar-muted";
+}
+
+// 主题切换只改唯一状态源，不直接碰 DOM，避免双向同步逻辑散到模板里。
 function handleThemeModeChange(nextValue: string | number): void {
   if (nextValue === "dark" || nextValue === "light") {
     setThemeMode(nextValue as ThemeMode);
@@ -116,268 +131,364 @@ watch(mobileSystemDrawerOpen, (isOpen) => {
 onBeforeUnmount(() => {
   syncMobileDrawerBodyScroll(false);
 });
-
-function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPageKey {
-  return key === "view-rules" || key === "sources" || key === "profile";
-}
 </script>
 
 <template>
-  <a-layout class="unified-shell" data-shell-root>
-    <div class="unified-shell__mobile-nav" data-mobile-shell-nav>
-      <div class="unified-shell__mobile-bar">
-        <div class="unified-shell__mobile-tabs" aria-label="内容菜单">
+  <div class="flex min-h-0 flex-1 flex-col min-[901px]:flex-row">
+    <div
+      class="sticky top-0 z-30 hidden px-4 pt-4 max-[900px]:block"
+      data-mobile-shell-nav
+    >
+      <div
+        class="flex items-center gap-3 rounded-editorial-xl border border-editorial-border bg-editorial-panel px-3 py-3 shadow-editorial-card backdrop-blur-xl"
+      >
+        <nav
+          class="flex min-w-0 flex-1 gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          aria-label="内容菜单"
+        >
           <RouterLink
             v-for="page in contentNavPages"
             :key="page.path"
-            class="unified-shell__mobile-tab"
-            :class="{ 'is-active': isActiveContentPath(page.path) }"
             :to="page.path"
+            :class="getMobileTabClasses(isActiveContentPath(page.path))"
             :data-mobile-content-tab="page.path"
             @click="closeMobileSystemDrawer"
           >
             {{ page.navLabel }}
           </RouterLink>
-        </div>
+        </nav>
 
-        <a-button
-          type="default"
-          class="unified-shell__mobile-system-toggle"
+        <button
+          type="button"
+          class="shrink-0 rounded-editorial-pill border border-editorial-border bg-editorial-control px-3 py-2 text-sm font-semibold text-editorial-text-main shadow-editorial-card transition hover:border-editorial-border-strong hover:bg-editorial-control-hover"
           data-mobile-system-toggle
           :aria-expanded="mobileSystemDrawerOpen ? 'true' : 'false'"
           aria-controls="mobile-system-drawer"
           @click="toggleMobileSystemDrawer"
         >
           系统菜单
-        </a-button>
+        </button>
       </div>
     </div>
 
-    <a-layout-sider class="unified-shell__sider" width="280" :theme="isDarkMode ? 'dark' : 'light'">
-      <div class="unified-shell__brand">
-        <a-typography-text class="unified-shell__eyebrow" type="secondary">HotNow Editorial Desk</a-typography-text>
-        <a-typography-title :level="3" class="unified-shell__brand-title">
-          AI-first 工作台壳层
-        </a-typography-title>
-        <a-typography-paragraph class="unified-shell__brand-description">
-          AI 新讯、AI 热点和系统工作台共享同一套 Editorial Desk 主题 token 与导航语义。
-        </a-typography-paragraph>
-      </div>
+    <aside
+      class="sticky top-0 hidden h-[100dvh] w-[248px] flex-none flex-col overflow-y-auto border-r border-editorial-border-strong bg-editorial-sidebar px-[18px] py-6 shadow-editorial-page backdrop-blur-[18px] min-[901px]:flex min-[901px]:min-w-[248px] min-[901px]:max-w-[248px] min-[901px]:w-[248px] min-[1081px]:min-w-[280px] min-[1081px]:max-w-[280px] min-[1081px]:w-[280px]"
+    >
+      <div class="flex min-h-0 flex-1 flex-col gap-4">
+        <section class="rounded-editorial-xl border border-editorial-border bg-editorial-sidebar-panel px-4 py-5 shadow-editorial-card">
+          <p class="mb-1.5 inline-block text-xs font-semibold uppercase tracking-[0.12em] text-editorial-text-sidebar-muted">
+            HotNow Editorial Desk
+          </p>
+          <h1 class="mb-1 text-xl font-semibold leading-tight text-editorial-text-sidebar">
+            AI-first 工作台壳层
+          </h1>
+          <p class="mb-0 text-sm leading-6 text-editorial-text-body">
+            AI 新讯、AI 热点和系统工作台共享同一套 Editorial Desk 主题 token 与导航语义。
+          </p>
+        </section>
 
-      <section class="unified-shell__page-summary" data-shell-page-summary>
-        <a-typography-text class="unified-shell__page-summary-kicker" type="secondary">
-          当前页面
-        </a-typography-text>
-        <a-typography-title :level="4" class="unified-shell__page-summary-title" data-shell-page-title>
-          {{ currentPageTitle }}
-        </a-typography-title>
-        <a-typography-paragraph
-          class="unified-shell__page-summary-description"
-          data-shell-page-description
+        <section
+          class="rounded-editorial-xl border border-editorial-border bg-editorial-sidebar-panel px-4 py-4 shadow-editorial-card"
+          data-shell-page-summary
         >
-          {{ currentPageDescription }}
-        </a-typography-paragraph>
-      </section>
-
-      <section class="unified-shell__nav-group">
-        <p class="unified-shell__nav-kicker">内容菜单</p>
-        <a-menu class="unified-shell__nav" mode="inline" :selected-keys="activeContentNavKeys">
-          <a-menu-item v-for="page in contentNavPages" :key="page.path" :data-shell-nav="page.key">
-            <RouterLink class="unified-shell__nav-link" :to="page.path">
-              <span class="unified-shell__nav-label">{{ page.navLabel }}</span>
-              <span class="unified-shell__nav-description">{{ page.description }}</span>
-            </RouterLink>
-          </a-menu-item>
-        </a-menu>
-      </section>
-
-      <section class="unified-shell__nav-group">
-        <p class="unified-shell__nav-kicker">系统菜单</p>
-        <a-menu class="unified-shell__nav" mode="inline" :selected-keys="activeSystemNavKeys">
-          <a-menu-item v-for="page in systemNavPages" :key="page.key" :data-shell-nav="page.key">
-            <RouterLink v-if="canUseClientSystemNavigation" class="unified-shell__nav-link" :to="page.path">
-              <span class="unified-shell__nav-label">{{ page.navLabel }}</span>
-              <span class="unified-shell__nav-description">{{ page.description }}</span>
-            </RouterLink>
-            <a v-else class="unified-shell__nav-link" :href="page.path">
-              <span class="unified-shell__nav-label">{{ page.navLabel }}</span>
-              <span class="unified-shell__nav-description">{{ page.description }}</span>
-            </a>
-          </a-menu-item>
-        </a-menu>
-      </section>
-
-      <div class="unified-shell__sidebar-footer">
-        <section class="unified-shell__theme-panel" data-shell-theme-toggle>
-          <a-typography-text class="unified-shell__theme-kicker" type="secondary">
-            界面主题
-          </a-typography-text>
-          <a-space direction="vertical" size="middle" class="unified-shell__theme-stack">
-            <a-segmented
-              :value="themeMode"
-              :options="themeOptions"
-              @change="handleThemeModeChange"
-            />
-            <a-tag :color="isDarkMode ? 'blue' : 'green'">
-              {{ isDarkMode ? "深色模式" : "浅色模式" }}
-            </a-tag>
-          </a-space>
+          <p class="mb-1.5 inline-block text-xs font-semibold uppercase tracking-[0.12em] text-editorial-text-sidebar-muted">
+            当前页面
+          </p>
+          <h2 class="mb-1.5 text-lg font-semibold leading-tight text-editorial-text-sidebar" data-shell-page-title>
+            {{ currentPageTitle }}
+          </h2>
+          <p class="mb-0 text-sm leading-6 text-editorial-text-body" data-shell-page-description>
+            {{ currentPageDescription }}
+          </p>
         </section>
 
-        <section class="unified-shell__account-panel" data-shell-account-panel>
-          <a-typography-text class="unified-shell__theme-kicker" type="secondary">
-            当前登录用户
-          </a-typography-text>
+        <section class="flex flex-col gap-2">
+          <p class="pl-1 text-xs font-semibold uppercase tracking-[0.12em] text-editorial-text-sidebar-muted">
+            内容菜单
+          </p>
+          <nav class="flex flex-col gap-2" aria-label="内容菜单">
+            <RouterLink
+              v-for="page in contentNavPages"
+              :key="page.path"
+              :to="page.path"
+              :class="getShellNavLinkClasses(isActiveContentPath(page.path))"
+              :data-shell-nav-link="page.path"
+            >
+              <span class="text-sm font-semibold leading-5">{{ page.navLabel }}</span>
+              <span :class="getShellNavDescriptionClasses(isActiveContentPath(page.path))" class="text-xs leading-5">
+                {{ page.description }}
+              </span>
+            </RouterLink>
+          </nav>
+        </section>
 
-          <template v-if="profileLoadState === 'loading'">
-            <a-skeleton :active="true" :paragraph="{ rows: 2 }" />
-          </template>
+        <section class="flex flex-col gap-2">
+          <p class="pl-1 text-xs font-semibold uppercase tracking-[0.12em] text-editorial-text-sidebar-muted">
+            系统菜单
+          </p>
+          <nav class="flex flex-col gap-2" aria-label="系统菜单">
+            <template v-if="profile?.loggedIn">
+              <RouterLink
+                v-for="page in systemNavPages"
+                :key="page.key"
+                :to="page.path"
+                :class="getShellNavLinkClasses(route.path === page.path)"
+                :data-shell-nav-link="page.path"
+              >
+                <span class="text-sm font-semibold leading-5">{{ page.navLabel }}</span>
+                <span :class="getShellNavDescriptionClasses(route.path === page.path)" class="text-xs leading-5">
+                  {{ page.description }}
+                </span>
+              </RouterLink>
+            </template>
+            <template v-else>
+              <a
+                v-for="page in systemNavPages"
+                :key="page.key"
+                :href="page.path"
+                :class="getShellNavLinkClasses(route.path === page.path)"
+                :data-shell-nav-link="page.path"
+              >
+                <span class="text-sm font-semibold leading-5">{{ page.navLabel }}</span>
+                <span :class="getShellNavDescriptionClasses(route.path === page.path)" class="text-xs leading-5">
+                  {{ page.description }}
+                </span>
+              </a>
+            </template>
+          </nav>
+        </section>
 
-          <template v-else-if="profileLoadState === 'error'">
-            <a-alert
-              type="warning"
-              show-icon
-              :message="profileError ?? '读取当前登录用户失败'"
-            />
-          </template>
+        <div class="mt-auto flex flex-col gap-3 pt-2">
+          <section
+            class="rounded-editorial-xl border border-editorial-border bg-editorial-panel px-4 py-4 shadow-editorial-card"
+            data-shell-theme-toggle
+          >
+            <p class="mb-1.5 inline-block text-xs font-semibold uppercase tracking-[0.12em] text-editorial-text-sidebar-muted">
+              界面主题
+            </p>
+            <div class="flex flex-col gap-3">
+              <a-segmented
+                :value="themeMode"
+                :options="themeOptions"
+                class="w-full"
+                @change="handleThemeModeChange"
+              />
+              <div class="inline-flex items-center">
+                <span
+                  class="inline-flex items-center rounded-editorial-pill border border-editorial-border bg-editorial-control px-3 py-1 text-xs font-semibold"
+                  :class="isDarkMode ? 'text-sky-300' : 'text-emerald-700'"
+                >
+                  {{ isDarkMode ? "深色模式" : "浅色模式" }}
+                </span>
+              </div>
+            </div>
+          </section>
 
-          <template v-else-if="loggedInProfile">
-            <a-space direction="vertical" size="small" class="unified-shell__profile-summary">
-              <a-typography-text strong>{{ loggedInProfile.displayName }}</a-typography-text>
-              <a-typography-text type="secondary">@{{ loggedInProfile.username }}</a-typography-text>
-              <a-space wrap size="small">
-                <a-tag color="blue">{{ loggedInProfile.role }}</a-tag>
-                <a-tag color="green">已登录</a-tag>
-              </a-space>
-              <a-typography-text v-if="loggedInProfile.email">
-                邮箱：{{ loggedInProfile.email }}
-              </a-typography-text>
-            </a-space>
-          </template>
+          <section
+            class="rounded-editorial-xl border border-editorial-border bg-editorial-panel px-4 py-4 shadow-editorial-card"
+            data-shell-account-panel
+          >
+            <p class="mb-1.5 inline-block text-xs font-semibold uppercase tracking-[0.12em] text-editorial-text-sidebar-muted">
+              当前登录用户
+            </p>
 
-          <template v-else-if="guestProfile">
-            <a-space direction="vertical" size="small" class="unified-shell__guest-entry">
-              <a-space wrap size="small">
-                <a-tag color="blue">{{ guestProfile.role }}</a-tag>
-                <a-tag color="gold">公开访问</a-tag>
-              </a-space>
-              <a-typography-paragraph class="unified-shell__login-hint">
-                你现在看到的是公开内容。登录后才能进入系统菜单、保存策略和执行采集动作。
-              </a-typography-paragraph>
-              <a-button type="primary" href="/login" data-shell-login-link>
-                去登录
-              </a-button>
-            </a-space>
-          </template>
+            <template v-if="profileLoadState === 'loading'">
+              <a-skeleton :active="true" :paragraph="{ rows: 2 }" />
+            </template>
 
-          <template v-else>
-            <a-empty description="当前没有可读取的用户摘要" />
-          </template>
+            <template v-else-if="profileLoadState === 'error'">
+              <a-alert
+                type="warning"
+                show-icon
+                :message="profileError ?? '读取当前登录用户失败'"
+              />
+            </template>
+
+            <template v-else-if="loggedInProfile">
+              <div class="flex flex-col gap-2">
+                <p class="m-0 text-sm font-semibold leading-6 text-editorial-text-main">
+                  {{ loggedInProfile.displayName }}
+                </p>
+                <p class="m-0 text-sm leading-6 text-editorial-text-body">
+                  @{{ loggedInProfile.username }}
+                </p>
+                <div class="flex flex-wrap gap-2">
+                  <a-tag color="blue">{{ loggedInProfile.role }}</a-tag>
+                  <a-tag color="green">已登录</a-tag>
+                </div>
+                <p v-if="loggedInProfile.email" class="m-0 text-sm leading-6 text-editorial-text-body">
+                  邮箱：{{ loggedInProfile.email }}
+                </p>
+              </div>
+            </template>
+
+            <template v-else-if="guestProfile">
+              <div class="flex flex-col gap-3">
+                <div class="flex flex-wrap gap-2">
+                  <a-tag color="blue">{{ guestProfile.role }}</a-tag>
+                  <a-tag color="gold">公开访问</a-tag>
+                </div>
+                <p class="m-0 text-sm leading-6 text-editorial-text-body">
+                  你现在看到的是公开内容。登录后才能进入系统菜单、保存策略和执行采集动作。
+                </p>
+                <a href="/login" class="inline-flex" data-shell-login-link>
+                  <span
+                    class="inline-flex items-center rounded-editorial-pill border border-editorial-border bg-editorial-control px-4 py-2 text-sm font-semibold text-editorial-text-main shadow-editorial-card transition hover:border-editorial-border-strong hover:bg-editorial-control-hover"
+                  >
+                    去登录
+                  </span>
+                </a>
+              </div>
+            </template>
+
+            <template v-else>
+              <a-empty description="当前没有可读取的用户摘要" />
+            </template>
+          </section>
+        </div>
+      </div>
+    </aside>
+
+    <main class="min-w-0 flex-1">
+      <div class="mx-auto flex w-full max-w-editorial-shell flex-1 flex-col px-4 py-4 min-[901px]:px-[18px] min-[901px]:py-[18px] min-[1081px]:px-6 min-[1081px]:py-6">
+        <section class="rounded-editorial-xl border border-editorial-border bg-editorial-panel shadow-editorial-card">
+          <div class="p-4 min-[901px]:px-[22px] min-[901px]:py-[20px]">
+            <RouterView v-slot="{ Component }">
+              <component :is="Component" />
+            </RouterView>
+          </div>
         </section>
       </div>
-    </a-layout-sider>
+    </main>
 
-    <a-layout class="unified-shell__main">
-      <a-layout-content class="unified-shell__content">
-        <a-card class="unified-shell__view-port" size="small" :bordered="false">
-          <RouterView v-slot="{ Component }">
-            <component :is="Component" />
-          </RouterView>
-        </a-card>
-      </a-layout-content>
-    </a-layout>
-
-    <transition name="unified-shell-drawer">
+    <transition
+      enter-active-class="transition-opacity duration-150 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-opacity duration-150 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
       <div
         v-if="mobileSystemDrawerOpen"
-        class="unified-shell__mobile-drawer-backdrop"
+        class="fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-sm"
         data-mobile-drawer-backdrop
         @click="closeMobileSystemDrawer"
       >
         <section
           id="mobile-system-drawer"
-          class="unified-shell__mobile-drawer"
+          class="absolute left-4 right-4 top-[74px] max-h-[calc(100dvh-90px)] overflow-y-auto rounded-editorial-xl border border-editorial-border-strong bg-editorial-panel-strong p-4 shadow-editorial-page"
           data-mobile-system-drawer
           @click.stop
         >
-          <a-space direction="vertical" size="large" class="unified-shell__mobile-drawer-stack">
-            <div class="unified-shell__mobile-drawer-header">
-              <a-typography-text class="unified-shell__header-kicker" type="secondary">
+          <div class="flex flex-col gap-4">
+            <div class="flex flex-col gap-1.5">
+              <p class="m-0 text-xs font-semibold uppercase tracking-[0.12em] text-editorial-text-sidebar-muted">
                 系统菜单
-              </a-typography-text>
-              <a-typography-title :level="4" class="unified-shell__mobile-drawer-title">
+              </p>
+              <h2 class="m-0 text-lg font-semibold leading-tight text-editorial-text-main">
                 {{ currentPageTitle }}
-              </a-typography-title>
-              <a-typography-paragraph class="unified-shell__page-description">
+              </h2>
+              <p class="m-0 text-sm leading-6 text-editorial-text-body">
                 {{ currentPageDescription }}
-              </a-typography-paragraph>
+              </p>
             </div>
 
-            <a-menu class="unified-shell__nav unified-shell__nav--drawer" mode="inline" :selected-keys="activeSystemNavKeys">
-              <a-menu-item v-for="page in systemNavPages" :key="page.key">
+            <nav class="flex flex-col gap-2" aria-label="移动端系统菜单">
+              <template v-if="profile?.loggedIn">
                 <RouterLink
-                  v-if="canUseClientSystemNavigation"
-                  class="unified-shell__nav-link"
+                  v-for="page in systemNavPages"
+                  :key="page.key"
                   :to="page.path"
+                  :class="getShellNavLinkClasses(route.path === page.path)"
                   :data-mobile-drawer-link="page.path"
+                  :data-shell-nav-link="page.path"
                   @click="closeMobileSystemDrawer"
                 >
-                  <span class="unified-shell__nav-label">{{ page.navLabel }}</span>
-                  <span class="unified-shell__nav-description">{{ page.description }}</span>
+                  <span class="text-sm font-semibold leading-5">{{ page.navLabel }}</span>
+                  <span :class="getShellNavDescriptionClasses(route.path === page.path)" class="text-xs leading-5">
+                    {{ page.description }}
+                  </span>
                 </RouterLink>
+              </template>
+              <template v-else>
                 <a
-                  v-else
-                  class="unified-shell__nav-link"
+                  v-for="page in systemNavPages"
+                  :key="page.key"
                   :href="page.path"
+                  :class="getShellNavLinkClasses(route.path === page.path)"
                   :data-mobile-drawer-link="page.path"
+                  :data-shell-nav-link="page.path"
                   @click="closeMobileSystemDrawer"
                 >
-                  <span class="unified-shell__nav-label">{{ page.navLabel }}</span>
-                  <span class="unified-shell__nav-description">{{ page.description }}</span>
+                  <span class="text-sm font-semibold leading-5">{{ page.navLabel }}</span>
+                  <span :class="getShellNavDescriptionClasses(route.path === page.path)" class="text-xs leading-5">
+                    {{ page.description }}
+                  </span>
                 </a>
-              </a-menu-item>
-            </a-menu>
+              </template>
+            </nav>
 
-            <a-card size="small" title="界面主题">
-              <a-space direction="vertical" size="middle" class="unified-shell__mobile-theme-stack">
+            <section class="rounded-editorial-xl border border-editorial-border bg-editorial-panel px-4 py-4 shadow-editorial-card">
+              <p class="mb-1.5 inline-block text-xs font-semibold uppercase tracking-[0.12em] text-editorial-text-sidebar-muted">
+                界面主题
+              </p>
+              <div class="flex flex-col gap-3">
                 <a-segmented
                   :value="themeMode"
                   :options="themeOptions"
+                  class="w-full"
                   @change="handleThemeModeChange"
                 />
-                <a-tag :color="isDarkMode ? 'blue' : 'green'">
-                  {{ isDarkMode ? "深色模式" : "浅色模式" }}
-                </a-tag>
-              </a-space>
-            </a-card>
+                <div class="inline-flex items-center">
+                  <span
+                    class="inline-flex items-center rounded-editorial-pill border border-editorial-border bg-editorial-control px-3 py-1 text-xs font-semibold"
+                    :class="isDarkMode ? 'text-sky-300' : 'text-emerald-700'"
+                  >
+                    {{ isDarkMode ? "深色模式" : "浅色模式" }}
+                  </span>
+                </div>
+              </div>
+            </section>
 
-            <a-card size="small" title="当前登录用户">
+            <section class="rounded-editorial-xl border border-editorial-border bg-editorial-panel px-4 py-4 shadow-editorial-card">
+              <p class="mb-1.5 inline-block text-xs font-semibold uppercase tracking-[0.12em] text-editorial-text-sidebar-muted">
+                当前登录用户
+              </p>
               <template v-if="profileLoadState === 'loading'">
                 <a-skeleton :active="true" :paragraph="{ rows: 2 }" />
               </template>
               <template v-else-if="loggedInProfile">
-                <a-space direction="vertical" size="small">
-                  <a-typography-text strong>{{ loggedInProfile.displayName }}</a-typography-text>
-                  <a-typography-text type="secondary">@{{ loggedInProfile.username }}</a-typography-text>
-                  <a-space wrap size="small">
+                <div class="flex flex-col gap-2">
+                  <p class="m-0 text-sm font-semibold leading-6 text-editorial-text-main">
+                    {{ loggedInProfile.displayName }}
+                  </p>
+                  <p class="m-0 text-sm leading-6 text-editorial-text-body">
+                    @{{ loggedInProfile.username }}
+                  </p>
+                  <div class="flex flex-wrap gap-2">
                     <a-tag color="blue">{{ loggedInProfile.role }}</a-tag>
                     <a-tag color="green">已登录</a-tag>
-                  </a-space>
-                </a-space>
+                  </div>
+                </div>
               </template>
               <template v-else-if="guestProfile">
-                <a-space direction="vertical" size="small" class="unified-shell__guest-entry">
-                  <a-space wrap size="small">
+                <div class="flex flex-col gap-3">
+                  <div class="flex flex-wrap gap-2">
                     <a-tag color="blue">{{ guestProfile.role }}</a-tag>
                     <a-tag color="gold">公开访问</a-tag>
-                  </a-space>
-                  <a-typography-paragraph class="unified-shell__login-hint">
+                  </div>
+                  <p class="m-0 text-sm leading-6 text-editorial-text-body">
                     登录后才能进入系统菜单和工作台操作。
-                  </a-typography-paragraph>
-                  <a-button type="primary" href="/login" data-mobile-login-link>
-                    去登录
-                  </a-button>
-                </a-space>
+                  </p>
+                  <a href="/login" class="inline-flex" data-mobile-login-link>
+                    <span
+                    class="inline-flex items-center rounded-editorial-pill border border-editorial-border bg-editorial-control px-4 py-2 text-sm font-semibold text-editorial-text-main shadow-editorial-card transition hover:border-editorial-border-strong hover:bg-editorial-control-hover"
+                    >
+                      去登录
+                    </span>
+                  </a>
+                </div>
               </template>
               <template v-else-if="profileLoadState === 'error'">
                 <a-alert
@@ -389,369 +500,10 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
               <template v-else>
                 <a-empty description="当前没有可读取的用户摘要" />
               </template>
-            </a-card>
-          </a-space>
+            </section>
+          </div>
         </section>
       </div>
     </transition>
-  </a-layout>
+  </div>
 </template>
-
-<style scoped>
-.unified-shell {
-  min-height: 100vh;
-  color: var(--editorial-text-main);
-  background: transparent;
-}
-
-.unified-shell__mobile-nav {
-  display: none;
-}
-
-.unified-shell__sider {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  align-self: flex-start;
-  height: 100vh;
-  height: 100dvh;
-  overflow-y: auto;
-  flex: 0 0 280px;
-  padding: 24px 18px;
-  background: var(--editorial-bg-sidebar) !important;
-  border-right: 1px solid var(--editorial-border-strong);
-  box-shadow: var(--editorial-shadow-page);
-  backdrop-filter: blur(18px);
-}
-
-:deep(.unified-shell__sider .ant-layout-sider-children) {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  height: 100%;
-}
-
-.unified-shell__brand {
-  padding: 20px 18px;
-  border: 1px solid var(--editorial-border);
-  border-radius: var(--editorial-radius-xl);
-  background: var(--editorial-bg-sidebar-panel);
-  box-shadow: var(--editorial-shadow-card);
-}
-
-.unified-shell__eyebrow {
-  display: inline-block;
-  margin-bottom: 6px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--editorial-text-sidebar-muted);
-}
-
-.unified-shell__brand-title {
-  margin: 0;
-  color: var(--editorial-text-sidebar) !important;
-}
-
-.unified-shell__brand-description {
-  margin-bottom: 0;
-  color: var(--editorial-text-body);
-}
-
-.unified-shell__nav-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.unified-shell__page-summary {
-  padding: 18px 18px 16px;
-  border: 1px solid var(--editorial-border);
-  border-radius: var(--editorial-radius-xl);
-  background: var(--editorial-bg-sidebar-panel);
-  box-shadow: var(--editorial-shadow-card);
-}
-
-.unified-shell__page-summary-kicker,
-.unified-shell__theme-kicker {
-  display: inline-block;
-  margin-bottom: 6px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--editorial-text-sidebar-muted);
-}
-
-.unified-shell__page-summary-title {
-  margin: 0 0 6px;
-  color: var(--editorial-text-sidebar) !important;
-}
-
-.unified-shell__page-summary-description {
-  margin-bottom: 0;
-  color: var(--editorial-text-body);
-}
-
-.unified-shell__page-description {
-  margin-bottom: 0;
-  color: var(--editorial-text-body);
-}
-
-.unified-shell__nav-kicker {
-  margin: 0;
-  padding-left: 4px;
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--editorial-text-sidebar-muted);
-}
-
-.unified-shell__nav {
-  border-inline-end: 0;
-  background: transparent;
-}
-
-:deep(.unified-shell__nav .ant-menu-item) {
-  height: auto;
-  margin: 0 0 10px;
-  padding: 0 !important;
-  line-height: 1.4;
-  border-radius: var(--editorial-radius-lg);
-}
-
-:deep(.unified-shell__nav .ant-menu-item::after) {
-  display: none;
-}
-
-:deep(.unified-shell__nav .ant-menu-item-selected) {
-  background: var(--editorial-bg-link-active);
-  box-shadow: var(--editorial-shadow-accent);
-}
-
-:deep(.unified-shell__nav .ant-menu-item-selected .unified-shell__nav-link) {
-  color: var(--editorial-text-on-accent);
-  border-color: transparent;
-  background: transparent;
-}
-
-:deep(.unified-shell__nav .ant-menu-item-selected .unified-shell__nav-description) {
-  color: inherit;
-}
-
-.unified-shell__nav-link {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  line-height: 1.4;
-  padding: 14px 16px;
-  border: 1px solid var(--editorial-border);
-  border-radius: var(--editorial-radius-lg);
-  background: var(--editorial-bg-link);
-  color: var(--editorial-text-sidebar);
-  transition:
-    transform 160ms ease,
-    border-color 160ms ease,
-    background 160ms ease,
-    box-shadow 160ms ease;
-}
-
-.unified-shell__nav-link:hover {
-  transform: translateY(-1px);
-  border-color: var(--editorial-border-strong);
-  box-shadow: var(--editorial-shadow-floating);
-  text-decoration: none;
-}
-
-.unified-shell__nav-label {
-  font-weight: 600;
-}
-
-.unified-shell__nav-description {
-  font-size: 12px;
-  color: var(--editorial-text-sidebar-muted);
-}
-
-.unified-shell__main {
-  min-width: 0;
-  min-height: 100vh;
-}
-
-.unified-shell__sidebar-footer {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin-top: auto;
-  padding-top: 8px;
-}
-
-.unified-shell__content {
-  padding: 24px;
-}
-
-.unified-shell__theme-panel,
-.unified-shell__account-panel,
-.unified-shell__view-port {
-  width: 100%;
-  border-radius: var(--editorial-radius-xl);
-  background: var(--editorial-bg-panel);
-  box-shadow: var(--editorial-shadow-card);
-  border: 1px solid var(--editorial-border);
-}
-
-.unified-shell__theme-panel,
-.unified-shell__account-panel {
-  padding: 16px 18px;
-}
-
-.unified-shell__theme-stack,
-.unified-shell__profile-summary,
-.unified-shell__guest-entry {
-  width: 100%;
-}
-
-.unified-shell__guest-entry :deep(.ant-btn) {
-  align-self: flex-start;
-}
-
-.unified-shell__login-hint {
-  margin: 0;
-  color: var(--editorial-text-body);
-}
-
-:deep(.unified-shell__view-port .ant-card-head) {
-  border-bottom-color: var(--editorial-border);
-}
-
-:deep(.unified-shell__view-port .ant-card-body) {
-  padding: 20px 22px;
-}
-
-.unified-shell__mobile-drawer-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  background: rgba(9, 14, 24, 0.56);
-  backdrop-filter: blur(10px);
-}
-
-.unified-shell__mobile-drawer {
-  position: absolute;
-  top: 74px;
-  right: 16px;
-  left: 16px;
-  max-height: calc(100vh - 90px);
-  max-height: calc(100dvh - 90px);
-  overflow-y: auto;
-  padding: 18px;
-  border: 1px solid var(--editorial-border-strong);
-  border-radius: var(--editorial-radius-xl);
-  background: var(--editorial-bg-panel-strong);
-  box-shadow: var(--editorial-shadow-page);
-}
-
-.unified-shell__mobile-drawer-stack,
-.unified-shell__mobile-theme-stack {
-  width: 100%;
-}
-
-.unified-shell__mobile-drawer-title {
-  margin: 6px 0;
-  color: var(--editorial-text-main) !important;
-}
-
-.unified-shell-drawer-enter-active,
-.unified-shell-drawer-leave-active {
-  transition: opacity 160ms ease;
-}
-
-.unified-shell-drawer-enter-from,
-.unified-shell-drawer-leave-to {
-  opacity: 0;
-}
-
-@media (max-width: 1080px) {
-  .unified-shell__sider {
-    width: 248px !important;
-    min-width: 248px !important;
-    max-width: 248px !important;
-  }
-
-  .unified-shell__content {
-    padding: 18px;
-  }
-}
-
-@media (max-width: 900px) {
-  .unified-shell__mobile-nav {
-    position: sticky;
-    top: 0;
-    z-index: 30;
-    display: block;
-    padding: 16px 16px 0;
-  }
-
-  .unified-shell__mobile-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 12px;
-    border: 1px solid var(--editorial-border);
-    border-radius: var(--editorial-radius-xl);
-    background: var(--editorial-bg-panel);
-    box-shadow: var(--editorial-shadow-card);
-    backdrop-filter: blur(16px);
-  }
-
-  .unified-shell__mobile-tabs {
-    display: flex;
-    gap: 8px;
-    min-width: 0;
-    flex: 1;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .unified-shell__mobile-tabs::-webkit-scrollbar {
-    display: none;
-  }
-
-  .unified-shell__mobile-tab {
-    flex: 0 0 auto;
-    padding: 9px 14px;
-    border: 1px solid var(--editorial-border);
-    border-radius: var(--editorial-radius-pill);
-    background: var(--editorial-bg-link);
-    color: var(--editorial-text-sidebar);
-    font-size: 13px;
-    font-weight: 600;
-    text-decoration: none;
-    white-space: nowrap;
-  }
-
-  .unified-shell__mobile-tab.is-active {
-    border-color: transparent;
-    background: var(--editorial-bg-link-active);
-    color: var(--editorial-text-on-accent);
-    box-shadow: var(--editorial-shadow-accent);
-  }
-
-  .unified-shell__mobile-system-toggle {
-    flex: 0 0 auto;
-  }
-
-  .unified-shell__sider {
-    display: none;
-  }
-
-  .unified-shell__content {
-    padding: 16px;
-  }
-
-  :deep(.unified-shell__view-port .ant-card-body) {
-    padding: 16px;
-  }
-}
-
-:global(body.unified-shell-mobile-open) {
-  overflow: hidden;
-}
-</style>

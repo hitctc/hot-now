@@ -35,9 +35,9 @@ function createSourcesModel() {
         publishedTodayCount: 3,
         collectedTodayCount: 2,
         viewStats: {
-          hot: { candidateCount: 5, visibleCount: 2 },
-          articles: { candidateCount: 4, visibleCount: 3 },
-          ai: { candidateCount: 6, visibleCount: 4 }
+          hot: { todayCandidateCount: 5, todayVisibleCount: 2, todayVisibleShare: 0.4 },
+          articles: { todayCandidateCount: 4, todayVisibleCount: 3, todayVisibleShare: 0.3 },
+          ai: { todayCandidateCount: 6, todayVisibleCount: 4, todayVisibleShare: 0.5 }
         }
       }
     ],
@@ -107,12 +107,23 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-sources-section='analytics']").classes()).toContain(
       "shadow-editorial-card"
     );
-    expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 新讯入池 / 展示");
-    expect(wrapper.get("[data-sources-section='analytics']").text()).not.toContain("Articles 入池 / 展示");
+    expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 新讯今日候选 / 今日展示");
+    expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 新讯当前页今日占比");
+    expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 热点当前页今日占比");
+    expect(wrapper.get("[data-sources-section='analytics']").text().indexOf("AI 新讯今日候选 / 今日展示")).toBeLessThan(
+      wrapper.get("[data-sources-section='analytics']").text().indexOf("AI 热点今日候选 / 今日展示")
+    );
+    expect(wrapper.get("[data-sources-section='analytics']").text()).not.toContain("Articles 今日候选 / 今日展示");
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("OpenAI");
     expect(wrapper.get("[data-sources-section='inventory']").classes()).toContain("bg-editorial-panel");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("completed");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("选中时全量");
+
+    const analyticsHeaderCells = wrapper.get("[data-sources-section='analytics']").findAll("thead th");
+    const inventoryHeaderCells = wrapper.get("[data-sources-section='inventory']").findAll("thead th");
+
+    expect(analyticsHeaderCells.every((cell) => (cell.attributes("style") || "").includes("text-align: center"))).toBe(true);
+    expect(inventoryHeaderCells.every((cell) => (cell.attributes("style") || "").includes("text-align: center"))).toBe(true);
   });
 
   it("toggles a source and reloads the latest sources model", async () => {

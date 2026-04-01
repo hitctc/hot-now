@@ -31,8 +31,8 @@ const baseModel = {
   pageKey: "ai-hot" as const,
   sourceFilter: {
     options: [
-      { kind: "openai", name: "OpenAI", showAllWhenSelected: false },
-      { kind: "ithome", name: "IT之家", showAllWhenSelected: true }
+      { kind: "openai", name: "OpenAI", showAllWhenSelected: false, currentPageVisibleCount: 1 },
+      { kind: "ithome", name: "IT之家", showAllWhenSelected: true, currentPageVisibleCount: 0 }
     ],
     selectedSourceKinds: ["openai"]
   },
@@ -101,6 +101,9 @@ describe("AiHotPage", () => {
     );
     expect(wrapper.find("[data-content-filter-shell]").exists()).toBe(false);
     expect(wrapper.find("[data-content-source-filter]").exists()).toBe(true);
+    expect(wrapper.get("[data-content-source-filter]").text()).toContain("已选 1 / 2 · 共 1 条");
+    expect(wrapper.get("[data-source-option-count='openai']").text()).toBe("1");
+    expect(wrapper.get("[data-source-option-count='ithome']").text()).toBe("0");
     expect(wrapper.find("[data-content-sort-control]").exists()).toBe(true);
     expect(wrapper.get("[data-content-section='list']").classes()).toContain("grid");
     expect(wrapper.get("[data-content-section='list']").text()).toContain("Hot AI Event");

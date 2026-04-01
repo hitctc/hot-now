@@ -23,20 +23,22 @@ type AlertTone = "success" | "info" | "warning" | "error";
 type PageNotice = { tone: AlertTone; message: string };
 
 const analyticsColumns = [
-  { title: "来源", key: "name" },
-  { title: "总条数", key: "totalCount", align: "right" as const },
-  { title: "今天发布", key: "publishedTodayCount", align: "right" as const },
-  { title: "今天抓取", key: "collectedTodayCount", align: "right" as const },
-  { title: "AI 热点入池 / 展示", key: "hotStats", align: "right" as const },
-  { title: "AI 新讯入池 / 展示", key: "aiStats", align: "right" as const }
+  { title: "来源", key: "name", align: "center" as const },
+  { title: "总条数", key: "totalCount", align: "center" as const },
+  { title: "今天发布", key: "publishedTodayCount", align: "center" as const },
+  { title: "今天抓取", key: "collectedTodayCount", align: "center" as const },
+  { title: "AI 新讯今日候选 / 今日展示", key: "aiStats", align: "center" as const },
+  { title: "AI 新讯当前页今日占比", key: "aiShare", align: "center" as const },
+  { title: "AI 热点今日候选 / 今日展示", key: "hotStats", align: "center" as const },
+  { title: "AI 热点当前页今日占比", key: "hotShare", align: "center" as const }
 ];
 const inventoryColumns = [
-  { title: "来源", key: "name" },
+  { title: "来源", key: "name", align: "center" as const },
   { title: "启用", key: "enabled", align: "center" as const },
   { title: "选中时全量", key: "displayMode", align: "center" as const },
-  { title: "最近抓取时间", key: "lastCollectedAt" },
-  { title: "最近抓取状态", key: "lastCollectionStatus" },
-  { title: "RSS", key: "rssUrl" }
+  { title: "最近抓取时间", key: "lastCollectedAt", align: "center" as const },
+  { title: "最近抓取状态", key: "lastCollectionStatus", align: "center" as const },
+  { title: "RSS", key: "rssUrl", align: "center" as const }
 ];
 
 const isLoading = ref(true);
@@ -89,13 +91,27 @@ function formatDateTime(value: string | null | undefined): string {
 
 // 三个内容视图的候选 / 展示统计都用同一格式输出，便于在表格里横向比较。
 function formatViewStats(
-  stats: { candidateCount: number; visibleCount: number } | undefined
+  stats:
+    | { todayCandidateCount: number; todayVisibleCount: number; todayVisibleShare: number }
+    | undefined
 ): string {
   if (!stats) {
     return "0 / 0";
   }
 
-  return `${stats.candidateCount} / ${stats.visibleCount}`;
+  return `${stats.todayCandidateCount} / ${stats.todayVisibleCount}`;
+}
+
+function formatViewShare(
+  stats:
+    | { todayCandidateCount: number; todayVisibleCount: number; todayVisibleShare: number }
+    | undefined
+): string {
+  if (!stats) {
+    return "0.0%";
+  }
+
+  return `${(stats.todayVisibleShare * 100).toFixed(1)}%`;
 }
 
 // sources 页错误提示沿用后端 reason 映射，避免把接口细节直接暴露给用户。
@@ -391,8 +407,14 @@ onMounted(() => {
               <template v-else-if="column.key === 'collectedTodayCount'">
                 {{ record.collectedTodayCount ?? 0 }}
               </template>
+              <template v-else-if="column.key === 'aiShare'">
+                {{ formatViewShare(record.viewStats?.ai) }}
+              </template>
               <template v-else-if="column.key === 'hotStats'">
                 {{ formatViewStats(record.viewStats?.hot) }}
+              </template>
+              <template v-else-if="column.key === 'hotShare'">
+                {{ formatViewShare(record.viewStats?.hot) }}
               </template>
               <template v-else-if="column.key === 'aiStats'">
                 {{ formatViewStats(record.viewStats?.ai) }}

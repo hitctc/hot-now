@@ -16,7 +16,7 @@ describe("contentApi", () => {
     requestJson.mockResolvedValue({
       pageKey: "ai-new",
       sourceFilter: {
-        options: [{ kind: "openai", name: "OpenAI", showAllWhenSelected: false }],
+        options: [{ kind: "openai", name: "OpenAI", showAllWhenSelected: false, currentPageVisibleCount: 3 }],
         selectedSourceKinds: ["openai"]
       },
       featuredCard: null,
@@ -28,6 +28,7 @@ describe("contentApi", () => {
 
     await readAiNewPage([" openai ", "openai", "ithome"], "content_score");
     await readAiHotPage(undefined, "published_at");
+    const result = await readAiNewPage(["openai"], "content_score");
 
     expect(requestJson).toHaveBeenNthCalledWith(
       1,
@@ -44,6 +45,7 @@ describe("contentApi", () => {
         "x-hot-now-content-sort": "published_at"
       }
     });
+    expect(result.sourceFilter?.options[0]?.currentPageVisibleCount).toBe(3);
   });
 
   it("persists and restores selected content source kinds", async () => {
@@ -72,8 +74,8 @@ describe("contentApi", () => {
     expect(
       deriveInitialSelectedSourceKinds(
         [
-          { kind: "openai", name: "OpenAI", showAllWhenSelected: false },
-          { kind: "juya", name: "Juya AI Daily", showAllWhenSelected: true }
+          { kind: "openai", name: "OpenAI", showAllWhenSelected: false, currentPageVisibleCount: 0 },
+          { kind: "juya", name: "Juya AI Daily", showAllWhenSelected: true, currentPageVisibleCount: 0 }
         ],
         null
       )
@@ -81,8 +83,8 @@ describe("contentApi", () => {
     expect(
       deriveInitialSelectedSourceKinds(
         [
-          { kind: "openai", name: "OpenAI", showAllWhenSelected: false },
-          { kind: "juya", name: "Juya AI Daily", showAllWhenSelected: true }
+          { kind: "openai", name: "OpenAI", showAllWhenSelected: false, currentPageVisibleCount: 0 },
+          { kind: "juya", name: "Juya AI Daily", showAllWhenSelected: true, currentPageVisibleCount: 0 }
         ],
         ["juya"]
       )

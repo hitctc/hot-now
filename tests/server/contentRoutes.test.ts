@@ -34,12 +34,13 @@ describe("content routes", () => {
   });
 
   it("returns AI 新讯 and AI 热点 models through dedicated JSON APIs", async () => {
-    const listContentView = vi.fn().mockResolvedValue([
+    const contentCards = [
       {
         id: 101,
         title: "AI Weekly Insight",
         summary: "Roundup of recent AI and product updates.",
-        sourceName: "Juya AI Daily",
+        sourceName: "OpenAI",
+        sourceKind: "openai",
         canonicalUrl: "https://example.com/ai-weekly",
         publishedAt: "2026-03-28T10:00:00.000Z",
         isFavorited: false,
@@ -59,6 +60,7 @@ describe("content routes", () => {
         title: "AI Policy Watch",
         summary: "A compact summary for layout verification.",
         sourceName: "OpenAI",
+        sourceKind: "openai",
         canonicalUrl: "https://example.com/ai-policy",
         publishedAt: "2026-03-28T09:00:00.000Z",
         isFavorited: false,
@@ -66,7 +68,16 @@ describe("content routes", () => {
         contentScore: 88,
         scoreBadges: ["24h 内", "官方源"]
       }
-    ]);
+    ];
+    const listContentView = vi.fn().mockImplementation((_viewKey, options) => {
+      const selectedSourceKinds = options?.selectedSourceKinds;
+
+      if (!selectedSourceKinds || selectedSourceKinds.length === 0) {
+        return contentCards;
+      }
+
+      return contentCards.filter((card) => selectedSourceKinds.includes(card.sourceKind));
+    });
     const app = createContentTestServer({
       listContentView,
       listContentSources: vi.fn().mockResolvedValue([
@@ -88,7 +99,7 @@ describe("content routes", () => {
       featuredCard: { id: number } | null;
       cards: { id: number }[];
       sourceFilter?: {
-        options: { kind: string; name: string; showAllWhenSelected: boolean }[];
+        options: { kind: string; name: string; showAllWhenSelected: boolean; currentPageVisibleCount: number }[];
         selectedSourceKinds: string[];
       };
       emptyState: { title: string; tone: string } | null;
@@ -96,11 +107,11 @@ describe("content routes", () => {
 
     expect(aiNewResponse.statusCode).toBe(200);
     expect(aiNewPayload.pageKey).toBe("ai-new");
-    expect(aiNewPayload.featuredCard?.id).toBe(101);
-    expect(aiNewPayload.cards.map((card) => card.id)).toEqual([102]);
+    expect(aiNewPayload.featuredCard).toBeNull();
+    expect(aiNewPayload.cards.map((card) => card.id)).toEqual([101, 102]);
     expect(aiNewPayload.sourceFilter?.options).toEqual([
-      { kind: "openai", name: "OpenAI", showAllWhenSelected: false },
-      { kind: "ithome", name: "IT之家", showAllWhenSelected: true }
+      { kind: "openai", name: "OpenAI", showAllWhenSelected: false, currentPageVisibleCount: 2 },
+      { kind: "ithome", name: "IT之家", showAllWhenSelected: true, currentPageVisibleCount: 0 }
     ]);
     expect(aiNewPayload.sourceFilter?.selectedSourceKinds).toEqual(["openai"]);
     expect(aiNewPayload.emptyState).toBeNull();

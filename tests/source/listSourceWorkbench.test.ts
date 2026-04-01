@@ -23,9 +23,10 @@ describe("listSourceWorkbench", () => {
     }
   });
 
-  it("returns total, published-today, collected-today, and per-view candidate/visible counts", async () => {
+  it("returns total counts plus current-page today metrics for each source", async () => {
     const db = await createTestDatabase(databasesToClose);
     const openai = resolveSourceByKind(db, "openai");
+    const kr36 = resolveSourceByKind(db, "kr36");
 
     upsertContentItems(db, {
       sourceId: openai!.id,
@@ -45,20 +46,112 @@ describe("listSourceWorkbench", () => {
           bodyMarkdown: "Today collected body",
           publishedAt: "2026-03-30T10:00:00.000Z",
           fetchedAt: "2026-03-31T02:00:00.000Z"
+        },
+        {
+          title: "Today fallback visible",
+          canonicalUrl: "https://example.com/today-fallback-visible",
+          summary: "Today fallback summary",
+          bodyMarkdown: "Today fallback body",
+          publishedAt: null,
+          fetchedAt: "2026-03-31T03:00:00.000Z"
+        }
+      ]
+    });
+    upsertContentItems(db, {
+      sourceId: kr36!.id,
+      items: [
+        {
+          title: "36Kr today visible",
+          canonicalUrl: "https://example.com/36kr-today-visible",
+          summary: "36Kr today visible summary",
+          bodyMarkdown: "36Kr today visible body",
+          publishedAt: "2026-03-31T02:00:00.000Z",
+          fetchedAt: "2026-03-31T02:10:00.000Z"
         }
       ]
     });
 
-    const workbench = listSourceWorkbench(db);
+    const workbench = listSourceWorkbench(db, {
+      selectedSourceKinds: ["openai", "kr36"]
+    });
     const openaiRow = workbench.find((row) => row.kind === "openai");
+    const kr36Row = workbench.find((row) => row.kind === "kr36");
 
     expect(openaiRow).toMatchObject({
-      totalCount: 2,
+      totalCount: 3,
       publishedTodayCount: 1,
-      collectedTodayCount: 2
+      collectedTodayCount: 3
     });
-    expect(openaiRow?.viewStats.hot.candidateCount).toBeGreaterThanOrEqual(1);
-    expect(openaiRow?.viewStats.hot.visibleCount).toBeGreaterThanOrEqual(1);
+    expect(openaiRow?.viewStats.hot).toEqual({
+      todayCandidateCount: 2,
+      todayVisibleCount: 2,
+      todayVisibleShare: 2 / 3
+    });
+    expect(openaiRow?.viewStats.ai).toEqual({
+      todayCandidateCount: 2,
+      todayVisibleCount: 2,
+      todayVisibleShare: 2 / 3
+    });
+    expect(kr36Row?.viewStats.hot).toEqual({
+      todayCandidateCount: 1,
+      todayVisibleCount: 1,
+      todayVisibleShare: 1 / 3
+    });
+  });
+
+  it("keeps full-display sources out of the default workbench context until they are explicitly selected", async () => {
+    const db = await createTestDatabase(databasesToClose);
+    const juya = resolveSourceByKind(db, "juya");
+
+    db.prepare(
+      `
+        UPDATE content_sources
+        SET show_all_when_selected = 1
+        WHERE kind = 'juya'
+      `
+    ).run();
+
+    upsertContentItems(db, {
+      sourceId: juya!.id,
+      items: [
+        {
+          title: "Juya default hidden",
+          canonicalUrl: "https://example.com/juya-default-hidden",
+          summary: "Juya default hidden summary",
+          bodyMarkdown: "Juya default hidden body",
+          publishedAt: "2026-03-31T01:00:00.000Z",
+          fetchedAt: "2026-03-31T01:05:00.000Z"
+        }
+      ]
+    });
+
+    const defaultWorkbench = listSourceWorkbench(db);
+    const selectedWorkbench = listSourceWorkbench(db, {
+      selectedSourceKinds: ["juya"]
+    });
+    const defaultJuyaRow = defaultWorkbench.find((row) => row.kind === "juya");
+    const selectedJuyaRow = selectedWorkbench.find((row) => row.kind === "juya");
+
+    expect(defaultJuyaRow).toMatchObject({
+      totalCount: 1,
+      publishedTodayCount: 1,
+      collectedTodayCount: 1
+    });
+    expect(defaultJuyaRow?.viewStats.hot).toEqual({
+      todayCandidateCount: 0,
+      todayVisibleCount: 0,
+      todayVisibleShare: 0
+    });
+    expect(selectedJuyaRow?.viewStats.hot).toEqual({
+      todayCandidateCount: 1,
+      todayVisibleCount: 1,
+      todayVisibleShare: 1
+    });
+    expect(selectedJuyaRow?.viewStats.ai).toEqual({
+      todayCandidateCount: 1,
+      todayVisibleCount: 1,
+      todayVisibleShare: 1
+    });
   });
 });
 

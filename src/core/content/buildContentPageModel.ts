@@ -2,8 +2,7 @@ import type { SqliteDatabase } from "../db/openDatabase.js";
 import { listContentSources, type ContentSourceOption } from "../source/listContentSources.js";
 import {
   buildContentViewSelection,
-  type ContentSortMode,
-  type RankedContentCardView
+  type ContentSortMode
 } from "./buildContentViewSelection.js";
 import type { ContentCardView } from "./listContentView.js";
 
@@ -12,7 +11,7 @@ export type ContentPageKey = "ai-new" | "ai-hot";
 export type ContentPageModel = {
   pageKey: ContentPageKey;
   sourceFilter?: {
-    options: { kind: string; name: string; showAllWhenSelected: boolean }[];
+    options: { kind: string; name: string; showAllWhenSelected: boolean; currentPageVisibleCount: number }[];
     selectedSourceKinds: string[];
   };
   featuredCard: ContentCardView | null;
@@ -46,11 +45,8 @@ export function buildContentPageModel(
       selectedSourceKinds: effectiveSelectedSourceKinds,
       sortMode: options.sortMode ?? "published_at"
     });
-    const featuredRankedCard = pageKey === "ai-new" ? selectFeaturedCard(selection.visibleCards) : null;
-    const featuredCard = featuredRankedCard ? stripRankedCard(featuredRankedCard) : null;
-    const cards = selection.visibleCards
-      .filter((card) => card.id !== featuredRankedCard?.id)
-      .map(stripRankedCard);
+    const cards = selection.visibleCards.map(stripRankedCard);
+    const visibleCountsBySourceKind = countCurrentPageVisibleCardsBySourceKind(cards);
 
     return {
       pageKey,
@@ -60,12 +56,14 @@ export function buildContentPageModel(
               options: sourceOptions.map((source) => ({
                 kind: source.kind,
                 name: source.name,
-                showAllWhenSelected: source.showAllWhenSelected
+                showAllWhenSelected: source.showAllWhenSelected,
+                currentPageVisibleCount: visibleCountsBySourceKind[source.kind] ?? 0
               })),
               selectedSourceKinds: effectiveSelectedSourceKinds
             }
           : undefined,
-      featuredCard,
+      // 客户端内容页已经不再拆首条精选卡，这里保留空字段只为了兼容现有接口模型。
+      featuredCard: null,
       cards,
       emptyState:
         effectiveSelectedSourceKinds.length === 0
@@ -74,7 +72,7 @@ export function buildContentPageModel(
               description: "重新全选后即可恢复内容结果。",
               tone: "filtered"
             }
-          : featuredCard || cards.length > 0
+          : cards.length > 0
             ? null
             : {
                 title: pageKey === "ai-new" ? "暂无 AI 新讯" : "暂无 AI 热点",
@@ -100,22 +98,13 @@ export function buildContentPageModel(
   }
 }
 
-// 首条精选只从被 hero 正向命中的候选里挑；如果没人命中，就回退到当前排序第一条。
-export function selectFeaturedCard(cards: RankedContentCardView[]): RankedContentCardView | null {
-  const heroPreferred = cards
-    .filter((card) => card.heroDecision === "boost" && card.heroScoreDelta > 0)
-    .sort((left, right) => right.heroScoreDelta - left.heroScoreDelta);
-
-  return heroPreferred[0] ?? cards[0] ?? null;
-}
-
 function stripRankedCard({
   rankingScore: _rankingScore,
   rankingTimestamp: _rankingTimestamp,
   heroDecision: _heroDecision,
   heroScoreDelta: _heroScoreDelta,
   ...card
-}: RankedContentCardView): ContentCardView {
+}: ReturnType<typeof buildContentViewSelection>["visibleCards"][number]): ContentCardView {
   return card;
 }
 
@@ -131,6 +120,21 @@ function normalizeSelectedSourceKinds(selectedSourceKinds: string[] | undefined,
 
 function deriveDefaultSelectedSourceKinds(sourceOptions: ContentSourceOption[]): string[] {
   return sourceOptions.filter((source) => !source.showAllWhenSelected).map((source) => source.kind);
+}
+
+function countCurrentPageVisibleCardsBySourceKind(cards: ContentCardView[]) {
+  // 内容页来源胶囊现在直接反映当前卡片流里各来源真实占了多少条，不再回退单来源稳定口径。
+  const counts = new Map<string, number>();
+
+  for (const card of cards) {
+    if (!card.sourceKind) {
+      continue;
+    }
+
+    counts.set(card.sourceKind, (counts.get(card.sourceKind) ?? 0) + 1);
+  }
+
+  return Object.fromEntries(counts.entries());
 }
 
 function isMalformedContentStoreError(error: unknown) {

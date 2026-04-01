@@ -30,7 +30,7 @@ export type ContentCard = {
 };
 
 export type ContentSourceFilter = {
-  options: { kind: string; name: string; showAllWhenSelected: boolean }[];
+  options: { kind: string; name: string; showAllWhenSelected: boolean; currentPageVisibleCount: number }[];
   selectedSourceKinds: string[];
 };
 

@@ -1,4 +1,4 @@
-import { buildContentViewSelection, type ContentViewSelection } from "../content/buildContentViewSelection.js";
+import { buildContentViewSelection } from "../content/buildContentViewSelection.js";
 import type { SqliteDatabase } from "../db/openDatabase.js";
 import { listSourceCards } from "./listSourceCards.js";
 
@@ -10,8 +10,9 @@ type SourceCountRow = {
 };
 
 type SourceViewStats = {
-  candidateCount: number;
-  visibleCount: number;
+  todayCandidateCount: number;
+  todayVisibleCount: number;
+  todayVisibleShare: number;
 };
 
 export type SourceWorkbenchRow = {
@@ -32,13 +33,25 @@ export type SourceWorkbenchRow = {
   };
 };
 
-export function listSourceWorkbench(db: SqliteDatabase, referenceTime = new Date()): SourceWorkbenchRow[] {
-  // Source analytics reuse the same view selection pipeline so page stats and content tabs stay on one exact rule set.
+export function listSourceWorkbench(
+  db: SqliteDatabase,
+  options: {
+    referenceTime?: Date;
+    selectedSourceKinds?: string[];
+  } = {}
+): SourceWorkbenchRow[] {
+  // Workbench stats now follow the browser's真实来源筛选上下文，和内容页一起回答“当前页今天各来源贡献了多少”。
+  const referenceTime = options.referenceTime ?? new Date();
   const sourceCards = listSourceCards(db);
   const countMap = readSourceCountMap(db, referenceTime);
-  const hotStats = indexCountsBySource(buildContentViewSelection(db, "hot", { referenceTime }));
-  const articleStats = indexCountsBySource(buildContentViewSelection(db, "articles", { referenceTime }));
-  const aiStats = indexCountsBySource(buildContentViewSelection(db, "ai", { referenceTime }));
+  const enabledSources = sourceCards.filter((source) => source.isEnabled);
+  const effectiveSelectedSourceKinds = normalizeSelectedSourceKinds(
+    options.selectedSourceKinds,
+    enabledSources
+  ) ?? deriveDefaultSelectedSourceKinds(enabledSources);
+  const hotStats = readCurrentPageTodayStatsBySource(db, "hot", referenceTime, effectiveSelectedSourceKinds);
+  const articleStats = readCurrentPageTodayStatsBySource(db, "articles", referenceTime, effectiveSelectedSourceKinds);
+  const aiStats = readCurrentPageTodayStatsBySource(db, "ai", referenceTime, effectiveSelectedSourceKinds);
 
   return sourceCards.map((sourceCard) => ({
     ...sourceCard,
@@ -46,9 +59,9 @@ export function listSourceWorkbench(db: SqliteDatabase, referenceTime = new Date
     publishedTodayCount: countMap.get(sourceCard.kind)?.publishedTodayCount ?? 0,
     collectedTodayCount: countMap.get(sourceCard.kind)?.collectedTodayCount ?? 0,
     viewStats: {
-      hot: hotStats.get(sourceCard.kind) ?? { candidateCount: 0, visibleCount: 0 },
-      articles: articleStats.get(sourceCard.kind) ?? { candidateCount: 0, visibleCount: 0 },
-      ai: aiStats.get(sourceCard.kind) ?? { candidateCount: 0, visibleCount: 0 }
+      hot: hotStats.get(sourceCard.kind) ?? { todayCandidateCount: 0, todayVisibleCount: 0, todayVisibleShare: 0 },
+      articles: articleStats.get(sourceCard.kind) ?? { todayCandidateCount: 0, todayVisibleCount: 0, todayVisibleShare: 0 },
+      ai: aiStats.get(sourceCard.kind) ?? { todayCandidateCount: 0, todayVisibleCount: 0, todayVisibleShare: 0 }
     }
   }));
 }
@@ -73,22 +86,46 @@ function readSourceCountMap(db: SqliteDatabase, referenceTime: Date) {
   return new Map(rows.map((row) => [row.sourceKind, row]));
 }
 
-function indexCountsBySource(selection: ContentViewSelection) {
-  const stats = new Map<string, SourceViewStats>();
+function readCurrentPageTodayStatsBySource(
+  db: SqliteDatabase,
+  viewKey: "hot" | "articles" | "ai",
+  referenceTime: Date,
+  selectedSourceKinds: string[]
+) {
+  const selection = buildContentViewSelection(db, viewKey, {
+    referenceTime,
+    selectedSourceKinds
+  });
 
-  for (const card of selection.candidateCards) {
-    const entry = stats.get(card.sourceKind) ?? { candidateCount: 0, visibleCount: 0 };
-    entry.candidateCount += 1;
-    stats.set(card.sourceKind, entry);
+  return new Map(
+    Object.entries(selection.currentPageMetricsBySourceKind).map(([sourceKind, metrics]) => [
+      sourceKind,
+      {
+        todayCandidateCount: metrics.todayCandidateCount,
+        todayVisibleCount: metrics.todayVisibleCount,
+        todayVisibleShare: metrics.todayVisibleShare
+      }
+    ])
+  );
+}
+
+function normalizeSelectedSourceKinds(
+  selectedSourceKinds: string[] | undefined,
+  sourceCards: Array<{ kind: string }>
+) {
+  if (selectedSourceKinds === undefined) {
+    return undefined;
   }
 
-  for (const card of selection.visibleCards) {
-    const entry = stats.get(card.sourceKind) ?? { candidateCount: 0, visibleCount: 0 };
-    entry.visibleCount += 1;
-    stats.set(card.sourceKind, entry);
-  }
+  const allowedSourceKinds = new Set(sourceCards.map((source) => source.kind));
 
-  return stats;
+  return selectedSourceKinds.filter((kind, index, array) => {
+    return allowedSourceKinds.has(kind) && array.indexOf(kind) === index;
+  });
+}
+
+function deriveDefaultSelectedSourceKinds(sourceCards: Array<{ kind: string; showAllWhenSelected: boolean }>) {
+  return sourceCards.filter((source) => !source.showAllWhenSelected).map((source) => source.kind);
 }
 
 function buildShanghaiDayRange(referenceTime: Date) {

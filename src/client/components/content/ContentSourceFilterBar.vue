@@ -8,8 +8,9 @@ import {
 } from "./contentCardShared";
 
 const props = defineProps<{
-  options: { kind: string; name: string }[];
+  options: { kind: string; name: string; currentPageVisibleCount: number }[];
   selectedSourceKinds: string[];
+  visibleResultCount: number;
 }>();
 
 const emit = defineEmits<{
@@ -18,6 +19,9 @@ const emit = defineEmits<{
 
 const selectedSet = computed(() => new Set(props.selectedSourceKinds));
 const selectedCount = computed(() => props.selectedSourceKinds.length);
+const hasSelectedAllSources = computed(
+  () => props.options.length > 0 && props.selectedSourceKinds.length === props.options.length
+);
 
 function emitSelection(nextKinds: string[]): void {
   emit("change", nextKinds);
@@ -38,6 +42,16 @@ function selectAll(): void {
 function clearAll(): void {
   emitSelection([]);
 }
+
+// 全选和全不选现在共用一个入口，避免右侧堆两个重复语义的按钮。
+function handleToggleAll(): void {
+  if (hasSelectedAllSources.value) {
+    clearAll();
+    return;
+  }
+
+  selectAll();
+}
 </script>
 
 <template>
@@ -52,7 +66,7 @@ function clearAll(): void {
           来源筛选
         </p>
         <p class="m-0 text-sm font-medium text-editorial-text-body">
-          已选 {{ selectedCount }} / {{ options.length }}
+          已选 {{ selectedCount }} / {{ options.length }} · 共 {{ visibleResultCount }} 条
         </p>
       </div>
 
@@ -61,10 +75,11 @@ function clearAll(): void {
           <label
             v-for="option in options"
             :key="option.kind"
+            :data-source-option="option.kind"
             :class="[
-              'inline-flex shrink-0 cursor-pointer items-center gap-3 rounded-editorial-pill border px-3 py-2 text-sm font-semibold transition',
+              'inline-flex shrink-0 cursor-pointer select-none items-center gap-3 rounded-editorial-pill border px-3 py-2 text-sm font-semibold transition',
               selectedSet.has(option.kind)
-                ? 'border-transparent bg-editorial-link-active text-editorial-text-on-accent shadow-editorial-accent'
+                ? 'border-editorial-border-strong bg-editorial-link-active text-editorial-text-main shadow-editorial-accent ring-1 ring-inset ring-editorial-ring'
                 : 'border-editorial-border bg-editorial-control text-editorial-text-main hover:border-editorial-border-strong hover:bg-editorial-control-hover'
             ]"
           >
@@ -76,26 +91,24 @@ function clearAll(): void {
               @change="handleOptionToggle(option.kind, ($event.target as HTMLInputElement).checked)"
             />
             <span>{{ option.name }}</span>
+            <span
+              :data-source-option-count="option.kind"
+              class="inline-flex min-w-6 items-center justify-center rounded-editorial-pill border border-editorial-border bg-editorial-panel-strong px-2 py-0.5 text-[11px] font-semibold leading-4 text-editorial-text-muted"
+            >
+              {{ option.currentPageVisibleCount }}
+            </span>
           </label>
         </div>
       </div>
 
       <div class="flex shrink-0 items-center gap-2">
         <a-button
-          data-content-filter-action="select-all"
+          data-content-filter-action="toggle-all"
           size="small"
           :class="[editorialContentControlButtonClass, editorialContentControlButtonIdleClass]"
-          @click="selectAll"
+          @click="handleToggleAll"
         >
-          全选
-        </a-button>
-        <a-button
-          data-content-filter-action="clear-all"
-          size="small"
-          :class="[editorialContentControlButtonClass, editorialContentControlButtonIdleClass]"
-          @click="clearAll"
-        >
-          全不选
+          {{ hasSelectedAllSources ? "全不选" : "全选" }}
         </a-button>
       </div>
     </div>

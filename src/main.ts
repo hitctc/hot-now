@@ -2,6 +2,7 @@ import path from "node:path";
 import { existsSync } from "node:fs";
 import { loadRuntimeConfig } from "./core/config/loadRuntimeConfig.js";
 import { verifyPassword } from "./core/auth/passwords.js";
+import { buildContentPageModel } from "./core/content/buildContentPageModel.js";
 import { listContentView as listContentCards } from "./core/content/listContentView.js";
 import { createRuntimeDatabase } from "./core/db/createRuntimeDatabase.js";
 import { runMigrations } from "./core/db/runMigrations.js";
@@ -493,6 +494,11 @@ const app = createServer({
     verifyLogin
   },
   isRunning: () => lock.isRunning(),
+  getContentPageModel: async (pageKey, options) =>
+    buildContentPageModel(db, pageKey, {
+      ...options,
+      includeNlEvaluations: isNlFeatureAvailable()
+    }),
   listContentView: async (viewKey, options) =>
     listContentCards(db, viewKey, {
       ...options,
@@ -536,7 +542,7 @@ const app = createServer({
     });
   },
   deleteStrategyDraft: async (draftId) => deleteStrategyDraft(db, draftId),
-  listSources: async () => listSourceWorkbench(db),
+  listSources: async (options) => listSourceWorkbench(db, options),
   getSourcesOperationSummary: async () => readSourcesOperationSummary(db),
   toggleSource: async (kind, enable) => toggleSource(kind, enable),
   updateSourceDisplayMode: async (kind, showAllWhenSelected) => updateSourceDisplayMode(kind, showAllWhenSelected),

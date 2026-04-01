@@ -83,9 +83,9 @@ type SourceItem = {
   publishedTodayCount?: number;
   collectedTodayCount?: number;
   viewStats?: {
-    hot: { candidateCount: number; visibleCount: number };
-    articles: { candidateCount: number; visibleCount: number };
-    ai: { candidateCount: number; visibleCount: number };
+    hot: { todayCandidateCount: number; todayVisibleCount: number; todayVisibleShare: number };
+    articles: { todayCandidateCount: number; todayVisibleCount: number; todayVisibleShare: number };
+    ai: { todayCandidateCount: number; todayVisibleCount: number; todayVisibleShare: number };
   };
 };
 
@@ -203,9 +203,13 @@ function renderSourcesOverviewTable(sources: SourceItem[]) {
 }
 
 function renderSourcesOverviewRow(source: SourceItem) {
-  const hotStats = source.viewStats?.hot ?? { candidateCount: 0, visibleCount: 0 };
-  const articleStats = source.viewStats?.articles ?? { candidateCount: 0, visibleCount: 0 };
-  const aiStats = source.viewStats?.ai ?? { candidateCount: 0, visibleCount: 0 };
+  const hotStats = source.viewStats?.hot ?? { todayCandidateCount: 0, todayVisibleCount: 0, todayVisibleShare: 0 };
+  const articleStats = source.viewStats?.articles ?? {
+    todayCandidateCount: 0,
+    todayVisibleCount: 0,
+    todayVisibleShare: 0
+  };
+  const aiStats = source.viewStats?.ai ?? { todayCandidateCount: 0, todayVisibleCount: 0, todayVisibleShare: 0 };
 
   return `
     <tr>
@@ -213,9 +217,9 @@ function renderSourcesOverviewRow(source: SourceItem) {
       <td>${source.totalCount ?? 0}</td>
       <td>${source.publishedTodayCount ?? 0}</td>
       <td>${source.collectedTodayCount ?? 0}</td>
-      <td>${hotStats.candidateCount} / ${hotStats.visibleCount}</td>
-      <td>${articleStats.candidateCount} / ${articleStats.visibleCount}</td>
-      <td>${aiStats.candidateCount} / ${aiStats.visibleCount}</td>
+      <td>${hotStats.todayCandidateCount} / ${hotStats.todayVisibleCount}</td>
+      <td>${articleStats.todayCandidateCount} / ${articleStats.todayVisibleCount}</td>
+      <td>${aiStats.todayCandidateCount} / ${aiStats.todayVisibleCount}</td>
     </tr>
   `;
 }

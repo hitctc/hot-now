@@ -144,6 +144,51 @@ describe("settings api routes", () => {
     });
   });
 
+  it("passes the current content source filter header through to the sources workbench reader", async () => {
+    const listSources = vi.fn().mockResolvedValue([
+      {
+        kind: "openai",
+        name: "OpenAI",
+        rssUrl: "https://openai.com/news/rss.xml",
+        isEnabled: true,
+        showAllWhenSelected: false,
+        lastCollectedAt: null,
+        lastCollectionStatus: null
+      }
+    ]);
+    const app = createServer({
+      auth: {
+        requireLogin: true,
+        sessionSecret: "test-secret",
+        verifyLogin: vi.fn().mockResolvedValue({
+          username: "admin",
+          displayName: "系统管理员",
+          role: "admin"
+        })
+      },
+      listSources,
+      getSourcesOperationSummary: vi.fn().mockResolvedValue({
+        lastCollectionRunAt: null,
+        lastSendLatestEmailAt: null
+      })
+    } as never);
+    const cookie = await loginAndGetCookie(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/settings/sources",
+      headers: {
+        cookie: cookie ?? "",
+        "x-hot-now-source-filter": "openai,juya"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(listSources).toHaveBeenCalledWith({
+      selectedSourceKinds: ["openai", "juya"]
+    });
+  });
+
   it("returns the current user model for logged-in users", async () => {
     const app = createAuthenticatedServer();
     const cookie = await loginAndGetCookie(app);

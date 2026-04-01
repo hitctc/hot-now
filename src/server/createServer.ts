@@ -59,9 +59,9 @@ type SourceCard = {
   publishedTodayCount?: number;
   collectedTodayCount?: number;
   viewStats?: {
-    hot: { candidateCount: number; visibleCount: number };
-    articles: { candidateCount: number; visibleCount: number };
-    ai: { candidateCount: number; visibleCount: number };
+    hot: { todayCandidateCount: number; todayVisibleCount: number; todayVisibleShare: number };
+    articles: { todayCandidateCount: number; todayVisibleCount: number; todayVisibleShare: number };
+    ai: { todayCandidateCount: number; todayVisibleCount: number; todayVisibleShare: number };
   };
 };
 type SourcesOperationSummary = {
@@ -87,7 +87,7 @@ type ContentPageKey = "ai-new" | "ai-hot";
 type ContentPageModel = {
   pageKey: ContentPageKey;
   sourceFilter?: {
-    options: { kind: string; name: string; showAllWhenSelected: boolean }[];
+    options: { kind: string; name: string; showAllWhenSelected: boolean; currentPageVisibleCount: number }[];
     selectedSourceKinds: string[];
   };
   featuredCard: ContentCardView | null;
@@ -133,7 +133,7 @@ type ServerDeps = {
   clearAllFeedback?: () => Promise<ClearFeedbackResult> | ClearFeedbackResult;
   saveStrategyDraft?: (input: UpdateStrategyDraftInput) => Promise<UpdateStrategyDraftResult> | UpdateStrategyDraftResult;
   deleteStrategyDraft?: (draftId: number) => Promise<DeleteDraftResult> | DeleteDraftResult;
-  listSources?: () => Promise<SourceCard[]> | SourceCard[];
+  listSources?: (options?: { selectedSourceKinds?: string[] }) => Promise<SourceCard[]> | SourceCard[];
   getSourcesOperationSummary?: () => Promise<SourcesOperationSummary> | SourcesOperationSummary;
   toggleSource?: (kind: string, enable: boolean) => Promise<ToggleSourceResult> | ToggleSourceResult;
   updateSourceDisplayMode?: (
@@ -224,7 +224,7 @@ export function createServer(deps: ServerDeps = {}) {
       return;
     }
 
-    return reply.send(await readSettingsSourcesApiData(deps));
+    return reply.send(await readSettingsSourcesApiData(deps, request));
   });
 
   app.get("/api/settings/profile", async (request, reply) => {
@@ -925,9 +925,15 @@ async function readSettingsViewRulesApiData(deps: ServerDeps): Promise<ViewRules
   return workbench;
 }
 
-async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSettingsView> {
-  // Sources keeps a stable wrapper object so future client fields can be added without reshaping the endpoint.
-  const sources = ((await deps.listSources?.()) ?? []) as SourceCard[];
+async function readSettingsSourcesApiData(
+  deps: ServerDeps,
+  request: FastifyRequest
+): Promise<SourcesSettingsView> {
+  // Sources workbench now follows the same browser来源筛选上下文，避免和内容页出现两套来源统计口径。
+  const selectedSourceKinds = readSelectedSourceKindsHeader(request.headers["x-hot-now-source-filter"]);
+  const sources = ((await deps.listSources?.(
+    selectedSourceKinds === undefined ? undefined : { selectedSourceKinds }
+  )) ?? []) as SourceCard[];
   const operationSummary = deps.getSourcesOperationSummary
     ? await deps.getSourcesOperationSummary()
     : { lastCollectionRunAt: null, lastSendLatestEmailAt: null };
@@ -1152,6 +1158,7 @@ async function buildContentPageModelFromDependencies(
       selectedSourceKinds: effectiveSelectedSourceKinds,
       sortMode
     });
+    const currentPageVisibleCountsBySourceKind = countCurrentPageVisibleCardsBySourceKind(cards);
 
     return {
       pageKey,
@@ -1160,13 +1167,15 @@ async function buildContentPageModelFromDependencies(
             options: sourceOptions.map((source) => ({
               kind: source.kind,
               name: source.name,
-              showAllWhenSelected: source.showAllWhenSelected
+              showAllWhenSelected: source.showAllWhenSelected,
+              currentPageVisibleCount: currentPageVisibleCountsBySourceKind[source.kind] ?? 0
             })),
             selectedSourceKinds: effectiveSelectedSourceKinds
           }
         : undefined,
-      featuredCard: pageKey === "ai-new" ? cards[0] ?? null : null,
-      cards: pageKey === "ai-new" ? cards.slice(1) : cards,
+      // AI 新讯和 AI 热点都统一成标准卡流，保留 featuredCard 仅作兼容空字段。
+      featuredCard: null,
+      cards,
       emptyState:
         effectiveSelectedSourceKinds.length === 0
           ? {
@@ -1198,6 +1207,21 @@ async function buildContentPageModelFromDependencies(
       }
     };
   }
+}
+
+function countCurrentPageVisibleCardsBySourceKind(cards: ContentCardView[]) {
+  // fallback 内容接口直接按当前请求已经返回的卡片分布计算来源数量，避免再跑一套独立稳定口径。
+  const counts = new Map<string, number>();
+
+  for (const card of cards) {
+    if (!card.sourceKind) {
+      continue;
+    }
+
+    counts.set(card.sourceKind, (counts.get(card.sourceKind) ?? 0) + 1);
+  }
+
+  return Object.fromEntries(counts.entries());
 }
 
 async function renderContentForView(

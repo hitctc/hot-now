@@ -31,24 +31,12 @@ const baseModel = {
   pageKey: "ai-new" as const,
   sourceFilter: {
     options: [
-      { kind: "openai", name: "OpenAI", showAllWhenSelected: false },
-      { kind: "ithome", name: "IT之家", showAllWhenSelected: true }
+      { kind: "openai", name: "OpenAI", showAllWhenSelected: false, currentPageVisibleCount: 1 },
+      { kind: "ithome", name: "IT之家", showAllWhenSelected: true, currentPageVisibleCount: 1 }
     ],
     selectedSourceKinds: ["openai"]
   },
-  featuredCard: {
-    id: 1,
-    title: "AI Weekly Insight",
-    summary: "Feature story about AI workflow.",
-    sourceName: "OpenAI",
-    sourceKind: "openai",
-    canonicalUrl: "https://example.com/featured",
-    publishedAt: "2026-03-31T10:00:00.000Z",
-    isFavorited: false,
-    reaction: "none",
-    contentScore: 95,
-    scoreBadges: ["精选"]
-  },
+  featuredCard: null,
   cards: [
     {
       id: 1,
@@ -108,7 +96,7 @@ describe("AiNewPage", () => {
     });
   });
 
-  it("renders the featured card and the standard list", async () => {
+  it("renders AI 新讯 as one standard card list", async () => {
     contentApiMocks.readAiNewPage.mockResolvedValueOnce(createModel());
 
     const wrapper = mount(AiNewPage, {
@@ -126,10 +114,13 @@ describe("AiNewPage", () => {
     );
     expect(wrapper.find("[data-content-filter-shell]").exists()).toBe(false);
     expect(wrapper.find("[data-content-source-filter]").exists()).toBe(true);
+    expect(wrapper.get("[data-content-source-filter]").text()).toContain("已选 1 / 2 · 共 2 条");
+    expect(wrapper.get("[data-source-option-count='openai']").text()).toBe("1");
+    expect(wrapper.get("[data-source-option-count='ithome']").text()).toBe("1");
     expect(wrapper.find("[data-content-sort-control]").exists()).toBe(true);
-    expect(wrapper.get("[data-content-section='featured']").classes()).toContain("grid");
     expect(wrapper.get("[data-content-section='list']").classes()).toContain("grid");
-    expect(wrapper.get("[data-content-section='featured']").text()).toContain("AI Weekly Insight");
+    expect(wrapper.find("[data-content-section='featured']").exists()).toBe(false);
+    expect(wrapper.get("[data-content-section='list']").text()).toContain("AI Weekly Insight");
     expect(wrapper.get("[data-content-section='list']").text()).toContain("AI Agent Launch");
   });
 
@@ -139,19 +130,7 @@ describe("AiNewPage", () => {
       .mockResolvedValueOnce(createModel())
       .mockResolvedValueOnce(
         createModel({
-          featuredCard: {
-            id: 3,
-            title: "New OpenAI Model",
-            summary: "Updated featured story after filter change.",
-            sourceName: "OpenAI",
-            sourceKind: "openai",
-            canonicalUrl: "https://example.com/new-model",
-            publishedAt: "2026-03-31T12:00:00.000Z",
-            isFavorited: false,
-            reaction: "none",
-            contentScore: 97,
-            scoreBadges: ["精选"]
-          },
+          featuredCard: null,
           cards: [
             {
               id: 3,
@@ -169,8 +148,8 @@ describe("AiNewPage", () => {
           ],
           sourceFilter: {
             options: [
-              { kind: "openai", name: "OpenAI", showAllWhenSelected: false },
-              { kind: "ithome", name: "IT之家", showAllWhenSelected: true }
+              { kind: "openai", name: "OpenAI", showAllWhenSelected: false, currentPageVisibleCount: 1 },
+              { kind: "ithome", name: "IT之家", showAllWhenSelected: true, currentPageVisibleCount: 1 }
             ],
             selectedSourceKinds: ["openai", "ithome"]
           }
@@ -192,7 +171,9 @@ describe("AiNewPage", () => {
     expect(contentApiMocks.writeStoredContentSourceKinds).toHaveBeenCalledWith(["openai", "ithome"]);
     expect(contentApiMocks.readAiNewPage).toHaveBeenCalledTimes(2);
     expect(contentApiMocks.readAiNewPage).toHaveBeenLastCalledWith(["openai", "ithome"], "published_at");
-    expect(wrapper.get("[data-content-section='featured']").text()).toContain("New OpenAI Model");
+    expect(wrapper.find("[data-content-section='featured']").exists()).toBe(false);
+    expect(wrapper.get("[data-content-source-filter]").text()).toContain("已选 2 / 2 · 共 1 条");
+    expect(wrapper.get("[data-content-section='list']").text()).toContain("New OpenAI Model");
   });
 
   it("persists sort mode changes and reloads with the shared sort preference", async () => {

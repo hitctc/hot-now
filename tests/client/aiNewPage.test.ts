@@ -116,6 +116,7 @@ describe("AiNewPage", () => {
 
     expect(contentApiMocks.readAiNewPage).toHaveBeenCalledWith(["openai"]);
     expect(wrapper.get("[data-content-page='ai-new']").text()).toContain("AI 新讯");
+    expect(wrapper.find("[data-content-filter-shell]").exists()).toBe(true);
     expect(wrapper.get("[data-content-section='featured']").text()).toContain("AI Weekly Insight");
     expect(wrapper.get("[data-content-section='list']").text()).toContain("AI Agent Launch");
   });

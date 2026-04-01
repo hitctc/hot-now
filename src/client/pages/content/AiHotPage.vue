@@ -136,12 +136,13 @@ onMounted(() => {
 
     <a-alert v-if="hasLoadError && pageModel" type="warning" show-icon :message="loadError" banner />
 
-    <ContentSourceFilterBar
-      v-if="sourceFilter"
-      :options="sourceFilter.options"
-      :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
-      @change="handleSourceKindsChange"
-    />
+    <div v-if="sourceFilter" class="content-page__filter-shell" data-content-filter-shell>
+      <ContentSourceFilterBar
+        :options="sourceFilter.options"
+        :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
+        @change="handleSourceKindsChange"
+      />
+    </div>
 
     <a-skeleton v-if="isLoading" active :paragraph="{ rows: 6 }" />
 
@@ -198,7 +199,20 @@ onMounted(() => {
   gap: 16px;
 }
 
+.content-page__filter-shell {
+  position: sticky;
+  top: 24px;
+  z-index: 12;
+  width: 100%;
+}
+
 .content-page__refresh {
   align-self: flex-start;
+}
+
+@media (max-width: 900px) {
+  .content-page__filter-shell {
+    top: 88px;
+  }
 }
 </style>

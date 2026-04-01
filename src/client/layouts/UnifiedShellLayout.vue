@@ -38,6 +38,18 @@ const activeContentNavKeys = computed(() => {
   return [route.path === "/" ? "/ai-new" : route.path];
 });
 const activeSystemNavKeys = computed(() => (isSystemPageKey(activeNavKey.value) ? [activeNavKey.value] : []));
+const loggedInProfile = computed(() => (profile.value?.loggedIn ? profile.value : null));
+const guestProfile = computed(() => (profile.value && !profile.value.loggedIn ? profile.value : null));
+
+function buildGuestProfile(): SettingsProfile {
+  return {
+    username: "guest",
+    displayName: "公开访问",
+    role: "viewer",
+    email: null,
+    loggedIn: false
+  };
+}
 
 function isActiveContentPath(path: string): boolean {
   return route.path === path || (path === "/ai-new" && route.path === "/");
@@ -71,17 +83,11 @@ async function loadProfileSummary(): Promise<void> {
 
   try {
     const nextProfile = await readSettingsProfile();
-    profile.value = nextProfile;
-    profileLoadState.value = nextProfile ? "loaded" : "empty";
+    profile.value = nextProfile ?? buildGuestProfile();
+    profileLoadState.value = "loaded";
   } catch (error) {
     if (error instanceof HttpError && error.status === 401) {
-      profile.value = {
-        username: "guest",
-        displayName: "公开访问",
-        role: "viewer",
-        email: null,
-        loggedIn: false
-      };
+      profile.value = buildGuestProfile();
       profileLoadState.value = "loaded";
       return;
     }
@@ -235,19 +241,32 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
             />
           </template>
 
-          <template v-else-if="profile">
+          <template v-else-if="loggedInProfile">
             <a-space direction="vertical" size="small" class="unified-shell__profile-summary">
-              <a-typography-text strong>{{ profile.displayName }}</a-typography-text>
-              <a-typography-text type="secondary">@{{ profile.username }}</a-typography-text>
+              <a-typography-text strong>{{ loggedInProfile.displayName }}</a-typography-text>
+              <a-typography-text type="secondary">@{{ loggedInProfile.username }}</a-typography-text>
               <a-space wrap size="small">
-                <a-tag color="blue">{{ profile.role }}</a-tag>
-                <a-tag :color="profile.loggedIn ? 'green' : 'gold'">
-                  {{ profile.loggedIn ? "已登录" : "公开访问" }}
-                </a-tag>
+                <a-tag color="blue">{{ loggedInProfile.role }}</a-tag>
+                <a-tag color="green">已登录</a-tag>
               </a-space>
-              <a-typography-text v-if="profile.email">
-                邮箱：{{ profile.email }}
+              <a-typography-text v-if="loggedInProfile.email">
+                邮箱：{{ loggedInProfile.email }}
               </a-typography-text>
+            </a-space>
+          </template>
+
+          <template v-else-if="guestProfile">
+            <a-space direction="vertical" size="small" class="unified-shell__guest-entry">
+              <a-space wrap size="small">
+                <a-tag color="blue">{{ guestProfile.role }}</a-tag>
+                <a-tag color="gold">公开访问</a-tag>
+              </a-space>
+              <a-typography-paragraph class="unified-shell__login-hint">
+                你现在看到的是公开内容。登录后才能进入系统菜单、保存策略和执行采集动作。
+              </a-typography-paragraph>
+              <a-button type="primary" href="/login" data-shell-login-link>
+                去登录
+              </a-button>
             </a-space>
           </template>
 
@@ -336,16 +355,28 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
               <template v-if="profileLoadState === 'loading'">
                 <a-skeleton :active="true" :paragraph="{ rows: 2 }" />
               </template>
-              <template v-else-if="profile">
+              <template v-else-if="loggedInProfile">
                 <a-space direction="vertical" size="small">
-                  <a-typography-text strong>{{ profile.displayName }}</a-typography-text>
-                  <a-typography-text type="secondary">@{{ profile.username }}</a-typography-text>
+                  <a-typography-text strong>{{ loggedInProfile.displayName }}</a-typography-text>
+                  <a-typography-text type="secondary">@{{ loggedInProfile.username }}</a-typography-text>
                   <a-space wrap size="small">
-                    <a-tag color="blue">{{ profile.role }}</a-tag>
-                    <a-tag :color="profile.loggedIn ? 'green' : 'gold'">
-                      {{ profile.loggedIn ? "已登录" : "公开访问" }}
-                    </a-tag>
+                    <a-tag color="blue">{{ loggedInProfile.role }}</a-tag>
+                    <a-tag color="green">已登录</a-tag>
                   </a-space>
+                </a-space>
+              </template>
+              <template v-else-if="guestProfile">
+                <a-space direction="vertical" size="small" class="unified-shell__guest-entry">
+                  <a-space wrap size="small">
+                    <a-tag color="blue">{{ guestProfile.role }}</a-tag>
+                    <a-tag color="gold">公开访问</a-tag>
+                  </a-space>
+                  <a-typography-paragraph class="unified-shell__login-hint">
+                    登录后才能进入系统菜单和工作台操作。
+                  </a-typography-paragraph>
+                  <a-button type="primary" href="/login" data-mobile-login-link>
+                    去登录
+                  </a-button>
                 </a-space>
               </template>
               <template v-else-if="profileLoadState === 'error'">
@@ -571,8 +602,18 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
 }
 
 .unified-shell__theme-stack,
-.unified-shell__profile-summary {
+.unified-shell__profile-summary,
+.unified-shell__guest-entry {
   width: 100%;
+}
+
+.unified-shell__guest-entry :deep(.ant-btn) {
+  align-self: flex-start;
+}
+
+.unified-shell__login-hint {
+  margin: 0;
+  color: var(--editorial-text-body);
 }
 
 :deep(.unified-shell__view-port .ant-card-head) {

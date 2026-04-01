@@ -75,9 +75,7 @@ function clearAll(): void {
 
 <style scoped>
 .content-source-filter-card {
-  position: sticky;
-  top: 24px;
-  z-index: 12;
+  width: 100%;
   border-radius: 18px;
   border: 1px solid var(--editorial-border);
   background: color-mix(in srgb, var(--editorial-bg-panel) 92%, transparent);
@@ -128,9 +126,4 @@ function clearAll(): void {
   margin: 0;
 }
 
-@media (max-width: 900px) {
-  .content-source-filter-card {
-    top: 88px;
-  }
-}
 </style>

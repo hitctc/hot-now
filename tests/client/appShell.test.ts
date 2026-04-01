@@ -6,14 +6,8 @@ import { APP_ROUTE_BASE, CLIENT_ASSET_BASE } from "../../src/client/appBases";
 import App from "../../src/client/App.vue";
 import { createAppRouter } from "../../src/client/router";
 
-vi.mock("../../src/client/services/settingsApi", () => ({
-  readSettingsProfile: vi.fn().mockResolvedValue({
-    username: "admin",
-    displayName: "系统管理员",
-    role: "admin",
-    email: "admin@example.com",
-    loggedIn: true
-  }),
+const settingsApiMocks = vi.hoisted(() => ({
+  readSettingsProfile: vi.fn(),
   readSettingsViewRules: vi.fn(),
   readSettingsSources: vi.fn(),
   saveViewRuleConfig: vi.fn(),
@@ -30,8 +24,17 @@ vi.mock("../../src/client/services/settingsApi", () => ({
   triggerManualSendLatestEmail: vi.fn()
 }));
 
+vi.mock("../../src/client/services/settingsApi", () => settingsApiMocks);
+
 describe("client app shell", () => {
   beforeEach(() => {
+    settingsApiMocks.readSettingsProfile.mockResolvedValue({
+      username: "admin",
+      displayName: "系统管理员",
+      role: "admin",
+      email: "admin@example.com",
+      loggedIn: true
+    });
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: vi.fn().mockImplementation((query: string) => ({
@@ -142,5 +145,29 @@ describe("client app shell", () => {
 
     expect(router.currentRoute.value.fullPath).toBe("/settings/view-rules");
     expect(wrapper.find("[data-mobile-system-drawer]").exists()).toBe(false);
+  });
+
+  it("shows a login entry when the current visitor is anonymous", async () => {
+    settingsApiMocks.readSettingsProfile.mockResolvedValueOnce(null);
+
+    const router = createAppRouter();
+
+    await router.push("/ai-new");
+    await router.isReady();
+
+    const wrapper = mount(App, {
+      global: {
+        plugins: [Antd, router]
+      }
+    });
+
+    await flushPromises();
+
+    expect(wrapper.get("[data-shell-login-link]").attributes("href")).toBe("/login");
+
+    await wrapper.get("[data-mobile-system-toggle]").trigger("click");
+    await flushPromises();
+
+    expect(wrapper.get("[data-mobile-login-link]").attributes("href")).toBe("/login");
   });
 });

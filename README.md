@@ -64,6 +64,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 统一站点系统菜单（登录后访问）：`/settings/view-rules`、`/settings/sources`、`/settings/profile`
 - 内容页统一展示系统自动分数（`0-100`）和解释标签，不再提供手工评分表单
 - `/`、`/ai-new`、`/ai-hot` 顶部新增共享来源筛选条，支持 `全选 / 全不选`，浏览偏好保存在浏览器本地 `localStorage`
+- `/`、`/ai-new`、`/ai-hot` 现在同时提供共享排序切换：`按发布时间`、`按评分`；排序偏好保存在浏览器本地 `localStorage['hot-now-content-sort']`
 - 内容卡片保留 `收藏 / 点赞 / 点踩`，并新增局部 `补充反馈` 面板；点赞 / 点踩后会自动展开反馈面板，反馈会先进入反馈池，不会直接改正式策略
 - 如果本地 `data/hot-now.sqlite` 内容库损坏，内容页会降级显示错误提示，而不是直接返回 `500`
 - 统一站点左侧导航底部支持深色 / 浅色主题切换，主题偏好保存在浏览器本地 `localStorage`，刷新后保持
@@ -75,6 +76,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - `/`、`/ai-new`、`/ai-hot` 现在也通过 Fastify 返回统一客户端入口，再由 `Vue 3 + Ant Design Vue` 内容页读取 `/api/content/ai-new`、`/api/content/ai-hot` 渲染
 - `/settings/view-rules` 已升级为策略工作台：数值权重、LLM 厂商设置、正式自然语言策略、反馈池、草稿池都收进同一页
 - `/settings/sources` 现在会展示即时操作卡、来源统计概览表和 source 库存表，包含总条数、今天发布、今天抓取，以及 `AI 新讯 / AI 热点` 的入池与展示统计
+- `/settings/sources` 现在支持逐 source 配置“选中该来源时全量展示”；开启后，该来源不会在内容页首次默认勾选，只有用户显式勾选后才会按全量模式展示
 - `/settings/profile` 现在会展示会话状态、用户名、角色和联系邮箱，不再停留在占位页
 - 正式自然语言策略当前仍以 `global / hot / articles / ai` 四个内部 scope 落库；页面只展示 `全局 / AI 热点 / AI 新讯` 三个可见范围，`articles` 仅作为兼容保留。保存后会立即对当前内容库发起一次全量 LLM 重算，日常采集完成后会对新增内容做增量重算
 - 当前支持的 LLM 厂商是 `DeepSeek`、`MiniMax`、`Kimi`；用户在页面里录入 API key，本地只保存加密后的密文；未配置 `LLM_SETTINGS_MASTER_KEY` 时页面仍可保存规则文本，但不会启用自然语言匹配
@@ -88,7 +90,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 反馈池与草稿池动作：`POST /actions/feedback-pool/:id/create-draft`、`POST /actions/feedback-pool/:id/delete`、`POST /actions/feedback-pool/clear`、`POST /actions/strategy-drafts/:id/save`、`POST /actions/strategy-drafts/:id/delete`
 - 内容导航已收口为 AI-first：`/` 与 `/ai-new` 等同 `AI 新讯`，`/ai-hot` 承接 `AI 热点`，`/articles` 已移除
 
-统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。auth 开启后，内容菜单保持公开可读，但系统菜单和所有写操作仍然要求登录；`content_sources.is_enabled` 决定哪些 source 参与采集，`/settings/sources` 现在可以直接启用/停用 source，并分别手动执行一次采集或手动发送最新报告；内容页顶部的来源筛选只影响当前浏览结果，不会改 source 启用状态；legacy `/control` 也同步提供采集与发信动作。
+统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。auth 开启后，内容菜单保持公开可读，但系统菜单和所有写操作仍然要求登录；`content_sources.is_enabled` 决定哪些 source 参与采集，`content_sources.show_all_when_selected` 决定该 source 在内容页被显式勾选时是否全量展示；`/settings/sources` 现在可以直接启用/停用 source、切换“选中时全量展示”，并分别手动执行一次采集或手动发送最新报告；内容页顶部的来源筛选和排序只影响当前浏览结果，不会改 source 启用状态；legacy `/control` 也同步提供采集与发信动作。
 
 当前内置 RSS 源包括：
 
@@ -128,5 +130,5 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 相关测试：已通过
 - 类型构建：已通过
 - 系统页客户端构建：已通过
-- Playwright MCP 本地验收通过：`/login` 登录成功；`/`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常；浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持；内容页来源筛选写入 `localStorage['hot-now-content-sources']` 后刷新仍保留
+- Playwright MCP 本地验收通过：`/login` 登录成功；`/`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常；浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持；内容页来源筛选写入 `localStorage['hot-now-content-sources']`、排序偏好写入 `localStorage['hot-now-content-sort']` 后刷新仍保留
 - 如果要手动验证新的自然语言策略链路，先配置 `LLM_SETTINGS_MASTER_KEY`，再在 `/settings/view-rules` 保存厂商设置和正式规则，确认页面出现最新重算结果；然后到内容页验证反馈面板、反馈池和草稿池的联动

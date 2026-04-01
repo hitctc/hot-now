@@ -68,7 +68,6 @@ export function listNlRuleSets(db: SqliteDatabase): NlRuleSet[] {
           WHEN 'base' THEN 1
           WHEN 'ai_new' THEN 2
           WHEN 'ai_hot' THEN 3
-          WHEN 'hero' THEN 4
           ELSE 99
         END ASC
       `

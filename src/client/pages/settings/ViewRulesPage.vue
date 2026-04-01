@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
 
+import EditorialEmptyState from "../../components/content/EditorialEmptyState.vue";
 import {
   editorialContentCardClass,
+  editorialContentControlButtonClass,
+  editorialContentControlButtonDangerClass,
+  editorialContentControlButtonIdleClass,
   editorialContentIntroSectionClass,
   editorialContentPageClass,
   editorialContentSubpanelClass
@@ -47,15 +51,13 @@ const draftScopeOptions = [
   { label: "未指定", value: "unspecified" },
   { label: "基础入池门", value: "base" },
   { label: "AI 新讯入池门", value: "ai_new" },
-  { label: "AI 热点入池门", value: "ai_hot" },
-  { label: "首条精选门", value: "hero" }
+  { label: "AI 热点入池门", value: "ai_hot" }
 ] as const;
 const scopeLabels: Record<SettingsStrategyDraftScope, string> = {
   unspecified: "未指定",
   base: "基础入池门",
   ai_new: "AI 新讯入池门",
-  ai_hot: "AI 热点入池门",
-  hero: "首条精选门"
+  ai_hot: "AI 热点入池门"
 };
 
 const isLoading = ref(true);
@@ -73,8 +75,7 @@ const providerForm = reactive({
 const nlRuleForm = reactive<Record<SettingsStrategyGateScope, EditableNlRuleGate>>({
   base: { enabled: true, ruleText: "" },
   ai_new: { enabled: true, ruleText: "" },
-  ai_hot: { enabled: true, ruleText: "" },
-  hero: { enabled: true, ruleText: "" }
+  ai_hot: { enabled: true, ruleText: "" }
 });
 
 const providerCapabilityTone = computed<AlertTone>(() => {
@@ -241,8 +242,6 @@ function syncWorkbenchForms(nextWorkbench: SettingsViewRulesResponse): void {
   nlRuleForm.ai_new.ruleText = ruleByScope.get("ai_new")?.ruleText ?? "";
   nlRuleForm.ai_hot.enabled = ruleByScope.get("ai_hot")?.enabled ?? true;
   nlRuleForm.ai_hot.ruleText = ruleByScope.get("ai_hot")?.ruleText ?? "";
-  nlRuleForm.hero.enabled = ruleByScope.get("hero")?.enabled ?? true;
-  nlRuleForm.hero.ruleText = ruleByScope.get("hero")?.ruleText ?? "";
 
   draftForms.value = Object.fromEntries(
     nextWorkbench.strategyDrafts.map((draft) => [
@@ -385,8 +384,7 @@ async function handleNlRulesSave(): Promise<void> {
       saveNlRules({
         base: { enabled: nlRuleForm.base.enabled, ruleText: nlRuleForm.base.ruleText },
         ai_new: { enabled: nlRuleForm.ai_new.enabled, ruleText: nlRuleForm.ai_new.ruleText },
-        ai_hot: { enabled: nlRuleForm.ai_hot.enabled, ruleText: nlRuleForm.ai_hot.ruleText },
-        hero: { enabled: nlRuleForm.hero.enabled, ruleText: nlRuleForm.hero.ruleText }
+        ai_hot: { enabled: nlRuleForm.ai_hot.enabled, ruleText: nlRuleForm.ai_hot.ruleText }
       }),
     {
       fallbackMessage: "正式规则保存失败，请稍后再试。",
@@ -683,14 +681,6 @@ onMounted(() => {
                   data-nl-rule-scope="ai_hot"
                 />
               </a-form-item>
-              <a-form-item label="首条精选门">
-                <a-switch v-model:checked="nlRuleForm.hero.enabled" class="mb-3" />
-                <a-textarea
-                  v-model:value="nlRuleForm.hero.ruleText"
-                  :rows="3"
-                  data-nl-rule-scope="hero"
-                />
-              </a-form-item>
               <a-space wrap>
                 <a-button
                   type="primary"
@@ -715,27 +705,32 @@ onMounted(() => {
           data-view-rules-section="feedback-pool"
         >
           <template #extra>
-            <a-space wrap>
+            <div class="flex flex-wrap items-center justify-end gap-2">
               <a-button
+                size="small"
                 data-action="copy-feedback-pool"
+                :class="[editorialContentControlButtonClass, editorialContentControlButtonIdleClass]"
                 @click="copyText(feedbackCopyText, '反馈内容已复制。')"
               >
                 复制全部反馈
               </a-button>
               <a-button
-                danger
+                size="small"
                 data-action="clear-feedback-pool"
+                :class="[editorialContentControlButtonClass, editorialContentControlButtonDangerClass]"
                 :loading="isActionPending('feedback:clear')"
                 @click="handleFeedbackClearAll"
               >
                 清空全部反馈
               </a-button>
-            </a-space>
+            </div>
           </template>
 
-          <a-empty
+          <EditorialEmptyState
             v-if="workbench.feedbackPool.length === 0"
-            description="反馈池为空，内容页的新反馈会显示在这里。"
+            data-empty-state="feedback-pool"
+            title="反馈池为空"
+            description="内容页的新反馈会显示在这里。"
           />
 
           <div v-else class="flex w-full flex-col gap-4">
@@ -808,9 +803,11 @@ onMounted(() => {
           size="small"
           data-view-rules-section="strategy-drafts"
         >
-          <a-empty
+          <EditorialEmptyState
             v-if="workbench.strategyDrafts.length === 0"
-            description="草稿池为空，可以先把反馈转成草稿。"
+            data-empty-state="strategy-drafts"
+            title="草稿池为空"
+            description="可以先把反馈转成草稿。"
           />
 
           <div v-else class="flex w-full flex-col gap-4">

@@ -103,13 +103,6 @@ describe("runNlEvaluationCycle", () => {
               reason: null
             },
             {
-              scope: "hero" as const,
-              decision: "neutral" as const,
-              strengthLevel: null,
-              matchedKeywords: [],
-              reason: null
-            },
-            {
               scope: "ai_new" as const,
               decision: "boost" as const,
               strengthLevel: "high" as const,
@@ -131,13 +124,6 @@ describe("runNlEvaluationCycle", () => {
           },
           {
             scope: "ai_hot" as const,
-            decision: "neutral" as const,
-            strengthLevel: null,
-            matchedKeywords: [],
-            reason: null
-          },
-          {
-            scope: "hero" as const,
             decision: "neutral" as const,
             strengthLevel: null,
             matchedKeywords: [],
@@ -213,17 +199,6 @@ describe("runNlEvaluationCycle", () => {
         reason: "命中 agent workflow 偏好",
         providerKind: "deepseek",
         evaluatedAt: "2026-03-31T10:00:00.000Z"
-      },
-      {
-        contentItemId: boostedContentId,
-        scope: "hero",
-        decision: "neutral",
-        strengthLevel: null,
-        scoreDelta: 0,
-        matchedKeywords: [],
-        reason: null,
-        providerKind: "deepseek",
-        evaluatedAt: "2026-03-31T10:00:00.000Z"
       }
     ]);
     expect(listNlEvaluationsForContent(handle.db, blockedContentId)).toEqual(
@@ -292,13 +267,6 @@ describe("runNlEvaluationCycle", () => {
                     reason: null
                   },
                   {
-                    scope: "hero" as const,
-                    decision: "neutral" as const,
-                    strengthLevel: null,
-                    matchedKeywords: [],
-                    reason: null
-                  },
-                  {
                     scope: "ai_new" as const,
                     decision: "neutral" as const,
                     strengthLevel: null,
@@ -321,7 +289,7 @@ describe("runNlEvaluationCycle", () => {
       successCount: 1,
       failureCount: 1
     });
-    expect(listNlEvaluationsForContent(handle.db, firstContentId)).toHaveLength(4);
+    expect(listNlEvaluationsForContent(handle.db, firstContentId)).toHaveLength(3);
     expect(listNlEvaluationsForContent(handle.db, secondContentId)).toEqual([]);
     expect(listNlEvaluationRuns(handle.db)[0]?.notes).toContain("provider timeout");
   });

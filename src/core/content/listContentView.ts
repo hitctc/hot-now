@@ -34,8 +34,6 @@ export function listContentView(
     ({
       rankingScore: _rankingScore,
       rankingTimestamp: _rankingTimestamp,
-      heroDecision: _heroDecision,
-      heroScoreDelta: _heroScoreDelta,
       ...card
     }) => card
   );

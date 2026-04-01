@@ -91,12 +91,6 @@ function handleToggleAll(): void {
               @change="handleOptionToggle(option.kind, ($event.target as HTMLInputElement).checked)"
             />
             <span>{{ option.name }}</span>
-            <span
-              :data-source-option-count="option.kind"
-              class="inline-flex min-w-6 items-center justify-center rounded-editorial-pill border border-editorial-border bg-editorial-panel-strong px-2 py-0.5 text-[11px] font-semibold leading-4 text-editorial-text-muted"
-            >
-              {{ option.currentPageVisibleCount }}
-            </span>
           </label>
         </div>
       </div>

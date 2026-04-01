@@ -40,8 +40,7 @@ function createWorkbench() {
     nlRules: [
       { scope: "base", enabled: true, ruleText: "保留 workflow 深度总结。", createdAt: "", updatedAt: "" },
       { scope: "ai_new", enabled: true, ruleText: "优先展示 agent 相关内容。", createdAt: "", updatedAt: "" },
-      { scope: "ai_hot", enabled: true, ruleText: "", createdAt: "", updatedAt: "" },
-      { scope: "hero", enabled: false, ruleText: "精选只留最强信号。", createdAt: "", updatedAt: "" }
+      { scope: "ai_hot", enabled: true, ruleText: "", createdAt: "", updatedAt: "" }
     ],
     feedbackPool: [
       {
@@ -87,6 +86,14 @@ function createWorkbench() {
       createdAt: "2026-03-31T09:10:00.000Z"
     },
     isEvaluationRunning: false
+  } satisfies settingsApi.SettingsViewRulesResponse;
+}
+
+function createEmptyWorkbench() {
+  return {
+    ...createWorkbench(),
+    feedbackPool: [],
+    strategyDrafts: []
   } satisfies settingsApi.SettingsViewRulesResponse;
 }
 
@@ -155,9 +162,14 @@ describe("ViewRulesPage", () => {
     expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("基础入池门");
     expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("AI 热点入池门");
     expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("AI 新讯入池门");
-    expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("首条精选门");
     expect(wrapper.get("[data-view-rules-section='feedback-pool']").classes()).toContain("rounded-editorial-xl");
     expect(wrapper.get("[data-view-rules-section='feedback-pool']").text()).toContain("Agent 工作流总结");
+    expect(wrapper.get("[data-action='copy-feedback-pool']").attributes("class")).toContain("!rounded-editorial-pill");
+    expect(wrapper.get("[data-action='copy-feedback-pool']").attributes("class")).toContain("!bg-editorial-control");
+    expect(wrapper.get("[data-action='copy-feedback-pool']").attributes("class")).toContain("!select-none");
+    expect(wrapper.get("[data-action='clear-feedback-pool']").attributes("class")).toContain("!rounded-editorial-pill");
+    expect(wrapper.get("[data-action='clear-feedback-pool']").attributes("class")).toContain("!border-editorial-danger");
+    expect(wrapper.get("[data-action='clear-feedback-pool']").attributes("class")).toContain("!text-editorial-danger");
     expect(
       (wrapper.get("[data-draft-form='301'] textarea").element as HTMLTextAreaElement).value
     ).toBe("优先展示包含 agent workflow 的深度总结。");
@@ -189,8 +201,7 @@ describe("ViewRulesPage", () => {
     expect(settingsApi.saveNlRules).toHaveBeenCalledWith({
       base: { enabled: true, ruleText: "新的基础规则" },
       ai_new: { enabled: true, ruleText: "优先展示 agent 相关内容。" },
-      ai_hot: { enabled: true, ruleText: "" },
-      hero: { enabled: false, ruleText: "精选只留最强信号。" }
+      ai_hot: { enabled: true, ruleText: "" }
     });
     expect(settingsApi.readSettingsViewRules).toHaveBeenCalledTimes(2);
     expect(wrapper.text()).toContain("当前内容库已完成重算");
@@ -214,5 +225,30 @@ describe("ViewRulesPage", () => {
     );
     expect(settingsApi.saveNlRules).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain("草稿已写入正式策略编辑器");
+  });
+
+  it("renders the shared editorial empty states for feedback and draft pools", async () => {
+    vi.mocked(settingsApi.readSettingsViewRules).mockResolvedValue(createEmptyWorkbench());
+
+    const wrapper = mount(ViewRulesPage, {
+      global: {
+        plugins: [Antd]
+      }
+    });
+
+    await flushPromises();
+
+    const feedbackEmptyState = wrapper.get("[data-empty-state='feedback-pool']");
+    const draftEmptyState = wrapper.get("[data-empty-state='strategy-drafts']");
+
+    expect(feedbackEmptyState.text()).toContain("反馈池为空");
+    expect(feedbackEmptyState.text()).toContain("内容页的新反馈会显示在这里。");
+    expect(feedbackEmptyState.classes()).toContain("rounded-editorial-xl");
+    expect(feedbackEmptyState.classes()).toContain("bg-editorial-panel");
+
+    expect(draftEmptyState.text()).toContain("草稿池为空");
+    expect(draftEmptyState.text()).toContain("可以先把反馈转成草稿。");
+    expect(draftEmptyState.classes()).toContain("rounded-editorial-xl");
+    expect(draftEmptyState.classes()).toContain("bg-editorial-panel");
   });
 });

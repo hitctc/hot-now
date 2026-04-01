@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute } from "vue-router";
 
+import EditorialEmptyState from "../components/content/EditorialEmptyState.vue";
 import { useTheme, type ThemeMode } from "../composables/useTheme";
 import { HttpError } from "../services/http";
 import { readSettingsProfile, type SettingsProfile } from "../services/settingsApi";
@@ -48,9 +49,9 @@ function isActiveContentPath(path: string): boolean {
 // 导航选中态直接靠 Tailwind class 切换，不再依赖 a-menu 的内部选中结构。
 function getShellNavLinkClasses(isActive: boolean): string[] {
   return [
-    "group flex min-w-0 flex-col gap-1 rounded-editorial-lg border px-4 py-3 text-left no-underline transition duration-150 ease-out",
+    "group relative flex min-w-0 select-none flex-col gap-1 overflow-hidden rounded-editorial-lg border px-4 py-3 text-left no-underline transition duration-150 ease-out",
     isActive
-      ? "border-transparent bg-editorial-link-active text-editorial-text-on-accent shadow-editorial-accent"
+      ? "border-editorial-border-strong bg-editorial-link-active text-editorial-text-sidebar shadow-editorial-accent ring-1 ring-inset ring-editorial-ring before:absolute before:bottom-3 before:left-0 before:top-3 before:w-1 before:rounded-r-full before:bg-editorial-accent before:content-['']"
       : "border-editorial-border bg-editorial-link text-editorial-text-sidebar hover:-translate-y-px hover:border-editorial-border-strong hover:bg-editorial-control-hover hover:shadow-editorial-floating hover:no-underline"
   ];
 }
@@ -58,16 +59,16 @@ function getShellNavLinkClasses(isActive: boolean): string[] {
 // 移动端顶部 tab 只保留更紧凑的 pill 形态， active 态依旧从同一份路由判断里拿。
 function getMobileTabClasses(isActive: boolean): string[] {
   return [
-    "flex shrink-0 items-center rounded-editorial-pill border px-3 py-2 text-[13px] font-semibold leading-5 no-underline transition duration-150 ease-out whitespace-nowrap",
+    "flex shrink-0 select-none items-center rounded-editorial-pill border px-3 py-2 text-[13px] font-semibold leading-5 no-underline transition duration-150 ease-out whitespace-nowrap",
     isActive
-      ? "border-transparent bg-editorial-link-active text-editorial-text-on-accent shadow-editorial-accent"
+      ? "border-editorial-border-strong bg-editorial-link-active text-editorial-text-main shadow-editorial-accent ring-1 ring-inset ring-editorial-ring"
       : "border-editorial-border bg-editorial-link text-editorial-text-sidebar hover:-translate-y-px hover:border-editorial-border-strong hover:bg-editorial-control-hover hover:shadow-editorial-floating hover:no-underline"
   ];
 }
 
-// 激活态描述文案直接继承链接前景色，这样对比度会和高亮背景一起走，不会退回成 muted。
+// 激活态辅助文案改回正文色，避免导航在选中时又退回成 dashboard 式的白字蓝块。
 function getShellNavDescriptionClasses(isActive: boolean): string {
-  return isActive ? "text-inherit" : "text-editorial-text-sidebar-muted";
+  return isActive ? "text-editorial-text-body" : "text-editorial-text-sidebar-muted";
 }
 
 // 主题切换只改唯一状态源，不直接碰 DOM，避免双向同步逻辑散到模板里。
@@ -160,7 +161,7 @@ onBeforeUnmount(() => {
 
         <button
           type="button"
-          class="shrink-0 rounded-editorial-pill border border-editorial-border bg-editorial-control px-3 py-2 text-sm font-semibold text-editorial-text-main shadow-editorial-card transition hover:border-editorial-border-strong hover:bg-editorial-control-hover"
+          class="shrink-0 select-none rounded-editorial-pill border border-editorial-border bg-editorial-control px-3 py-2 text-sm font-semibold text-editorial-text-main shadow-editorial-card transition hover:border-editorial-border-strong hover:bg-editorial-control-hover"
           data-mobile-system-toggle
           :aria-expanded="mobileSystemDrawerOpen ? 'true' : 'false'"
           aria-controls="mobile-system-drawer"
@@ -270,7 +271,7 @@ onBeforeUnmount(() => {
               <a-segmented
                 :value="themeMode"
                 :options="themeOptions"
-                class="w-full"
+                class="w-full select-none"
                 @change="handleThemeModeChange"
               />
               <div class="inline-flex items-center">
@@ -342,7 +343,12 @@ onBeforeUnmount(() => {
             </template>
 
             <template v-else>
-              <a-empty description="当前没有可读取的用户摘要" />
+              <EditorialEmptyState
+                title="暂无用户摘要"
+                description="当前没有可读取的用户摘要。"
+                :compact="true"
+                data-shell-empty-state="sidebar-profile"
+              />
             </template>
           </section>
         </div>
@@ -498,7 +504,12 @@ onBeforeUnmount(() => {
                 />
               </template>
               <template v-else>
-                <a-empty description="当前没有可读取的用户摘要" />
+                <EditorialEmptyState
+                  title="暂无用户摘要"
+                  description="当前没有可读取的用户摘要。"
+                  :compact="true"
+                  data-shell-empty-state="mobile-profile"
+                />
               </template>
             </section>
           </div>

@@ -357,11 +357,6 @@ function renderNlRulesCard(workbench: ViewRulesWorkbenchView): string {
           <input type="checkbox" name="aiHotEnabled"${ruleByScope.get("ai_hot")?.enabled === false ? "" : " checked"} />
           <textarea name="aiHotRuleText" rows="3" data-nl-rule-scope="ai_hot">${escapeHtml(ruleByScope.get("ai_hot")?.ruleText ?? "")}</textarea>
         </label>
-        <label class="content-feedback-field">
-          <span>首条精选门</span>
-          <input type="checkbox" name="heroEnabled"${ruleByScope.get("hero")?.enabled === false ? "" : " checked"} />
-          <textarea name="heroRuleText" rows="3" data-nl-rule-scope="hero">${escapeHtml(ruleByScope.get("hero")?.ruleText ?? "")}</textarea>
-        </label>
         <div class="system-action-row">
           <button type="submit" class="primary-mini-button">保存正式规则</button>
         </div>
@@ -482,7 +477,6 @@ function renderStrategyDraftEntry(draft: StrategyDraftItem): string {
             ${renderSelectOption("base", "基础入池门", draft.suggestedScope)}
             ${renderSelectOption("ai_new", "AI 新讯入池门", draft.suggestedScope)}
             ${renderSelectOption("ai_hot", "AI 热点入池门", draft.suggestedScope)}
-            ${renderSelectOption("hero", "首条精选门", draft.suggestedScope)}
           </select>
         </label>
         <label class="content-feedback-field">

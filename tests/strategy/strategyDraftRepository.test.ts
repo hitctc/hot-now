@@ -94,7 +94,7 @@ describe("strategyDraftRepository", () => {
     });
     const secondId = createStrategyDraft(handle.db, {
       draftText: "second draft",
-      suggestedScope: "hero"
+      suggestedScope: "unspecified"
     });
 
     expect(listStrategyDrafts(handle.db).map((draft) => draft.id)).toEqual([secondId, firstId]);

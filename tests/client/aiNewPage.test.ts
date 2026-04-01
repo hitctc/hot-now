@@ -115,8 +115,8 @@ describe("AiNewPage", () => {
     expect(wrapper.find("[data-content-filter-shell]").exists()).toBe(false);
     expect(wrapper.find("[data-content-source-filter]").exists()).toBe(true);
     expect(wrapper.get("[data-content-source-filter]").text()).toContain("已选 1 / 2 · 共 2 条");
-    expect(wrapper.get("[data-source-option-count='openai']").text()).toBe("1");
-    expect(wrapper.get("[data-source-option-count='ithome']").text()).toBe("1");
+    expect(wrapper.find("[data-source-option-count='openai']").exists()).toBe(false);
+    expect(wrapper.find("[data-source-option-count='ithome']").exists()).toBe(false);
     expect(wrapper.find("[data-content-sort-control]").exists()).toBe(true);
     expect(wrapper.get("[data-content-section='list']").classes()).toContain("grid");
     expect(wrapper.find("[data-content-section='featured']").exists()).toBe(false);

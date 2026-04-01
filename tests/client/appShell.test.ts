@@ -92,8 +92,8 @@ describe("client app shell", () => {
     expect(navLinks.map((node) => node.attributes("href"))).toEqual([
       "/ai-new",
       "/ai-hot",
-      "/settings/view-rules",
       "/settings/sources",
+      "/settings/view-rules",
       "/settings/profile"
     ]);
 
@@ -102,8 +102,8 @@ describe("client app shell", () => {
     ).toEqual([
       "AI 新讯",
       "AI 热点",
-      "筛选策略",
       "数据收集",
+      "筛选策略",
       "当前用户"
     ]);
 
@@ -113,14 +113,50 @@ describe("client app shell", () => {
 
     expect(activeNavLink.classes()).toEqual(
       expect.arrayContaining([
+        "select-none",
+        "border-editorial-border-strong",
         "bg-editorial-link-active",
-        "text-editorial-text-on-accent",
+        "text-editorial-text-sidebar",
+        "ring-1",
+        "ring-editorial-ring",
+        "before:bg-editorial-accent",
+        "before:content-['']",
         "shadow-editorial-accent"
       ])
     );
     expect(activeNavLink.find("span.text-xs").classes()).toEqual(
-      expect.arrayContaining(["text-inherit"])
+      expect.arrayContaining(["text-editorial-text-body"])
     );
+  });
+
+  it("keeps shell navigation highlights in the editorial paper style instead of a solid accent block", async () => {
+    const router = createAppRouter();
+
+    await router.push("/ai-hot");
+    await router.isReady();
+
+    const wrapper = mount(App, {
+      global: {
+        plugins: [Antd, router]
+      }
+    });
+
+    await flushPromises();
+
+    const activeNavLink = wrapper.get('[data-shell-nav-link="/ai-hot"]');
+
+    expect(activeNavLink.classes()).toEqual(
+      expect.arrayContaining([
+        "select-none",
+        "bg-editorial-link-active",
+        "border-editorial-border-strong",
+        "text-editorial-text-sidebar",
+        "ring-1",
+        "ring-editorial-ring",
+        "shadow-editorial-accent"
+      ])
+    );
+    expect(activeNavLink.classes()).not.toEqual(expect.arrayContaining(["text-editorial-text-on-accent"]));
   });
 
   it("keeps the /client/ asset base separate from the /settings/ route base while mounting AI content routes in the same app", async () => {
@@ -158,6 +194,8 @@ describe("client app shell", () => {
     expect(
       wrapper.findAll("[data-mobile-content-tab]").map((node) => node.text().trim())
     ).toEqual(["AI 新讯", "AI 热点"]);
+    expect(wrapper.get("[data-mobile-system-toggle]").classes()).toEqual(expect.arrayContaining(["select-none"]));
+    expect(wrapper.get('[data-mobile-content-tab="/ai-new"]').classes()).toEqual(expect.arrayContaining(["select-none"]));
 
     await wrapper.get("[data-mobile-system-toggle]").trigger("click");
     await flushPromises();

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { editorialContentCardClass } from "./contentCardShared";
+import EditorialEmptyState from "./EditorialEmptyState.vue";
 
 defineProps<{
   state: {
@@ -11,13 +11,9 @@ defineProps<{
 </script>
 
 <template>
-  <a-result
-    :class="[editorialContentCardClass, 'rounded-editorial-xl']"
+  <EditorialEmptyState
     :status="state.tone === 'degraded' ? 'warning' : 'info'"
     :title="state.title"
-  >
-    <template #subTitle>
-      {{ state.description }}
-    </template>
-  </a-result>
+    :description="state.description"
+  />
 </template>

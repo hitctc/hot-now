@@ -37,8 +37,7 @@ function createAuthenticatedServer() {
       nlRules: [
         { scope: "base", enabled: true, ruleText: "", createdAt: "", updatedAt: "" },
         { scope: "ai_new", enabled: true, ruleText: "", createdAt: "", updatedAt: "" },
-        { scope: "ai_hot", enabled: true, ruleText: "", createdAt: "", updatedAt: "" },
-        { scope: "hero", enabled: false, ruleText: "", createdAt: "", updatedAt: "" }
+        { scope: "ai_hot", enabled: true, ruleText: "", createdAt: "", updatedAt: "" }
       ],
       feedbackPool: [],
       strategyDrafts: [],
@@ -106,8 +105,7 @@ describe("settings api routes", () => {
       nlRules: [
         { scope: "base", enabled: true },
         { scope: "ai_new", enabled: true },
-        { scope: "ai_hot", enabled: true },
-        { scope: "hero", enabled: false }
+        { scope: "ai_hot", enabled: true }
       ]
     });
   });

@@ -88,12 +88,21 @@ describe("ContentHeroCard", () => {
     await flushPromises();
     expect(contentApi.saveFavorite).toHaveBeenCalledWith(101, true);
     expect(wrapper.text()).toContain("已加入收藏");
+    expect(wrapper.get("[data-content-action='favorite']").attributes("class")).toContain("!select-none");
+    expect(wrapper.get("[data-content-action='favorite']").attributes("class")).toContain("!bg-editorial-link-active");
+    expect(wrapper.get("[data-content-action='favorite']").attributes("class")).toContain("!text-editorial-text-main");
 
     await wrapper.get("[data-content-action='reaction'][data-reaction='like']").trigger("click");
     await flushPromises();
     expect(contentApi.saveReaction).toHaveBeenCalledWith(101, "like");
     expect(wrapper.text()).toContain("已记录点赞，可以继续补充原因");
     expect(wrapper.text()).toContain("反馈说明");
+    expect(wrapper.get("[data-content-action='reaction'][data-reaction='like']").attributes("class")).toContain(
+      "!bg-editorial-link-active"
+    );
+    expect(wrapper.get("[data-content-action='reaction'][data-reaction='like']").attributes("class")).toContain(
+      "!text-editorial-text-main"
+    );
 
     await wrapper.get("[data-content-action='feedback-panel-toggle']").trigger("click");
     await flushPromises();

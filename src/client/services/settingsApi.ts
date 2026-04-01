@@ -13,7 +13,7 @@ export type SettingsProfileResponse = {
 };
 
 export type SettingsProviderKind = "deepseek" | "minimax" | "kimi";
-export type SettingsStrategyGateScope = "base" | "ai_new" | "ai_hot" | "hero";
+export type SettingsStrategyGateScope = "base" | "ai_new" | "ai_hot";
 export type SettingsStrategyDraftScope = SettingsStrategyGateScope | "unspecified";
 
 export type SettingsProviderSettingsSummary = {

@@ -27,13 +27,16 @@ export const editorialContentFeedbackSummaryClass =
   "flex flex-col gap-2 rounded-editorial-lg border border-editorial-border bg-editorial-control px-4 py-3";
 
 export const editorialContentControlButtonClass =
-  "!inline-flex !items-center !rounded-editorial-pill !border !px-3 !py-1.5 !text-xs !font-semibold !leading-5 !shadow-editorial-card !transition";
+  "!inline-flex !select-none !items-center !rounded-editorial-pill !border !px-3 !py-1.5 !text-xs !font-semibold !leading-5 !shadow-editorial-card !transition";
 
 export const editorialContentControlButtonIdleClass =
   "!border-editorial-border !bg-editorial-control !text-editorial-text-main hover:!border-editorial-border-strong hover:!bg-editorial-control-hover hover:!text-editorial-text-main";
 
+export const editorialContentControlButtonDangerClass =
+  "!border-editorial-danger !bg-transparent !text-editorial-danger hover:!border-editorial-danger hover:!bg-editorial-control-hover hover:!text-editorial-danger";
+
 export const editorialContentControlButtonActiveClass =
-  "!border-transparent !bg-editorial-link-active !text-editorial-text-on-accent !shadow-editorial-accent hover:!text-editorial-text-on-accent";
+  "!border-editorial-border-strong !bg-editorial-link-active !text-editorial-text-main !shadow-editorial-accent !ring-1 !ring-inset !ring-editorial-ring hover:!border-editorial-border-strong hover:!bg-editorial-link-active hover:!text-editorial-text-main";
 
 export const editorialContentPageClass = "flex w-full flex-col gap-6";
 

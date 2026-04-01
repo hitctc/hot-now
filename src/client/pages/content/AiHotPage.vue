@@ -18,7 +18,6 @@ import {
   readStoredContentSourceKinds,
   writeStoredContentSortMode,
   writeStoredContentSourceKinds,
-  type ContentCard,
   type ContentSortMode,
   type ContentPageModel
 } from "../../services/contentApi";
@@ -100,25 +99,9 @@ async function handleSortModeChange(nextSortMode: ContentSortMode): Promise<void
   await loadPage({ selectedKinds: readPageSourceKinds(), silent: true });
 }
 
-function isDuplicatedFeaturedCard(card: ContentCard | null, cards: ContentCard[]): boolean {
-  return Boolean(card && cards[0] && cards[0].id === card.id);
-}
-
 const sourceFilter = computed(() => pageModel.value?.sourceFilter ?? null);
-const featuredCard = computed(() => pageModel.value?.featuredCard ?? null);
-const listCards = computed(() => {
-  const cards = pageModel.value?.cards ?? [];
-
-  if (cards.length === 0) {
-    return featuredCard.value ? [featuredCard.value] : [];
-  }
-
-  if (!featuredCard.value) {
-    return cards;
-  }
-
-  return isDuplicatedFeaturedCard(featuredCard.value, cards) ? cards.slice(1) : cards;
-});
+const listCards = computed(() => pageModel.value?.cards ?? []);
+const visibleResultCount = computed(() => listCards.value.length);
 const displayState = computed(() => {
   if (!pageModel.value && loadError.value) {
     return buildErrorState(loadError.value);
@@ -159,6 +142,7 @@ onMounted(() => {
       v-if="sourceFilter"
       :options="sourceFilter.options"
       :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
+      :visible-result-count="visibleResultCount"
       @change="handleSourceKindsChange"
     />
 

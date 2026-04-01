@@ -101,8 +101,6 @@ export function buildContentPageModel(
 function stripRankedCard({
   rankingScore: _rankingScore,
   rankingTimestamp: _rankingTimestamp,
-  heroDecision: _heroDecision,
-  heroScoreDelta: _heroScoreDelta,
   ...card
 }: ReturnType<typeof buildContentViewSelection>["visibleCards"][number]): ContentCardView {
   return card;

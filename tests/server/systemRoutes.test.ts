@@ -278,8 +278,7 @@ describe("system routes", () => {
         rules: {
           base: { enabled: true, ruleText: "暂不展示融资快讯。" },
           ai_new: { enabled: true, ruleText: "优先展示 agent workflow。" },
-          ai_hot: { enabled: false, ruleText: "" },
-          hero: { enabled: true, ruleText: "首条只留最强 AI 信号。" }
+          ai_hot: { enabled: false, ruleText: "" }
         }
       }
     });
@@ -288,8 +287,7 @@ describe("system routes", () => {
     expect(saveNlRules).toHaveBeenCalledWith({
       base: { enabled: true, ruleText: "暂不展示融资快讯。" },
       ai_new: { enabled: true, ruleText: "优先展示 agent workflow。" },
-      ai_hot: { enabled: false, ruleText: "" },
-      hero: { enabled: true, ruleText: "首条只留最强 AI 信号。" }
+      ai_hot: { enabled: false, ruleText: "" }
     });
     expect(response.json()).toEqual({
       ok: true,
@@ -342,8 +340,7 @@ describe("system routes", () => {
         rules: {
           base: { enabled: true, ruleText: "基础规则" },
           ai_new: { enabled: true, ruleText: "" },
-          ai_hot: { enabled: true, ruleText: "" },
-          hero: { enabled: true, ruleText: "" }
+          ai_hot: { enabled: true, ruleText: "" }
         }
       }
     });

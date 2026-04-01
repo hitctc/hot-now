@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 
+import EditorialEmptyState from "../../components/content/EditorialEmptyState.vue";
 import {
   editorialContentCardClass,
   editorialContentIntroSectionClass,
@@ -63,7 +64,12 @@ onMounted(() => {
       </template>
     </a-result>
 
-    <a-empty v-else-if="!profile" description="当前没有可读取的用户信息。" />
+    <EditorialEmptyState
+      v-else-if="!profile"
+      title="当前没有可读取的用户信息"
+      description="可以稍后刷新页面，或重新登录后再试。"
+      data-profile-empty-state
+    />
 
     <template v-else>
       <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

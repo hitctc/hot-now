@@ -243,8 +243,7 @@ function readRuleSetMap(db: SqliteDatabase): Record<NlRuleScope, string> {
   return {
     base: rules.find((rule) => rule.scope === "base" && rule.enabled)?.ruleText ?? "",
     ai_new: rules.find((rule) => rule.scope === "ai_new" && rule.enabled)?.ruleText ?? "",
-    ai_hot: rules.find((rule) => rule.scope === "ai_hot" && rule.enabled)?.ruleText ?? "",
-    hero: rules.find((rule) => rule.scope === "hero" && rule.enabled)?.ruleText ?? ""
+    ai_hot: rules.find((rule) => rule.scope === "ai_hot" && rule.enabled)?.ruleText ?? ""
   };
 }
 

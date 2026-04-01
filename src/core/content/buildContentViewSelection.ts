@@ -22,8 +22,6 @@ export type ContentSortMode = "published_at" | "content_score";
 export type RankedContentCardView = ContentCardView & {
   rankingScore: number;
   rankingTimestamp: string | null;
-  heroDecision: NlEvaluationDecision;
-  heroScoreDelta: number;
 };
 
 export type CurrentPageSourceMetrics = {
@@ -68,8 +66,6 @@ type ContentCardRow = {
   baseScoreDelta: number | null;
   viewDecision: string | null;
   viewScoreDelta: number | null;
-  heroDecision: string | null;
-  heroScoreDelta: number | null;
 };
 
 const matchingSourceViewBonus = 120;
@@ -127,8 +123,6 @@ const contentSelectSql = `
     base_eval.score_delta AS baseScoreDelta,
     view_eval.decision AS viewDecision,
     view_eval.score_delta AS viewScoreDelta,
-    hero_eval.decision AS heroDecision,
-    hero_eval.score_delta AS heroScoreDelta,
     COALESCE(ci.published_at, ci.fetched_at, ci.created_at) AS rankingTimestamp
   FROM content_items ci
   JOIN content_sources cs ON cs.id = ci.source_id
@@ -141,9 +135,6 @@ const contentSelectSql = `
   LEFT JOIN content_nl_evaluations view_eval
     ON view_eval.content_item_id = ci.id
    AND view_eval.scope = @viewScope
-  LEFT JOIN content_nl_evaluations hero_eval
-    ON hero_eval.content_item_id = ci.id
-   AND hero_eval.scope = 'hero'
   ORDER BY datetime(COALESCE(ci.published_at, ci.fetched_at, ci.created_at)) DESC, ci.id DESC
 `;
 
@@ -355,8 +346,6 @@ function buildRankedCardCandidate(
       context.includeNlEvaluations ? (row.baseScoreDelta ?? 0) + (row.viewScoreDelta ?? 0) : 0
     ),
     rankingTimestamp: row.rankingTimestamp,
-    heroDecision: normalizeNlDecision(row.heroDecision),
-    heroScoreDelta: context.includeNlEvaluations ? (row.heroScoreDelta ?? 0) : 0,
     isBlocked:
       context.includeNlEvaluations &&
       (normalizeNlDecision(row.baseDecision) === "block" || normalizeNlDecision(row.viewDecision) === "block")

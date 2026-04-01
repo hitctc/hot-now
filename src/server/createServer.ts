@@ -674,8 +674,7 @@ export function createServer(deps: ServerDeps = {}) {
     const rules = {
       base: readNlGatePayload(body.rules.base),
       ai_new: readNlGatePayload(body.rules.ai_new),
-      ai_hot: readNlGatePayload(body.rules.ai_hot),
-      hero: readNlGatePayload(body.rules.hero)
+      ai_hot: readNlGatePayload(body.rules.ai_hot)
     } satisfies Record<NlRuleScope, { enabled: boolean; ruleText: string }>;
 
     const result = await deps.saveNlRules(rules);
@@ -1574,7 +1573,7 @@ function isProviderKind(value: unknown): value is SaveProviderSettingsInput["pro
 }
 
 function isStrategyDraftScope(value: unknown): value is NonNullable<UpdateStrategyDraftInput["suggestedScope"]> {
-  return value === "unspecified" || value === "base" || value === "ai_new" || value === "ai_hot" || value === "hero";
+  return value === "unspecified" || value === "base" || value === "ai_new" || value === "ai_hot";
 }
 
 function readNlGatePayload(value: unknown): { enabled: boolean; ruleText: string } {
@@ -1592,8 +1591,7 @@ function defaultNlRules(): ViewRulesWorkbenchView["nlRules"] {
   return [
     { scope: "base", enabled: true, ruleText: "", createdAt: "", updatedAt: "" },
     { scope: "ai_new", enabled: true, ruleText: "", createdAt: "", updatedAt: "" },
-    { scope: "ai_hot", enabled: true, ruleText: "", createdAt: "", updatedAt: "" },
-    { scope: "hero", enabled: true, ruleText: "", createdAt: "", updatedAt: "" }
+    { scope: "ai_hot", enabled: true, ruleText: "", createdAt: "", updatedAt: "" }
   ];
 }
 

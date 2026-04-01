@@ -59,8 +59,8 @@ describe("ContentSourceFilterBar", () => {
     expect(wrapper.get("[data-content-source-filter]").classes()).toEqual(
       expect.arrayContaining(["rounded-editorial-xl", "border", "border-editorial-border", "bg-editorial-panel"])
     );
-    expect(wrapper.get("[data-source-option-count='openai']").text()).toBe("3");
-    expect(wrapper.get("[data-source-option-count='ithome']").text()).toBe("1");
+    expect(wrapper.find("[data-source-option-count='openai']").exists()).toBe(false);
+    expect(wrapper.find("[data-source-option-count='ithome']").exists()).toBe(false);
     expect(wrapper.get("[data-source-option='openai']").classes()).toEqual(
       expect.arrayContaining([
         "select-none",

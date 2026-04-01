@@ -36,13 +36,6 @@ describe("nlRuleRepository", () => {
         ruleText: "",
         createdAt: expect.any(String),
         updatedAt: expect.any(String)
-      },
-      {
-        scope: "hero",
-        enabled: true,
-        ruleText: "",
-        createdAt: expect.any(String),
-        updatedAt: expect.any(String)
       }
     ]);
   });

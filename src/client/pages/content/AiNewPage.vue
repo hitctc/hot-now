@@ -2,12 +2,10 @@
 import { computed, onMounted, ref } from "vue";
 
 import ContentEmptyState from "../../components/content/ContentEmptyState.vue";
-import ContentHeroCard from "../../components/content/ContentHeroCard.vue";
 import ContentSourceFilterBar from "../../components/content/ContentSourceFilterBar.vue";
 import ContentSortControl from "../../components/content/ContentSortControl.vue";
 import ContentStandardCard from "../../components/content/ContentStandardCard.vue";
 import {
-  editorialContentFeaturedSectionClass,
   editorialContentIntroSectionClass,
   editorialContentListSectionClass,
   editorialContentPageClass
@@ -20,7 +18,6 @@ import {
   readStoredContentSourceKinds,
   writeStoredContentSortMode,
   writeStoredContentSourceKinds,
-  type ContentCard,
   type ContentSortMode,
   type ContentPageModel
 } from "../../services/contentApi";
@@ -102,20 +99,8 @@ async function handleSortModeChange(nextSortMode: ContentSortMode): Promise<void
   await loadPage({ selectedKinds: readPageSourceKinds(), silent: true });
 }
 
-function isDuplicatedFeaturedCard(card: ContentCard | null, cards: ContentCard[]): boolean {
-  return Boolean(card && cards[0] && cards[0].id === card.id);
-}
-
-const featuredCard = computed(() => pageModel.value?.featuredCard ?? null);
-const standardCards = computed(() => {
-  const cards = pageModel.value?.cards ?? [];
-
-  if (!featuredCard.value) {
-    return cards;
-  }
-
-  return isDuplicatedFeaturedCard(featuredCard.value, cards) ? cards.slice(1) : cards;
-});
+const listCards = computed(() => pageModel.value?.cards ?? []);
+const visibleResultCount = computed(() => listCards.value.length);
 const sourceFilter = computed(() => pageModel.value?.sourceFilter ?? null);
 const displayState = computed(() => {
   if (!pageModel.value && loadError.value) {
@@ -126,7 +111,7 @@ const displayState = computed(() => {
     return pageModel.value.emptyState;
   }
 
-  if (featuredCard.value || standardCards.value.length > 0) {
+  if (listCards.value.length > 0) {
     return null;
   }
 
@@ -147,7 +132,7 @@ onMounted(() => {
         最快发现新一批 AI 信号
       </h1>
       <p class="mt-3 max-w-3xl text-base leading-7 text-editorial-text-body">
-        先看首条精选主卡，再扫后面的标准卡。这里优先收集 AI 新闻、模型、事件和智能体线索。
+        这里直接按统一标准卡浏览最新 AI 新闻、模型、事件和智能体线索，不再额外拆首条精选。
       </p>
     </section>
 
@@ -157,6 +142,7 @@ onMounted(() => {
       v-if="sourceFilter"
       :options="sourceFilter.options"
       :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
+      :visible-result-count="visibleResultCount"
       @change="handleSourceKindsChange"
     />
 
@@ -172,19 +158,11 @@ onMounted(() => {
 
     <template v-else-if="pageModel">
       <section
-        v-if="featuredCard"
-        :class="editorialContentFeaturedSectionClass"
-        data-content-section="featured"
-      >
-        <ContentHeroCard :card="featuredCard" />
-      </section>
-
-      <section
-        v-if="standardCards.length > 0"
+        v-if="listCards.length > 0"
         :class="editorialContentListSectionClass"
         data-content-section="list"
       >
-          <ContentStandardCard v-for="card in standardCards" :key="card.id" :card="card" />
+        <ContentStandardCard v-for="card in listCards" :key="card.id" :card="card" />
       </section>
     </template>
 

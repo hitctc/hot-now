@@ -69,8 +69,8 @@ const profilePageMeta = {
   description: "当前会展示登录用户摘要和会话上下文。"
 } as const satisfies ShellPageMeta;
 
-export const shellPageMetas = [aiNewPageMeta, aiHotPageMeta, viewRulesPageMeta, sourcesPageMeta, profilePageMeta] as const satisfies readonly ShellPageMeta[];
-export const systemShellPageMetas = [viewRulesPageMeta, sourcesPageMeta, profilePageMeta] as const satisfies readonly ShellPageMeta[];
+export const shellPageMetas = [aiNewPageMeta, aiHotPageMeta, sourcesPageMeta, viewRulesPageMeta, profilePageMeta] as const satisfies readonly ShellPageMeta[];
+export const systemShellPageMetas = [sourcesPageMeta, viewRulesPageMeta, profilePageMeta] as const satisfies readonly ShellPageMeta[];
 
 declare module "vue-router" {
   interface RouteMeta {

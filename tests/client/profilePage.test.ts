@@ -65,4 +65,23 @@ describe("ProfilePage", () => {
     expect(wrapper.text()).toContain("admin@example.com");
     expect(wrapper.text()).toContain("已登录");
   });
+
+  it("renders the shared editorial empty state when the profile payload is empty", async () => {
+    vi.mocked(settingsApi.readSettingsProfile).mockResolvedValue(null);
+
+    const wrapper = mount(ProfilePage, {
+      global: {
+        plugins: [Antd]
+      }
+    });
+
+    await flushPromises();
+
+    const emptyState = wrapper.get("[data-profile-empty-state]");
+
+    expect(emptyState.text()).toContain("当前没有可读取的用户信息");
+    expect(emptyState.text()).toContain("可以稍后刷新页面，或重新登录后再试。");
+    expect(emptyState.classes()).toContain("rounded-editorial-xl");
+    expect(emptyState.classes()).toContain("bg-editorial-panel");
+  });
 });

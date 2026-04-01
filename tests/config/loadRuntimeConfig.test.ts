@@ -149,13 +149,13 @@ describe("loadRuntimeConfig", () => {
     expect(config.llm).toEqual({ settingsMasterKey: "master-key-123" });
   });
 
-  it("keeps llm master key nullable when env is missing", async () => {
+  it("falls back to SESSION_SECRET when llm master key env is missing", async () => {
     const config = await loadRuntimeConfig({
       configPath: path.resolve("config/hot-now.config.json"),
       env: baseEnv
     });
 
-    expect(config.llm).toEqual({ settingsMasterKey: null });
+    expect(config.llm).toEqual({ settingsMasterKey: "session-secret-value" });
   });
 
   it("throws when a required SMTP env value is missing", async () => {

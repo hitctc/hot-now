@@ -22,6 +22,8 @@ export SESSION_SECRET="replace-with-long-random-secret"
 export LLM_SETTINGS_MASTER_KEY="replace-with-local-master-key"
 ```
 
+`LLM_SETTINGS_MASTER_KEY` 现在是可选覆盖项；如果你不单独配置，系统会回退使用 `SESSION_SECRET` 继续加密保存厂商 API key。
+
 4. 如果这次改动涉及 unified shell 客户端页面，先构建最新客户端资源：`npm run build:client`
 5. 启动开发服务：
 
@@ -84,7 +86,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
   - `ai_hot`：AI 热点入池门
   - `hero`：首条精选门
   保存后会立即对当前内容库发起一次全量 LLM 重算，日常采集完成后会对新增内容做增量重算；`hero` 只参与 `/` 与 `/ai-new` 的精选主卡挑选
-- 当前支持的 LLM 厂商是 `DeepSeek`、`MiniMax`、`Kimi`；用户在页面里录入 API key，本地只保存加密后的密文；未配置 `LLM_SETTINGS_MASTER_KEY` 时页面仍可保存规则文本，但不会启用自然语言匹配
+- 当前支持的 LLM 厂商是 `DeepSeek`、`MiniMax`、`Kimi`；用户在页面里录入 API key，本地只保存加密后的密文；未显式配置 `LLM_SETTINGS_MASTER_KEY` 时，系统会回退使用 `SESSION_SECRET` 作为本地加密 key
 - Legacy 报告页（当前仍保留）：`/history`、`/reports/:date`、`/control`
 - legacy `/history`、`/control` 与 `/reports/:date` 的 fallback notice 轻量跟随共享主题资源
 - 手动采集：`POST /actions/collect`
@@ -111,7 +113,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 ## 配置
 
 - `config/hot-now.config.json`：服务端口、`collectionSchedule` 采集周期、`mailSchedule` 发信时间、`manualActions` 手动动作开关、报告目录，以及兼容旧逻辑的 `source.rssUrl`
-- 环境变量：SMTP 主机、端口、发件人、授权码、收件人、网页基础地址、统一站点登录凭据与会话密钥，以及可选的 `LLM_SETTINGS_MASTER_KEY`
+- 环境变量：SMTP 主机、端口、发件人、授权码、收件人、网页基础地址、统一站点登录凭据与会话密钥，以及作为独立覆盖项的 `LLM_SETTINGS_MASTER_KEY`
 
 默认配置下：
 
@@ -136,4 +138,4 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 类型构建：已通过
 - 系统页客户端构建：已通过
 - Playwright MCP 本地验收通过：`/login` 登录成功；`/`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常；浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持；内容页来源筛选写入 `localStorage['hot-now-content-sources']`、排序偏好写入 `localStorage['hot-now-content-sort']` 后刷新仍保留
-- 如果要手动验证新的自然语言策略链路，先配置 `LLM_SETTINGS_MASTER_KEY`，再在 `/settings/view-rules` 保存厂商设置和正式规则，确认页面出现最新重算结果；然后到内容页验证反馈面板、反馈池和草稿池的联动
+- 如果要手动验证新的自然语言策略链路，直接在 `/settings/view-rules` 保存厂商设置和正式规则即可；如需把厂商配置和会话密钥分开管理，再额外配置 `LLM_SETTINGS_MASTER_KEY`；然后到内容页验证反馈面板、反馈池和草稿池的联动

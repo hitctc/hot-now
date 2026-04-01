@@ -37,8 +37,8 @@ export type RuntimeConfig = {
     sessionSecret: string;
   };
   llm?: {
-    // The workbench can persist provider API keys only when a local master key is available,
-    // so runtime config keeps this value nullable instead of making startup depend on it.
+    // Runtime always resolves one encryption key for provider storage: prefer the dedicated
+    // LLM master key, otherwise reuse the local session secret as the fallback secret.
     settingsMasterKey: string | null;
   };
 };

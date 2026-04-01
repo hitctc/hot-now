@@ -48,9 +48,9 @@ export async function loadRuntimeConfig(options: Options = {}): Promise<RuntimeC
       sessionSecret: required(env.SESSION_SECRET, "SESSION_SECRET")
     },
     llm: {
-      // The LLM settings master key gates encrypted provider storage only, so missing env
-      // should disable that feature instead of preventing the whole app from starting.
-      settingsMasterKey: env.LLM_SETTINGS_MASTER_KEY ?? null
+      // Provider API keys still need encrypted storage in local mode, so explicit LLM master keys
+      // override the shared session secret while missing env falls back to SESSION_SECRET.
+      settingsMasterKey: env.LLM_SETTINGS_MASTER_KEY ?? required(env.SESSION_SECRET, "SESSION_SECRET")
     }
   };
 }

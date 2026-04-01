@@ -149,7 +149,7 @@ SQLite 可靠性约定：
 
 推荐 smoke test：
 
-1. 准备 `SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_USER`、`SMTP_PASS`、`MAIL_TO`、`BASE_URL`、`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET`；如需验证自然语言匹配，再额外准备 `LLM_SETTINGS_MASTER_KEY`
+1. 准备 `SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_USER`、`SMTP_PASS`、`MAIL_TO`、`BASE_URL`、`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET`；如需让厂商 API key 使用独立加密密钥，再额外准备 `LLM_SETTINGS_MASTER_KEY`
 2. 启动 `npm run dev`
 3. 打开 `/login` 并完成登录
 4. 如需验证自然语言链路，先进入 `/settings/view-rules` 保存厂商设置和正式规则，确认页面出现最新重算结果
@@ -242,7 +242,7 @@ SQLite 可靠性约定：
 - graceful shutdown 现在会执行真实的 `wal_checkpoint(TRUNCATE)`，减少把 live 库直接当普通文件同步时产生坏快照的风险
 - 已新增 `npm run db:check`、`npm run db:snapshot`、`npm run db:restore -- <snapshot-file>`，并把 verified snapshot 目录收口为 `data/recovery-backups/<timestamp>/`
 - live `data/hot-now.sqlite` 已收口为运行时文件，不再作为常规 git 产物；跨设备和服务器只流转 verified snapshot
-- 自然语言匹配目前走预计算模式，只支持单活厂商；已接入 `DeepSeek`、`MiniMax`、`Kimi`，API key 通过页面录入并用 `LLM_SETTINGS_MASTER_KEY` 加密后落库
+- 自然语言匹配目前走预计算模式，只支持单活厂商；已接入 `DeepSeek`、`MiniMax`、`Kimi`，API key 通过页面录入后会优先使用 `LLM_SETTINGS_MASTER_KEY` 加密落库；未显式配置时回退使用 `SESSION_SECRET`
 - 报告层已切到多源语义：`report.json` / `report.html` / 邮件正文会保留 `sourceKinds`、`issueUrls`、失败 source 数量等信息，不再把输出描述成单一日报
 - legacy `/history`、`/reports/:date`、`/control` 与 unified shell 共存，且相关测试和文档已同步
 

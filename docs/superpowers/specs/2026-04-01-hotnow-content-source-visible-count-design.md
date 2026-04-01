@@ -1,5 +1,8 @@
 # HotNow Content Source Visible Count Design
 
+> Superseded by [2026-04-01-hotnow-current-page-source-metrics-design.md](/Users/tc-nihao/100-tc/700-code/100-center/hot-now/docs/superpowers/specs/2026-04-01-hotnow-current-page-source-metrics-design.md).
+> 这份旧设计基于“来源单独选中时的稳定结果”口径，已不再适用当前“与内容页真实结果完全对齐”的方向。
+
 ## 背景
 
 当前 Vue 内容页已经支持：

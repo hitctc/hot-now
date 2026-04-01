@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
 
+import {
+  editorialContentCardClass,
+  editorialContentIntroSectionClass,
+  editorialContentPageClass
+} from "../../components/content/contentCardShared";
 import { HttpError } from "../../services/http";
 import {
   readSettingsSources,
@@ -232,7 +237,19 @@ onMounted(() => {
 
 <template>
   <a-spin :spinning="isRefreshing">
-    <a-space direction="vertical" size="large" class="sources-page">
+    <div :class="editorialContentPageClass" data-settings-page="sources">
+      <section :class="editorialContentIntroSectionClass" data-settings-intro="sources">
+        <p class="m-0 text-xs font-semibold uppercase tracking-[0.24em] text-editorial-text-muted">
+          Sources Workbench
+        </p>
+        <h1 class="mt-3 text-3xl font-semibold tracking-tight text-editorial-text-main">
+          在一个页面里看采集入口、来源库存和多源统计
+        </h1>
+        <p class="mt-3 max-w-3xl text-base leading-7 text-editorial-text-body">
+          手动采集、手动发信和 source 开关逻辑保持不变，这里只把系统页外层切到 Tailwind panel，和统一壳层保持同一套节奏。
+        </p>
+      </section>
+
       <a-alert
         v-if="pageNotice"
         :message="pageNotice.message"
@@ -256,39 +273,35 @@ onMounted(() => {
       </a-result>
 
       <template v-else-if="sourcesModel">
-        <a-row :gutter="[16, 16]">
-          <a-col :xs="24" :sm="12" :xl="6">
-            <a-card size="small">
-              <a-statistic title="接入来源" :value="totalSourceCount" />
-            </a-card>
-          </a-col>
-          <a-col :xs="24" :sm="12" :xl="6">
-            <a-card size="small">
-              <a-statistic title="已启用来源" :value="enabledSourceCount" />
-            </a-card>
-          </a-col>
-          <a-col :xs="24" :sm="12" :xl="6">
-            <a-card size="small">
-              <a-statistic
-                title="最近采集"
-                :value="formatDateTime(sourcesModel.operations.lastCollectionRunAt)"
-              />
-            </a-card>
-          </a-col>
-          <a-col :xs="24" :sm="12" :xl="6">
-            <a-card size="small">
-              <a-statistic
-                title="最近发信"
-                :value="formatDateTime(sourcesModel.operations.lastSendLatestEmailAt)"
-              />
-            </a-card>
-          </a-col>
-        </a-row>
+        <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <a-card :class="editorialContentCardClass" size="small">
+            <a-statistic title="接入来源" :value="totalSourceCount" />
+          </a-card>
+          <a-card :class="editorialContentCardClass" size="small">
+            <a-statistic title="已启用来源" :value="enabledSourceCount" />
+          </a-card>
+          <a-card :class="editorialContentCardClass" size="small">
+            <a-statistic
+              title="最近采集"
+              :value="formatDateTime(sourcesModel.operations.lastCollectionRunAt)"
+            />
+          </a-card>
+          <a-card :class="editorialContentCardClass" size="small">
+            <a-statistic
+              title="最近发信"
+              :value="formatDateTime(sourcesModel.operations.lastSendLatestEmailAt)"
+            />
+          </a-card>
+        </section>
 
-        <a-row :gutter="[16, 16]">
-          <a-col :xs="24" :xl="12">
-            <a-card title="手动执行采集" size="small" data-sources-section="manual-collect">
-              <a-space direction="vertical" size="middle" class="sources-page__section-stack">
+        <section class="grid gap-4 xl:grid-cols-2">
+          <a-card
+            :class="editorialContentCardClass"
+            title="手动执行采集"
+            size="small"
+            data-sources-section="manual-collect"
+          >
+              <div class="flex w-full flex-col gap-4">
                 <a-typography-paragraph type="secondary">
                   当前会对所有已启用 source 发起一次采集，并刷新最新内容库。
                 </a-typography-paragraph>
@@ -301,17 +314,16 @@ onMounted(() => {
                 >
                   {{ sourcesModel.operations.isRunning ? "采集中..." : "手动执行采集" }}
                 </a-button>
-              </a-space>
-            </a-card>
-          </a-col>
+              </div>
+          </a-card>
 
-          <a-col :xs="24" :xl="12">
-            <a-card
-              title="发送最新报告"
-              size="small"
-              data-sources-section="manual-send-latest-email"
-            >
-              <a-space direction="vertical" size="middle" class="sources-page__section-stack">
+          <a-card
+            :class="editorialContentCardClass"
+            title="发送最新报告"
+            size="small"
+            data-sources-section="manual-send-latest-email"
+          >
+              <div class="flex w-full flex-col gap-4">
                 <a-typography-paragraph type="secondary">
                   直接读取最新一份报告并尝试发信，适合采集完成后的人工重试。
                 </a-typography-paragraph>
@@ -323,12 +335,16 @@ onMounted(() => {
                 >
                   {{ sourcesModel.operations.isRunning ? "任务执行中..." : "发送最新报告" }}
                 </a-button>
-              </a-space>
-            </a-card>
-          </a-col>
-        </a-row>
+              </div>
+          </a-card>
+        </section>
 
-        <a-card title="来源统计概览" size="small" data-sources-section="analytics">
+        <a-card
+          :class="editorialContentCardClass"
+          title="来源统计概览"
+          size="small"
+          data-sources-section="analytics"
+        >
           <a-table
             :data-source="sourcesModel.sources"
             :columns="analyticsColumns"
@@ -364,7 +380,12 @@ onMounted(() => {
           </a-table>
         </a-card>
 
-        <a-card title="来源库存" size="small" data-sources-section="inventory">
+        <a-card
+          :class="editorialContentCardClass"
+          title="来源库存"
+          size="small"
+          data-sources-section="inventory"
+        >
           <a-table
             :data-source="sourcesModel.sources"
             :columns="inventoryColumns"
@@ -412,13 +433,6 @@ onMounted(() => {
           </a-table>
         </a-card>
       </template>
-    </a-space>
+    </div>
   </a-spin>
 </template>
-
-<style scoped>
-.sources-page,
-.sources-page__section-stack {
-  width: 100%;
-}
-</style>

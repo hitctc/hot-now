@@ -5,6 +5,12 @@ import {
   viewRuleFieldDefinitions,
   type ViewRuleConfigValues
 } from "../../../core/viewRules/viewRuleConfig";
+import {
+  editorialContentCardClass,
+  editorialContentIntroSectionClass,
+  editorialContentPageClass,
+  editorialContentSubpanelClass
+} from "../../components/content/contentCardShared";
 import { HttpError } from "../../services/http";
 import {
   clearFeedbackPool,
@@ -598,7 +604,19 @@ onMounted(() => {
 
 <template>
   <a-spin :spinning="isRefreshing">
-    <a-space direction="vertical" size="large" class="view-rules-page">
+    <div :class="editorialContentPageClass" data-settings-page="view-rules">
+      <section :class="editorialContentIntroSectionClass" data-settings-intro="view-rules">
+        <p class="m-0 text-xs font-semibold uppercase tracking-[0.24em] text-editorial-text-muted">
+          View Rules Workbench
+        </p>
+        <h1 class="mt-3 text-3xl font-semibold tracking-tight text-editorial-text-main">
+          把反馈、草稿和正式规则收口到同一块策略台面
+        </h1>
+        <p class="mt-3 max-w-3xl text-base leading-7 text-editorial-text-body">
+          这里继续沿用原来的保存、重算和草稿流转逻辑，只把页面级布局迁到 Tailwind，方便后续系统页统一主题和骨架。
+        </p>
+      </section>
+
       <a-alert
         v-if="pageNotice"
         :message="pageNotice.message"
@@ -622,40 +640,32 @@ onMounted(() => {
       </a-result>
 
       <template v-else-if="workbench">
-        <a-row :gutter="[16, 16]" class="view-rules-page__stats">
-          <a-col :xs="24" :sm="12" :xl="6">
-            <a-card size="small">
-              <a-statistic title="数值规则" :value="workbench.numericRules.length" />
-            </a-card>
-          </a-col>
-          <a-col :xs="24" :sm="12" :xl="6">
-            <a-card size="small">
-              <a-statistic title="反馈池" :value="workbench.feedbackPool.length" />
-            </a-card>
-          </a-col>
-          <a-col :xs="24" :sm="12" :xl="6">
-            <a-card size="small">
-              <a-statistic title="草稿池" :value="workbench.strategyDrafts.length" />
-            </a-card>
-          </a-col>
-          <a-col :xs="24" :sm="12" :xl="6">
-            <a-card size="small">
-              <a-statistic
-                title="重算状态"
-                :value="workbench.isEvaluationRunning ? '进行中' : '空闲'"
-              />
-            </a-card>
-          </a-col>
-        </a-row>
+        <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <a-card :class="editorialContentCardClass" size="small">
+            <a-statistic title="数值规则" :value="workbench.numericRules.length" />
+          </a-card>
+          <a-card :class="editorialContentCardClass" size="small">
+            <a-statistic title="反馈池" :value="workbench.feedbackPool.length" />
+          </a-card>
+          <a-card :class="editorialContentCardClass" size="small">
+            <a-statistic title="草稿池" :value="workbench.strategyDrafts.length" />
+          </a-card>
+          <a-card :class="editorialContentCardClass" size="small">
+            <a-statistic
+              title="重算状态"
+              :value="workbench.isEvaluationRunning ? '进行中' : '空闲'"
+            />
+          </a-card>
+        </section>
 
-        <a-row :gutter="[16, 16]">
-          <a-col :xs="24" :xl="9">
-            <a-card
-              title="LLM 设置"
-              size="small"
-              data-view-rules-section="provider-settings"
-            >
-              <a-space direction="vertical" size="middle" class="view-rules-page__section-stack">
+        <section class="grid gap-4 xl:grid-cols-5">
+          <a-card
+            :class="[editorialContentCardClass, 'xl:col-span-2']"
+            title="LLM 设置"
+            size="small"
+            data-view-rules-section="provider-settings"
+          >
+              <div class="flex w-full flex-col gap-4">
                 <a-alert
                   :type="providerCapabilityTone"
                   :message="workbench.providerCapability.message"
@@ -714,125 +724,123 @@ onMounted(() => {
                     </a-button>
                   </a-space>
                 </a-form>
-              </a-space>
-            </a-card>
-          </a-col>
+              </div>
+          </a-card>
 
-          <a-col :xs="24" :xl="15">
-            <a-card
-              title="正式自然语言策略"
-              size="small"
-              data-view-rules-section="nl-rules"
+          <a-card
+            :class="[editorialContentCardClass, 'xl:col-span-3']"
+            title="正式自然语言策略"
+            size="small"
+            data-view-rules-section="nl-rules"
+          >
+            <template #extra>
+              <a-tag :color="workbench.isEvaluationRunning ? 'processing' : 'blue'">
+                {{ workbench.isEvaluationRunning ? "重算进行中" : "等待下一次重算" }}
+              </a-tag>
+            </template>
+
+            <a-form
+              layout="vertical"
+              data-view-rules-form="nl-rules"
+              @submit.prevent="handleNlRulesSave"
             >
-              <template #extra>
-                <a-tag :color="workbench.isEvaluationRunning ? 'processing' : 'blue'">
-                  {{ workbench.isEvaluationRunning ? "重算进行中" : "等待下一次重算" }}
-                </a-tag>
-              </template>
-
-              <a-form
-                layout="vertical"
-                data-view-rules-form="nl-rules"
-                @submit.prevent="handleNlRulesSave"
-              >
-                <a-form-item label="全局规则">
-                  <a-textarea
-                    v-model:value="nlRuleForm.global"
-                    :rows="4"
-                    data-nl-rule-scope="global"
-                  />
-                </a-form-item>
-                <a-form-item label="AI 热点规则">
-                  <a-textarea
-                    v-model:value="nlRuleForm.hot"
-                    :rows="3"
-                    data-nl-rule-scope="hot"
-                  />
-                </a-form-item>
-                <a-form-item label="AI 新讯规则">
-                  <a-textarea
-                    v-model:value="nlRuleForm.ai"
-                    :rows="3"
-                    data-nl-rule-scope="ai"
-                  />
-                </a-form-item>
-                <a-space wrap>
-                  <a-button
-                    type="primary"
-                    html-type="submit"
-                    data-action="save-nl-rules"
-                    :loading="isActionPending('nl-rules:save')"
-                  >
-                    保存正式规则
-                  </a-button>
-                  <a-typography-text type="secondary">
-                    保存后会立即尝试重算当前内容库。
-                  </a-typography-text>
-                </a-space>
-              </a-form>
-            </a-card>
-          </a-col>
-        </a-row>
+              <a-form-item label="全局规则">
+                <a-textarea
+                  v-model:value="nlRuleForm.global"
+                  :rows="4"
+                  data-nl-rule-scope="global"
+                />
+              </a-form-item>
+              <a-form-item label="AI 热点规则">
+                <a-textarea
+                  v-model:value="nlRuleForm.hot"
+                  :rows="3"
+                  data-nl-rule-scope="hot"
+                />
+              </a-form-item>
+              <a-form-item label="AI 新讯规则">
+                <a-textarea
+                  v-model:value="nlRuleForm.ai"
+                  :rows="3"
+                  data-nl-rule-scope="ai"
+                />
+              </a-form-item>
+              <a-space wrap>
+                <a-button
+                  type="primary"
+                  html-type="submit"
+                  data-action="save-nl-rules"
+                  :loading="isActionPending('nl-rules:save')"
+                >
+                  保存正式规则
+                </a-button>
+                <a-typography-text type="secondary">
+                  保存后会立即尝试重算当前内容库。
+                </a-typography-text>
+              </a-space>
+            </a-form>
+          </a-card>
+        </section>
 
         <a-card
+          :class="editorialContentCardClass"
           title="数值权重规则"
           size="small"
           data-view-rules-section="numeric-rules"
         >
-          <a-row v-if="workbench.numericRules.length > 0" :gutter="[16, 16]">
-            <a-col
+          <div v-if="workbench.numericRules.length > 0" class="grid gap-4 xl:grid-cols-3">
+            <a-card
               v-for="rule in workbench.numericRules"
               :key="rule.ruleKey"
-              :xs="24"
-              :xl="8"
+              :class="[editorialContentSubpanelClass, 'w-full shadow-editorial-card']"
+              size="small"
             >
-              <a-card size="small" class="view-rules-page__rule-card">
-                <template #title>
-                  <a-space size="small">
-                    <span>{{ rule.displayName }}</span>
-                    <a-tag :color="rule.isEnabled ? 'green' : 'default'">
-                      {{ rule.isEnabled ? "启用中" : "已禁用" }}
-                    </a-tag>
-                  </a-space>
-                </template>
+              <template #title>
+                <a-space size="small">
+                  <span>{{ rule.displayName }}</span>
+                  <a-tag :color="rule.isEnabled ? 'green' : 'default'">
+                    {{ rule.isEnabled ? "启用中" : "已禁用" }}
+                  </a-tag>
+                </a-space>
+              </template>
 
-                <a-form
-                  v-if="ruleForms[rule.ruleKey]"
-                  layout="vertical"
-                  :data-view-rule-form="rule.ruleKey"
-                  @submit.prevent="handleRuleSave(rule.ruleKey)"
+              <a-form
+                v-if="ruleForms[rule.ruleKey]"
+                layout="vertical"
+                :data-view-rule-form="rule.ruleKey"
+                @submit.prevent="handleRuleSave(rule.ruleKey)"
+              >
+                <a-form-item
+                  v-for="field in viewRuleFieldDefinitions"
+                  :key="field.name"
+                  :label="field.label"
                 >
-                  <a-form-item
-                    v-for="field in viewRuleFieldDefinitions"
-                    :key="field.name"
-                    :label="field.label"
-                  >
-                    <a-input-number
-                      v-model:value="ruleForms[rule.ruleKey][field.name]"
-                      class="view-rules-page__number-input"
-                      :min="Number(field.min)"
-                      :step="Number(field.step)"
-                      :precision="field.inputMode === 'decimal' ? 2 : 0"
-                    />
-                    <div class="view-rules-page__field-description">
-                      {{ field.description }}
-                    </div>
-                  </a-form-item>
-                  <a-button
-                    type="primary"
-                    html-type="submit"
-                    :loading="isActionPending(`rule:${rule.ruleKey}`)"
-                  >
-                    保存策略
-                  </a-button>
-                </a-form>
-              </a-card>
-            </a-col>
-          </a-row>
+                  <a-input-number
+                    v-model:value="ruleForms[rule.ruleKey][field.name]"
+                    class="!w-full"
+                    :min="Number(field.min)"
+                    :step="Number(field.step)"
+                    :precision="field.inputMode === 'decimal' ? 2 : 0"
+                  />
+                  <div class="mt-1.5 text-xs leading-5 text-editorial-text-muted">
+                    {{ field.description }}
+                  </div>
+                </a-form-item>
+                <a-button
+                  type="primary"
+                  html-type="submit"
+                  :loading="isActionPending(`rule:${rule.ruleKey}`)"
+                >
+                  保存策略
+                </a-button>
+              </a-form>
+            </a-card>
+          </div>
           <a-empty v-else description="当前还没有可编辑的数值规则。" />
         </a-card>
 
         <a-card
+          :class="editorialContentCardClass"
           title="反馈池"
           size="small"
           data-view-rules-section="feedback-pool"
@@ -861,12 +869,12 @@ onMounted(() => {
             description="反馈池为空，内容页的新反馈会显示在这里。"
           />
 
-          <a-space v-else direction="vertical" size="middle" class="view-rules-page__section-stack">
+          <div v-else class="flex w-full flex-col gap-4">
             <a-card
               v-for="entry in workbench.feedbackPool"
               :key="entry.id"
               size="small"
-              class="view-rules-page__list-card"
+              :class="[editorialContentSubpanelClass, 'w-full shadow-editorial-card']"
             >
               <template #title>
                 <a-space size="small" wrap>
@@ -893,14 +901,14 @@ onMounted(() => {
                 </a-descriptions-item>
               </a-descriptions>
 
-              <a-space wrap class="view-rules-page__tag-list">
+              <div class="my-3 flex flex-wrap gap-2">
                 <a-tag v-for="keyword in entry.positiveKeywords" :key="`positive-${entry.id}-${keyword}`" color="green">
                   + {{ keyword }}
                 </a-tag>
                 <a-tag v-for="keyword in entry.negativeKeywords" :key="`negative-${entry.id}-${keyword}`" color="red">
                   - {{ keyword }}
                 </a-tag>
-              </a-space>
+              </div>
 
               <a-space wrap>
                 <a-button @click="copyText(buildFeedbackCopyText(entry), '反馈内容已复制。')">
@@ -922,10 +930,11 @@ onMounted(() => {
                 </a-button>
               </a-space>
             </a-card>
-          </a-space>
+          </div>
         </a-card>
 
         <a-card
+          :class="editorialContentCardClass"
           title="草稿池"
           size="small"
           data-view-rules-section="strategy-drafts"
@@ -935,12 +944,12 @@ onMounted(() => {
             description="草稿池为空，可以先把反馈转成草稿。"
           />
 
-          <a-space v-else direction="vertical" size="middle" class="view-rules-page__section-stack">
+          <div v-else class="flex w-full flex-col gap-4">
             <a-card
               v-for="draft in workbench.strategyDrafts"
               :key="draft.id"
               size="small"
-              class="view-rules-page__list-card"
+              :class="[editorialContentSubpanelClass, 'w-full shadow-editorial-card']"
             >
               <template #title>
                 <a-space size="small" wrap>
@@ -1005,37 +1014,9 @@ onMounted(() => {
                 </a-space>
               </a-form>
             </a-card>
-          </a-space>
+          </div>
         </a-card>
       </template>
-    </a-space>
+    </div>
   </a-spin>
 </template>
-
-<style scoped>
-.view-rules-page,
-.view-rules-page__section-stack {
-  width: 100%;
-}
-
-.view-rules-page__number-input {
-  width: 100%;
-}
-
-.view-rules-page__field-description {
-  margin-top: 6px;
-  color: rgba(100, 116, 139, 0.92);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.view-rules-page__rule-card,
-.view-rules-page__list-card {
-  width: 100%;
-}
-
-.view-rules-page__tag-list {
-  display: flex;
-  margin: 12px 0 16px;
-}
-</style>

@@ -146,11 +146,33 @@ describe("ViewRulesPage", () => {
     await flushPromises();
 
     expect(settingsApi.readSettingsViewRules).toHaveBeenCalledTimes(1);
+    expect(wrapper.get("[data-settings-intro='view-rules']").classes()).toContain("rounded-editorial-xl");
+    expect(wrapper.get("[data-settings-intro='view-rules']").classes()).toContain("bg-editorial-panel");
+    expect(wrapper.get("[data-settings-intro='view-rules']").classes()).toContain("shadow-editorial-page");
+    expect(wrapper.get("[data-view-rules-section='provider-settings']").classes()).toContain(
+      "rounded-editorial-xl"
+    );
+    expect(wrapper.get("[data-view-rules-section='provider-settings']").classes()).toContain(
+      "border"
+    );
+    expect(wrapper.get("[data-view-rules-section='provider-settings']").classes()).toContain(
+      "border-editorial-border"
+    );
+    expect(wrapper.get("[data-view-rules-section='provider-settings']").classes()).toContain(
+      "bg-editorial-panel"
+    );
+    expect(wrapper.get("[data-view-rules-section='provider-settings']").classes()).toContain(
+      "shadow-editorial-card"
+    );
     expect(wrapper.get("[data-view-rules-section='provider-settings']").text()).toContain("DeepSeek");
+    expect(wrapper.get("[data-view-rules-section='nl-rules']").classes()).toContain("rounded-editorial-xl");
+    expect(wrapper.get("[data-view-rules-section='nl-rules']").classes()).toContain("bg-editorial-panel");
+    expect(wrapper.get("[data-view-rules-section='nl-rules']").classes()).toContain("shadow-editorial-card");
     expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("正式自然语言策略");
     expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("AI 热点规则");
     expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("AI 新讯规则");
     expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).not.toContain("Articles 规则");
+    expect(wrapper.get("[data-view-rules-section='feedback-pool']").classes()).toContain("rounded-editorial-xl");
     expect(wrapper.get("[data-view-rules-section='feedback-pool']").text()).toContain("Agent 工作流总结");
     expect(
       (wrapper.get("[data-draft-form='301'] textarea").element as HTMLTextAreaElement).value

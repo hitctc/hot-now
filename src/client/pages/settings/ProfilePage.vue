@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 
+import {
+  editorialContentCardClass,
+  editorialContentIntroSectionClass,
+  editorialContentPageClass
+} from "../../components/content/contentCardShared";
 import { HttpError } from "../../services/http";
 import { readSettingsProfile, type SettingsProfile } from "../../services/settingsApi";
 
@@ -32,7 +37,19 @@ onMounted(() => {
 </script>
 
 <template>
-  <a-space direction="vertical" size="large" class="profile-page">
+  <div :class="editorialContentPageClass" data-settings-page="profile">
+    <section :class="editorialContentIntroSectionClass" data-settings-intro="profile">
+      <p class="m-0 text-xs font-semibold uppercase tracking-[0.24em] text-editorial-text-muted">
+        Profile Workbench
+      </p>
+      <h1 class="mt-3 text-3xl font-semibold tracking-tight text-editorial-text-main">
+        把当前账号摘要收进统一的系统页骨架
+      </h1>
+      <p class="mt-3 max-w-3xl text-base leading-7 text-editorial-text-body">
+        账号信息、登录态提示和错误提示逻辑保持原样，只把页面外层、intro 和 summary panel 迁到 Tailwind。
+      </p>
+    </section>
+
     <a-skeleton v-if="isLoading" active :paragraph="{ rows: 6 }" />
 
     <a-result
@@ -49,26 +66,25 @@ onMounted(() => {
     <a-empty v-else-if="!profile" description="当前没有可读取的用户信息。" />
 
     <template v-else>
-      <a-row :gutter="[16, 16]">
-        <a-col :xs="24" :sm="12" :xl="8">
-          <a-card size="small">
-            <a-statistic title="用户名" :value="profile.username" />
-          </a-card>
-        </a-col>
-        <a-col :xs="24" :sm="12" :xl="8">
-          <a-card size="small">
-            <a-statistic title="角色" :value="profile.role" />
-          </a-card>
-        </a-col>
-        <a-col :xs="24" :sm="12" :xl="8">
-          <a-card size="small">
-            <a-statistic title="会话状态" :value="profile.loggedIn ? '已登录' : '公开访问'" />
-          </a-card>
-        </a-col>
-      </a-row>
+      <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <a-card :class="editorialContentCardClass" size="small">
+          <a-statistic title="用户名" :value="profile.username" />
+        </a-card>
+        <a-card :class="editorialContentCardClass" size="small">
+          <a-statistic title="角色" :value="profile.role" />
+        </a-card>
+        <a-card :class="editorialContentCardClass" size="small">
+          <a-statistic title="会话状态" :value="profile.loggedIn ? '已登录' : '公开访问'" />
+        </a-card>
+      </section>
 
-      <a-card title="当前登录用户" size="small" data-profile-section="summary">
-        <a-space direction="vertical" size="middle" class="profile-page__stack">
+      <a-card
+        :class="editorialContentCardClass"
+        title="当前登录用户"
+        size="small"
+        data-profile-section="summary"
+      >
+        <div class="flex w-full flex-col gap-4">
           <a-alert
             :type="profile.loggedIn ? 'success' : 'info'"
             :message="profile.loggedIn ? '当前会话有效，可以访问系统菜单。' : '当前处于公开访问模式。'"
@@ -92,15 +108,8 @@ onMounted(() => {
               {{ profile.loggedIn ? "已登录（当前会话有效）" : "未登录（公开访问模式）" }}
             </a-descriptions-item>
           </a-descriptions>
-        </a-space>
+        </div>
       </a-card>
     </template>
-  </a-space>
+  </div>
 </template>
-
-<style scoped>
-.profile-page,
-.profile-page__stack {
-  width: 100%;
-}
-</style>

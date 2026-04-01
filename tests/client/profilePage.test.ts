@@ -51,6 +51,16 @@ describe("ProfilePage", () => {
 
     await flushPromises();
 
+    expect(wrapper.get("[data-settings-intro='profile']").classes()).toContain("rounded-editorial-xl");
+    expect(wrapper.get("[data-settings-intro='profile']").classes()).toContain("bg-editorial-panel");
+    expect(wrapper.get("[data-settings-intro='profile']").classes()).toContain("shadow-editorial-page");
+    expect(wrapper.get("[data-profile-section='summary']").classes()).toContain("rounded-editorial-xl");
+    expect(wrapper.get("[data-profile-section='summary']").classes()).toContain("border");
+    expect(wrapper.get("[data-profile-section='summary']").classes()).toContain(
+      "border-editorial-border"
+    );
+    expect(wrapper.get("[data-profile-section='summary']").classes()).toContain("bg-editorial-panel");
+    expect(wrapper.get("[data-profile-section='summary']").classes()).toContain("shadow-editorial-card");
     expect(wrapper.get("[data-profile-section='summary']").text()).toContain("系统管理员");
     expect(wrapper.text()).toContain("admin@example.com");
     expect(wrapper.text()).toContain("已登录");

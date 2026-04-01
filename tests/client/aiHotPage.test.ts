@@ -99,7 +99,9 @@ describe("AiHotPage", () => {
     expect(wrapper.get("[data-content-page='ai-hot']").classes()).toEqual(
       expect.arrayContaining(["flex", "flex-col", "gap-6"])
     );
+    expect(wrapper.find("[data-content-filter-shell]").exists()).toBe(false);
     expect(wrapper.find("[data-content-source-filter]").exists()).toBe(true);
+    expect(wrapper.find("[data-content-sort-control]").exists()).toBe(true);
     expect(wrapper.get("[data-content-section='list']").classes()).toContain("grid");
     expect(wrapper.get("[data-content-section='list']").text()).toContain("Hot AI Event");
   });

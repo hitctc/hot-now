@@ -134,7 +134,7 @@ export function buildContentViewSelection(
   const viewRuleConfig = getViewRuleConfig(db, viewKey);
   const referenceTime = options.referenceTime ?? new Date();
   const includeNlEvaluations = options.includeNlEvaluations ?? true;
-  const sortMode = options.sortMode ?? "published_at";
+  const sortMode = options.sortMode;
   const selectedSourceKinds = normalizeSelectedSourceKinds(options.selectedSourceKinds);
   const rows = db.prepare(contentSelectSql).all({ viewScope: viewKey }) as ContentCardRow[];
   const rankedCards = rows
@@ -335,7 +335,12 @@ function calculateFreshnessWindowScore(
   return Math.max(0, Math.min(100, 100 - (ageDays / windowDays) * 100));
 }
 
-function compareVisibleCards(sortMode: ContentSortMode, left: RankedContentCardCandidate, right: RankedContentCardCandidate): number {
+function compareVisibleCards(sortMode: ContentSortMode | undefined, left: RankedContentCardCandidate, right: RankedContentCardCandidate): number {
+  // Core selection keeps the legacy ranking order unless a caller explicitly asks for a user-facing sort.
+  if (sortMode === undefined) {
+    return compareByRanking(left, right);
+  }
+
   if (sortMode === "content_score") {
     if (right.contentScore !== left.contentScore) {
       return right.contentScore - left.contentScore;

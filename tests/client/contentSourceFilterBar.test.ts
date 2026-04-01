@@ -33,6 +33,10 @@ describe("ContentSourceFilterBar", () => {
     await flushPromises();
 
     expect(wrapper.emitted("change")?.at(-1)).toEqual([[]]);
+    expect(wrapper.text()).not.toContain("当前只看这些来源");
+    expect(wrapper.text()).not.toContain("浏览偏好只影响当前内容页");
+    expect(wrapper.text()).toContain("来源筛选");
+    expect(wrapper.text()).toContain("已选 1 / 2");
     expect(wrapper.get("[data-content-source-filter]").classes()).toEqual(
       expect.arrayContaining(["rounded-editorial-xl", "border", "border-editorial-border", "bg-editorial-panel"])
     );

@@ -1,9 +1,22 @@
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createServer } from "../../src/server/createServer.js";
 
+const clientBuildRoot = createClientBuildFixture();
+
+function createSystemTestServer(overrides: Parameters<typeof createServer>[0] = {}) {
+  // The system route suite pins its own bundle fixture so concurrent build tests cannot race on dist/.
+  return createServer({
+    clientBuildRoot,
+    ...overrides
+  } as never);
+}
+
 describe("system routes", () => {
   it("renders the view-rules page as the Vue client entry shell", async () => {
-    const app = createServer({
+    const app = createSystemTestServer({
       auth: {
         requireLogin: true,
         sessionSecret: "test-secret",
@@ -40,7 +53,7 @@ describe("system routes", () => {
   }, 15_000);
 
   it("renders the sources page as the Vue client entry shell", async () => {
-    const app = createServer({
+    const app = createSystemTestServer({
       auth: {
         requireLogin: true,
         sessionSecret: "test-secret",
@@ -75,7 +88,7 @@ describe("system routes", () => {
   });
 
   it("renders the profile page as the Vue client entry shell", async () => {
-    const app = createServer({
+    const app = createSystemTestServer({
       auth: {
         requireLogin: true,
         sessionSecret: "test-secret",
@@ -110,7 +123,7 @@ describe("system routes", () => {
   });
 
   it("renders disabled state on both manual action cards when a job is already running", async () => {
-    const app = createServer({
+    const app = createSystemTestServer({
       listSources: vi.fn().mockResolvedValue([
         {
           kind: "openai",
@@ -140,7 +153,7 @@ describe("system routes", () => {
 
   it("calls toggleSource for source enable action", async () => {
     const toggleSource = vi.fn().mockResolvedValue({ ok: true });
-    const app = createServer({
+    const app = createSystemTestServer({
       toggleSource
     } as never);
 
@@ -156,7 +169,7 @@ describe("system routes", () => {
 
   it("calls updateSourceDisplayMode for source display mode action", async () => {
     const updateSourceDisplayMode = vi.fn().mockResolvedValue({ ok: true });
-    const app = createServer({
+    const app = createSystemTestServer({
       updateSourceDisplayMode
     } as never);
 
@@ -172,7 +185,7 @@ describe("system routes", () => {
 
   it("returns 400 when source display mode payload is not boolean", async () => {
     const updateSourceDisplayMode = vi.fn();
-    const app = createServer({
+    const app = createSystemTestServer({
       updateSourceDisplayMode
     } as never);
 
@@ -188,7 +201,7 @@ describe("system routes", () => {
   });
 
   it("returns 404 when toggling a source kind that does not exist", async () => {
-    const app = createServer({
+    const app = createSystemTestServer({
       toggleSource: vi.fn().mockResolvedValue({ ok: false, reason: "not-found" })
     } as never);
 
@@ -204,7 +217,7 @@ describe("system routes", () => {
 
   it("returns 400 when source enable payload is not boolean", async () => {
     const toggleSource = vi.fn();
-    const app = createServer({
+    const app = createSystemTestServer({
       toggleSource
     } as never);
 
@@ -221,7 +234,7 @@ describe("system routes", () => {
 
   it("calls saveViewRuleConfig for view rule save action", async () => {
     const saveViewRuleConfig = vi.fn().mockResolvedValue({ ok: true });
-    const app = createServer({
+    const app = createSystemTestServer({
       saveViewRuleConfig
     } as never);
 
@@ -255,7 +268,7 @@ describe("system routes", () => {
 
   it("calls saveProviderSettings for llm provider configuration", async () => {
     const saveProviderSettings = vi.fn().mockResolvedValue({ ok: true });
-    const app = createServer({
+    const app = createSystemTestServer({
       saveProviderSettings
     } as never);
 
@@ -288,7 +301,7 @@ describe("system routes", () => {
         failureCount: 0
       }
     });
-    const app = createServer({
+    const app = createSystemTestServer({
       saveNlRules
     } as never);
 
@@ -326,7 +339,7 @@ describe("system routes", () => {
 
   it("returns 400 for invalid view-rule payload", async () => {
     const saveViewRuleConfig = vi.fn();
-    const app = createServer({
+    const app = createSystemTestServer({
       saveViewRuleConfig
     } as never);
 
@@ -341,7 +354,7 @@ describe("system routes", () => {
   });
 
   it("returns 401 for anonymous system actions when auth is enabled", async () => {
-    const app = createServer({
+    const app = createSystemTestServer({
       auth: {
         requireLogin: true,
         sessionSecret: "test-secret",
@@ -376,3 +389,32 @@ describe("system routes", () => {
     expect(ruleResponse.statusCode).toBe(401);
   });
 });
+
+function createClientBuildFixture() {
+  // The fixture only needs the emitted HTML contract and referenced asset paths that system route tests assert on.
+  const fixtureRoot = mkdtempSync(path.join(tmpdir(), "hot-now-system-client-"));
+  const assetsDir = path.join(fixtureRoot, "assets");
+  mkdirSync(assetsDir, { recursive: true });
+  writeFileSync(path.join(assetsDir, "index-test.js"), "console.log('system route fixture');\n", "utf8");
+  writeFileSync(path.join(assetsDir, "index-test.css"), "body{background:#fff;}\n", "utf8");
+  writeFileSync(
+    path.join(fixtureRoot, "index.html"),
+    `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HotNow Test Shell</title>
+    <script type="module" crossorigin src="/client/assets/index-test.js"></script>
+    <link rel="stylesheet" crossorigin href="/client/assets/index-test.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>
+`,
+    "utf8"
+  );
+
+  return fixtureRoot;
+}

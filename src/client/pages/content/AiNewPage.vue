@@ -153,16 +153,18 @@ onMounted(() => {
 
     <a-alert v-if="hasLoadError && pageModel" type="warning" show-icon :message="loadError" banner />
 
-    <div v-if="sourceFilter" class="sticky top-[4.25rem] z-10" data-content-filter-shell>
-      <div class="flex flex-col gap-3">
-        <ContentSourceFilterBar
-          :options="sourceFilter.options"
-          :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
-          @change="handleSourceKindsChange"
-        />
-        <ContentSortControl :sort-mode="sortMode" @change="handleSortModeChange" />
-      </div>
-    </div>
+    <ContentSourceFilterBar
+      v-if="sourceFilter"
+      :options="sourceFilter.options"
+      :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
+      @change="handleSourceKindsChange"
+    />
+
+    <ContentSortControl
+      v-if="sourceFilter"
+      :sort-mode="sortMode"
+      @change="handleSortModeChange"
+    />
 
     <a-skeleton v-if="isLoading" active :paragraph="{ rows: 7 }" />
 

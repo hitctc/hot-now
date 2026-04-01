@@ -43,23 +43,44 @@ function clearAll(): void {
 <template>
   <a-card
     :bordered="false"
-    :class="[editorialContentFloatingPanelClass, 'backdrop-blur-xl']"
+    :class="[editorialContentFloatingPanelClass, 'sticky top-0 z-10 backdrop-blur-xl']"
     data-content-source-filter
   >
-    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-      <div class="space-y-2">
-        <p class="m-0 text-xs font-semibold uppercase tracking-[0.24em] text-editorial-text-muted">
+    <div class="flex items-center gap-3">
+      <div class="shrink-0">
+        <p class="m-0 text-[11px] font-semibold uppercase tracking-[0.22em] text-editorial-text-muted">
           来源筛选
         </p>
-        <div class="space-y-1">
-          <h3 class="m-0 text-lg font-semibold text-editorial-text-main">当前只看这些来源</h3>
-          <p class="m-0 text-sm leading-6 text-editorial-text-body">
-            浏览偏好只影响当前内容页；已选 {{ selectedCount }} / {{ options.length }}。
-          </p>
+        <p class="m-0 text-sm font-medium text-editorial-text-body">
+          已选 {{ selectedCount }} / {{ options.length }}
+        </p>
+      </div>
+
+      <div class="min-w-0 flex-1 overflow-x-auto">
+        <div class="flex w-max items-center gap-3 pr-1">
+          <label
+            v-for="option in options"
+            :key="option.kind"
+            :class="[
+              'inline-flex shrink-0 cursor-pointer items-center gap-3 rounded-editorial-pill border px-3 py-2 text-sm font-semibold transition',
+              selectedSet.has(option.kind)
+                ? 'border-transparent bg-editorial-link-active text-editorial-text-on-accent shadow-editorial-accent'
+                : 'border-editorial-border bg-editorial-control text-editorial-text-main hover:border-editorial-border-strong hover:bg-editorial-control-hover'
+            ]"
+          >
+            <input
+              class="m-0 size-4 cursor-pointer accent-[var(--editorial-accent)]"
+              :data-source-kind="option.kind"
+              type="checkbox"
+              :checked="selectedSet.has(option.kind)"
+              @change="handleOptionToggle(option.kind, ($event.target as HTMLInputElement).checked)"
+            />
+            <span>{{ option.name }}</span>
+          </label>
         </div>
       </div>
 
-      <div class="flex flex-wrap gap-2">
+      <div class="flex shrink-0 items-center gap-2">
         <a-button
           data-content-filter-action="select-all"
           size="small"
@@ -77,28 +98,6 @@ function clearAll(): void {
           全不选
         </a-button>
       </div>
-    </div>
-
-    <div class="mt-4 flex flex-wrap gap-3">
-      <label
-        v-for="option in options"
-        :key="option.kind"
-        :class="[
-          'inline-flex cursor-pointer items-center gap-3 rounded-editorial-pill border px-3 py-2 text-sm font-semibold transition',
-          selectedSet.has(option.kind)
-            ? 'border-transparent bg-editorial-link-active text-editorial-text-on-accent shadow-editorial-accent'
-            : 'border-editorial-border bg-editorial-control text-editorial-text-main hover:border-editorial-border-strong hover:bg-editorial-control-hover'
-        ]"
-      >
-        <input
-          class="m-0 size-4 cursor-pointer accent-[var(--editorial-accent)]"
-          :data-source-kind="option.kind"
-          type="checkbox"
-          :checked="selectedSet.has(option.kind)"
-          @change="handleOptionToggle(option.kind, ($event.target as HTMLInputElement).checked)"
-        />
-        <span>{{ option.name }}</span>
-      </label>
     </div>
   </a-card>
 </template>

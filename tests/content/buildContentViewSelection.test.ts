@@ -8,6 +8,7 @@ import { listContentView } from "../../src/core/content/listContentView.js";
 import { openDatabase } from "../../src/core/db/openDatabase.js";
 import { runMigrations } from "../../src/core/db/runMigrations.js";
 import { seedInitialData } from "../../src/core/db/seedInitialData.js";
+import { saveViewRuleConfig } from "../../src/core/viewRules/viewRuleRepository.js";
 
 describe("buildContentViewSelection", () => {
   const databasesToClose: ReturnType<typeof openDatabase>[] = [];
@@ -169,6 +170,47 @@ describe("buildContentViewSelection", () => {
       "Older High Score",
       "Newer Low Score"
     ]);
+  });
+
+  it("keeps the saved ranking order when no explicit sort mode is provided", async () => {
+    const db = await createTestDatabase(databasesToClose);
+    const openai = resolveSourceByKind(db, "openai");
+
+    saveViewRuleConfig(db, "hot", {
+      limit: 20,
+      freshnessWindowDays: 10,
+      freshnessWeight: 0.5,
+      sourceWeight: 0,
+      completenessWeight: 0.5,
+      aiWeight: 0,
+      heatWeight: 0
+    });
+
+    upsertContentItems(db, {
+      sourceId: openai!.id,
+      items: [
+        {
+          title: "Fresh concise note",
+          canonicalUrl: "https://example.com/fresh-concise-note",
+          summary: "tiny",
+          bodyMarkdown: "",
+          publishedAt: "2026-03-31T03:00:00.000Z",
+          fetchedAt: "2026-03-31T03:00:00.000Z"
+        },
+        {
+          title: "Older complete brief",
+          canonicalUrl: "https://example.com/older-complete-brief",
+          summary: "This longer summary carries enough context to outrank the fresh note once ranking is applied.",
+          bodyMarkdown: "Detailed context paragraph ".repeat(20),
+          publishedAt: "2026-03-26T03:00:00.000Z",
+          fetchedAt: "2026-03-26T03:00:00.000Z"
+        }
+      ]
+    });
+
+    const selection = buildContentViewSelection(db, "hot");
+
+    expect(selection.visibleCards[0]?.title).toBe("Older complete brief");
   });
 });
 

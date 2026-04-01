@@ -34,26 +34,27 @@ describe("seedInitialData", () => {
 
     expect(columns.some((column) => column.name === "is_enabled")).toBe(true);
     expect(columns.some((column) => column.name === "is_active")).toBe(true);
+    expect(columns.some((column) => column.name === "show_all_when_selected")).toBe(true);
 
     const enabledRows = db
       .prepare(
         `
-          SELECT kind, is_enabled
+          SELECT kind, is_enabled, show_all_when_selected
           FROM content_sources
           ORDER BY kind
         `
       )
-      .all() as Array<{ kind: string; is_enabled: number }>;
+      .all() as Array<{ kind: string; is_enabled: number; show_all_when_selected: number }>;
 
     expect(enabledRows).toEqual([
-      { kind: "aifanr", is_enabled: 1 },
-      { kind: "google_ai", is_enabled: 1 },
-      { kind: "ithome", is_enabled: 1 },
-      { kind: "juya", is_enabled: 1 },
-      { kind: "kr36", is_enabled: 1 },
-      { kind: "kr36_newsflash", is_enabled: 1 },
-      { kind: "openai", is_enabled: 1 },
-      { kind: "techcrunch_ai", is_enabled: 1 }
+      { kind: "aifanr", is_enabled: 1, show_all_when_selected: 0 },
+      { kind: "google_ai", is_enabled: 1, show_all_when_selected: 0 },
+      { kind: "ithome", is_enabled: 1, show_all_when_selected: 0 },
+      { kind: "juya", is_enabled: 1, show_all_when_selected: 0 },
+      { kind: "kr36", is_enabled: 1, show_all_when_selected: 0 },
+      { kind: "kr36_newsflash", is_enabled: 1, show_all_when_selected: 0 },
+      { kind: "openai", is_enabled: 1, show_all_when_selected: 0 },
+      { kind: "techcrunch_ai", is_enabled: 1, show_all_when_selected: 0 }
     ]);
 
     const activeRows = db
@@ -94,6 +95,24 @@ describe("seedInitialData", () => {
       .all() as Array<{ kind: string }>;
 
     expect(activeRows).toEqual([{ kind: "openai" }]);
+  });
+
+  it("keeps show_all_when_selected disabled by default for all built-in sources", async () => {
+    const db = await createTestDatabase();
+
+    seedInitialData(db, { username: "admin", password: "bootstrap-password" });
+
+    const rows = db
+      .prepare(
+        `
+          SELECT kind, show_all_when_selected
+          FROM content_sources
+          ORDER BY kind
+        `
+      )
+      .all() as Array<{ kind: string; show_all_when_selected: number }>;
+
+    expect(rows.every((row) => row.show_all_when_selected === 0)).toBe(true);
   });
 
   it("seeds default view rules without overwriting existing config_json", async () => {

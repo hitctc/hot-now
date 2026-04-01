@@ -19,6 +19,7 @@ export type SourceWorkbenchRow = {
   name: string;
   rssUrl: string | null;
   isEnabled: boolean;
+  showAllWhenSelected: boolean;
   lastCollectedAt: string | null;
   lastCollectionStatus: string | null;
   totalCount: number;

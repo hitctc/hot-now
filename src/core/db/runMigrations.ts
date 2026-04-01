@@ -1,9 +1,10 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 3;
+const schemaVersion = 4;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
+const sourceDisplayModeMigrationName = "004_source_display_mode";
 
 const migrationStatements = [
   `
@@ -251,6 +252,20 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(3, feedbackAndLlmStrategyWorkbenchMigrationName);
+
+    // Source display mode stays additive so older SQLite files can gain the new setting without
+    // rebuilding the local database or losing any collected content and report history.
+    if (!hasColumn(db, "content_sources", "show_all_when_selected")) {
+      db.exec("ALTER TABLE content_sources ADD COLUMN show_all_when_selected INTEGER NOT NULL DEFAULT 0");
+    }
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(4, sourceDisplayModeMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

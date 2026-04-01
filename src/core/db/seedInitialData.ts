@@ -66,11 +66,12 @@ export function seedInitialData(db: SqliteDatabase, authBootstrap?: AuthBootstra
   // the unified-site schema is coherent before dedicated user management lands.
   ensureContentSourcesEnabledColumn(db);
   ensureContentSourcesActiveColumn(db);
+  ensureContentSourcesShowAllWhenSelectedColumn(db);
 
   const insertSource = db.prepare(
     `
-      INSERT INTO content_sources (kind, name, site_url, rss_url, is_enabled, is_builtin, updated_at)
-      VALUES (@kind, @name, @siteUrl, @rssUrl, 1, 1, CURRENT_TIMESTAMP)
+      INSERT INTO content_sources (kind, name, site_url, rss_url, is_enabled, is_builtin, show_all_when_selected, updated_at)
+      VALUES (@kind, @name, @siteUrl, @rssUrl, 1, 1, 0, CURRENT_TIMESTAMP)
       ON CONFLICT(kind) DO UPDATE SET
         name = excluded.name,
         site_url = excluded.site_url,
@@ -152,6 +153,16 @@ function ensureContentSourcesEnabledColumn(db: SqliteDatabase): void {
   db.exec("ALTER TABLE content_sources ADD COLUMN is_enabled INTEGER NOT NULL DEFAULT 1");
 }
 
+function ensureContentSourcesShowAllWhenSelectedColumn(db: SqliteDatabase): void {
+  // The content page display-mode toggle is additive only, so older local databases can pick it
+  // up during seed without resetting any existing source rows or manual source settings.
+  if (hasContentSourcesShowAllWhenSelectedColumn(db)) {
+    return;
+  }
+
+  db.exec("ALTER TABLE content_sources ADD COLUMN show_all_when_selected INTEGER NOT NULL DEFAULT 0");
+}
+
 function hasContentSourcesActiveColumn(db: SqliteDatabase): boolean {
   // PRAGMA introspection lets the seed stay compatible with both legacy and patched local databases.
   const columns = db
@@ -168,6 +179,15 @@ function hasContentSourcesEnabledColumn(db: SqliteDatabase): boolean {
     .all() as Array<{ name: string }>;
 
   return columns.some((column) => column.name === "is_enabled");
+}
+
+function hasContentSourcesShowAllWhenSelectedColumn(db: SqliteDatabase): boolean {
+  // PRAGMA introspection lets the seed stay compatible with both legacy and patched local databases.
+  const columns = db
+    .prepare("PRAGMA table_info(content_sources)")
+    .all() as Array<{ name: string }>;
+
+  return columns.some((column) => column.name === "show_all_when_selected");
 }
 
 function ensureDefaultActiveSource(db: SqliteDatabase): void {

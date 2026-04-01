@@ -30,7 +30,8 @@ describe("listSourceCards", () => {
 
     db.exec(`
       UPDATE content_sources
-      SET is_active = CASE WHEN kind = 'openai' THEN 1 ELSE 0 END
+      SET is_active = CASE WHEN kind = 'openai' THEN 1 ELSE 0 END,
+          show_all_when_selected = CASE WHEN kind = 'openai' THEN 1 ELSE 0 END
     `);
 
     db.prepare(
@@ -78,17 +79,20 @@ describe("listSourceCards", () => {
     expect(cards.find((card) => card.kind === "juya")).toMatchObject({
       kind: "juya",
       isEnabled: true,
+      showAllWhenSelected: false,
       lastCollectedAt: "2026-03-28T08:05:00.000Z",
       lastCollectionStatus: "completed"
     });
     expect(cards.find((card) => card.kind === "openai")).toMatchObject({
       kind: "openai",
       isEnabled: true,
+      showAllWhenSelected: true,
       lastCollectedAt: "2026-03-28T09:01:00.000Z",
       lastCollectionStatus: "failed"
     });
     expect(cards.find((card) => card.kind === "google_ai")).toMatchObject({
       kind: "google_ai",
+      showAllWhenSelected: false,
       lastCollectedAt: null,
       lastCollectionStatus: null
     });

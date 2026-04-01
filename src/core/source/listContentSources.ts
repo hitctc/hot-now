@@ -4,12 +4,14 @@ export type ContentSourceOption = {
   kind: string;
   name: string;
   isEnabled: boolean;
+  showAllWhenSelected: boolean;
 };
 
 type ContentSourceRow = {
   kind: string;
   name: string;
   is_enabled: number;
+  show_all_when_selected: number;
 };
 
 export function listContentSources(db: SqliteDatabase): ContentSourceOption[] {
@@ -18,7 +20,7 @@ export function listContentSources(db: SqliteDatabase): ContentSourceOption[] {
     db
       .prepare(
         `
-          SELECT kind, name, is_enabled
+          SELECT kind, name, is_enabled, show_all_when_selected
           FROM content_sources
           ORDER BY id ASC
         `
@@ -27,6 +29,7 @@ export function listContentSources(db: SqliteDatabase): ContentSourceOption[] {
   ).map((row) => ({
     kind: row.kind,
     name: row.name,
-    isEnabled: row.is_enabled === 1
+    isEnabled: row.is_enabled === 1,
+    showAllWhenSelected: row.show_all_when_selected === 1
   }));
 }

@@ -65,7 +65,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(3);
+    expect(schemaVersion).toBe(4);
 
     const appliedMigrations = db
       .prepare(
@@ -80,7 +80,8 @@ describe("runMigrations", () => {
     expect(appliedMigrations).toEqual([
       { version: 1, name: "001_unified_site_baseline" },
       { version: 2, name: "002_digest_report_mail_attempts" },
-      { version: 3, name: "003_feedback_and_llm_strategy_workbench" }
+      { version: 3, name: "003_feedback_and_llm_strategy_workbench" },
+      { version: 4, name: "004_source_display_mode" }
     ]);
 
     const digestReportColumns = db
@@ -93,25 +94,35 @@ describe("runMigrations", () => {
 
     expect(digestReportColumns.map((column) => column.name)).toContain("last_email_attempted_at");
 
+    const sourceColumns = db
+      .prepare(
+        `
+          PRAGMA table_info(content_sources)
+        `
+      )
+      .all() as Array<{ name: string }>;
+
+    expect(sourceColumns.map((column) => column.name)).toContain("show_all_when_selected");
+
     const sourceRows = db
       .prepare(
         `
-          SELECT kind, is_enabled
+          SELECT kind, is_enabled, show_all_when_selected
           FROM content_sources
           ORDER BY kind
         `
       )
-      .all() as Array<{ kind: string; is_enabled: number }>;
+      .all() as Array<{ kind: string; is_enabled: number; show_all_when_selected: number }>;
 
     expect(sourceRows).toEqual([
-      { kind: "aifanr", is_enabled: 1 },
-      { kind: "google_ai", is_enabled: 1 },
-      { kind: "ithome", is_enabled: 1 },
-      { kind: "juya", is_enabled: 1 },
-      { kind: "kr36", is_enabled: 1 },
-      { kind: "kr36_newsflash", is_enabled: 1 },
-      { kind: "openai", is_enabled: 1 },
-      { kind: "techcrunch_ai", is_enabled: 1 }
+      { kind: "aifanr", is_enabled: 1, show_all_when_selected: 0 },
+      { kind: "google_ai", is_enabled: 1, show_all_when_selected: 0 },
+      { kind: "ithome", is_enabled: 1, show_all_when_selected: 0 },
+      { kind: "juya", is_enabled: 1, show_all_when_selected: 0 },
+      { kind: "kr36", is_enabled: 1, show_all_when_selected: 0 },
+      { kind: "kr36_newsflash", is_enabled: 1, show_all_when_selected: 0 },
+      { kind: "openai", is_enabled: 1, show_all_when_selected: 0 },
+      { kind: "techcrunch_ai", is_enabled: 1, show_all_when_selected: 0 }
     ]);
 
     const adminRow = db

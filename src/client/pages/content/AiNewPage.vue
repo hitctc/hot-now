@@ -120,26 +120,25 @@ onMounted(() => {
 </script>
 
 <template>
-  <a-space direction="vertical" size="large" class="content-page content-page--ai-new" data-content-page="ai-new">
+  <div class="content-page content-page--ai-new" data-content-page="ai-new">
     <a-card class="content-page__intro" :bordered="false">
-      <a-space direction="vertical" size="small">
+      <div class="content-page__intro-stack">
         <a-typography-text class="content-page__kicker" type="secondary">AI 新讯</a-typography-text>
         <a-typography-title :level="2" class="content-page__title">最快发现新一批 AI 信号</a-typography-title>
         <a-typography-paragraph class="content-page__description">
           先看首条精选主卡，再扫后面的标准卡。这里优先收集 AI 新闻、模型、事件和智能体线索。
         </a-typography-paragraph>
-      </a-space>
+      </div>
     </a-card>
 
     <a-alert v-if="hasLoadError && pageModel" type="warning" show-icon :message="loadError" banner />
 
-    <div v-if="sourceFilter" class="content-page__filter-shell" data-content-filter-shell>
-      <ContentSourceFilterBar
-        :options="sourceFilter.options"
-        :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
-        @change="handleSourceKindsChange"
-      />
-    </div>
+    <ContentSourceFilterBar
+      v-if="sourceFilter"
+      :options="sourceFilter.options"
+      :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
+      @change="handleSourceKindsChange"
+    />
 
     <a-skeleton v-if="isLoading" active :paragraph="{ rows: 7 }" />
 
@@ -161,12 +160,15 @@ onMounted(() => {
     </template>
 
     <a-spin v-if="isRefreshing" class="content-page__refresh" />
-  </a-space>
+  </div>
 </template>
 
 <style scoped>
 .content-page {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .content-page__intro {
@@ -175,6 +177,12 @@ onMounted(() => {
   background: linear-gradient(135deg, rgba(35, 82, 255, 0.08), rgba(255, 106, 42, 0.05)),
     var(--editorial-bg-panel);
   box-shadow: var(--editorial-shadow-page);
+}
+
+.content-page__intro-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .content-page__kicker {
@@ -200,20 +208,7 @@ onMounted(() => {
   gap: 16px;
 }
 
-.content-page__filter-shell {
-  position: sticky;
-  top: 24px;
-  z-index: 12;
-  width: 100%;
-}
-
 .content-page__refresh {
   align-self: flex-start;
-}
-
-@media (max-width: 900px) {
-  .content-page__filter-shell {
-    top: 88px;
-  }
 }
 </style>

@@ -91,7 +91,7 @@ describe("AiHotPage", () => {
 
     expect(contentApiMocks.readAiHotPage).toHaveBeenCalledWith(["openai"]);
     expect(wrapper.get("[data-content-page='ai-hot']").text()).toContain("AI 热点");
-    expect(wrapper.find("[data-content-filter-shell]").exists()).toBe(true);
+    expect(wrapper.find("[data-content-source-filter]").exists()).toBe(true);
     expect(wrapper.get("[data-content-section='list']").text()).toContain("Hot AI Event");
   });
 

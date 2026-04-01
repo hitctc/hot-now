@@ -1,10 +1,13 @@
 import { nextTick } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { editorialTokens } from "../../src/client/theme/editorialTokens";
+
 describe("useTheme", () => {
   beforeEach(() => {
     vi.resetModules();
     window.localStorage.clear();
+    document.documentElement.removeAttribute("style");
     document.documentElement.removeAttribute("data-theme");
   });
 
@@ -12,41 +15,66 @@ describe("useTheme", () => {
     vi.restoreAllMocks();
   });
 
+  it("boots the persisted theme before the app mounts without waiting for nextTick", async () => {
+    window.localStorage.setItem("hot-now-theme", "light");
+
+    const { bootstrapEditorialTheme, THEME_STORAGE_KEY } = await import("../../src/client/composables/useTheme");
+    const lightTokens = editorialTokens.light;
+
+    bootstrapEditorialTheme();
+
+    expect(THEME_STORAGE_KEY).toBe("hot-now-theme");
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("light");
+    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(document.documentElement.style.colorScheme).toBe("light");
+    expect(document.documentElement.style.getPropertyValue("--editorial-bg-page")).toBe(lightTokens.bgPage);
+    expect(document.documentElement.style.getPropertyValue("--editorial-accent")).toBe(lightTokens.accent);
+  });
+
   it("syncs the persisted theme mode with localStorage and document data-theme", async () => {
     window.localStorage.setItem("hot-now-theme", "light");
 
-    const { useTheme, THEME_STORAGE_KEY } = await import("../../src/client/composables/useTheme");
+    const { bootstrapEditorialTheme, useTheme, THEME_STORAGE_KEY } = await import("../../src/client/composables/useTheme");
     const theme = useTheme();
+    const lightTokens = editorialTokens.light;
+    const darkTokens = editorialTokens.dark;
 
-    await nextTick();
+    bootstrapEditorialTheme();
 
     expect(THEME_STORAGE_KEY).toBe("hot-now-theme");
     expect(theme.themeMode.value).toBe("light");
     expect(theme.isDarkMode.value).toBe(false);
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("light");
     expect(document.documentElement.dataset.theme).toBe("light");
-    expect(document.documentElement.style.getPropertyValue("--editorial-bg-page")).toBe("#f4ede3");
-    expect(document.documentElement.style.getPropertyValue("--editorial-accent")).toBe("#2352ff");
-    expect(theme.themeConfig.value.token?.colorPrimary).toBe("#2352ff");
-    expect(theme.themeConfig.value.token?.colorBgLayout).toBe("#f4ede3");
-    expect(theme.themeConfig.value.token?.colorBgContainer).toBe("rgba(255, 252, 247, 0.98)");
-    expect(theme.themeConfig.value.token?.colorText).toBe("#13233c");
-    expect(theme.themeConfig.value.token?.borderRadius).toBe(14);
+    expect(document.documentElement.style.colorScheme).toBe("light");
+    expect(document.documentElement.style.getPropertyValue("--editorial-bg-page")).toBe(lightTokens.bgPage);
+    expect(document.documentElement.style.getPropertyValue("--editorial-accent")).toBe(lightTokens.accent);
+    expect(theme.themeConfig.value.token?.colorPrimary).toBe(lightTokens.accent);
+    expect(theme.themeConfig.value.token?.colorBgLayout).toBe(lightTokens.bgPage);
+    expect(theme.themeConfig.value.token?.colorBgContainer).toBe(lightTokens.bgPanelStrong);
+    expect(theme.themeConfig.value.token?.colorText).toBe(lightTokens.textMain);
+    expect(theme.themeConfig.value.token?.borderRadiusSM).toBe(Number.parseFloat(lightTokens.radiusSm));
+    expect(theme.themeConfig.value.token?.borderRadius).toBe(Number.parseFloat(lightTokens.radiusMd));
+    expect(theme.themeConfig.value.token?.borderRadiusLG).toBe(Number.parseFloat(lightTokens.radiusLg));
 
     theme.setThemeMode("dark");
     await nextTick();
 
+    expect(THEME_STORAGE_KEY).toBe("hot-now-theme");
     expect(theme.themeMode.value).toBe("dark");
     expect(theme.isDarkMode.value).toBe(true);
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
     expect(document.documentElement.dataset.theme).toBe("dark");
-    expect(document.documentElement.style.getPropertyValue("--editorial-bg-page")).toBe("#111722");
-    expect(document.documentElement.style.getPropertyValue("--editorial-accent")).toBe("#7ea2ff");
-    expect(theme.themeConfig.value.token?.colorPrimary).toBe("#7ea2ff");
-    expect(theme.themeConfig.value.token?.colorBgLayout).toBe("#111722");
-    expect(theme.themeConfig.value.token?.colorBgContainer).toBe("rgba(29, 38, 53, 0.98)");
-    expect(theme.themeConfig.value.token?.colorText).toBe("#eef3ff");
-    expect(theme.themeConfig.value.token?.borderRadius).toBe(14);
+    expect(document.documentElement.style.colorScheme).toBe("dark");
+    expect(document.documentElement.style.getPropertyValue("--editorial-bg-page")).toBe(darkTokens.bgPage);
+    expect(document.documentElement.style.getPropertyValue("--editorial-accent")).toBe(darkTokens.accent);
+    expect(theme.themeConfig.value.token?.colorPrimary).toBe(darkTokens.accent);
+    expect(theme.themeConfig.value.token?.colorBgLayout).toBe(darkTokens.bgPage);
+    expect(theme.themeConfig.value.token?.colorBgContainer).toBe(darkTokens.bgPanelStrong);
+    expect(theme.themeConfig.value.token?.colorText).toBe(darkTokens.textMain);
+    expect(theme.themeConfig.value.token?.borderRadiusSM).toBe(Number.parseFloat(darkTokens.radiusSm));
+    expect(theme.themeConfig.value.token?.borderRadius).toBe(Number.parseFloat(darkTokens.radiusMd));
+    expect(theme.themeConfig.value.token?.borderRadiusLG).toBe(Number.parseFloat(darkTokens.radiusLg));
 
     theme.toggleTheme();
     await nextTick();
@@ -54,6 +82,7 @@ describe("useTheme", () => {
     expect(theme.themeMode.value).toBe("light");
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("light");
     expect(document.documentElement.dataset.theme).toBe("light");
-    expect(document.documentElement.style.getPropertyValue("--editorial-bg-page")).toBe("#f4ede3");
+    expect(document.documentElement.style.colorScheme).toBe("light");
+    expect(document.documentElement.style.getPropertyValue("--editorial-bg-page")).toBe(lightTokens.bgPage);
   });
 });

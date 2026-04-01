@@ -4,7 +4,10 @@ import { createApp } from "vue";
 
 import App from "./App.vue";
 import { router } from "./router";
-import "./styles/editorialShell.css";
+import { bootstrapEditorialTheme } from "./composables/useTheme";
+import "./styles/tailwind.css";
+
+bootstrapEditorialTheme();
 
 const app = createApp(App);
 

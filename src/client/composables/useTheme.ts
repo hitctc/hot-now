@@ -2,10 +2,10 @@ import { computed, ref, watch, type ComputedRef, type Ref } from "vue";
 import type { ConfigProviderProps } from "ant-design-vue";
 
 import {
-  applyEditorialThemeCssVariables,
   createEditorialProviderTheme,
   type EditorialThemeMode
 } from "../theme/editorialTheme";
+import { createEditorialCssVariables } from "../theme/editorialTokens";
 
 export type ThemeMode = EditorialThemeMode;
 
@@ -42,6 +42,13 @@ function readPersistedThemeMode(): ThemeMode {
   }
 }
 
+// 页面挂载前先把主题状态写进 document，避免首屏等到组件 setup 后才补 CSS variables。
+export function bootstrapEditorialTheme(): ThemeMode {
+  const nextThemeMode = readPersistedThemeMode();
+  syncThemeModeToDocument(nextThemeMode);
+  return nextThemeMode;
+}
+
 // 把当前主题同步到本地存储和 document 根节点，供样式和测试共享同一份状态。
 function syncThemeModeToDocument(nextThemeMode: ThemeMode): void {
   if (typeof document === "undefined") {
@@ -49,7 +56,12 @@ function syncThemeModeToDocument(nextThemeMode: ThemeMode): void {
   }
 
   document.documentElement.dataset.theme = nextThemeMode;
-  applyEditorialThemeCssVariables(nextThemeMode, document.documentElement);
+  document.documentElement.style.colorScheme = nextThemeMode;
+  const cssVariables = createEditorialCssVariables(nextThemeMode);
+
+  for (const [name, value] of Object.entries(cssVariables)) {
+    document.documentElement.style.setProperty(name, value);
+  }
 }
 
 // 将主题偏好持久化到 localStorage，失败时静默回退，不阻断页面启动。

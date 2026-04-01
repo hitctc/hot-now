@@ -10,7 +10,6 @@ import { seedInitialData } from "../../src/core/db/seedInitialData.js";
 import { saveFeedbackPoolEntry } from "../../src/core/feedback/feedbackPoolRepository.js";
 import { saveFavorite, saveReaction } from "../../src/core/feedback/feedbackRepository.js";
 import { saveNlEvaluations } from "../../src/core/strategy/nlEvaluationRepository.js";
-import { saveViewRuleConfig } from "../../src/core/viewRules/viewRuleRepository.js";
 
 describe("listContentView", () => {
   const databasesToClose: ReturnType<typeof openDatabase>[] = [];
@@ -201,7 +200,7 @@ describe("listContentView", () => {
     expect(hotCards[1]?.title).toBe("Older hot item");
   });
 
-  it("changes the hot view limit after saving a new rule config", async () => {
+  it("keeps the hot view capped by the fixed internal limit and ignores persisted numeric rows", async () => {
     const db = await createTestDatabase();
     const source = resolveSourceByKind(db, "openai");
 
@@ -209,60 +208,38 @@ describe("listContentView", () => {
 
     upsertContentItems(db, {
       sourceId: source!.id,
-      items: [
-        {
-          title: "Limit item A",
-          canonicalUrl: "https://example.com/limit-item-a",
-          summary: "Short neutral summary.",
-          bodyMarkdown: "Compact neutral body text.",
-          publishedAt: "2026-03-29T11:00:00.000Z",
-          fetchedAt: "2026-03-29T11:05:00.000Z"
-        },
-        {
-          title: "Limit item B",
-          canonicalUrl: "https://example.com/limit-item-b",
-          summary: "Short neutral summary.",
-          bodyMarkdown: "Compact neutral body text.",
-          publishedAt: "2026-03-29T10:00:00.000Z",
-          fetchedAt: "2026-03-29T10:05:00.000Z"
-        },
-        {
-          title: "Limit item C",
-          canonicalUrl: "https://example.com/limit-item-c",
-          summary: "Short neutral summary.",
-          bodyMarkdown: "Compact neutral body text.",
-          publishedAt: "2026-03-29T09:00:00.000Z",
-          fetchedAt: "2026-03-29T09:05:00.000Z"
-        }
-      ]
+      items: Array.from({ length: 30 }, (_, index) => ({
+        title: `Limit item ${index + 1}`,
+        canonicalUrl: `https://example.com/limit-item-${index + 1}`,
+        summary: "Short neutral summary.",
+        bodyMarkdown: "Compact neutral body text.",
+        publishedAt: `2026-03-29T${String(23 - (index % 24)).padStart(2, "0")}:00:00.000Z`,
+        fetchedAt: `2026-03-29T${String(23 - (index % 24)).padStart(2, "0")}:05:00.000Z`
+      }))
     });
 
-    saveViewRuleConfig(db, "hot", {
-      limit: 1,
-      freshnessWindowDays: 3,
-      freshnessWeight: 0.35,
-      sourceWeight: 0.1,
-      completenessWeight: 0.1,
-      aiWeight: 0.05,
-      heatWeight: 0.4
-    });
+    db.prepare(
+      `
+        UPDATE view_rule_configs
+        SET config_json = ?
+        WHERE rule_key = 'hot'
+      `
+    ).run(
+      JSON.stringify({
+        limit: 1,
+        freshnessWindowDays: 1,
+        freshnessWeight: 1,
+        sourceWeight: 0,
+        completenessWeight: 0,
+        aiWeight: 0,
+        heatWeight: 0
+      })
+    );
 
-    expect(listContentView(db, "hot")).toHaveLength(1);
-
-    saveViewRuleConfig(db, "hot", {
-      limit: 2,
-      freshnessWindowDays: 3,
-      freshnessWeight: 0.35,
-      sourceWeight: 0.1,
-      completenessWeight: 0.1,
-      aiWeight: 0.05,
-      heatWeight: 0.4
-    });
-
-    expect(listContentView(db, "hot")).toHaveLength(2);
+    expect(listContentView(db, "hot")).toHaveLength(20);
   });
 
-  it("reorders the hot view when the saved weights favor completeness over freshness", async () => {
+  it("keeps the fixed hot ranking even if a stale numeric config row prefers completeness", async () => {
     const db = await createTestDatabase();
     const source = resolveSourceByKind(db, "openai");
 
@@ -295,77 +272,26 @@ describe("listContentView", () => {
     const defaultHotCards = listContentView(db, "hot");
     expect(defaultHotCards[0]?.title).toBe("Fresh quick blurb");
 
-    saveViewRuleConfig(db, "hot", {
-      limit: 20,
-      freshnessWindowDays: 3,
-      freshnessWeight: 0.05,
-      sourceWeight: 0.05,
-      completenessWeight: 0.7,
-      aiWeight: 0.05,
-      heatWeight: 0.15
-    });
+    db.prepare(
+      `
+        UPDATE view_rule_configs
+        SET config_json = ?
+        WHERE rule_key = 'hot'
+      `
+    ).run(
+      JSON.stringify({
+        limit: 20,
+        freshnessWindowDays: 30,
+        freshnessWeight: 0.05,
+        sourceWeight: 0.05,
+        completenessWeight: 0.7,
+        aiWeight: 0.05,
+        heatWeight: 0.15
+      })
+    );
 
     const weightedHotCards = listContentView(db, "hot");
-    expect(weightedHotCards[0]?.title).toBe("Complete deep analysis");
-  });
-
-  it("reorders the hot view when only the freshness window changes", async () => {
-    const db = await createTestDatabase();
-    const source = resolveSourceByKind(db, "openai");
-
-    expect(source).toBeDefined();
-
-    upsertContentItems(db, {
-      sourceId: source!.id,
-      items: [
-        {
-          title: "Fresh concise note",
-          canonicalUrl: "https://example.com/fresh-concise-note",
-          summary: "tiny",
-          bodyMarkdown: "",
-          publishedAt: "2026-03-29T11:00:00.000Z",
-          fetchedAt: "2026-03-29T11:05:00.000Z"
-        },
-        {
-          title: "Older complete brief",
-          canonicalUrl: "https://example.com/older-complete-brief",
-          summary:
-            "This longer summary gives enough background context to count as a fuller entry in the hot view tests.",
-          bodyMarkdown:
-            "Long-form neutral body text with enough detail and follow-up context to make this entry clearly more complete. ".repeat(
-              4
-            ),
-          publishedAt: "2026-03-24T10:00:00.000Z",
-          fetchedAt: "2026-03-24T10:05:00.000Z"
-        }
-      ]
-    });
-
-    saveViewRuleConfig(db, "hot", {
-      limit: 20,
-      freshnessWindowDays: 3,
-      freshnessWeight: 0.5,
-      sourceWeight: 0,
-      completenessWeight: 0.5,
-      aiWeight: 0,
-      heatWeight: 0
-    });
-
-    const shortWindowCards = listContentView(db, "hot");
-    expect(shortWindowCards[0]?.title).toBe("Fresh concise note");
-
-    saveViewRuleConfig(db, "hot", {
-      limit: 20,
-      freshnessWindowDays: 10,
-      freshnessWeight: 0.5,
-      sourceWeight: 0,
-      completenessWeight: 0.5,
-      aiWeight: 0,
-      heatWeight: 0
-    });
-
-    const longWindowCards = listContentView(db, "hot");
-    expect(longWindowCards[0]?.title).toBe("Older complete brief");
+    expect(weightedHotCards[0]?.title).toBe("Fresh quick blurb");
   });
 
   it("prioritizes the newly added domestic sources in their matching navigation views", async () => {
@@ -485,7 +411,7 @@ describe("listContentView", () => {
       contentItemId: globalBlockedId,
       evaluations: [
         {
-          scope: "global",
+          scope: "base",
           decision: "block",
           strengthLevel: "medium",
           scoreDelta: 0,
@@ -500,7 +426,7 @@ describe("listContentView", () => {
       contentItemId: aiBlockedId,
       evaluations: [
         {
-          scope: "ai",
+          scope: "ai_new",
           decision: "block",
           strengthLevel: "medium",
           scoreDelta: 0,
@@ -555,7 +481,7 @@ describe("listContentView", () => {
       contentItemId: boostedId,
       evaluations: [
         {
-          scope: "global",
+          scope: "base",
           decision: "boost",
           strengthLevel: "high",
           scoreDelta: 42,

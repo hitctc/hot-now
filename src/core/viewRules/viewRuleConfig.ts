@@ -158,6 +158,11 @@ export const defaultViewRuleDefinitions: DefaultViewRuleDefinition[] = [
 
 const defaultViewRuleByKey = new Map(defaultViewRuleDefinitions.map((rule) => [rule.ruleKey, rule] as const));
 
+// 内容排序仍保留这一组固定内部默认值，但不再暴露给设置页编辑。
+export function getInternalViewRuleConfig(ruleKey: string): ViewRuleConfigValues {
+  return defaultViewRuleByKey.get(isViewRuleKey(ruleKey) ? ruleKey : "hot")?.config ?? defaultViewRuleDefinitions[0].config;
+}
+
 export function isViewRuleKey(value: string): value is ViewRuleKey {
   return value === "hot" || value === "articles" || value === "ai";
 }

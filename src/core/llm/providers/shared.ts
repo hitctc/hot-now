@@ -99,9 +99,9 @@ export function createOpenAiCompatibleEvaluationProvider(
 
 function buildSystemPrompt(): string {
   return [
-    "You are evaluating HotNow content against four scopes: global, hot, articles, ai.",
+    "You are evaluating HotNow content against four scopes: base, ai_new, ai_hot, hero.",
     "Return strict JSON only.",
-    'Use this schema: {"evaluations":[{"scope":"global|hot|articles|ai","decision":"boost|penalize|block|neutral","strengthLevel":"low|medium|high|null","matchedKeywords":["string"],"reason":"string|null"}]}',
+    'Use this schema: {"evaluations":[{"scope":"base|ai_new|ai_hot|hero","decision":"boost|penalize|block|neutral","strengthLevel":"low|medium|high|null","matchedKeywords":["string"],"reason":"string|null"}]}',
     "Always return exactly four evaluations, one for each scope, in any order.",
     "If a scope has an empty rule text, return neutral with null strengthLevel, empty matchedKeywords, and null reason."
   ].join(" ");

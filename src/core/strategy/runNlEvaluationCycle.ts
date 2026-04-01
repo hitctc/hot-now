@@ -241,10 +241,10 @@ function readRuleSetMap(db: SqliteDatabase): Record<NlRuleScope, string> {
   const rules = listNlRuleSets(db);
 
   return {
-    global: rules.find((rule) => rule.scope === "global")?.ruleText ?? "",
-    hot: rules.find((rule) => rule.scope === "hot")?.ruleText ?? "",
-    articles: rules.find((rule) => rule.scope === "articles")?.ruleText ?? "",
-    ai: rules.find((rule) => rule.scope === "ai")?.ruleText ?? ""
+    base: rules.find((rule) => rule.scope === "base" && rule.enabled)?.ruleText ?? "",
+    ai_new: rules.find((rule) => rule.scope === "ai_new" && rule.enabled)?.ruleText ?? "",
+    ai_hot: rules.find((rule) => rule.scope === "ai_hot" && rule.enabled)?.ruleText ?? "",
+    hero: rules.find((rule) => rule.scope === "hero" && rule.enabled)?.ruleText ?? ""
   };
 }
 

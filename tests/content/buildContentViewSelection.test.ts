@@ -8,7 +8,7 @@ import { listContentView } from "../../src/core/content/listContentView.js";
 import { openDatabase } from "../../src/core/db/openDatabase.js";
 import { runMigrations } from "../../src/core/db/runMigrations.js";
 import { seedInitialData } from "../../src/core/db/seedInitialData.js";
-import { saveViewRuleConfig } from "../../src/core/viewRules/viewRuleRepository.js";
+import { saveNlEvaluations } from "../../src/core/strategy/nlEvaluationRepository.js";
 
 describe("buildContentViewSelection", () => {
   const databasesToClose: ReturnType<typeof openDatabase>[] = [];
@@ -172,19 +172,9 @@ describe("buildContentViewSelection", () => {
     ]);
   });
 
-  it("keeps the saved ranking order when no explicit sort mode is provided", async () => {
+  it("keeps ranking order from the internal defaults and ignores persisted numeric rule rows", async () => {
     const db = await createTestDatabase(databasesToClose);
     const openai = resolveSourceByKind(db, "openai");
-
-    saveViewRuleConfig(db, "hot", {
-      limit: 20,
-      freshnessWindowDays: 10,
-      freshnessWeight: 0.5,
-      sourceWeight: 0,
-      completenessWeight: 0.5,
-      aiWeight: 0,
-      heatWeight: 0
-    });
 
     upsertContentItems(db, {
       sourceId: openai!.id,
@@ -207,10 +197,47 @@ describe("buildContentViewSelection", () => {
         }
       ]
     });
+    db.prepare(
+      `
+        UPDATE view_rule_configs
+        SET config_json = ?
+        WHERE rule_key = 'hot'
+      `
+    ).run(
+      JSON.stringify({
+        limit: 1,
+        freshnessWindowDays: 1,
+        freshnessWeight: 1,
+        sourceWeight: 0,
+        completenessWeight: 0,
+        aiWeight: 0,
+        heatWeight: 0
+      })
+    );
+    const olderId = db
+      .prepare("SELECT id FROM content_items WHERE canonical_url = ? LIMIT 1")
+      .get("https://example.com/older-complete-brief") as { id: number };
+
+    saveNlEvaluations(db, {
+      contentItemId: olderId.id,
+      evaluations: [
+        {
+          scope: "base",
+          decision: "boost",
+          strengthLevel: "high",
+          scoreDelta: 42,
+          matchedKeywords: ["完整"],
+          reason: "基础入池门强命中",
+          providerKind: "deepseek",
+          evaluatedAt: "2026-03-31T04:00:00.000Z"
+        }
+      ]
+    });
 
     const selection = buildContentViewSelection(db, "hot");
 
     expect(selection.visibleCards[0]?.title).toBe("Older complete brief");
+    expect(selection.visibleCards).toHaveLength(2);
   });
 });
 

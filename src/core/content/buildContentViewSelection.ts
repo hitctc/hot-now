@@ -1,9 +1,13 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
 import { scoreContentItem, type ContentScoreBreakdown } from "./contentScoring.js";
-import { getViewRuleConfig } from "../viewRules/viewRuleRepository.js";
 import { BUILTIN_SOURCES } from "../source/sourceCatalog.js";
-import type { ViewRuleConfigValues } from "../viewRules/viewRuleConfig.js";
+import {
+  getInternalViewRuleConfig,
+  type ViewRuleConfigValues
+} from "../viewRules/viewRuleConfig.js";
 import type { ContentCardView, ContentViewKey } from "./listContentView.js";
+import type { NlEvaluationDecision } from "../strategy/nlEvaluationRepository.js";
+import type { StrategyGateScope } from "../strategy/strategyGateScopes.js";
 
 export type ContentViewSelectionOptions = {
   includeNlEvaluations?: boolean;
@@ -18,6 +22,8 @@ export type ContentSortMode = "published_at" | "content_score";
 export type RankedContentCardView = ContentCardView & {
   rankingScore: number;
   rankingTimestamp: string | null;
+  heroDecision: NlEvaluationDecision;
+  heroScoreDelta: number;
 };
 
 export type ContentViewSelection = {
@@ -49,10 +55,12 @@ type ContentCardRow = {
   feedbackPositiveKeywordsJson: string | null;
   feedbackNegativeKeywordsJson: string | null;
   rankingTimestamp: string | null;
-  globalDecision: string | null;
-  globalScoreDelta: number | null;
+  baseDecision: string | null;
+  baseScoreDelta: number | null;
   viewDecision: string | null;
   viewScoreDelta: number | null;
+  heroDecision: string | null;
+  heroScoreDelta: number | null;
 };
 
 const matchingSourceViewBonus = 120;
@@ -106,22 +114,27 @@ const contentSelectSql = `
     fp.strength_level AS feedbackStrengthLevel,
     fp.positive_keywords_json AS feedbackPositiveKeywordsJson,
     fp.negative_keywords_json AS feedbackNegativeKeywordsJson,
-    global_eval.decision AS globalDecision,
-    global_eval.score_delta AS globalScoreDelta,
+    base_eval.decision AS baseDecision,
+    base_eval.score_delta AS baseScoreDelta,
     view_eval.decision AS viewDecision,
     view_eval.score_delta AS viewScoreDelta,
+    hero_eval.decision AS heroDecision,
+    hero_eval.score_delta AS heroScoreDelta,
     COALESCE(ci.published_at, ci.fetched_at, ci.created_at) AS rankingTimestamp
   FROM content_items ci
   JOIN content_sources cs ON cs.id = ci.source_id
   LEFT JOIN latest_favorite ON latest_favorite.content_item_id = ci.id
   LEFT JOIN latest_reaction ON latest_reaction.content_item_id = ci.id
   LEFT JOIN feedback_pool fp ON fp.content_item_id = ci.id
-  LEFT JOIN content_nl_evaluations global_eval
-    ON global_eval.content_item_id = ci.id
-   AND global_eval.scope = 'global'
+  LEFT JOIN content_nl_evaluations base_eval
+    ON base_eval.content_item_id = ci.id
+   AND base_eval.scope = 'base'
   LEFT JOIN content_nl_evaluations view_eval
     ON view_eval.content_item_id = ci.id
    AND view_eval.scope = @viewScope
+  LEFT JOIN content_nl_evaluations hero_eval
+    ON hero_eval.content_item_id = ci.id
+   AND hero_eval.scope = 'hero'
   ORDER BY datetime(COALESCE(ci.published_at, ci.fetched_at, ci.created_at)) DESC, ci.id DESC
 `;
 
@@ -131,12 +144,14 @@ export function buildContentViewSelection(
   options: ContentViewSelectionOptions = {}
 ): ContentViewSelection {
   // Shared selection keeps one exact candidate/visible pipeline for content pages and system analytics.
-  const viewRuleConfig = getViewRuleConfig(db, viewKey);
+  const viewRuleConfig = getInternalViewRuleConfig(viewKey);
   const referenceTime = options.referenceTime ?? new Date();
   const includeNlEvaluations = options.includeNlEvaluations ?? true;
   const sortMode = options.sortMode;
   const selectedSourceKinds = normalizeSelectedSourceKinds(options.selectedSourceKinds);
-  const rows = db.prepare(contentSelectSql).all({ viewScope: viewKey }) as ContentCardRow[];
+  const rows = db
+    .prepare(contentSelectSql)
+    .all({ viewScope: mapViewScope(viewKey) }) as ContentCardRow[];
   const rankedCards = rows
     .map((row) =>
       buildRankedCardCandidate(row, {
@@ -220,12 +235,14 @@ function buildRankedCardCandidate(
       row.sourceKind,
       row.rankingTimestamp,
       context.referenceTime,
-      context.includeNlEvaluations ? (row.globalScoreDelta ?? 0) + (row.viewScoreDelta ?? 0) : 0
+      context.includeNlEvaluations ? (row.baseScoreDelta ?? 0) + (row.viewScoreDelta ?? 0) : 0
     ),
     rankingTimestamp: row.rankingTimestamp,
+    heroDecision: normalizeNlDecision(row.heroDecision),
+    heroScoreDelta: context.includeNlEvaluations ? (row.heroScoreDelta ?? 0) : 0,
     isBlocked:
       context.includeNlEvaluations &&
-      (normalizeNlDecision(row.globalDecision) === "block" || normalizeNlDecision(row.viewDecision) === "block")
+      (normalizeNlDecision(row.baseDecision) === "block" || normalizeNlDecision(row.viewDecision) === "block")
   };
 }
 
@@ -255,6 +272,19 @@ function compareByRanking(left: RankedContentCardCandidate, right: RankedContent
 function normalizeReaction(value: string | null): "like" | "dislike" | "none" {
   // Unknown legacy values degrade to `none` so view rendering stays stable.
   return value === "like" || value === "dislike" ? value : "none";
+}
+
+// 旧内容 view key 仍保留在内部排序层，正式自然语言策略只再认新的 gate scope。
+function mapViewScope(viewKey: ContentViewKey): StrategyGateScope | null {
+  if (viewKey === "ai") {
+    return "ai_new";
+  }
+
+  if (viewKey === "hot") {
+    return "ai_hot";
+  }
+
+  return null;
 }
 
 function normalizeSuggestedEffect(value: string | null): "boost" | "penalize" | "block" | "neutral" | null {

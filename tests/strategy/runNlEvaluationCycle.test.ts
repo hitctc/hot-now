@@ -21,7 +21,10 @@ describe("runNlEvaluationCycle", () => {
       title: "Agent workflow",
       canonicalUrl: "https://example.com/agent-workflow"
     });
-    saveNlRuleSet(handle.db, "global", "保留 agent workflow 相关内容。");
+    saveNlRuleSet(handle.db, "base", {
+      enabled: true,
+      ruleText: "保留 agent workflow 相关内容。"
+    });
 
     const result = await runNlEvaluationCycle(
       handle.db,
@@ -72,36 +75,42 @@ describe("runNlEvaluationCycle", () => {
       title: "Funding flash",
       canonicalUrl: "https://example.com/funding-flash"
     });
-    saveNlRuleSet(handle.db, "global", "融资快讯先不要展示，agent workflow 相关内容加分。");
-    saveNlRuleSet(handle.db, "ai", "AI 页优先保留 agent 与模型工程内容。");
+    saveNlRuleSet(handle.db, "base", {
+      enabled: true,
+      ruleText: "融资快讯先不要展示，agent workflow 相关内容加分。"
+    });
+    saveNlRuleSet(handle.db, "ai_new", {
+      enabled: true,
+      ruleText: "AI 页优先保留 agent 与模型工程内容。"
+    });
 
     const evaluateContent = vi.fn(async ({ content }: { content: { title: string } }) => {
       if (content.title === "Agent workflow update") {
         return {
           evaluations: [
             {
-              scope: "global" as const,
+              scope: "base" as const,
               decision: "boost" as const,
               strengthLevel: "medium" as const,
               matchedKeywords: ["agent", "workflow"],
               reason: "命中 agent workflow 偏好"
             },
             {
-              scope: "hot" as const,
+              scope: "ai_hot" as const,
               decision: "neutral" as const,
               strengthLevel: null,
               matchedKeywords: [],
               reason: null
             },
             {
-              scope: "articles" as const,
+              scope: "hero" as const,
               decision: "neutral" as const,
               strengthLevel: null,
               matchedKeywords: [],
               reason: null
             },
             {
-              scope: "ai" as const,
+              scope: "ai_new" as const,
               decision: "boost" as const,
               strengthLevel: "high" as const,
               matchedKeywords: ["agent"],
@@ -114,28 +123,28 @@ describe("runNlEvaluationCycle", () => {
       return {
         evaluations: [
           {
-            scope: "global" as const,
+            scope: "base" as const,
             decision: "block" as const,
             strengthLevel: "medium" as const,
             matchedKeywords: ["融资"],
             reason: "命中融资快讯屏蔽"
           },
           {
-            scope: "hot" as const,
+            scope: "ai_hot" as const,
             decision: "neutral" as const,
             strengthLevel: null,
             matchedKeywords: [],
             reason: null
           },
           {
-            scope: "articles" as const,
+            scope: "hero" as const,
             decision: "neutral" as const,
             strengthLevel: null,
             matchedKeywords: [],
             reason: null
           },
           {
-            scope: "ai" as const,
+            scope: "ai_new" as const,
             decision: "penalize" as const,
             strengthLevel: "low" as const,
             matchedKeywords: ["融资"],
@@ -174,18 +183,7 @@ describe("runNlEvaluationCycle", () => {
     expect(listNlEvaluationsForContent(handle.db, boostedContentId)).toEqual([
       {
         contentItemId: boostedContentId,
-        scope: "ai",
-        decision: "boost",
-        strengthLevel: "high",
-        scoreDelta: 42,
-        matchedKeywords: ["agent"],
-        reason: "AI 页强相关",
-        providerKind: "deepseek",
-        evaluatedAt: "2026-03-31T10:00:00.000Z"
-      },
-      {
-        contentItemId: boostedContentId,
-        scope: "articles",
+        scope: "ai_hot",
         decision: "neutral",
         strengthLevel: null,
         scoreDelta: 0,
@@ -196,7 +194,18 @@ describe("runNlEvaluationCycle", () => {
       },
       {
         contentItemId: boostedContentId,
-        scope: "global",
+        scope: "ai_new",
+        decision: "boost",
+        strengthLevel: "high",
+        scoreDelta: 42,
+        matchedKeywords: ["agent"],
+        reason: "AI 页强相关",
+        providerKind: "deepseek",
+        evaluatedAt: "2026-03-31T10:00:00.000Z"
+      },
+      {
+        contentItemId: boostedContentId,
+        scope: "base",
         decision: "boost",
         strengthLevel: "medium",
         scoreDelta: 24,
@@ -207,7 +216,7 @@ describe("runNlEvaluationCycle", () => {
       },
       {
         contentItemId: boostedContentId,
-        scope: "hot",
+        scope: "hero",
         decision: "neutral",
         strengthLevel: null,
         scoreDelta: 0,
@@ -220,12 +229,12 @@ describe("runNlEvaluationCycle", () => {
     expect(listNlEvaluationsForContent(handle.db, blockedContentId)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          scope: "global",
+          scope: "base",
           decision: "block",
           scoreDelta: 0
         }),
         expect.objectContaining({
-          scope: "ai",
+          scope: "ai_new",
           decision: "penalize",
           scoreDelta: -10
         })
@@ -245,7 +254,10 @@ describe("runNlEvaluationCycle", () => {
       title: "Broken content",
       canonicalUrl: "https://example.com/broken-content"
     });
-    saveNlRuleSet(handle.db, "global", "保留稳定内容。");
+    saveNlRuleSet(handle.db, "base", {
+      enabled: true,
+      ruleText: "保留稳定内容。"
+    });
 
     const result = await runNlEvaluationCycle(
       handle.db,
@@ -266,28 +278,28 @@ describe("runNlEvaluationCycle", () => {
               return {
                 evaluations: [
                   {
-                    scope: "global" as const,
+                    scope: "base" as const,
                     decision: "boost" as const,
                     strengthLevel: "low" as const,
                     matchedKeywords: ["稳定"],
                     reason: "主规则命中"
                   },
                   {
-                    scope: "hot" as const,
+                    scope: "ai_hot" as const,
                     decision: "neutral" as const,
                     strengthLevel: null,
                     matchedKeywords: [],
                     reason: null
                   },
                   {
-                    scope: "articles" as const,
+                    scope: "hero" as const,
                     decision: "neutral" as const,
                     strengthLevel: null,
                     matchedKeywords: [],
                     reason: null
                   },
                   {
-                    scope: "ai" as const,
+                    scope: "ai_new" as const,
                     decision: "neutral" as const,
                     strengthLevel: null,
                     matchedKeywords: [],

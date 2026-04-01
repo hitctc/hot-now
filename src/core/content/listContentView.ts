@@ -30,5 +30,13 @@ export function listContentView(
   options: ContentViewSelectionOptions = {}
 ): ContentCardView[] {
   // The public content API still returns only the visible cards so existing callers stay unchanged.
-  return buildContentViewSelection(db, viewKey, options).visibleCards.map(({ rankingScore: _rankingScore, rankingTimestamp: _rankingTimestamp, ...card }) => card);
+  return buildContentViewSelection(db, viewKey, options).visibleCards.map(
+    ({
+      rankingScore: _rankingScore,
+      rankingTimestamp: _rankingTimestamp,
+      heroDecision: _heroDecision,
+      heroScoreDelta: _heroScoreDelta,
+      ...card
+    }) => card
+  );
 }

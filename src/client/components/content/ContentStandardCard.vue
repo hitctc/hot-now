@@ -5,6 +5,11 @@ import ContentActionBar from "./ContentActionBar.vue";
 import ContentFeedbackPanel from "./ContentFeedbackPanel.vue";
 import {
   cloneContentCard,
+  editorialContentBadgeClass,
+  editorialContentCardClass,
+  editorialContentFeedbackSummaryClass,
+  editorialContentMetaClass,
+  editorialContentScoreBadgeClass,
   formatFeedbackSummary,
   formatPublishedAt,
   readSafeUrl
@@ -101,29 +106,39 @@ const feedbackSummary = computed(() => formatFeedbackSummary(cardState.feedbackE
 
 <template>
   <a-card
-    class="content-card content-card--standard"
     :bordered="false"
+    :class="[editorialContentCardClass, 'overflow-hidden']"
     :data-content-id="cardState.id"
     data-content-variant="standard"
   >
-    <a-space direction="vertical" size="middle" class="content-card__stack">
-      <div class="content-card__meta">
-        <a-tag color="blue">{{ cardState.sourceName }}</a-tag>
-        <a-typography-text type="secondary">{{ publishedText }}</a-typography-text>
+    <div class="flex flex-col gap-4">
+      <div :class="editorialContentMetaClass">
+        <span :class="editorialContentBadgeClass">{{ cardState.sourceName }}</span>
+        <span>{{ publishedText }}</span>
+        <span :class="editorialContentScoreBadgeClass">系统分 {{ cardState.contentScore }}</span>
       </div>
 
-      <a-typography-title :level="4" class="content-card__title">
-        <a v-if="safeUrl" :href="safeUrl" target="_blank" rel="noreferrer">{{ cardState.title }}</a>
+      <h3 class="text-xl font-semibold leading-tight text-editorial-text-main">
+        <a
+          v-if="safeUrl"
+          :href="safeUrl"
+          target="_blank"
+          rel="noreferrer"
+          class="text-current no-underline transition hover:text-editorial-accent hover:no-underline"
+        >
+          {{ cardState.title }}
+        </a>
         <span v-else>{{ cardState.title }}</span>
-      </a-typography-title>
+      </h3>
 
-      <a-typography-paragraph class="content-card__summary">
+      <p class="m-0 text-[15px] leading-7 text-editorial-text-body">
         {{ cardState.summary }}
-      </a-typography-paragraph>
+      </p>
 
-      <div class="content-card__badges">
-        <a-tag color="processing">系统分 {{ cardState.contentScore }}</a-tag>
-        <a-tag v-for="badge in cardState.scoreBadges" :key="badge">{{ badge }}</a-tag>
+      <div class="flex flex-wrap gap-2">
+        <span v-for="badge in cardState.scoreBadges" :key="badge" :class="editorialContentBadgeClass">
+          {{ badge }}
+        </span>
       </div>
 
       <ContentActionBar
@@ -137,11 +152,11 @@ const feedbackSummary = computed(() => formatFeedbackSummary(cardState.feedbackE
         @toggle-feedback="feedbackOpen = !feedbackOpen"
       />
 
-      <div v-if="feedbackSummary" class="content-card__feedback-summary">
-        <a-typography-text type="secondary">反馈池建议</a-typography-text>
-        <a-typography-paragraph class="content-card__feedback-summary-text">
+      <div v-if="feedbackSummary" :class="editorialContentFeedbackSummaryClass">
+        <span class="text-xs font-semibold uppercase tracking-[0.18em] text-editorial-text-muted">反馈池建议</span>
+        <p class="m-0 text-sm leading-6 text-editorial-text-body">
           {{ feedbackSummary }}
-        </a-typography-paragraph>
+        </p>
       </div>
 
       <ContentFeedbackPanel
@@ -151,66 +166,6 @@ const feedbackSummary = computed(() => formatFeedbackSummary(cardState.feedbackE
         :submitting="isBusy"
         @submit="handleFeedbackSubmit"
       />
-    </a-space>
+    </div>
   </a-card>
 </template>
-
-<style scoped>
-.content-card {
-  border-radius: 22px;
-  border: 1px solid var(--editorial-border);
-  background: var(--editorial-bg-panel);
-  box-shadow: var(--editorial-shadow-card);
-}
-
-.content-card--standard {
-  padding: 2px;
-}
-
-.content-card__stack {
-  width: 100%;
-}
-
-.content-card__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.content-card__title {
-  margin: 0;
-}
-
-.content-card__title :deep(a) {
-  color: inherit;
-}
-
-.content-card__summary {
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.7;
-  color: var(--editorial-text-body);
-}
-
-.content-card__badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.content-card__feedback-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
-  border-radius: var(--editorial-radius-lg);
-  background: var(--editorial-bg-control);
-  border: 1px solid var(--editorial-border);
-}
-
-.content-card__feedback-summary-text {
-  margin: 0;
-  color: var(--editorial-text-body);
-}
-</style>

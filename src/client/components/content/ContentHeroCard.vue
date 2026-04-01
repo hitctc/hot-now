@@ -3,7 +3,18 @@ import { computed, reactive, ref, watch } from "vue";
 
 import ContentActionBar from "./ContentActionBar.vue";
 import ContentFeedbackPanel from "./ContentFeedbackPanel.vue";
-import { cloneContentCard, formatFeedbackSummary, formatPublishedAt, readSafeUrl } from "./contentCardShared";
+import {
+  cloneContentCard,
+  editorialContentBadgeClass,
+  editorialContentCardClass,
+  editorialContentFeedbackSummaryClass,
+  editorialContentInsetPanelClass,
+  editorialContentMetaClass,
+  editorialContentScoreBadgeClass,
+  formatFeedbackSummary,
+  formatPublishedAt,
+  readSafeUrl
+} from "./contentCardShared";
 import {
   saveFavorite,
   saveFeedbackPoolEntry,
@@ -96,110 +107,72 @@ const feedbackSummary = computed(() => formatFeedbackSummary(cardState.feedbackE
 
 <template>
   <a-card
-    class="content-card content-card--hero"
     :bordered="false"
+    :class="[editorialContentCardClass, 'overflow-hidden']"
     :data-content-id="cardState.id"
     data-content-variant="hero"
   >
-    <a-space direction="vertical" size="middle" class="content-card__stack">
-      <div class="content-card__meta">
-        <a-tag color="blue">{{ cardState.sourceName }}</a-tag>
-        <a-typography-text type="secondary">{{ publishedText }}</a-typography-text>
+    <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-6">
+      <div class="flex flex-col gap-4">
+        <div :class="editorialContentMetaClass">
+          <span :class="editorialContentBadgeClass">{{ cardState.sourceName }}</span>
+          <span>{{ publishedText }}</span>
+          <span :class="editorialContentScoreBadgeClass">系统分 {{ cardState.contentScore }}</span>
+        </div>
+
+        <div class="flex flex-col gap-3">
+          <h2 class="text-[1.85rem] font-semibold leading-tight tracking-tight text-editorial-text-main md:text-[2rem]">
+            <a
+              v-if="safeUrl"
+              :href="safeUrl"
+              target="_blank"
+              rel="noreferrer"
+              class="text-current no-underline transition hover:text-editorial-accent hover:no-underline"
+            >
+              {{ cardState.title }}
+            </a>
+            <span v-else>{{ cardState.title }}</span>
+          </h2>
+
+          <p class="m-0 text-base leading-7 text-editorial-text-body">
+            {{ cardState.summary }}
+          </p>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          <span v-for="badge in cardState.scoreBadges" :key="badge" :class="editorialContentBadgeClass">
+            {{ badge }}
+          </span>
+        </div>
+
+        <div v-if="feedbackSummary" :class="editorialContentFeedbackSummaryClass">
+          <span class="text-xs font-semibold uppercase tracking-[0.18em] text-editorial-text-muted">反馈池建议</span>
+          <p class="m-0 text-sm leading-6 text-editorial-text-body">
+            {{ feedbackSummary }}
+          </p>
+        </div>
       </div>
 
-      <a-typography-title :level="2" class="content-card__title">
-        <a v-if="safeUrl" :href="safeUrl" target="_blank" rel="noreferrer">{{ cardState.title }}</a>
-        <span v-else>{{ cardState.title }}</span>
-      </a-typography-title>
+      <div :class="[editorialContentInsetPanelClass, 'flex h-full flex-col gap-4 px-4 py-4']">
+        <ContentActionBar
+          :is-favorited="cardState.isFavorited"
+          :reaction="cardState.reaction"
+          :is-busy="isBusy"
+          :feedback-open="feedbackOpen"
+          :status-text="statusText"
+          @favorite="handleFavorite"
+          @reaction="handleReaction"
+          @toggle-feedback="feedbackOpen = !feedbackOpen"
+        />
 
-      <a-typography-paragraph class="content-card__summary">
-        {{ cardState.summary }}
-      </a-typography-paragraph>
-
-      <div class="content-card__badges">
-        <a-tag color="processing">系统分 {{ cardState.contentScore }}</a-tag>
-        <a-tag v-for="badge in cardState.scoreBadges" :key="badge">{{ badge }}</a-tag>
+        <ContentFeedbackPanel
+          v-if="feedbackOpen"
+          :model-value="cardState.feedbackEntry"
+          :reaction-snapshot="cardState.reaction"
+          :submitting="isBusy"
+          @submit="handleFeedbackSubmit"
+        />
       </div>
-
-      <ContentActionBar
-        :is-favorited="cardState.isFavorited"
-        :reaction="cardState.reaction"
-        :is-busy="isBusy"
-        :feedback-open="feedbackOpen"
-        :status-text="statusText"
-        @favorite="handleFavorite"
-        @reaction="handleReaction"
-        @toggle-feedback="feedbackOpen = !feedbackOpen"
-      />
-
-      <div v-if="feedbackSummary" class="content-card__feedback-summary">
-        <a-typography-text type="secondary">反馈池建议</a-typography-text>
-        <a-typography-paragraph class="content-card__feedback-summary-text">
-          {{ feedbackSummary }}
-        </a-typography-paragraph>
-      </div>
-
-      <ContentFeedbackPanel
-        v-if="feedbackOpen"
-        :model-value="cardState.feedbackEntry"
-        :reaction-snapshot="cardState.reaction"
-        :submitting="isBusy"
-        @submit="handleFeedbackSubmit"
-      />
-    </a-space>
+    </div>
   </a-card>
 </template>
-
-<style scoped>
-.content-card {
-  border-radius: 22px;
-  border: 1px solid var(--editorial-border);
-  background: var(--editorial-bg-panel);
-  box-shadow: var(--editorial-shadow-card);
-}
-
-.content-card__stack {
-  width: 100%;
-}
-
-.content-card__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.content-card__title {
-  margin: 0;
-}
-
-.content-card__title :deep(a) {
-  color: inherit;
-}
-
-.content-card__summary {
-  margin: 0;
-  font-size: 16px;
-}
-
-.content-card__badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.content-card__feedback-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
-  border-radius: var(--editorial-radius-lg);
-  background: var(--editorial-bg-control);
-  border: 1px solid var(--editorial-border);
-}
-
-.content-card__feedback-summary-text {
-  margin: 0;
-  color: var(--editorial-text-body);
-}
-</style>

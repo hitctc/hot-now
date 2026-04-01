@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { reactive, watch } from "vue";
 
+import { editorialContentSubpanelClass } from "./contentCardShared";
+
 import type { ContentFeedbackEntry, ContentFeedbackSuggestedEffect, ContentFeedbackStrengthLevel, ContentReaction } from "../../services/contentApi";
 
 const props = defineProps<{
@@ -58,13 +60,13 @@ watch(() => props.modelValue, syncFormState, { immediate: true, deep: true });
 </script>
 
 <template>
-  <a-form layout="vertical" class="content-feedback-panel" @finish="handleSubmit">
-    <a-form-item label="反馈说明">
+  <a-form layout="vertical" :class="[editorialContentSubpanelClass, 'flex flex-col gap-4 px-4 py-4']" @finish="handleSubmit">
+    <a-form-item class="!mb-0" label="反馈说明">
       <a-textarea v-model:value="formState.freeText" :rows="3" placeholder="补充为什么值得加分、减分或屏蔽。" />
     </a-form-item>
 
-    <div class="content-feedback-panel__grid">
-      <a-form-item label="建议动作">
+    <div class="grid gap-x-3 gap-y-0 md:grid-cols-2">
+      <a-form-item class="!mb-0" label="建议动作">
         <a-select v-model:value="formState.suggestedEffect">
           <a-select-option value="">未设置</a-select-option>
           <a-select-option value="boost">加分</a-select-option>
@@ -74,7 +76,7 @@ watch(() => props.modelValue, syncFormState, { immediate: true, deep: true });
         </a-select>
       </a-form-item>
 
-      <a-form-item label="强度">
+      <a-form-item class="!mb-0" label="强度">
         <a-select v-model:value="formState.strengthLevel">
           <a-select-option value="">未设置</a-select-option>
           <a-select-option value="high">高</a-select-option>
@@ -83,31 +85,22 @@ watch(() => props.modelValue, syncFormState, { immediate: true, deep: true });
         </a-select>
       </a-form-item>
 
-      <a-form-item label="关键词加分">
+      <a-form-item class="!mb-0" label="关键词加分">
         <a-input v-model:value="formState.positiveKeywords" placeholder="agent, workflow" />
       </a-form-item>
 
-      <a-form-item label="关键词减分">
+      <a-form-item class="!mb-0" label="关键词减分">
         <a-input v-model:value="formState.negativeKeywords" placeholder="融资, 快讯" />
       </a-form-item>
     </div>
 
-    <a-button type="primary" html-type="submit" :loading="submitting">
+    <a-button
+      type="primary"
+      html-type="submit"
+      :loading="submitting"
+      class="!w-full !rounded-editorial-pill !px-4 !py-2 !text-sm !font-semibold md:!w-auto"
+    >
       保存反馈池建议
     </a-button>
   </a-form>
 </template>
-
-<style scoped>
-.content-feedback-panel__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 12px;
-}
-
-@media (max-width: 900px) {
-  .content-feedback-panel__grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

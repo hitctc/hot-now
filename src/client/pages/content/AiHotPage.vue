@@ -4,6 +4,11 @@ import { computed, onMounted, ref } from "vue";
 import ContentEmptyState from "../../components/content/ContentEmptyState.vue";
 import ContentSourceFilterBar from "../../components/content/ContentSourceFilterBar.vue";
 import ContentStandardCard from "../../components/content/ContentStandardCard.vue";
+import {
+  editorialContentIntroSectionClass,
+  editorialContentListSectionClass,
+  editorialContentPageClass
+} from "../../components/content/contentCardShared";
 import { HttpError } from "../../services/http";
 import {
   readAiHotPage,
@@ -123,91 +128,41 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="content-page content-page--ai-hot" data-content-page="ai-hot">
-    <a-card class="content-page__intro" :bordered="false">
-      <div class="content-page__intro-stack">
-        <a-typography-text class="content-page__kicker" type="secondary">AI 热点</a-typography-text>
-        <a-typography-title :level="2" class="content-page__title">AI 热度已经起来了，再来这里看聚合结果</a-typography-title>
-        <a-typography-paragraph class="content-page__description">
-          这里承接已经形成热度的 AI 新闻、模型、事件和智能体，按卡片流快速浏览，再决定要不要深入。
-        </a-typography-paragraph>
-      </div>
-    </a-card>
+  <div :class="editorialContentPageClass" data-content-page="ai-hot">
+    <section :class="editorialContentIntroSectionClass">
+      <p class="m-0 text-xs font-semibold uppercase tracking-[0.24em] text-editorial-text-muted">AI 热点</p>
+      <h1 class="mt-3 text-3xl font-semibold tracking-tight text-editorial-text-main">
+        AI 热度已经起来了，再来这里看聚合结果
+      </h1>
+      <p class="mt-3 max-w-3xl text-base leading-7 text-editorial-text-body">
+        这里承接已经形成热度的 AI 新闻、模型、事件和智能体，按卡片流快速浏览，再决定要不要深入。
+      </p>
+    </section>
 
     <a-alert v-if="hasLoadError && pageModel" type="warning" show-icon :message="loadError" banner />
 
-    <ContentSourceFilterBar
-      v-if="sourceFilter"
-      :options="sourceFilter.options"
-      :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
-      @change="handleSourceKindsChange"
-    />
+    <div v-if="sourceFilter" class="sticky top-[4.25rem] z-10" data-content-filter-shell>
+      <ContentSourceFilterBar
+        :options="sourceFilter.options"
+        :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
+        @change="handleSourceKindsChange"
+      />
+    </div>
 
     <a-skeleton v-if="isLoading" active :paragraph="{ rows: 6 }" />
 
     <ContentEmptyState v-else-if="displayState" :state="displayState" data-content-empty-state />
 
     <template v-else-if="pageModel">
-      <ContentEmptyState
-        v-if="listCards.length === 0 && displayState"
-        :state="displayState"
-        data-content-empty-state
-      />
-
-      <div v-else class="content-page__list" data-content-section="list">
+      <section
+        v-if="listCards.length > 0"
+        :class="editorialContentListSectionClass"
+        data-content-section="list"
+      >
         <ContentStandardCard v-for="card in listCards" :key="card.id" :card="card" />
-      </div>
+      </section>
     </template>
 
-    <a-spin v-if="isRefreshing" class="content-page__refresh" />
+    <a-spin v-if="isRefreshing" class="self-start" />
   </div>
 </template>
-
-<style scoped>
-.content-page {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.content-page__intro {
-  border-radius: 24px;
-  border: 1px solid var(--editorial-border);
-  background: linear-gradient(135deg, rgba(35, 82, 255, 0.08), rgba(255, 106, 42, 0.05)),
-    var(--editorial-bg-panel);
-  box-shadow: var(--editorial-shadow-page);
-}
-
-.content-page__intro-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.content-page__kicker {
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.content-page__title {
-  margin: 0;
-}
-
-.content-page__description {
-  margin: 0;
-  max-width: 64ch;
-  color: var(--editorial-text-body);
-  line-height: 1.8;
-}
-
-.content-page__list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.content-page__refresh {
-  align-self: flex-start;
-}
-</style>

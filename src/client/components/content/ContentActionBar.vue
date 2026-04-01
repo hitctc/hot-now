@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import {
+  editorialContentControlButtonActiveClass,
+  editorialContentControlButtonClass,
+  editorialContentControlButtonIdleClass
+} from "./contentCardShared";
+
 import type { ContentReaction } from "../../services/contentApi";
 
 const props = defineProps<{
@@ -17,12 +23,15 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="content-action-bar">
-    <a-space wrap size="small">
+  <div class="flex flex-col gap-3">
+    <div class="flex flex-wrap gap-2">
       <a-button
         data-content-action="favorite"
         size="small"
-        :type="isFavorited ? 'primary' : 'default'"
+        :class="[
+          editorialContentControlButtonClass,
+          isFavorited ? editorialContentControlButtonActiveClass : editorialContentControlButtonIdleClass
+        ]"
         :loading="isBusy"
         @click="emit('favorite')"
       >
@@ -32,7 +41,10 @@ const emit = defineEmits<{
         data-content-action="reaction"
         data-reaction="like"
         size="small"
-        :type="reaction === 'like' ? 'primary' : 'default'"
+        :class="[
+          editorialContentControlButtonClass,
+          reaction === 'like' ? editorialContentControlButtonActiveClass : editorialContentControlButtonIdleClass
+        ]"
         :loading="isBusy"
         @click="emit('reaction', 'like')"
       >
@@ -42,31 +54,30 @@ const emit = defineEmits<{
         data-content-action="reaction"
         data-reaction="dislike"
         size="small"
-        :type="reaction === 'dislike' ? 'primary' : 'default'"
+        :class="[
+          editorialContentControlButtonClass,
+          reaction === 'dislike' ? editorialContentControlButtonActiveClass : editorialContentControlButtonIdleClass
+        ]"
         :loading="isBusy"
         @click="emit('reaction', 'dislike')"
       >
         点踩
       </a-button>
-      <a-button data-content-action="feedback-panel-toggle" size="small" :ghost="!feedbackOpen" @click="emit('toggleFeedback')">
+      <a-button
+        data-content-action="feedback-panel-toggle"
+        size="small"
+        :class="[
+          editorialContentControlButtonClass,
+          feedbackOpen ? editorialContentControlButtonActiveClass : editorialContentControlButtonIdleClass
+        ]"
+        @click="emit('toggleFeedback')"
+      >
         {{ feedbackOpen ? "收起反馈" : "补充反馈" }}
       </a-button>
-    </a-space>
+    </div>
 
-    <a-typography-text v-if="statusText" class="content-action-bar__status" type="secondary">
+    <p v-if="statusText" class="m-0 text-xs leading-5 text-editorial-text-muted">
       {{ statusText }}
-    </a-typography-text>
+    </p>
   </div>
 </template>
-
-<style scoped>
-.content-action-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.content-action-bar__status {
-  font-size: 12px;
-}
-</style>

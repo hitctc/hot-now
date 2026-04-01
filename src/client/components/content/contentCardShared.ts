@@ -1,5 +1,49 @@
 import type { ContentCard, ContentFeedbackEntry } from "../../services/contentApi";
 
+// 这些常量把内容页常用的卡片、标签和按钮样式集中起来，避免每个组件重复拼一长串 Tailwind class。
+export const editorialContentPanelClass =
+  "rounded-editorial-xl border border-editorial-border bg-editorial-panel";
+
+export const editorialContentCardClass = `${editorialContentPanelClass} shadow-editorial-card`;
+
+export const editorialContentFloatingPanelClass = `${editorialContentPanelClass} shadow-editorial-floating`;
+
+export const editorialContentInsetPanelClass =
+  "rounded-editorial-lg border border-editorial-border bg-editorial-control";
+
+export const editorialContentSubpanelClass =
+  "rounded-editorial-lg border border-editorial-border bg-editorial-panel-strong";
+
+export const editorialContentMetaClass =
+  "flex flex-wrap items-center gap-2 text-xs font-medium text-editorial-text-muted";
+
+export const editorialContentBadgeClass =
+  "inline-flex items-center rounded-editorial-pill border border-editorial-border bg-editorial-control px-3 py-1 text-xs font-semibold leading-5 text-editorial-text-body";
+
+export const editorialContentScoreBadgeClass =
+  "inline-flex items-center rounded-editorial-pill bg-editorial-link px-3 py-1 text-xs font-semibold leading-5 text-editorial-accent";
+
+export const editorialContentFeedbackSummaryClass =
+  "flex flex-col gap-2 rounded-editorial-lg border border-editorial-border bg-editorial-control px-4 py-3";
+
+export const editorialContentControlButtonClass =
+  "!inline-flex !items-center !rounded-editorial-pill !border !px-3 !py-1.5 !text-xs !font-semibold !leading-5 !shadow-editorial-card !transition";
+
+export const editorialContentControlButtonIdleClass =
+  "!border-editorial-border !bg-editorial-control !text-editorial-text-main hover:!border-editorial-border-strong hover:!bg-editorial-control-hover hover:!text-editorial-text-main";
+
+export const editorialContentControlButtonActiveClass =
+  "!border-transparent !bg-editorial-link-active !text-editorial-text-on-accent !shadow-editorial-accent hover:!text-editorial-text-on-accent";
+
+export const editorialContentPageClass = "flex w-full flex-col gap-6";
+
+export const editorialContentIntroSectionClass =
+  "rounded-editorial-xl border border-editorial-border bg-editorial-panel px-6 py-6 shadow-editorial-page sm:px-8";
+
+export const editorialContentFeaturedSectionClass = "grid gap-6";
+
+export const editorialContentListSectionClass = "grid gap-4 xl:grid-cols-2";
+
 export function cloneContentCard(card: ContentCard): ContentCard {
   return {
     ...card,

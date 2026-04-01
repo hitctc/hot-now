@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
+import {
+  editorialContentControlButtonClass,
+  editorialContentControlButtonIdleClass,
+  editorialContentFloatingPanelClass
+} from "./contentCardShared";
+
 const props = defineProps<{
   options: { kind: string; name: string }[];
   selectedSourceKinds: string[];
@@ -35,33 +41,57 @@ function clearAll(): void {
 </script>
 
 <template>
-  <a-card class="content-source-filter-card" :bordered="false" data-content-source-filter>
-    <div class="content-source-filter-card__header">
-      <div>
-        <a-typography-text class="content-source-filter-card__kicker" type="secondary">
+  <a-card
+    :bordered="false"
+    :class="[editorialContentFloatingPanelClass, 'backdrop-blur-xl']"
+    data-content-source-filter
+  >
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div class="space-y-2">
+        <p class="m-0 text-xs font-semibold uppercase tracking-[0.24em] text-editorial-text-muted">
           来源筛选
-        </a-typography-text>
-        <a-typography-title :level="5" class="content-source-filter-card__title">
-          当前只看这些来源
-        </a-typography-title>
-        <a-typography-text class="content-source-filter-card__summary" type="secondary">
-          已选 {{ selectedCount }} / {{ options.length }}
-        </a-typography-text>
+        </p>
+        <div class="space-y-1">
+          <h3 class="m-0 text-lg font-semibold text-editorial-text-main">当前只看这些来源</h3>
+          <p class="m-0 text-sm leading-6 text-editorial-text-body">
+            浏览偏好只影响当前内容页；已选 {{ selectedCount }} / {{ options.length }}。
+          </p>
+        </div>
       </div>
 
-      <a-space size="small">
-        <a-button data-content-filter-action="select-all" size="small" @click="selectAll">全选</a-button>
-        <a-button data-content-filter-action="clear-all" size="small" @click="clearAll">全不选</a-button>
-      </a-space>
+      <div class="flex flex-wrap gap-2">
+        <a-button
+          data-content-filter-action="select-all"
+          size="small"
+          :class="[editorialContentControlButtonClass, editorialContentControlButtonIdleClass]"
+          @click="selectAll"
+        >
+          全选
+        </a-button>
+        <a-button
+          data-content-filter-action="clear-all"
+          size="small"
+          :class="[editorialContentControlButtonClass, editorialContentControlButtonIdleClass]"
+          @click="clearAll"
+        >
+          全不选
+        </a-button>
+      </div>
     </div>
 
-    <div class="content-source-filter-card__options">
+    <div class="mt-4 flex flex-wrap gap-3">
       <label
         v-for="option in options"
         :key="option.kind"
-        class="content-source-filter-card__option"
+        :class="[
+          'inline-flex cursor-pointer items-center gap-3 rounded-editorial-pill border px-3 py-2 text-sm font-semibold transition',
+          selectedSet.has(option.kind)
+            ? 'border-transparent bg-editorial-link-active text-editorial-text-on-accent shadow-editorial-accent'
+            : 'border-editorial-border bg-editorial-control text-editorial-text-main hover:border-editorial-border-strong hover:bg-editorial-control-hover'
+        ]"
       >
         <input
+          class="m-0 size-4 cursor-pointer accent-[var(--editorial-accent)]"
           :data-source-kind="option.kind"
           type="checkbox"
           :checked="selectedSet.has(option.kind)"
@@ -72,67 +102,3 @@ function clearAll(): void {
     </div>
   </a-card>
 </template>
-
-<style scoped>
-.content-source-filter-card {
-  position: sticky;
-  top: 24px;
-  z-index: 12;
-  width: 100%;
-  border-radius: 18px;
-  border: 1px solid var(--editorial-border);
-  background: color-mix(in srgb, var(--editorial-bg-panel) 92%, transparent);
-  box-shadow: var(--editorial-shadow-floating);
-  backdrop-filter: blur(18px);
-}
-
-.content-source-filter-card__header {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: flex-start;
-  margin-bottom: 16px;
-}
-
-.content-source-filter-card__kicker {
-  display: block;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.content-source-filter-card__title {
-  margin: 4px 0 0;
-}
-
-.content-source-filter-card__summary {
-  display: block;
-  margin-top: 4px;
-}
-
-.content-source-filter-card__options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.content-source-filter-card__option {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid rgba(127, 127, 127, 0.18);
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.content-source-filter-card__option input {
-  margin: 0;
-}
-
-@media (max-width: 900px) {
-  .content-source-filter-card {
-    top: 88px;
-  }
-}
-
-</style>

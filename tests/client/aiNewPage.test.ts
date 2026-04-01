@@ -116,7 +116,12 @@ describe("AiNewPage", () => {
 
     expect(contentApiMocks.readAiNewPage).toHaveBeenCalledWith(["openai"]);
     expect(wrapper.get("[data-content-page='ai-new']").text()).toContain("AI 新讯");
+    expect(wrapper.get("[data-content-page='ai-new']").classes()).toEqual(
+      expect.arrayContaining(["flex", "flex-col", "gap-6"])
+    );
     expect(wrapper.find("[data-content-source-filter]").exists()).toBe(true);
+    expect(wrapper.get("[data-content-section='featured']").classes()).toContain("grid");
+    expect(wrapper.get("[data-content-section='list']").classes()).toContain("grid");
     expect(wrapper.get("[data-content-section='featured']").text()).toContain("AI Weekly Insight");
     expect(wrapper.get("[data-content-section='list']").text()).toContain("AI Agent Launch");
   });

@@ -5,6 +5,12 @@ import ContentEmptyState from "../../components/content/ContentEmptyState.vue";
 import ContentHeroCard from "../../components/content/ContentHeroCard.vue";
 import ContentSourceFilterBar from "../../components/content/ContentSourceFilterBar.vue";
 import ContentStandardCard from "../../components/content/ContentStandardCard.vue";
+import {
+  editorialContentFeaturedSectionClass,
+  editorialContentIntroSectionClass,
+  editorialContentListSectionClass,
+  editorialContentPageClass
+} from "../../components/content/contentCardShared";
 import { HttpError } from "../../services/http";
 import {
   readAiNewPage,
@@ -120,95 +126,49 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="content-page content-page--ai-new" data-content-page="ai-new">
-    <a-card class="content-page__intro" :bordered="false">
-      <div class="content-page__intro-stack">
-        <a-typography-text class="content-page__kicker" type="secondary">AI 新讯</a-typography-text>
-        <a-typography-title :level="2" class="content-page__title">最快发现新一批 AI 信号</a-typography-title>
-        <a-typography-paragraph class="content-page__description">
-          先看首条精选主卡，再扫后面的标准卡。这里优先收集 AI 新闻、模型、事件和智能体线索。
-        </a-typography-paragraph>
-      </div>
-    </a-card>
+  <div :class="editorialContentPageClass" data-content-page="ai-new">
+    <section :class="editorialContentIntroSectionClass">
+      <p class="m-0 text-xs font-semibold uppercase tracking-[0.24em] text-editorial-text-muted">AI 新讯</p>
+      <h1 class="mt-3 text-3xl font-semibold tracking-tight text-editorial-text-main">
+        最快发现新一批 AI 信号
+      </h1>
+      <p class="mt-3 max-w-3xl text-base leading-7 text-editorial-text-body">
+        先看首条精选主卡，再扫后面的标准卡。这里优先收集 AI 新闻、模型、事件和智能体线索。
+      </p>
+    </section>
 
     <a-alert v-if="hasLoadError && pageModel" type="warning" show-icon :message="loadError" banner />
 
-    <ContentSourceFilterBar
-      v-if="sourceFilter"
-      :options="sourceFilter.options"
-      :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
-      @change="handleSourceKindsChange"
-    />
+    <div v-if="sourceFilter" class="sticky top-[4.25rem] z-10" data-content-filter-shell>
+      <ContentSourceFilterBar
+        :options="sourceFilter.options"
+        :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
+        @change="handleSourceKindsChange"
+      />
+    </div>
 
     <a-skeleton v-if="isLoading" active :paragraph="{ rows: 7 }" />
 
     <ContentEmptyState v-else-if="displayState" :state="displayState" data-content-empty-state />
 
     <template v-else-if="pageModel">
-      <ContentEmptyState
-        v-if="!featuredCard && standardCards.length === 0 && displayState"
-        :state="displayState"
-        data-content-empty-state
-      />
+      <section
+        v-if="featuredCard"
+        :class="editorialContentFeaturedSectionClass"
+        data-content-section="featured"
+      >
+        <ContentHeroCard :card="featuredCard" />
+      </section>
 
-      <div v-else class="content-page__stack">
-        <ContentHeroCard v-if="featuredCard" :card="featuredCard" data-content-section="featured" />
-        <div v-if="standardCards.length > 0" class="content-page__list" data-content-section="list">
+      <section
+        v-if="standardCards.length > 0"
+        :class="editorialContentListSectionClass"
+        data-content-section="list"
+      >
           <ContentStandardCard v-for="card in standardCards" :key="card.id" :card="card" />
-        </div>
-      </div>
+      </section>
     </template>
 
-    <a-spin v-if="isRefreshing" class="content-page__refresh" />
+    <a-spin v-if="isRefreshing" class="self-start" />
   </div>
 </template>
-
-<style scoped>
-.content-page {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.content-page__intro {
-  border-radius: 24px;
-  border: 1px solid var(--editorial-border);
-  background: linear-gradient(135deg, rgba(35, 82, 255, 0.08), rgba(255, 106, 42, 0.05)),
-    var(--editorial-bg-panel);
-  box-shadow: var(--editorial-shadow-page);
-}
-
-.content-page__intro-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.content-page__kicker {
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.content-page__title {
-  margin: 0;
-}
-
-.content-page__description {
-  margin: 0;
-  max-width: 64ch;
-  color: var(--editorial-text-body);
-  line-height: 1.8;
-}
-
-.content-page__stack,
-.content-page__list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.content-page__refresh {
-  align-self: flex-start;
-}
-</style>

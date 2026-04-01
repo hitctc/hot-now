@@ -1,10 +1,22 @@
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createSessionToken } from "../../src/core/auth/session.js";
 import { createServer } from "../../src/server/createServer.js";
 
+const clientBuildRoot = createClientBuildFixture();
+
+function createContentTestServer(overrides: Parameters<typeof createServer>[0] = {}) {
+  return createServer({
+    clientBuildRoot,
+    ...overrides
+  } as never);
+}
+
 describe("content routes", () => {
   it("serves the Vue client entry on /, /ai-new and /ai-hot, and removes /articles", async () => {
-    const app = createServer({
+    const app = createContentTestServer({
       listContentView: vi.fn().mockResolvedValue([])
     } as never);
 
@@ -55,7 +67,7 @@ describe("content routes", () => {
         scoreBadges: ["24h 内", "官方源"]
       }
     ]);
-    const app = createServer({
+    const app = createContentTestServer({
       listContentView,
       listContentSources: vi.fn().mockResolvedValue([
         { kind: "openai", name: "OpenAI", isEnabled: true, showAllWhenSelected: false },
@@ -125,7 +137,7 @@ describe("content routes", () => {
       (error as Error & { code?: string }).code = "SQLITE_CORRUPT";
       throw error;
     });
-    const app = createServer({
+    const app = createContentTestServer({
       listContentView,
       listRatingDimensions: vi.fn().mockResolvedValue([])
     } as never);
@@ -148,7 +160,7 @@ describe("content routes", () => {
   });
 
   it("keeps content pages public while auth-enabled system pages still redirect anonymous visitors", async () => {
-    const app = createServer({
+    const app = createContentTestServer({
       auth: {
         requireLogin: true,
         sessionSecret: "test-secret"
@@ -168,7 +180,7 @@ describe("content routes", () => {
   });
 
   it("serves the signed-in system route through the client entry", async () => {
-    const app = createServer({
+    const app = createContentTestServer({
       auth: {
         requireLogin: true,
         sessionSecret: "test-secret"
@@ -205,7 +217,7 @@ describe("content routes", () => {
   });
 
   it("serves site.js without ratings submit logic", async () => {
-    const app = createServer({
+    const app = createContentTestServer({
       listContentView: vi.fn().mockResolvedValue([])
     } as never);
 
@@ -221,7 +233,7 @@ describe("content routes", () => {
 
   it("calls saveFavorite for favorite action", async () => {
     const saveFavorite = vi.fn().mockResolvedValue({ ok: true });
-    const app = createServer({
+    const app = createContentTestServer({
       saveFavorite
     } as never);
 
@@ -238,7 +250,7 @@ describe("content routes", () => {
 
   it("calls saveReaction for reaction action", async () => {
     const saveReaction = vi.fn().mockResolvedValue({ ok: true });
-    const app = createServer({
+    const app = createContentTestServer({
       saveReaction
     } as never);
 
@@ -254,7 +266,7 @@ describe("content routes", () => {
 
   it("calls saveContentFeedback for feedback pool action", async () => {
     const saveContentFeedback = vi.fn().mockResolvedValue({ ok: true, entryId: 9 });
-    const app = createServer({
+    const app = createContentTestServer({
       saveContentFeedback
     } as never);
 
@@ -293,7 +305,7 @@ describe("content routes", () => {
       saved: 2,
       averageRating: 4.5
     });
-    const app = createServer({
+    const app = createContentTestServer({
       saveRatings
     } as never);
 
@@ -309,7 +321,7 @@ describe("content routes", () => {
   });
 
   it("returns 404 for content actions when content id does not exist", async () => {
-    const app = createServer({
+    const app = createContentTestServer({
       saveFavorite: vi.fn().mockResolvedValue({ ok: false, reason: "not-found" }),
       saveReaction: vi.fn().mockResolvedValue({ ok: false, reason: "not-found" }),
       saveRatings: vi.fn().mockResolvedValue({ ok: false, reason: "not-found" })
@@ -337,7 +349,7 @@ describe("content routes", () => {
   });
 
   it("returns 400 when ratings payload contains unknown dimensions", async () => {
-    const app = createServer({
+    const app = createContentTestServer({
       saveRatings: vi.fn().mockResolvedValue({
         ok: false,
         reason: "unknown-dimensions",
@@ -361,7 +373,7 @@ describe("content routes", () => {
 
   it("returns 400 and skips saveRatings when payload mixes valid and invalid scores", async () => {
     const saveRatings = vi.fn().mockResolvedValue({ ok: true, saved: 1, averageRating: 4 });
-    const app = createServer({
+    const app = createContentTestServer({
       saveRatings
     } as never);
 
@@ -377,7 +389,7 @@ describe("content routes", () => {
   });
 
   it("rejects anonymous content actions with 401 when auth is enabled", async () => {
-    const app = createServer({
+    const app = createContentTestServer({
       auth: {
         requireLogin: true,
         sessionSecret: "test-secret",
@@ -409,3 +421,31 @@ describe("content routes", () => {
     expect(ratingsResponse.statusCode).toBe(401);
   });
 });
+
+function createClientBuildFixture() {
+  const fixtureRoot = mkdtempSync(path.join(tmpdir(), "hot-now-content-client-"));
+  const assetsDir = path.join(fixtureRoot, "assets");
+  mkdirSync(assetsDir, { recursive: true });
+  writeFileSync(path.join(assetsDir, "index-test.js"), "console.log('content route fixture');\n", "utf8");
+  writeFileSync(path.join(assetsDir, "index-test.css"), "body{background:#fff;}\n", "utf8");
+  writeFileSync(
+    path.join(fixtureRoot, "index.html"),
+    `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HotNow Content Test Shell</title>
+    <script type="module" crossorigin src="/client/assets/index-test.js"></script>
+    <link rel="stylesheet" crossorigin href="/client/assets/index-test.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>
+`,
+    "utf8"
+  );
+
+  return fixtureRoot;
+}

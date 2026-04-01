@@ -65,7 +65,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(4);
+    expect(schemaVersion).toBe(5);
 
     const appliedMigrations = db
       .prepare(
@@ -81,7 +81,8 @@ describe("runMigrations", () => {
       { version: 1, name: "001_unified_site_baseline" },
       { version: 2, name: "002_digest_report_mail_attempts" },
       { version: 3, name: "003_feedback_and_llm_strategy_workbench" },
-      { version: 4, name: "004_source_display_mode" }
+      { version: 4, name: "004_source_display_mode" },
+      { version: 5, name: "005_nl_rule_enabled_flag" }
     ]);
 
     const digestReportColumns = db

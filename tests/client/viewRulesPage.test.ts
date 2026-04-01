@@ -13,7 +13,6 @@ vi.mock("../../src/client/services/settingsApi", async () => {
   return {
     ...actual,
     readSettingsViewRules: vi.fn(),
-    saveViewRuleConfig: vi.fn(),
     saveProviderSettings: vi.fn(),
     deleteProviderSettings: vi.fn(),
     saveNlRules: vi.fn(),
@@ -27,22 +26,6 @@ vi.mock("../../src/client/services/settingsApi", async () => {
 
 function createWorkbench() {
   return {
-    numericRules: [
-      {
-        ruleKey: "hot",
-        displayName: "热点策略",
-        config: {
-          limit: 20,
-          freshnessWindowDays: 3,
-          freshnessWeight: 0.35,
-          sourceWeight: 0.1,
-          completenessWeight: 0.1,
-          aiWeight: 0.05,
-          heatWeight: 0.4
-        },
-        isEnabled: true
-      }
-    ],
     providerSettings: {
       providerKind: "deepseek",
       apiKeyLast4: "1234",
@@ -55,10 +38,10 @@ function createWorkbench() {
       message: "已配置可用厂商"
     },
     nlRules: [
-      { scope: "global", ruleText: "保留 workflow 深度总结。", createdAt: "", updatedAt: "" },
-      { scope: "hot", ruleText: "", createdAt: "", updatedAt: "" },
-      { scope: "articles", ruleText: "", createdAt: "", updatedAt: "" },
-      { scope: "ai", ruleText: "优先展示 agent 相关内容。", createdAt: "", updatedAt: "" }
+      { scope: "base", enabled: true, ruleText: "保留 workflow 深度总结。", createdAt: "", updatedAt: "" },
+      { scope: "ai_new", enabled: true, ruleText: "优先展示 agent 相关内容。", createdAt: "", updatedAt: "" },
+      { scope: "ai_hot", enabled: true, ruleText: "", createdAt: "", updatedAt: "" },
+      { scope: "hero", enabled: false, ruleText: "精选只留最强信号。", createdAt: "", updatedAt: "" }
     ],
     feedbackPool: [
       {
@@ -82,7 +65,7 @@ function createWorkbench() {
         id: 301,
         sourceFeedbackId: 201,
         draftText: "优先展示包含 agent workflow 的深度总结。",
-        suggestedScope: "ai",
+        suggestedScope: "ai_new",
         draftEffectSummary: "强化 AI 页的 agent 内容。",
         positiveKeywords: ["agent", "workflow"],
         negativeKeywords: ["融资"],
@@ -169,9 +152,10 @@ describe("ViewRulesPage", () => {
     expect(wrapper.get("[data-view-rules-section='nl-rules']").classes()).toContain("bg-editorial-panel");
     expect(wrapper.get("[data-view-rules-section='nl-rules']").classes()).toContain("shadow-editorial-card");
     expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("正式自然语言策略");
-    expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("AI 热点规则");
-    expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("AI 新讯规则");
-    expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).not.toContain("Articles 规则");
+    expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("基础入池门");
+    expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("AI 热点入池门");
+    expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("AI 新讯入池门");
+    expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("首条精选门");
     expect(wrapper.get("[data-view-rules-section='feedback-pool']").classes()).toContain("rounded-editorial-xl");
     expect(wrapper.get("[data-view-rules-section='feedback-pool']").text()).toContain("Agent 工作流总结");
     expect(
@@ -198,15 +182,15 @@ describe("ViewRulesPage", () => {
 
     await flushPromises();
 
-    await wrapper.get("[data-nl-rule-scope='global']").setValue("新的全局规则");
+    await wrapper.get("[data-nl-rule-scope='base']").setValue("新的基础规则");
     await wrapper.get("[data-view-rules-form='nl-rules']").trigger("submit");
     await flushPromises();
 
     expect(settingsApi.saveNlRules).toHaveBeenCalledWith({
-      global: "新的全局规则",
-      hot: "",
-      articles: "",
-      ai: "优先展示 agent 相关内容。"
+      base: { enabled: true, ruleText: "新的基础规则" },
+      ai_new: { enabled: true, ruleText: "优先展示 agent 相关内容。" },
+      ai_hot: { enabled: true, ruleText: "" },
+      hero: { enabled: false, ruleText: "精选只留最强信号。" }
     });
     expect(settingsApi.readSettingsViewRules).toHaveBeenCalledTimes(2);
     expect(wrapper.text()).toContain("当前内容库已完成重算");
@@ -225,7 +209,7 @@ describe("ViewRulesPage", () => {
 
     await wrapper.get("[data-action='apply-draft'][data-draft-id='301']").trigger("click");
 
-    expect((wrapper.get("[data-nl-rule-scope='ai']").element as HTMLTextAreaElement).value).toContain(
+    expect((wrapper.get("[data-nl-rule-scope='ai_new']").element as HTMLTextAreaElement).value).toContain(
       "优先展示包含 agent workflow 的深度总结。"
     );
     expect(settingsApi.saveNlRules).not.toHaveBeenCalled();

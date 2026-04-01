@@ -44,7 +44,6 @@ import {
   updateStrategyDraft
 } from "./core/strategy/strategyDraftRepository.js";
 import { listReportDates, readTextFile } from "./core/storage/reportStore.js";
-import { listViewRules, saveViewRuleConfig } from "./core/viewRules/viewRuleRepository.js";
 import { createServer } from "./server/createServer.js";
 
 type ReportSummary = {
@@ -244,11 +243,10 @@ function getCurrentUserProfile() {
 }
 
 function getViewRulesWorkbenchData() {
-  // The strategy workbench reads all four layers together so the settings page can stay fully server-rendered.
+  // The strategy workbench now exposes only gate-based NL settings plus provider, feedback, and drafts.
   const latestEvaluationRun = listNlEvaluationRuns(db)[0] ?? null;
 
   return {
-    numericRules: listViewRules(db),
     providerSettings: getProviderSettingsSummary(db),
     providerCapability: readProviderCapability(),
     nlRules: listNlRuleSets(db),
@@ -506,15 +504,13 @@ const app = createServer({
   saveContentFeedback: async (contentItemId, input) => saveFeedbackPoolEntry(db, { contentItemId, ...input }),
   listRatingDimensions: async () => listRatingDimensions(db),
   saveRatings: async (contentItemId, scores) => saveRatings(db, contentItemId, scores),
-  listViewRules: async () => listViewRules(db),
   getViewRulesWorkbenchData: async () => getViewRulesWorkbenchData(),
-  saveViewRuleConfig: async (ruleKey, config) => saveViewRuleConfig(db, ruleKey, config),
   saveProviderSettings: async (input) =>
     persistProviderSettings(db, input, {
       settingsMasterKey: config.llm?.settingsMasterKey ?? null
     }),
   deleteProviderSettings: async () => removeProviderSettings(db),
-  saveNlRules: async (rules: Record<NlRuleScope, string>) => {
+  saveNlRules: async (rules: Record<NlRuleScope, { enabled: boolean; ruleText: string }>) => {
     for (const scope of Object.keys(rules) as NlRuleScope[]) {
       saveNlRuleSet(db, scope, rules[scope]);
     }

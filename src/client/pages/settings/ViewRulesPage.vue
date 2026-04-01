@@ -2,10 +2,6 @@
 import { computed, onMounted, reactive, ref } from "vue";
 
 import {
-  viewRuleFieldDefinitions,
-  type ViewRuleConfigValues
-} from "../../../core/viewRules/viewRuleConfig";
-import {
   editorialContentCardClass,
   editorialContentIntroSectionClass,
   editorialContentPageClass,
@@ -22,11 +18,10 @@ import {
   saveNlRules,
   saveProviderSettings,
   saveStrategyDraft,
-  saveViewRuleConfig,
   type SaveNlRulesResponse,
   type SettingsFeedbackPoolItem,
-  type SettingsNlRuleScope,
   type SettingsProviderKind,
+  type SettingsStrategyGateScope,
   type SettingsStrategyDraftItem,
   type SettingsStrategyDraftScope,
   type SettingsViewRulesResponse
@@ -34,6 +29,7 @@ import {
 
 type AlertTone = "success" | "info" | "warning" | "error";
 type PageNotice = { tone: AlertTone; message: string };
+type EditableNlRuleGate = { enabled: boolean; ruleText: string };
 type EditableDraftForm = {
   suggestedScope: SettingsStrategyDraftScope;
   draftText: string;
@@ -49,17 +45,17 @@ const providerKindOptions = [
 ] as const;
 const draftScopeOptions = [
   { label: "未指定", value: "unspecified" },
-  { label: "全局", value: "global" },
-  { label: "AI 热点", value: "hot" },
-  { label: "旧 Articles（已移除）", value: "articles", disabled: true },
-  { label: "AI 新讯", value: "ai" }
+  { label: "基础入池门", value: "base" },
+  { label: "AI 新讯入池门", value: "ai_new" },
+  { label: "AI 热点入池门", value: "ai_hot" },
+  { label: "首条精选门", value: "hero" }
 ] as const;
 const scopeLabels: Record<SettingsStrategyDraftScope, string> = {
   unspecified: "未指定",
-  global: "全局",
-  hot: "AI 热点",
-  articles: "旧 Articles（已移除）",
-  ai: "AI 新讯"
+  base: "基础入池门",
+  ai_new: "AI 新讯入池门",
+  ai_hot: "AI 热点入池门",
+  hero: "首条精选门"
 };
 
 const isLoading = ref(true);
@@ -68,18 +64,17 @@ const loadError = ref<string | null>(null);
 const pageNotice = ref<PageNotice | null>(null);
 const workbench = ref<SettingsViewRulesResponse | null>(null);
 const pendingActions = reactive<Record<string, boolean>>({});
-const ruleForms = ref<Record<string, ViewRuleConfigValues>>({});
 const draftForms = ref<Record<number, EditableDraftForm>>({});
 const providerForm = reactive({
   providerKind: "deepseek" as SettingsProviderKind | string,
   apiKey: "",
   isEnabled: true
 });
-const nlRuleForm = reactive<Record<SettingsNlRuleScope, string>>({
-  global: "",
-  hot: "",
-  articles: "",
-  ai: ""
+const nlRuleForm = reactive<Record<SettingsStrategyGateScope, EditableNlRuleGate>>({
+  base: { enabled: true, ruleText: "" },
+  ai_new: { enabled: true, ruleText: "" },
+  ai_hot: { enabled: true, ruleText: "" },
+  hero: { enabled: true, ruleText: "" }
 });
 
 const providerCapabilityTone = computed<AlertTone>(() => {
@@ -235,30 +230,19 @@ function parseKeywordInput(rawValue: string): string[] {
 
 // 每次读到新的工作台数据后，都把页面里的可编辑表单重新同步一遍。
 function syncWorkbenchForms(nextWorkbench: SettingsViewRulesResponse): void {
-  ruleForms.value = Object.fromEntries(
-    nextWorkbench.numericRules.map((rule) => [
-      rule.ruleKey,
-      {
-        limit: rule.config.limit,
-        freshnessWindowDays: rule.config.freshnessWindowDays,
-        freshnessWeight: rule.config.freshnessWeight,
-        sourceWeight: rule.config.sourceWeight,
-        completenessWeight: rule.config.completenessWeight,
-        aiWeight: rule.config.aiWeight,
-        heatWeight: rule.config.heatWeight
-      }
-    ])
-  );
-
   providerForm.providerKind = nextWorkbench.providerSettings?.providerKind ?? "deepseek";
   providerForm.apiKey = "";
   providerForm.isEnabled = nextWorkbench.providerSettings?.isEnabled ?? true;
 
-  const ruleTextByScope = new Map(nextWorkbench.nlRules.map((rule) => [rule.scope, rule.ruleText]));
-  nlRuleForm.global = ruleTextByScope.get("global") ?? "";
-  nlRuleForm.hot = ruleTextByScope.get("hot") ?? "";
-  nlRuleForm.articles = ruleTextByScope.get("articles") ?? "";
-  nlRuleForm.ai = ruleTextByScope.get("ai") ?? "";
+  const ruleByScope = new Map(nextWorkbench.nlRules.map((rule) => [rule.scope, rule]));
+  nlRuleForm.base.enabled = ruleByScope.get("base")?.enabled ?? true;
+  nlRuleForm.base.ruleText = ruleByScope.get("base")?.ruleText ?? "";
+  nlRuleForm.ai_new.enabled = ruleByScope.get("ai_new")?.enabled ?? true;
+  nlRuleForm.ai_new.ruleText = ruleByScope.get("ai_new")?.ruleText ?? "";
+  nlRuleForm.ai_hot.enabled = ruleByScope.get("ai_hot")?.enabled ?? true;
+  nlRuleForm.ai_hot.ruleText = ruleByScope.get("ai_hot")?.ruleText ?? "";
+  nlRuleForm.hero.enabled = ruleByScope.get("hero")?.enabled ?? true;
+  nlRuleForm.hero.ruleText = ruleByScope.get("hero")?.ruleText ?? "";
 
   draftForms.value = Object.fromEntries(
     nextWorkbench.strategyDrafts.map((draft) => [
@@ -272,51 +256,6 @@ function syncWorkbenchForms(nextWorkbench: SettingsViewRulesResponse): void {
       }
     ])
   );
-}
-
-// 规则表单在提交前再做一次前端校验，避免把空值或非法数值直接打给后端。
-function readValidatedRuleConfig(ruleKey: string): ViewRuleConfigValues | null {
-  const form = ruleForms.value[ruleKey];
-
-  if (!form) {
-    showNotice("error", "未找到对应的规则表单。");
-    return null;
-  }
-
-  if (!Number.isFinite(form.limit) || form.limit < 1 || !Number.isInteger(form.limit)) {
-    showNotice("error", "条数限制必须是不小于 1 的整数。");
-    return null;
-  }
-
-  if (
-    !Number.isFinite(form.freshnessWindowDays) ||
-    form.freshnessWindowDays < 1 ||
-    !Number.isInteger(form.freshnessWindowDays)
-  ) {
-    showNotice("error", "新鲜度窗口必须是不小于 1 的整数。");
-    return null;
-  }
-
-  if (
-    !Number.isFinite(form.freshnessWeight) ||
-    !Number.isFinite(form.sourceWeight) ||
-    !Number.isFinite(form.completenessWeight) ||
-    !Number.isFinite(form.aiWeight) ||
-    !Number.isFinite(form.heatWeight)
-  ) {
-    showNotice("error", "请先把权重字段填写完整。");
-    return null;
-  }
-
-  return {
-    limit: form.limit,
-    freshnessWindowDays: form.freshnessWindowDays,
-    freshnessWeight: form.freshnessWeight,
-    sourceWeight: form.sourceWeight,
-    completenessWeight: form.completenessWeight,
-    aiWeight: form.aiWeight,
-    heatWeight: form.heatWeight
-  };
 }
 
 // 文本复制优先走 Clipboard API，失败时只提示，不打断页面主流程。
@@ -401,24 +340,6 @@ async function runWorkbenchAction<T>(
   }
 }
 
-// 数值规则继续逐条保存，保持和原后端接口一致。
-async function handleRuleSave(ruleKey: string): Promise<void> {
-  const config = readValidatedRuleConfig(ruleKey);
-
-  if (!config) {
-    return;
-  }
-
-  await runWorkbenchAction(
-    `rule:${ruleKey}`,
-    () => saveViewRuleConfig(ruleKey, config),
-    {
-      fallbackMessage: "规则保存失败，请稍后再试。",
-      successMessage: "规则已保存。"
-    }
-  );
-}
-
 // 厂商配置保存需要先拿到 providerKind 和 API key，避免把空 key 保存成脏配置。
 async function handleProviderSave(): Promise<void> {
   const providerKind = providerForm.providerKind.trim();
@@ -462,10 +383,10 @@ async function handleNlRulesSave(): Promise<void> {
     "nl-rules:save",
     () =>
       saveNlRules({
-        global: nlRuleForm.global,
-        hot: nlRuleForm.hot,
-        articles: nlRuleForm.articles,
-        ai: nlRuleForm.ai
+        base: { enabled: nlRuleForm.base.enabled, ruleText: nlRuleForm.base.ruleText },
+        ai_new: { enabled: nlRuleForm.ai_new.enabled, ruleText: nlRuleForm.ai_new.ruleText },
+        ai_hot: { enabled: nlRuleForm.ai_hot.enabled, ruleText: nlRuleForm.ai_hot.ruleText },
+        hero: { enabled: nlRuleForm.hero.enabled, ruleText: nlRuleForm.hero.ruleText }
       }),
     {
       fallbackMessage: "正式规则保存失败，请稍后再试。",
@@ -586,14 +507,8 @@ function handleDraftApply(draftId: number): void {
     return;
   }
 
-  // Articles 入口已经移除，旧草稿需要先改到新范围后才能继续写入正式规则。
-  if (form.suggestedScope === "articles") {
-    showNotice("warning", "Articles 范围已移除，请先改成 AI 新讯或 AI 热点。");
-    return;
-  }
-
-  const currentValue = nlRuleForm[form.suggestedScope].trim();
-  nlRuleForm[form.suggestedScope] = currentValue ? `${currentValue}\n\n${draftText}` : draftText;
+  const currentValue = nlRuleForm[form.suggestedScope].ruleText.trim();
+  nlRuleForm[form.suggestedScope].ruleText = currentValue ? `${currentValue}\n\n${draftText}` : draftText;
   showNotice("success", "草稿已写入正式策略编辑器，记得保存正式规则。");
 }
 
@@ -607,13 +522,13 @@ onMounted(() => {
     <div :class="editorialContentPageClass" data-settings-page="view-rules">
       <section :class="editorialContentIntroSectionClass" data-settings-intro="view-rules">
         <p class="m-0 text-xs font-semibold uppercase tracking-[0.24em] text-editorial-text-muted">
-          View Rules Workbench
+          AI Strategy Gates
         </p>
         <h1 class="mt-3 text-3xl font-semibold tracking-tight text-editorial-text-main">
-          把反馈、草稿和正式规则收口到同一块策略台面
+          用四道门定义什么内容能进系统、能进新讯、能进热点、能当精选
         </h1>
         <p class="mt-3 max-w-3xl text-base leading-7 text-editorial-text-body">
-          这里继续沿用原来的保存、重算和草稿流转逻辑，只把页面级布局迁到 Tailwind，方便后续系统页统一主题和骨架。
+          这里不再维护数值权重，只保留基础入池、AI 新讯、AI 热点、首条精选四道门，以及反馈池、草稿池和厂商设置。
         </p>
       </section>
 
@@ -642,7 +557,7 @@ onMounted(() => {
       <template v-else-if="workbench">
         <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <a-card :class="editorialContentCardClass" size="small">
-            <a-statistic title="数值规则" :value="workbench.numericRules.length" />
+            <a-statistic title="策略门" :value="workbench.nlRules.length" />
           </a-card>
           <a-card :class="editorialContentCardClass" size="small">
             <a-statistic title="反馈池" :value="workbench.feedbackPool.length" />
@@ -744,25 +659,36 @@ onMounted(() => {
               data-view-rules-form="nl-rules"
               @submit.prevent="handleNlRulesSave"
             >
-              <a-form-item label="全局规则">
+              <a-form-item label="基础入池门">
+                <a-switch v-model:checked="nlRuleForm.base.enabled" class="mb-3" />
                 <a-textarea
-                  v-model:value="nlRuleForm.global"
+                  v-model:value="nlRuleForm.base.ruleText"
                   :rows="4"
-                  data-nl-rule-scope="global"
+                  data-nl-rule-scope="base"
                 />
               </a-form-item>
-              <a-form-item label="AI 热点规则">
+              <a-form-item label="AI 新讯入池门">
+                <a-switch v-model:checked="nlRuleForm.ai_new.enabled" class="mb-3" />
                 <a-textarea
-                  v-model:value="nlRuleForm.hot"
+                  v-model:value="nlRuleForm.ai_new.ruleText"
                   :rows="3"
-                  data-nl-rule-scope="hot"
+                  data-nl-rule-scope="ai_new"
                 />
               </a-form-item>
-              <a-form-item label="AI 新讯规则">
+              <a-form-item label="AI 热点入池门">
+                <a-switch v-model:checked="nlRuleForm.ai_hot.enabled" class="mb-3" />
                 <a-textarea
-                  v-model:value="nlRuleForm.ai"
+                  v-model:value="nlRuleForm.ai_hot.ruleText"
                   :rows="3"
-                  data-nl-rule-scope="ai"
+                  data-nl-rule-scope="ai_hot"
+                />
+              </a-form-item>
+              <a-form-item label="首条精选门">
+                <a-switch v-model:checked="nlRuleForm.hero.enabled" class="mb-3" />
+                <a-textarea
+                  v-model:value="nlRuleForm.hero.ruleText"
+                  :rows="3"
+                  data-nl-rule-scope="hero"
                 />
               </a-form-item>
               <a-space wrap>
@@ -781,63 +707,6 @@ onMounted(() => {
             </a-form>
           </a-card>
         </section>
-
-        <a-card
-          :class="editorialContentCardClass"
-          title="数值权重规则"
-          size="small"
-          data-view-rules-section="numeric-rules"
-        >
-          <div v-if="workbench.numericRules.length > 0" class="grid gap-4 xl:grid-cols-3">
-            <a-card
-              v-for="rule in workbench.numericRules"
-              :key="rule.ruleKey"
-              :class="[editorialContentSubpanelClass, 'w-full shadow-editorial-card']"
-              size="small"
-            >
-              <template #title>
-                <a-space size="small">
-                  <span>{{ rule.displayName }}</span>
-                  <a-tag :color="rule.isEnabled ? 'green' : 'default'">
-                    {{ rule.isEnabled ? "启用中" : "已禁用" }}
-                  </a-tag>
-                </a-space>
-              </template>
-
-              <a-form
-                v-if="ruleForms[rule.ruleKey]"
-                layout="vertical"
-                :data-view-rule-form="rule.ruleKey"
-                @submit.prevent="handleRuleSave(rule.ruleKey)"
-              >
-                <a-form-item
-                  v-for="field in viewRuleFieldDefinitions"
-                  :key="field.name"
-                  :label="field.label"
-                >
-                  <a-input-number
-                    v-model:value="ruleForms[rule.ruleKey][field.name]"
-                    class="!w-full"
-                    :min="Number(field.min)"
-                    :step="Number(field.step)"
-                    :precision="field.inputMode === 'decimal' ? 2 : 0"
-                  />
-                  <div class="mt-1.5 text-xs leading-5 text-editorial-text-muted">
-                    {{ field.description }}
-                  </div>
-                </a-form-item>
-                <a-button
-                  type="primary"
-                  html-type="submit"
-                  :loading="isActionPending(`rule:${rule.ruleKey}`)"
-                >
-                  保存策略
-                </a-button>
-              </a-form>
-            </a-card>
-          </div>
-          <a-empty v-else description="当前还没有可编辑的数值规则。" />
-        </a-card>
 
         <a-card
           :class="editorialContentCardClass"

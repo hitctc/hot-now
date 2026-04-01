@@ -1,5 +1,4 @@
 import { HttpError, requestJson } from "./http";
-import type { ViewRuleConfigValues } from "../../core/viewRules/viewRuleConfig";
 
 export type SettingsProfile = {
   username: string;
@@ -14,15 +13,8 @@ export type SettingsProfileResponse = {
 };
 
 export type SettingsProviderKind = "deepseek" | "minimax" | "kimi";
-export type SettingsNlRuleScope = "global" | "hot" | "articles" | "ai";
-export type SettingsStrategyDraftScope = SettingsNlRuleScope | "unspecified";
-
-export type SettingsViewRuleItem = {
-  ruleKey: string;
-  displayName: string;
-  config: ViewRuleConfigValues;
-  isEnabled: boolean;
-};
+export type SettingsStrategyGateScope = "base" | "ai_new" | "ai_hot" | "hero";
+export type SettingsStrategyDraftScope = SettingsStrategyGateScope | "unspecified";
 
 export type SettingsProviderSettingsSummary = {
   providerKind: SettingsProviderKind | string;
@@ -38,7 +30,8 @@ export type SettingsProviderCapability = {
 };
 
 export type SettingsNlRuleItem = {
-  scope: SettingsNlRuleScope;
+  scope: SettingsStrategyGateScope;
+  enabled: boolean;
   ruleText: string;
   createdAt: string;
   updatedAt: string;
@@ -87,7 +80,6 @@ export type SettingsNlEvaluationRun = {
 };
 
 export type SettingsViewRulesResponse = {
-  numericRules: SettingsViewRuleItem[];
   providerSettings: SettingsProviderSettingsSummary | null;
   providerCapability: SettingsProviderCapability;
   nlRules: SettingsNlRuleItem[];
@@ -138,7 +130,12 @@ export type SaveProviderSettingsResponse = {
   providerKind: string;
 };
 
-export type SaveNlRulesPayload = Record<SettingsNlRuleScope, string>;
+export type SaveNlRuleGatePayload = {
+  enabled: boolean;
+  ruleText: string;
+};
+
+export type SaveNlRulesPayload = Record<SettingsStrategyGateScope, SaveNlRuleGatePayload>;
 export type SaveNlRulesResponse = {
   ok: true;
   run?: {
@@ -148,11 +145,6 @@ export type SaveNlRulesResponse = {
     successCount?: number;
     failureCount?: number;
   };
-};
-
-export type SaveViewRuleConfigResponse = {
-  ok: true;
-  ruleKey: string;
 };
 
 export type CreateDraftFromFeedbackResponse = {
@@ -241,16 +233,6 @@ function postSettingsAction<T>(url: string, body: unknown): Promise<T> {
   return requestJson<T>(url, {
     method: "POST",
     body: JSON.stringify(body)
-  });
-}
-
-// 数值规则保存保持逐条提交，避免多个页面规则互相覆盖。
-export function saveViewRuleConfig(
-  ruleKey: string,
-  config: ViewRuleConfigValues
-): Promise<SaveViewRuleConfigResponse> {
-  return postSettingsAction<SaveViewRuleConfigResponse>(`/actions/view-rules/${encodeURIComponent(ruleKey)}`, {
-    config
   });
 }
 

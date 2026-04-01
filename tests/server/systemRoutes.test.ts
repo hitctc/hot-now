@@ -232,40 +232,6 @@ describe("system routes", () => {
     expect(toggleSource).not.toHaveBeenCalled();
   });
 
-  it("calls saveViewRuleConfig for view rule save action", async () => {
-    const saveViewRuleConfig = vi.fn().mockResolvedValue({ ok: true });
-    const app = createSystemTestServer({
-      saveViewRuleConfig
-    } as never);
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/actions/view-rules/hot",
-      payload: {
-        config: {
-          limit: 10,
-          freshnessWindowDays: 3,
-          freshnessWeight: 0.4,
-          sourceWeight: 0.1,
-          completenessWeight: 0.1,
-          aiWeight: 0.05,
-          heatWeight: 0.35
-        }
-      }
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(saveViewRuleConfig).toHaveBeenCalledWith("hot", {
-      limit: 10,
-      freshnessWindowDays: 3,
-      freshnessWeight: 0.4,
-      sourceWeight: 0.1,
-      completenessWeight: 0.1,
-      aiWeight: 0.05,
-      heatWeight: 0.35
-    });
-  });
-
   it("calls saveProviderSettings for llm provider configuration", async () => {
     const saveProviderSettings = vi.fn().mockResolvedValue({ ok: true });
     const app = createSystemTestServer({
@@ -310,20 +276,20 @@ describe("system routes", () => {
       url: "/actions/view-rules/nl-rules",
       payload: {
         rules: {
-          global: "暂不展示融资快讯。",
-          hot: "",
-          articles: "",
-          ai: "优先展示 agent workflow。"
+          base: { enabled: true, ruleText: "暂不展示融资快讯。" },
+          ai_new: { enabled: true, ruleText: "优先展示 agent workflow。" },
+          ai_hot: { enabled: false, ruleText: "" },
+          hero: { enabled: true, ruleText: "首条只留最强 AI 信号。" }
         }
       }
     });
 
     expect(response.statusCode).toBe(200);
     expect(saveNlRules).toHaveBeenCalledWith({
-      global: "暂不展示融资快讯。",
-      hot: "",
-      articles: "",
-      ai: "优先展示 agent workflow。"
+      base: { enabled: true, ruleText: "暂不展示融资快讯。" },
+      ai_new: { enabled: true, ruleText: "优先展示 agent workflow。" },
+      ai_hot: { enabled: false, ruleText: "" },
+      hero: { enabled: true, ruleText: "首条只留最强 AI 信号。" }
     });
     expect(response.json()).toEqual({
       ok: true,
@@ -337,20 +303,20 @@ describe("system routes", () => {
     });
   });
 
-  it("returns 400 for invalid view-rule payload", async () => {
-    const saveViewRuleConfig = vi.fn();
+  it("returns 400 for invalid nl-rule payload", async () => {
+    const saveNlRules = vi.fn();
     const app = createSystemTestServer({
-      saveViewRuleConfig
+      saveNlRules
     } as never);
 
     const response = await app.inject({
       method: "POST",
-      url: "/actions/view-rules/hot",
-      payload: { config: "invalid" }
+      url: "/actions/view-rules/nl-rules",
+      payload: { rules: "invalid" }
     });
 
     expect(response.statusCode).toBe(400);
-    expect(saveViewRuleConfig).not.toHaveBeenCalled();
+    expect(saveNlRules).not.toHaveBeenCalled();
   });
 
   it("returns 401 for anonymous system actions when auth is enabled", async () => {
@@ -361,7 +327,7 @@ describe("system routes", () => {
         verifyLogin: vi.fn().mockResolvedValue(null)
       },
       toggleSource: vi.fn().mockResolvedValue({ ok: true }),
-      saveViewRuleConfig: vi.fn().mockResolvedValue({ ok: true })
+      saveNlRules: vi.fn().mockResolvedValue({ ok: true, run: { status: "skipped" } })
     } as never);
 
     const activateResponse = await app.inject({
@@ -371,16 +337,13 @@ describe("system routes", () => {
     });
     const ruleResponse = await app.inject({
       method: "POST",
-      url: "/actions/view-rules/hot",
+      url: "/actions/view-rules/nl-rules",
       payload: {
-        config: {
-          limit: 20,
-          freshnessWindowDays: 3,
-          freshnessWeight: 0.35,
-          sourceWeight: 0.1,
-          completenessWeight: 0.1,
-          aiWeight: 0.05,
-          heatWeight: 0.4
+        rules: {
+          base: { enabled: true, ruleText: "基础规则" },
+          ai_new: { enabled: true, ruleText: "" },
+          ai_hot: { enabled: true, ruleText: "" },
+          hero: { enabled: true, ruleText: "" }
         }
       }
     });

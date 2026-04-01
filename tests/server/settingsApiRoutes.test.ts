@@ -23,22 +23,6 @@ function createAuthenticatedServer() {
       })
     },
     getViewRulesWorkbenchData: vi.fn().mockResolvedValue({
-      numericRules: [
-        {
-          ruleKey: "hot",
-          displayName: "热点策略",
-          config: {
-            limit: 20,
-            freshnessWindowDays: 3,
-            freshnessWeight: 0.35,
-            sourceWeight: 0.1,
-            completenessWeight: 0.1,
-            aiWeight: 0.05,
-            heatWeight: 0.4
-          },
-          isEnabled: true
-        }
-      ],
       providerSettings: {
         providerKind: "deepseek",
         apiKeyLast4: "1234",
@@ -50,7 +34,12 @@ function createAuthenticatedServer() {
         featureAvailable: true,
         message: "已配置可用厂商"
       },
-      nlRules: [],
+      nlRules: [
+        { scope: "base", enabled: true, ruleText: "", createdAt: "", updatedAt: "" },
+        { scope: "ai_new", enabled: true, ruleText: "", createdAt: "", updatedAt: "" },
+        { scope: "ai_hot", enabled: true, ruleText: "", createdAt: "", updatedAt: "" },
+        { scope: "hero", enabled: false, ruleText: "", createdAt: "", updatedAt: "" }
+      ],
       feedbackPool: [],
       strategyDrafts: [],
       latestEvaluationRun: null,
@@ -106,13 +95,6 @@ describe("settings api routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
-      numericRules: [
-        {
-          ruleKey: "hot",
-          displayName: "热点策略",
-          isEnabled: true
-        }
-      ],
       providerSettings: {
         providerKind: "deepseek",
         apiKeyLast4: "1234"
@@ -120,7 +102,13 @@ describe("settings api routes", () => {
       providerCapability: {
         hasMasterKey: true,
         featureAvailable: true
-      }
+      },
+      nlRules: [
+        { scope: "base", enabled: true },
+        { scope: "ai_new", enabled: true },
+        { scope: "ai_hot", enabled: true },
+        { scope: "hero", enabled: false }
+      ]
     });
   });
 

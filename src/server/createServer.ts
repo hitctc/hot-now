@@ -45,15 +45,8 @@ type ReportSummary = {
 type ParseRatingScoresResult =
   | { ok: true; scores: Record<string, number> }
   | { ok: false; reason: "invalid-ratings-payload" };
-type SaveViewRuleResult = { ok: true } | { ok: false; reason: "invalid-config" | "not-found" };
 type ToggleSourceResult = { ok: true } | { ok: false; reason: "not-found" };
 type UpdateSourceDisplayModeResult = { ok: true } | { ok: false; reason: "not-found" };
-type ViewRuleCard = {
-  ruleKey: string;
-  displayName: string;
-  config: Record<string, unknown>;
-  isEnabled: boolean;
-};
 type SourceCard = {
   kind: string;
   name: string;
@@ -129,12 +122,12 @@ type ServerDeps = {
   ) => Promise<SaveFeedbackPoolEntryResult> | SaveFeedbackPoolEntryResult;
   listRatingDimensions?: () => Promise<RatingDimension[]> | RatingDimension[];
   saveRatings?: (contentItemId: number, scores: Record<string, number>) => Promise<SaveRatingsResult> | SaveRatingsResult;
-  listViewRules?: () => Promise<ViewRuleCard[]> | ViewRuleCard[];
   getViewRulesWorkbenchData?: () => Promise<ViewRulesWorkbenchView> | ViewRulesWorkbenchView;
-  saveViewRuleConfig?: (ruleKey: string, config: Record<string, unknown>) => Promise<SaveViewRuleResult> | SaveViewRuleResult;
   saveProviderSettings?: (input: SaveProviderSettingsInput) => Promise<SaveProviderSettingsResult> | SaveProviderSettingsResult;
   deleteProviderSettings?: () => Promise<boolean> | boolean;
-  saveNlRules?: (rules: Record<NlRuleScope, string>) => Promise<SaveNlRulesResult> | SaveNlRulesResult;
+  saveNlRules?: (
+    rules: Record<NlRuleScope, { enabled: boolean; ruleText: string }>
+  ) => Promise<SaveNlRulesResult> | SaveNlRulesResult;
   createDraftFromFeedback?: (feedbackId: number) => Promise<CreateDraftFromFeedbackResult> | CreateDraftFromFeedbackResult;
   deleteFeedbackEntry?: (feedbackId: number) => Promise<DeleteFeedbackResult> | DeleteFeedbackResult;
   clearAllFeedback?: () => Promise<ClearFeedbackResult> | ClearFeedbackResult;
@@ -173,7 +166,7 @@ export function createServer(deps: ServerDeps = {}) {
   const authConfig = deps.auth;
   const authEnabled = authConfig?.requireLogin === true;
   const hasUnifiedShellDeps = Boolean(
-    deps.listContentView || deps.listViewRules || deps.getViewRulesWorkbenchData || deps.listSources || deps.getCurrentUserProfile
+    deps.listContentView || deps.getViewRulesWorkbenchData || deps.listSources || deps.getCurrentUserProfile
   );
   const siteCss = readSiteCss();
   const siteJs = readSiteJs();
@@ -619,41 +612,6 @@ export function createServer(deps: ServerDeps = {}) {
     });
   });
 
-  app.post("/actions/view-rules/:ruleKey", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.saveViewRuleConfig) {
-      return reply.code(503).send({ ok: false, reason: "view-rules-disabled" });
-    }
-
-    const ruleKeyCandidate = (request.params as { ruleKey?: unknown } | undefined)?.ruleKey;
-    const ruleKey = typeof ruleKeyCandidate === "string" ? ruleKeyCandidate.trim() : "";
-
-    if (!ruleKey) {
-      return reply.code(400).send({ ok: false, reason: "invalid-rule-key" });
-    }
-
-    const body = request.body as { config?: unknown } | undefined;
-
-    if (!isPlainObject(body?.config)) {
-      return reply.code(400).send({ ok: false, reason: "invalid-view-rule-payload" });
-    }
-
-    const result = await deps.saveViewRuleConfig(ruleKey, body.config);
-
-    if (!result.ok && result.reason === "not-found") {
-      return reply.code(404).send({ ok: false, reason: "not-found" });
-    }
-
-    if (!result.ok && result.reason === "invalid-config") {
-      return reply.code(400).send({ ok: false, reason: "invalid-view-rule-payload" });
-    }
-
-    return reply.send({ ok: true, ruleKey });
-  });
-
   app.post("/actions/view-rules/provider-settings", async (request, reply) => {
     if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
       return;
@@ -714,11 +672,11 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     const rules = {
-      global: typeof body.rules.global === "string" ? body.rules.global : "",
-      hot: typeof body.rules.hot === "string" ? body.rules.hot : "",
-      articles: typeof body.rules.articles === "string" ? body.rules.articles : "",
-      ai: typeof body.rules.ai === "string" ? body.rules.ai : ""
-    } satisfies Record<NlRuleScope, string>;
+      base: readNlGatePayload(body.rules.base),
+      ai_new: readNlGatePayload(body.rules.ai_new),
+      ai_hot: readNlGatePayload(body.rules.ai_hot),
+      hero: readNlGatePayload(body.rules.hero)
+    } satisfies Record<NlRuleScope, { enabled: boolean; ruleText: string }>;
 
     const result = await deps.saveNlRules(rules);
 
@@ -946,35 +904,17 @@ function readSettingsApiSession(
 
 async function readSettingsViewRulesApiData(deps: ServerDeps): Promise<ViewRulesWorkbenchView> {
   // The API reuses the exact workbench model the page renderer consumes so the Vue client does not need duplicate mapping.
-  const workbench = deps.getViewRulesWorkbenchData ? await deps.getViewRulesWorkbenchData() : await deps.listViewRules?.();
+  const workbench = deps.getViewRulesWorkbenchData ? await deps.getViewRulesWorkbenchData() : null;
 
   if (!workbench) {
     return {
-      numericRules: [],
       providerSettings: null,
       providerCapability: {
         hasMasterKey: false,
         featureAvailable: false,
         message: "当前没有可读取的策略工作台数据。"
       },
-      nlRules: [],
-      feedbackPool: [],
-      strategyDrafts: [],
-      latestEvaluationRun: null,
-      isEvaluationRunning: false
-    };
-  }
-
-  if (Array.isArray(workbench)) {
-    return {
-      numericRules: workbench,
-      providerSettings: null,
-      providerCapability: {
-        hasMasterKey: false,
-        featureAvailable: false,
-        message: "当前没有可读取的策略工作台数据。"
-      },
-      nlRules: [],
+      nlRules: defaultNlRules(),
       feedbackPool: [],
       strategyDrafts: [],
       latestEvaluationRun: null,
@@ -1383,11 +1323,11 @@ function readContentSortModeHeader(headerValue: string | string[] | undefined): 
 async function renderSystemPageForPath(deps: ServerDeps, pathname: string, loggedIn: boolean): Promise<string | undefined> {
   // System pages keep callback wiring in main; routes only decide which renderer to call for the current path.
   if (pathname === "/settings/view-rules") {
-    if (!deps.getViewRulesWorkbenchData && !deps.listViewRules) {
+    if (!deps.getViewRulesWorkbenchData) {
       return undefined;
     }
 
-    const workbench = deps.getViewRulesWorkbenchData ? await deps.getViewRulesWorkbenchData() : await deps.listViewRules!();
+    const workbench = await deps.getViewRulesWorkbenchData();
     return renderViewRulesPage(workbench);
   }
 
@@ -1616,7 +1556,27 @@ function isProviderKind(value: unknown): value is SaveProviderSettingsInput["pro
 }
 
 function isStrategyDraftScope(value: unknown): value is NonNullable<UpdateStrategyDraftInput["suggestedScope"]> {
-  return value === "unspecified" || value === "global" || value === "hot" || value === "articles" || value === "ai";
+  return value === "unspecified" || value === "base" || value === "ai_new" || value === "ai_hot" || value === "hero";
+}
+
+function readNlGatePayload(value: unknown): { enabled: boolean; ruleText: string } {
+  if (!isPlainObject(value)) {
+    return { enabled: true, ruleText: "" };
+  }
+
+  return {
+    enabled: typeof value.enabled === "boolean" ? value.enabled : true,
+    ruleText: typeof value.ruleText === "string" ? value.ruleText : ""
+  };
+}
+
+function defaultNlRules(): ViewRulesWorkbenchView["nlRules"] {
+  return [
+    { scope: "base", enabled: true, ruleText: "", createdAt: "", updatedAt: "" },
+    { scope: "ai_new", enabled: true, ruleText: "", createdAt: "", updatedAt: "" },
+    { scope: "ai_hot", enabled: true, ruleText: "", createdAt: "", updatedAt: "" },
+    { scope: "hero", enabled: true, ruleText: "", createdAt: "", updatedAt: "" }
+  ];
 }
 
 function parseRatingScores(value: unknown): ParseRatingScoresResult {

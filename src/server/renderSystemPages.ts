@@ -1,12 +1,3 @@
-import { viewRuleFieldDefinitions } from "../core/viewRules/viewRuleConfig.js";
-
-type ViewRuleItem = {
-  ruleKey: string;
-  displayName: string;
-  config: Record<string, unknown>;
-  isEnabled: boolean;
-};
-
 type ProviderSettingsSummaryView = {
   providerKind: string;
   apiKeyLast4: string;
@@ -22,6 +13,7 @@ type ProviderCapabilityView = {
 
 type NlRuleItem = {
   scope: string;
+  enabled: boolean;
   ruleText: string;
   createdAt: string;
   updatedAt: string;
@@ -70,7 +62,6 @@ type NlEvaluationRunItem = {
 };
 
 export type ViewRulesWorkbenchView = {
-  numericRules: ViewRuleItem[];
   providerSettings: ProviderSettingsSummaryView | null;
   providerCapability: ProviderCapabilityView;
   nlRules: NlRuleItem[];
@@ -119,15 +110,13 @@ export type ProfileView = {
   loggedIn: boolean;
 };
 
-export function renderViewRulesPage(rules: ViewRuleItem[] | ViewRulesWorkbenchView): string {
+export function renderViewRulesPage(rules: ViewRulesWorkbenchView): string {
   const workbench = normalizeViewRulesWorkbench(rules);
 
-  // The settings module keeps one card per rule so users can edit the weight form without leaving unified shell.
-  if (workbench.numericRules.length === 0) {
+  // The legacy renderer only exists as a fallback, so an empty gate model should still show a readable shell.
+  if (workbench.nlRules.length === 0) {
     return renderEmptyState("筛选策略", "当前还没有可编辑的规则，请先完成系统初始化。");
   }
-
-  const cardsHtml = workbench.numericRules.map((rule) => renderViewRuleCard(rule)).join("");
 
   return `
     <section class="content-intro content-intro--system">
@@ -137,11 +126,10 @@ export function renderViewRulesPage(rules: ViewRuleItem[] | ViewRulesWorkbenchVi
     <section class="system-section system-section--workbench" data-system-section="view-rules">
       <header class="system-section-header">
         <p class="system-section-kicker">策略工作台</p>
-        <h3 class="system-section-title">逐项调整内容筛选规则与反馈链路</h3>
-        <p class="system-section-description">这里保留 hot / articles / ai 的权重表单，同时把反馈池、草稿池、正式自然语言规则和厂商设置收进同一个工作台。</p>
+        <h3 class="system-section-title">调整四道门策略与反馈链路</h3>
+        <p class="system-section-description">这里把基础入池、AI 新讯、AI 热点、首条精选四道门，以及反馈池、草稿池和 LLM 厂商设置收进同一个工作台。</p>
       </header>
       <div class="system-stack system-stack--control system-stack--workbench">
-        ${cardsHtml}
         ${renderProviderSettingsCard(workbench)}
         ${renderNlRulesCard(workbench)}
         ${renderFeedbackPoolCard(workbench.feedbackPool)}
@@ -280,52 +268,6 @@ export function renderProfilePage(profile: ProfileView | null): string {
   `;
 }
 
-function renderViewRuleCard(rule: ViewRuleItem): string {
-  // Each rule exposes the same fixed set of inputs so operators can tune weights without editing raw JSON.
-  return `
-    <article class="system-card system-card--control system-card--view-rule system-card--panel system-card--form-panel" data-system-card="view-rule" data-rule-key="${escapeHtml(rule.ruleKey)}">
-      <header class="system-card-header">
-        <h3 class="system-card-title">${escapeHtml(rule.displayName)}</h3>
-        <p class="system-card-meta">rule_key: <code>${escapeHtml(rule.ruleKey)}</code> · ${rule.isEnabled ? "启用中" : "已禁用"}</p>
-      </header>
-      <form class="system-form rating-form" data-system-action="view-rule-save" data-rule-key="${escapeHtml(rule.ruleKey)}">
-        <div class="rating-grid">
-          ${viewRuleFieldDefinitions.map((field) => renderViewRuleField(rule, field)).join("")}
-        </div>
-        <p class="system-card-meta">保存时会自动补齐缺省字段，权重建议填写 0 到 1 之间的小数。</p>
-        <div class="system-action-row">
-          <button type="submit" class="primary-mini-button">保存策略</button>
-        </div>
-        <div class="system-status-region">
-          <p class="action-status system-status" data-role="action-status" aria-live="polite"></p>
-        </div>
-      </form>
-    </article>
-  `;
-}
-
-function renderViewRuleField(rule: ViewRuleItem, field: (typeof viewRuleFieldDefinitions)[number]): string {
-  const rawValue = rule.config[field.name];
-  const value = typeof rawValue === "number" && Number.isFinite(rawValue) ? String(rawValue) : "";
-
-  return `
-    <label class="rating-field">
-      <span class="field-label">${escapeHtml(field.label)}</span>
-      <input
-        class="field-input"
-        type="number"
-        name="${escapeHtml(field.name)}"
-        value="${escapeHtml(value)}"
-        inputmode="${field.inputMode}"
-        min="${field.min}"
-        step="${field.step}"
-        required
-      />
-      <span class="system-card-meta">${escapeHtml(field.description)}</span>
-    </label>
-  `;
-}
-
 function renderProviderSettingsCard(workbench: ViewRulesWorkbenchView): string {
   const providerSettings = workbench.providerSettings;
   const selectedProvider = providerSettings?.providerKind ?? "deepseek";
@@ -377,30 +319,34 @@ function renderProviderSettingsCard(workbench: ViewRulesWorkbenchView): string {
 }
 
 function renderNlRulesCard(workbench: ViewRulesWorkbenchView): string {
-  const ruleByScope = new Map(workbench.nlRules.map((rule) => [rule.scope, rule.ruleText]));
+  const ruleByScope = new Map(workbench.nlRules.map((rule) => [rule.scope, rule]));
 
   return `
     <article class="system-card system-card--control system-card--nl-rules system-card--panel system-card--form-panel" data-system-card="nl-rules">
       <header class="system-card-header">
         <h3 class="system-card-title">正式自然语言策略</h3>
-        <p class="system-card-meta">保存后会立即对当前内容库执行一次自然语言重算；无可用厂商时只保存文本，不启用匹配。</p>
+        <p class="system-card-meta">保存后会立即对当前内容库执行一次自然语言重算；每道门都可以单独启用或停用。</p>
       </header>
       <form class="system-form" data-system-action="nl-rules-save">
         <label class="content-feedback-field">
-          <span>全局规则</span>
-          <textarea name="globalRuleText" rows="4" data-nl-rule-scope="global">${escapeHtml(ruleByScope.get("global") ?? "")}</textarea>
+          <span>基础入池门</span>
+          <input type="checkbox" name="baseEnabled"${ruleByScope.get("base")?.enabled === false ? "" : " checked"} />
+          <textarea name="baseRuleText" rows="4" data-nl-rule-scope="base">${escapeHtml(ruleByScope.get("base")?.ruleText ?? "")}</textarea>
         </label>
         <label class="content-feedback-field">
-          <span>hot 规则</span>
-          <textarea name="hotRuleText" rows="3" data-nl-rule-scope="hot">${escapeHtml(ruleByScope.get("hot") ?? "")}</textarea>
+          <span>AI 新讯入池门</span>
+          <input type="checkbox" name="aiNewEnabled"${ruleByScope.get("ai_new")?.enabled === false ? "" : " checked"} />
+          <textarea name="aiNewRuleText" rows="3" data-nl-rule-scope="ai_new">${escapeHtml(ruleByScope.get("ai_new")?.ruleText ?? "")}</textarea>
         </label>
         <label class="content-feedback-field">
-          <span>articles 规则</span>
-          <textarea name="articlesRuleText" rows="3" data-nl-rule-scope="articles">${escapeHtml(ruleByScope.get("articles") ?? "")}</textarea>
+          <span>AI 热点入池门</span>
+          <input type="checkbox" name="aiHotEnabled"${ruleByScope.get("ai_hot")?.enabled === false ? "" : " checked"} />
+          <textarea name="aiHotRuleText" rows="3" data-nl-rule-scope="ai_hot">${escapeHtml(ruleByScope.get("ai_hot")?.ruleText ?? "")}</textarea>
         </label>
         <label class="content-feedback-field">
-          <span>ai 规则</span>
-          <textarea name="aiRuleText" rows="3" data-nl-rule-scope="ai">${escapeHtml(ruleByScope.get("ai") ?? "")}</textarea>
+          <span>首条精选门</span>
+          <input type="checkbox" name="heroEnabled"${ruleByScope.get("hero")?.enabled === false ? "" : " checked"} />
+          <textarea name="heroRuleText" rows="3" data-nl-rule-scope="hero">${escapeHtml(ruleByScope.get("hero")?.ruleText ?? "")}</textarea>
         </label>
         <div class="system-action-row">
           <button type="submit" class="primary-mini-button">保存正式规则</button>
@@ -519,10 +465,10 @@ function renderStrategyDraftEntry(draft: StrategyDraftItem): string {
           <span class="field-label">目标范围</span>
           <select class="field-input" name="suggestedScope">
             ${renderSelectOption("unspecified", "未指定", draft.suggestedScope)}
-            ${renderSelectOption("global", "全局", draft.suggestedScope)}
-            ${renderSelectOption("hot", "hot", draft.suggestedScope)}
-            ${renderSelectOption("articles", "articles", draft.suggestedScope)}
-            ${renderSelectOption("ai", "ai", draft.suggestedScope)}
+            ${renderSelectOption("base", "基础入池门", draft.suggestedScope)}
+            ${renderSelectOption("ai_new", "AI 新讯入池门", draft.suggestedScope)}
+            ${renderSelectOption("ai_hot", "AI 热点入池门", draft.suggestedScope)}
+            ${renderSelectOption("hero", "首条精选门", draft.suggestedScope)}
           </select>
         </label>
         <label class="content-feedback-field">
@@ -690,29 +636,7 @@ function renderEmptyState(title: string, description: string): string {
   `;
 }
 
-function normalizeViewRulesWorkbench(input: ViewRuleItem[] | ViewRulesWorkbenchView): ViewRulesWorkbenchView {
-  if (Array.isArray(input)) {
-    return {
-      numericRules: input,
-      providerSettings: null,
-      providerCapability: {
-        hasMasterKey: false,
-        featureAvailable: false,
-        message: "当前未启用自然语言匹配。"
-      },
-      nlRules: [
-        { scope: "global", ruleText: "", createdAt: "", updatedAt: "" },
-        { scope: "hot", ruleText: "", createdAt: "", updatedAt: "" },
-        { scope: "articles", ruleText: "", createdAt: "", updatedAt: "" },
-        { scope: "ai", ruleText: "", createdAt: "", updatedAt: "" }
-      ],
-      feedbackPool: [],
-      strategyDrafts: [],
-      latestEvaluationRun: null,
-      isEvaluationRunning: false
-    };
-  }
-
+function normalizeViewRulesWorkbench(input: ViewRulesWorkbenchView): ViewRulesWorkbenchView {
   return input;
 }
 

@@ -108,16 +108,17 @@ describe("SourcesPage", () => {
       "shadow-editorial-card"
     );
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 新讯今日候选 / 今日展示");
-    expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 新讯当前页今日占比");
-    expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 热点当前页今日占比");
+    expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 新讯独立展示占比");
+    expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 热点独立展示占比");
+    expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("选中时全量");
     expect(wrapper.get("[data-sources-section='analytics']").text().indexOf("AI 新讯今日候选 / 今日展示")).toBeLessThan(
       wrapper.get("[data-sources-section='analytics']").text().indexOf("AI 热点今日候选 / 今日展示")
     );
     expect(wrapper.get("[data-sources-section='analytics']").text()).not.toContain("Articles 今日候选 / 今日展示");
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("OpenAI");
     expect(wrapper.get("[data-sources-section='inventory']").classes()).toContain("bg-editorial-panel");
-    expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("completed");
-    expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("选中时全量");
+    expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("已完成");
+    expect(wrapper.get("[data-sources-section='inventory']").text()).not.toContain("选中时全量");
 
     const analyticsHeaderCells = wrapper.get("[data-sources-section='analytics']").findAll("thead th");
     const inventoryHeaderCells = wrapper.get("[data-sources-section='inventory']").findAll("thead th");

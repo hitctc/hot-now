@@ -37,21 +37,21 @@ export function listSourceWorkbench(
   db: SqliteDatabase,
   options: {
     referenceTime?: Date;
-    selectedSourceKinds?: string[];
   } = {}
 ): SourceWorkbenchRow[] {
-  // Workbench stats now follow the browser's真实来源筛选上下文，和内容页一起回答“当前页今天各来源贡献了多少”。
+  // Workbench stats改回独立来源口径，回答“这个来源自己今天能贡献多少候选、展示和占比”。
   const referenceTime = options.referenceTime ?? new Date();
   const sourceCards = listSourceCards(db);
   const countMap = readSourceCountMap(db, referenceTime);
   const enabledSources = sourceCards.filter((source) => source.isEnabled);
-  const effectiveSelectedSourceKinds = normalizeSelectedSourceKinds(
-    options.selectedSourceKinds,
-    enabledSources
-  ) ?? deriveDefaultSelectedSourceKinds(enabledSources);
-  const hotStats = readCurrentPageTodayStatsBySource(db, "hot", referenceTime, effectiveSelectedSourceKinds);
-  const articleStats = readCurrentPageTodayStatsBySource(db, "articles", referenceTime, effectiveSelectedSourceKinds);
-  const aiStats = readCurrentPageTodayStatsBySource(db, "ai", referenceTime, effectiveSelectedSourceKinds);
+  const hotStats = readIndependentTodayStatsBySource(db, enabledSources.map((source) => source.kind), "hot", referenceTime);
+  const articleStats = readIndependentTodayStatsBySource(
+    db,
+    enabledSources.map((source) => source.kind),
+    "articles",
+    referenceTime
+  );
+  const aiStats = readIndependentTodayStatsBySource(db, enabledSources.map((source) => source.kind), "ai", referenceTime);
 
   return sourceCards.map((sourceCard) => ({
     ...sourceCard,
@@ -86,46 +86,42 @@ function readSourceCountMap(db: SqliteDatabase, referenceTime: Date) {
   return new Map(rows.map((row) => [row.sourceKind, row]));
 }
 
-function readCurrentPageTodayStatsBySource(
+function readIndependentTodayStatsBySource(
   db: SqliteDatabase,
+  sourceKinds: string[],
   viewKey: "hot" | "articles" | "ai",
-  referenceTime: Date,
-  selectedSourceKinds: string[]
+  referenceTime: Date
 ) {
-  const selection = buildContentViewSelection(db, viewKey, {
-    referenceTime,
-    selectedSourceKinds
-  });
+  const stats = new Map<string, SourceViewStats>();
+  let totalVisibleCount = 0;
 
-  return new Map(
-    Object.entries(selection.currentPageMetricsBySourceKind).map(([sourceKind, metrics]) => [
-      sourceKind,
-      {
-        todayCandidateCount: metrics.todayCandidateCount,
-        todayVisibleCount: metrics.todayVisibleCount,
-        todayVisibleShare: metrics.todayVisibleShare
-      }
-    ])
-  );
-}
+  for (const sourceKind of sourceKinds) {
+    const selection = buildContentViewSelection(db, viewKey, {
+      referenceTime,
+      selectedSourceKinds: [sourceKind]
+    });
+    const metrics = selection.currentPageMetricsBySourceKind[sourceKind] ?? {
+      todayCandidateCount: 0,
+      todayVisibleCount: 0,
+      todayVisibleShare: 0
+    };
 
-function normalizeSelectedSourceKinds(
-  selectedSourceKinds: string[] | undefined,
-  sourceCards: Array<{ kind: string }>
-) {
-  if (selectedSourceKinds === undefined) {
-    return undefined;
+    stats.set(sourceKind, {
+      todayCandidateCount: metrics.todayCandidateCount,
+      todayVisibleCount: metrics.todayVisibleCount,
+      todayVisibleShare: 0
+    });
+    totalVisibleCount += metrics.todayVisibleCount;
   }
 
-  const allowedSourceKinds = new Set(sourceCards.map((source) => source.kind));
+  for (const [sourceKind, entry] of stats.entries()) {
+    stats.set(sourceKind, {
+      ...entry,
+      todayVisibleShare: totalVisibleCount > 0 ? entry.todayVisibleCount / totalVisibleCount : 0
+    });
+  }
 
-  return selectedSourceKinds.filter((kind, index, array) => {
-    return allowedSourceKinds.has(kind) && array.indexOf(kind) === index;
-  });
-}
-
-function deriveDefaultSelectedSourceKinds(sourceCards: Array<{ kind: string; showAllWhenSelected: boolean }>) {
-  return sourceCards.filter((source) => !source.showAllWhenSelected).map((source) => source.kind);
+  return stats;
 }
 
 function buildShanghaiDayRange(referenceTime: Date) {

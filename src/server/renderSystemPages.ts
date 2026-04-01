@@ -189,9 +189,12 @@ function renderSourcesOverviewTable(sources: SourceItem[]) {
             <th>总条数</th>
             <th>今天发布</th>
             <th>今天抓取</th>
-            <th>Hot 入池 / 展示</th>
-            <th>Articles 入池 / 展示</th>
-            <th>AI 入池 / 展示</th>
+            <th>Hot 今日候选 / 今日展示</th>
+            <th>Hot 独立展示占比</th>
+            <th>Articles 今日候选 / 今日展示</th>
+            <th>Articles 独立展示占比</th>
+            <th>AI 今日候选 / 今日展示</th>
+            <th>AI 独立展示占比</th>
           </tr>
         </thead>
         <tbody>
@@ -218,10 +221,17 @@ function renderSourcesOverviewRow(source: SourceItem) {
       <td>${source.publishedTodayCount ?? 0}</td>
       <td>${source.collectedTodayCount ?? 0}</td>
       <td>${hotStats.todayCandidateCount} / ${hotStats.todayVisibleCount}</td>
+      <td>${formatPercent(hotStats.todayVisibleShare)}</td>
       <td>${articleStats.todayCandidateCount} / ${articleStats.todayVisibleCount}</td>
+      <td>${formatPercent(articleStats.todayVisibleShare)}</td>
       <td>${aiStats.todayCandidateCount} / ${aiStats.todayVisibleCount}</td>
+      <td>${formatPercent(aiStats.todayVisibleShare)}</td>
     </tr>
   `;
+}
+
+function formatPercent(value: number) {
+  return `${(Math.max(0, value) * 100).toFixed(1)}%`;
 }
 
 export function renderProfilePage(profile: ProfileView | null): string {
@@ -538,7 +548,7 @@ function renderSourceCard(source: SourceItem): string {
         </div>
         <div class="system-detail-row">
           <dt>最近抓取状态</dt>
-          <dd>${escapeHtml(source.lastCollectionStatus?.trim() || "unknown")}</dd>
+          <dd>${escapeHtml(formatCollectionStatus(source.lastCollectionStatus))}</dd>
         </div>
       </dl>
       <div class="system-card-actions system-card-actions--source">
@@ -722,6 +732,32 @@ function formatDateTime(value: string | null): string {
   })
     .format(parsed)
     .replace(/\//g, "-");
+}
+
+function formatCollectionStatus(value: string | null): string {
+  const normalized = value?.trim().toLowerCase();
+
+  if (!normalized) {
+    return "未知";
+  }
+
+  if (normalized === "completed") {
+    return "已完成";
+  }
+
+  if (normalized === "running") {
+    return "进行中";
+  }
+
+  if (normalized === "failed") {
+    return "已失败";
+  }
+
+  if (normalized === "pending") {
+    return "等待中";
+  }
+
+  return value ?? "未知";
 }
 
 function toSafeHttpUrl(rawValue: string | null): string | null {

@@ -12,7 +12,7 @@ describe("settingsApi", () => {
     window.localStorage.clear();
   });
 
-  it("reuses the stored content source filter when reading the sources workbench", async () => {
+  it("reads the sources workbench without reusing the content-page source filter", async () => {
     const { writeStoredContentSourceKinds } = await import("../../src/client/services/contentApi");
     const { readSettingsSources } = await import("../../src/client/services/settingsApi");
 
@@ -30,10 +30,6 @@ describe("settingsApi", () => {
 
     await readSettingsSources();
 
-    expect(requestJson).toHaveBeenCalledWith("/api/settings/sources", {
-      headers: {
-        "x-hot-now-source-filter": "openai,juya"
-      }
-    });
+    expect(requestJson).toHaveBeenCalledWith("/api/settings/sources");
   });
 });

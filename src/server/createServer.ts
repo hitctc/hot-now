@@ -133,7 +133,7 @@ type ServerDeps = {
   clearAllFeedback?: () => Promise<ClearFeedbackResult> | ClearFeedbackResult;
   saveStrategyDraft?: (input: UpdateStrategyDraftInput) => Promise<UpdateStrategyDraftResult> | UpdateStrategyDraftResult;
   deleteStrategyDraft?: (draftId: number) => Promise<DeleteDraftResult> | DeleteDraftResult;
-  listSources?: (options?: { selectedSourceKinds?: string[] }) => Promise<SourceCard[]> | SourceCard[];
+  listSources?: () => Promise<SourceCard[]> | SourceCard[];
   getSourcesOperationSummary?: () => Promise<SourcesOperationSummary> | SourcesOperationSummary;
   toggleSource?: (kind: string, enable: boolean) => Promise<ToggleSourceResult> | ToggleSourceResult;
   updateSourceDisplayMode?: (
@@ -224,7 +224,7 @@ export function createServer(deps: ServerDeps = {}) {
       return;
     }
 
-    return reply.send(await readSettingsSourcesApiData(deps, request));
+    return reply.send(await readSettingsSourcesApiData(deps));
   });
 
   app.get("/api/settings/profile", async (request, reply) => {
@@ -925,15 +925,9 @@ async function readSettingsViewRulesApiData(deps: ServerDeps): Promise<ViewRules
   return workbench;
 }
 
-async function readSettingsSourcesApiData(
-  deps: ServerDeps,
-  request: FastifyRequest
-): Promise<SourcesSettingsView> {
-  // Sources workbench now follows the same browser来源筛选上下文，避免和内容页出现两套来源统计口径。
-  const selectedSourceKinds = readSelectedSourceKindsHeader(request.headers["x-hot-now-source-filter"]);
-  const sources = ((await deps.listSources?.(
-    selectedSourceKinds === undefined ? undefined : { selectedSourceKinds }
-  )) ?? []) as SourceCard[];
+async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSettingsView> {
+  // Sources workbench uses独立来源统计，不再依赖内容页当前筛选上下文。
+  const sources = ((await deps.listSources?.()) ?? []) as SourceCard[];
   const operationSummary = deps.getSourcesOperationSummary
     ? await deps.getSourcesOperationSummary()
     : { lastCollectionRunAt: null, lastSendLatestEmailAt: null };

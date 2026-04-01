@@ -542,7 +542,7 @@ const app = createServer({
     });
   },
   deleteStrategyDraft: async (draftId) => deleteStrategyDraft(db, draftId),
-  listSources: async (options) => listSourceWorkbench(db, options),
+  listSources: async () => listSourceWorkbench(db),
   getSourcesOperationSummary: async () => readSourcesOperationSummary(db),
   toggleSource: async (kind, enable) => toggleSource(kind, enable),
   updateSourceDisplayMode: async (kind, showAllWhenSelected) => updateSourceDisplayMode(kind, showAllWhenSelected),

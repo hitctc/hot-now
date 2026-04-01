@@ -24,18 +24,18 @@ type PageNotice = { tone: AlertTone; message: string };
 
 const analyticsColumns = [
   { title: "来源", key: "name", align: "center" as const },
+  { title: "选中时全量", key: "displayMode", align: "center" as const },
   { title: "总条数", key: "totalCount", align: "center" as const },
   { title: "今天发布", key: "publishedTodayCount", align: "center" as const },
   { title: "今天抓取", key: "collectedTodayCount", align: "center" as const },
   { title: "AI 新讯今日候选 / 今日展示", key: "aiStats", align: "center" as const },
-  { title: "AI 新讯当前页今日占比", key: "aiShare", align: "center" as const },
+  { title: "AI 新讯独立展示占比", key: "aiShare", align: "center" as const },
   { title: "AI 热点今日候选 / 今日展示", key: "hotStats", align: "center" as const },
-  { title: "AI 热点当前页今日占比", key: "hotShare", align: "center" as const }
+  { title: "AI 热点独立展示占比", key: "hotShare", align: "center" as const }
 ];
 const inventoryColumns = [
   { title: "来源", key: "name", align: "center" as const },
   { title: "启用", key: "enabled", align: "center" as const },
-  { title: "选中时全量", key: "displayMode", align: "center" as const },
   { title: "最近抓取时间", key: "lastCollectedAt", align: "center" as const },
   { title: "最近抓取状态", key: "lastCollectionStatus", align: "center" as const },
   { title: "RSS", key: "rssUrl", align: "center" as const }
@@ -112,6 +112,33 @@ function formatViewShare(
   }
 
   return `${(stats.todayVisibleShare * 100).toFixed(1)}%`;
+}
+
+// 最近抓取状态保留原始枚举给后端和数据库，页面统一翻译成中文给用户看。
+function formatCollectionStatus(value: string | null | undefined): string {
+  const normalized = value?.trim().toLowerCase();
+
+  if (!normalized) {
+    return "未知";
+  }
+
+  if (normalized === "completed") {
+    return "已完成";
+  }
+
+  if (normalized === "running") {
+    return "进行中";
+  }
+
+  if (normalized === "failed") {
+    return "已失败";
+  }
+
+  if (normalized === "pending") {
+    return "等待中";
+  }
+
+  return value ?? "未知";
 }
 
 // sources 页错误提示沿用后端 reason 映射，避免把接口细节直接暴露给用户。
@@ -401,6 +428,16 @@ onMounted(() => {
               <template v-else-if="column.key === 'totalCount'">
                 {{ record.totalCount ?? 0 }}
               </template>
+              <template v-else-if="column.key === 'displayMode'">
+                <a-switch
+                  :checked="record.showAllWhenSelected"
+                  :loading="isActionPending(`display-mode:${record.kind}`)"
+                  :checked-children="'全量'"
+                  :un-checked-children="'截断'"
+                  :data-source-display-mode="record.kind"
+                  @change="handleToggleSourceDisplayMode(record)"
+                />
+              </template>
               <template v-else-if="column.key === 'publishedTodayCount'">
                 {{ record.publishedTodayCount ?? 0 }}
               </template>
@@ -453,22 +490,12 @@ onMounted(() => {
                   @change="handleToggleSource(record)"
                 />
               </template>
-              <template v-else-if="column.key === 'displayMode'">
-                <a-switch
-                  :checked="record.showAllWhenSelected"
-                  :loading="isActionPending(`display-mode:${record.kind}`)"
-                  :checked-children="'全量'"
-                  :un-checked-children="'截断'"
-                  :data-source-display-mode="record.kind"
-                  @change="handleToggleSourceDisplayMode(record)"
-                />
-              </template>
               <template v-else-if="column.key === 'lastCollectedAt'">
                 {{ formatDateTime(record.lastCollectedAt) }}
               </template>
               <template v-else-if="column.key === 'lastCollectionStatus'">
                 <a-tag :color="record.lastCollectionStatus === 'completed' ? 'green' : 'gold'">
-                  {{ record.lastCollectionStatus || "unknown" }}
+                  {{ formatCollectionStatus(record.lastCollectionStatus) }}
                 </a-tag>
               </template>
               <template v-else-if="column.key === 'rssUrl'">

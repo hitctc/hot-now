@@ -144,7 +144,7 @@ describe("settings api routes", () => {
     });
   });
 
-  it("passes the current content source filter header through to the sources workbench reader", async () => {
+  it("does not pass content-page source filters through to the sources workbench reader", async () => {
     const listSources = vi.fn().mockResolvedValue([
       {
         kind: "openai",
@@ -184,9 +184,7 @@ describe("settings api routes", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(listSources).toHaveBeenCalledWith({
-      selectedSourceKinds: ["openai", "juya"]
-    });
+    expect(listSources).toHaveBeenCalledWith();
   });
 
   it("returns the current user model for logged-in users", async () => {

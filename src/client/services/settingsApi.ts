@@ -1,4 +1,3 @@
-import { readStoredContentSourceKinds } from "./contentApi";
 import { HttpError, requestJson } from "./http";
 
 export type SettingsProfile = {
@@ -224,24 +223,9 @@ export function readSettingsViewRules(): Promise<SettingsViewRulesResponse> {
   return requestJson<SettingsViewRulesResponse>("/api/settings/view-rules");
 }
 
-function createSettingsSourcesHeaders(): HeadersInit | undefined {
-  // sources 工作台复用内容页本地来源筛选，这样统计语义始终跟当前浏览器上下文一致。
-  const selectedSourceKinds = readStoredContentSourceKinds();
-
-  if (selectedSourceKinds === null) {
-    return undefined;
-  }
-
-  return {
-    "x-hot-now-source-filter": selectedSourceKinds.join(",")
-  };
-}
-
-// 预留给后续系统页工作区的数据读取接口，当前只把来源筛选上下文沿用到工作台读取。
+// sources 工作台现在使用独立来源统计，不再复用内容页当前筛选上下文。
 export function readSettingsSources(): Promise<SettingsSourcesResponse> {
-  return requestJson<SettingsSourcesResponse>("/api/settings/sources", {
-    headers: createSettingsSourcesHeaders()
-  });
+  return requestJson<SettingsSourcesResponse>("/api/settings/sources");
 }
 
 // 系统页写操作统一走 JSON POST，这样页面组件不需要重复拼 fetch 细节。

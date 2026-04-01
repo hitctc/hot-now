@@ -26,9 +26,18 @@ export type RankedContentCardView = ContentCardView & {
   heroScoreDelta: number;
 };
 
+export type CurrentPageSourceMetrics = {
+  todayCandidateCount: number;
+  todayVisibleCount: number;
+  todayVisibleShare: number;
+};
+
 export type ContentViewSelection = {
   candidateCards: RankedContentCardView[];
   visibleCards: RankedContentCardView[];
+  visibleCountsBySourceKind: Record<string, number>;
+  currentPageMetricsBySourceKind: Record<string, CurrentPageSourceMetrics>;
+  currentPageTodayVisibleCount: number;
 };
 
 type RankedContentCardCandidate = RankedContentCardView & {
@@ -152,7 +161,7 @@ export function buildContentViewSelection(
   const rows = db
     .prepare(contentSelectSql)
     .all({ viewScope: mapViewScope(viewKey) }) as ContentCardRow[];
-  const rankedCards = rows
+  const rankedCandidates = rows
     .map((row) =>
       buildRankedCardCandidate(row, {
         viewKey,
@@ -161,7 +170,8 @@ export function buildContentViewSelection(
         includeNlEvaluations
       })
     )
-    .filter((card) => !card.isBlocked)
+    .filter((card) => !card.isBlocked);
+  const rankedCards = rankedCandidates
     .filter((card) => selectedSourceKinds === null || selectedSourceKinds.has(card.sourceKind))
     .sort(compareByRanking);
   const limit = options.limitOverride ?? viewRuleConfig.limit;
@@ -178,12 +188,119 @@ export function buildContentViewSelection(
     ...rankedCards.filter((card) => !fullDisplaySourceKinds.has(card.sourceKind)).slice(0, limit)
   ]
     .sort((left, right) => compareVisibleCards(sortMode, left, right))
-    .map(({ isBlocked: _isBlocked, showAllWhenSelected: _showAllWhenSelected, ...card }) => card);
+    .map(stripInternalSelectionCard);
+  // 旧来源 tag 仍暂时保留稳定单来源口径，便于旧调用方在这轮迁移里逐步切换。
+  const visibleCountsBySourceKind = countStableVisibleCardsBySourceKind(rankedCandidates, limit);
+  const currentPageMetricsBySourceKind = countCurrentPageMetricsBySourceKind(
+    rankedCards,
+    visibleCards,
+    referenceTime
+  );
+  const currentPageTodayVisibleCount = Object.values(currentPageMetricsBySourceKind)
+    .reduce((sum, entry) => sum + entry.todayVisibleCount, 0);
 
   return {
-    candidateCards: rankedCards.map(({ isBlocked: _isBlocked, showAllWhenSelected: _showAllWhenSelected, ...card }) => card),
-    visibleCards
+    candidateCards: rankedCards.map(stripInternalSelectionCard),
+    visibleCards,
+    visibleCountsBySourceKind,
+    currentPageMetricsBySourceKind: applyCurrentPageVisibleShares(
+      currentPageMetricsBySourceKind,
+      currentPageTodayVisibleCount
+    ),
+    currentPageTodayVisibleCount
   };
+}
+
+function countStableVisibleCardsBySourceKind(
+  cards: RankedContentCardCandidate[],
+  limit: number
+): Record<string, number> {
+  const counts = new Map<string, { candidateCount: number; showAllWhenSelected: boolean }>();
+
+  for (const card of cards) {
+    const entry = counts.get(card.sourceKind) ?? {
+      candidateCount: 0,
+      showAllWhenSelected: card.showAllWhenSelected
+    };
+
+    entry.candidateCount += 1;
+    counts.set(card.sourceKind, entry);
+  }
+
+  return Object.fromEntries(
+    [...counts.entries()].map(([sourceKind, entry]) => [
+      sourceKind,
+      entry.showAllWhenSelected ? entry.candidateCount : Math.min(entry.candidateCount, limit)
+    ])
+  );
+}
+
+function countCurrentPageMetricsBySourceKind(
+  candidateCards: RankedContentCardCandidate[],
+  visibleCards: RankedContentCardView[],
+  referenceTime: Date
+): Record<string, CurrentPageSourceMetrics> {
+  // 当前页来源指标只回答“在这次真实筛选结果里，今天每个来源贡献了多少候选和展示”。
+  const { shanghaiDayStart, shanghaiNextDayStart } = buildShanghaiDayRange(referenceTime);
+  const metrics = new Map<string, CurrentPageSourceMetrics>();
+
+  for (const card of candidateCards) {
+    if (!isWithinShanghaiDay(card.publishedAt ?? card.rankingTimestamp, shanghaiDayStart, shanghaiNextDayStart)) {
+      continue;
+    }
+
+    const entry = metrics.get(card.sourceKind) ?? {
+      todayCandidateCount: 0,
+      todayVisibleCount: 0,
+      todayVisibleShare: 0
+    };
+    entry.todayCandidateCount += 1;
+    metrics.set(card.sourceKind, entry);
+  }
+
+  for (const card of visibleCards) {
+    if (!isWithinShanghaiDay(card.publishedAt ?? card.rankingTimestamp, shanghaiDayStart, shanghaiNextDayStart)) {
+      continue;
+    }
+
+    const entry = metrics.get(card.sourceKind) ?? {
+      todayCandidateCount: 0,
+      todayVisibleCount: 0,
+      todayVisibleShare: 0
+    };
+    entry.todayVisibleCount += 1;
+    metrics.set(card.sourceKind, entry);
+  }
+
+  return Object.fromEntries(metrics.entries());
+}
+
+function applyCurrentPageVisibleShares(
+  metricsBySourceKind: Record<string, CurrentPageSourceMetrics>,
+  currentPageTodayVisibleCount: number
+): Record<string, CurrentPageSourceMetrics> {
+  // 今日占比统一在这里补齐，确保内容页和工作台复用同一分母定义。
+  return Object.fromEntries(
+    Object.entries(metricsBySourceKind).map(([sourceKind, metrics]) => [
+      sourceKind,
+      {
+        ...metrics,
+        todayVisibleShare:
+          currentPageTodayVisibleCount > 0
+            ? metrics.todayVisibleCount / currentPageTodayVisibleCount
+            : 0
+      }
+    ])
+  );
+}
+
+// 内容页选择链路会保留内部排序与开关字段，这里统一在对外返回前剥离，避免两套 map 写法漂移。
+function stripInternalSelectionCard({
+  isBlocked: _isBlocked,
+  showAllWhenSelected: _showAllWhenSelected,
+  ...card
+}: RankedContentCardCandidate): RankedContentCardView {
+  return card;
 }
 
 function buildRankedCardCandidate(
@@ -406,6 +523,48 @@ function toTimestampMs(value: string | null): number {
 
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isWithinShanghaiDay(
+  value: string | null,
+  shanghaiDayStart: string,
+  shanghaiNextDayStart: string
+) {
+  if (!value) {
+    return false;
+  }
+
+  const timestamp = Date.parse(value);
+  const shanghaiDayStartTimestamp = Date.parse(shanghaiDayStart);
+  const shanghaiNextDayStartTimestamp = Date.parse(shanghaiNextDayStart);
+
+  if (
+    Number.isNaN(timestamp) ||
+    Number.isNaN(shanghaiDayStartTimestamp) ||
+    Number.isNaN(shanghaiNextDayStartTimestamp)
+  ) {
+    return false;
+  }
+
+  return timestamp >= shanghaiDayStartTimestamp && timestamp < shanghaiNextDayStartTimestamp;
+}
+
+function buildShanghaiDayRange(referenceTime: Date) {
+  // 统计日统一锚定到上海自然日，避免服务器时区不同导致“今天”口径漂移。
+  const shanghaiFormatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  const [year, month, day] = shanghaiFormatter.format(referenceTime).split("-");
+  const nextDayReferenceTime = new Date(referenceTime.getTime() + 24 * 60 * 60 * 1000);
+  const [nextYear, nextMonth, nextDay] = shanghaiFormatter.format(nextDayReferenceTime).split("-");
+
+  return {
+    shanghaiDayStart: `${year}-${month}-${day}T00:00:00+08:00`,
+    shanghaiNextDayStart: `${nextYear}-${nextMonth}-${nextDay}T00:00:00+08:00`
+  };
 }
 
 function parseKeywordJson(rawValue: string | null): string[] {

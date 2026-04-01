@@ -65,6 +65,10 @@ describe("buildContentViewSelection", () => {
 
     expect(selection.candidateCards.map((card) => card.sourceKind)).toEqual(["ithome"]);
     expect(selection.visibleCards.map((card) => card.title)).toEqual(["IT之家 only"]);
+    expect(selection.visibleCountsBySourceKind).toEqual({
+      openai: 1,
+      ithome: 1
+    });
     expect(listContentView(db, "articles", { selectedSourceKinds: ["ithome"] })).toHaveLength(1);
   });
 
@@ -109,6 +113,10 @@ describe("buildContentViewSelection", () => {
       "OpenAI Full C",
       "ITHome Limited"
     ]);
+    expect(selection.visibleCountsBySourceKind).toEqual({
+      openai: 3,
+      ithome: 1
+    });
   });
 
   it("supports published-at and content-score sorts on the final visible set", async () => {
@@ -238,6 +246,88 @@ describe("buildContentViewSelection", () => {
 
     expect(selection.visibleCards[0]?.title).toBe("Older complete brief");
     expect(selection.visibleCards).toHaveLength(2);
+  });
+
+  it("returns current-page source metrics for today candidate, today visible, and today visible share", async () => {
+    const db = await createTestDatabase(databasesToClose);
+    const openai = resolveSourceByKind(db, "openai");
+    const kr36 = resolveSourceByKind(db, "kr36");
+
+    upsertContentItems(db, {
+      sourceId: openai!.id,
+      items: [
+        {
+          title: "OpenAI today visible",
+          canonicalUrl: "https://example.com/openai-today-visible",
+          summary: "OpenAI today visible summary",
+          bodyMarkdown: "OpenAI today visible body",
+          publishedAt: "2026-03-31T01:00:00.000Z",
+          fetchedAt: "2026-03-31T01:10:00.000Z"
+        }
+      ]
+    });
+    upsertContentItems(db, {
+      sourceId: kr36!.id,
+      items: [
+        {
+          title: "36Kr today visible",
+          canonicalUrl: "https://example.com/kr36-today-visible",
+          summary: "36Kr today visible summary",
+          bodyMarkdown: "36Kr today visible body",
+          publishedAt: "2026-03-31T02:00:00.000Z",
+          fetchedAt: "2026-03-31T02:10:00.000Z"
+        }
+      ]
+    });
+
+    const selection = buildContentViewSelection(db, "ai", {
+      referenceTime: new Date("2026-03-31T04:00:00.000Z"),
+      selectedSourceKinds: ["openai", "kr36"],
+      sortMode: "published_at"
+    });
+
+    expect(selection.currentPageTodayVisibleCount).toBe(2);
+    expect(selection.currentPageMetricsBySourceKind.openai).toMatchObject({
+      todayCandidateCount: 1,
+      todayVisibleCount: 1,
+      todayVisibleShare: 0.5
+    });
+    expect(selection.currentPageMetricsBySourceKind.kr36).toMatchObject({
+      todayCandidateCount: 1,
+      todayVisibleCount: 1,
+      todayVisibleShare: 0.5
+    });
+  });
+
+  it("falls back to fetchedAt for today metrics when publishedAt is missing", async () => {
+    const db = await createTestDatabase(databasesToClose);
+    const openai = resolveSourceByKind(db, "openai");
+
+    upsertContentItems(db, {
+      sourceId: openai!.id,
+      items: [
+        {
+          title: "OpenAI today fallback",
+          canonicalUrl: "https://example.com/openai-today-fallback",
+          summary: "OpenAI today fallback summary",
+          bodyMarkdown: "OpenAI today fallback body",
+          publishedAt: null,
+          fetchedAt: "2026-03-31T03:00:00.000Z"
+        }
+      ]
+    });
+
+    const selection = buildContentViewSelection(db, "ai", {
+      referenceTime: new Date("2026-03-31T04:00:00.000Z"),
+      selectedSourceKinds: ["openai"],
+      sortMode: "published_at"
+    });
+
+    expect(selection.currentPageMetricsBySourceKind.openai).toMatchObject({
+      todayCandidateCount: 1,
+      todayVisibleCount: 1,
+      todayVisibleShare: 1
+    });
   });
 });
 

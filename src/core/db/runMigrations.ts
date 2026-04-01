@@ -1,10 +1,11 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 4;
+const schemaVersion = 5;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
 const sourceDisplayModeMigrationName = "004_source_display_mode";
+const nlRuleEnabledFlagMigrationName = "005_nl_rule_enabled_flag";
 
 const migrationStatements = [
   `
@@ -266,6 +267,20 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(4, sourceDisplayModeMigrationName);
+
+    // Gate rules need an explicit enable flag so each natural-language gate can be paused without
+    // clearing its text and losing the authored rule.
+    if (!hasColumn(db, "nl_rule_sets", "is_enabled")) {
+      db.exec("ALTER TABLE nl_rule_sets ADD COLUMN is_enabled INTEGER NOT NULL DEFAULT 1");
+    }
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(5, nlRuleEnabledFlagMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

@@ -1,6 +1,8 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
-
-export type StrategyDraftScope = "unspecified" | "global" | "hot" | "articles" | "ai";
+import {
+  normalizeStrategyDraftScope,
+  type StrategyDraftScope
+} from "./strategyGateScopes.js";
 
 export type StrategyDraft = {
   id: number;
@@ -148,7 +150,7 @@ export function deleteStrategyDraft(db: SqliteDatabase, draftId: number): boolea
 }
 
 function normalizeSuggestedScope(value: string | undefined): StrategyDraftScope {
-  return value === "global" || value === "hot" || value === "articles" || value === "ai" ? value : "unspecified";
+  return normalizeStrategyDraftScope(value);
 }
 
 function normalizeDraftText(value: string): string {

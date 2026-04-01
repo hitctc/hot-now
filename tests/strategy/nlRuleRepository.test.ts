@@ -17,25 +17,29 @@ describe("nlRuleRepository", () => {
 
     expect(listNlRuleSets(handle.db)).toEqual([
       {
-        scope: "global",
+        scope: "base",
+        enabled: true,
         ruleText: "",
         createdAt: expect.any(String),
         updatedAt: expect.any(String)
       },
       {
-        scope: "hot",
+        scope: "ai_new",
+        enabled: true,
         ruleText: "",
         createdAt: expect.any(String),
         updatedAt: expect.any(String)
       },
       {
-        scope: "articles",
+        scope: "ai_hot",
+        enabled: true,
         ruleText: "",
         createdAt: expect.any(String),
         updatedAt: expect.any(String)
       },
       {
-        scope: "ai",
+        scope: "hero",
+        enabled: true,
         ruleText: "",
         createdAt: expect.any(String),
         updatedAt: expect.any(String)
@@ -49,18 +53,25 @@ describe("nlRuleRepository", () => {
 
     const successResult = saveNlRuleSet(
       handle.db,
-      "global",
-      "暂时不展示融资快讯；agent workflow 相关内容加分。"
+      "base",
+      {
+        enabled: false,
+        ruleText: "暂时不展示融资快讯；agent workflow 相关内容加分。"
+      }
     );
-    const failureResult = saveNlRuleSet(handle.db, "unknown-scope", "missing");
+    const failureResult = saveNlRuleSet(handle.db, "unknown-scope", {
+      enabled: true,
+      ruleText: "missing"
+    });
 
     expect(successResult).toEqual({ ok: true });
     expect(failureResult).toEqual({
       ok: false,
       reason: "not-found"
     });
-    expect(getNlRuleSet(handle.db, "global")).toEqual({
-      scope: "global",
+    expect(getNlRuleSet(handle.db, "base")).toEqual({
+      scope: "base",
+      enabled: false,
       ruleText: "暂时不展示融资快讯；agent workflow 相关内容加分。",
       createdAt: expect.any(String),
       updatedAt: expect.any(String)

@@ -46,7 +46,7 @@ describe("strategyDraftRepository", () => {
       id: draftId,
       sourceFeedbackId: feedbackSave.entryId,
       draftText: "AI 页优先保留 agent workflow 和模型工程拆解",
-      suggestedScope: "ai",
+      suggestedScope: "ai_new",
       draftEffectSummary: "AI 页高优先",
       positiveKeywords: ["agent", "workflow", "model"],
       negativeKeywords: ["融资", "快讯"]
@@ -58,7 +58,7 @@ describe("strategyDraftRepository", () => {
         id: draftId,
         sourceFeedbackId: feedbackSave.entryId,
         draftText: "AI 页优先保留 agent workflow 和模型工程拆解",
-        suggestedScope: "ai",
+        suggestedScope: "ai_new",
         draftEffectSummary: "AI 页高优先",
         positiveKeywords: ["agent", "workflow", "model"],
         negativeKeywords: ["融资", "快讯"],
@@ -75,7 +75,7 @@ describe("strategyDraftRepository", () => {
     const result = updateStrategyDraft(handle.db, {
       id: 999_999,
       draftText: "missing",
-      suggestedScope: "global"
+      suggestedScope: "base"
     });
 
     expect(result).toEqual({
@@ -90,15 +90,32 @@ describe("strategyDraftRepository", () => {
 
     const firstId = createStrategyDraft(handle.db, {
       draftText: "first draft",
-      suggestedScope: "hot"
+      suggestedScope: "ai_hot"
     });
     const secondId = createStrategyDraft(handle.db, {
       draftText: "second draft",
-      suggestedScope: "articles"
+      suggestedScope: "hero"
     });
 
     expect(listStrategyDrafts(handle.db).map((draft) => draft.id)).toEqual([secondId, firstId]);
     expect(deleteStrategyDraft(handle.db, secondId)).toBe(true);
     expect(listStrategyDrafts(handle.db).map((draft) => draft.id)).toEqual([firstId]);
+  });
+
+  it("normalizes legacy scopes to unspecified when reading and writing drafts", async () => {
+    const handle = await createTestDatabase("hot-now-strategy-draft-");
+    handles.push(handle);
+
+    const firstId = createStrategyDraft(handle.db, {
+      draftText: "legacy hot draft",
+      suggestedScope: "hot" as never
+    });
+    const secondId = createStrategyDraft(handle.db, {
+      draftText: "legacy articles draft",
+      suggestedScope: "articles" as never
+    });
+
+    expect(listStrategyDrafts(handle.db).find((draft) => draft.id === firstId)?.suggestedScope).toBe("unspecified");
+    expect(listStrategyDrafts(handle.db).find((draft) => draft.id === secondId)?.suggestedScope).toBe("unspecified");
   });
 });

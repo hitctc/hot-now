@@ -1,10 +1,16 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
+import {
+  STRATEGY_GATE_SCOPES,
+  isStrategyGateScope,
+  type StrategyGateScope
+} from "./strategyGateScopes.js";
 
-export const DEFAULT_NL_RULE_SCOPES = ["global", "hot", "articles", "ai"] as const;
+export const DEFAULT_NL_RULE_SCOPES = STRATEGY_GATE_SCOPES;
 
-export type NlRuleScope = (typeof DEFAULT_NL_RULE_SCOPES)[number];
+export type NlRuleScope = StrategyGateScope;
 export type NlRuleSet = {
   scope: NlRuleScope;
+  enabled: boolean;
   ruleText: string;
   createdAt: string;
   updatedAt: string;
@@ -14,9 +20,15 @@ export type SaveNlRuleSetResult = { ok: true } | { ok: false; reason: "not-found
 
 type NlRuleRow = {
   scope: string;
+  enabled: number;
   ruleText: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type SaveNlRuleSetInput = {
+  enabled: boolean;
+  ruleText: string;
 };
 
 export function ensureDefaultNlRuleSets(db: SqliteDatabase): void {
@@ -24,8 +36,8 @@ export function ensureDefaultNlRuleSets(db: SqliteDatabase): void {
   // predictably in the settings workbench before any admin customization.
   const insertIfMissing = db.prepare(
     `
-      INSERT INTO nl_rule_sets (scope, rule_text)
-      VALUES (?, '')
+      INSERT INTO nl_rule_sets (scope, is_enabled, rule_text)
+      VALUES (?, 1, '')
       ON CONFLICT(scope) DO NOTHING
     `
   );
@@ -46,23 +58,26 @@ export function listNlRuleSets(db: SqliteDatabase): NlRuleSet[] {
       `
         SELECT
           scope,
+          is_enabled AS enabled,
           rule_text AS ruleText,
           created_at AS createdAt,
           updated_at AS updatedAt
         FROM nl_rule_sets
+        WHERE scope IN (${DEFAULT_NL_RULE_SCOPES.map(() => "?").join(", ")})
         ORDER BY CASE scope
-          WHEN 'global' THEN 1
-          WHEN 'hot' THEN 2
-          WHEN 'articles' THEN 3
-          WHEN 'ai' THEN 4
+          WHEN 'base' THEN 1
+          WHEN 'ai_new' THEN 2
+          WHEN 'ai_hot' THEN 3
+          WHEN 'hero' THEN 4
           ELSE 99
         END ASC
       `
     )
-    .all() as NlRuleRow[];
+    .all(...DEFAULT_NL_RULE_SCOPES) as NlRuleRow[];
 
   return rows.map((row) => ({
     scope: normalizeScope(row.scope),
+    enabled: row.enabled === 1,
     ruleText: row.ruleText,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt
@@ -77,6 +92,7 @@ export function getNlRuleSet(db: SqliteDatabase, scope: NlRuleScope): NlRuleSet 
       `
         SELECT
           scope,
+          is_enabled AS enabled,
           rule_text AS ruleText,
           created_at AS createdAt,
           updated_at AS updatedAt
@@ -93,35 +109,33 @@ export function getNlRuleSet(db: SqliteDatabase, scope: NlRuleScope): NlRuleSet 
 
   return {
     scope: normalizeScope(row.scope),
+    enabled: row.enabled === 1,
     ruleText: row.ruleText,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt
   };
 }
 
-export function saveNlRuleSet(db: SqliteDatabase, scope: string, ruleText: string): SaveNlRuleSetResult {
+export function saveNlRuleSet(db: SqliteDatabase, scope: string, input: SaveNlRuleSetInput): SaveNlRuleSetResult {
   ensureDefaultNlRuleSets(db);
 
-  if (!isNlRuleScope(scope)) {
+  if (!isStrategyGateScope(scope)) {
     return { ok: false, reason: "not-found" };
   }
 
   db.prepare(
     `
       UPDATE nl_rule_sets
-      SET rule_text = ?,
+      SET is_enabled = ?,
+          rule_text = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE scope = ?
     `
-  ).run(ruleText.trim(), scope);
+  ).run(input.enabled ? 1 : 0, input.ruleText.trim(), scope);
 
   return { ok: true };
 }
 
-function isNlRuleScope(value: string): value is NlRuleScope {
-  return DEFAULT_NL_RULE_SCOPES.includes(value as NlRuleScope);
-}
-
 function normalizeScope(value: string): NlRuleScope {
-  return isNlRuleScope(value) ? value : "global";
+  return isStrategyGateScope(value) ? value : "base";
 }

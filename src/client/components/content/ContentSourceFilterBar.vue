@@ -75,7 +75,14 @@ function clearAll(): void {
 
 <style scoped>
 .content-source-filter-card {
+  position: sticky;
+  top: 24px;
+  z-index: 12;
   border-radius: 18px;
+  border: 1px solid var(--editorial-border);
+  background: color-mix(in srgb, var(--editorial-bg-panel) 92%, transparent);
+  box-shadow: var(--editorial-shadow-floating);
+  backdrop-filter: blur(18px);
 }
 
 .content-source-filter-card__header {
@@ -119,5 +126,11 @@ function clearAll(): void {
 
 .content-source-filter-card__option input {
   margin: 0;
+}
+
+@media (max-width: 900px) {
+  .content-source-filter-card {
+    top: 88px;
+  }
 }
 </style>

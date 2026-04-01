@@ -33,5 +33,6 @@ describe("ContentSourceFilterBar", () => {
     await flushPromises();
 
     expect(wrapper.emitted("change")?.at(-1)).toEqual([[]]);
+    expect(wrapper.get("[data-content-source-filter]").classes()).toContain("content-source-filter-card");
   });
 });

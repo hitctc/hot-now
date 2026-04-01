@@ -101,6 +101,7 @@ export type SettingsSourceItem = {
   name: string;
   rssUrl: string | null;
   isEnabled: boolean;
+  showAllWhenSelected: boolean;
   lastCollectedAt: string | null;
   lastCollectionStatus: string | null;
   totalCount?: number;
@@ -191,6 +192,12 @@ export type ToggleSourceResponse = {
   ok: true;
   kind: string;
   enable: boolean;
+};
+
+export type UpdateSourceDisplayModeResponse = {
+  ok: true;
+  kind: string;
+  showAllWhenSelected: boolean;
 };
 
 export type ManualCollectResponse = {
@@ -313,6 +320,17 @@ export function deleteStrategyDraft(
 // source 切换使用显式 enable 布尔值，避免前端和后端对“下一状态”产生歧义。
 export function toggleSource(kind: string, enable: boolean): Promise<ToggleSourceResponse> {
   return postSettingsAction<ToggleSourceResponse>("/actions/sources/toggle", { kind, enable });
+}
+
+// source 展示模式单独走一个动作接口，避免和采集启停语义混在一起。
+export function updateSourceDisplayMode(
+  kind: string,
+  showAllWhenSelected: boolean
+): Promise<UpdateSourceDisplayModeResponse> {
+  return postSettingsAction<UpdateSourceDisplayModeResponse>("/actions/sources/display-mode", {
+    kind,
+    showAllWhenSelected
+  });
 }
 
 // 手动采集走独立动作接口，保持和旧系统页一致的任务语义。

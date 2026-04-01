@@ -10,6 +10,7 @@ import { HttpError } from "../../services/http";
 import {
   readSettingsSources,
   toggleSource,
+  updateSourceDisplayMode,
   triggerManualCollect,
   triggerManualSendLatestEmail,
   type ManualCollectResponse,
@@ -32,6 +33,7 @@ const analyticsColumns = [
 const inventoryColumns = [
   { title: "来源", key: "name" },
   { title: "启用", key: "enabled", align: "center" as const },
+  { title: "选中时全量", key: "displayMode", align: "center" as const },
   { title: "最近抓取时间", key: "lastCollectedAt" },
   { title: "最近抓取状态", key: "lastCollectionStatus" },
   { title: "RSS", key: "rssUrl" }
@@ -196,6 +198,25 @@ async function handleToggleSource(source: SettingsSourceItem): Promise<void> {
       reasonMessages: {
         "invalid-source-kind": "source kind 不合法，无法切换。",
         "invalid-source-enable": "source 启用状态参数不合法。",
+        "not-found": "对应 source 不存在，可能已被移除。"
+      }
+    }
+  );
+}
+
+// 展示模式开关只改当前 source 的浏览策略，不影响采集启停或最近抓取状态。
+async function handleToggleSourceDisplayMode(source: SettingsSourceItem): Promise<void> {
+  const nextShowAllWhenSelected = !source.showAllWhenSelected;
+
+  await runSourcesAction(
+    `display-mode:${source.kind}`,
+    () => updateSourceDisplayMode(source.kind, nextShowAllWhenSelected),
+    {
+      fallbackMessage: "source 展示模式切换失败，请稍后再试。",
+      successMessage: nextShowAllWhenSelected ? "已开启选中时全量展示。" : "已关闭选中时全量展示。",
+      reasonMessages: {
+        "invalid-source-kind": "source kind 不合法，无法更新展示模式。",
+        "invalid-source-display-mode": "source 展示模式参数不合法。",
         "not-found": "对应 source 不存在，可能已被移除。"
       }
     }
@@ -408,6 +429,16 @@ onMounted(() => {
                   :un-checked-children="'停用'"
                   :data-source-toggle="record.kind"
                   @change="handleToggleSource(record)"
+                />
+              </template>
+              <template v-else-if="column.key === 'displayMode'">
+                <a-switch
+                  :checked="record.showAllWhenSelected"
+                  :loading="isActionPending(`display-mode:${record.kind}`)"
+                  :checked-children="'全量'"
+                  :un-checked-children="'截断'"
+                  :data-source-display-mode="record.kind"
+                  @change="handleToggleSourceDisplayMode(record)"
                 />
               </template>
               <template v-else-if="column.key === 'lastCollectedAt'">

@@ -62,6 +62,7 @@ function createAuthenticatedServer() {
         name: "OpenAI",
         rssUrl: "https://openai.com/news/rss.xml",
         isEnabled: true,
+        showAllWhenSelected: true,
         lastCollectedAt: "2026-03-31T01:05:00.000Z",
         lastCollectionStatus: "completed"
       }
@@ -141,7 +142,8 @@ describe("settings api routes", () => {
         {
           kind: "openai",
           name: "OpenAI",
-          isEnabled: true
+          isEnabled: true,
+          showAllWhenSelected: true
         }
       ],
       operations: {

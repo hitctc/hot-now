@@ -47,6 +47,7 @@ type ParseRatingScoresResult =
   | { ok: false; reason: "invalid-ratings-payload" };
 type SaveViewRuleResult = { ok: true } | { ok: false; reason: "invalid-config" | "not-found" };
 type ToggleSourceResult = { ok: true } | { ok: false; reason: "not-found" };
+type UpdateSourceDisplayModeResult = { ok: true } | { ok: false; reason: "not-found" };
 type ViewRuleCard = {
   ruleKey: string;
   displayName: string;
@@ -58,6 +59,7 @@ type SourceCard = {
   name: string;
   rssUrl: string | null;
   isEnabled: boolean;
+  showAllWhenSelected: boolean;
   lastCollectedAt: string | null;
   lastCollectionStatus: string | null;
   totalCount?: number;
@@ -141,6 +143,10 @@ type ServerDeps = {
   listSources?: () => Promise<SourceCard[]> | SourceCard[];
   getSourcesOperationSummary?: () => Promise<SourcesOperationSummary> | SourcesOperationSummary;
   toggleSource?: (kind: string, enable: boolean) => Promise<ToggleSourceResult> | ToggleSourceResult;
+  updateSourceDisplayMode?: (
+    kind: string,
+    showAllWhenSelected: boolean
+  ) => Promise<UpdateSourceDisplayModeResult> | UpdateSourceDisplayModeResult;
   getCurrentUserProfile?: () => Promise<CurrentUserProfile | null> | CurrentUserProfile | null;
   getContentPageModel?: (
     pageKey: ContentPageKey,
@@ -875,6 +881,36 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     return reply.send({ ok: true, kind, enable });
+  });
+
+  app.post("/actions/sources/display-mode", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.updateSourceDisplayMode) {
+      return reply.code(503).send({ ok: false, reason: "sources-disabled" });
+    }
+
+    const body = request.body as { kind?: unknown; showAllWhenSelected?: unknown } | undefined;
+    const kind = typeof body?.kind === "string" ? body.kind.trim() : "";
+    const showAllWhenSelected = typeof body?.showAllWhenSelected === "boolean" ? body.showAllWhenSelected : null;
+
+    if (!kind) {
+      return reply.code(400).send({ ok: false, reason: "invalid-source-kind" });
+    }
+
+    if (showAllWhenSelected === null) {
+      return reply.code(400).send({ ok: false, reason: "invalid-source-display-mode" });
+    }
+
+    const result = await deps.updateSourceDisplayMode(kind, showAllWhenSelected);
+
+    if (!result.ok && result.reason === "not-found") {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+
+    return reply.send({ ok: true, kind, showAllWhenSelected });
   });
 
   return app;

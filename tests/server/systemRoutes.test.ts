@@ -154,6 +154,39 @@ describe("system routes", () => {
     expect(toggleSource).toHaveBeenCalledWith("openai", true);
   });
 
+  it("calls updateSourceDisplayMode for source display mode action", async () => {
+    const updateSourceDisplayMode = vi.fn().mockResolvedValue({ ok: true });
+    const app = createServer({
+      updateSourceDisplayMode
+    } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/sources/display-mode",
+      payload: { kind: "openai", showAllWhenSelected: true }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(updateSourceDisplayMode).toHaveBeenCalledWith("openai", true);
+  });
+
+  it("returns 400 when source display mode payload is not boolean", async () => {
+    const updateSourceDisplayMode = vi.fn();
+    const app = createServer({
+      updateSourceDisplayMode
+    } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/sources/display-mode",
+      payload: { kind: "openai", showAllWhenSelected: "yes" }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ ok: false, reason: "invalid-source-display-mode" });
+    expect(updateSourceDisplayMode).not.toHaveBeenCalled();
+  });
+
   it("returns 404 when toggling a source kind that does not exist", async () => {
     const app = createServer({
       toggleSource: vi.fn().mockResolvedValue({ ok: false, reason: "not-found" })

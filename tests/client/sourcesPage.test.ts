@@ -14,6 +14,7 @@ vi.mock("../../src/client/services/settingsApi", async () => {
     ...actual,
     readSettingsSources: vi.fn(),
     toggleSource: vi.fn(),
+    updateSourceDisplayMode: vi.fn(),
     triggerManualCollect: vi.fn(),
     triggerManualSendLatestEmail: vi.fn()
   };
@@ -27,6 +28,7 @@ function createSourcesModel() {
         name: "OpenAI",
         rssUrl: "https://openai.com/news/rss.xml",
         isEnabled: true,
+        showAllWhenSelected: true,
         lastCollectedAt: "2026-03-31T08:00:00.000Z",
         lastCollectionStatus: "completed",
         totalCount: 20,
@@ -110,6 +112,7 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("OpenAI");
     expect(wrapper.get("[data-sources-section='inventory']").classes()).toContain("bg-editorial-panel");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("completed");
+    expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("选中时全量");
   });
 
   it("toggles a source and reloads the latest sources model", async () => {
@@ -161,5 +164,33 @@ describe("SourcesPage", () => {
 
     expect(settingsApi.triggerManualCollect).toHaveBeenCalledTimes(1);
     expect(wrapper.text()).toContain("已开始执行采集");
+  });
+
+  it("updates source display mode and reloads the latest sources model", async () => {
+    vi.mocked(settingsApi.readSettingsSources)
+      .mockResolvedValueOnce(createSourcesModel())
+      .mockResolvedValueOnce({
+        ...createSourcesModel(),
+        sources: [{ ...createSourcesModel().sources[0], showAllWhenSelected: false }]
+      });
+    vi.mocked(settingsApi.updateSourceDisplayMode).mockResolvedValue({
+      ok: true,
+      kind: "openai",
+      showAllWhenSelected: false
+    });
+
+    const wrapper = mount(SourcesPage, {
+      global: {
+        plugins: [Antd]
+      }
+    });
+
+    await flushPromises();
+    await wrapper.get("[data-source-display-mode='openai']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.updateSourceDisplayMode).toHaveBeenCalledWith("openai", false);
+    expect(settingsApi.readSettingsSources).toHaveBeenCalledTimes(2);
+    expect(wrapper.text()).toContain("已关闭选中时全量展示");
   });
 });

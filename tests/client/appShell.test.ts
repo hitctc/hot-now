@@ -69,9 +69,11 @@ describe("client app shell", () => {
     expect(wrapper.text()).toContain("AI-first 工作台壳层");
     expect(wrapper.text()).toContain("当前登录用户页");
     expect(wrapper.text()).toContain("当前会展示登录用户摘要和会话上下文");
+    expect(wrapper.find("[data-shell-page-summary]").exists()).toBe(true);
     expect(wrapper.find("[data-shell-page-title]").text()).toBe("当前登录用户页");
     expect(wrapper.find("[data-shell-page-description]").text()).toContain("登录用户摘要");
     expect(wrapper.find("[data-shell-theme-toggle]").exists()).toBe(true);
+    expect(wrapper.find(".unified-shell__header").exists()).toBe(false);
 
     const navLinks = wrapper.findAll(".unified-shell__nav-link");
 

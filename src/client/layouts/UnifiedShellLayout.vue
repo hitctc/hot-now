@@ -158,6 +158,21 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
         </a-typography-paragraph>
       </div>
 
+      <section class="unified-shell__page-summary" data-shell-page-summary>
+        <a-typography-text class="unified-shell__page-summary-kicker" type="secondary">
+          当前页面
+        </a-typography-text>
+        <a-typography-title :level="4" class="unified-shell__page-summary-title" data-shell-page-title>
+          {{ currentPageTitle }}
+        </a-typography-title>
+        <a-typography-paragraph
+          class="unified-shell__page-summary-description"
+          data-shell-page-description
+        >
+          {{ currentPageDescription }}
+        </a-typography-paragraph>
+      </section>
+
       <section class="unified-shell__nav-group">
         <p class="unified-shell__nav-kicker">内容菜单</p>
         <a-menu class="unified-shell__nav" mode="inline" :selected-keys="activeContentNavKeys">
@@ -185,81 +200,71 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
           </a-menu-item>
         </a-menu>
       </section>
-    </a-layout-sider>
 
-    <a-layout class="unified-shell__main">
-      <a-layout-header class="unified-shell__header">
-        <div class="unified-shell__header-copy">
-          <a-typography-text class="unified-shell__header-kicker" type="secondary">
-            系统页工作台
+      <div class="unified-shell__sidebar-footer">
+        <section class="unified-shell__theme-panel" data-shell-theme-toggle>
+          <a-typography-text class="unified-shell__theme-kicker" type="secondary">
+            界面主题
           </a-typography-text>
-          <a-typography-title :level="2" class="unified-shell__page-title" data-shell-page-title>
-            {{ currentPageTitle }}
-          </a-typography-title>
-          <a-typography-paragraph
-            class="unified-shell__page-description"
-            data-shell-page-description
-          >
-            {{ currentPageDescription }}
-          </a-typography-paragraph>
-        </div>
-
-        <div class="unified-shell__header-controls">
-          <div class="unified-shell__theme-switch" data-shell-theme-toggle>
+          <a-space direction="vertical" size="middle" class="unified-shell__theme-stack">
             <a-segmented
               :value="themeMode"
               :options="themeOptions"
               @change="handleThemeModeChange"
             />
-          </div>
-          <a-tag :color="isDarkMode ? 'blue' : 'green'">
-            {{ isDarkMode ? "深色模式" : "浅色模式" }}
-          </a-tag>
-        </div>
-      </a-layout-header>
+            <a-tag :color="isDarkMode ? 'blue' : 'green'">
+              {{ isDarkMode ? "深色模式" : "浅色模式" }}
+            </a-tag>
+          </a-space>
+        </section>
 
-      <a-layout-content class="unified-shell__content">
-        <a-space direction="vertical" size="large" class="unified-shell__stack">
-          <a-card class="unified-shell__profile-card" size="small" title="当前登录用户">
-            <template v-if="profileLoadState === 'loading'">
-              <a-skeleton :active="true" :paragraph="{ rows: 2 }" />
-            </template>
+        <section class="unified-shell__account-panel" data-shell-account-panel>
+          <a-typography-text class="unified-shell__theme-kicker" type="secondary">
+            当前登录用户
+          </a-typography-text>
 
-            <template v-else-if="profileLoadState === 'error'">
-              <a-alert
-                type="warning"
-                show-icon
-                :message="profileError ?? '读取当前登录用户失败'"
-              />
-            </template>
+          <template v-if="profileLoadState === 'loading'">
+            <a-skeleton :active="true" :paragraph="{ rows: 2 }" />
+          </template>
 
-            <template v-else-if="profile">
-              <a-space direction="vertical" size="small" class="unified-shell__profile-summary">
-                <a-typography-text strong>{{ profile.displayName }}</a-typography-text>
-                <a-typography-text type="secondary">@{{ profile.username }}</a-typography-text>
-                <a-space wrap size="small">
-                  <a-tag color="blue">{{ profile.role }}</a-tag>
-                  <a-tag :color="profile.loggedIn ? 'green' : 'gold'">
-                    {{ profile.loggedIn ? "已登录" : "公开访问" }}
-                  </a-tag>
-                </a-space>
-                <a-typography-text v-if="profile.email">
-                  邮箱：{{ profile.email }}
-                </a-typography-text>
+          <template v-else-if="profileLoadState === 'error'">
+            <a-alert
+              type="warning"
+              show-icon
+              :message="profileError ?? '读取当前登录用户失败'"
+            />
+          </template>
+
+          <template v-else-if="profile">
+            <a-space direction="vertical" size="small" class="unified-shell__profile-summary">
+              <a-typography-text strong>{{ profile.displayName }}</a-typography-text>
+              <a-typography-text type="secondary">@{{ profile.username }}</a-typography-text>
+              <a-space wrap size="small">
+                <a-tag color="blue">{{ profile.role }}</a-tag>
+                <a-tag :color="profile.loggedIn ? 'green' : 'gold'">
+                  {{ profile.loggedIn ? "已登录" : "公开访问" }}
+                </a-tag>
               </a-space>
-            </template>
+              <a-typography-text v-if="profile.email">
+                邮箱：{{ profile.email }}
+              </a-typography-text>
+            </a-space>
+          </template>
 
-            <template v-else>
-              <a-empty description="当前没有可读取的用户摘要" />
-            </template>
-          </a-card>
+          <template v-else>
+            <a-empty description="当前没有可读取的用户摘要" />
+          </template>
+        </section>
+      </div>
+    </a-layout-sider>
 
-          <a-card class="unified-shell__view-port" size="small" :bordered="false">
-            <RouterView v-slot="{ Component }">
-              <component :is="Component" />
-            </RouterView>
-          </a-card>
-        </a-space>
+    <a-layout class="unified-shell__main">
+      <a-layout-content class="unified-shell__content">
+        <a-card class="unified-shell__view-port" size="small" :bordered="false">
+          <RouterView v-slot="{ Component }">
+            <component :is="Component" />
+          </RouterView>
+        </a-card>
       </a-layout-content>
     </a-layout>
 
@@ -427,6 +432,38 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
   gap: 8px;
 }
 
+.unified-shell__page-summary {
+  padding: 18px 18px 16px;
+  border: 1px solid var(--editorial-border);
+  border-radius: var(--editorial-radius-xl);
+  background: var(--editorial-bg-sidebar-panel);
+  box-shadow: var(--editorial-shadow-card);
+}
+
+.unified-shell__page-summary-kicker,
+.unified-shell__theme-kicker {
+  display: inline-block;
+  margin-bottom: 6px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--editorial-text-sidebar-muted);
+}
+
+.unified-shell__page-summary-title {
+  margin: 0 0 6px;
+  color: var(--editorial-text-sidebar) !important;
+}
+
+.unified-shell__page-summary-description {
+  margin-bottom: 0;
+  color: var(--editorial-text-body);
+}
+
+.unified-shell__page-description {
+  margin-bottom: 0;
+  color: var(--editorial-text-body);
+}
+
 .unified-shell__nav-kicker {
   margin: 0;
   padding-left: 4px;
@@ -506,72 +543,44 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
   min-height: 100vh;
 }
 
-.unified-shell__header {
-  height: auto;
-  margin: 24px 24px 0;
-  padding: 24px 28px 18px;
-  border: 1px solid var(--editorial-border);
-  border-radius: var(--editorial-radius-xl);
-  background: var(--editorial-bg-panel);
-  box-shadow: var(--editorial-shadow-card);
-  backdrop-filter: blur(16px);
+.unified-shell__sidebar-footer {
   display: flex;
-  justify-content: space-between;
-  gap: 24px;
-}
-
-.unified-shell__header-copy {
-  min-width: 0;
-}
-
-.unified-shell__header-kicker {
-  color: var(--editorial-text-muted);
-}
-
-.unified-shell__page-title {
-  margin: 4px 0 6px;
-  color: var(--editorial-text-main) !important;
-}
-
-.unified-shell__page-description {
-  margin-bottom: 0;
-  color: var(--editorial-text-body);
-}
-
-.unified-shell__header-controls {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: auto;
+  padding-top: 8px;
 }
 
 .unified-shell__content {
   padding: 24px;
 }
 
-.unified-shell__stack {
-  width: 100%;
-}
-
-.unified-shell__profile-card,
+.unified-shell__theme-panel,
+.unified-shell__account-panel,
 .unified-shell__view-port {
   width: 100%;
   border-radius: var(--editorial-radius-xl);
-  background: var(--editorial-bg-panel-strong);
+  background: var(--editorial-bg-panel);
   box-shadow: var(--editorial-shadow-card);
+  border: 1px solid var(--editorial-border);
 }
 
-:deep(.unified-shell__profile-card .ant-card-head),
+.unified-shell__theme-panel,
+.unified-shell__account-panel {
+  padding: 16px 18px;
+}
+
+.unified-shell__theme-stack,
+.unified-shell__profile-summary {
+  width: 100%;
+}
+
 :deep(.unified-shell__view-port .ant-card-head) {
   border-bottom-color: var(--editorial-border);
 }
 
-:deep(.unified-shell__profile-card .ant-card-body),
 :deep(.unified-shell__view-port .ant-card-body) {
   padding: 20px 22px;
-}
-
-.unified-shell__profile-summary {
-  width: 100%;
 }
 
 .unified-shell__mobile-drawer-backdrop {
@@ -622,11 +631,6 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
     width: 248px !important;
     min-width: 248px !important;
     max-width: 248px !important;
-  }
-
-  .unified-shell__header {
-    margin: 18px 18px 0;
-    padding: 20px 22px 16px;
   }
 
   .unified-shell__content {
@@ -697,23 +701,11 @@ function isSystemPageKey(key: string | symbol | undefined): key is SystemShellPa
     display: none;
   }
 
-  .unified-shell__header {
-    margin: 12px 16px 0;
-    padding: 18px 18px 14px;
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .unified-shell__header-controls {
-    justify-content: space-between;
-  }
-
   .unified-shell__content {
     padding: 16px;
   }
 
-  :deep(.unified-shell__view-port .ant-card-body),
-  :deep(.unified-shell__profile-card .ant-card-body) {
+  :deep(.unified-shell__view-port .ant-card-body) {
     padding: 16px;
   }
 }

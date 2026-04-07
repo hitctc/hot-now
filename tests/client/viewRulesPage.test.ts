@@ -132,40 +132,22 @@ describe("ViewRulesPage", () => {
     await flushPromises();
 
     expect(settingsApi.readSettingsViewRules).toHaveBeenCalledTimes(1);
-    expect(wrapper.get("[data-settings-intro='view-rules']").classes()).toContain("rounded-editorial-xl");
-    expect(wrapper.get("[data-settings-intro='view-rules']").classes()).toContain("bg-editorial-panel");
-    expect(wrapper.get("[data-settings-intro='view-rules']").classes()).toContain("shadow-editorial-page");
-    expect(wrapper.get("[data-view-rules-section='provider-settings']").classes()).toContain(
-      "rounded-editorial-xl"
-    );
-    expect(wrapper.get("[data-view-rules-section='provider-settings']").classes()).toContain(
-      "border"
-    );
-    expect(wrapper.get("[data-view-rules-section='provider-settings']").classes()).toContain(
-      "border-editorial-border"
-    );
-    expect(wrapper.get("[data-view-rules-section='provider-settings']").classes()).toContain(
-      "bg-editorial-panel"
-    );
-    expect(wrapper.get("[data-view-rules-section='provider-settings']").classes()).toContain(
-      "shadow-editorial-card"
-    );
+    expect(wrapper.get("[data-settings-intro='view-rules']").text()).toContain("Strategy Settings");
+    expect(wrapper.get("[data-settings-section='overview']").text()).toContain("策略门");
+    expect(wrapper.get("[data-settings-section='overview']").text()).toContain("反馈池");
+    expect(wrapper.get("[data-settings-section='overview']").text()).toContain("草稿池");
     expect(wrapper.get("[data-view-rules-section='provider-settings']").text()).toContain("DeepSeek");
-    expect(wrapper.get("[data-view-rules-section='nl-rules']").classes()).toContain("rounded-editorial-xl");
-    expect(wrapper.get("[data-view-rules-section='nl-rules']").classes()).toContain("bg-editorial-panel");
-    expect(wrapper.get("[data-view-rules-section='nl-rules']").classes()).toContain("shadow-editorial-card");
     expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("正式自然语言策略");
     expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("基础入池门");
     expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("AI 热点入池门");
     expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("AI 新讯入池门");
-    expect(wrapper.get("[data-view-rules-section='feedback-pool']").classes()).toContain("rounded-editorial-xl");
+    expect(wrapper.get("[data-settings-section='feedback-pool']").exists()).toBe(true);
     expect(wrapper.get("[data-view-rules-section='feedback-pool']").text()).toContain("Agent 工作流总结");
-    expect(wrapper.get("[data-action='copy-feedback-pool']").attributes("class")).toContain("!rounded-editorial-pill");
-    expect(wrapper.get("[data-action='copy-feedback-pool']").attributes("class")).toContain("!bg-editorial-control");
-    expect(wrapper.get("[data-action='copy-feedback-pool']").attributes("class")).toContain("!select-none");
-    expect(wrapper.get("[data-action='clear-feedback-pool']").attributes("class")).toContain("!rounded-editorial-pill");
-    expect(wrapper.get("[data-action='clear-feedback-pool']").attributes("class")).toContain("!border-editorial-danger");
-    expect(wrapper.get("[data-action='clear-feedback-pool']").attributes("class")).toContain("!text-editorial-danger");
+    expect(wrapper.get("[data-feedback-row]").text()).toContain("Agent 工作流总结");
+    expect(wrapper.get("[data-action='copy-feedback-pool']").text()).toContain("复制全部反馈");
+    expect(wrapper.get("[data-action='clear-feedback-pool']").text()).toContain("清空全部反馈");
+    expect(wrapper.get("[data-settings-section='strategy-drafts']").exists()).toBe(true);
+    expect(wrapper.get("[data-draft-row]").text()).toContain("草稿 #301");
     expect(
       (wrapper.get("[data-draft-form='301'] textarea").element as HTMLTextAreaElement).value
     ).toBe("优先展示包含 agent workflow 的深度总结。");
@@ -227,12 +209,12 @@ describe("ViewRulesPage", () => {
 
     expect(feedbackEmptyState.text()).toContain("反馈池为空");
     expect(feedbackEmptyState.text()).toContain("内容页的新反馈会显示在这里。");
-    expect(feedbackEmptyState.classes()).toContain("rounded-editorial-xl");
+    expect(feedbackEmptyState.classes()).toContain("rounded-editorial-lg");
     expect(feedbackEmptyState.classes()).toContain("bg-editorial-panel");
 
     expect(draftEmptyState.text()).toContain("草稿池为空");
     expect(draftEmptyState.text()).toContain("可以先把反馈转成草稿。");
-    expect(draftEmptyState.classes()).toContain("rounded-editorial-xl");
+    expect(draftEmptyState.classes()).toContain("rounded-editorial-lg");
     expect(draftEmptyState.classes()).toContain("bg-editorial-panel");
   });
 });

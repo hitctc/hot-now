@@ -88,21 +88,11 @@ describe("SourcesPage", () => {
 
     await flushPromises();
 
-    expect(wrapper.get("[data-settings-intro='sources']").classes()).toContain("rounded-editorial-xl");
-    expect(wrapper.get("[data-settings-intro='sources']").classes()).toContain("bg-editorial-panel");
-    expect(wrapper.get("[data-settings-intro='sources']").classes()).toContain("shadow-editorial-page");
-    expect(wrapper.get("[data-sources-section='manual-collect']").classes()).toContain(
-      "rounded-editorial-xl"
-    );
-    expect(wrapper.get("[data-sources-section='manual-collect']").classes()).toContain("bg-editorial-panel");
+    expect(wrapper.get("[data-settings-intro='sources']").text()).toContain("Source Inventory");
+    expect(wrapper.get("[data-sources-section='overview']").findAll("article")).toHaveLength(4);
+    expect(wrapper.get("[data-sources-section='overview']").text()).toContain("接入来源");
+    expect(wrapper.get("[data-sources-section='overview']").text()).toContain("已启用来源");
     expect(wrapper.get("[data-sources-section='manual-collect']").text()).toContain("手动执行采集");
-    expect(wrapper.get("[data-sources-section='manual-send-latest-email']").classes()).toContain(
-      "shadow-editorial-card"
-    );
-    expect(wrapper.get("[data-sources-section='analytics']").classes()).toContain("rounded-editorial-xl");
-    expect(wrapper.get("[data-sources-section='analytics']").classes()).toContain(
-      "shadow-editorial-card"
-    );
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 新讯今日候选 / 今日展示");
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 新讯独立展示占比");
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 热点独立展示占比");
@@ -112,6 +102,7 @@ describe("SourcesPage", () => {
     );
     expect(wrapper.get("[data-sources-section='analytics']").text()).not.toContain("Articles 今日候选 / 今日展示");
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("OpenAI");
+    expect(wrapper.get("[data-sources-section='manual-send-latest-email']").text()).toContain("发送最新报告");
     expect(wrapper.get("[data-sources-section='inventory']").classes()).toContain("bg-editorial-panel");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("已完成");
     expect(wrapper.get("[data-sources-section='inventory']").text()).not.toContain("选中时全量");

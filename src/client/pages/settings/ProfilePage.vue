@@ -3,8 +3,6 @@ import { onMounted, ref } from "vue";
 
 import EditorialEmptyState from "../../components/content/EditorialEmptyState.vue";
 import {
-  editorialContentCardClass,
-  editorialContentIntroSectionClass,
   editorialContentPageClass
 } from "../../components/content/contentCardShared";
 import { HttpError } from "../../services/http";
@@ -39,15 +37,15 @@ onMounted(() => {
 
 <template>
   <div :class="editorialContentPageClass" data-settings-page="profile">
-    <section :class="editorialContentIntroSectionClass" data-settings-intro="profile">
-      <p class="m-0 text-xs font-semibold uppercase tracking-[0.24em] text-editorial-text-muted">
-        Profile Workbench
+    <section class="flex flex-col gap-2" data-settings-intro="profile">
+      <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
+        Account Settings
       </p>
-      <h1 class="mt-3 text-3xl font-semibold tracking-tight text-editorial-text-main">
-        把当前账号摘要收进统一的系统页骨架
+      <h1 class="m-0 text-2xl font-semibold tracking-[-0.02em] text-editorial-text-main">
+        当前登录用户
       </h1>
-      <p class="mt-3 max-w-3xl text-base leading-7 text-editorial-text-body">
-        账号信息、登录态提示和错误提示逻辑保持原样，只把页面外层、intro 和 summary panel 迁到 Tailwind。
+      <p class="m-0 max-w-3xl text-sm leading-6 text-editorial-text-body">
+        查看当前账号、会话状态和联系信息。
       </p>
     </section>
 
@@ -72,50 +70,58 @@ onMounted(() => {
     />
 
     <template v-else>
-      <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <a-card :class="editorialContentCardClass" size="small">
-          <a-statistic title="用户名" :value="profile.username" />
-        </a-card>
-        <a-card :class="editorialContentCardClass" size="small">
-          <a-statistic title="角色" :value="profile.role" />
-        </a-card>
-        <a-card :class="editorialContentCardClass" size="small">
-          <a-statistic title="会话状态" :value="profile.loggedIn ? '已登录' : '公开访问'" />
-        </a-card>
+      <section class="grid gap-3 md:grid-cols-3" data-profile-section="overview">
+        <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+          <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">用户名</p>
+          <p class="mt-2 mb-0 text-base font-medium text-editorial-text-main">{{ profile.username }}</p>
+        </article>
+        <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+          <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">角色</p>
+          <p class="mt-2 mb-0 text-base font-medium text-editorial-text-main">{{ profile.role }}</p>
+        </article>
+        <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+          <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">会话状态</p>
+          <p class="mt-2 mb-0 text-base font-medium text-editorial-text-main">
+            {{ profile.loggedIn ? "已登录" : "公开访问" }}
+          </p>
+        </article>
       </section>
 
-      <a-card
-        :class="editorialContentCardClass"
-        title="当前登录用户"
-        size="small"
+      <section
+        class="rounded-editorial-lg border border-editorial-border bg-editorial-panel px-5 py-5"
         data-profile-section="summary"
       >
-        <div class="flex w-full flex-col gap-4">
-          <a-alert
-            :type="profile.loggedIn ? 'success' : 'info'"
-            :message="profile.loggedIn ? '当前会话有效，可以访问系统菜单。' : '当前处于公开访问模式。'"
-            show-icon
-          />
+        <div class="flex flex-col gap-4">
+          <div>
+            <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">当前账号摘要</p>
+            <h2 class="mt-2 mb-0 text-lg font-medium text-editorial-text-main">{{ profile.displayName }}</h2>
+            <p class="mt-2 mb-0 text-sm leading-6 text-editorial-text-body">
+              {{ profile.loggedIn ? "当前会话有效，可以访问系统菜单。" : "当前处于公开访问模式。" }}
+            </p>
+          </div>
 
-          <a-descriptions :column="1" bordered size="small">
-            <a-descriptions-item label="username">
-              {{ profile.username }}
-            </a-descriptions-item>
-            <a-descriptions-item label="displayName">
-              {{ profile.displayName }}
-            </a-descriptions-item>
-            <a-descriptions-item label="role">
-              {{ profile.role }}
-            </a-descriptions-item>
-            <a-descriptions-item label="email">
-              {{ profile.email || "未设置" }}
-            </a-descriptions-item>
-            <a-descriptions-item label="登录状态">
-              {{ profile.loggedIn ? "已登录（当前会话有效）" : "未登录（公开访问模式）" }}
-            </a-descriptions-item>
-          </a-descriptions>
+          <div class="grid gap-3 md:grid-cols-2">
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-link px-4 py-4">
+              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">显示名称</p>
+              <p class="mt-2 mb-0 text-sm text-editorial-text-main" data-profile-field="display-name">{{ profile.displayName }}</p>
+            </article>
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-link px-4 py-4">
+              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">邮箱</p>
+              <p class="mt-2 mb-0 text-sm text-editorial-text-main" data-profile-field="email">{{ profile.email || "未设置" }}</p>
+            </article>
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-link px-4 py-4">
+              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">username</p>
+              <p class="mt-2 mb-0 text-sm text-editorial-text-main" data-profile-field="username">{{ profile.username }}</p>
+            </article>
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-link px-4 py-4">
+              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">登录状态</p>
+              <p class="mt-2 mb-0 text-sm text-editorial-text-main" data-profile-field="session-status">
+                {{ profile.loggedIn ? "已登录（当前会话有效）" : "未登录（公开访问模式）" }}
+              </p>
+            </article>
+          </div>
         </div>
-      </a-card>
+      </section>
     </template>
   </div>
 </template>

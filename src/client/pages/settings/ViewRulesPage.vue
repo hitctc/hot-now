@@ -7,7 +7,6 @@ import {
   editorialContentControlButtonClass,
   editorialContentControlButtonDangerClass,
   editorialContentControlButtonIdleClass,
-  editorialContentIntroSectionClass,
   editorialContentPageClass,
   editorialContentSubpanelClass
 } from "../../components/content/contentCardShared";
@@ -518,15 +517,15 @@ onMounted(() => {
 <template>
   <a-spin :spinning="isRefreshing">
     <div :class="editorialContentPageClass" data-settings-page="view-rules">
-      <section :class="editorialContentIntroSectionClass" data-settings-intro="view-rules">
-        <p class="m-0 text-xs font-semibold uppercase tracking-[0.24em] text-editorial-text-muted">
-          AI Strategy Gates
+      <section class="flex flex-col gap-2" data-settings-intro="view-rules">
+        <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
+          Strategy Settings
         </p>
-        <h1 class="mt-3 text-3xl font-semibold tracking-tight text-editorial-text-main">
-          用四道门定义什么内容能进系统、能进新讯、能进热点、能当精选
+        <h1 class="m-0 text-2xl font-semibold tracking-[-0.02em] text-editorial-text-main">
+          筛选策略
         </h1>
-        <p class="mt-3 max-w-3xl text-base leading-7 text-editorial-text-body">
-          这里不再维护数值权重，只保留基础入池、AI 新讯、AI 热点、首条精选四道门，以及反馈池、草稿池和厂商设置。
+        <p class="m-0 max-w-3xl text-sm leading-6 text-editorial-text-body">
+          在同一页维护厂商设置、正式规则、反馈池和草稿池。
         </p>
       </section>
 
@@ -553,7 +552,7 @@ onMounted(() => {
       </a-result>
 
       <template v-else-if="workbench">
-        <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section class="grid gap-3 md:grid-cols-2 xl:grid-cols-4" data-settings-section="overview">
           <a-card :class="editorialContentCardClass" size="small">
             <a-statistic title="策略门" :value="workbench.nlRules.length" />
           </a-card>
@@ -571,7 +570,7 @@ onMounted(() => {
           </a-card>
         </section>
 
-        <section class="grid gap-4 xl:grid-cols-5">
+        <section class="grid gap-4 xl:grid-cols-5" data-settings-section="nl-rules">
           <a-card
             :class="[editorialContentCardClass, 'xl:col-span-2']"
             title="LLM 设置"
@@ -698,6 +697,7 @@ onMounted(() => {
           </a-card>
         </section>
 
+        <section data-settings-section="feedback-pool">
         <a-card
           :class="editorialContentCardClass"
           title="反馈池"
@@ -739,6 +739,7 @@ onMounted(() => {
               :key="entry.id"
               size="small"
               :class="[editorialContentSubpanelClass, 'w-full shadow-editorial-card']"
+              data-feedback-row
             >
               <template #title>
                 <a-space size="small" wrap>
@@ -796,7 +797,9 @@ onMounted(() => {
             </a-card>
           </div>
         </a-card>
+        </section>
 
+        <section data-settings-section="strategy-drafts">
         <a-card
           :class="editorialContentCardClass"
           title="草稿池"
@@ -816,6 +819,7 @@ onMounted(() => {
               :key="draft.id"
               size="small"
               :class="[editorialContentSubpanelClass, 'w-full shadow-editorial-card']"
+              data-draft-row
             >
               <template #title>
                 <a-space size="small" wrap>
@@ -882,6 +886,7 @@ onMounted(() => {
             </a-card>
           </div>
         </a-card>
+        </section>
       </template>
     </div>
   </a-spin>

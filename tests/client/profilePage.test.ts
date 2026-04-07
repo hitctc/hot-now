@@ -47,19 +47,13 @@ describe("ProfilePage", () => {
 
     await flushPromises();
 
-    expect(wrapper.get("[data-settings-intro='profile']").classes()).toContain("rounded-editorial-xl");
-    expect(wrapper.get("[data-settings-intro='profile']").classes()).toContain("bg-editorial-panel");
-    expect(wrapper.get("[data-settings-intro='profile']").classes()).toContain("shadow-editorial-page");
-    expect(wrapper.get("[data-profile-section='summary']").classes()).toContain("rounded-editorial-xl");
-    expect(wrapper.get("[data-profile-section='summary']").classes()).toContain("border");
-    expect(wrapper.get("[data-profile-section='summary']").classes()).toContain(
-      "border-editorial-border"
-    );
-    expect(wrapper.get("[data-profile-section='summary']").classes()).toContain("bg-editorial-panel");
-    expect(wrapper.get("[data-profile-section='summary']").classes()).toContain("shadow-editorial-card");
+    expect(wrapper.get("[data-settings-intro='profile']").text()).toContain("Account Settings");
+    expect(wrapper.get("[data-profile-section='overview']").findAll("article")).toHaveLength(3);
     expect(wrapper.get("[data-profile-section='summary']").text()).toContain("系统管理员");
-    expect(wrapper.text()).toContain("admin@example.com");
-    expect(wrapper.text()).toContain("已登录");
+    expect(wrapper.get("[data-profile-field='display-name']").text()).toBe("系统管理员");
+    expect(wrapper.get("[data-profile-field='email']").text()).toBe("admin@example.com");
+    expect(wrapper.get("[data-profile-field='username']").text()).toBe("admin");
+    expect(wrapper.get("[data-profile-field='session-status']").text()).toContain("已登录");
   });
 
   it("renders the shared editorial empty state when the profile payload is empty", async () => {
@@ -73,7 +67,7 @@ describe("ProfilePage", () => {
 
     expect(emptyState.text()).toContain("当前没有可读取的用户信息");
     expect(emptyState.text()).toContain("可以稍后刷新页面，或重新登录后再试。");
-    expect(emptyState.classes()).toContain("rounded-editorial-xl");
+    expect(emptyState.classes()).toContain("rounded-editorial-lg");
     expect(emptyState.classes()).toContain("bg-editorial-panel");
   });
 });

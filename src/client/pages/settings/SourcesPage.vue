@@ -3,7 +3,6 @@ import { computed, onMounted, reactive, ref } from "vue";
 
 import {
   editorialContentCardClass,
-  editorialContentIntroSectionClass,
   editorialContentPageClass
 } from "../../components/content/contentCardShared";
 import { HttpError } from "../../services/http";
@@ -302,15 +301,15 @@ onMounted(() => {
 <template>
   <a-spin :spinning="isRefreshing">
     <div :class="editorialContentPageClass" data-settings-page="sources">
-      <section :class="editorialContentIntroSectionClass" data-settings-intro="sources">
-        <p class="m-0 text-xs font-semibold uppercase tracking-[0.24em] text-editorial-text-muted">
-          Sources Workbench
+      <section class="flex flex-col gap-2" data-settings-intro="sources">
+        <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
+          Source Inventory
         </p>
-        <h1 class="mt-3 text-3xl font-semibold tracking-tight text-editorial-text-main">
-          在一个页面里看采集入口、来源库存和多源统计
+        <h1 class="m-0 text-2xl font-semibold tracking-[-0.02em] text-editorial-text-main">
+          数据收集
         </h1>
-        <p class="mt-3 max-w-3xl text-base leading-7 text-editorial-text-body">
-          手动采集、手动发信和 source 开关逻辑保持不变，这里只把系统页外层切到 Tailwind panel，和统一壳层保持同一套节奏。
+        <p class="m-0 max-w-3xl text-sm leading-6 text-editorial-text-body">
+          查看来源状态、执行采集动作和当前统计口径。
         </p>
       </section>
 
@@ -337,25 +336,23 @@ onMounted(() => {
       </a-result>
 
       <template v-else-if="sourcesModel">
-        <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <a-card :class="editorialContentCardClass" size="small">
-            <a-statistic title="接入来源" :value="totalSourceCount" />
-          </a-card>
-          <a-card :class="editorialContentCardClass" size="small">
-            <a-statistic title="已启用来源" :value="enabledSourceCount" />
-          </a-card>
-          <a-card :class="editorialContentCardClass" size="small">
-            <a-statistic
-              title="最近采集"
-              :value="formatDateTime(sourcesModel.operations.lastCollectionRunAt)"
-            />
-          </a-card>
-          <a-card :class="editorialContentCardClass" size="small">
-            <a-statistic
-              title="最近发信"
-              :value="formatDateTime(sourcesModel.operations.lastSendLatestEmailAt)"
-            />
-          </a-card>
+        <section class="grid gap-3 md:grid-cols-2 xl:grid-cols-4" data-sources-section="overview">
+          <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+            <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">接入来源</p>
+            <p class="mt-2 mb-0 text-xl font-medium text-editorial-text-main">{{ totalSourceCount }}</p>
+          </article>
+          <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+            <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">已启用来源</p>
+            <p class="mt-2 mb-0 text-xl font-medium text-editorial-text-main">{{ enabledSourceCount }}</p>
+          </article>
+          <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+            <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">最近采集</p>
+            <p class="mt-2 mb-0 text-sm text-editorial-text-main">{{ formatDateTime(sourcesModel.operations.lastCollectionRunAt) }}</p>
+          </article>
+          <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+            <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">最近发信</p>
+            <p class="mt-2 mb-0 text-sm text-editorial-text-main">{{ formatDateTime(sourcesModel.operations.lastSendLatestEmailAt) }}</p>
+          </article>
         </section>
 
         <section class="grid gap-4 xl:grid-cols-2">

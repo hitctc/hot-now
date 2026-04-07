@@ -150,6 +150,10 @@ describe("AiHotPage", () => {
     );
     expect(wrapper.find("[data-content-filter-shell]").exists()).toBe(false);
     expect(wrapper.findAll("[data-content-toolbar-card]").length).toBe(1);
+    const toolbarMainRow = wrapper.get("[data-content-toolbar-main-row]");
+    expect(toolbarMainRow.find("[data-content-toolbar-summary]").exists()).toBe(true);
+    expect(toolbarMainRow.find("[data-content-sort-control]").exists()).toBe(true);
+    expect(toolbarMainRow.find("[data-content-search-control]").exists()).toBe(true);
     expect(wrapper.get("[data-content-sticky-toolbar]").classes()).toEqual(
       expect.arrayContaining(["sticky", "z-20", "top-4", "max-[900px]:top-[72px]"])
     );

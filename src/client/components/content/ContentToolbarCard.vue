@@ -78,52 +78,59 @@ function handleClear(): void {
 
 <template>
   <section :class="[editorialContentCardClass, 'flex flex-col gap-4 px-4 py-4']" data-content-toolbar-card>
-    <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-      <button
-        type="button"
-        class="flex min-w-0 flex-1 flex-col gap-1 text-left"
-        :aria-expanded="isSourceExpanded"
-        :aria-controls="sourcePanelId"
-        data-content-toolbar-summary
-        @click="toggleSourcePanel"
-      >
-        <span class="text-sm font-medium leading-6 text-editorial-text-main">
-          {{ sourceSummaryText }}
-        </span>
-        <span class="text-[11px] leading-5 text-editorial-text-muted">
-          {{ sourceCountText }}
-        </span>
-      </button>
+    <div
+      class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"
+      data-content-toolbar-main-row
+    >
+      <div class="flex min-w-0 flex-1 flex-col gap-2">
+        <div class="flex min-w-0 flex-wrap items-start gap-2">
+          <button
+            type="button"
+            class="flex min-w-0 flex-1 flex-col gap-1 text-left"
+            :aria-expanded="isSourceExpanded"
+            :aria-controls="sourcePanelId"
+            data-content-toolbar-summary
+            @click="toggleSourcePanel"
+          >
+            <span class="text-sm font-medium leading-6 text-editorial-text-main">
+              {{ sourceSummaryText }}
+            </span>
+            <span class="text-[11px] leading-5 text-editorial-text-muted">
+              {{ sourceCountText }}
+            </span>
+          </button>
 
-      <a-button
-        size="small"
-        :class="[editorialContentControlButtonClass, editorialContentControlButtonIdleClass]"
-        data-content-toolbar-source-toggle
-        :aria-expanded="isSourceExpanded"
-        :aria-controls="sourcePanelId"
-        @click="toggleSourcePanel"
-      >
-        {{ isSourceExpanded ? "收起来源" : "展开来源" }}
-      </a-button>
-    </div>
-
-    <div class="flex flex-col gap-3 lg:flex-row lg:items-start">
-      <div class="lg:flex-none">
-        <ContentSortControl
-          :sort-mode="sortMode"
-          compact
-          @change="handleSortChange"
-        />
+          <a-button
+            size="small"
+            :class="[editorialContentControlButtonClass, editorialContentControlButtonIdleClass]"
+            data-content-toolbar-source-toggle
+            :aria-expanded="isSourceExpanded"
+            :aria-controls="sourcePanelId"
+            @click="toggleSourcePanel"
+          >
+            {{ isSourceExpanded ? "收起来源" : "展开来源" }}
+          </a-button>
+        </div>
       </div>
 
-      <div class="lg:min-w-0 lg:flex-1">
-        <ContentSearchControl
-          :keyword="keyword"
-          :is-loading="isLoading"
-          compact
-          @search="handleSearch"
-          @clear="handleClear"
-        />
+      <div class="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+        <div class="sm:flex-none">
+          <ContentSortControl
+            :sort-mode="sortMode"
+            compact
+            @change="handleSortChange"
+          />
+        </div>
+
+        <div class="sm:min-w-0 sm:flex-1">
+          <ContentSearchControl
+            :keyword="keyword"
+            :is-loading="isLoading"
+            compact
+            @search="handleSearch"
+            @clear="handleClear"
+          />
+        </div>
       </div>
     </div>
 

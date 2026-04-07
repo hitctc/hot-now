@@ -26,6 +26,11 @@ describe("ContentToolbarCard", () => {
     expect(wrapper.get("[data-content-toolbar-card]").classes()).toEqual(
       expect.arrayContaining(["rounded-editorial-lg", "border", "bg-editorial-panel"])
     );
+    expect(wrapper.findAll("[data-content-toolbar-main-row]").length).toBe(1);
+    const mainRow = wrapper.get("[data-content-toolbar-main-row]");
+    expect(mainRow.find("[data-content-toolbar-summary]").exists()).toBe(true);
+    expect(mainRow.find("[data-content-sort-control]").exists()).toBe(true);
+    expect(mainRow.find("[data-content-search-control]").exists()).toBe(true);
     expect(wrapper.get("[data-content-toolbar-summary]").text()).toContain("来源：未选择");
     expect(wrapper.get("[data-content-toolbar-summary]").attributes("aria-expanded")).toBe("false");
     expect(wrapper.get("[data-content-toolbar-source-toggle]").text()).toContain("展开来源");

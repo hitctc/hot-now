@@ -219,7 +219,14 @@ onMounted(() => {
 
 <template>
   <div :class="editorialContentPageClass" data-content-page="ai-new">
-    <a-alert v-if="hasLoadError && pageModel" type="warning" show-icon :message="loadError" banner />
+    <a-alert
+      v-if="hasLoadError && pageModel"
+      class="editorial-inline-alert editorial-inline-alert--warning"
+      type="warning"
+      show-icon
+      :message="loadError"
+      banner
+    />
 
     <div
       v-if="sourceFilter"

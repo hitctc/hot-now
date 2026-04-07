@@ -30,6 +30,9 @@ describe("editorial theme bridge", () => {
     expect(editorialTokens.light.bgPage).toBe("#fbfbfa");
     expect(editorialTokens.light.bgSidebarPanel).toBe("#f7f7f5");
     expect(editorialTokens.light.textMain).toBe("#37352f");
+    expect(editorialTokens.light.success).toBe("#2f2f2f");
+    expect(editorialTokens.light.warning).toBe("#2f2f2f");
+    expect(editorialTokens.light.danger).toBe("#2f2f2f");
     expect(editorialTokens.light.border).toBe("rgba(55, 53, 47, 0.08)");
     expect(darkCssVariables["--editorial-bg-page"]).toBe(editorialTokens.dark.bgPage);
     expect(darkCssVariables["--editorial-accent"]).toBe(editorialTokens.dark.accent);
@@ -52,6 +55,10 @@ describe("editorial theme bridge", () => {
 
     expect(lightProviderTheme.algorithm).toBe(antTheme.defaultAlgorithm);
     expect(lightProviderTheme.token?.colorPrimary).toBe(editorialTokens.light.accent);
+    expect(lightProviderTheme.token?.colorInfo).toBe(editorialTokens.light.accent);
+    expect(lightProviderTheme.token?.colorSuccess).toBe(editorialTokens.light.success);
+    expect(lightProviderTheme.token?.colorWarning).toBe(editorialTokens.light.warning);
+    expect(lightProviderTheme.token?.colorError).toBe(editorialTokens.light.danger);
     expect(lightProviderTheme.token?.colorBgLayout).toBe(editorialTokens.light.bgPage);
     expect(lightProviderTheme.token?.colorBgContainer).toBe(editorialTokens.light.bgPanelStrong);
     expect(lightProviderTheme.token?.colorBgElevated).toBe(editorialTokens.light.bgPanel);

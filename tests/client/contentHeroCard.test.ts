@@ -1,9 +1,10 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import Antd from "ant-design-vue";
+import Antd, { message } from "ant-design-vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ContentHeroCard from "../../src/client/components/content/ContentHeroCard.vue";
 import type { ContentCard } from "../../src/client/services/contentApi";
+import { HttpError } from "../../src/client/services/http";
 
 vi.mock("../../src/client/services/contentApi", async () => {
   const actual = await vi.importActual<typeof import("../../src/client/services/contentApi")>(
@@ -17,6 +18,10 @@ vi.mock("../../src/client/services/contentApi", async () => {
 });
 
 import * as contentApi from "../../src/client/services/contentApi";
+
+function createMockMessageHandle(): ReturnType<typeof message.success> {
+  return (() => undefined) as ReturnType<typeof message.success>;
+}
 
 const card: ContentCard = {
   id: 101,
@@ -56,6 +61,7 @@ describe("ContentHeroCard", () => {
   });
 
   it("renders featured content with only the feedback action and saves feedback payloads", async () => {
+    const successSpy = vi.spyOn(message, "success").mockImplementation(() => createMockMessageHandle());
     vi.mocked(contentApi.saveFeedbackPoolEntry).mockResolvedValue({ ok: true, contentItemId: 101, entryId: 1 });
 
     const wrapper = mount(ContentHeroCard, {
@@ -93,7 +99,7 @@ describe("ContentHeroCard", () => {
     const inputs = wrapper.findAll("input");
     await inputs[0]?.setValue("agent, workflow");
     await inputs[1]?.setValue("融资");
-    wrapper.findComponent({ name: "AForm" }).vm.$emit("finish");
+    await wrapper.get("[data-feedback-panel] button").trigger("click");
     await flushPromises();
 
     expect(contentApi.saveFeedbackPoolEntry).toHaveBeenCalledWith(
@@ -106,6 +112,7 @@ describe("ContentHeroCard", () => {
       })
     );
     expect(vi.mocked(contentApi.saveFeedbackPoolEntry).mock.calls[0]?.[1]).not.toHaveProperty("reactionSnapshot");
+    expect(successSpy).toHaveBeenCalledWith("反馈池建议已保存");
   });
 
   it("shows expand and collapse controls for long featured summaries", async () => {
@@ -132,5 +139,30 @@ describe("ContentHeroCard", () => {
     expect(wrapper.get("[data-content-summary-toggle]").text()).toBe("收起");
     expect(wrapper.get("[data-content-hero-summary]").attributes("data-content-summary-expanded")).toBe("true");
     expect(wrapper.get("[data-content-hero-summary]").attributes("class")).not.toContain("[-webkit-line-clamp:6]");
+  });
+
+  it("shows a login-required message when feedback save is rejected with 401", async () => {
+    const warningSpy = vi.spyOn(message, "warning").mockImplementation(() => createMockMessageHandle());
+    vi.mocked(contentApi.saveFeedbackPoolEntry).mockRejectedValue(
+      new HttpError("Request failed for /actions/content/101/feedback-pool", 401, { ok: false, reason: "unauthorized" })
+    );
+
+    const wrapper = mount(ContentHeroCard, {
+      props: {
+        card
+      },
+      global: {
+        plugins: [Antd]
+      }
+    });
+
+    await wrapper.get("[data-content-action='feedback-panel-toggle']").trigger("click");
+    await flushPromises();
+
+    await wrapper.get("[data-feedback-panel] button").trigger("click");
+    await flushPromises();
+
+    expect(wrapper.text()).toContain("请先登录后再保存反馈池建议。");
+    expect(warningSpy).toHaveBeenCalledWith("请先登录后再保存反馈池建议。");
   });
 });

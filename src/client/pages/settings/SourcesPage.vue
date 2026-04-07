@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { message } from "ant-design-vue";
 import { computed, onMounted, reactive, ref } from "vue";
 
 import {
@@ -52,9 +53,26 @@ const enabledSourceCount = computed(
 );
 const totalSourceCount = computed(() => sourcesModel.value?.sources.length ?? 0);
 
-// 页面提示统一通过一层 notice 管理，避免操作结果分散到表格各处。
-function showNotice(tone: AlertTone, message: string): void {
-  pageNotice.value = { tone, message };
+// 页面提示统一通过一层 notice 管理，操作后同时保留页内 Alert 和全局 toast。
+function showNotice(tone: AlertTone, noticeMessage: string): void {
+  pageNotice.value = { tone, message: noticeMessage };
+
+  if (tone === "success") {
+    void message.success(noticeMessage);
+    return;
+  }
+
+  if (tone === "warning") {
+    void message.warning(noticeMessage);
+    return;
+  }
+
+  if (tone === "error") {
+    void message.error(noticeMessage);
+    return;
+  }
+
+  void message.info(noticeMessage);
 }
 
 // source 切换和手动动作都需要独立 loading，按 action key 细分最直接。
@@ -315,6 +333,7 @@ onMounted(() => {
 
       <a-alert
         v-if="pageNotice"
+        :class="['editorial-inline-alert', `editorial-inline-alert--${pageNotice.tone}`]"
         :message="pageNotice.message"
         :type="pageNotice.tone"
         show-icon

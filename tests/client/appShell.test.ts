@@ -82,8 +82,8 @@ describe("client app shell", () => {
 
     await flushPromises();
 
-    expect(wrapper.text()).toContain("HotNow");
-    expect(wrapper.text()).toContain("AI Workspace");
+    expect(wrapper.text()).not.toContain("HotNow");
+    expect(wrapper.text()).toContain("热讯");
     expect(wrapper.text()).toContain("当前用户");
     expect(wrapper.text()).toContain("当前登录账号、会话状态和联系信息。");
     expect(wrapper.get("[data-shell-root]").classes()).toEqual(
@@ -97,7 +97,7 @@ describe("client app shell", () => {
     );
     expect(wrapper.find("[data-shell-page-summary]").exists()).toBe(false);
     expect(wrapper.find("[data-workspace-sidebar]").exists()).toBe(true);
-    expect(wrapper.get("[data-workspace-brand]").text()).toContain("AI Workspace");
+    expect(wrapper.get("[data-workspace-brand]").text()).toContain("热讯");
     expect(wrapper.find("[data-page-header-title]").text()).toBe("当前用户");
     expect(wrapper.find("[data-page-header-description]").text()).toContain("当前登录账号");
     expect(wrapper.find("[data-shell-theme-toggle]").exists()).toBe(true);

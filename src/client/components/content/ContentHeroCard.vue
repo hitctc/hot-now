@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { message } from "ant-design-vue";
 import { computed, reactive, ref, watch } from "vue";
 
 import ContentActionBar from "./ContentActionBar.vue";
@@ -21,6 +22,7 @@ import {
   type ContentCard,
   type SaveFeedbackPoolEntryPayload
 } from "../../services/contentApi";
+import { HttpError } from "../../services/http";
 
 const props = defineProps<{
   card: ContentCard;
@@ -61,8 +63,16 @@ async function handleFeedbackSubmit(payload: SaveFeedbackPoolEntryPayload): Prom
       negativeKeywords: payload.negativeKeywords
     };
     statusText.value = "反馈池建议已保存";
-  } catch {
-    statusText.value = "反馈池建议保存失败，请稍后重试。";
+    void message.success("反馈池建议已保存");
+  } catch (error) {
+    // 内容页允许公开浏览，401 更可能是用户未登录而不是后端异常，需要给出明确提示。
+    if (error instanceof HttpError && error.status === 401) {
+      statusText.value = "请先登录后再保存反馈池建议。";
+      void message.warning("请先登录后再保存反馈池建议。");
+    } else {
+      statusText.value = "反馈池建议保存失败，请稍后重试。";
+      void message.error("反馈池建议保存失败，请稍后重试。");
+    }
   } finally {
     isBusy.value = false;
   }

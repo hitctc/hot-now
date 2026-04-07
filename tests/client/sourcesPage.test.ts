@@ -1,9 +1,14 @@
 import { flushPromises } from "@vue/test-utils";
+import { message } from "ant-design-vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import SourcesPage from "../../src/client/pages/settings/SourcesPage.vue";
 import * as settingsApi from "../../src/client/services/settingsApi";
 import { mountWithApp } from "./helpers/mountWithApp";
+
+function createMockMessageHandle(): ReturnType<typeof message.success> {
+  return (() => undefined) as ReturnType<typeof message.success>;
+}
 
 vi.mock("../../src/client/services/settingsApi", async () => {
   const actual = await vi.importActual<typeof import("../../src/client/services/settingsApi")>(
@@ -116,6 +121,7 @@ describe("SourcesPage", () => {
   });
 
   it("toggles a source and reloads the latest sources model", async () => {
+    const successSpy = vi.spyOn(message, "success").mockImplementation(() => createMockMessageHandle());
     vi.mocked(settingsApi.readSettingsSources)
       .mockResolvedValueOnce(createSourcesModel())
       .mockResolvedValueOnce({
@@ -137,6 +143,7 @@ describe("SourcesPage", () => {
     expect(settingsApi.toggleSource).toHaveBeenCalledWith("openai", false);
     expect(settingsApi.readSettingsSources).toHaveBeenCalledTimes(2);
     expect(wrapper.text()).toContain("已停用 source");
+    expect(successSpy).toHaveBeenCalledWith("已停用 source。");
   });
 
   it("starts manual collection and refreshes the page model", async () => {

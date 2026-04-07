@@ -57,3 +57,109 @@
     overflow: hidden;
   }
 }
+
+@layer components {
+  .editorial-inline-alert.ant-alert {
+    --editorial-alert-accent: rgba(55, 53, 47, 0.18);
+    border: 1px solid var(--editorial-border);
+    border-inline-start: 3px solid var(--editorial-alert-accent);
+    border-radius: var(--editorial-radius-md);
+    background: var(--editorial-bg-panel);
+    box-shadow: var(--editorial-shadow-card);
+    color: var(--editorial-text-main);
+  }
+
+  .editorial-inline-alert.ant-alert .ant-alert-message {
+    color: var(--editorial-text-main);
+    font-weight: 500;
+  }
+
+  .editorial-inline-alert.ant-alert .ant-alert-description,
+  .editorial-inline-alert.ant-alert .ant-alert-close-icon,
+  .editorial-inline-alert.ant-alert .ant-alert-icon {
+    color: var(--editorial-text-body);
+  }
+
+  .editorial-inline-alert.ant-alert .ant-alert-close-icon:hover {
+    color: var(--editorial-text-main);
+  }
+
+  .editorial-inline-alert--info.ant-alert {
+    --editorial-alert-accent: rgba(103, 112, 133, 0.42);
+  }
+
+  .editorial-inline-alert--success.ant-alert {
+    --editorial-alert-accent: rgba(111, 137, 125, 0.46);
+  }
+
+  .editorial-inline-alert--warning.ant-alert {
+    --editorial-alert-accent: rgba(166, 136, 89, 0.48);
+  }
+
+  .editorial-inline-alert--error.ant-alert {
+    --editorial-alert-accent: rgba(181, 124, 117, 0.5);
+  }
+
+  html[data-theme="light"] .editorial-inline-alert.ant-alert {
+    background: #f5f4f1;
+  }
+
+  html[data-theme="dark"] .editorial-inline-alert.ant-alert {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: #252525;
+  }
+
+  html[data-theme="dark"] .editorial-inline-alert--info.ant-alert {
+    --editorial-alert-accent: rgba(173, 184, 215, 0.42);
+  }
+
+  html[data-theme="dark"] .editorial-inline-alert--success.ant-alert {
+    --editorial-alert-accent: rgba(144, 183, 162, 0.42);
+  }
+
+  html[data-theme="dark"] .editorial-inline-alert--warning.ant-alert {
+    --editorial-alert-accent: rgba(203, 176, 132, 0.44);
+  }
+
+  html[data-theme="dark"] .editorial-inline-alert--error.ant-alert {
+    --editorial-alert-accent: rgba(214, 153, 145, 0.46);
+  }
+
+  .editorial-status-tag.ant-tag {
+    margin-inline-end: 0;
+    border-color: var(--editorial-border);
+    border-radius: var(--editorial-radius-pill);
+    background: var(--editorial-bg-panel);
+    color: var(--editorial-text-body);
+    box-shadow: none;
+  }
+
+  .editorial-status-tag--running.ant-tag {
+    background: var(--editorial-bg-link);
+    color: var(--editorial-text-main);
+  }
+
+  .editorial-status-tag--interrupted.ant-tag {
+    border-color: rgba(166, 136, 89, 0.36);
+    background: rgba(166, 136, 89, 0.14);
+    color: var(--editorial-text-main);
+  }
+
+  .editorial-status-tag--idle.ant-tag {
+    background: #f2f1ed;
+    color: var(--editorial-text-body);
+  }
+
+  html[data-theme="dark"] .editorial-status-tag--running.ant-tag {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  html[data-theme="dark"] .editorial-status-tag--interrupted.ant-tag {
+    border-color: rgba(203, 176, 132, 0.38);
+    background: rgba(203, 176, 132, 0.16);
+  }
+
+  html[data-theme="dark"] .editorial-status-tag--idle.ant-tag {
+    background: rgba(255, 255, 255, 0.04);
+  }
+}

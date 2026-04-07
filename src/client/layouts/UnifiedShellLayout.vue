@@ -174,9 +174,8 @@ onBeforeUnmount(() => {
     >
       <div class="flex items-center gap-3">
         <div class="min-w-0 flex-1">
-          <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">HotNow</p>
           <nav
-            class="mt-2 flex min-w-0 flex-1 gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            class="flex min-w-0 flex-1 gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             aria-label="内容菜单"
           >
             <RouterLink
@@ -212,11 +211,8 @@ onBeforeUnmount(() => {
     >
       <div class="flex min-h-0 flex-1 flex-col gap-5">
         <section class="px-3 py-2" data-workspace-brand>
-          <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
-            HotNow
-          </p>
           <h1 class="mt-1 text-[20px] font-semibold tracking-[-0.01em] text-editorial-text-main">
-            AI Workspace
+            热讯
           </h1>
         </section>
 
@@ -293,6 +289,7 @@ onBeforeUnmount(() => {
 
             <template v-else-if="profileLoadState === 'error'">
               <a-alert
+                class="editorial-inline-alert editorial-inline-alert--warning"
                 type="warning"
                 show-icon
                 :message="profileError ?? '读取当前登录用户失败'"
@@ -496,11 +493,12 @@ onBeforeUnmount(() => {
                 </div>
               </template>
               <template v-else-if="profileLoadState === 'error'">
-                <a-alert
-                  type="warning"
-                  show-icon
-                  :message="profileError ?? '读取当前登录用户失败'"
-                />
+              <a-alert
+                class="editorial-inline-alert editorial-inline-alert--warning"
+                type="warning"
+                show-icon
+                :message="profileError ?? '读取当前登录用户失败'"
+              />
               </template>
               <template v-else>
                 <EditorialEmptyState

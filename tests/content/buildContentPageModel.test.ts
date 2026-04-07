@@ -68,23 +68,36 @@ describe("buildContentPageModel", () => {
     expect(aiHotPage.cards.map((card) => card.title)).toContain("Paged 2");
   });
 
-  it("filters ai-new cards by title keyword before pagination", async () => {
+  it("filters the full ai-new result set by title keyword before pagination", async () => {
     const handle = await createTestDatabase("hot-now-content-page-search-");
     handles.push(handle);
 
-    insertAiNewItem(handle.db, "Agent platform launch", "2026-03-31T03:00:00.000Z", "2026-03-31T03:00:05.000Z");
-    insertAiNewItem(handle.db, "Model refresh bulletin", "2026-03-31T02:00:00.000Z", "2026-03-31T02:00:05.000Z");
-    insertAiNewItem(handle.db, "Agent benchmark roundup", "2026-03-31T01:00:00.000Z", "2026-03-31T01:00:05.000Z");
+    for (let index = 0; index < 55; index += 1) {
+      const publishedAt = new Date(Date.UTC(2026, 2, 31, 3, 59 - index, 0)).toISOString();
+      const fetchedAt = new Date(Date.UTC(2026, 2, 31, 3, 59 - index, 5)).toISOString();
+      const title = index < 50 ? `Model refresh bulletin ${index + 1}` : `Agent benchmark roundup ${index - 49}`;
+
+      insertAiNewItem(handle.db, title, publishedAt, fetchedAt);
+    }
 
     const model = buildContentPageModel(handle.db, "ai-new", {
+      page: 1,
       searchKeyword: "agent"
     });
 
     expect(model.cards.map((card) => card.title)).toEqual([
-      "Agent platform launch",
-      "Agent benchmark roundup"
+      "Agent benchmark roundup 1",
+      "Agent benchmark roundup 2",
+      "Agent benchmark roundup 3",
+      "Agent benchmark roundup 4",
+      "Agent benchmark roundup 5"
     ]);
-    expect(model.pagination?.totalResults).toBe(2);
+    expect(model.pagination).toEqual({
+      page: 1,
+      pageSize: 50,
+      totalResults: 5,
+      totalPages: 1
+    });
   });
 
   it("returns a search-specific empty state when no title matches", async () => {

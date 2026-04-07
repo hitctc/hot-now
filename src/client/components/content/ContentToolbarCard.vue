@@ -27,7 +27,7 @@ const emit = defineEmits<{
   clear: [];
 }>();
 
-const isSourceExpanded = ref(true);
+const isSourceExpanded = ref(false);
 
 const selectedSourceNames = computed(() => {
   const selectedKinds = new Set(props.selectedSourceKinds);

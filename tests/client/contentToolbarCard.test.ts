@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import ContentToolbarCard from "../../src/client/components/content/ContentToolbarCard.vue";
 
 describe("ContentToolbarCard", () => {
-  it("summarizes selected sources and keeps the source panel open after selection changes", async () => {
+  it("starts collapsed and keeps the source panel open after selection changes", async () => {
     const wrapper = mount(ContentToolbarCard, {
       props: {
         options: [
@@ -27,16 +27,28 @@ describe("ContentToolbarCard", () => {
       expect.arrayContaining(["rounded-editorial-lg", "border", "bg-editorial-panel"])
     );
     expect(wrapper.get("[data-content-toolbar-summary]").text()).toContain("来源：未选择");
-    expect(wrapper.get("[data-content-toolbar-source-toggle]").text()).toContain("收起来源");
-    expect((wrapper.get("[data-content-toolbar-source-panel]").element as HTMLElement).style.display).toBe("");
+    expect(wrapper.get("[data-content-toolbar-summary]").attributes("aria-expanded")).toBe("false");
+    expect(wrapper.get("[data-content-toolbar-source-toggle]").text()).toContain("展开来源");
+    expect(wrapper.get("[data-content-toolbar-source-toggle]").attributes("aria-expanded")).toBe("false");
+    expect((wrapper.get("[data-content-toolbar-source-panel]").element as HTMLElement).style.display).toBe("none");
     expect(wrapper.get("[data-content-sort-control]").classes()).not.toContain("bg-editorial-panel");
     expect(wrapper.get("[data-content-search-control]").classes()).toContain("w-full");
+
+    await wrapper.get("[data-content-toolbar-summary]").trigger("click");
+    await flushPromises();
+
+    expect((wrapper.get("[data-content-toolbar-source-panel]").element as HTMLElement).style.display).toBe("");
+    expect(wrapper.get("[data-content-toolbar-source-toggle]").text()).toContain("收起来源");
+    expect(wrapper.get("[data-content-toolbar-summary]").attributes("aria-expanded")).toBe("true");
+    expect(wrapper.get("[data-content-toolbar-source-toggle]").attributes("aria-expanded")).toBe("true");
 
     await wrapper.get("[data-content-toolbar-source-toggle]").trigger("click");
     await flushPromises();
 
     expect((wrapper.get("[data-content-toolbar-source-panel]").element as HTMLElement).style.display).toBe("none");
     expect(wrapper.get("[data-content-toolbar-source-toggle]").text()).toContain("展开来源");
+    expect(wrapper.get("[data-content-toolbar-summary]").attributes("aria-expanded")).toBe("false");
+    expect(wrapper.get("[data-content-toolbar-source-toggle]").attributes("aria-expanded")).toBe("false");
 
     await wrapper.get("[data-content-toolbar-summary]").trigger("click");
     await flushPromises();
@@ -57,6 +69,7 @@ describe("ContentToolbarCard", () => {
     await wrapper.get("[data-source-kind='openai']").setValue(true);
     await flushPromises();
     expect(wrapper.emitted("changeSource")?.at(-1)).toEqual([["openai"]]);
+    expect((wrapper.get("[data-content-toolbar-source-panel]").element as HTMLElement).style.display).toBe("");
 
     await wrapper.setProps({
       selectedSourceKinds: ["openai"]
@@ -72,16 +85,7 @@ describe("ContentToolbarCard", () => {
     await flushPromises();
 
     expect(wrapper.get("[data-content-toolbar-summary]").text()).toContain("来源：OpenAI、IT之家 +1");
-
-    await wrapper.get("[data-content-toolbar-summary]").trigger("click");
-    await flushPromises();
-
-    expect((wrapper.get("[data-content-toolbar-source-panel]").element as HTMLElement).style.display).toBe("none");
-    expect(wrapper.get("[data-content-toolbar-source-toggle]").text()).toContain("展开来源");
-
-    await wrapper.get("[data-content-toolbar-source-toggle]").trigger("click");
-    await flushPromises();
-
     expect((wrapper.get("[data-content-toolbar-source-panel]").element as HTMLElement).style.display).toBe("");
+    expect(wrapper.get("[data-content-toolbar-source-toggle]").text()).toContain("收起来源");
   });
 });

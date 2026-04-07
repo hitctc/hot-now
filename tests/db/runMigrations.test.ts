@@ -65,7 +65,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(6);
+    expect(schemaVersion).toBe(7);
 
     const appliedMigrations = db
       .prepare(
@@ -83,7 +83,8 @@ describe("runMigrations", () => {
       { version: 3, name: "003_feedback_and_llm_strategy_workbench" },
       { version: 4, name: "004_source_display_mode" },
       { version: 5, name: "005_nl_rule_enabled_flag" },
-      { version: 6, name: "006_provider_settings_multi_save" }
+      { version: 6, name: "006_provider_settings_multi_save" },
+      { version: 7, name: "007_source_bridge_metadata" }
     ]);
 
     const digestReportColumns = db
@@ -104,7 +105,9 @@ describe("runMigrations", () => {
       )
       .all() as Array<{ name: string }>;
 
-    expect(sourceColumns.map((column) => column.name)).toContain("show_all_when_selected");
+    expect(sourceColumns.map((column) => column.name)).toEqual(
+      expect.arrayContaining(["show_all_when_selected", "source_type", "bridge_kind", "bridge_config_json"])
+    );
 
     const providerSettingsColumns = db
       .prepare(
@@ -121,21 +124,29 @@ describe("runMigrations", () => {
       .prepare(
         `
           SELECT kind, is_enabled, show_all_when_selected
+               , source_type, bridge_kind, bridge_config_json
           FROM content_sources
           ORDER BY kind
         `
       )
-      .all() as Array<{ kind: string; is_enabled: number; show_all_when_selected: number }>;
+      .all() as Array<{
+      kind: string;
+      is_enabled: number;
+      show_all_when_selected: number;
+      source_type: string;
+      bridge_kind: string | null;
+      bridge_config_json: string | null;
+    }>;
 
     expect(sourceRows).toEqual([
-      { kind: "aifanr", is_enabled: 1, show_all_when_selected: 0 },
-      { kind: "google_ai", is_enabled: 1, show_all_when_selected: 0 },
-      { kind: "ithome", is_enabled: 1, show_all_when_selected: 0 },
-      { kind: "juya", is_enabled: 1, show_all_when_selected: 0 },
-      { kind: "kr36", is_enabled: 1, show_all_when_selected: 0 },
-      { kind: "kr36_newsflash", is_enabled: 1, show_all_when_selected: 0 },
-      { kind: "openai", is_enabled: 1, show_all_when_selected: 0 },
-      { kind: "techcrunch_ai", is_enabled: 1, show_all_when_selected: 0 }
+      { kind: "aifanr", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
+      { kind: "google_ai", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
+      { kind: "ithome", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
+      { kind: "juya", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
+      { kind: "kr36", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
+      { kind: "kr36_newsflash", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
+      { kind: "openai", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
+      { kind: "techcrunch_ai", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null }
     ]);
 
     const adminRow = db

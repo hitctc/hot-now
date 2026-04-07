@@ -1,12 +1,13 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 6;
+const schemaVersion = 7;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
 const sourceDisplayModeMigrationName = "004_source_display_mode";
 const nlRuleEnabledFlagMigrationName = "005_nl_rule_enabled_flag";
 const providerSettingsMultiSaveMigrationName = "006_provider_settings_multi_save";
+const sourceBridgeMetadataMigrationName = "007_source_bridge_metadata";
 
 const migrationStatements = [
   `
@@ -329,6 +330,28 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(6, providerSettingsMultiSaveMigrationName);
+
+    // Bridge-backed sources still save a final rss_url, but source rows now need explicit type and
+    // bridge metadata so the sources workbench can manage RSS and WeChat sources in one table.
+    if (!hasColumn(db, "content_sources", "source_type")) {
+      db.exec("ALTER TABLE content_sources ADD COLUMN source_type TEXT NOT NULL DEFAULT 'rss'");
+    }
+
+    if (!hasColumn(db, "content_sources", "bridge_kind")) {
+      db.exec("ALTER TABLE content_sources ADD COLUMN bridge_kind TEXT");
+    }
+
+    if (!hasColumn(db, "content_sources", "bridge_config_json")) {
+      db.exec("ALTER TABLE content_sources ADD COLUMN bridge_config_json TEXT");
+    }
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(7, sourceBridgeMetadataMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

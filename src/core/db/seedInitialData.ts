@@ -67,14 +67,32 @@ export function seedInitialData(db: SqliteDatabase, authBootstrap?: AuthBootstra
   ensureContentSourcesEnabledColumn(db);
   ensureContentSourcesActiveColumn(db);
   ensureContentSourcesShowAllWhenSelectedColumn(db);
+  ensureContentSourcesSourceTypeColumn(db);
+  ensureContentSourcesBridgeKindColumn(db);
+  ensureContentSourcesBridgeConfigColumn(db);
 
   const insertSource = db.prepare(
     `
-      INSERT INTO content_sources (kind, name, site_url, rss_url, is_enabled, is_builtin, show_all_when_selected, updated_at)
-      VALUES (@kind, @name, @siteUrl, @rssUrl, 1, 1, 0, CURRENT_TIMESTAMP)
+      INSERT INTO content_sources (
+        kind,
+        name,
+        site_url,
+        rss_url,
+        source_type,
+        bridge_kind,
+        bridge_config_json,
+        is_enabled,
+        is_builtin,
+        show_all_when_selected,
+        updated_at
+      )
+      VALUES (@kind, @name, @siteUrl, @rssUrl, 'rss', NULL, NULL, 1, 1, 0, CURRENT_TIMESTAMP)
       ON CONFLICT(kind) DO UPDATE SET
         name = excluded.name,
         site_url = excluded.site_url,
+        source_type = 'rss',
+        bridge_kind = NULL,
+        bridge_config_json = NULL,
         is_builtin = excluded.is_builtin,
         updated_at = CURRENT_TIMESTAMP
     `
@@ -163,6 +181,34 @@ function ensureContentSourcesShowAllWhenSelectedColumn(db: SqliteDatabase): void
   db.exec("ALTER TABLE content_sources ADD COLUMN show_all_when_selected INTEGER NOT NULL DEFAULT 0");
 }
 
+function ensureContentSourcesSourceTypeColumn(db: SqliteDatabase): void {
+  // Source rows now carry an explicit type so built-in RSS rows and user-added bridge rows can
+  // share one workbench without guessing from nullable fields.
+  if (hasContentSourcesSourceTypeColumn(db)) {
+    return;
+  }
+
+  db.exec("ALTER TABLE content_sources ADD COLUMN source_type TEXT NOT NULL DEFAULT 'rss'");
+}
+
+function ensureContentSourcesBridgeKindColumn(db: SqliteDatabase): void {
+  // Bridge provider metadata is additive only, so older local databases can gain the field in place.
+  if (hasContentSourcesBridgeKindColumn(db)) {
+    return;
+  }
+
+  db.exec("ALTER TABLE content_sources ADD COLUMN bridge_kind TEXT");
+}
+
+function ensureContentSourcesBridgeConfigColumn(db: SqliteDatabase): void {
+  // Raw bridge input stays in JSON so the sources page can show where a feed came from later on.
+  if (hasContentSourcesBridgeConfigColumn(db)) {
+    return;
+  }
+
+  db.exec("ALTER TABLE content_sources ADD COLUMN bridge_config_json TEXT");
+}
+
 function hasContentSourcesActiveColumn(db: SqliteDatabase): boolean {
   // PRAGMA introspection lets the seed stay compatible with both legacy and patched local databases.
   const columns = db
@@ -188,6 +234,30 @@ function hasContentSourcesShowAllWhenSelectedColumn(db: SqliteDatabase): boolean
     .all() as Array<{ name: string }>;
 
   return columns.some((column) => column.name === "show_all_when_selected");
+}
+
+function hasContentSourcesSourceTypeColumn(db: SqliteDatabase): boolean {
+  const columns = db
+    .prepare("PRAGMA table_info(content_sources)")
+    .all() as Array<{ name: string }>;
+
+  return columns.some((column) => column.name === "source_type");
+}
+
+function hasContentSourcesBridgeKindColumn(db: SqliteDatabase): boolean {
+  const columns = db
+    .prepare("PRAGMA table_info(content_sources)")
+    .all() as Array<{ name: string }>;
+
+  return columns.some((column) => column.name === "bridge_kind");
+}
+
+function hasContentSourcesBridgeConfigColumn(db: SqliteDatabase): boolean {
+  const columns = db
+    .prepare("PRAGMA table_info(content_sources)")
+    .all() as Array<{ name: string }>;
+
+  return columns.some((column) => column.name === "bridge_config_json");
 }
 
 function ensureDefaultActiveSource(db: SqliteDatabase): void {

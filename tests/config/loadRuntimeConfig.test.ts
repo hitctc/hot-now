@@ -158,6 +158,31 @@ describe("loadRuntimeConfig", () => {
     expect(config.llm).toEqual({ settingsMasterKey: "session-secret-value" });
   });
 
+  it("loads optional wechat bridge env values when provided", async () => {
+    const config = await loadRuntimeConfig({
+      configPath: path.resolve("config/hot-now.config.json"),
+      env: {
+        ...baseEnv,
+        WECHAT_BRIDGE_BASE_URL: "https://bridge.example.test",
+        WECHAT_BRIDGE_TOKEN: "bridge-secret"
+      }
+    });
+
+    expect(config.wechatBridge).toEqual({
+      baseUrl: "https://bridge.example.test",
+      token: "bridge-secret"
+    });
+  });
+
+  it("keeps wechat bridge config null when env values are missing", async () => {
+    const config = await loadRuntimeConfig({
+      configPath: path.resolve("config/hot-now.config.json"),
+      env: baseEnv
+    });
+
+    expect(config.wechatBridge).toBeNull();
+  });
+
   it("throws when a required SMTP env value is missing", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-config-"));
     const configPath = path.join(tempDir, "hot-now.config.json");

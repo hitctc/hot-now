@@ -143,6 +143,59 @@ describe("contentApi", () => {
     });
   });
 
+  it("sends the shared title search keyword through ai-hot header", async () => {
+    requestJson.mockResolvedValue({
+      pageKey: "ai-hot",
+      sourceFilter: undefined,
+      featuredCard: null,
+      cards: [],
+      pagination: null,
+      emptyState: null
+    });
+
+    const { readAiHotPage } = await import("../../src/client/services/contentApi");
+
+    await readAiHotPage({
+      selectedSourceKinds: ["ithome"],
+      sortMode: "content_score",
+      searchKeyword: "workflow"
+    });
+
+    expect(requestJson).toHaveBeenCalledWith("/api/content/ai-hot", {
+      headers: {
+        "x-hot-now-source-filter": "ithome",
+        "x-hot-now-content-sort": "content_score",
+        "x-hot-now-content-search": "workflow"
+      }
+    });
+  });
+
+  it("does not send content search header for blank keywords", async () => {
+    requestJson.mockResolvedValue({
+      pageKey: "ai-new",
+      sourceFilter: undefined,
+      featuredCard: null,
+      cards: [],
+      pagination: null,
+      emptyState: null
+    });
+
+    const { readAiNewPage } = await import("../../src/client/services/contentApi");
+
+    await readAiNewPage({
+      selectedSourceKinds: ["openai"],
+      sortMode: "published_at",
+      searchKeyword: "   "
+    });
+
+    expect(requestJson).toHaveBeenCalledWith("/api/content/ai-new", {
+      headers: {
+        "x-hot-now-source-filter": "openai",
+        "x-hot-now-content-sort": "published_at"
+      }
+    });
+  });
+
   it("only posts feedback pool actions and no longer exports favorite or reaction helpers", async () => {
     requestJson.mockResolvedValue({ ok: true });
 

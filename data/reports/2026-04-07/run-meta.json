@@ -1,0 +1,13 @@
+{
+  "date": "2026-04-07",
+  "trigger": "scheduled",
+  "generatedAt": "2026-04-07T10:10:11.859Z",
+  "mailStatus": "not-sent-by-collection",
+  "degraded": true,
+  "topicCount": 10,
+  "sourceFailureCount": 2,
+  "failedSourceKinds": [
+    "kr36",
+    "kr36_newsflash"
+  ]
+}

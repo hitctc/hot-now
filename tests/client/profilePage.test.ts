@@ -1,9 +1,9 @@
-import { flushPromises, mount } from "@vue/test-utils";
-import Antd from "ant-design-vue";
+import { flushPromises } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ProfilePage from "../../src/client/pages/settings/ProfilePage.vue";
 import * as settingsApi from "../../src/client/services/settingsApi";
+import { mountWithApp } from "./helpers/mountWithApp";
 
 vi.mock("../../src/client/services/settingsApi", async () => {
   const actual = await vi.importActual<typeof import("../../src/client/services/settingsApi")>(
@@ -43,11 +43,7 @@ describe("ProfilePage", () => {
       loggedIn: true
     });
 
-    const wrapper = mount(ProfilePage, {
-      global: {
-        plugins: [Antd]
-      }
-    });
+    const wrapper = mountWithApp(ProfilePage);
 
     await flushPromises();
 
@@ -69,11 +65,7 @@ describe("ProfilePage", () => {
   it("renders the shared editorial empty state when the profile payload is empty", async () => {
     vi.mocked(settingsApi.readSettingsProfile).mockResolvedValue(null);
 
-    const wrapper = mount(ProfilePage, {
-      global: {
-        plugins: [Antd]
-      }
-    });
+    const wrapper = mountWithApp(ProfilePage);
 
     await flushPromises();
 

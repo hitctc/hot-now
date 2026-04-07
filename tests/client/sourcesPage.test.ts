@@ -1,9 +1,9 @@
-import { flushPromises, mount } from "@vue/test-utils";
-import Antd from "ant-design-vue";
+import { flushPromises } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import SourcesPage from "../../src/client/pages/settings/SourcesPage.vue";
 import * as settingsApi from "../../src/client/services/settingsApi";
+import { mountWithApp } from "./helpers/mountWithApp";
 
 vi.mock("../../src/client/services/settingsApi", async () => {
   const actual = await vi.importActual<typeof import("../../src/client/services/settingsApi")>(
@@ -84,11 +84,7 @@ describe("SourcesPage", () => {
   it("renders operation cards and source tables from the api model", async () => {
     vi.mocked(settingsApi.readSettingsSources).mockResolvedValue(createSourcesModel());
 
-    const wrapper = mount(SourcesPage, {
-      global: {
-        plugins: [Antd]
-      }
-    });
+    const wrapper = mountWithApp(SourcesPage);
 
     await flushPromises();
 
@@ -140,11 +136,7 @@ describe("SourcesPage", () => {
       enable: false
     });
 
-    const wrapper = mount(SourcesPage, {
-      global: {
-        plugins: [Antd]
-      }
-    });
+    const wrapper = mountWithApp(SourcesPage);
 
     await flushPromises();
     await wrapper.get("[data-source-toggle='openai']").trigger("click");
@@ -164,11 +156,7 @@ describe("SourcesPage", () => {
       action: "collect"
     });
 
-    const wrapper = mount(SourcesPage, {
-      global: {
-        plugins: [Antd]
-      }
-    });
+    const wrapper = mountWithApp(SourcesPage);
 
     await flushPromises();
     await wrapper.get("[data-action='manual-collect']").trigger("click");
@@ -191,11 +179,7 @@ describe("SourcesPage", () => {
       showAllWhenSelected: false
     });
 
-    const wrapper = mount(SourcesPage, {
-      global: {
-        plugins: [Antd]
-      }
-    });
+    const wrapper = mountWithApp(SourcesPage);
 
     await flushPromises();
     await wrapper.get("[data-source-display-mode='openai']").trigger("click");

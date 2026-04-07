@@ -33,8 +33,8 @@ export function createEditorialProviderTheme(mode: EditorialThemeMode): Provider
       colorError: palette.danger,
       colorBgLayout: palette.bgPage,
       colorBgContainer: palette.bgPanelStrong,
-      colorBgElevated: palette.bgSidebarPanel,
-      colorFillAlter: palette.bgControl,
+      colorBgElevated: palette.bgPanel,
+      colorFillAlter: palette.bgLinkActiveStrong,
       colorText: palette.textMain,
       colorTextSecondary: palette.textBody,
       colorTextTertiary: palette.textMuted,
@@ -45,7 +45,7 @@ export function createEditorialProviderTheme(mode: EditorialThemeMode): Provider
       borderRadiusLG,
       fontFamily: palette.fontUi,
       fontSize: 14,
-      controlHeight: 40,
+      controlHeight: 36,
       boxShadow: palette.shadowCard,
       boxShadowSecondary: palette.shadowFloating
     }

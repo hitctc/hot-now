@@ -1,9 +1,9 @@
-import { flushPromises, mount } from "@vue/test-utils";
-import Antd from "ant-design-vue";
+import { flushPromises } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import ViewRulesPage from "../../src/client/pages/settings/ViewRulesPage.vue";
 import * as settingsApi from "../../src/client/services/settingsApi";
+import { mountWithApp } from "./helpers/mountWithApp";
 
 vi.mock("../../src/client/services/settingsApi", async () => {
   const actual = await vi.importActual<typeof import("../../src/client/services/settingsApi")>(
@@ -127,11 +127,7 @@ describe("ViewRulesPage", () => {
   it("renders the provider, nl-rules, feedback and draft sections from the api workbench", async () => {
     vi.mocked(settingsApi.readSettingsViewRules).mockResolvedValue(createWorkbench());
 
-    const wrapper = mount(ViewRulesPage, {
-      global: {
-        plugins: [Antd]
-      }
-    });
+    const wrapper = mountWithApp(ViewRulesPage);
 
     await flushPromises();
 
@@ -186,11 +182,7 @@ describe("ViewRulesPage", () => {
       }
     });
 
-    const wrapper = mount(ViewRulesPage, {
-      global: {
-        plugins: [Antd]
-      }
-    });
+    const wrapper = mountWithApp(ViewRulesPage);
 
     await flushPromises();
 
@@ -210,11 +202,7 @@ describe("ViewRulesPage", () => {
   it("applies a draft into the matching nl-rule editor without saving immediately", async () => {
     vi.mocked(settingsApi.readSettingsViewRules).mockResolvedValue(createWorkbench());
 
-    const wrapper = mount(ViewRulesPage, {
-      global: {
-        plugins: [Antd]
-      }
-    });
+    const wrapper = mountWithApp(ViewRulesPage);
 
     await flushPromises();
 
@@ -230,11 +218,7 @@ describe("ViewRulesPage", () => {
   it("renders the shared editorial empty states for feedback and draft pools", async () => {
     vi.mocked(settingsApi.readSettingsViewRules).mockResolvedValue(createEmptyWorkbench());
 
-    const wrapper = mount(ViewRulesPage, {
-      global: {
-        plugins: [Antd]
-      }
-    });
+    const wrapper = mountWithApp(ViewRulesPage);
 
     await flushPromises();
 

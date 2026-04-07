@@ -2,9 +2,9 @@ import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { LatestReportEmailError, type LatestReportEmailErrorReason } from "../core/pipeline/sendLatestReportEmail.js";
+import type { BuildContentPageModelOptions } from "../core/content/buildContentPageModel.js";
 import type { ContentSortMode, ContentViewSelectionOptions } from "../core/content/buildContentViewSelection.js";
 import type { ContentCardView, ContentViewKey } from "../core/content/listContentView.js";
-import type { FeedbackSaveResult, ReactionValue } from "../core/feedback/feedbackRepository.js";
 import type { SaveFeedbackPoolEntryInput, SaveFeedbackPoolEntryResult } from "../core/feedback/feedbackPoolRepository.js";
 import type { SaveProviderSettingsInput, SaveProviderSettingsResult } from "../core/llm/providerSettingsRepository.js";
 import type { RatingDimension, SaveRatingsResult } from "../core/ratings/ratingRepository.js";
@@ -92,6 +92,12 @@ type ContentPageModel = {
   };
   featuredCard: ContentCardView | null;
   cards: ContentCardView[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalResults: number;
+    totalPages: number;
+  } | null;
   emptyState: {
     title: string;
     description: string;
@@ -114,8 +120,6 @@ type ServerDeps = {
     options?: Pick<ContentViewSelectionOptions, "selectedSourceKinds" | "sortMode">
   ) => Promise<ContentCardView[]> | ContentCardView[];
   listContentSources?: () => Promise<ContentSourceOption[]> | ContentSourceOption[];
-  saveFavorite?: (contentItemId: number, isFavorited: boolean) => Promise<FeedbackSaveResult> | FeedbackSaveResult;
-  saveReaction?: (contentItemId: number, reaction: ReactionValue) => Promise<FeedbackSaveResult> | FeedbackSaveResult;
   saveContentFeedback?: (
     contentItemId: number,
     input: Omit<SaveFeedbackPoolEntryInput, "contentItemId">
@@ -143,7 +147,7 @@ type ServerDeps = {
   getCurrentUserProfile?: () => Promise<CurrentUserProfile | null> | CurrentUserProfile | null;
   getContentPageModel?: (
     pageKey: ContentPageKey,
-    options?: Pick<ContentViewSelectionOptions, "selectedSourceKinds" | "sortMode">
+    options?: Pick<BuildContentPageModelOptions, "selectedSourceKinds" | "sortMode" | "page">
   ) => Promise<ContentPageModel> | ContentPageModel;
   auth?: {
     requireLogin: boolean;
@@ -471,66 +475,6 @@ export function createServer(deps: ServerDeps = {}) {
     );
   });
 
-  app.post("/actions/content/:id/favorite", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.saveFavorite) {
-      return reply.code(503).send({ ok: false, reason: "content-actions-disabled" });
-    }
-
-    const contentItemId = parseContentItemId(request.params);
-
-    if (!contentItemId) {
-      return reply.code(400).send({ ok: false, reason: "invalid-content-id" });
-    }
-
-    const body = request.body as { isFavorited?: unknown } | undefined;
-
-    if (typeof body?.isFavorited !== "boolean") {
-      return reply.code(400).send({ ok: false, reason: "invalid-favorite-payload" });
-    }
-
-    const result = await deps.saveFavorite(contentItemId, body.isFavorited);
-
-    if (!result.ok && result.reason === "not-found") {
-      return reply.code(404).send({ ok: false, reason: "not-found" });
-    }
-
-    return reply.send({ ok: true, contentItemId, isFavorited: body.isFavorited });
-  });
-
-  app.post("/actions/content/:id/reaction", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.saveReaction) {
-      return reply.code(503).send({ ok: false, reason: "content-actions-disabled" });
-    }
-
-    const contentItemId = parseContentItemId(request.params);
-
-    if (!contentItemId) {
-      return reply.code(400).send({ ok: false, reason: "invalid-content-id" });
-    }
-
-    const body = request.body as { reaction?: unknown } | undefined;
-
-    if (!isReactionValue(body?.reaction)) {
-      return reply.code(400).send({ ok: false, reason: "invalid-reaction" });
-    }
-
-    const result = await deps.saveReaction(contentItemId, body.reaction);
-
-    if (!result.ok && result.reason === "not-found") {
-      return reply.code(404).send({ ok: false, reason: "not-found" });
-    }
-
-    return reply.send({ ok: true, contentItemId, reaction: body.reaction });
-  });
-
   app.post("/actions/content/:id/feedback-pool", async (request, reply) => {
     if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
       return;
@@ -555,7 +499,6 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     const input = {
-      reactionSnapshot: isReactionSnapshot(body?.reactionSnapshot) ? body?.reactionSnapshot : "none",
       freeText: typeof body?.freeText === "string" ? body.freeText : null,
       suggestedEffect: isSuggestedEffect(body?.suggestedEffect) ? body.suggestedEffect : null,
       strengthLevel: isStrengthLevel(body?.strengthLevel) ? body.strengthLevel : null,
@@ -1108,13 +1051,15 @@ async function readContentPageModelApiData(
   if (deps.getContentPageModel) {
     const selectedSourceKinds = readSelectedSourceKindsHeader(request.headers["x-hot-now-source-filter"]);
     const sortMode = readContentSortModeHeader(request.headers["x-hot-now-content-sort"]);
+    const page = readContentPageQueryPage(request);
     return deps.getContentPageModel(
       pageKey,
-      selectedSourceKinds === undefined && sortMode === undefined
+      selectedSourceKinds === undefined && sortMode === undefined && page === 1
         ? undefined
         : {
             selectedSourceKinds,
-            sortMode
+            sortMode,
+            page
           }
     );
   }
@@ -1147,11 +1092,13 @@ async function buildContentPageModelFromDependencies(
     const selectedSourceKinds = readContentPageSelectedSourceKinds(request.headers["x-hot-now-source-filter"], sourceOptions);
     const effectiveSelectedSourceKinds = selectedSourceKinds ?? deriveDefaultSelectedSourceKinds(sourceOptions);
     const sortMode = readContentSortModeHeader(request.headers["x-hot-now-content-sort"]) ?? "published_at";
-    const cards = await deps.listContentView(viewKey, {
+    const requestedPage = readContentPageQueryPage(request);
+    const allCards = await deps.listContentView(viewKey, {
       selectedSourceKinds: effectiveSelectedSourceKinds,
       sortMode
     });
-    const currentPageVisibleCountsBySourceKind = countCurrentPageVisibleCardsBySourceKind(cards);
+    const pagination = paginateContentCards(allCards, requestedPage);
+    const currentPageVisibleCountsBySourceKind = countCurrentPageVisibleCardsBySourceKind(pagination.cards);
 
     return {
       pageKey,
@@ -1168,7 +1115,8 @@ async function buildContentPageModelFromDependencies(
         : undefined,
       // AI 新讯和 AI 热点都统一成标准卡流，保留 featuredCard 仅作兼容空字段。
       featuredCard: null,
-      cards,
+      cards: pagination.cards,
+      pagination: pagination.meta,
       emptyState:
         effectiveSelectedSourceKinds.length === 0
           ? {
@@ -1176,10 +1124,12 @@ async function buildContentPageModelFromDependencies(
               description: "重新全选后即可恢复内容结果。",
               tone: "filtered"
             }
-          : cards.length === 0
+          : pagination.meta.totalResults === 0
             ? {
-                title: pageKey === "ai-new" ? "暂无 AI 新讯" : "暂无 AI 热点",
-                description: "可以稍后刷新，或先检查数据源采集状态。",
+                title: pageKey === "ai-new" ? "当前 24 小时内暂无 AI 新讯" : "暂无 AI 热点",
+                description: pageKey === "ai-new"
+                  ? "可以稍后刷新，或者检查最近 24 小时内是否有新的 AI 内容进入内容池。"
+                  : "可以稍后刷新，或先检查数据源采集状态。",
                 tone: "default"
               }
             : null
@@ -1193,6 +1143,7 @@ async function buildContentPageModelFromDependencies(
       pageKey,
       featuredCard: null,
       cards: [],
+      pagination: null,
       emptyState: {
         title: "内容暂不可用",
         description: "检测到本地内容库读取失败，请修复或重建 data/hot-now.sqlite 后再刷新。",
@@ -1215,6 +1166,37 @@ function countCurrentPageVisibleCardsBySourceKind(cards: ContentCardView[]) {
   }
 
   return Object.fromEntries(counts.entries());
+}
+
+function readContentPageQueryPage(request: FastifyRequest) {
+  const query = request.query as { page?: string | number | undefined };
+  const parsed = Number(query.page);
+
+  if (!Number.isFinite(parsed)) {
+    return 1;
+  }
+
+  const normalized = Math.floor(parsed);
+  return normalized >= 1 ? normalized : 1;
+}
+
+function paginateContentCards(cards: ContentCardView[], requestedPage: number) {
+  // 内容 API fallback 也要和核心模型保持一致，统一按 50 条分页并在越界时回退到最后一页。
+  const pageSize = 50;
+  const totalResults = cards.length;
+  const totalPages = Math.max(1, Math.ceil(totalResults / pageSize));
+  const page = Math.min(requestedPage, totalPages);
+  const startIndex = (page - 1) * pageSize;
+
+  return {
+    cards: cards.slice(startIndex, startIndex + pageSize),
+    meta: {
+      page,
+      pageSize,
+      totalResults,
+      totalPages
+    }
+  };
 }
 
 async function renderContentForView(
@@ -1549,15 +1531,6 @@ function parseNumericRouteId(params: unknown, key: string): number | null {
   }
 
   return parsed;
-}
-
-function isReactionValue(value: unknown): value is ReactionValue {
-  // Only the three explicit reaction values are accepted to avoid writing arbitrary feedback strings.
-  return value === "like" || value === "dislike" || value === "none";
-}
-
-function isReactionSnapshot(value: unknown): value is NonNullable<SaveFeedbackPoolEntryInput["reactionSnapshot"]> {
-  return value === "like" || value === "dislike" || value === "none";
 }
 
 function isSuggestedEffect(value: unknown): value is NonNullable<SaveFeedbackPoolEntryInput["suggestedEffect"]> {

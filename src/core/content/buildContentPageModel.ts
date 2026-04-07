@@ -8,6 +8,13 @@ import type { ContentCardView } from "./listContentView.js";
 
 export type ContentPageKey = "ai-new" | "ai-hot";
 
+export type ContentPagination = {
+  page: number;
+  pageSize: number;
+  totalResults: number;
+  totalPages: number;
+};
+
 export type ContentPageModel = {
   pageKey: ContentPageKey;
   sourceFilter?: {
@@ -16,6 +23,7 @@ export type ContentPageModel = {
   };
   featuredCard: ContentCardView | null;
   cards: ContentCardView[];
+  pagination: ContentPagination | null;
   emptyState: {
     title: string;
     description: string;
@@ -27,7 +35,10 @@ export type BuildContentPageModelOptions = {
   includeNlEvaluations?: boolean;
   selectedSourceKinds?: string[];
   sortMode?: ContentSortMode;
+  page?: number;
 };
+
+const contentPageSize = 50;
 
 // 内容页模型在这里统一拼装，避免 server route 再复制一套精选卡、来源筛选和空态判断。
 export function buildContentPageModel(
@@ -45,8 +56,9 @@ export function buildContentPageModel(
       selectedSourceKinds: effectiveSelectedSourceKinds,
       sortMode: options.sortMode ?? "published_at"
     });
-    const cards = selection.visibleCards.map(stripRankedCard);
-    const visibleCountsBySourceKind = countCurrentPageVisibleCardsBySourceKind(cards);
+    const allCards = selection.visibleCards.map(stripRankedCard);
+    const pagination = paginateContentCards(allCards, options.page);
+    const visibleCountsBySourceKind = countCurrentPageVisibleCardsBySourceKind(pagination.cards);
 
     return {
       pageKey,
@@ -64,7 +76,8 @@ export function buildContentPageModel(
           : undefined,
       // 客户端内容页已经不再拆首条精选卡，这里保留空字段只为了兼容现有接口模型。
       featuredCard: null,
-      cards,
+      cards: pagination.cards,
+      pagination: pagination.meta,
       emptyState:
         effectiveSelectedSourceKinds.length === 0
           ? {
@@ -72,11 +85,13 @@ export function buildContentPageModel(
               description: "重新全选后即可恢复内容结果。",
               tone: "filtered"
             }
-          : cards.length > 0
+          : pagination.meta.totalResults > 0
             ? null
             : {
-                title: pageKey === "ai-new" ? "暂无 AI 新讯" : "暂无 AI 热点",
-                description: "可以稍后刷新，或先检查数据源采集状态。",
+                title: pageKey === "ai-new" ? "当前 24 小时内暂无 AI 新讯" : "暂无 AI 热点",
+                description: pageKey === "ai-new"
+                  ? "可以稍后刷新，或者检查最近 24 小时内是否有新的 AI 内容进入内容池。"
+                  : "可以稍后刷新，或先检查数据源采集状态。",
                 tone: "default"
               }
     };
@@ -89,6 +104,7 @@ export function buildContentPageModel(
       pageKey,
       featuredCard: null,
       cards: [],
+      pagination: null,
       emptyState: {
         title: "内容暂不可用",
         description: "检测到本地内容库读取失败，请修复或重建 data/hot-now.sqlite 后再刷新。",
@@ -104,6 +120,33 @@ function stripRankedCard({
   ...card
 }: ReturnType<typeof buildContentViewSelection>["visibleCards"][number]): ContentCardView {
   return card;
+}
+
+function paginateContentCards(cards: ContentCardView[], requestedPage: number | undefined) {
+  // 内容页统一先拿完整结果集，再做固定 50 条的分页切片，避免把分页语义混进策略层。
+  const totalResults = cards.length;
+  const totalPages = Math.max(1, Math.ceil(totalResults / contentPageSize));
+  const page = Math.min(normalizeRequestedPage(requestedPage), totalPages);
+  const startIndex = (page - 1) * contentPageSize;
+
+  return {
+    cards: cards.slice(startIndex, startIndex + contentPageSize),
+    meta: {
+      page,
+      pageSize: contentPageSize,
+      totalResults,
+      totalPages
+    }
+  };
+}
+
+function normalizeRequestedPage(value: number | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 1;
+  }
+
+  const normalized = Math.floor(value);
+  return normalized >= 1 ? normalized : 1;
 }
 
 function normalizeSelectedSourceKinds(selectedSourceKinds: string[] | undefined, sourceOptions: ContentSourceOption[]) {

@@ -43,8 +43,6 @@ describe("content routes", () => {
         sourceKind: "openai",
         canonicalUrl: "https://example.com/ai-weekly",
         publishedAt: "2026-03-28T10:00:00.000Z",
-        isFavorited: false,
-        reaction: "none",
         feedbackEntry: {
           freeText: "保留 agent workflow 内容",
           suggestedEffect: "boost",
@@ -63,8 +61,6 @@ describe("content routes", () => {
         sourceKind: "openai",
         canonicalUrl: "https://example.com/ai-policy",
         publishedAt: "2026-03-28T09:00:00.000Z",
-        isFavorited: false,
-        reaction: "none",
         contentScore: 88,
         scoreBadges: ["24h 内", "官方源"]
       }
@@ -139,6 +135,72 @@ describe("content routes", () => {
     expect(listContentView).toHaveBeenCalledWith("hot", {
       selectedSourceKinds: ["openai"],
       sortMode: "published_at"
+    });
+  });
+
+  it("passes page query through to getContentPageModel and returns pagination metadata", async () => {
+    const getContentPageModel = vi.fn().mockResolvedValue({
+      pageKey: "ai-new",
+      sourceFilter: {
+        options: [
+          { kind: "openai", name: "OpenAI", showAllWhenSelected: false, currentPageVisibleCount: 50 }
+        ],
+        selectedSourceKinds: ["openai"]
+      },
+      featuredCard: null,
+      cards: Array.from({ length: 50 }, (_, index) => ({
+        id: index + 1,
+        title: `Paged card ${index + 1}`,
+        summary: "Paged summary",
+        sourceName: "OpenAI",
+        sourceKind: "openai",
+        canonicalUrl: `https://example.com/paged-${index + 1}`,
+        publishedAt: "2026-03-31T10:00:00.000Z",
+        contentScore: 90,
+        scoreBadges: ["24h 内"]
+      })),
+      pagination: {
+        page: 2,
+        pageSize: 50,
+        totalResults: 120,
+        totalPages: 3
+      },
+      emptyState: null
+    });
+    const app = createContentTestServer({
+      getContentPageModel
+    } as never);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/content/ai-new?page=2",
+      headers: {
+        "x-hot-now-source-filter": "openai",
+        "x-hot-now-content-sort": "published_at"
+      }
+    });
+    const payload = response.json() as {
+      pageKey: string;
+      pagination: {
+        page: number;
+        pageSize: number;
+        totalResults: number;
+        totalPages: number;
+      } | null;
+    };
+
+    expect(response.statusCode).toBe(200);
+    expect(payload.pageKey).toBe("ai-new");
+    expect(payload.pagination).toEqual({
+      page: 2,
+      pageSize: 50,
+      totalResults: 120,
+      totalPages: 3
+    });
+    expect(getContentPageModel).toHaveBeenCalledWith("ai-new", {
+      selectedSourceKinds: ["openai"],
+      sortMode: "published_at",
+      page: 2
     });
   });
 
@@ -242,37 +304,22 @@ describe("content routes", () => {
     expect(response.body).toContain("document.body.appendChild(toast)");
   });
 
-  it("calls saveFavorite for favorite action", async () => {
-    const saveFavorite = vi.fn().mockResolvedValue({ ok: true });
-    const app = createContentTestServer({
-      saveFavorite
-    } as never);
+  it("removes the favorite and reaction action endpoints", async () => {
+    const app = createContentTestServer({} as never);
 
-    const response = await app.inject({
+    const favoriteResponse = await app.inject({
       method: "POST",
       url: "/actions/content/42/favorite",
       payload: { isFavorited: true }
     });
-
-    expect(response.statusCode).toBe(200);
-    expect(saveFavorite).toHaveBeenCalledWith(42, true);
-    expect(response.json()).toEqual({ ok: true, contentItemId: 42, isFavorited: true });
-  });
-
-  it("calls saveReaction for reaction action", async () => {
-    const saveReaction = vi.fn().mockResolvedValue({ ok: true });
-    const app = createContentTestServer({
-      saveReaction
-    } as never);
-
-    const response = await app.inject({
+    const reactionResponse = await app.inject({
       method: "POST",
       url: "/actions/content/42/reaction",
       payload: { reaction: "dislike" }
     });
 
-    expect(response.statusCode).toBe(200);
-    expect(saveReaction).toHaveBeenCalledWith(42, "dislike");
+    expect(favoriteResponse.statusCode).toBe(404);
+    expect(reactionResponse.statusCode).toBe(404);
   });
 
   it("calls saveContentFeedback for feedback pool action", async () => {
@@ -285,7 +332,6 @@ describe("content routes", () => {
       method: "POST",
       url: "/actions/content/42/feedback-pool",
       payload: {
-        reactionSnapshot: "like",
         freeText: "保留 agent workflow 内容",
         suggestedEffect: "boost",
         strengthLevel: "high",
@@ -296,7 +342,6 @@ describe("content routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(saveContentFeedback).toHaveBeenCalledWith(42, {
-      reactionSnapshot: "like",
       freeText: "保留 agent workflow 内容",
       suggestedEffect: "boost",
       strengthLevel: "high",
@@ -333,29 +378,15 @@ describe("content routes", () => {
 
   it("returns 404 for content actions when content id does not exist", async () => {
     const app = createContentTestServer({
-      saveFavorite: vi.fn().mockResolvedValue({ ok: false, reason: "not-found" }),
-      saveReaction: vi.fn().mockResolvedValue({ ok: false, reason: "not-found" }),
       saveRatings: vi.fn().mockResolvedValue({ ok: false, reason: "not-found" })
     } as never);
 
-    const favoriteResponse = await app.inject({
-      method: "POST",
-      url: "/actions/content/999/favorite",
-      payload: { isFavorited: true }
-    });
-    const reactionResponse = await app.inject({
-      method: "POST",
-      url: "/actions/content/999/reaction",
-      payload: { reaction: "like" }
-    });
     const ratingsResponse = await app.inject({
       method: "POST",
       url: "/actions/content/999/ratings",
       payload: { scores: { value: 4 } }
     });
 
-    expect(favoriteResponse.statusCode).toBe(404);
-    expect(reactionResponse.statusCode).toBe(404);
     expect(ratingsResponse.statusCode).toBe(404);
   });
 
@@ -406,29 +437,15 @@ describe("content routes", () => {
         sessionSecret: "test-secret",
         verifyLogin: vi.fn().mockResolvedValue(null)
       },
-      saveFavorite: vi.fn().mockResolvedValue({ ok: true }),
-      saveReaction: vi.fn().mockResolvedValue({ ok: true }),
       saveRatings: vi.fn().mockResolvedValue({ ok: true, saved: 1, averageRating: 4 })
     });
 
-    const favoriteResponse = await app.inject({
-      method: "POST",
-      url: "/actions/content/42/favorite",
-      payload: { isFavorited: true }
-    });
-    const reactionResponse = await app.inject({
-      method: "POST",
-      url: "/actions/content/42/reaction",
-      payload: { reaction: "like" }
-    });
     const ratingsResponse = await app.inject({
       method: "POST",
       url: "/actions/content/42/ratings",
       payload: { scores: { value: 4 } }
     });
 
-    expect(favoriteResponse.statusCode).toBe(401);
-    expect(reactionResponse.statusCode).toBe(401);
     expect(ratingsResponse.statusCode).toBe(401);
   });
 });

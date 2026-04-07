@@ -184,9 +184,18 @@ describe("AiHotPage", () => {
     expect(wrapper.get("[data-content-empty-state]").text()).toContain("页面加载失败");
   });
 
-  it("clears the shared search keyword and reloads the default result set", async () => {
+  it("clears the shared search keyword, returns to page 1, and reloads the default result set", async () => {
     contentApiMocks.readStoredContentSearchKeyword.mockReturnValue("agent");
-    contentApiMocks.readAiHotPage.mockResolvedValue(createModel());
+    contentApiMocks.readAiHotPage.mockResolvedValue(
+      createModel({
+        pagination: {
+          page: 2,
+          pageSize: 50,
+          totalResults: 80,
+          totalPages: 2
+        }
+      })
+    );
 
     const wrapper = mount(AiHotPage, { global: { plugins: [Antd] } });
     await flushPromises();
@@ -195,9 +204,46 @@ describe("AiHotPage", () => {
     await flushPromises();
 
     expect(contentApiMocks.writeStoredContentSearchKeyword).toHaveBeenCalledWith("");
+    expect(routerMocks.replace).toHaveBeenCalledWith({
+      query: {
+        page: "1"
+      }
+    });
     expect(contentApiMocks.readAiHotPage).toHaveBeenLastCalledWith(
-      expect.objectContaining({ searchKeyword: "" })
+      expect.objectContaining({
+        page: 1,
+        searchKeyword: ""
+      })
     );
+  });
+
+  it("persists sort mode changes and reloads ai-hot with the updated sort preference", async () => {
+    contentApiMocks.readAiHotPage
+      .mockResolvedValueOnce(createModel())
+      .mockResolvedValueOnce(createModel());
+
+    const wrapper = mount(AiHotPage, {
+      global: {
+        plugins: [Antd]
+      }
+    });
+
+    await flushPromises();
+    await wrapper.get("[data-content-sort-mode='published_at']").trigger("click");
+    await flushPromises();
+
+    expect(contentApiMocks.writeStoredContentSortMode).toHaveBeenCalledWith("published_at");
+    expect(routerMocks.replace).toHaveBeenCalledWith({
+      query: {
+        page: "1"
+      }
+    });
+    expect(contentApiMocks.readAiHotPage).toHaveBeenNthCalledWith(2, {
+      selectedSourceKinds: ["openai"],
+      sortMode: "published_at",
+      page: 1,
+      searchKeyword: ""
+    });
   });
 
   it("keeps the silent refresh spinner horizontally centered after source filter changes", async () => {
@@ -220,6 +266,17 @@ describe("AiHotPage", () => {
 
     expect(indicator.classes()).toEqual(expect.arrayContaining(["flex", "w-full", "justify-center"]));
     expect(indicator.find(".ant-spin").exists()).toBe(true);
+    expect(routerMocks.replace).toHaveBeenCalledWith({
+      query: {
+        page: "1"
+      }
+    });
+    expect(contentApiMocks.readAiHotPage).toHaveBeenNthCalledWith(2, {
+      selectedSourceKinds: ["openai", "ithome"],
+      sortMode: "content_score",
+      page: 1,
+      searchKeyword: ""
+    });
 
     deferred.resolve(createModel());
     await flushPromises();

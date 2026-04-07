@@ -147,7 +147,7 @@ type ServerDeps = {
   getCurrentUserProfile?: () => Promise<CurrentUserProfile | null> | CurrentUserProfile | null;
   getContentPageModel?: (
     pageKey: ContentPageKey,
-    options?: Pick<BuildContentPageModelOptions, "selectedSourceKinds" | "sortMode" | "page">
+    options?: Pick<BuildContentPageModelOptions, "selectedSourceKinds" | "sortMode" | "page" | "searchKeyword">
   ) => Promise<ContentPageModel> | ContentPageModel;
   auth?: {
     requireLogin: boolean;
@@ -1051,15 +1051,17 @@ async function readContentPageModelApiData(
   if (deps.getContentPageModel) {
     const selectedSourceKinds = readSelectedSourceKindsHeader(request.headers["x-hot-now-source-filter"]);
     const sortMode = readContentSortModeHeader(request.headers["x-hot-now-content-sort"]);
+    const searchKeyword = readContentSearchHeader(request.headers["x-hot-now-content-search"]);
     const page = readContentPageQueryPage(request);
     return deps.getContentPageModel(
       pageKey,
-      selectedSourceKinds === undefined && sortMode === undefined && page === 1
+      selectedSourceKinds === undefined && sortMode === undefined && searchKeyword === undefined && page === 1
         ? undefined
         : {
             selectedSourceKinds,
             sortMode,
-            page
+            page,
+            searchKeyword
           }
     );
   }
@@ -1093,12 +1095,14 @@ async function buildContentPageModelFromDependencies(
     const selectedSourceKinds = readContentPageSelectedSourceKinds(request.headers["x-hot-now-source-filter"], sourceOptions);
     const effectiveSelectedSourceKinds = selectedSourceKinds ?? deriveDefaultSelectedSourceKinds(sourceOptions);
     const sortMode = readContentSortModeHeader(request.headers["x-hot-now-content-sort"]) ?? "published_at";
+    const searchKeyword = readContentSearchHeader(request.headers["x-hot-now-content-search"]);
     const requestedPage = readContentPageQueryPage(request);
     const allCards = await deps.listContentView(viewKey, {
       selectedSourceKinds: effectiveSelectedSourceKinds,
       sortMode
     });
-    const pagination = paginateContentCards(allCards, requestedPage);
+    const filteredCards = filterCardsByTitleKeyword(allCards, searchKeyword);
+    const pagination = paginateContentCards(filteredCards, requestedPage);
     const currentPageVisibleCountsBySourceKind = countCurrentPageVisibleCardsBySourceKind(pagination.cards);
 
     return {
@@ -1125,6 +1129,12 @@ async function buildContentPageModelFromDependencies(
               description: "重新全选后即可恢复内容结果。",
               tone: "filtered"
             }
+          : hasSearchKeyword(searchKeyword) && pagination.meta.totalResults === 0
+            ? {
+                title: "没有找到匹配的内容",
+                description: "可以换个关键词，或清空搜索后查看全部结果。",
+                tone: "filtered"
+              }
           : pagination.meta.totalResults === 0
             ? {
                 title: pageKey === "ai-new" ? "当前 24 小时内暂无 AI 新讯" : "暂无 AI 热点",
@@ -1179,6 +1189,17 @@ function readContentPageQueryPage(request: FastifyRequest) {
 
   const normalized = Math.floor(parsed);
   return normalized >= 1 ? normalized : 1;
+}
+
+// fallback API 也要保持和核心模型一致：关键词只匹配标题，匹配前先做 trim + lowercase。
+function filterCardsByTitleKeyword(cards: ContentCardView[], keyword: string | undefined) {
+  const normalizedKeyword = normalizeSearchKeyword(keyword);
+
+  if (!normalizedKeyword) {
+    return cards;
+  }
+
+  return cards.filter((card) => card.title.toLowerCase().includes(normalizedKeyword));
 }
 
 function paginateContentCards(cards: ContentCardView[], requestedPage: number) {
@@ -1308,6 +1329,28 @@ function deriveDefaultSelectedSourceKinds(sourceOptions: ContentSourceOption[]):
   // First-visit defaults intentionally leave full-display sources unchecked so users do not land on
   // an unexpectedly long feed before opting into that behavior.
   return sourceOptions.filter((source) => !source.showAllWhenSelected).map((source) => source.kind);
+}
+
+// header 允许客户端带空格；这里统一规整后再决定是否透传给模型层。
+function readContentSearchHeader(headerValue: string | string[] | undefined) {
+  const rawValue = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+  const normalizedKeyword = normalizeSearchKeyword(rawValue);
+
+  return normalizedKeyword === "" ? undefined : rawValue?.trim();
+}
+
+// 这个判断用于空态分支，确保空白关键词不会误触发“搜索无结果”提示。
+function hasSearchKeyword(keyword: string | undefined) {
+  return normalizeSearchKeyword(keyword) !== "";
+}
+
+// 搜索关键词只做最小规范化：trim + lowercase，后续按标题 includes 匹配。
+function normalizeSearchKeyword(keyword: string | undefined) {
+  if (typeof keyword !== "string") {
+    return "";
+  }
+
+  return keyword.trim().toLowerCase();
 }
 
 function readContentSortModeHeader(headerValue: string | string[] | undefined): ContentSortMode | undefined {

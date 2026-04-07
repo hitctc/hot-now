@@ -36,6 +36,7 @@ export type BuildContentPageModelOptions = {
   selectedSourceKinds?: string[];
   sortMode?: ContentSortMode;
   page?: number;
+  searchKeyword?: string;
 };
 
 const contentPageSize = 50;
@@ -57,7 +58,8 @@ export function buildContentPageModel(
       sortMode: options.sortMode ?? "published_at"
     });
     const allCards = selection.visibleCards.map(stripRankedCard);
-    const pagination = paginateContentCards(allCards, options.page);
+    const filteredCards = filterCardsByTitleKeyword(allCards, options.searchKeyword);
+    const pagination = paginateContentCards(filteredCards, options.page);
     const visibleCountsBySourceKind = countCurrentPageVisibleCardsBySourceKind(pagination.cards);
 
     return {
@@ -85,6 +87,12 @@ export function buildContentPageModel(
               description: "重新全选后即可恢复内容结果。",
               tone: "filtered"
             }
+          : hasSearchKeyword(options.searchKeyword) && pagination.meta.totalResults === 0
+            ? {
+                title: "没有找到匹配的内容",
+                description: "可以换个关键词，或清空搜索后查看全部结果。",
+                tone: "filtered"
+              }
           : pagination.meta.totalResults > 0
             ? null
             : {
@@ -122,6 +130,17 @@ function stripRankedCard({
   return card;
 }
 
+// 搜索只作用在标题文本；这里会把关键词规范化后做大小写不敏感的包含匹配。
+function filterCardsByTitleKeyword(cards: ContentCardView[], keyword: string | undefined) {
+  const normalizedKeyword = normalizeSearchKeyword(keyword);
+
+  if (!normalizedKeyword) {
+    return cards;
+  }
+
+  return cards.filter((card) => card.title.toLowerCase().includes(normalizedKeyword));
+}
+
 function paginateContentCards(cards: ContentCardView[], requestedPage: number | undefined) {
   // 内容页统一先拿完整结果集，再做固定 50 条的分页切片，避免把分页语义混进策略层。
   const totalResults = cards.length;
@@ -147,6 +166,20 @@ function normalizeRequestedPage(value: number | undefined) {
 
   const normalized = Math.floor(value);
   return normalized >= 1 ? normalized : 1;
+}
+
+// 这个 helper 统一判断关键词是否有效，避免不同空白输入在空态逻辑里出现分歧。
+function hasSearchKeyword(keyword: string | undefined) {
+  return normalizeSearchKeyword(keyword) !== "";
+}
+
+// 关键词会在入口统一 trim + lowercase，空串会按“未开启搜索”处理。
+function normalizeSearchKeyword(keyword: string | undefined) {
+  if (typeof keyword !== "string") {
+    return "";
+  }
+
+  return keyword.trim().toLowerCase();
 }
 
 function normalizeSelectedSourceKinds(selectedSourceKinds: string[] | undefined, sourceOptions: ContentSourceOption[]) {

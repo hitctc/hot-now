@@ -67,6 +67,43 @@ describe("buildContentPageModel", () => {
     expect(aiNewPage.cards.map((card) => card.title)).toEqual(["Paged 1"]);
     expect(aiHotPage.cards.map((card) => card.title)).toContain("Paged 2");
   });
+
+  it("filters ai-new cards by title keyword before pagination", async () => {
+    const handle = await createTestDatabase("hot-now-content-page-search-");
+    handles.push(handle);
+
+    insertAiNewItem(handle.db, "Agent platform launch", "2026-03-31T03:00:00.000Z", "2026-03-31T03:00:05.000Z");
+    insertAiNewItem(handle.db, "Model refresh bulletin", "2026-03-31T02:00:00.000Z", "2026-03-31T02:00:05.000Z");
+    insertAiNewItem(handle.db, "Agent benchmark roundup", "2026-03-31T01:00:00.000Z", "2026-03-31T01:00:05.000Z");
+
+    const model = buildContentPageModel(handle.db, "ai-new", {
+      searchKeyword: "agent"
+    });
+
+    expect(model.cards.map((card) => card.title)).toEqual([
+      "Agent platform launch",
+      "Agent benchmark roundup"
+    ]);
+    expect(model.pagination?.totalResults).toBe(2);
+  });
+
+  it("returns a search-specific empty state when no title matches", async () => {
+    const handle = await createTestDatabase("hot-now-content-page-search-empty-");
+    handles.push(handle);
+
+    insertAiNewItem(handle.db, "Model refresh bulletin", "2026-03-31T03:00:00.000Z", "2026-03-31T03:00:05.000Z");
+
+    const model = buildContentPageModel(handle.db, "ai-new", {
+      searchKeyword: "agent"
+    });
+
+    expect(model.cards).toEqual([]);
+    expect(model.emptyState).toEqual({
+      title: "没有找到匹配的内容",
+      description: "可以换个关键词，或清空搜索后查看全部结果。",
+      tone: "filtered"
+    });
+  });
 });
 
 function insertPagedAiNewItem(
@@ -102,6 +139,47 @@ function insertPagedAiNewItem(
     `https://example.com/paged-${index}`,
     `Summary ${index}`,
     `Body ${index}`,
+    publishedAt,
+    fetchedAt
+  );
+}
+
+// 这个 helper 专门给搜索语义测试造标题数据，避免耦合分页编号命名。
+function insertAiNewItem(
+  db: Awaited<ReturnType<typeof createTestDatabase>>["db"],
+  title: string,
+  publishedAt: string,
+  fetchedAt: string
+) {
+  const slug = title.toLowerCase().replace(/\s+/g, "-");
+
+  db.prepare(
+    `
+      INSERT INTO content_items (
+        source_id,
+        title,
+        canonical_url,
+        summary,
+        body_markdown,
+        published_at,
+        fetched_at
+      )
+      SELECT
+        id,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?
+      FROM content_sources
+      WHERE kind = 'openai'
+    `
+  ).run(
+    title,
+    `https://example.com/${slug}`,
+    `${title} summary`,
+    `${title} body`,
     publishedAt,
     fetchedAt
   );

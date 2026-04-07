@@ -87,7 +87,8 @@ describe("content routes", () => {
       url: "/api/content/ai-new",
       headers: {
         "x-hot-now-source-filter": "openai,missing",
-        "x-hot-now-content-sort": "content_score"
+        "x-hot-now-content-sort": "content_score",
+        "x-hot-now-content-search": "weekly"
       }
     });
     const aiNewPayload = aiNewResponse.json() as {
@@ -104,9 +105,9 @@ describe("content routes", () => {
     expect(aiNewResponse.statusCode).toBe(200);
     expect(aiNewPayload.pageKey).toBe("ai-new");
     expect(aiNewPayload.featuredCard).toBeNull();
-    expect(aiNewPayload.cards.map((card) => card.id)).toEqual([101, 102]);
+    expect(aiNewPayload.cards.map((card) => card.id)).toEqual([101]);
     expect(aiNewPayload.sourceFilter?.options).toEqual([
-      { kind: "openai", name: "OpenAI", showAllWhenSelected: false, currentPageVisibleCount: 2 },
+      { kind: "openai", name: "OpenAI", showAllWhenSelected: false, currentPageVisibleCount: 1 },
       { kind: "ithome", name: "IT之家", showAllWhenSelected: true, currentPageVisibleCount: 0 }
     ]);
     expect(aiNewPayload.sourceFilter?.selectedSourceKinds).toEqual(["openai"]);
@@ -176,7 +177,8 @@ describe("content routes", () => {
       url: "/api/content/ai-new?page=2",
       headers: {
         "x-hot-now-source-filter": "openai",
-        "x-hot-now-content-sort": "published_at"
+        "x-hot-now-content-sort": "published_at",
+        "x-hot-now-content-search": "agent"
       }
     });
     const payload = response.json() as {
@@ -200,7 +202,8 @@ describe("content routes", () => {
     expect(getContentPageModel).toHaveBeenCalledWith("ai-new", {
       selectedSourceKinds: ["openai"],
       sortMode: "published_at",
-      page: 2
+      page: 2,
+      searchKeyword: "agent"
     });
   });
 

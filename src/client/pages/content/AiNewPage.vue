@@ -5,6 +5,7 @@ import { useRoute, useRouter } from "vue-router";
 import ContentEmptyState from "../../components/content/ContentEmptyState.vue";
 import ContentHeroCard from "../../components/content/ContentHeroCard.vue";
 import ContentPaginationBar from "../../components/content/ContentPaginationBar.vue";
+import ContentSearchControl from "../../components/content/ContentSearchControl.vue";
 import ContentSourceFilterBar from "../../components/content/ContentSourceFilterBar.vue";
 import ContentSortControl from "../../components/content/ContentSortControl.vue";
 import ContentStandardCard from "../../components/content/ContentStandardCard.vue";
@@ -16,8 +17,10 @@ import { HttpError } from "../../services/http";
 import {
   deriveInitialSelectedSourceKinds,
   readAiNewPage,
+  readStoredContentSearchKeyword,
   readStoredContentSortMode,
   readStoredContentSourceKinds,
+  writeStoredContentSearchKeyword,
   writeStoredContentSortMode,
   writeStoredContentSourceKinds,
   type ContentSortMode,
@@ -30,6 +33,7 @@ const loadError = ref<string | null>(null);
 const pageModel = ref<ContentPageModel | null>(null);
 const selectedSourceKinds = ref<string[] | null>(readStoredContentSourceKinds());
 const sortMode = ref<ContentSortMode>(readStoredContentSortMode() ?? "published_at");
+const appliedSearchKeyword = ref(readStoredContentSearchKeyword() ?? "");
 const route = useRoute();
 const router = useRouter();
 
@@ -79,7 +83,8 @@ function buildErrorState(message: string) {
   } as const;
 }
 
-async function loadPage(options: { selectedKinds?: string[]; silent?: boolean } = {}): Promise<void> {
+// 页面刷新统一从这里走，这样筛选、排序和标题搜索就不会长出多套请求路径。
+async function loadPage(options: { selectedKinds?: string[]; silent?: boolean; searchKeyword?: string } = {}): Promise<void> {
   if (options.silent) {
     isRefreshing.value = true;
   } else {
@@ -92,7 +97,8 @@ async function loadPage(options: { selectedKinds?: string[]; silent?: boolean } 
     const nextModel = await readAiNewPage({
       selectedSourceKinds: options.selectedKinds ?? readPageSourceKinds(),
       sortMode: sortMode.value,
-      page: requestedPage
+      page: requestedPage,
+      searchKeyword: options.searchKeyword ?? appliedSearchKeyword.value
     });
     pageModel.value = nextModel;
 
@@ -134,6 +140,30 @@ async function handleSortModeChange(nextSortMode: ContentSortMode): Promise<void
   writeStoredContentSortMode(nextSortMode);
   await replacePageQuery(1);
   await loadPage({ selectedKinds: readPageSourceKinds(), silent: true });
+}
+
+// 只有用户明确提交后才生效关键词，避免输入中的草稿反复触发请求。
+async function handleSearchSubmit(nextKeyword: string): Promise<void> {
+  appliedSearchKeyword.value = nextKeyword;
+  writeStoredContentSearchKeyword(nextKeyword);
+  await replacePageQuery(1);
+  await loadPage({
+    selectedKinds: readPageSourceKinds(),
+    searchKeyword: nextKeyword,
+    silent: true
+  });
+}
+
+// 清空关键词时沿用同一条刷新链路，保证分页和结果集会一起回到默认状态。
+async function handleSearchClear(): Promise<void> {
+  appliedSearchKeyword.value = "";
+  writeStoredContentSearchKeyword("");
+  await replacePageQuery(1);
+  await loadPage({
+    selectedKinds: readPageSourceKinds(),
+    searchKeyword: "",
+    silent: true
+  });
 }
 
 async function handlePaginationChange(nextPage: number): Promise<void> {
@@ -180,10 +210,19 @@ onMounted(() => {
         @change="handleSourceKindsChange"
       />
 
-      <ContentSortControl
-        :sort-mode="sortMode"
-        @change="handleSortModeChange"
-      />
+      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <ContentSortControl
+          :sort-mode="sortMode"
+          @change="handleSortModeChange"
+        />
+
+        <ContentSearchControl
+          :keyword="appliedSearchKeyword"
+          :is-loading="isRefreshing"
+          @search="handleSearchSubmit"
+          @clear="handleSearchClear"
+        />
+      </div>
     </div>
 
     <a-skeleton v-if="isLoading" active :paragraph="{ rows: 7 }" />

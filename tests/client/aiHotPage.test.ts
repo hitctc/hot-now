@@ -22,7 +22,9 @@ const contentApiMocks = vi.hoisted(() => ({
   readStoredContentSourceKinds: vi.fn(),
   writeStoredContentSourceKinds: vi.fn(),
   readStoredContentSortMode: vi.fn(),
-  writeStoredContentSortMode: vi.fn()
+  writeStoredContentSortMode: vi.fn(),
+  readStoredContentSearchKeyword: vi.fn(),
+  writeStoredContentSearchKeyword: vi.fn()
 }));
 
 vi.mock("../../src/client/services/contentApi", async () => {
@@ -36,7 +38,9 @@ vi.mock("../../src/client/services/contentApi", async () => {
     readStoredContentSourceKinds: contentApiMocks.readStoredContentSourceKinds,
     writeStoredContentSourceKinds: contentApiMocks.writeStoredContentSourceKinds,
     readStoredContentSortMode: contentApiMocks.readStoredContentSortMode,
-    writeStoredContentSortMode: contentApiMocks.writeStoredContentSortMode
+    writeStoredContentSortMode: contentApiMocks.writeStoredContentSortMode,
+    readStoredContentSearchKeyword: contentApiMocks.readStoredContentSearchKeyword,
+    writeStoredContentSearchKeyword: contentApiMocks.writeStoredContentSearchKeyword
   };
 });
 
@@ -89,6 +93,7 @@ describe("AiHotPage", () => {
     });
     contentApiMocks.readStoredContentSourceKinds.mockReturnValue(["openai"]);
     contentApiMocks.readStoredContentSortMode.mockReturnValue("content_score");
+    contentApiMocks.readStoredContentSearchKeyword.mockReturnValue(null);
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: vi.fn().mockImplementation((query: string) => ({
@@ -118,7 +123,8 @@ describe("AiHotPage", () => {
     expect(contentApiMocks.readAiHotPage).toHaveBeenCalledWith({
       selectedSourceKinds: ["openai"],
       sortMode: "content_score",
-      page: 1
+      page: 1,
+      searchKeyword: ""
     });
     expect(wrapper.get("[data-content-page='ai-hot']").classes()).toEqual(
       expect.arrayContaining(["flex", "flex-col", "gap-6"])
@@ -149,6 +155,49 @@ describe("AiHotPage", () => {
 
     expect(wrapper.text()).toContain("AI 热点加载失败，请稍后重试。");
     expect(wrapper.get("[data-content-empty-state]").text()).toContain("页面加载失败");
+  });
+
+  it("submits the shared title search keyword and reloads ai-hot from page 1", async () => {
+    routeState.query = { page: "2" };
+    contentApiMocks.readStoredContentSearchKeyword.mockReturnValue("agent");
+    contentApiMocks.readAiHotPage.mockResolvedValue(createModel());
+
+    const wrapper = mount(AiHotPage, { global: { plugins: [Antd] } });
+    await flushPromises();
+
+    await wrapper.get("[data-content-search-input]").setValue("openai");
+    await wrapper.get("[data-content-search-submit]").trigger("click");
+    await flushPromises();
+
+    expect(contentApiMocks.writeStoredContentSearchKeyword).toHaveBeenCalledWith("openai");
+    expect(routerMocks.replace).toHaveBeenCalledWith({ query: { page: "1" } });
+    expect(contentApiMocks.readAiHotPage).toHaveBeenLastCalledWith({
+      selectedSourceKinds: ["openai"],
+      sortMode: "content_score",
+      page: 1,
+      searchKeyword: "openai"
+    });
+  });
+
+  it("clears the shared search keyword and reloads the default result set", async () => {
+    routeState.query = { page: "2" };
+    contentApiMocks.readStoredContentSearchKeyword.mockReturnValue("agent");
+    contentApiMocks.readAiHotPage.mockResolvedValue(createModel());
+
+    const wrapper = mount(AiHotPage, { global: { plugins: [Antd] } });
+    await flushPromises();
+
+    await wrapper.get("[data-content-search-clear]").trigger("click");
+    await flushPromises();
+
+    expect(contentApiMocks.writeStoredContentSearchKeyword).toHaveBeenCalledWith("");
+    expect(routerMocks.replace).toHaveBeenCalledWith({ query: { page: "1" } });
+    expect(contentApiMocks.readAiHotPage).toHaveBeenLastCalledWith({
+      selectedSourceKinds: ["openai"],
+      sortMode: "content_score",
+      page: 1,
+      searchKeyword: ""
+    });
   });
 
   it("reloads ai-hot when the user flips to the next page", async () => {
@@ -184,7 +233,8 @@ describe("AiHotPage", () => {
     expect(contentApiMocks.readAiHotPage).toHaveBeenNthCalledWith(2, {
       selectedSourceKinds: ["openai"],
       sortMode: "content_score",
-      page: 2
+      page: 2,
+      searchKeyword: ""
     });
   });
 });

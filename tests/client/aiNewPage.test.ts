@@ -22,7 +22,9 @@ const contentApiMocks = vi.hoisted(() => ({
   readStoredContentSourceKinds: vi.fn(),
   writeStoredContentSourceKinds: vi.fn(),
   readStoredContentSortMode: vi.fn(),
-  writeStoredContentSortMode: vi.fn()
+  writeStoredContentSortMode: vi.fn(),
+  readStoredContentSearchKeyword: vi.fn(),
+  writeStoredContentSearchKeyword: vi.fn()
 }));
 
 vi.mock("../../src/client/services/contentApi", async () => {
@@ -36,7 +38,9 @@ vi.mock("../../src/client/services/contentApi", async () => {
     readStoredContentSourceKinds: contentApiMocks.readStoredContentSourceKinds,
     writeStoredContentSourceKinds: contentApiMocks.writeStoredContentSourceKinds,
     readStoredContentSortMode: contentApiMocks.readStoredContentSortMode,
-    writeStoredContentSortMode: contentApiMocks.writeStoredContentSortMode
+    writeStoredContentSortMode: contentApiMocks.writeStoredContentSortMode,
+    readStoredContentSearchKeyword: contentApiMocks.readStoredContentSearchKeyword,
+    writeStoredContentSearchKeyword: contentApiMocks.writeStoredContentSearchKeyword
   };
 });
 
@@ -100,6 +104,7 @@ describe("AiNewPage", () => {
     });
     contentApiMocks.readStoredContentSourceKinds.mockReturnValue(["openai"]);
     contentApiMocks.readStoredContentSortMode.mockReturnValue(null);
+    contentApiMocks.readStoredContentSearchKeyword.mockReturnValue(null);
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: vi.fn().mockImplementation((query: string) => ({
@@ -129,7 +134,8 @@ describe("AiNewPage", () => {
     expect(contentApiMocks.readAiNewPage).toHaveBeenCalledWith({
       selectedSourceKinds: ["openai"],
       sortMode: "published_at",
-      page: 1
+      page: 1,
+      searchKeyword: ""
     });
     expect(wrapper.get("[data-content-page='ai-new']").classes()).toEqual(
       expect.arrayContaining(["flex", "flex-col", "gap-6"])
@@ -207,7 +213,8 @@ describe("AiNewPage", () => {
     expect(contentApiMocks.readAiNewPage).toHaveBeenLastCalledWith({
       selectedSourceKinds: ["openai", "ithome"],
       sortMode: "published_at",
-      page: 1
+      page: 1,
+      searchKeyword: ""
     });
     expect(wrapper.find("[data-content-section='featured']").exists()).toBe(false);
     expect(wrapper.get("[data-content-source-filter]").text()).toContain("已选 2 / 2 · 共 1 条");
@@ -239,7 +246,30 @@ describe("AiNewPage", () => {
     expect(contentApiMocks.readAiNewPage).toHaveBeenLastCalledWith({
       selectedSourceKinds: ["openai"],
       sortMode: "content_score",
-      page: 1
+      page: 1,
+      searchKeyword: ""
+    });
+  });
+
+  it("submits the shared title search keyword and reloads ai-new from page 1", async () => {
+    routeState.query = { page: "3" };
+    contentApiMocks.readStoredContentSearchKeyword.mockReturnValue("agent");
+    contentApiMocks.readAiNewPage.mockResolvedValue(createModel());
+
+    const wrapper = mount(AiNewPage, { global: { plugins: [Antd] } });
+    await flushPromises();
+
+    await wrapper.get("[data-content-search-input]").setValue("openai");
+    await wrapper.get("[data-content-search-submit]").trigger("click");
+    await flushPromises();
+
+    expect(contentApiMocks.writeStoredContentSearchKeyword).toHaveBeenCalledWith("openai");
+    expect(routerMocks.replace).toHaveBeenCalledWith({ query: { page: "1" } });
+    expect(contentApiMocks.readAiNewPage).toHaveBeenLastCalledWith({
+      selectedSourceKinds: ["openai"],
+      sortMode: "published_at",
+      page: 1,
+      searchKeyword: "openai"
     });
   });
 
@@ -280,7 +310,8 @@ describe("AiNewPage", () => {
     expect(contentApiMocks.readAiNewPage).toHaveBeenNthCalledWith(1, {
       selectedSourceKinds: ["openai"],
       sortMode: "published_at",
-      page: 2
+      page: 2,
+      searchKeyword: ""
     });
     expect(routerMocks.replace).toHaveBeenCalledWith({
       query: {
@@ -290,7 +321,8 @@ describe("AiNewPage", () => {
     expect(contentApiMocks.readAiNewPage).toHaveBeenNthCalledWith(2, {
       selectedSourceKinds: ["openai"],
       sortMode: "published_at",
-      page: 3
+      page: 3,
+      searchKeyword: ""
     });
   });
 });

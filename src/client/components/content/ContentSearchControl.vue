@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { ref, watch } from "vue";
 
 const props = defineProps<{
   keyword: string;
@@ -19,8 +19,6 @@ watch(
     draftKeyword.value = nextKeyword;
   }
 );
-
-const hasDraftKeyword = computed(() => draftKeyword.value.trim().length > 0);
 
 // 统一把关键词裁掉首尾空白后再抛给页面层，保证后续 header 与持久化口径一致。
 function submitSearch(): void {
@@ -48,7 +46,6 @@ function clearSearch(): void {
     <a-button
       size="small"
       :loading="isLoading"
-      :disabled="!hasDraftKeyword"
       data-content-search-submit
       @click="submitSearch"
     >

@@ -21,18 +21,32 @@ describe("contentApi", () => {
       },
       featuredCard: null,
       cards: [],
+      pagination: {
+        page: 2,
+        pageSize: 50,
+        totalResults: 120,
+        totalPages: 3
+      },
       emptyState: null
     });
 
     const { readAiNewPage, readAiHotPage } = await import("../../src/client/services/contentApi");
 
-    await readAiNewPage([" openai ", "openai", "ithome"], "content_score");
-    await readAiHotPage(undefined, "published_at");
-    const result = await readAiNewPage(["openai"], "content_score");
+    await readAiNewPage({
+      selectedSourceKinds: [" openai ", "openai", "ithome"],
+      sortMode: "content_score",
+      page: 2
+    });
+    await readAiHotPage({ sortMode: "published_at" });
+    const result = await readAiNewPage({
+      selectedSourceKinds: ["openai"],
+      sortMode: "content_score",
+      page: 2
+    });
 
     expect(requestJson).toHaveBeenNthCalledWith(
       1,
-      "/api/content/ai-new",
+      "/api/content/ai-new?page=2",
       expect.objectContaining({
         headers: {
           "x-hot-now-source-filter": "openai,ithome",
@@ -46,6 +60,7 @@ describe("contentApi", () => {
       }
     });
     expect(result.sourceFilter?.options[0]?.currentPageVisibleCount).toBe(3);
+    expect(result.pagination?.page).toBe(2);
   });
 
   it("persists and restores selected content source kinds", async () => {
@@ -91,17 +106,15 @@ describe("contentApi", () => {
     ).toEqual(["juya"]);
   });
 
-  it("posts content actions to dedicated endpoints", async () => {
+  it("only posts feedback pool actions and no longer exports favorite or reaction helpers", async () => {
     requestJson.mockResolvedValue({ ok: true });
 
-    const { saveFavorite, saveReaction, saveFeedbackPoolEntry } = await import(
-      "../../src/client/services/contentApi"
-    );
+    const contentApi = await import("../../src/client/services/contentApi");
 
-    await saveFavorite(42, true);
-    await saveReaction(42, "like");
-    await saveFeedbackPoolEntry(42, {
-      reactionSnapshot: "like",
+    expect("saveFavorite" in contentApi).toBe(false);
+    expect("saveReaction" in contentApi).toBe(false);
+
+    await contentApi.saveFeedbackPoolEntry(42, {
       freeText: "保留 agent workflow 内容",
       suggestedEffect: "boost",
       strengthLevel: "high",
@@ -109,18 +122,9 @@ describe("contentApi", () => {
       negativeKeywords: []
     });
 
-    expect(requestJson).toHaveBeenNthCalledWith(1, "/actions/content/42/favorite", {
-      method: "POST",
-      body: JSON.stringify({ isFavorited: true })
-    });
-    expect(requestJson).toHaveBeenNthCalledWith(2, "/actions/content/42/reaction", {
-      method: "POST",
-      body: JSON.stringify({ reaction: "like" })
-    });
-    expect(requestJson).toHaveBeenNthCalledWith(3, "/actions/content/42/feedback-pool", {
+    expect(requestJson).toHaveBeenNthCalledWith(1, "/actions/content/42/feedback-pool", {
       method: "POST",
       body: JSON.stringify({
-        reactionSnapshot: "like",
         freeText: "保留 agent workflow 内容",
         suggestedEffect: "boost",
         strengthLevel: "high",

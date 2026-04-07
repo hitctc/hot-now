@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
 import ContentEmptyState from "../../components/content/ContentEmptyState.vue";
 import ContentHeroCard from "../../components/content/ContentHeroCard.vue";
+import ContentPaginationBar from "../../components/content/ContentPaginationBar.vue";
 import ContentSourceFilterBar from "../../components/content/ContentSourceFilterBar.vue";
 import ContentSortControl from "../../components/content/ContentSortControl.vue";
 import ContentStandardCard from "../../components/content/ContentStandardCard.vue";
@@ -28,9 +30,33 @@ const loadError = ref<string | null>(null);
 const pageModel = ref<ContentPageModel | null>(null);
 const selectedSourceKinds = ref<string[] | null>(readStoredContentSourceKinds());
 const sortMode = ref<ContentSortMode>(readStoredContentSortMode() ?? "published_at");
+const route = useRoute();
+const router = useRouter();
 
 function readPageSourceKinds(): string[] | undefined {
   return selectedSourceKinds.value === null ? undefined : selectedSourceKinds.value;
+}
+
+function readCurrentPage(): number {
+  const rawValue = route.query.page;
+  const rawString = Array.isArray(rawValue) ? rawValue[0] : rawValue;
+  const parsed = Number(rawString);
+
+  if (!Number.isFinite(parsed)) {
+    return 1;
+  }
+
+  const normalized = Math.floor(parsed);
+  return normalized >= 1 ? normalized : 1;
+}
+
+async function replacePageQuery(page: number): Promise<void> {
+  await router.replace({
+    query: {
+      ...route.query,
+      page: String(page)
+    }
+  });
 }
 
 function buildFallbackEmptyState() {
@@ -62,8 +88,17 @@ async function loadPage(options: { selectedKinds?: string[]; silent?: boolean } 
   }
 
   try {
-    const nextModel = await readAiNewPage(options.selectedKinds ?? readPageSourceKinds(), sortMode.value);
+    const requestedPage = readCurrentPage();
+    const nextModel = await readAiNewPage({
+      selectedSourceKinds: options.selectedKinds ?? readPageSourceKinds(),
+      sortMode: sortMode.value,
+      page: requestedPage
+    });
     pageModel.value = nextModel;
+
+    if (nextModel.pagination && nextModel.pagination.page !== requestedPage) {
+      await replacePageQuery(nextModel.pagination.page);
+    }
 
     if (selectedSourceKinds.value === null) {
       const nextKinds = nextModel.sourceFilter
@@ -90,19 +125,27 @@ async function loadPage(options: { selectedKinds?: string[]; silent?: boolean } 
 async function handleSourceKindsChange(nextKinds: string[]): Promise<void> {
   selectedSourceKinds.value = nextKinds;
   writeStoredContentSourceKinds(nextKinds);
+  await replacePageQuery(1);
   await loadPage({ selectedKinds: nextKinds, silent: true });
 }
 
 async function handleSortModeChange(nextSortMode: ContentSortMode): Promise<void> {
   sortMode.value = nextSortMode;
   writeStoredContentSortMode(nextSortMode);
+  await replacePageQuery(1);
+  await loadPage({ selectedKinds: readPageSourceKinds(), silent: true });
+}
+
+async function handlePaginationChange(nextPage: number): Promise<void> {
+  await replacePageQuery(nextPage);
   await loadPage({ selectedKinds: readPageSourceKinds(), silent: true });
 }
 
 const listCards = computed(() => pageModel.value?.cards ?? []);
 const featuredCard = computed(() => pageModel.value?.featuredCard ?? null);
-const visibleResultCount = computed(() => listCards.value.length);
+const visibleResultCount = computed(() => pageModel.value?.pagination?.totalResults ?? listCards.value.length);
 const sourceFilter = computed(() => pageModel.value?.sourceFilter ?? null);
+const pagination = computed(() => pageModel.value?.pagination ?? null);
 const displayState = computed(() => {
   if (!pageModel.value && loadError.value) {
     return buildErrorState(loadError.value);
@@ -163,6 +206,15 @@ onMounted(() => {
       >
         <ContentStandardCard v-for="card in listCards" :key="card.id" :card="card" />
       </section>
+
+      <ContentPaginationBar
+        v-if="pagination"
+        :page="pagination.page"
+        :page-size="pagination.pageSize"
+        :total-results="pagination.totalResults"
+        :total-pages="pagination.totalPages"
+        @change="handlePaginationChange"
+      />
     </template>
 
     <a-spin v-if="isRefreshing" class="self-start" />

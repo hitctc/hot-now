@@ -4,6 +4,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import AiHotPage from "../../src/client/pages/content/AiHotPage.vue";
 
+const routerMocks = vi.hoisted(() => ({
+  replace: vi.fn()
+}));
+
+const routeState = vi.hoisted(() => ({
+  query: {} as Record<string, unknown>
+}));
+
+vi.mock("vue-router", () => ({
+  useRouter: () => routerMocks,
+  useRoute: () => routeState
+}));
+
 const contentApiMocks = vi.hoisted(() => ({
   readAiHotPage: vi.fn(),
   readStoredContentSourceKinds: vi.fn(),
@@ -37,6 +50,12 @@ const baseModel = {
     selectedSourceKinds: ["openai"]
   },
   featuredCard: null,
+  pagination: {
+    page: 1,
+    pageSize: 50,
+    totalResults: 80,
+    totalPages: 2
+  },
   cards: [
     {
       id: 11,
@@ -46,8 +65,6 @@ const baseModel = {
       sourceKind: "openai",
       canonicalUrl: "https://example.com/hot",
       publishedAt: "2026-03-31T13:00:00.000Z",
-      isFavorited: false,
-      reaction: "none",
       contentScore: 90,
       scoreBadges: ["热点"]
     }
@@ -66,6 +83,10 @@ describe("AiHotPage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     window.localStorage.clear();
+    routeState.query = {};
+    routerMocks.replace.mockImplementation(async (location: { query?: Record<string, unknown> }) => {
+      routeState.query = location.query ?? {};
+    });
     contentApiMocks.readStoredContentSourceKinds.mockReturnValue(["openai"]);
     contentApiMocks.readStoredContentSortMode.mockReturnValue("content_score");
     Object.defineProperty(window, "matchMedia", {
@@ -94,17 +115,22 @@ describe("AiHotPage", () => {
 
     await flushPromises();
 
-    expect(contentApiMocks.readAiHotPage).toHaveBeenCalledWith(["openai"], "content_score");
+    expect(contentApiMocks.readAiHotPage).toHaveBeenCalledWith({
+      selectedSourceKinds: ["openai"],
+      sortMode: "content_score",
+      page: 1
+    });
     expect(wrapper.get("[data-content-page='ai-hot']").classes()).toEqual(
       expect.arrayContaining(["flex", "flex-col", "gap-6"])
     );
     expect(wrapper.find("[data-content-filter-shell]").exists()).toBe(false);
     expect(wrapper.find("[data-content-source-filter]").exists()).toBe(true);
     expect(wrapper.find("[data-content-toolbar]").exists()).toBe(true);
-    expect(wrapper.get("[data-content-source-filter]").text()).toContain("已选 1 / 2 · 共 1 条");
+    expect(wrapper.get("[data-content-source-filter]").text()).toContain("已选 1 / 2 · 共 80 条");
     expect(wrapper.find("[data-source-option-count='openai']").exists()).toBe(false);
     expect(wrapper.find("[data-source-option-count='ithome']").exists()).toBe(false);
     expect(wrapper.find("[data-content-sort-control]").exists()).toBe(true);
+    expect(wrapper.get("[data-content-pagination-summary]").text()).toContain("第 1 / 2 页 · 共 80 条");
     expect(wrapper.get("[data-content-section='list']").attributes("data-list-style")).toBe("database");
     expect(wrapper.get("[data-content-section='list']").text()).toContain("Hot AI Event");
     expect(wrapper.findAll("[data-content-row]").length).toBe(1);
@@ -123,5 +149,42 @@ describe("AiHotPage", () => {
 
     expect(wrapper.text()).toContain("AI 热点加载失败，请稍后重试。");
     expect(wrapper.get("[data-content-empty-state]").text()).toContain("页面加载失败");
+  });
+
+  it("reloads ai-hot when the user flips to the next page", async () => {
+    routeState.query = { page: "1" };
+    contentApiMocks.readAiHotPage
+      .mockResolvedValueOnce(createModel())
+      .mockResolvedValueOnce(
+        createModel({
+          pagination: {
+            page: 2,
+            pageSize: 50,
+            totalResults: 80,
+            totalPages: 2
+          }
+        })
+      );
+
+    const wrapper = mount(AiHotPage, {
+      global: {
+        plugins: [Antd]
+      }
+    });
+
+    await flushPromises();
+    await wrapper.get("[data-content-pagination-action='next']").trigger("click");
+    await flushPromises();
+
+    expect(routerMocks.replace).toHaveBeenCalledWith({
+      query: {
+        page: "2"
+      }
+    });
+    expect(contentApiMocks.readAiHotPage).toHaveBeenNthCalledWith(2, {
+      selectedSourceKinds: ["openai"],
+      sortMode: "content_score",
+      page: 2
+    });
   });
 });

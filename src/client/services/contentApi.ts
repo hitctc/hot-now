@@ -2,7 +2,6 @@ import { requestJson } from "./http";
 
 export type ContentPageKey = "ai-new" | "ai-hot";
 export type ContentSortMode = "published_at" | "content_score";
-export type ContentReaction = "like" | "dislike" | "none";
 export type ContentFeedbackSuggestedEffect = "boost" | "penalize" | "block" | "neutral" | "";
 export type ContentFeedbackStrengthLevel = "high" | "medium" | "low" | "";
 
@@ -22,8 +21,6 @@ export type ContentCard = {
   sourceKind?: string;
   canonicalUrl: string;
   publishedAt: string | null;
-  isFavorited: boolean;
-  reaction: ContentReaction;
   contentScore: number;
   scoreBadges: string[];
   feedbackEntry?: ContentFeedbackEntry;
@@ -39,23 +36,17 @@ export type ContentPageModel = {
   sourceFilter?: ContentSourceFilter;
   featuredCard: ContentCard | null;
   cards: ContentCard[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalResults: number;
+    totalPages: number;
+  } | null;
   emptyState: {
     title: string;
     description: string;
     tone: "default" | "degraded" | "filtered";
   } | null;
-};
-
-export type ContentFavoriteResponse = {
-  ok: true;
-  contentItemId: number;
-  isFavorited: boolean;
-};
-
-export type ContentReactionResponse = {
-  ok: true;
-  contentItemId: number;
-  reaction: ContentReaction;
 };
 
 export type ContentFeedbackResponse = {
@@ -65,7 +56,6 @@ export type ContentFeedbackResponse = {
 };
 
 export type SaveFeedbackPoolEntryPayload = {
-  reactionSnapshot: ContentReaction;
   freeText: string;
   suggestedEffect: ContentFeedbackSuggestedEffect;
   strengthLevel: ContentFeedbackStrengthLevel;
@@ -75,6 +65,12 @@ export type SaveFeedbackPoolEntryPayload = {
 
 export const CONTENT_SOURCE_STORAGE_KEY = "hot-now-content-sources";
 export const CONTENT_SORT_STORAGE_KEY = "hot-now-content-sort";
+
+export type ReadContentPageOptions = {
+  selectedSourceKinds?: string[];
+  sortMode?: ContentSortMode;
+  page?: number;
+};
 
 // 内容筛选偏好只允许 string[]，其他脏数据一律回落到 null，交给页面决定默认行为。
 function readPersistedStringArray(key: string): string[] | null {
@@ -161,13 +157,21 @@ function createContentPageRequestHeaders(
   return Object.keys(headers).length > 0 ? headers : undefined;
 }
 
+function buildContentPagePath(path: string, page: number | undefined): string {
+  // 内容页分页状态只保留在 URL query 里，第一页继续回落到无 query 的短路径。
+  if (typeof page !== "number" || !Number.isFinite(page) || page <= 1) {
+    return path;
+  }
+
+  return `${path}?page=${encodeURIComponent(String(Math.floor(page)))}`;
+}
+
 async function readContentPage(
   path: string,
-  selectedSourceKinds?: string[],
-  sortMode?: ContentSortMode
+  options: ReadContentPageOptions = {}
 ): Promise<ContentPageModel> {
   return requestJson<ContentPageModel>(path, {
-    headers: createContentPageRequestHeaders(selectedSourceKinds, sortMode)
+    headers: createContentPageRequestHeaders(options.selectedSourceKinds, options.sortMode)
   });
 }
 
@@ -207,25 +211,21 @@ export function deriveInitialSelectedSourceKinds(
 }
 
 export function readAiNewPage(
-  selectedSourceKinds?: string[],
-  sortMode: ContentSortMode = "published_at"
+  options: ReadContentPageOptions = {}
 ): Promise<ContentPageModel> {
-  return readContentPage("/api/content/ai-new", selectedSourceKinds, sortMode);
+  return readContentPage(buildContentPagePath("/api/content/ai-new", options.page), {
+    selectedSourceKinds: options.selectedSourceKinds,
+    sortMode: options.sortMode ?? "published_at"
+  });
 }
 
 export function readAiHotPage(
-  selectedSourceKinds?: string[],
-  sortMode: ContentSortMode = "published_at"
+  options: ReadContentPageOptions = {}
 ): Promise<ContentPageModel> {
-  return readContentPage("/api/content/ai-hot", selectedSourceKinds, sortMode);
-}
-
-export function saveFavorite(contentItemId: number, isFavorited: boolean): Promise<ContentFavoriteResponse> {
-  return postContentAction<ContentFavoriteResponse>(`/actions/content/${contentItemId}/favorite`, { isFavorited });
-}
-
-export function saveReaction(contentItemId: number, reaction: Exclude<ContentReaction, "none">): Promise<ContentReactionResponse> {
-  return postContentAction<ContentReactionResponse>(`/actions/content/${contentItemId}/reaction`, { reaction });
+  return readContentPage(buildContentPagePath("/api/content/ai-hot", options.page), {
+    selectedSourceKinds: options.selectedSourceKinds,
+    sortMode: options.sortMode ?? "published_at"
+  });
 }
 
 export function saveFeedbackPoolEntry(

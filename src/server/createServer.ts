@@ -14,6 +14,13 @@ import type {
 } from "../core/llm/providerSettingsRepository.js";
 import type { RatingDimension, SaveRatingsResult } from "../core/ratings/ratingRepository.js";
 import type { ContentSourceOption } from "../core/source/listContentSources.js";
+import type {
+  DeleteSourceResult,
+  SaveSourceInput,
+  SaveSourceResult,
+  ToggleSourceResult,
+  UpdateSourceDisplayModeResult
+} from "../core/source/sourceMutationRepository.js";
 import type { NlRuleScope } from "../core/strategy/nlRuleRepository.js";
 import type { RunNlEvaluationCycleResult } from "../core/strategy/runNlEvaluationCycle.js";
 import type { UpdateStrategyDraftInput, UpdateStrategyDraftResult } from "../core/strategy/strategyDraftRepository.js";
@@ -50,14 +57,19 @@ type ReportSummary = {
 type ParseRatingScoresResult =
   | { ok: true; scores: Record<string, number> }
   | { ok: false; reason: "invalid-ratings-payload" };
-type ToggleSourceResult = { ok: true } | { ok: false; reason: "not-found" };
-type UpdateSourceDisplayModeResult = { ok: true } | { ok: false; reason: "not-found" };
 type SourceCard = {
   kind: string;
   name: string;
+  siteUrl: string;
   rssUrl: string | null;
   isEnabled: boolean;
+  isBuiltIn: boolean;
   showAllWhenSelected: boolean;
+  sourceType: string;
+  bridgeKind: string | null;
+  bridgeConfigSummary: string | null;
+  bridgeInputMode: "feed_url" | "article_url" | null;
+  bridgeInputValue: string | null;
   lastCollectedAt: string | null;
   lastCollectionStatus: string | null;
   totalCount?: number;
@@ -149,6 +161,9 @@ type ServerDeps = {
   deleteStrategyDraft?: (draftId: number) => Promise<DeleteDraftResult> | DeleteDraftResult;
   listSources?: () => Promise<SourceCard[]> | SourceCard[];
   getSourcesOperationSummary?: () => Promise<SourcesOperationSummary> | SourcesOperationSummary;
+  createSource?: (input: SaveSourceInput) => Promise<SaveSourceResult> | SaveSourceResult;
+  updateSource?: (input: SaveSourceInput) => Promise<SaveSourceResult> | SaveSourceResult;
+  deleteSource?: (kind: string) => Promise<DeleteSourceResult> | DeleteSourceResult;
   toggleSource?: (kind: string, enable: boolean) => Promise<ToggleSourceResult> | ToggleSourceResult;
   updateSourceDisplayMode?: (
     kind: string,
@@ -844,6 +859,73 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.send({ ok: true, kind, enable });
   });
 
+  app.post("/actions/sources/create", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.createSource) {
+      return reply.code(503).send({ ok: false, reason: "sources-disabled" });
+    }
+
+    const payload = parseSourceSavePayload(request.body);
+
+    if (!payload) {
+      return reply.code(400).send({ ok: false, reason: "invalid-source-payload" });
+    }
+
+    const result = await deps.createSource({ ...payload, mode: "create" });
+    return sendSourceSaveResult(reply, result);
+  });
+
+  app.post("/actions/sources/update", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.updateSource) {
+      return reply.code(503).send({ ok: false, reason: "sources-disabled" });
+    }
+
+    const payload = parseSourceSavePayload(request.body);
+
+    if (!payload) {
+      return reply.code(400).send({ ok: false, reason: "invalid-source-payload" });
+    }
+
+    const result = await deps.updateSource({ ...payload, mode: "update" });
+    return sendSourceSaveResult(reply, result);
+  });
+
+  app.post("/actions/sources/delete", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.deleteSource) {
+      return reply.code(503).send({ ok: false, reason: "sources-disabled" });
+    }
+
+    const body = request.body as { kind?: unknown } | undefined;
+    const kind = typeof body?.kind === "string" ? body.kind.trim() : "";
+
+    if (!kind) {
+      return reply.code(400).send({ ok: false, reason: "invalid-source-payload" });
+    }
+
+    const result = await deps.deleteSource(kind);
+
+    if (!result.ok) {
+      if (result.reason === "not-found") {
+        return reply.code(404).send({ ok: false, reason: "not-found" });
+      }
+
+      return reply.code(409).send({ ok: false, reason: result.reason });
+    }
+
+    return reply.send({ ok: true, kind: result.kind });
+  });
+
   app.post("/actions/sources/display-mode", async (request, reply) => {
     if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
       return;
@@ -875,6 +957,110 @@ export function createServer(deps: ServerDeps = {}) {
   });
 
   return app;
+}
+
+function parseSourceSavePayload(body: unknown): SaveSourceInput | null {
+  if (!body || typeof body !== "object") {
+    return null;
+  }
+
+  const payload = body as Record<string, unknown>;
+  const sourceType = typeof payload.sourceType === "string" ? payload.sourceType.trim() : "";
+  const kind = typeof payload.kind === "string" ? payload.kind.trim() : "";
+  const name = typeof payload.name === "string" ? payload.name.trim() : "";
+  const siteUrl = typeof payload.siteUrl === "string" ? payload.siteUrl.trim() : "";
+
+  if (!kind || !name || !siteUrl) {
+    return null;
+  }
+
+  if (sourceType === "rss") {
+    const rssUrl = typeof payload.rssUrl === "string" ? payload.rssUrl.trim() : "";
+
+    if (!rssUrl) {
+      return null;
+    }
+
+    return {
+      mode: "create",
+      sourceType: "rss",
+      kind,
+      name,
+      siteUrl,
+      rssUrl
+    };
+  }
+
+  if (sourceType !== "wechat_bridge") {
+    return null;
+  }
+
+  const bridgeKind = typeof payload.bridgeKind === "string" ? payload.bridgeKind.trim() : "";
+  const inputMode = typeof payload.inputMode === "string" ? payload.inputMode.trim() : "";
+
+  if (bridgeKind !== "wechat2rss") {
+    return null;
+  }
+
+  if (inputMode === "feed_url") {
+    const feedUrl = typeof payload.feedUrl === "string" ? payload.feedUrl.trim() : "";
+
+    if (!feedUrl) {
+      return null;
+    }
+
+    return {
+      mode: "create",
+      sourceType: "wechat_bridge",
+      kind,
+      name,
+      siteUrl,
+      bridgeKind: "wechat2rss",
+      inputMode: "feed_url",
+      feedUrl
+    };
+  }
+
+  if (inputMode === "article_url") {
+    const articleUrl = typeof payload.articleUrl === "string" ? payload.articleUrl.trim() : "";
+
+    if (!articleUrl) {
+      return null;
+    }
+
+    return {
+      mode: "create",
+      sourceType: "wechat_bridge",
+      kind,
+      name,
+      siteUrl,
+      bridgeKind: "wechat2rss",
+      inputMode: "article_url",
+      articleUrl
+    };
+  }
+
+  return null;
+}
+
+function sendSourceSaveResult(reply: FastifyReply, result: SaveSourceResult) {
+  if (!result.ok) {
+    if (result.reason === "not-found") {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+
+    if (result.reason === "wechat-bridge-disabled") {
+      return reply.code(503).send({ ok: false, reason: "wechat-bridge-disabled" });
+    }
+
+    if (result.reason === "bridge-registration-failed") {
+      return reply.code(502).send({ ok: false, reason: "bridge-registration-failed" });
+    }
+
+    return reply.code(409).send({ ok: false, reason: result.reason });
+  }
+
+  return reply.send({ ok: true, kind: result.kind });
 }
 
 function readAuthenticatedSession(cookieHeader: string | undefined, sessionSecret: string) {

@@ -36,6 +36,12 @@ import { listContentSources } from "./core/source/listContentSources.js";
 import { listSourceWorkbench } from "./core/source/listSourceWorkbench.js";
 import { readSourcesOperationSummary } from "./core/source/readSourcesOperationSummary.js";
 import { loadEnabledSourceIssues } from "./core/source/loadEnabledSourceIssues.js";
+import {
+  deleteSource as removeSource,
+  saveSource as persistSource,
+  toggleSource as persistSourceToggle,
+  updateSourceDisplayMode as persistSourceDisplayMode
+} from "./core/source/sourceMutationRepository.js";
 import { listNlEvaluationRuns } from "./core/strategy/nlEvaluationRepository.js";
 import { listNlRuleSets, saveNlRuleSet, type NlRuleScope } from "./core/strategy/nlRuleRepository.js";
 import {
@@ -71,8 +77,6 @@ type UserProfileRow = {
   display_name: string | null;
   email: string | null;
 };
-type ToggleSourceResult = { ok: true } | { ok: false; reason: "not-found" };
-type UpdateSourceDisplayModeResult = { ok: true } | { ok: false; reason: "not-found" };
 
 const config = await loadRuntimeConfig();
 const recoveryDir = path.join(path.dirname(config.database.file), "recovery-backups");
@@ -103,31 +107,6 @@ const readCurrentUserProfile = db.prepare(
     WHERE id = 1
   `
 );
-const readSourceByKind = db.prepare(
-  `
-    SELECT id
-    FROM content_sources
-    WHERE kind = ?
-    LIMIT 1
-  `
-);
-const setSourceEnabledStatement = db.prepare(
-  `
-    UPDATE content_sources
-    SET is_enabled = ?,
-        updated_at = CURRENT_TIMESTAMP
-    WHERE kind = ?
-  `
-);
-const setSourceDisplayModeStatement = db.prepare(
-  `
-    UPDATE content_sources
-    SET show_all_when_selected = ?,
-        updated_at = CURRENT_TIMESTAMP
-    WHERE kind = ?
-  `
-);
-
 // Collection runs now stop after report generation so recurring fetches no longer send mail as a side effect.
 async function runCollectionTask(triggerType: DailyReportTrigger) {
   return await runCollectionCycle(config, triggerType, {
@@ -196,41 +175,6 @@ async function verifyLogin(username: string, password: string) {
     displayName: profile.display_name?.trim() || profile.username,
     role: profile.role?.trim() || "admin"
   };
-}
-
-function toggleSource(kind: string, enable: boolean): ToggleSourceResult {
-  // Source toggles update only the targeted row so operators can keep multiple feeds enabled at once.
-  const toggle = db.transaction((normalizedKind: string, nextEnabled: boolean): ToggleSourceResult => {
-    const source = readSourceByKind.get(normalizedKind) as { id: number } | undefined;
-
-    if (!source) {
-      return { ok: false, reason: "not-found" };
-    }
-
-    setSourceEnabledStatement.run(nextEnabled ? 1 : 0, normalizedKind);
-    return { ok: true };
-  });
-
-  return toggle(kind.trim(), enable);
-}
-
-function updateSourceDisplayMode(kind: string, showAllWhenSelected: boolean): UpdateSourceDisplayModeResult {
-  // Display-mode toggles stay separate from enable toggles so operators can tune browse behavior
-  // without changing whether a source participates in collection.
-  const updateDisplayMode = db.transaction(
-    (normalizedKind: string, nextShowAllWhenSelected: boolean): UpdateSourceDisplayModeResult => {
-      const source = readSourceByKind.get(normalizedKind) as { id: number } | undefined;
-
-      if (!source) {
-        return { ok: false, reason: "not-found" };
-      }
-
-      setSourceDisplayModeStatement.run(nextShowAllWhenSelected ? 1 : 0, normalizedKind);
-      return { ok: true };
-    }
-  );
-
-  return updateDisplayMode(kind.trim(), showAllWhenSelected);
 }
 
 function getCurrentUserProfile() {
@@ -641,8 +585,18 @@ const app = createServer({
   deleteStrategyDraft: async (draftId) => deleteStrategyDraft(db, draftId),
   listSources: async () => listSourceWorkbench(db),
   getSourcesOperationSummary: async () => readSourcesOperationSummary(db),
-  toggleSource: async (kind, enable) => toggleSource(kind, enable),
-  updateSourceDisplayMode: async (kind, showAllWhenSelected) => updateSourceDisplayMode(kind, showAllWhenSelected),
+  createSource: async (input) =>
+    await persistSource(db, input, {
+      wechatBridge: config.wechatBridge ?? null
+    }),
+  updateSource: async (input) =>
+    await persistSource(db, input, {
+      wechatBridge: config.wechatBridge ?? null
+    }),
+  deleteSource: async (kind) => removeSource(db, kind),
+  toggleSource: async (kind, enable) => persistSourceToggle(db, kind, enable),
+  updateSourceDisplayMode: async (kind, showAllWhenSelected) =>
+    persistSourceDisplayMode(db, kind, showAllWhenSelected),
   getCurrentUserProfile: async () => getCurrentUserProfile(),
   listReportSummaries: listStoredReportSummaries,
   latestReportDate: async () => (await listReportDates(config.report.dataDir))[0] ?? null,

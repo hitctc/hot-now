@@ -3,9 +3,14 @@ import type { SqliteDatabase } from "../db/openDatabase.js";
 type SourceRow = {
   kind: string;
   name: string;
+  site_url: string;
   rss_url: string | null;
   is_enabled: number;
+  is_builtin: number;
   show_all_when_selected: number;
+  source_type: string | null;
+  bridge_kind: string | null;
+  bridge_config_json: string | null;
 };
 
 type CollectionRunRow = {
@@ -18,9 +23,16 @@ type CollectionRunRow = {
 export type SourceCard = {
   kind: string;
   name: string;
+  siteUrl: string;
   rssUrl: string | null;
   isEnabled: boolean;
+  isBuiltIn: boolean;
   showAllWhenSelected: boolean;
+  sourceType: string;
+  bridgeKind: string | null;
+  bridgeConfigSummary: string | null;
+  bridgeInputMode: "feed_url" | "article_url" | null;
+  bridgeInputValue: string | null;
   lastCollectedAt: string | null;
   lastCollectionStatus: string | null;
 };
@@ -31,7 +43,8 @@ export function listSourceCards(db: SqliteDatabase): SourceCard[] {
   const sourceRows = db
     .prepare(
       `
-        SELECT kind, name, rss_url, is_enabled, show_all_when_selected
+        SELECT kind, name, site_url, rss_url, is_enabled, is_builtin, show_all_when_selected
+               , source_type, bridge_kind, bridge_config_json
         FROM content_sources
         ORDER BY id ASC
       `
@@ -50,13 +63,21 @@ export function listSourceCards(db: SqliteDatabase): SourceCard[] {
 
   return sourceRows.map((source) => {
     const latestRun = latestRunBySourceKind.get(source.kind);
+    const bridgeConfig = parseBridgeConfig(source.bridge_config_json);
 
     return {
       kind: source.kind,
       name: source.name,
+      siteUrl: source.site_url,
       rssUrl: source.rss_url,
       isEnabled: source.is_enabled === 1,
+      isBuiltIn: source.is_builtin === 1,
       showAllWhenSelected: source.show_all_when_selected === 1,
+      sourceType: source.source_type?.trim() || "rss",
+      bridgeKind: source.bridge_kind?.trim() || null,
+      bridgeConfigSummary: bridgeConfig.summary,
+      bridgeInputMode: bridgeConfig.inputMode,
+      bridgeInputValue: bridgeConfig.inputValue,
       lastCollectedAt: latestRun?.finishedAt ?? latestRun?.startedAt ?? null,
       lastCollectionStatus: latestRun?.status ?? null
     };
@@ -114,5 +135,43 @@ function parseSourceKinds(notes: string | null): string[] {
     return typeof parsed.sourceKind === "string" && parsed.sourceKind.trim() ? [parsed.sourceKind.trim()] : [];
   } catch {
     return [];
+  }
+}
+
+function parseBridgeConfig(value: string | null): {
+  summary: string | null;
+  inputMode: "feed_url" | "article_url" | null;
+  inputValue: string | null;
+} {
+  if (!value?.trim()) {
+    return { summary: null, inputMode: null, inputValue: null };
+  }
+
+  try {
+    const parsed = JSON.parse(value) as {
+      inputMode?: unknown;
+      feedUrl?: unknown;
+      articleUrl?: unknown;
+    };
+
+    if (parsed.inputMode === "feed_url") {
+      return {
+        summary: "现成 feed URL",
+        inputMode: "feed_url",
+        inputValue: typeof parsed.feedUrl === "string" ? parsed.feedUrl : null
+      };
+    }
+
+    if (parsed.inputMode === "article_url") {
+      return {
+        summary: "公众号文章链接",
+        inputMode: "article_url",
+        inputValue: typeof parsed.articleUrl === "string" ? parsed.articleUrl : null
+      };
+    }
+
+    return { summary: "桥接配置", inputMode: null, inputValue: null };
+  } catch {
+    return { summary: "桥接配置", inputMode: null, inputValue: null };
   }
 }

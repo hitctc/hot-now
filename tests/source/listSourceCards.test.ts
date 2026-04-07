@@ -147,4 +147,46 @@ describe("listSourceCards", () => {
       lastCollectionStatus: "completed"
     });
   });
+
+  it("returns source type and bridge summaries for custom bridge rows", async () => {
+    const db = await createTestDatabase();
+
+    db.prepare(
+      `
+        INSERT INTO content_sources (
+          kind,
+          name,
+          site_url,
+          rss_url,
+          is_enabled,
+          is_builtin,
+          show_all_when_selected,
+          source_type,
+          bridge_kind,
+          bridge_config_json
+        )
+        VALUES (?, ?, ?, ?, 1, 0, 0, 'wechat_bridge', 'wechat2rss', ?)
+      `
+    ).run(
+      "wechat_demo",
+      "微信 Demo",
+      "https://mp.weixin.qq.com/",
+      "https://bridge.example.test/feed/demo.xml",
+      JSON.stringify({
+        inputMode: "article_url",
+        articleUrl: "https://mp.weixin.qq.com/s?__biz=abc",
+        resolvedFrom: "wechat2rss"
+      })
+    );
+
+    const cards = listSourceCards(db);
+
+    expect(cards.find((card) => card.kind === "wechat_demo")).toMatchObject({
+      sourceType: "wechat_bridge",
+      bridgeKind: "wechat2rss",
+      bridgeConfigSummary: "公众号文章链接",
+      bridgeInputMode: "article_url",
+      bridgeInputValue: "https://mp.weixin.qq.com/s?__biz=abc"
+    });
+  });
 });

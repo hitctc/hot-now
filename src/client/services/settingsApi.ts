@@ -91,9 +91,16 @@ export type SettingsViewRulesResponse = {
 export type SettingsSourceItem = {
   kind: string;
   name: string;
+  siteUrl: string;
   rssUrl: string | null;
   isEnabled: boolean;
+  isBuiltIn: boolean;
   showAllWhenSelected: boolean;
+  sourceType: string;
+  bridgeKind: string | null;
+  bridgeConfigSummary: string | null;
+  bridgeInputMode: "feed_url" | "article_url" | null;
+  bridgeInputValue: string | null;
   lastCollectedAt: string | null;
   lastCollectionStatus: string | null;
   totalCount?: number;
@@ -206,6 +213,43 @@ export type UpdateSourceDisplayModeResponse = {
   ok: true;
   kind: string;
   showAllWhenSelected: boolean;
+};
+
+export type SaveSourcePayload =
+  | {
+      sourceType: "rss";
+      kind: string;
+      name: string;
+      siteUrl: string;
+      rssUrl: string;
+    }
+  | {
+      sourceType: "wechat_bridge";
+      kind: string;
+      name: string;
+      siteUrl: string;
+      bridgeKind: "wechat2rss";
+      inputMode: "feed_url";
+      feedUrl: string;
+    }
+  | {
+      sourceType: "wechat_bridge";
+      kind: string;
+      name: string;
+      siteUrl: string;
+      bridgeKind: "wechat2rss";
+      inputMode: "article_url";
+      articleUrl: string;
+    };
+
+export type SaveSourceResponse = {
+  ok: true;
+  kind: string;
+};
+
+export type DeleteSourceResponse = {
+  ok: true;
+  kind: string;
 };
 
 export type ManualCollectResponse = {
@@ -344,6 +388,21 @@ export function updateSourceDisplayMode(
     kind,
     showAllWhenSelected
   });
+}
+
+// 来源新增复用统一 JSON action，bridge 解析在后端保存阶段完成。
+export function createSource(payload: SaveSourcePayload): Promise<SaveSourceResponse> {
+  return postSettingsAction<SaveSourceResponse>("/actions/sources/create", payload);
+}
+
+// 来源编辑沿用与新增相同的 payload 结构，只是后端按 update 语义处理。
+export function updateSource(payload: SaveSourcePayload): Promise<SaveSourceResponse> {
+  return postSettingsAction<SaveSourceResponse>("/actions/sources/update", payload);
+}
+
+// 删除只需要 source kind，是否允许删除由后端按 built-in / in-use 规则判断。
+export function deleteSource(kind: string): Promise<DeleteSourceResponse> {
+  return postSettingsAction<DeleteSourceResponse>("/actions/sources/delete", { kind });
 }
 
 // 手动采集走独立动作接口，保持和旧系统页一致的任务语义。

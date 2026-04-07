@@ -18,9 +18,16 @@ type SourceViewStats = {
 export type SourceWorkbenchRow = {
   kind: string;
   name: string;
+  siteUrl: string;
   rssUrl: string | null;
   isEnabled: boolean;
+  isBuiltIn: boolean;
   showAllWhenSelected: boolean;
+  sourceType: string;
+  bridgeKind: string | null;
+  bridgeConfigSummary: string | null;
+  bridgeInputMode: "feed_url" | "article_url" | null;
+  bridgeInputValue: string | null;
   lastCollectedAt: string | null;
   lastCollectionStatus: string | null;
   totalCount: number;

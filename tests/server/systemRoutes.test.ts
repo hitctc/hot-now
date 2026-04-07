@@ -232,6 +232,96 @@ describe("system routes", () => {
     expect(toggleSource).not.toHaveBeenCalled();
   });
 
+  it("calls createSource for the source create action", async () => {
+    const createSource = vi.fn().mockResolvedValue({ ok: true, kind: "wechat_demo" });
+    const app = createSystemTestServer({
+      createSource
+    } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/sources/create",
+      payload: {
+        sourceType: "wechat_bridge",
+        kind: "wechat_demo",
+        name: "微信 Demo",
+        siteUrl: "https://mp.weixin.qq.com/",
+        bridgeKind: "wechat2rss",
+        inputMode: "article_url",
+        articleUrl: "https://mp.weixin.qq.com/s?__biz=abc"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(createSource).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceType: "wechat_bridge",
+        inputMode: "article_url",
+        articleUrl: "https://mp.weixin.qq.com/s?__biz=abc"
+      })
+    );
+  });
+
+  it("returns 400 for invalid source create payloads", async () => {
+    const createSource = vi.fn();
+    const app = createSystemTestServer({
+      createSource
+    } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/sources/create",
+      payload: { sourceType: "wechat_bridge", kind: "wechat_demo" }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ ok: false, reason: "invalid-source-payload" });
+    expect(createSource).not.toHaveBeenCalled();
+  });
+
+  it("calls updateSource for the source update action", async () => {
+    const updateSource = vi.fn().mockResolvedValue({ ok: true, kind: "wechat_demo" });
+    const app = createSystemTestServer({
+      updateSource
+    } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/sources/update",
+      payload: {
+        sourceType: "rss",
+        kind: "wechat_demo",
+        name: "微信 Demo",
+        siteUrl: "https://example.com",
+        rssUrl: "https://example.com/feed.xml"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(updateSource).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceType: "rss",
+        rssUrl: "https://example.com/feed.xml"
+      })
+    );
+  });
+
+  it("calls deleteSource for the source delete action", async () => {
+    const deleteSource = vi.fn().mockResolvedValue({ ok: true, kind: "wechat_demo" });
+    const app = createSystemTestServer({
+      deleteSource
+    } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/sources/delete",
+      payload: { kind: "wechat_demo" }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(deleteSource).toHaveBeenCalledWith("wechat_demo");
+  });
+
   it("calls saveProviderSettings for llm provider configuration", async () => {
     const saveProviderSettings = vi.fn().mockResolvedValue({ ok: true });
     const app = createSystemTestServer({

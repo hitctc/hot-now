@@ -61,13 +61,14 @@ type NlEvaluationRunItem = {
 };
 
 export type ViewRulesWorkbenchView = {
-  providerSettings: ProviderSettingsSummaryView | null;
+  providerSettings: ProviderSettingsSummaryView[];
   providerCapability: ProviderCapabilityView;
   nlRules: NlRuleItem[];
   feedbackPool: FeedbackPoolItem[];
   strategyDrafts: StrategyDraftItem[];
   latestEvaluationRun: NlEvaluationRunItem | null;
   isEvaluationRunning: boolean;
+  isEvaluationStopRequested: boolean;
 };
 
 type SourceItem = {
@@ -282,8 +283,11 @@ export function renderProfilePage(profile: ProfileView | null): string {
 }
 
 function renderProviderSettingsCard(workbench: ViewRulesWorkbenchView): string {
-  const providerSettings = workbench.providerSettings;
-  const selectedProvider = providerSettings?.providerKind ?? "deepseek";
+  const providerSettingsList = workbench.providerSettings;
+  const enabledProviderSettings = providerSettingsList.find((settings) => settings.isEnabled) ?? null;
+  const selectedProvider = enabledProviderSettings?.providerKind ?? providerSettingsList[0]?.providerKind ?? "deepseek";
+  const selectedProviderSettings =
+    providerSettingsList.find((settings) => settings.providerKind === selectedProvider) ?? null;
   const latestRun = workbench.latestEvaluationRun;
   const latestRunText = latestRun
     ? `${formatProviderLabel(latestRun.providerKind)} · ${latestRun.status} · ${formatDateTime(latestRun.finishedAt ?? latestRun.startedAt)}`
@@ -294,7 +298,7 @@ function renderProviderSettingsCard(workbench: ViewRulesWorkbenchView): string {
     <article class="system-card system-card--control system-card--provider system-card--panel system-card--form-panel" data-system-card="provider-settings">
       <header class="system-card-header">
         <h3 class="system-card-title">LLM 设置</h3>
-        <p class="system-card-meta">当前厂商：${escapeHtml(providerSettings ? formatProviderLabel(providerSettings.providerKind) : "未配置")}</p>
+        <p class="system-card-meta">已启用厂商：${escapeHtml(formatProviderLabel(enabledProviderSettings?.providerKind ?? null))}</p>
         <p class="system-card-meta">状态说明：${escapeHtml(availabilityText)}</p>
         <p class="system-card-meta">上次重算：${escapeHtml(latestRunText)}${workbench.isEvaluationRunning ? " · 进行中" : ""}</p>
       </header>
@@ -309,8 +313,8 @@ function renderProviderSettingsCard(workbench: ViewRulesWorkbenchView): string {
         </label>
         <label class="rating-field">
           <span class="field-label">API Key</span>
-          <input class="field-input" type="password" name="apiKey" placeholder="输入新的 API key 会覆盖当前配置" />
-          <span class="system-card-meta">已保存尾号：${escapeHtml(providerSettings?.apiKeyLast4 ?? "未配置")}</span>
+          <input class="field-input" type="password" name="apiKey" placeholder="输入新的 API key 会更新当前厂商配置" />
+          <span class="system-card-meta">当前厂商尾号：${escapeHtml(selectedProviderSettings?.apiKeyLast4 ?? "未配置")}</span>
         </label>
         <div class="system-action-row">
           <button type="submit" class="primary-mini-button">保存厂商设置</button>
@@ -319,7 +323,38 @@ function renderProviderSettingsCard(workbench: ViewRulesWorkbenchView): string {
           <p class="action-status system-status" data-role="action-status" aria-live="polite"></p>
         </div>
       </form>
+      <form class="system-form" data-system-action="provider-settings-activation">
+        <label class="rating-field">
+          <span class="field-label">厂商</span>
+          <select class="field-input" name="providerKind">
+            ${renderSelectOption("deepseek", "DeepSeek", selectedProvider)}
+            ${renderSelectOption("minimax", "MiniMax", selectedProvider)}
+            ${renderSelectOption("kimi", "Kimi", selectedProvider)}
+          </select>
+        </label>
+        <label class="rating-field">
+          <span class="field-label">启用状态</span>
+          <select class="field-input" name="enable">
+            ${renderSelectOption("true", "启用当前厂商", selectedProviderSettings?.isEnabled ? "false" : "true")}
+            ${renderSelectOption("false", "停用当前厂商", selectedProviderSettings?.isEnabled ? "false" : "true")}
+          </select>
+        </label>
+        <div class="system-action-row">
+          <button type="submit" class="secondary-mini-button">更新启用状态</button>
+        </div>
+        <div class="system-status-region">
+          <p class="action-status system-status" data-role="action-status" aria-live="polite"></p>
+        </div>
+      </form>
       <form class="system-form" data-system-action="provider-settings-delete">
+        <label class="rating-field">
+          <span class="field-label">厂商</span>
+          <select class="field-input" name="providerKind">
+            ${renderSelectOption("deepseek", "DeepSeek", selectedProvider)}
+            ${renderSelectOption("minimax", "MiniMax", selectedProvider)}
+            ${renderSelectOption("kimi", "Kimi", selectedProvider)}
+          </select>
+        </label>
         <div class="system-action-row">
           <button type="submit" class="secondary-mini-button">删除当前厂商配置</button>
         </div>

@@ -293,4 +293,200 @@ describe("runNlEvaluationCycle", () => {
     expect(listNlEvaluationsForContent(handle.db, secondContentId)).toEqual([]);
     expect(listNlEvaluationRuns(handle.db)[0]?.notes).toContain("provider timeout");
   });
+
+  it("updates the running counters while a long full recompute is still in progress", async () => {
+    const handle = await createTestDatabase("hot-now-run-nl-cycle-");
+    handles.push(handle);
+
+    insertTestContentItem(handle.db, {
+      title: "First content",
+      canonicalUrl: "https://example.com/first-content"
+    });
+    insertTestContentItem(handle.db, {
+      title: "Second content",
+      canonicalUrl: "https://example.com/second-content"
+    });
+    saveNlRuleSet(handle.db, "base", {
+      enabled: true,
+      ruleText: "保留 content 相关内容。"
+    });
+
+    let releaseSecondEvaluation = () => undefined;
+    const secondEvaluation = new Promise<void>((resolve) => {
+      releaseSecondEvaluation = resolve;
+    });
+
+    const runningTask = runNlEvaluationCycle(
+      handle.db,
+      {
+        mode: "full-recompute"
+      },
+      {
+        resolveProvider: async () => ({
+          ok: true,
+          provider: {
+            providerKind: "deepseek",
+            modelName: "deepseek-chat",
+            evaluateContent: async ({ content }) => {
+              if (content.title === "Second content") {
+                await secondEvaluation;
+              }
+
+              return {
+                evaluations: [
+                  {
+                    scope: "base" as const,
+                    decision: "boost" as const,
+                    strengthLevel: "low" as const,
+                    matchedKeywords: ["content"],
+                    reason: "命中基础规则"
+                  },
+                  {
+                    scope: "ai_hot" as const,
+                    decision: "neutral" as const,
+                    strengthLevel: null,
+                    matchedKeywords: [],
+                    reason: null
+                  },
+                  {
+                    scope: "ai_new" as const,
+                    decision: "neutral" as const,
+                    strengthLevel: null,
+                    matchedKeywords: [],
+                    reason: null
+                  }
+                ]
+              };
+            }
+          }
+        }),
+        now: () => new Date("2026-03-31T12:00:00.000Z")
+      }
+    );
+
+    await vi.waitFor(() => {
+      expect(listNlEvaluationRuns(handle.db)[0]).toMatchObject({
+        status: "running",
+        itemCount: 2,
+        successCount: 1,
+        failureCount: 0
+      });
+    });
+
+    releaseSecondEvaluation();
+
+    await expect(runningTask).resolves.toEqual({
+      runId: expect.any(Number),
+      status: "completed",
+      itemCount: 2,
+      successCount: 2,
+      failureCount: 0
+    });
+  });
+
+  it("stops before evaluating more content once cancellation has been requested", async () => {
+    const handle = await createTestDatabase("hot-now-run-nl-cycle-");
+    handles.push(handle);
+
+    insertTestContentItem(handle.db, {
+      title: "First content",
+      canonicalUrl: "https://example.com/first-content"
+    });
+    insertTestContentItem(handle.db, {
+      title: "Second content",
+      canonicalUrl: "https://example.com/second-content"
+    });
+    insertTestContentItem(handle.db, {
+      title: "Third content",
+      canonicalUrl: "https://example.com/third-content"
+    });
+    saveNlRuleSet(handle.db, "base", {
+      enabled: true,
+      ruleText: "保留 content 相关内容。"
+    });
+
+    let stopRequested = false;
+    let releaseFirstEvaluation: (() => void) | null = null;
+    let notifyFirstEvaluationStarted: (() => void) | null = null;
+    const firstEvaluationStarted = new Promise<void>((resolve) => {
+      notifyFirstEvaluationStarted = resolve;
+    });
+    const firstEvaluationGate = new Promise<void>((resolve) => {
+      releaseFirstEvaluation = resolve;
+    });
+    let evaluationCount = 0;
+    const evaluateContent = vi.fn(async () => {
+      evaluationCount += 1;
+
+      if (evaluationCount === 1) {
+        notifyFirstEvaluationStarted?.();
+        await firstEvaluationGate;
+      }
+
+      return {
+      evaluations: [
+        {
+          scope: "base" as const,
+          decision: "boost" as const,
+          strengthLevel: "low" as const,
+          matchedKeywords: ["content"],
+          reason: "命中基础规则"
+        },
+        {
+          scope: "ai_hot" as const,
+          decision: "neutral" as const,
+          strengthLevel: null,
+          matchedKeywords: [],
+          reason: null
+        },
+        {
+          scope: "ai_new" as const,
+          decision: "neutral" as const,
+          strengthLevel: null,
+          matchedKeywords: [],
+          reason: null
+        }
+      ]
+      };
+    });
+
+    const runningTask = runNlEvaluationCycle(
+      handle.db,
+      {
+        mode: "full-recompute"
+      },
+      {
+        resolveProvider: async () => ({
+          ok: true,
+          provider: {
+            providerKind: "deepseek",
+            modelName: "deepseek-chat",
+            evaluateContent
+          }
+        }),
+        now: () => new Date("2026-03-31T12:30:00.000Z"),
+        shouldStop: () => stopRequested
+      }
+    );
+
+    await firstEvaluationStarted;
+    stopRequested = true;
+    releaseFirstEvaluation?.();
+
+    await expect(runningTask).resolves.toEqual({
+      runId: expect.any(Number),
+      status: "cancelled",
+      itemCount: 3,
+      successCount: 1,
+      failureCount: 0
+    });
+    expect(evaluateContent).toHaveBeenCalledTimes(1);
+    expect(listNlEvaluationRuns(handle.db)[0]).toMatchObject({
+      status: "cancelled",
+      itemCount: 3,
+      successCount: 1,
+      failureCount: 0
+    });
+    expect(listNlEvaluationRuns(handle.db)[0]?.notes).toContain("cancelled-by-user");
+  });
 });

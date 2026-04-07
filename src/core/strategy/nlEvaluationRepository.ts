@@ -38,6 +38,9 @@ export type CreateNlEvaluationRunInput = {
   status: string;
   providerKind?: LlmProviderKind | null;
   startedAt: string;
+  itemCount?: number;
+  successCount?: number;
+  failureCount?: number;
 };
 
 export type FinishNlEvaluationRunInput = {
@@ -48,6 +51,12 @@ export type FinishNlEvaluationRunInput = {
   successCount: number;
   failureCount: number;
   notes?: string | null;
+};
+
+export type UpdateNlEvaluationRunProgressInput = {
+  id: number;
+  successCount: number;
+  failureCount: number;
 };
 
 export type NlEvaluationRunRecord = {
@@ -185,14 +194,38 @@ export function createNlEvaluationRun(db: SqliteDatabase, input: CreateNlEvaluat
           run_type,
           status,
           provider_kind,
-          started_at
+          started_at,
+          item_count,
+          success_count,
+          failure_count
         )
-        VALUES (?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `
     )
-    .run(input.runType, input.status, input.providerKind ?? null, input.startedAt);
+    .run(
+      input.runType,
+      input.status,
+      input.providerKind ?? null,
+      input.startedAt,
+      input.itemCount ?? 0,
+      input.successCount ?? 0,
+      input.failureCount ?? 0
+    );
 
   return Number(result.lastInsertRowid);
+}
+
+export function updateNlEvaluationRunProgress(db: SqliteDatabase, input: UpdateNlEvaluationRunProgressInput): void {
+  // Progress is updated independently from the final status so the UI can estimate remaining time
+  // before the long-running recompute writes its finished marker.
+  db.prepare(
+    `
+      UPDATE nl_evaluation_runs
+      SET success_count = ?,
+          failure_count = ?
+      WHERE id = ?
+    `
+  ).run(input.successCount, input.failureCount, input.id);
 }
 
 export function finishNlEvaluationRun(db: SqliteDatabase, input: FinishNlEvaluationRunInput): void {

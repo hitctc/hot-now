@@ -1,11 +1,12 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 5;
+const schemaVersion = 6;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
 const sourceDisplayModeMigrationName = "004_source_display_mode";
 const nlRuleEnabledFlagMigrationName = "005_nl_rule_enabled_flag";
+const providerSettingsMultiSaveMigrationName = "006_provider_settings_multi_save";
 
 const migrationStatements = [
   `
@@ -161,11 +162,10 @@ const feedbackAndLlmWorkbenchStatements = [
   `,
   `
     CREATE TABLE IF NOT EXISTS llm_provider_settings (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      provider_kind TEXT NOT NULL,
+      provider_kind TEXT PRIMARY KEY,
       encrypted_api_key TEXT NOT NULL,
       api_key_last4 TEXT NOT NULL,
-      is_enabled INTEGER NOT NULL DEFAULT 1,
+      is_enabled INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
@@ -281,6 +281,54 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(5, nlRuleEnabledFlagMigrationName);
+
+    // LLM 厂商配置现在要支持“分别保存 + 独立启用”，所以旧的单行表需要就地转成按厂商存储。
+    if (hasColumn(db, "llm_provider_settings", "id")) {
+      db.exec("ALTER TABLE llm_provider_settings RENAME TO llm_provider_settings_legacy");
+      db.exec(`
+        CREATE TABLE llm_provider_settings (
+          provider_kind TEXT PRIMARY KEY,
+          encrypted_api_key TEXT NOT NULL,
+          api_key_last4 TEXT NOT NULL,
+          is_enabled INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      db.exec(`
+        INSERT INTO llm_provider_settings (
+          provider_kind,
+          encrypted_api_key,
+          api_key_last4,
+          is_enabled,
+          created_at,
+          updated_at
+        )
+        SELECT
+          provider_kind,
+          encrypted_api_key,
+          api_key_last4,
+          is_enabled,
+          created_at,
+          updated_at
+        FROM llm_provider_settings_legacy
+      `);
+      db.exec("DROP TABLE llm_provider_settings_legacy");
+    }
+
+    db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_llm_provider_settings_single_enabled
+      ON llm_provider_settings(is_enabled)
+      WHERE is_enabled = 1
+    `);
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(6, providerSettingsMultiSaveMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

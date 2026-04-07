@@ -23,12 +23,20 @@ function createAuthenticatedServer() {
       })
     },
     getViewRulesWorkbenchData: vi.fn().mockResolvedValue({
-      providerSettings: {
-        providerKind: "deepseek",
-        apiKeyLast4: "1234",
-        isEnabled: true,
-        updatedAt: "2026-03-31T09:00:00.000Z"
-      },
+      providerSettings: [
+        {
+          providerKind: "deepseek",
+          apiKeyLast4: "1234",
+          isEnabled: true,
+          updatedAt: "2026-03-31T09:00:00.000Z"
+        },
+        {
+          providerKind: "minimax",
+          apiKeyLast4: "5678",
+          isEnabled: false,
+          updatedAt: "2026-03-31T08:30:00.000Z"
+        }
+      ],
       providerCapability: {
         hasMasterKey: true,
         featureAvailable: true,
@@ -42,7 +50,8 @@ function createAuthenticatedServer() {
       feedbackPool: [],
       strategyDrafts: [],
       latestEvaluationRun: null,
-      isEvaluationRunning: false
+      isEvaluationRunning: false,
+      isEvaluationStopRequested: false
     }),
     listSources: vi.fn().mockResolvedValue([
       {
@@ -94,10 +103,18 @@ describe("settings api routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
-      providerSettings: {
-        providerKind: "deepseek",
-        apiKeyLast4: "1234"
-      },
+      providerSettings: [
+        {
+          providerKind: "deepseek",
+          apiKeyLast4: "1234",
+          isEnabled: true
+        },
+        {
+          providerKind: "minimax",
+          apiKeyLast4: "5678",
+          isEnabled: false
+        }
+      ],
       providerCapability: {
         hasMasterKey: true,
         featureAvailable: true

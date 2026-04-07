@@ -243,17 +243,55 @@ describe("system routes", () => {
       url: "/actions/view-rules/provider-settings",
       payload: {
         providerKind: "deepseek",
-        apiKey: "sk-live-secret-1234",
-        isEnabled: true
+        apiKey: "sk-live-secret-1234"
       }
     });
 
     expect(response.statusCode).toBe(200);
     expect(saveProviderSettings).toHaveBeenCalledWith({
       providerKind: "deepseek",
-      apiKey: "sk-live-secret-1234",
-      isEnabled: true
+      apiKey: "sk-live-secret-1234"
     });
+  });
+
+  it("calls updateProviderSettingsActivation to enable a saved provider", async () => {
+    const updateProviderSettingsActivation = vi.fn().mockResolvedValue({ ok: true });
+    const app = createSystemTestServer({
+      updateProviderSettingsActivation
+    } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/view-rules/provider-settings/activation",
+      payload: {
+        providerKind: "minimax",
+        enable: true
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(updateProviderSettingsActivation).toHaveBeenCalledWith({
+      providerKind: "minimax",
+      enable: true
+    });
+  });
+
+  it("calls deleteProviderSettings with the selected provider kind", async () => {
+    const deleteProviderSettings = vi.fn().mockResolvedValue(true);
+    const app = createSystemTestServer({
+      deleteProviderSettings
+    } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/view-rules/provider-settings/delete",
+      payload: {
+        providerKind: "deepseek"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(deleteProviderSettings).toHaveBeenCalledWith("deepseek");
   });
 
   it("calls saveNlRules and returns the recompute result", async () => {
@@ -298,6 +336,31 @@ describe("system routes", () => {
         successCount: 10,
         failureCount: 0
       }
+    });
+  });
+
+  it("calls cancelNlEvaluation and returns the accepted state", async () => {
+    const cancelNlEvaluation = vi.fn().mockResolvedValue({
+      ok: true,
+      accepted: true,
+      status: "cancelling"
+    });
+    const app = createSystemTestServer({
+      cancelNlEvaluation
+    } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/view-rules/nl-rules/cancel",
+      payload: {}
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(cancelNlEvaluation).toHaveBeenCalledTimes(1);
+    expect(response.json()).toEqual({
+      ok: true,
+      accepted: true,
+      status: "cancelling"
     });
   });
 

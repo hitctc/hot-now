@@ -65,7 +65,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(5);
+    expect(schemaVersion).toBe(6);
 
     const appliedMigrations = db
       .prepare(
@@ -82,7 +82,8 @@ describe("runMigrations", () => {
       { version: 2, name: "002_digest_report_mail_attempts" },
       { version: 3, name: "003_feedback_and_llm_strategy_workbench" },
       { version: 4, name: "004_source_display_mode" },
-      { version: 5, name: "005_nl_rule_enabled_flag" }
+      { version: 5, name: "005_nl_rule_enabled_flag" },
+      { version: 6, name: "006_provider_settings_multi_save" }
     ]);
 
     const digestReportColumns = db
@@ -104,6 +105,17 @@ describe("runMigrations", () => {
       .all() as Array<{ name: string }>;
 
     expect(sourceColumns.map((column) => column.name)).toContain("show_all_when_selected");
+
+    const providerSettingsColumns = db
+      .prepare(
+        `
+          PRAGMA table_info(llm_provider_settings)
+        `
+      )
+      .all() as Array<{ name: string }>;
+
+    expect(providerSettingsColumns.map((column) => column.name)).not.toContain("id");
+    expect(providerSettingsColumns.map((column) => column.name)).toContain("provider_kind");
 
     const sourceRows = db
       .prepare(

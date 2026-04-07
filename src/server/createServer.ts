@@ -6,7 +6,12 @@ import type { BuildContentPageModelOptions } from "../core/content/buildContentP
 import type { ContentSortMode, ContentViewSelectionOptions } from "../core/content/buildContentViewSelection.js";
 import type { ContentCardView, ContentViewKey } from "../core/content/listContentView.js";
 import type { SaveFeedbackPoolEntryInput, SaveFeedbackPoolEntryResult } from "../core/feedback/feedbackPoolRepository.js";
-import type { SaveProviderSettingsInput, SaveProviderSettingsResult } from "../core/llm/providerSettingsRepository.js";
+import type {
+  SaveProviderSettingsInput,
+  SaveProviderSettingsResult,
+  UpdateProviderSettingsActivationInput,
+  UpdateProviderSettingsActivationResult
+} from "../core/llm/providerSettingsRepository.js";
 import type { RatingDimension, SaveRatingsResult } from "../core/ratings/ratingRepository.js";
 import type { ContentSourceOption } from "../core/source/listContentSources.js";
 import type { NlRuleScope } from "../core/strategy/nlRuleRepository.js";
@@ -79,6 +84,7 @@ type ManualSendLatestEmailResult =
   | { accepted: true; action: "send-latest-email" }
   | { accepted: false; reason: LatestReportEmailErrorReason };
 type SaveNlRulesResult = { ok: true; run: RunNlEvaluationCycleResult } | { ok: false; reason: string };
+type CancelNlEvaluationResult = { ok: true; accepted: boolean; status: "idle" | "cancelling" };
 type CreateDraftFromFeedbackResult = { ok: true; draftId: number } | { ok: false; reason: "not-found" };
 type DeleteFeedbackResult = boolean;
 type ClearFeedbackResult = number;
@@ -128,10 +134,14 @@ type ServerDeps = {
   saveRatings?: (contentItemId: number, scores: Record<string, number>) => Promise<SaveRatingsResult> | SaveRatingsResult;
   getViewRulesWorkbenchData?: () => Promise<ViewRulesWorkbenchView> | ViewRulesWorkbenchView;
   saveProviderSettings?: (input: SaveProviderSettingsInput) => Promise<SaveProviderSettingsResult> | SaveProviderSettingsResult;
-  deleteProviderSettings?: () => Promise<boolean> | boolean;
+  updateProviderSettingsActivation?: (
+    input: UpdateProviderSettingsActivationInput
+  ) => Promise<UpdateProviderSettingsActivationResult> | UpdateProviderSettingsActivationResult;
+  deleteProviderSettings?: (providerKind: string) => Promise<boolean> | boolean;
   saveNlRules?: (
     rules: Record<NlRuleScope, { enabled: boolean; ruleText: string }>
   ) => Promise<SaveNlRulesResult> | SaveNlRulesResult;
+  cancelNlEvaluation?: () => Promise<CancelNlEvaluationResult> | CancelNlEvaluationResult;
   createDraftFromFeedback?: (feedbackId: number) => Promise<CreateDraftFromFeedbackResult> | CreateDraftFromFeedbackResult;
   deleteFeedbackEntry?: (feedbackId: number) => Promise<DeleteFeedbackResult> | DeleteFeedbackResult;
   clearAllFeedback?: () => Promise<ClearFeedbackResult> | ClearFeedbackResult;
@@ -572,7 +582,6 @@ export function createServer(deps: ServerDeps = {}) {
     const body = request.body as Record<string, unknown> | undefined;
     const providerKind = typeof body?.providerKind === "string" ? body.providerKind.trim() : "";
     const apiKey = typeof body?.apiKey === "string" ? body.apiKey.trim() : "";
-    const isEnabled = typeof body?.isEnabled === "boolean" ? body.isEnabled : true;
 
     if (!isProviderKind(providerKind) || !apiKey) {
       return reply.code(400).send({ ok: false, reason: "invalid-provider-settings" });
@@ -580,8 +589,7 @@ export function createServer(deps: ServerDeps = {}) {
 
     const result = await deps.saveProviderSettings({
       providerKind,
-      apiKey,
-      isEnabled
+      apiKey
     });
 
     if (!result.ok && result.reason === "master-key-required") {
@@ -589,6 +597,35 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     return reply.send({ ok: true, providerKind });
+  });
+
+  app.post("/actions/view-rules/provider-settings/activation", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.updateProviderSettingsActivation) {
+      return reply.code(503).send({ ok: false, reason: "provider-settings-disabled" });
+    }
+
+    const body = request.body as Record<string, unknown> | undefined;
+    const providerKind = typeof body?.providerKind === "string" ? body.providerKind.trim() : "";
+    const enable = typeof body?.enable === "boolean" ? body.enable : null;
+
+    if (!isProviderKind(providerKind) || enable === null) {
+      return reply.code(400).send({ ok: false, reason: "invalid-provider-activation" });
+    }
+
+    const result = await deps.updateProviderSettingsActivation({
+      providerKind,
+      enable
+    });
+
+    if (!result.ok && result.reason === "not-found") {
+      return reply.code(409).send({ ok: false, reason: "provider-settings-not-found" });
+    }
+
+    return reply.send({ ok: true, providerKind, isEnabled: enable });
   });
 
   app.post("/actions/view-rules/provider-settings/delete", async (request, reply) => {
@@ -600,7 +637,14 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.code(503).send({ ok: false, reason: "provider-settings-disabled" });
     }
 
-    await deps.deleteProviderSettings();
+    const body = request.body as Record<string, unknown> | undefined;
+    const providerKind = typeof body?.providerKind === "string" ? body.providerKind.trim() : "";
+
+    if (!isProviderKind(providerKind)) {
+      return reply.code(400).send({ ok: false, reason: "invalid-provider-settings" });
+    }
+
+    await deps.deleteProviderSettings(providerKind);
     return reply.send({ ok: true });
   });
 
@@ -632,6 +676,18 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     return reply.send({ ok: true, run: result.run });
+  });
+
+  app.post("/actions/view-rules/nl-rules/cancel", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.cancelNlEvaluation) {
+      return reply.code(503).send({ ok: false, reason: "nl-rules-disabled" });
+    }
+
+    return reply.send(await deps.cancelNlEvaluation());
   });
 
   app.post("/actions/feedback-pool/:id/create-draft", async (request, reply) => {
@@ -855,7 +911,7 @@ async function readSettingsViewRulesApiData(deps: ServerDeps): Promise<ViewRules
 
   if (!workbench) {
     return {
-      providerSettings: null,
+      providerSettings: [],
       providerCapability: {
         hasMasterKey: false,
         featureAvailable: false,
@@ -865,7 +921,8 @@ async function readSettingsViewRulesApiData(deps: ServerDeps): Promise<ViewRules
       feedbackPool: [],
       strategyDrafts: [],
       latestEvaluationRun: null,
-      isEvaluationRunning: false
+      isEvaluationRunning: false,
+      isEvaluationStopRequested: false
     };
   }
 

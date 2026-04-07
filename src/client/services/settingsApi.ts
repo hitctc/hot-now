@@ -79,13 +79,14 @@ export type SettingsNlEvaluationRun = {
 };
 
 export type SettingsViewRulesResponse = {
-  providerSettings: SettingsProviderSettingsSummary | null;
+  providerSettings: SettingsProviderSettingsSummary[];
   providerCapability: SettingsProviderCapability;
   nlRules: SettingsNlRuleItem[];
   feedbackPool: SettingsFeedbackPoolItem[];
   strategyDrafts: SettingsStrategyDraftItem[];
   latestEvaluationRun: SettingsNlEvaluationRun | null;
   isEvaluationRunning: boolean;
+  isEvaluationStopRequested: boolean;
 };
 export type SettingsSourceItem = {
   kind: string;
@@ -121,12 +122,22 @@ export type SettingsSourcesResponse = {
 export type SaveProviderSettingsPayload = {
   providerKind: SettingsProviderKind | string;
   apiKey: string;
-  isEnabled: boolean;
 };
 
 export type SaveProviderSettingsResponse = {
   ok: true;
   providerKind: string;
+};
+
+export type UpdateProviderSettingsActivationPayload = {
+  providerKind: SettingsProviderKind | string;
+  enable: boolean;
+};
+
+export type UpdateProviderSettingsActivationResponse = {
+  ok: true;
+  providerKind: string;
+  isEnabled: boolean;
 };
 
 export type SaveNlRuleGatePayload = {
@@ -144,6 +155,12 @@ export type SaveNlRulesResponse = {
     successCount?: number;
     failureCount?: number;
   };
+};
+
+export type CancelNlEvaluationResponse = {
+  ok: true;
+  accepted: boolean;
+  status: "idle" | "cancelling";
 };
 
 export type CreateDraftFromFeedbackResponse = {
@@ -235,21 +252,36 @@ function postSettingsAction<T>(url: string, body: unknown): Promise<T> {
   });
 }
 
-// 厂商设置保存保持单活语义，新的 API key 会覆盖当前配置。
+// 厂商设置保存现在只更新当前厂商的 API key，不再顺手切换启用状态。
 export function saveProviderSettings(
   payload: SaveProviderSettingsPayload
 ): Promise<SaveProviderSettingsResponse> {
   return postSettingsAction<SaveProviderSettingsResponse>("/actions/view-rules/provider-settings", payload);
 }
 
-// 删除当前厂商配置后，工作台会回到“未配置”状态。
-export function deleteProviderSettings(): Promise<{ ok: true }> {
-  return postSettingsAction<{ ok: true }>("/actions/view-rules/provider-settings/delete", {});
+// 启用动作单独拆开，避免“更新 key”与“切换当前启用厂商”耦在一起。
+export function updateProviderSettingsActivation(
+  payload: UpdateProviderSettingsActivationPayload
+): Promise<UpdateProviderSettingsActivationResponse> {
+  return postSettingsAction<UpdateProviderSettingsActivationResponse>(
+    "/actions/view-rules/provider-settings/activation",
+    payload
+  );
+}
+
+// 删除动作需要带上当前选中的厂商，避免多厂商模式下误删其他配置。
+export function deleteProviderSettings(providerKind: SettingsProviderKind | string): Promise<{ ok: true }> {
+  return postSettingsAction<{ ok: true }>("/actions/view-rules/provider-settings/delete", { providerKind });
 }
 
 // 正式自然语言策略保存后，后端会按当前配置尝试触发一次重算。
 export function saveNlRules(rules: SaveNlRulesPayload): Promise<SaveNlRulesResponse> {
   return postSettingsAction<SaveNlRulesResponse>("/actions/view-rules/nl-rules", { rules });
+}
+
+// 中断请求采用协作式停止：当前项跑完后就不会继续评估后续内容。
+export function cancelNlEvaluation(): Promise<CancelNlEvaluationResponse> {
+  return postSettingsAction<CancelNlEvaluationResponse>("/actions/view-rules/nl-rules/cancel", {});
 }
 
 // 反馈转草稿沿用现有单条动作接口，成功后刷新整个工作台。

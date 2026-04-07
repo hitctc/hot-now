@@ -1,5 +1,10 @@
 import { resolveNlScoreDelta } from "./nlDecision.js";
-import { saveNlEvaluations, createNlEvaluationRun, finishNlEvaluationRun } from "./nlEvaluationRepository.js";
+import {
+  saveNlEvaluations,
+  createNlEvaluationRun,
+  finishNlEvaluationRun,
+  updateNlEvaluationRunProgress
+} from "./nlEvaluationRepository.js";
 import { listNlRuleSets, type NlRuleScope } from "./nlRuleRepository.js";
 import type { SqliteDatabase } from "../db/openDatabase.js";
 import type { ResolveLlmProviderResult } from "../llm/createLlmProvider.js";
@@ -15,11 +20,12 @@ export type RunNlEvaluationCycleInput = {
 export type RunNlEvaluationCycleDeps = {
   resolveProvider?: () => Promise<ResolveLlmProviderResult> | ResolveLlmProviderResult;
   now?: () => Date;
+  shouldStop?: () => boolean;
 };
 
 export type RunNlEvaluationCycleResult = {
   runId: number;
-  status: "completed" | "failed" | "skipped";
+  status: "running" | "completed" | "failed" | "skipped" | "cancelled";
   itemCount: number;
   successCount: number;
   failureCount: number;
@@ -37,6 +43,7 @@ export async function runNlEvaluationCycle(
   const ruleSets = readRuleSetMap(db);
   const startedAt = now().toISOString();
   const resolveProvider = deps.resolveProvider ?? (async () => ({ ok: false, reason: "missing-provider-settings" as const }));
+  const shouldStop = deps.shouldStop ?? (() => false);
 
   if (candidates.length === 0) {
     const runId = createNlEvaluationRun(db, {
@@ -125,13 +132,25 @@ export async function runNlEvaluationCycle(
     runType: input.mode,
     status: "running",
     providerKind: resolvedProvider.provider.providerKind,
-    startedAt
+    startedAt,
+    itemCount: candidates.length,
+    successCount: 0,
+    failureCount: 0
   });
   const errors: string[] = [];
   let successCount = 0;
   let failureCount = 0;
+  let cancelled = false;
 
   for (const candidate of candidates) {
+    // User-triggered cancellation is checked between content items so already-finished evaluations stay effective
+    // and the current provider request does not need cross-vendor abort support.
+    if (shouldStop()) {
+      cancelled = true;
+      errors.push("cancelled-by-user");
+      break;
+    }
+
     try {
       const evaluationResult = await resolvedProvider.provider.evaluateContent({
         content: candidate,
@@ -161,10 +180,18 @@ export async function runNlEvaluationCycle(
     } catch (error) {
       failureCount += 1;
       errors.push(`${candidate.id}: ${error instanceof Error ? error.message : "unknown error"}`);
+    } finally {
+      // Progress is written after every candidate so the settings page can show processed count
+      // and remaining-time estimates while a full recompute is still ongoing.
+      updateNlEvaluationRunProgress(db, {
+        id: runId,
+        successCount,
+        failureCount
+      });
     }
   }
 
-  const status = successCount === 0 && failureCount > 0 ? "failed" : "completed";
+  const status = cancelled ? "cancelled" : successCount === 0 && failureCount > 0 ? "failed" : "completed";
   const finishedAt = now().toISOString();
 
   finishNlEvaluationRun(db, {

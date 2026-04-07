@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { message } from "ant-design-vue";
+import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 
 import EditorialEmptyState from "../../components/content/EditorialEmptyState.vue";
 import {
@@ -12,6 +13,7 @@ import {
 } from "../../components/content/contentCardShared";
 import { HttpError } from "../../services/http";
 import {
+  cancelNlEvaluation,
   clearFeedbackPool,
   createDraftFromFeedback,
   deleteFeedbackEntry,
@@ -21,8 +23,10 @@ import {
   saveNlRules,
   saveProviderSettings,
   saveStrategyDraft,
+  updateProviderSettingsActivation,
   type SaveNlRulesResponse,
   type SettingsFeedbackPoolItem,
+  type SettingsProviderSettingsSummary,
   type SettingsProviderKind,
   type SettingsStrategyGateScope,
   type SettingsStrategyDraftItem,
@@ -46,6 +50,7 @@ const providerKindOptions = [
   { label: "MiniMax", value: "minimax" },
   { label: "Kimi", value: "kimi" }
 ] as const;
+const RUN_STATUS_REFRESH_INTERVAL_MS = 15_000;
 const draftScopeOptions = [
   { label: "未指定", value: "unspecified" },
   { label: "基础入池门", value: "base" },
@@ -64,12 +69,12 @@ const isRefreshing = ref(false);
 const loadError = ref<string | null>(null);
 const pageNotice = ref<PageNotice | null>(null);
 const workbench = ref<SettingsViewRulesResponse | null>(null);
+const nowTimestamp = ref(Date.now());
 const pendingActions = reactive<Record<string, boolean>>({});
 const draftForms = ref<Record<number, EditableDraftForm>>({});
 const providerForm = reactive({
   providerKind: "deepseek" as SettingsProviderKind | string,
-  apiKey: "",
-  isEnabled: true
+  apiKey: ""
 });
 const nlRuleForm = reactive<Record<SettingsStrategyGateScope, EditableNlRuleGate>>({
   base: { enabled: true, ruleText: "" },
@@ -93,24 +98,256 @@ const providerCapabilityTone = computed<AlertTone>(() => {
   return "info";
 });
 
+const enabledProviderSettings = computed(() =>
+  (workbench.value?.providerSettings ?? []).find((settings) => settings.isEnabled) ?? null
+);
+
+const selectedProviderSettings = computed(() => {
+  const selectedProviderKind = providerForm.providerKind.trim() as SettingsProviderKind;
+  return (workbench.value?.providerSettings ?? []).find((settings) => settings.providerKind === selectedProviderKind) ?? null;
+});
+
+const selectedProviderStatus = computed(() => {
+  const selectedProviderKind = providerForm.providerKind.trim() as SettingsProviderKind;
+  const selectedProviderLabel = formatProviderLabel(selectedProviderKind);
+  const statusLabel = readProviderStatusLabel(selectedProviderSettings.value);
+  const enabledProviderLabel = formatProviderLabel(enabledProviderSettings.value?.providerKind);
+
+  const message =
+    statusLabel === "已配置并启用"
+      ? `${selectedProviderLabel} 当前已配置并启用。`
+      : statusLabel === "已保存未启用"
+        ? `${selectedProviderLabel} 当前已保存，但还未启用。`
+        : enabledProviderSettings.value
+          ? `${selectedProviderLabel} 当前未配置；先保存 API Key，之后再单独启用。当前启用厂商是 ${enabledProviderLabel}。`
+          : `${selectedProviderLabel} 当前未配置；先保存 API Key，之后再单独启用。`;
+
+  return {
+    label: selectedProviderLabel,
+    statusLabel,
+    message,
+    tone:
+      statusLabel === "已配置并启用"
+        ? "success"
+        : statusLabel === "已保存未启用"
+          ? "warning"
+          : "info"
+  } as const;
+});
+
 const feedbackCopyText = computed(() =>
   (workbench.value?.feedbackPool ?? []).map((entry) => buildFeedbackCopyText(entry)).join("\n\n---\n\n")
 );
-const latestRunSummary = computed(() => {
+let runStatusRefreshTimer: number | null = null;
+
+const latestRunInsight = computed(() => {
   const latestRun = workbench.value?.latestEvaluationRun;
 
   if (!latestRun) {
+    return null;
+  }
+
+  const processedCount = latestRun.successCount + latestRun.failureCount;
+  const startedAtMs = Date.parse(latestRun.startedAt);
+  const elapsedMs = Number.isNaN(startedAtMs) ? null : Math.max(0, nowTimestamp.value - startedAtMs);
+  const isStaleRunning = latestRun.status === "running" && !workbench.value?.isEvaluationRunning;
+  const remainingCount = Math.max(0, latestRun.itemCount - processedCount);
+  const remainingMs =
+    elapsedMs !== null && latestRun.itemCount > 0 && processedCount > 0 && remainingCount > 0
+      ? Math.round((elapsedMs / processedCount) * remainingCount)
+      : null;
+
+  return {
+    processedCount,
+    elapsedMs,
+    remainingMs,
+    isStaleRunning
+  };
+});
+
+const latestRunSummary = computed(() => {
+  const latestRun = workbench.value?.latestEvaluationRun;
+  const insight = latestRunInsight.value;
+  const isStopRequested = workbench.value?.isEvaluationRunning && workbench.value?.isEvaluationStopRequested;
+
+  if (!latestRun || !insight) {
     return "暂无重算记录";
   }
 
-  return `${formatProviderLabel(latestRun.providerKind)} · ${latestRun.status} · ${formatDateTime(
+  const runStatusLabel = isStopRequested ? "正在停止" : formatRunStatusLabel(latestRun.status, insight.isStaleRunning);
+
+  return `${formatProviderLabel(latestRun.providerKind)} · ${runStatusLabel} · ${formatDateTime(
     latestRun.finishedAt ?? latestRun.startedAt
   )}`;
 });
 
-// 页面级提示统一收口在这里，避免每个卡片都再维护一套重复的状态文案。
-function showNotice(tone: AlertTone, message: string): void {
-  pageNotice.value = { tone, message };
+const runStatusTagLabel = computed(() => {
+  const insight = latestRunInsight.value;
+  const latestRun = workbench.value?.latestEvaluationRun;
+  const isStopRequested = workbench.value?.isEvaluationRunning && workbench.value?.isEvaluationStopRequested;
+
+  if (isStopRequested) {
+    return "正在停止";
+  }
+
+  if (workbench.value?.isEvaluationRunning) {
+    return "重算进行中";
+  }
+
+  if (latestRun?.status === "cancelled") {
+    return "已中断";
+  }
+
+  if (insight?.isStaleRunning) {
+    return "上次重算中断";
+  }
+
+  return "等待下一次重算";
+});
+
+const runStatusTagTone = computed(() => {
+  const insight = latestRunInsight.value;
+  const latestRun = workbench.value?.latestEvaluationRun;
+  const isStopRequested = workbench.value?.isEvaluationRunning && workbench.value?.isEvaluationStopRequested;
+
+  if (isStopRequested) {
+    return "interrupted";
+  }
+
+  if (workbench.value?.isEvaluationRunning) {
+    return "running";
+  }
+
+  if (latestRun?.status === "cancelled") {
+    return "interrupted";
+  }
+
+  if (insight?.isStaleRunning) {
+    return "interrupted";
+  }
+
+  return "idle";
+});
+
+const runStatusOverviewText = computed(() => {
+  const insight = latestRunInsight.value;
+  const latestRun = workbench.value?.latestEvaluationRun;
+  const isStopRequested = workbench.value?.isEvaluationRunning && workbench.value?.isEvaluationStopRequested;
+
+  if (isStopRequested) {
+    return "停止中";
+  }
+
+  if (workbench.value?.isEvaluationRunning) {
+    return "进行中";
+  }
+
+  if (latestRun?.status === "cancelled") {
+    return "已中断";
+  }
+
+  if (insight?.isStaleRunning) {
+    return "中断";
+  }
+
+  return "空闲";
+});
+
+const latestRunDetailTone = computed<AlertTone>(() => {
+  if (workbench.value?.isEvaluationRunning && workbench.value?.isEvaluationStopRequested) {
+    return "warning";
+  }
+
+  if (workbench.value?.isEvaluationRunning) {
+    return "info";
+  }
+
+  if (workbench.value?.latestEvaluationRun?.status === "cancelled") {
+    return "warning";
+  }
+
+  if (latestRunInsight.value?.isStaleRunning) {
+    return "warning";
+  }
+
+  if (workbench.value?.latestEvaluationRun?.status === "failed") {
+    return "error";
+  }
+
+  return "success";
+});
+
+const latestRunDetailText = computed(() => {
+  const latestRun = workbench.value?.latestEvaluationRun;
+  const insight = latestRunInsight.value;
+
+  if (!latestRun || !insight) {
+    return "保存后会立即尝试重算当前内容库。";
+  }
+
+  if (workbench.value?.isEvaluationRunning && workbench.value?.isEvaluationStopRequested) {
+    if (insight.processedCount <= 0) {
+      return "已发送中断请求，当前正在处理的第一条内容完成后会停止重算。";
+    }
+
+    return `已发送中断请求，当前正在处理的这一条完成后会停止重算。已处理 ${insight.processedCount} / ${latestRun.itemCount} 条内容，已跑的结果保持生效。`;
+  }
+
+  if (workbench.value?.isEvaluationRunning) {
+    if (insight.processedCount <= 0) {
+      return `已运行 ${formatDurationMs(insight.elapsedMs)}，当前正在建立首批进度，处理完第一条内容后会开始预估剩余时间。`;
+    }
+
+    if (insight.remainingMs !== null) {
+      return `已运行 ${formatDurationMs(insight.elapsedMs)}，已处理 ${insight.processedCount} / ${latestRun.itemCount} 条，预计还需约 ${formatDurationMs(insight.remainingMs)}。`;
+    }
+
+    return `已运行 ${formatDurationMs(insight.elapsedMs)}，已处理 ${insight.processedCount} / ${latestRun.itemCount} 条。`;
+  }
+
+  if (insight.isStaleRunning) {
+    return `上次重算开始于 ${formatDateTime(latestRun.startedAt)}，但当前没有活跃任务，可重新保存正式规则触发一次新的重算。`;
+  }
+
+  if (latestRun.status === "cancelled") {
+    return `上次重算已中断，共处理 ${insight.processedCount} / ${latestRun.itemCount} 条内容；已跑的结果保持生效。`;
+  }
+
+  if (latestRun.status === "completed") {
+    return `上次重算已完成，共处理 ${insight.processedCount} / ${latestRun.itemCount} 条内容。`;
+  }
+
+  if (latestRun.status === "failed") {
+    return `上次重算失败，共处理 ${insight.processedCount} / ${latestRun.itemCount} 条内容。${summarizeRunNotes(latestRun.notes)}`;
+  }
+
+  if (latestRun.status === "skipped") {
+    return `上次重算未执行。${summarizeRunNotes(latestRun.notes)}`;
+  }
+
+  return "保存后会立即尝试重算当前内容库。";
+});
+
+// 页面级提示统一收口在这里，保留页内 Alert 的同时补一层全局 toast，避免操作结果只停留在首屏顶部。
+function showNotice(tone: AlertTone, noticeMessage: string): void {
+  pageNotice.value = { tone, message: noticeMessage };
+
+  if (tone === "success") {
+    void message.success(noticeMessage);
+    return;
+  }
+
+  if (tone === "warning") {
+    void message.warning(noticeMessage);
+    return;
+  }
+
+  if (tone === "error") {
+    void message.error(noticeMessage);
+    return;
+  }
+
+  void message.info(noticeMessage);
 }
 
 // 待处理状态按动作 key 细分，避免不同卡片的 loading 相互影响。
@@ -144,6 +381,69 @@ function formatDateTime(value: string | null | undefined): string {
   }).format(date);
 }
 
+// 重算状态统一转成中文，避免页面里同时出现英文枚举和值得误解的技术状态。
+function formatRunStatusLabel(status: string, isStaleRunning: boolean): string {
+  if (isStaleRunning) {
+    return "已中断";
+  }
+
+  if (status === "cancelled") {
+    return "已中断";
+  }
+
+  if (status === "completed") {
+    return "已完成";
+  }
+
+  if (status === "running") {
+    return "进行中";
+  }
+
+  if (status === "failed") {
+    return "失败";
+  }
+
+  if (status === "skipped") {
+    return "已跳过";
+  }
+
+  return status.trim() || "未知";
+}
+
+// 时长展示按分钟和小时收口，优先给用户直观预估，不暴露毫秒这类技术细节。
+function formatDurationMs(value: number | null): string {
+  if (value === null || !Number.isFinite(value) || value <= 0) {
+    return "不到 1 分钟";
+  }
+
+  const totalMinutes = Math.max(1, Math.round(value / 60_000));
+
+  if (totalMinutes < 60) {
+    return `${totalMinutes} 分钟`;
+  }
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (minutes === 0) {
+    return `${hours} 小时`;
+  }
+
+  return `${hours} 小时 ${minutes} 分钟`;
+}
+
+// 失败或跳过时只展示首条说明，避免把后端聚合的整段 notes 全量塞进 UI。
+function summarizeRunNotes(notes: string | null | undefined): string {
+  const trimmed = notes?.trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  const firstNote = trimmed.split(";")[0]?.trim() || trimmed;
+  return ` 最近说明：${firstNote}`;
+}
+
 // 厂商标识在多个卡片都会复用，这里统一转成人更容易扫读的标签。
 function formatProviderLabel(value: string | null | undefined): string {
   if (value === "deepseek") {
@@ -159,6 +459,15 @@ function formatProviderLabel(value: string | null | undefined): string {
   }
 
   return value?.trim() || "未配置";
+}
+
+// 选择器切换后，页面要立刻告诉用户“这个厂商有没有保存、有没有启用”，所以状态翻译基于当前选中的摘要项。
+function readProviderStatusLabel(currentProviderSettings: SettingsProviderSettingsSummary | null): string {
+  if (!currentProviderSettings) {
+    return "未配置";
+  }
+
+  return currentProviderSettings.isEnabled ? "已配置并启用" : "已保存未启用";
 }
 
 // 服务端错误都从同一个出口翻译，页面只需要补动作级别的兜底文案。
@@ -228,11 +537,21 @@ function parseKeywordInput(rawValue: string): string[] {
     .filter(Boolean);
 }
 
+// 厂商选择器只允许三家固定厂商，刷新后要优先对齐真正启用中的厂商，避免下拉框和系统生效状态脱节。
+function isSupportedProviderKind(value: string): value is SettingsProviderKind {
+  return providerKindOptions.some((option) => option.value === value);
+}
+
 // 每次读到新的工作台数据后，都把页面里的可编辑表单重新同步一遍。
 function syncWorkbenchForms(nextWorkbench: SettingsViewRulesResponse): void {
-  providerForm.providerKind = nextWorkbench.providerSettings?.providerKind ?? "deepseek";
+  const currentProviderKind = providerForm.providerKind.trim();
+  const enabledProviderKind = nextWorkbench.providerSettings.find((settings) => settings.isEnabled)?.providerKind ?? null;
+  const fallbackProviderKind = nextWorkbench.providerSettings[0]?.providerKind ?? "deepseek";
+
+  providerForm.providerKind =
+    enabledProviderKind ??
+    (isSupportedProviderKind(currentProviderKind) ? currentProviderKind : fallbackProviderKind);
   providerForm.apiKey = "";
-  providerForm.isEnabled = nextWorkbench.providerSettings?.isEnabled ?? true;
 
   const ruleByScope = new Map(nextWorkbench.nlRules.map((rule) => [rule.scope, rule]));
   nlRuleForm.base.enabled = ruleByScope.get("base")?.enabled ?? true;
@@ -283,6 +602,7 @@ async function loadWorkbench(options: { silent?: boolean } = {}): Promise<boolea
   try {
     const nextWorkbench = await readSettingsViewRules();
     workbench.value = nextWorkbench;
+    nowTimestamp.value = Date.now();
     syncWorkbenchForms(nextWorkbench);
     loadError.value = null;
     return true;
@@ -302,6 +622,29 @@ async function loadWorkbench(options: { silent?: boolean } = {}): Promise<boolea
     } else {
       isLoading.value = false;
     }
+  }
+}
+
+// 运行中状态需要周期性刷新，才能把已处理数量和剩余时间估算同步到当前页面。
+function refreshRunStatusHeartbeat(): void {
+  nowTimestamp.value = Date.now();
+
+  if (workbench.value?.isEvaluationRunning && !isRefreshing.value) {
+    void loadWorkbench({ silent: true });
+  }
+}
+
+// 心跳定时器和页面生命周期绑定，避免离开页面后继续轮询。
+function startRunStatusHeartbeat(): void {
+  stopRunStatusHeartbeat();
+  runStatusRefreshTimer = window.setInterval(refreshRunStatusHeartbeat, RUN_STATUS_REFRESH_INTERVAL_MS);
+}
+
+// 定时器清理单独抽出来，保证 mounted / unmounted 之间的行为可读且稳定。
+function stopRunStatusHeartbeat(): void {
+  if (runStatusRefreshTimer !== null) {
+    window.clearInterval(runStatusRefreshTimer);
+    runStatusRefreshTimer = null;
   }
 }
 
@@ -353,8 +696,7 @@ async function handleProviderSave(): Promise<void> {
     () =>
       saveProviderSettings({
         providerKind,
-        apiKey,
-        isEnabled: providerForm.isEnabled
+        apiKey
       }),
     {
       fallbackMessage: "厂商配置保存失败，请稍后再试。",
@@ -367,9 +709,45 @@ async function handleProviderSave(): Promise<void> {
   );
 }
 
-// 删除当前厂商配置后，工作台会退回未配置状态并沿用最新后端能力说明。
+// 启用和停用分开后，用户可以先保存多个厂商，再单独切换当前真正生效的厂商。
+async function handleProviderActivation(enable: boolean): Promise<void> {
+  const providerKind = providerForm.providerKind.trim();
+
+  if (!providerKind) {
+    showNotice("error", "请先选择一个厂商。");
+    return;
+  }
+
+  await runWorkbenchAction(
+    `provider:${providerKind}:${enable ? "enable" : "disable"}`,
+    () =>
+      updateProviderSettingsActivation({
+        providerKind,
+        enable
+      }),
+    {
+      fallbackMessage: enable ? "启用厂商失败，请稍后再试。" : "停用厂商失败，请稍后再试。",
+      successMessage: enable
+        ? `${formatProviderLabel(providerKind)} 已启用。`
+        : `${formatProviderLabel(providerKind)} 已停用。`,
+      reasonMessages: {
+        "invalid-provider-activation": "厂商启用状态不合法，请刷新后重试。",
+        "provider-settings-not-found": "请先保存当前厂商的 API Key，再执行启用。"
+      }
+    }
+  );
+}
+
+// 删除动作要显式带上当前选中的厂商，避免多厂商模式下误删其他配置。
 async function handleProviderDelete(): Promise<void> {
-  await runWorkbenchAction("provider:delete", () => deleteProviderSettings(), {
+  const providerKind = providerForm.providerKind.trim();
+
+  if (!providerKind) {
+    showNotice("error", "请先选择一个厂商。");
+    return;
+  }
+
+  await runWorkbenchAction("provider:delete", () => deleteProviderSettings(providerKind), {
     fallbackMessage: "厂商配置删除失败，请稍后再试。",
     successMessage: "厂商配置已删除。"
   });
@@ -394,6 +772,10 @@ async function handleNlRulesSave(): Promise<void> {
           return "正式规则已保存，当前内容库已完成重算。";
         }
 
+        if (runStatus === "running") {
+          return "正式规则已保存，重算已转入后台运行。";
+        }
+
         if (runStatus === "skipped") {
           return "正式规则已保存，但当前未执行自然语言重算。";
         }
@@ -406,6 +788,15 @@ async function handleNlRulesSave(): Promise<void> {
       }
     }
   );
+}
+
+// 中断重算只会阻止后续内容继续评估，当前已经完成的结果和当前项的持久化结果都会继续保留。
+async function handleNlEvaluationCancel(): Promise<void> {
+  await runWorkbenchAction("nl-rules:cancel", () => cancelNlEvaluation(), {
+    fallbackMessage: "中断重算失败，请稍后再试。",
+    successMessage: (result) =>
+      result.accepted ? "已发送中断请求，当前正在处理的这一条完成后会停止重算。" : "当前没有正在运行的重算任务。"
+  });
 }
 
 // 反馈转草稿后直接刷新整页，确保反馈池和草稿池同时拿到新状态。
@@ -510,31 +901,26 @@ function handleDraftApply(draftId: number): void {
 }
 
 onMounted(() => {
+  startRunStatusHeartbeat();
   void loadWorkbench();
+});
+
+onUnmounted(() => {
+  stopRunStatusHeartbeat();
 });
 </script>
 
 <template>
   <a-spin :spinning="isRefreshing">
     <div :class="editorialContentPageClass" data-settings-page="view-rules">
-      <section class="flex flex-col gap-2" data-settings-intro="view-rules">
-        <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
-          Strategy Settings
-        </p>
-        <h1 class="m-0 text-2xl font-semibold tracking-[-0.02em] text-editorial-text-main">
-          筛选策略
-        </h1>
-        <p class="m-0 text-sm leading-6 text-editorial-text-body">
-          在同一页维护厂商设置、正式规则、反馈池和草稿池。
-        </p>
-      </section>
-
       <a-alert
         v-if="pageNotice"
+        :class="['editorial-inline-alert', `editorial-inline-alert--${pageNotice.tone}`]"
         :message="pageNotice.message"
         :type="pageNotice.tone"
         show-icon
         closable
+        data-view-rules-page-notice
         @close="pageNotice = null"
       />
 
@@ -565,7 +951,7 @@ onMounted(() => {
           <a-card :class="editorialContentCardClass" size="small">
             <a-statistic
               title="重算状态"
-              :value="workbench.isEvaluationRunning ? '进行中' : '空闲'"
+              :value="runStatusOverviewText"
             />
           </a-card>
         </section>
@@ -579,20 +965,22 @@ onMounted(() => {
           >
               <div class="flex w-full flex-col gap-4">
                 <a-alert
+                  :class="['editorial-inline-alert', `editorial-inline-alert--${providerCapabilityTone}`]"
                   :type="providerCapabilityTone"
                   :message="workbench.providerCapability.message"
                   show-icon
+                  data-view-rules-provider-alert
                 />
 
                 <a-descriptions :column="1" size="small" bordered>
-                  <a-descriptions-item label="当前厂商">
-                    {{ formatProviderLabel(workbench.providerSettings?.providerKind) }}
+                  <a-descriptions-item label="已启用厂商">
+                    {{ formatProviderLabel(enabledProviderSettings?.providerKind) }}
                   </a-descriptions-item>
-                  <a-descriptions-item label="已保存尾号">
-                    {{ workbench.providerSettings?.apiKeyLast4 || "未配置" }}
+                  <a-descriptions-item label="当前厂商尾号">
+                    {{ selectedProviderSettings?.apiKeyLast4 || "未配置" }}
                   </a-descriptions-item>
-                  <a-descriptions-item label="最近更新">
-                    {{ formatDateTime(workbench.providerSettings?.updatedAt) }}
+                  <a-descriptions-item label="当前厂商更新">
+                    {{ formatDateTime(selectedProviderSettings?.updatedAt) }}
                   </a-descriptions-item>
                   <a-descriptions-item label="最近重算">
                     {{ latestRunSummary }}
@@ -608,12 +996,23 @@ onMounted(() => {
                     <a-select
                       v-model:value="providerForm.providerKind"
                       :options="providerKindOptions"
+                      data-provider-kind-select
                     />
+                    <a-alert
+                      :class="['mt-3 editorial-inline-alert', `editorial-inline-alert--${selectedProviderStatus.tone}`]"
+                      :type="selectedProviderStatus.tone"
+                      :message="selectedProviderStatus.message"
+                      show-icon
+                      data-view-rules-selected-provider-status
+                    />
+                    <p class="mb-0 mt-2 text-xs leading-5 text-editorial-text-muted" data-view-rules-provider-status-note>
+                      每个厂商会分别保存 API key；启用动作独立控制，系统同一时间只会启用一个厂商。
+                    </p>
                   </a-form-item>
                   <a-form-item label="API Key">
                     <a-input-password
                       v-model:value="providerForm.apiKey"
-                      placeholder="输入新的 API key 会覆盖当前配置"
+                      placeholder="输入新的 API key 会更新当前厂商配置"
                       data-provider-api-key
                     />
                   </a-form-item>
@@ -626,8 +1025,25 @@ onMounted(() => {
                     >
                       保存厂商设置
                     </a-button>
+                    <a-button
+                      v-if="selectedProviderSettings && !selectedProviderSettings.isEnabled"
+                      data-action="enable-provider-settings"
+                      :loading="isActionPending(`provider:${providerForm.providerKind}:enable`)"
+                      @click="handleProviderActivation(true)"
+                    >
+                      启用当前厂商
+                    </a-button>
+                    <a-button
+                      v-else-if="selectedProviderSettings?.isEnabled"
+                      data-action="disable-provider-settings"
+                      :loading="isActionPending(`provider:${providerForm.providerKind}:disable`)"
+                      @click="handleProviderActivation(false)"
+                    >
+                      停用当前厂商
+                    </a-button>
                     <a-popconfirm
-                      title="确认删除当前厂商配置吗？"
+                      v-if="selectedProviderSettings"
+                      title="确认删除当前选择的厂商配置吗？"
                       ok-text="确认删除"
                       cancel-text="取消"
                       @confirm="handleProviderDelete"
@@ -640,6 +1056,14 @@ onMounted(() => {
                         删除当前厂商配置
                       </a-button>
                     </a-popconfirm>
+                    <a-button
+                      v-else
+                      danger
+                      disabled
+                      data-action="delete-provider-settings"
+                    >
+                      删除当前厂商配置
+                    </a-button>
                   </a-space>
                 </a-form>
               </div>
@@ -652,8 +1076,11 @@ onMounted(() => {
             data-view-rules-section="nl-rules"
           >
             <template #extra>
-              <a-tag :color="workbench.isEvaluationRunning ? 'processing' : 'blue'">
-                {{ workbench.isEvaluationRunning ? "重算进行中" : "等待下一次重算" }}
+              <a-tag
+                :class="['editorial-status-tag', `editorial-status-tag--${runStatusTagTone}`]"
+                data-view-rules-run-status
+              >
+                {{ runStatusTagLabel }}
               </a-tag>
             </template>
 
@@ -663,10 +1090,18 @@ onMounted(() => {
               @submit.prevent="handleNlRulesSave"
             >
               <a-alert
-                class="mb-4"
+                class="editorial-inline-alert editorial-inline-alert--info mb-4"
                 type="info"
                 show-icon
                 message="AI 新讯固定按最近 24 小时窗口构建结果集；AI 热点继续按热点形成逻辑筛选，不会被额外压成 24 小时。"
+                data-view-rules-window-alert
+              />
+              <a-alert
+                :class="['editorial-inline-alert', `editorial-inline-alert--${latestRunDetailTone}`, 'mb-4']"
+                :type="latestRunDetailTone"
+                show-icon
+                :message="latestRunDetailText"
+                data-view-rules-run-detail
               />
               <a-form-item label="基础入池门">
                 <a-switch v-model:checked="nlRuleForm.base.enabled" class="mb-3" />
@@ -700,6 +1135,16 @@ onMounted(() => {
                   :loading="isActionPending('nl-rules:save')"
                 >
                   保存正式规则
+                </a-button>
+                <a-button
+                  v-if="workbench.isEvaluationRunning"
+                  danger
+                  data-action="cancel-nl-evaluation"
+                  :loading="isActionPending('nl-rules:cancel')"
+                  :disabled="workbench.isEvaluationStopRequested"
+                  @click="handleNlEvaluationCancel"
+                >
+                  {{ workbench.isEvaluationStopRequested ? "停止中…" : "中断重算" }}
                 </a-button>
                 <a-typography-text type="secondary">
                   保存后会立即尝试重算当前内容库。

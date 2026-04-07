@@ -189,6 +189,12 @@
       return;
     }
 
+    if (target.dataset.systemAction === "provider-settings-activation") {
+      event.preventDefault();
+      await handleProviderSettingsActivation(target);
+      return;
+    }
+
     if (target.dataset.systemAction === "provider-settings-delete") {
       event.preventDefault();
       await handleProviderSettingsDelete(target);
@@ -401,8 +407,7 @@
 
     const response = await postJson("/actions/view-rules/provider-settings", {
       providerKind,
-      apiKey,
-      isEnabled: true
+      apiKey
     });
 
     if (!response.ok) {
@@ -415,11 +420,19 @@
   }
 
   async function handleProviderSettingsDelete(form) {
+    const formData = new FormData(form);
+    const providerKind = String(formData.get("providerKind") || "").trim();
+
+    if (!providerKind) {
+      showFormStatus(form, "请先选择一个厂商。", "error");
+      return;
+    }
+
     if (!window.confirm("确认删除当前厂商配置吗？")) {
       return;
     }
 
-    const response = await postJson("/actions/view-rules/provider-settings/delete", {});
+    const response = await postJson("/actions/view-rules/provider-settings/delete", { providerKind });
 
     if (!response.ok) {
       showFormStatus(form, await readSystemActionError(response, "厂商配置删除失败，请稍后再试。"), "error");
@@ -427,6 +440,30 @@
     }
 
     showFormStatus(form, "厂商配置已删除。", "success");
+    await refreshCurrentShellPage();
+  }
+
+  async function handleProviderSettingsActivation(form) {
+    const formData = new FormData(form);
+    const providerKind = String(formData.get("providerKind") || "").trim();
+    const enableValue = String(formData.get("enable") || "").trim();
+
+    if (!providerKind || (enableValue !== "true" && enableValue !== "false")) {
+      showFormStatus(form, "请先选择厂商和启用状态。", "error");
+      return;
+    }
+
+    const response = await postJson("/actions/view-rules/provider-settings/activation", {
+      providerKind,
+      enable: enableValue === "true"
+    });
+
+    if (!response.ok) {
+      showFormStatus(form, await readSystemActionError(response, "厂商启用状态更新失败，请稍后再试。"), "error");
+      return;
+    }
+
+    showFormStatus(form, enableValue === "true" ? "厂商已启用。" : "厂商已停用。", "success");
     await refreshCurrentShellPage();
   }
 

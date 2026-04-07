@@ -78,7 +78,7 @@
 - `/`：统一站点 AI 新讯首页（未登录也可访问，等同 `/ai-new`）
 - `/ai-new`：统一站点 AI 新讯页（未登录也可访问）
 - `/ai-hot`：统一站点 AI 热点页（未登录也可访问）
-- `/settings/view-rules`：统一站点筛选策略工作台（登录后，由 `Vue 3 + Ant Design Vue` 驱动，当前只保留 `基础入池门 / AI 新讯入池门 / AI 热点入池门 / 首条精选门` 四道门；每道门维护 `启用开关 + 自然语言规则文本`，并继续收口 LLM 设置、反馈池、草稿池）
+- `/settings/view-rules`：统一站点筛选策略工作台（登录后，由 `Vue 3 + Ant Design Vue` 驱动，当前只保留 `基础入池门 / AI 新讯入池门 / AI 热点入池门 / 首条精选门` 四道门；每道门维护 `启用开关 + 自然语言规则文本`，并继续收口 LLM 设置、反馈池、草稿池；全量重算运行中支持手动中断，已跑完的结果保持生效）
 - `/settings/sources`：统一站点数据迭代收集页（登录后，由 `Vue 3 + Ant Design Vue` 驱动，可启用/停用 source、切换“选中该来源时全量展示”，并分别手动执行采集 / 手动发送最新报告；页面会展示总条数、今天发布、今天抓取，以及 `AI 新讯 / AI 热点` 入池与展示统计）
 - `/settings/profile`：统一站点当前登录用户页（登录后，由 `Vue 3 + Ant Design Vue` 驱动，展示会话状态、账号摘要和联系邮箱）
 - 统一站点左侧导航底部支持深色 / 浅色主题切换，偏好写入浏览器本地 `localStorage` 并在刷新后保持
@@ -101,8 +101,11 @@
 - `POST /actions/send-latest-email`：手动发送最新一份已生成报告
 - `POST /actions/run`：`/actions/collect` 的兼容别名（legacy，当前仍保留）
 - `POST /actions/content/:id/feedback-pool`：保存或覆盖当前内容卡片的反馈池条目
-- `POST /actions/view-rules/provider-settings`、`POST /actions/view-rules/provider-settings/delete`：保存 / 删除单活 LLM 厂商配置
+- `POST /actions/view-rules/provider-settings`：按厂商保存或更新 API key
+- `POST /actions/view-rules/provider-settings/activation`：单独启用 / 停用某个已保存厂商，系统同一时间只保留一个启用厂商
+- `POST /actions/view-rules/provider-settings/delete`：删除指定厂商配置
 - `POST /actions/view-rules/nl-rules`：保存 `base / ai_new / ai_hot / hero` 四道门正式自然语言策略（每道门结构为 `enabled + ruleText`），并立即触发当前内容库全量重算；`hero` 只参与 `/` 与 `/ai-new` 的精选主卡挑选
+- `POST /actions/view-rules/nl-rules/cancel`：对正在运行的全量自然语言重算发送协作式中断请求；当前正在评估的内容会先完成，已跑完的结果继续生效
 - `POST /actions/feedback-pool/:id/create-draft`、`POST /actions/feedback-pool/:id/delete`、`POST /actions/feedback-pool/clear`：反馈池转草稿、删单条、清空全部
 - `POST /actions/strategy-drafts/:id/save`、`POST /actions/strategy-drafts/:id/delete`：草稿池保存与删除
 - 兼容约定：真实应用默认启用 `requireLogin=true` 的 unified shell；auth 开启时内容菜单仍允许匿名查看，但系统菜单、legacy 路由和所有写操作都需要登录；测试或未注入 auth 的场景仍可保持 legacy `/ -> 最新报告` 与 legacy 路由公开行为
@@ -156,7 +159,7 @@ SQLite 可靠性约定：
 1. 准备 `SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_USER`、`SMTP_PASS`、`MAIL_TO`、`BASE_URL`、`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET`；如需让厂商 API key 使用独立加密密钥，再额外准备 `LLM_SETTINGS_MASTER_KEY`
 2. 启动 `npm run dev`
 3. 打开 `/login` 并完成登录
-4. 如需验证自然语言链路，先进入 `/settings/view-rules` 保存厂商设置和正式规则，确认页面出现最新重算结果
+4. 如需验证自然语言链路，先进入 `/settings/view-rules` 为目标厂商保存 API key，再单独启用该厂商并保存正式规则，确认页面出现最新重算结果
 5. 进入 `/settings/sources` 或 legacy `/control`，先手动执行一次采集；需要验证发信时，再单独触发一次“发送最新报告”
 6. 检查是否生成报告目录与 `report.json`、`report.html`、`run-meta.json`
 7. 检查 `/`、`/ai-new`、`/ai-hot`、`/settings/view-rules`、`/settings/sources`、`/history`、`/reports/:date` 是否正常显示，并验证内容页 source 过滤条、共享排序切换、共享标题搜索、内容卡片反馈面板、反馈池、草稿池和正式规则编辑区
@@ -243,13 +246,13 @@ SQLite 可靠性约定：
 - 内容页现在同时支持 `page` query 分页；翻页状态写在 URL 中，不写入 `localStorage`，筛选或排序变化后会自动回到第一页
 - 开启“选中时全量展示”的 source 在内容页首次进入时默认不勾选；只有用户显式勾选后，该 source 才会免受普通 view limit 截断
 - 内容页现在会把当前反馈池条目回填到局部反馈面板，内容交互形成 `补充反馈 -> 反馈池 -> 草稿池 -> 正式自然语言策略 -> 全量 / 增量重算` 的闭环
-- 正式自然语言策略保存后会立即触发当前内容库全量重算；采集链路在落库后会自动触发增量自然语言评估
+- 正式自然语言策略保存后会立即触发当前内容库全量重算；运行中的全量重算支持页面内手动中断，已完成的结果会保留；采集链路在落库后会自动触发增量自然语言评估
 - 内容页现在对本地内容库损坏做了降级兜底：检测到 `SQLITE_CORRUPT` / `SQLITE_NOTADB` 时继续渲染统一站点，并提示修复或重建 `data/hot-now.sqlite`
 - 启动入口现在会对 `data/hot-now.sqlite` 做 SQLite 健康检查；如果主库损坏，会提示最近的 verified snapshot 和 `npm run db:restore -- <snapshot-file>` 恢复命令
 - graceful shutdown 现在会执行真实的 `wal_checkpoint(TRUNCATE)`，减少把 live 库直接当普通文件同步时产生坏快照的风险
 - 已新增 `npm run db:check`、`npm run db:snapshot`、`npm run db:restore -- <snapshot-file>`，并把 verified snapshot 目录收口为 `data/recovery-backups/<timestamp>/`
 - live `data/hot-now.sqlite` 已收口为运行时文件，不再作为常规 git 产物；跨设备和服务器只流转 verified snapshot
-- 自然语言匹配目前走预计算模式，只支持单活厂商；已接入 `DeepSeek`、`MiniMax`、`Kimi`，API key 通过页面录入后会优先使用 `LLM_SETTINGS_MASTER_KEY` 加密落库；未显式配置时回退使用 `SESSION_SECRET`
+- 自然语言匹配目前走预计算模式；已接入 `DeepSeek`、`MiniMax`、`Kimi`，每个厂商会分别保存自己的 API key，但同一时间只允许一个启用厂商；API key 通过页面录入后会优先使用 `LLM_SETTINGS_MASTER_KEY` 加密落库；未显式配置时回退使用 `SESSION_SECRET`
 - 报告层已切到多源语义：`report.json` / `report.html` / 邮件正文会保留 `sourceKinds`、`issueUrls`、失败 source 数量等信息，不再把输出描述成单一日报
 - legacy `/history`、`/reports/:date`、`/control` 与 unified shell 共存，且相关测试和文档已同步
 

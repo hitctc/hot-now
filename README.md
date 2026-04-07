@@ -81,7 +81,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 统一站点保留左侧品牌块、浅深主题切换和本地 `localStorage` 持久化
 - `/settings/*` 现在通过 Fastify 返回统一客户端入口，再由 `Vue 3 + Ant Design Vue` 接管页面渲染
 - `/`、`/ai-new`、`/ai-hot` 现在也通过 Fastify 返回统一客户端入口，再由 `Vue 3 + Ant Design Vue` 内容页读取 `/api/content/ai-new`、`/api/content/ai-hot` 渲染
-- `/settings/view-rules` 已升级为门槛型策略工作台：只保留 `基础入池门 / AI 新讯入池门 / AI 热点入池门 / 首条精选门` 四道门，每道门只维护 `启用开关 + 自然语言规则文本`，并继续收口 LLM 厂商设置、反馈池、草稿池
+- `/settings/view-rules` 已升级为门槛型策略工作台：只保留 `基础入池门 / AI 新讯入池门 / AI 热点入池门 / 首条精选门` 四道门，每道门只维护 `启用开关 + 自然语言规则文本`，并继续收口 LLM 厂商设置、反馈池、草稿池；全量重算运行中可手动中断，已完成的评估结果会继续保留
 - `/settings/sources` 现在会展示即时操作卡、来源统计概览表和 source 库存表，包含总条数、今天发布、今天抓取，以及 `AI 新讯 / AI 热点` 的入池与展示统计
 - `/settings/sources` 现在支持逐 source 配置“选中该来源时全量展示”；开启后，该来源不会在内容页首次默认勾选，只有用户显式勾选后才会按全量模式展示
 - `/settings/profile` 现在会展示会话状态、用户名、角色和联系邮箱，不再停留在占位页
@@ -90,7 +90,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
   - `ai_new`：AI 新讯入池门
   - `ai_hot`：AI 热点入池门
   - `hero`：首条精选门
-  保存后会立即对当前内容库发起一次全量 LLM 重算，日常采集完成后会对新增内容做增量重算；`hero` 只参与 `/` 与 `/ai-new` 的精选主卡挑选
+  保存后会立即对当前内容库发起一次全量 LLM 重算，日常采集完成后会对新增内容做增量重算；运行中的全量重算支持手动中断，已跑完的内容会继续生效；`hero` 只参与 `/` 与 `/ai-new` 的精选主卡挑选
 - 当前支持的 LLM 厂商是 `DeepSeek`、`MiniMax`、`Kimi`；用户在页面里录入 API key，本地只保存加密后的密文；未显式配置 `LLM_SETTINGS_MASTER_KEY` 时，系统会回退使用 `SESSION_SECRET` 作为本地加密 key
 - Legacy 报告页（当前仍保留）：`/history`、`/reports/:date`、`/control`
 - legacy `/history`、`/control` 与 `/reports/:date` 的 fallback notice 轻量跟随共享主题资源
@@ -98,7 +98,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 手动发送最新报告：`POST /actions/send-latest-email`
 - 兼容别名：`POST /actions/run`（等价于手动采集）
 - 内容反馈写入：`POST /actions/content/:id/feedback-pool`
-- LLM / 规则工作台动作：`POST /actions/view-rules/provider-settings`、`POST /actions/view-rules/provider-settings/delete`、`POST /actions/view-rules/nl-rules`
+- LLM / 规则工作台动作：`POST /actions/view-rules/provider-settings`、`POST /actions/view-rules/provider-settings/activation`、`POST /actions/view-rules/provider-settings/delete`、`POST /actions/view-rules/nl-rules`、`POST /actions/view-rules/nl-rules/cancel`
 - 反馈池与草稿池动作：`POST /actions/feedback-pool/:id/create-draft`、`POST /actions/feedback-pool/:id/delete`、`POST /actions/feedback-pool/clear`、`POST /actions/strategy-drafts/:id/save`、`POST /actions/strategy-drafts/:id/delete`
 - 内容导航已收口为 AI-first：`/` 与 `/ai-new` 等同 `AI 新讯`，`/ai-hot` 承接 `AI 热点`，`/articles` 已移除
 
@@ -143,4 +143,4 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 类型构建：已通过
 - 系统页客户端构建：已通过
 - Playwright MCP 本地验收通过：`/login` 登录成功；`/`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常；浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持；内容页来源筛选写入 `localStorage['hot-now-content-sources']`、排序偏好写入 `localStorage['hot-now-content-sort']`、标题搜索词写入 `localStorage['hot-now-content-search']` 后刷新仍保留
-- 如果要手动验证新的自然语言策略链路，直接在 `/settings/view-rules` 保存厂商设置和正式规则即可；如需把厂商配置和会话密钥分开管理，再额外配置 `LLM_SETTINGS_MASTER_KEY`；然后到内容页验证反馈面板、反馈池和草稿池的联动
+- 如果要手动验证新的自然语言策略链路，直接在 `/settings/view-rules` 先为目标厂商保存 API key，再单独启用该厂商并保存正式规则即可；如需把厂商配置和会话密钥分开管理，再额外配置 `LLM_SETTINGS_MASTER_KEY`；然后到内容页验证反馈面板、反馈池和草稿池的联动

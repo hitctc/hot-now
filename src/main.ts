@@ -18,9 +18,11 @@ import { fetchAndExtractArticle } from "./core/fetch/extractArticle.js";
 import { createLlmProvider, type ResolveLlmProviderResult } from "./core/llm/createLlmProvider.js";
 import {
   deleteProviderSettings as removeProviderSettings,
-  getProviderSettingsSummary,
-  readProviderSettings,
-  saveProviderSettings as persistProviderSettings
+  getEnabledProviderSettingsSummary,
+  listProviderSettingsSummaries,
+  readEnabledProviderSettings,
+  saveProviderSettings as persistProviderSettings,
+  updateProviderSettingsActivation as persistProviderSettingsActivation
 } from "./core/llm/providerSettingsRepository.js";
 import { sendDailyEmail } from "./core/mail/sendDailyEmail.js";
 import { LatestReportEmailError, sendLatestReportEmail } from "./core/pipeline/sendLatestReportEmail.js";
@@ -36,7 +38,11 @@ import { readSourcesOperationSummary } from "./core/source/readSourcesOperationS
 import { loadEnabledSourceIssues } from "./core/source/loadEnabledSourceIssues.js";
 import { listNlEvaluationRuns } from "./core/strategy/nlEvaluationRepository.js";
 import { listNlRuleSets, saveNlRuleSet, type NlRuleScope } from "./core/strategy/nlRuleRepository.js";
-import { runNlEvaluationCycle, type RunNlEvaluationCycleInput } from "./core/strategy/runNlEvaluationCycle.js";
+import {
+  runNlEvaluationCycle,
+  type RunNlEvaluationCycleInput,
+  type RunNlEvaluationCycleResult
+} from "./core/strategy/runNlEvaluationCycle.js";
 import {
   createStrategyDraft,
   deleteStrategyDraft,
@@ -82,6 +88,7 @@ seedInitialData(db, {
 });
 const lock = createRunLock();
 const nlEvaluationLock = createRunLock();
+let nlEvaluationStopRequested = false;
 const readAdminProfile = db.prepare(
   `
     SELECT username, password_hash, role, display_name
@@ -247,13 +254,16 @@ function getViewRulesWorkbenchData() {
   const latestEvaluationRun = listNlEvaluationRuns(db)[0] ?? null;
 
   return {
-    providerSettings: getProviderSettingsSummary(db),
+    providerSettings: listProviderSettingsSummaries(db),
     providerCapability: readProviderCapability(),
     nlRules: listNlRuleSets(db),
     feedbackPool: listFeedbackPoolEntries(db),
     strategyDrafts: listStrategyDrafts(db),
     latestEvaluationRun,
-    isEvaluationRunning: nlEvaluationLock.isRunning() || latestEvaluationRun?.status === "running"
+    // Only the in-memory lock can prove a recompute is still alive in this local single-process app.
+    // Database rows that stayed on running after a restart should be treated as stale history, not live work.
+    isEvaluationRunning: nlEvaluationLock.isRunning(),
+    isEvaluationStopRequested: nlEvaluationStopRequested
   };
 }
 
@@ -269,17 +279,17 @@ function readProviderCapability() {
     };
   }
 
-  const providerSummary = getProviderSettingsSummary(db);
+  const providerSummary = getEnabledProviderSettingsSummary(db);
 
   if (!providerSummary || !providerSummary.isEnabled) {
     return {
       hasMasterKey: true,
       featureAvailable: false,
-      message: "已保存正式规则，但当前未配置可用厂商，暂不启用自然语言匹配。"
+      message: "已保存正式规则，但当前没有启用中的厂商，暂不启用自然语言匹配。"
     };
   }
 
-  const resolvedSettings = readProviderSettings(db, { settingsMasterKey });
+  const resolvedSettings = readEnabledProviderSettings(db, { settingsMasterKey });
 
   if (!resolvedSettings.ok) {
     return {
@@ -288,7 +298,7 @@ function readProviderCapability() {
       message:
         resolvedSettings.reason === "decrypt-failed"
           ? "当前厂商配置无法解密，请重新保存 API key。"
-          : "已保存正式规则，但当前未配置可用厂商，暂不启用自然语言匹配。"
+          : "已保存正式规则，但当前没有启用中的厂商，暂不启用自然语言匹配。"
     };
   }
 
@@ -296,7 +306,7 @@ function readProviderCapability() {
     return {
       hasMasterKey: true,
       featureAvailable: false,
-      message: "已保存正式规则，但当前未配置可用厂商，暂不启用自然语言匹配。"
+      message: "已保存正式规则，但当前没有启用中的厂商，暂不启用自然语言匹配。"
     };
   }
 
@@ -313,7 +323,7 @@ function isNlFeatureAvailable(): boolean {
 
 async function resolveConfiguredLlmProvider(): Promise<ResolveLlmProviderResult> {
   // Provider resolution is centralized here so collection and settings-triggered recomputes reuse one rule set.
-  const resolvedSettings = readProviderSettings(db, {
+  const resolvedSettings = readEnabledProviderSettings(db, {
     settingsMasterKey: config.llm?.settingsMasterKey ?? null
   });
 
@@ -345,11 +355,87 @@ async function runNlEvaluationTask(input: RunNlEvaluationCycleInput) {
     };
   }
 
+  nlEvaluationStopRequested = false;
+
   return await nlEvaluationLock.runExclusive(async () => {
-    return await runNlEvaluationCycle(db, input, {
-      resolveProvider: async () => await resolveConfiguredLlmProvider()
-    });
+    try {
+      return await runNlEvaluationCycle(db, input, {
+        resolveProvider: async () => await resolveConfiguredLlmProvider(),
+        shouldStop: () => nlEvaluationStopRequested
+      });
+    } finally {
+      nlEvaluationStopRequested = false;
+    }
   });
+}
+
+async function startNlEvaluationTask(input: RunNlEvaluationCycleInput): Promise<RunNlEvaluationCycleResult> {
+  // Settings saves should return immediately after the recompute has been accepted, while the heavy
+  // content-by-content evaluation continues in the background.
+  if (nlEvaluationLock.isRunning()) {
+    const latestRun = listNlEvaluationRuns(db)[0];
+
+    return {
+      runId: latestRun?.id ?? 0,
+      status: "skipped" as const,
+      itemCount: latestRun?.itemCount ?? input.contentItemIds?.length ?? 0,
+      successCount: latestRun?.successCount ?? 0,
+      failureCount: latestRun?.failureCount ?? 0
+    };
+  }
+
+  const latestRunIdBeforeStart = listNlEvaluationRuns(db)[0]?.id ?? 0;
+  const backgroundTask = runNlEvaluationTask(input);
+
+  void backgroundTask.catch((error) => {
+    console.error("[hot-now] nl evaluation task failed", error);
+  });
+
+  // Give the background task one microtask turn so provider resolution and the new run row can land
+  // before the settings page immediately refreshes its workbench model.
+  await Promise.resolve();
+
+  const latestRun = listNlEvaluationRuns(db)[0];
+
+  if (latestRun && latestRun.id > latestRunIdBeforeStart) {
+    return {
+      runId: latestRun.id,
+      status:
+        latestRun.status === "running" || latestRun.status === "completed" || latestRun.status === "failed"
+          ? latestRun.status
+          : ("skipped" as const),
+      itemCount: latestRun.itemCount,
+      successCount: latestRun.successCount,
+      failureCount: latestRun.failureCount
+    };
+  }
+
+  return {
+    runId: 0,
+    status: "running" as const,
+    itemCount: 0,
+    successCount: 0,
+    failureCount: 0
+  };
+}
+
+function cancelNlEvaluationTask() {
+  // Cancellation is cooperative: the current content item is allowed to finish so already-saved judgments stay valid.
+  if (!nlEvaluationLock.isRunning()) {
+    return {
+      ok: true as const,
+      accepted: false as const,
+      status: "idle" as const
+    };
+  }
+
+  nlEvaluationStopRequested = true;
+
+  return {
+    ok: true as const,
+    accepted: true as const,
+    status: "cancelling" as const
+  };
 }
 
 function createDraftFromFeedback(feedbackId: number) {
@@ -512,7 +598,20 @@ const app = createServer({
     persistProviderSettings(db, input, {
       settingsMasterKey: config.llm?.settingsMasterKey ?? null
     }),
-  deleteProviderSettings: async () => removeProviderSettings(db),
+  updateProviderSettingsActivation: async (input) => persistProviderSettingsActivation(db, input),
+  deleteProviderSettings: async (providerKind: string) => {
+    const normalizedProviderKind = providerKind.trim();
+
+    if (
+      normalizedProviderKind !== "deepseek" &&
+      normalizedProviderKind !== "minimax" &&
+      normalizedProviderKind !== "kimi"
+    ) {
+      return false;
+    }
+
+    return removeProviderSettings(db, normalizedProviderKind);
+  },
   saveNlRules: async (rules: Record<NlRuleScope, { enabled: boolean; ruleText: string }>) => {
     for (const scope of Object.keys(rules) as NlRuleScope[]) {
       saveNlRuleSet(db, scope, rules[scope]);
@@ -520,9 +619,10 @@ const app = createServer({
 
     return {
       ok: true as const,
-      run: await runNlEvaluationTask({ mode: "full-recompute" })
+      run: await startNlEvaluationTask({ mode: "full-recompute" })
     };
   },
+  cancelNlEvaluation: async () => cancelNlEvaluationTask(),
   createDraftFromFeedback: async (feedbackId) => createDraftFromFeedback(feedbackId),
   deleteFeedbackEntry: async (feedbackId) => deleteFeedbackPoolEntry(db, feedbackId),
   clearAllFeedback: async () => clearFeedbackPool(db),

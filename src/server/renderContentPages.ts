@@ -135,9 +135,6 @@ function renderContentBody(
   feedbackEntry?: ContentFeedbackEntryView
 ): string {
   // The body helper keeps both card variants on one action contract while allowing density changes in CSS.
-  const favoritePressed = card.isFavorited ? "true" : "false";
-  const likePressed = card.reaction === "like" ? "true" : "false";
-  const dislikePressed = card.reaction === "dislike" ? "true" : "false";
 
   return `
     <div class="content-card-body content-card-body--${variant}">
@@ -147,33 +144,6 @@ function renderContentBody(
       ${renderScoreBadges(card.scoreBadges)}
       <div class="content-card-region content-card-region--actions">
         <div class="content-actions">
-          <button
-            type="button"
-            class="action-chip"
-            data-content-action="favorite"
-            data-favorited="${favoritePressed}"
-            aria-pressed="${favoritePressed}"
-          >
-            ${card.isFavorited ? "已收藏" : "收藏"}
-          </button>
-          <button
-            type="button"
-            class="action-chip"
-            data-content-action="reaction"
-            data-reaction="like"
-            aria-pressed="${likePressed}"
-          >
-            点赞
-          </button>
-          <button
-            type="button"
-            class="action-chip"
-            data-content-action="reaction"
-            data-reaction="dislike"
-            aria-pressed="${dislikePressed}"
-          >
-            点踩
-          </button>
           <button
             type="button"
             class="action-chip"
@@ -201,7 +171,7 @@ function renderFeedbackPanel(feedbackEntry?: ContentFeedbackEntryView): string {
       <form class="content-feedback-form" data-content-feedback-form>
         <label class="content-feedback-field">
           <span>反馈说明</span>
-          <textarea name="freeText" rows="3" placeholder="这里可以补充为什么点赞 / 点踩，或给管理员留策略建议。">${escapeHtml(freeText)}</textarea>
+          <textarea name="freeText" rows="3" placeholder="这里可以补充为什么值得保留、降权或屏蔽，或给管理员留策略建议。">${escapeHtml(freeText)}</textarea>
         </label>
         <div class="content-feedback-grid">
           <label class="content-feedback-field">

@@ -35,9 +35,9 @@ function createSourcesModel() {
         publishedTodayCount: 3,
         collectedTodayCount: 2,
         viewStats: {
-          hot: { todayCandidateCount: 5, todayVisibleCount: 2, todayVisibleShare: 0.4 },
-          articles: { todayCandidateCount: 4, todayVisibleCount: 3, todayVisibleShare: 0.3 },
-          ai: { todayCandidateCount: 6, todayVisibleCount: 4, todayVisibleShare: 0.5 }
+          hot: { candidateCount: 5, visibleCount: 2, visibleShare: 0.4 },
+          articles: { candidateCount: 4, visibleCount: 3, visibleShare: 0.3 },
+          ai: { candidateCount: 6, visibleCount: 4, visibleShare: 0.5 }
         }
       }
     ],
@@ -93,14 +93,15 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-sources-section='overview']").text()).toContain("接入来源");
     expect(wrapper.get("[data-sources-section='overview']").text()).toContain("已启用来源");
     expect(wrapper.get("[data-sources-section='manual-collect']").text()).toContain("手动执行采集");
-    expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 新讯今日候选 / 今日展示");
+    expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 新讯24小时候选 / 24小时展示");
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 新讯独立展示占比");
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 热点独立展示占比");
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("选中时全量");
-    expect(wrapper.get("[data-sources-section='analytics']").text().indexOf("AI 新讯今日候选 / 今日展示")).toBeLessThan(
-      wrapper.get("[data-sources-section='analytics']").text().indexOf("AI 热点今日候选 / 今日展示")
+    expect(wrapper.get("[data-sources-section='analytics']").text().indexOf("AI 新讯24小时候选 / 24小时展示")).toBeLessThan(
+      wrapper.get("[data-sources-section='analytics']").text().indexOf("AI 热点候选 / 展示")
     );
-    expect(wrapper.get("[data-sources-section='analytics']").text()).not.toContain("Articles 今日候选 / 今日展示");
+    expect(wrapper.get("[data-sources-section='analytics']").text()).not.toContain("AI 新讯今日候选 / 今日展示");
+    expect(wrapper.get("[data-sources-section='analytics']").text()).not.toContain("AI 热点今日候选 / 今日展示");
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("OpenAI");
     expect(wrapper.get("[data-sources-section='manual-send-latest-email']").text()).toContain("发送最新报告");
     expect(wrapper.get("[data-sources-section='inventory']").classes()).toContain("bg-editorial-panel");

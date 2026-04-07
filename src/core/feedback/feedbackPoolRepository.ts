@@ -1,12 +1,10 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
 
-export type FeedbackReactionSnapshot = "like" | "dislike" | "none";
 export type FeedbackSuggestedEffect = "boost" | "penalize" | "block" | "neutral";
 export type FeedbackStrengthLevel = "low" | "medium" | "high";
 
 export type SaveFeedbackPoolEntryInput = {
   contentItemId: number;
-  reactionSnapshot?: FeedbackReactionSnapshot;
   freeText?: string | null;
   suggestedEffect?: FeedbackSuggestedEffect | null;
   strengthLevel?: FeedbackStrengthLevel | null;
@@ -20,7 +18,6 @@ export type FeedbackPoolEntry = {
   contentTitle: string;
   canonicalUrl: string;
   sourceName: string;
-  reactionSnapshot: FeedbackReactionSnapshot;
   freeText: string | null;
   suggestedEffect: FeedbackSuggestedEffect | null;
   strengthLevel: FeedbackStrengthLevel | null;
@@ -38,7 +35,6 @@ type FeedbackPoolRow = {
   contentTitle: string;
   canonicalUrl: string;
   sourceName: string;
-  reactionSnapshot: string | null;
   freeText: string | null;
   suggestedEffect: string | null;
   strengthLevel: string | null;
@@ -81,7 +77,7 @@ export function saveFeedbackPoolEntry(
     `
   ).run(
     input.contentItemId,
-    normalizeReactionSnapshot(input.reactionSnapshot),
+    null,
     normalizeNullableText(input.freeText),
     input.suggestedEffect ?? null,
     input.strengthLevel ?? null,
@@ -112,7 +108,6 @@ export function listFeedbackPoolEntries(db: SqliteDatabase): FeedbackPoolEntry[]
           ci.title AS contentTitle,
           ci.canonical_url AS canonicalUrl,
           cs.name AS sourceName,
-          fp.reaction_snapshot AS reactionSnapshot,
           fp.free_text AS freeText,
           fp.suggested_effect AS suggestedEffect,
           fp.strength_level AS strengthLevel,
@@ -134,7 +129,6 @@ export function listFeedbackPoolEntries(db: SqliteDatabase): FeedbackPoolEntry[]
     contentTitle: row.contentTitle,
     canonicalUrl: row.canonicalUrl,
     sourceName: row.sourceName,
-    reactionSnapshot: normalizeReactionSnapshot(row.reactionSnapshot),
     freeText: row.freeText,
     suggestedEffect: normalizeSuggestedEffect(row.suggestedEffect),
     strengthLevel: normalizeStrengthLevel(row.strengthLevel),
@@ -162,10 +156,6 @@ function contentItemExists(db: SqliteDatabase, contentItemId: number): boolean {
     | { id: number }
     | undefined;
   return Boolean(row);
-}
-
-function normalizeReactionSnapshot(value: string | null | undefined): FeedbackReactionSnapshot {
-  return value === "like" || value === "dislike" ? value : "none";
 }
 
 function normalizeSuggestedEffect(value: string | null): FeedbackSuggestedEffect | null {

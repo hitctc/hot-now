@@ -37,7 +37,7 @@
 - `src/core/fetch/`
   负责抓取原文和正文提取。
 - `src/core/feedback/`
-  负责内容收藏 / 点赞 / 点踩，以及反馈池的读写。
+  负责内容反馈池与草稿池相关数据的读写。
 - `src/core/llm/`
   负责厂商配置加密存储、provider 适配与自然语言评估调用。
 - `src/core/topics/`
@@ -86,11 +86,12 @@
 - 内容导航已收口为 AI-first：`/` 与 `/ai-new` 等同 `AI 新讯`，`/ai-hot` 承接 `AI 热点`，`/articles` 已移除
 - `/`、`/ai-new`、`/ai-hot` 顶部新增共享 source 复选过滤条，支持 `全选 / 全不选`，浏览偏好写入浏览器本地 `localStorage['hot-now-content-sources']`
 - `/`、`/ai-new`、`/ai-hot` 同时提供共享排序切换：`按发布时间`、`按评分`，偏好写入浏览器本地 `localStorage['hot-now-content-sort']`
-- `/`、`/ai-new`、`/ai-hot` 顶部现在还提供共享标题搜索框；搜索只匹配标题，按回车或点击按钮才生效，关键词写入浏览器本地 `localStorage['hot-now-content-search']`
+- `/`、`/ai-new`、`/ai-hot` 顶部还提供共享标题搜索框；搜索只匹配标题，按回车或点击按钮才生效，关键词写入浏览器本地 `localStorage['hot-now-content-search']`
 - `/`、`/ai-new`、`/ai-hot` 现在通过 Fastify 返回统一客户端入口，再由 `Vue 3 + Vite + Ant Design Vue` 内容页读取 `/api/content/ai-new`、`/api/content/ai-hot` 渲染
 - `/api/content/ai-new?page=<n>` 与 `/api/content/ai-hot?page=<n>` 现在支持分页，固定 `50` 条 / 页；缺失、非法或越界页码会回退到有效页
 - `AI 新讯` 固定按最近 `24` 小时窗口和 `ai_new` 门规则构建结果集；`AI 热点` 固定按 `ai_hot` 门规则与热点形成逻辑构建结果集，不会被额外压成 `24` 小时
-- 内容卡片保留 `收藏 / 点赞 / 点踩`，并新增局部 `补充反馈` 面板；点赞 / 点踩后自动展开，反馈进入反馈池，不会直接修改正式策略
+- `AI 新讯` 与 `AI 热点` 的标准内容卡片会在标题左侧显示连续排序序号；序号按全量分页结果延续，不会在翻页后重新从 `1` 开始
+- 内容卡片现在只保留局部 `补充反馈` 面板；反馈进入反馈池，不会直接修改正式策略
 - 如果本地 `data/hot-now.sqlite` 内容库损坏，内容页会降级显示提示，不再直接以 `500` 打断 unified shell
 - `/history`：历史报告（legacy，当前仍保留）
 - `/reports/:date`：指定日期报告（legacy，当前仍保留）
@@ -226,7 +227,7 @@ SQLite 可靠性约定：
 - 原文抓取过程中出现过一次 `jsdom` 的 `Could not parse CSS stylesheet` 日志噪音，未阻断本轮任务完成；如果后续要收口发布质量，可以继续评估是否需要单独治理
 - Task4（single-user login + unified app shell）已落地：新增 `passwords/session` auth helper、登录页与统一壳层菜单路由，且保留 legacy 报告路由兼容
 - 真实入口已收口为“内容公开、系统受保护”：`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 现在是必填；auth 开启时 `/`、`/ai-new`、`/ai-hot` 允许匿名查看，但 `/settings/*`、legacy 路由和 `POST /actions/collect`、`POST /actions/send-latest-email`、`POST /actions/run` 都要求登录
-- 内容页评分已切为系统自动百分制，页面保留收藏 / 点赞 / 点踩，不再提供手工评分表单
+- 内容页评分已切为系统自动百分制，页面只保留 `补充反馈` 面板，不再提供收藏 / 点赞 / 点踩或手工评分表单
 - 多源采集后端已完成：`loadEnabledSourceIssues` / `runDailyDigest` 已接入多源并行汇总，单个 feed 失败不会阻断整次日报，只有全部 enabled sources 都失败时才会硬失败
 - 内置 RSS 源已扩展到 8 个，覆盖聚合日报、国际官方 AI 博客、国内热点资讯 / 快讯与科技媒体；新增国内源默认作为 built-in source 写入 `content_sources`
 - 采集和发信已拆成两个独立功能：默认配置下采集每 `10` 分钟执行一次，发信每天 `10:00` 执行一次；两者都支持手动触发，并共用同一把运行锁
@@ -240,7 +241,7 @@ SQLite 可靠性约定：
 - 内容页顶部现在还会渲染共享标题搜索框；生效关键词通过 `localStorage['hot-now-content-search'] + x-hot-now-content-search` header 驱动内容 API 做标题过滤，再进入分页切片
 - 内容页现在同时支持 `page` query 分页；翻页状态写在 URL 中，不写入 `localStorage`，筛选或排序变化后会自动回到第一页
 - 开启“选中时全量展示”的 source 在内容页首次进入时默认不勾选；只有用户显式勾选后，该 source 才会免受普通 view limit 截断
-- 内容页现在会把当前反馈池条目回填到局部反馈面板，内容交互形成 `点赞/点踩 -> 反馈池 -> 草稿池 -> 正式自然语言策略 -> 全量 / 增量重算` 的闭环
+- 内容页现在会把当前反馈池条目回填到局部反馈面板，内容交互形成 `补充反馈 -> 反馈池 -> 草稿池 -> 正式自然语言策略 -> 全量 / 增量重算` 的闭环
 - 正式自然语言策略保存后会立即触发当前内容库全量重算；采集链路在落库后会自动触发增量自然语言评估
 - 内容页现在对本地内容库损坏做了降级兜底：检测到 `SQLITE_CORRUPT` / `SQLITE_NOTADB` 时继续渲染统一站点，并提示修复或重建 `data/hot-now.sqlite`
 - 启动入口现在会对 `data/hot-now.sqlite` 做 SQLite 健康检查；如果主库损坏，会提示最近的 verified snapshot 和 `npm run db:restore -- <snapshot-file>` 恢复命令

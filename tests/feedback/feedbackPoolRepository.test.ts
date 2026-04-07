@@ -28,7 +28,6 @@ describe("feedbackPoolRepository", () => {
 
     const firstSave = saveFeedbackPoolEntry(handle.db, {
       contentItemId,
-      reactionSnapshot: "like",
       freeText: "保留 agent 工作流方向",
       suggestedEffect: "boost",
       strengthLevel: "high",
@@ -37,7 +36,6 @@ describe("feedbackPoolRepository", () => {
     });
     const secondSave = saveFeedbackPoolEntry(handle.db, {
       contentItemId,
-      reactionSnapshot: "dislike",
       freeText: "这类融资快讯先别展示",
       suggestedEffect: "block",
       strengthLevel: "medium",
@@ -61,7 +59,6 @@ describe("feedbackPoolRepository", () => {
         contentTitle: "Agent workflow report",
         canonicalUrl: "https://example.com/agent-workflow-report",
         sourceName: "OpenAI",
-        reactionSnapshot: "dislike",
         freeText: "这类融资快讯先别展示",
         suggestedEffect: "block",
         strengthLevel: "medium",

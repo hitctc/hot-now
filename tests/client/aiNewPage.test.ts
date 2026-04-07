@@ -94,6 +94,17 @@ function createModel(overrides: Partial<typeof baseModel> = {}) {
   };
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((innerResolve, innerReject) => {
+    resolve = innerResolve;
+    reject = innerReject;
+  });
+
+  return { promise, resolve, reject };
+}
+
 describe("AiNewPage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -105,6 +116,14 @@ describe("AiNewPage", () => {
     contentApiMocks.readStoredContentSourceKinds.mockReturnValue(["openai"]);
     contentApiMocks.readStoredContentSortMode.mockReturnValue(null);
     contentApiMocks.readStoredContentSearchKeyword.mockReturnValue(null);
+    Object.defineProperty(window, "scrollTo", {
+      writable: true,
+      value: vi.fn()
+    });
+    Object.defineProperty(window, "scrollY", {
+      writable: true,
+      value: 0
+    });
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: vi.fn().mockImplementation((query: string) => ({
@@ -143,6 +162,9 @@ describe("AiNewPage", () => {
     expect(wrapper.find("[data-content-filter-shell]").exists()).toBe(false);
     expect(wrapper.find("[data-content-source-filter]").exists()).toBe(true);
     expect(wrapper.find("[data-content-toolbar]").exists()).toBe(true);
+    expect(wrapper.get("[data-content-sticky-toolbar]").classes()).toEqual(
+      expect.arrayContaining(["sticky", "z-20", "top-4", "max-[900px]:top-[72px]"])
+    );
     expect(wrapper.get("[data-content-source-filter]").text()).toContain("已选 1 / 2 · 共 120 条");
     expect(wrapper.find("[data-source-option-count='openai']").exists()).toBe(false);
     expect(wrapper.find("[data-source-option-count='ithome']").exists()).toBe(false);
@@ -153,6 +175,7 @@ describe("AiNewPage", () => {
     expect(wrapper.get("[data-content-section='list']").text()).toContain("AI Weekly Insight");
     expect(wrapper.get("[data-content-section='list']").text()).toContain("AI Agent Launch");
     expect(wrapper.findAll("[data-content-row]").length).toBe(2);
+    expect(wrapper.findAll("[data-content-display-index]").map((node) => node.text())).toEqual(["1", "2"]);
   });
 
   it("persists source selections and reloads with the updated filter", async () => {
@@ -252,7 +275,6 @@ describe("AiNewPage", () => {
   });
 
   it("submits the shared title search keyword and reloads ai-new from page 1", async () => {
-    routeState.query = { page: "3" };
     contentApiMocks.readStoredContentSearchKeyword.mockReturnValue("agent");
     contentApiMocks.readAiNewPage.mockResolvedValue(createModel());
 
@@ -273,6 +295,60 @@ describe("AiNewPage", () => {
     });
   });
 
+  it("keeps the silent refresh spinner horizontally centered after source filter changes", async () => {
+    const deferred = createDeferred<typeof baseModel>();
+    contentApiMocks.readAiNewPage.mockResolvedValueOnce(createModel()).mockImplementationOnce(() => deferred.promise);
+
+    const wrapper = mount(AiNewPage, {
+      global: {
+        plugins: [Antd]
+      }
+    });
+
+    await flushPromises();
+    await wrapper.get("[data-source-kind='ithome']").setValue(true);
+    await flushPromises();
+
+    const indicator = wrapper.get("[data-content-refresh-indicator]");
+
+    expect(indicator.classes()).toEqual(expect.arrayContaining(["flex", "w-full", "justify-center"]));
+    expect(indicator.find(".ant-spin").exists()).toBe(true);
+
+    deferred.resolve(createModel());
+    await flushPromises();
+  });
+
+  it("shows a back-to-top button after scrolling and uses smooth scrolling when clicked", async () => {
+    contentApiMocks.readAiNewPage.mockResolvedValueOnce(createModel());
+
+    const wrapper = mount(AiNewPage, {
+      global: {
+        plugins: [Antd]
+      }
+    });
+
+    await flushPromises();
+
+    expect(wrapper.find("[data-content-back-to-top]").exists()).toBe(false);
+
+    Object.defineProperty(window, "scrollY", {
+      writable: true,
+      value: 720
+    });
+    window.dispatchEvent(new Event("scroll"));
+    await flushPromises();
+
+    expect(wrapper.get("[data-content-back-to-top]").text()).toContain("回到顶部");
+
+    await wrapper.get("[data-content-back-to-top]").trigger("click");
+    await flushPromises();
+
+    expect(window.scrollTo).toHaveBeenLastCalledWith({
+      top: 0,
+      behavior: "smooth"
+    });
+  });
+
   it("syncs pagination through the route query and reloads the requested page", async () => {
     routeState.query = { page: "2" };
     contentApiMocks.readAiNewPage
@@ -283,7 +359,31 @@ describe("AiNewPage", () => {
             pageSize: 50,
             totalResults: 120,
             totalPages: 3
-          }
+          },
+          cards: [
+            {
+              id: 201,
+              title: "Page 2 First Card",
+              summary: "The first card on the second page.",
+              sourceName: "OpenAI",
+              sourceKind: "openai",
+              canonicalUrl: "https://example.com/page-2-first",
+              publishedAt: "2026-03-31T14:00:00.000Z",
+              contentScore: 88,
+              scoreBadges: ["精选"]
+            },
+            {
+              id: 202,
+              title: "Page 2 Second Card",
+              summary: "The second card on the second page.",
+              sourceName: "IT之家",
+              sourceKind: "ithome",
+              canonicalUrl: "https://example.com/page-2-second",
+              publishedAt: "2026-03-31T14:30:00.000Z",
+              contentScore: 83,
+              scoreBadges: ["24h 内"]
+            }
+          ]
         })
       )
       .mockResolvedValueOnce(
@@ -293,7 +393,31 @@ describe("AiNewPage", () => {
             pageSize: 50,
             totalResults: 120,
             totalPages: 3
-          }
+          },
+          cards: [
+            {
+              id: 301,
+              title: "Page 3 First Card",
+              summary: "The first card on the third page.",
+              sourceName: "OpenAI",
+              sourceKind: "openai",
+              canonicalUrl: "https://example.com/page-3-first",
+              publishedAt: "2026-03-31T15:00:00.000Z",
+              contentScore: 87,
+              scoreBadges: ["精选"]
+            },
+            {
+              id: 302,
+              title: "Page 3 Second Card",
+              summary: "The second card on the third page.",
+              sourceName: "IT之家",
+              sourceKind: "ithome",
+              canonicalUrl: "https://example.com/page-3-second",
+              publishedAt: "2026-03-31T15:30:00.000Z",
+              contentScore: 81,
+              scoreBadges: ["24h 内"]
+            }
+          ]
         })
       );
 
@@ -304,6 +428,7 @@ describe("AiNewPage", () => {
     });
 
     await flushPromises();
+    expect(wrapper.findAll("[data-content-display-index]").map((node) => node.text())).toEqual(["51", "52"]);
     await wrapper.get("[data-content-pagination-action='next']").trigger("click");
     await flushPromises();
 
@@ -324,5 +449,10 @@ describe("AiNewPage", () => {
       page: 3,
       searchKeyword: ""
     });
+    expect(window.scrollTo).toHaveBeenCalledWith({
+      top: 0,
+      behavior: "auto"
+    });
+    expect(wrapper.findAll("[data-content-display-index]").map((node) => node.text())).toEqual(["101", "102"]);
   });
 });

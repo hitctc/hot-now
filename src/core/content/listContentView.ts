@@ -11,8 +11,6 @@ export type ContentCardView = {
   sourceKind: string;
   canonicalUrl: string;
   publishedAt: string | null;
-  isFavorited: boolean;
-  reaction: "like" | "dislike" | "none";
   contentScore: number;
   scoreBadges: string[];
   feedbackEntry?: {

@@ -25,7 +25,6 @@ type FeedbackPoolItem = {
   contentTitle: string;
   canonicalUrl: string;
   sourceName: string;
-  reactionSnapshot: string;
   freeText: string | null;
   suggestedEffect: string | null;
   strengthLevel: string | null;
@@ -83,9 +82,9 @@ type SourceItem = {
   publishedTodayCount?: number;
   collectedTodayCount?: number;
   viewStats?: {
-    hot: { todayCandidateCount: number; todayVisibleCount: number; todayVisibleShare: number };
-    articles: { todayCandidateCount: number; todayVisibleCount: number; todayVisibleShare: number };
-    ai: { todayCandidateCount: number; todayVisibleCount: number; todayVisibleShare: number };
+    hot: { candidateCount: number; visibleCount: number; visibleShare: number };
+    articles: { candidateCount: number; visibleCount: number; visibleShare: number };
+    ai: { candidateCount: number; visibleCount: number; visibleShare: number };
   };
 };
 
@@ -189,11 +188,11 @@ function renderSourcesOverviewTable(sources: SourceItem[]) {
             <th>总条数</th>
             <th>今天发布</th>
             <th>今天抓取</th>
-            <th>Hot 今日候选 / 今日展示</th>
+            <th>AI 热点候选 / 展示</th>
             <th>Hot 独立展示占比</th>
             <th>Articles 今日候选 / 今日展示</th>
             <th>Articles 独立展示占比</th>
-            <th>AI 今日候选 / 今日展示</th>
+            <th>AI 新讯24小时候选 / 24小时展示</th>
             <th>AI 独立展示占比</th>
           </tr>
         </thead>
@@ -206,13 +205,13 @@ function renderSourcesOverviewTable(sources: SourceItem[]) {
 }
 
 function renderSourcesOverviewRow(source: SourceItem) {
-  const hotStats = source.viewStats?.hot ?? { todayCandidateCount: 0, todayVisibleCount: 0, todayVisibleShare: 0 };
+  const hotStats = source.viewStats?.hot ?? { candidateCount: 0, visibleCount: 0, visibleShare: 0 };
   const articleStats = source.viewStats?.articles ?? {
-    todayCandidateCount: 0,
-    todayVisibleCount: 0,
-    todayVisibleShare: 0
+    candidateCount: 0,
+    visibleCount: 0,
+    visibleShare: 0
   };
-  const aiStats = source.viewStats?.ai ?? { todayCandidateCount: 0, todayVisibleCount: 0, todayVisibleShare: 0 };
+  const aiStats = source.viewStats?.ai ?? { candidateCount: 0, visibleCount: 0, visibleShare: 0 };
 
   return `
     <tr>
@@ -220,12 +219,12 @@ function renderSourcesOverviewRow(source: SourceItem) {
       <td>${source.totalCount ?? 0}</td>
       <td>${source.publishedTodayCount ?? 0}</td>
       <td>${source.collectedTodayCount ?? 0}</td>
-      <td>${hotStats.todayCandidateCount} / ${hotStats.todayVisibleCount}</td>
-      <td>${formatPercent(hotStats.todayVisibleShare)}</td>
-      <td>${articleStats.todayCandidateCount} / ${articleStats.todayVisibleCount}</td>
-      <td>${formatPercent(articleStats.todayVisibleShare)}</td>
-      <td>${aiStats.todayCandidateCount} / ${aiStats.todayVisibleCount}</td>
-      <td>${formatPercent(aiStats.todayVisibleShare)}</td>
+      <td>${hotStats.candidateCount} / ${hotStats.visibleCount}</td>
+      <td>${formatPercent(hotStats.visibleShare)}</td>
+      <td>${articleStats.candidateCount} / ${articleStats.visibleCount}</td>
+      <td>${formatPercent(articleStats.visibleShare)}</td>
+      <td>${aiStats.candidateCount} / ${aiStats.visibleCount}</td>
+      <td>${formatPercent(aiStats.visibleShare)}</td>
     </tr>
   `;
 }
@@ -403,7 +402,7 @@ function renderFeedbackPoolEntry(entry: FeedbackPoolItem): string {
     <article class="system-card system-card--control system-card--feedback-entry system-card--panel" data-feedback-id="${entry.id}">
       <header class="system-card-header">
         <h3 class="system-card-title">${escapeHtml(entry.contentTitle)}</h3>
-        <p class="system-card-meta">${escapeHtml(entry.sourceName)} · ${escapeHtml(entry.reactionSnapshot)} · ${escapeHtml(formatDateTime(entry.updatedAt))}</p>
+        <p class="system-card-meta">${escapeHtml(entry.sourceName)} · ${escapeHtml(formatDateTime(entry.updatedAt))}</p>
       </header>
       <dl class="system-detail-list">
         <div class="system-detail-row">

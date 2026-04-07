@@ -524,7 +524,7 @@ onMounted(() => {
         <h1 class="m-0 text-2xl font-semibold tracking-[-0.02em] text-editorial-text-main">
           筛选策略
         </h1>
-        <p class="m-0 max-w-3xl text-sm leading-6 text-editorial-text-body">
+        <p class="m-0 text-sm leading-6 text-editorial-text-body">
           在同一页维护厂商设置、正式规则、反馈池和草稿池。
         </p>
       </section>
@@ -626,14 +626,20 @@ onMounted(() => {
                     >
                       保存厂商设置
                     </a-button>
-                    <a-button
-                      danger
-                      data-action="delete-provider-settings"
-                      :loading="isActionPending('provider:delete')"
-                      @click="handleProviderDelete"
+                    <a-popconfirm
+                      title="确认删除当前厂商配置吗？"
+                      ok-text="确认删除"
+                      cancel-text="取消"
+                      @confirm="handleProviderDelete"
                     >
-                      删除当前厂商配置
-                    </a-button>
+                      <a-button
+                        danger
+                        data-action="delete-provider-settings"
+                        :loading="isActionPending('provider:delete')"
+                      >
+                        删除当前厂商配置
+                      </a-button>
+                    </a-popconfirm>
                   </a-space>
                 </a-form>
               </div>
@@ -720,15 +726,21 @@ onMounted(() => {
               >
                 复制全部反馈
               </a-button>
-              <a-button
-                size="small"
-                data-action="clear-feedback-pool"
-                :class="[editorialContentControlButtonClass, editorialContentControlButtonDangerClass]"
-                :loading="isActionPending('feedback:clear')"
-                @click="handleFeedbackClearAll"
+              <a-popconfirm
+                title="确认清空全部反馈吗？"
+                ok-text="确认清空"
+                cancel-text="取消"
+                @confirm="handleFeedbackClearAll"
               >
-                清空全部反馈
-              </a-button>
+                <a-button
+                  size="small"
+                  data-action="clear-feedback-pool"
+                  :class="[editorialContentControlButtonClass, editorialContentControlButtonDangerClass]"
+                  :loading="isActionPending('feedback:clear')"
+                >
+                  清空全部反馈
+                </a-button>
+              </a-popconfirm>
             </div>
           </template>
 
@@ -751,7 +763,6 @@ onMounted(() => {
                 <a-space size="small" wrap>
                   <span>{{ entry.contentTitle }}</span>
                   <a-tag color="blue">{{ entry.sourceName }}</a-tag>
-                  <a-tag>{{ entry.reactionSnapshot }}</a-tag>
                 </a-space>
               </template>
 
@@ -792,13 +803,20 @@ onMounted(() => {
                 >
                   转成草稿
                 </a-button>
-                <a-button
-                  danger
-                  :loading="isActionPending(`feedback:${entry.id}:delete`)"
-                  @click="handleFeedbackDelete(entry.id)"
+                <a-popconfirm
+                  title="确认删除这条反馈吗？"
+                  ok-text="确认删除"
+                  cancel-text="取消"
+                  @confirm="handleFeedbackDelete(entry.id)"
                 >
-                  删除
-                </a-button>
+                  <a-button
+                    danger
+                    :loading="isActionPending(`feedback:${entry.id}:delete`)"
+                    :data-action="`delete-feedback-${entry.id}`"
+                  >
+                    删除
+                  </a-button>
+                </a-popconfirm>
               </a-space>
             </a-card>
           </div>
@@ -880,13 +898,20 @@ onMounted(() => {
                   <a-button @click="copyText(buildDraftCopyText(draft.id), '草稿内容已复制。')">
                     复制
                   </a-button>
-                  <a-button
-                    danger
-                    :loading="isActionPending(`draft:${draft.id}:delete`)"
-                    @click="handleDraftDelete(draft.id)"
+                  <a-popconfirm
+                    title="确认删除这条草稿吗？"
+                    ok-text="确认删除"
+                    cancel-text="取消"
+                    @confirm="handleDraftDelete(draft.id)"
                   >
-                    删除草稿
-                  </a-button>
+                    <a-button
+                      danger
+                      :loading="isActionPending(`draft:${draft.id}:delete`)"
+                      :data-action="`delete-draft-${draft.id}`"
+                    >
+                      删除草稿
+                    </a-button>
+                  </a-popconfirm>
                 </a-space>
               </a-form>
             </a-card>

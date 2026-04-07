@@ -3,11 +3,13 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import ContentEmptyState from "../../components/content/ContentEmptyState.vue";
+import ContentBackToTopButton from "../../components/content/ContentBackToTopButton.vue";
 import ContentPaginationBar from "../../components/content/ContentPaginationBar.vue";
 import ContentSearchControl from "../../components/content/ContentSearchControl.vue";
 import ContentSourceFilterBar from "../../components/content/ContentSourceFilterBar.vue";
 import ContentSortControl from "../../components/content/ContentSortControl.vue";
 import ContentStandardCard from "../../components/content/ContentStandardCard.vue";
+import { useContentPageScroll } from "../../components/content/useContentPageScroll";
 import {
   editorialContentListSectionClass,
   editorialContentPageClass
@@ -35,6 +37,7 @@ const sortMode = ref<ContentSortMode>(readStoredContentSortMode() ?? "published_
 const appliedSearchKeyword = ref(readStoredContentSearchKeyword() ?? "");
 const route = useRoute();
 const router = useRouter();
+const { showBackToTopButton, scrollPageToTop, handleBackToTopClick } = useContentPageScroll();
 
 function readPageSourceKinds(): string[] | undefined {
   return selectedSourceKinds.value === null ? undefined : selectedSourceKinds.value;
@@ -82,7 +85,7 @@ function buildErrorState(message: string) {
   } as const;
 }
 
-// 页面刷新统一收口到这里，标题搜索和现有筛选、排序才能保持同一套口径。
+// 页面加载支持“静默刷新 + 指定搜索词”，确保排序/筛选/搜索都走统一刷新逻辑。
 async function loadPage(options: { selectedKinds?: string[]; silent?: boolean; searchKeyword?: string } = {}): Promise<void> {
   if (options.silent) {
     isRefreshing.value = true;
@@ -131,6 +134,7 @@ async function handleSourceKindsChange(nextKinds: string[]): Promise<void> {
   selectedSourceKinds.value = nextKinds;
   writeStoredContentSourceKinds(nextKinds);
   await replacePageQuery(1);
+  scrollPageToTop("auto");
   await loadPage({ selectedKinds: nextKinds, silent: true });
 }
 
@@ -138,14 +142,16 @@ async function handleSortModeChange(nextSortMode: ContentSortMode): Promise<void
   sortMode.value = nextSortMode;
   writeStoredContentSortMode(nextSortMode);
   await replacePageQuery(1);
+  scrollPageToTop("auto");
   await loadPage({ selectedKinds: readPageSourceKinds(), silent: true });
 }
 
-// 只有用户确认搜索时才提交关键词，避免输入中的标题草稿打断当前阅读。
+// 只有点击“搜索”才会生效关键词，避免输入中的草稿实时触发请求。
 async function handleSearchSubmit(nextKeyword: string): Promise<void> {
   appliedSearchKeyword.value = nextKeyword;
   writeStoredContentSearchKeyword(nextKeyword);
   await replacePageQuery(1);
+  scrollPageToTop("auto");
   await loadPage({
     selectedKinds: readPageSourceKinds(),
     searchKeyword: nextKeyword,
@@ -153,11 +159,12 @@ async function handleSearchSubmit(nextKeyword: string): Promise<void> {
   });
 }
 
-// 清空后直接回到默认结果集，并和其他过滤动作一样回到第一页。
+// 清空关键词后同样回到第一页，保证分页与结果集语义一致。
 async function handleSearchClear(): Promise<void> {
   appliedSearchKeyword.value = "";
   writeStoredContentSearchKeyword("");
   await replacePageQuery(1);
+  scrollPageToTop("auto");
   await loadPage({
     selectedKinds: readPageSourceKinds(),
     searchKeyword: "",
@@ -167,6 +174,8 @@ async function handleSearchClear(): Promise<void> {
 
 async function handlePaginationChange(nextPage: number): Promise<void> {
   await replacePageQuery(nextPage);
+  // 翻页后先回到顶部，避免用户继续停在上一页底部附近阅读新结果。
+  scrollPageToTop("auto");
   await loadPage({ selectedKinds: readPageSourceKinds(), silent: true });
 }
 
@@ -174,6 +183,18 @@ const sourceFilter = computed(() => pageModel.value?.sourceFilter ?? null);
 const listCards = computed(() => pageModel.value?.cards ?? []);
 const visibleResultCount = computed(() => pageModel.value?.pagination?.totalResults ?? listCards.value.length);
 const pagination = computed(() => pageModel.value?.pagination ?? null);
+const displayIndexOffset = computed(() => {
+  const currentPagination = pagination.value;
+
+  if (!currentPagination) {
+    return 0;
+  }
+
+  const safePage = currentPagination.page >= 1 ? currentPagination.page : 1;
+  const safePageSize = currentPagination.pageSize >= 1 ? currentPagination.pageSize : listCards.value.length;
+
+  return (safePage - 1) * safePageSize;
+});
 const displayState = computed(() => {
   if (!pageModel.value && loadError.value) {
     return buildErrorState(loadError.value);
@@ -200,7 +221,11 @@ onMounted(() => {
   <div :class="editorialContentPageClass" data-content-page="ai-hot">
     <a-alert v-if="hasLoadError && pageModel" type="warning" show-icon :message="loadError" banner />
 
-    <div v-if="sourceFilter" class="flex flex-col gap-3">
+    <div
+      v-if="sourceFilter"
+      class="sticky top-4 z-20 flex flex-col gap-3 max-[900px]:top-[72px]"
+      data-content-sticky-toolbar
+    >
       <ContentSourceFilterBar
         :options="sourceFilter.options"
         :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
@@ -235,7 +260,12 @@ onMounted(() => {
         data-content-list
         data-list-style="database"
       >
-        <ContentStandardCard v-for="card in listCards" :key="card.id" :card="card" />
+        <ContentStandardCard
+          v-for="(card, index) in listCards"
+          :key="card.id"
+          :card="card"
+          :display-index="displayIndexOffset + index + 1"
+        />
       </section>
 
       <ContentPaginationBar
@@ -248,6 +278,17 @@ onMounted(() => {
       />
     </template>
 
-    <a-spin v-if="isRefreshing" class="self-start" />
+    <div
+      v-if="isRefreshing"
+      class="flex w-full justify-center"
+      data-content-refresh-indicator
+    >
+      <a-spin />
+    </div>
+
+    <ContentBackToTopButton
+      :visible="showBackToTopButton"
+      @click="handleBackToTopClick"
+    />
   </div>
 </template>

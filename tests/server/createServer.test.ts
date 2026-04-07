@@ -468,6 +468,31 @@ describe("createServer", () => {
     expect(protectedResponse.headers.location).toBe("/login");
   });
 
+  it("returns json for async logout requests that accept application/json", async () => {
+    const app = createServer({
+      auth: {
+        requireLogin: true,
+        sessionSecret: "test-secret",
+        verifyLogin: vi.fn().mockResolvedValue(null)
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/logout",
+      headers: {
+        accept: "application/json"
+      }
+    });
+    const setCookie = Array.isArray(response.headers["set-cookie"])
+      ? response.headers["set-cookie"][0]
+      : response.headers["set-cookie"];
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ ok: true });
+    expect(setCookie).toContain("Max-Age=0");
+  });
+
   it("redirects anonymous legacy page routes to login when auth is enabled", async () => {
     const app = createServer({
       auth: {

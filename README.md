@@ -70,7 +70,9 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - `/`、`/ai-new`、`/ai-hot` 顶部现在还提供共享标题搜索框；搜索只匹配标题，按回车或点击按钮才生效，关键词保存在浏览器本地 `localStorage['hot-now-content-search']`
 - `/api/content/ai-new?page=<n>` 与 `/api/content/ai-hot?page=<n>` 现在支持分页，固定 `50` 条 / 页
 - `AI 新讯` 固定按最近 `24` 小时窗口和 `ai_new` 门规则构建结果集；`AI 热点` 固定按 `ai_hot` 门规则与热点形成逻辑构建结果集，不会被额外压成 `24` 小时
-- 内容卡片保留 `收藏 / 点赞 / 点踩`，并新增局部 `补充反馈` 面板；点赞 / 点踩后会自动展开反馈面板，反馈会先进入反馈池，不会直接改正式策略
+- `AI 新讯` 与 `AI 热点` 的标准内容卡片会在标题左侧显示连续排序序号；序号跨分页延续，不会在新页重新从 `1` 开始
+- 内容页顶部的来源筛选与排序控制会保持悬浮；翻页后会自动回到顶部，长列表滚动时右下角会出现“回到顶部”按钮
+- 内容卡片现在只保留局部 `补充反馈` 面板，反馈会先进入反馈池，不会直接改正式策略
 - 如果本地 `data/hot-now.sqlite` 内容库损坏，内容页会降级显示错误提示，而不是直接返回 `500`
 - 统一站点左侧导航底部支持深色 / 浅色主题切换，主题偏好保存在浏览器本地 `localStorage`，刷新后保持
 - `unified shell` 页面已完整切到 `Notion Workspace` 风格的黑白灰双主题：`/`、`/ai-new`、`/ai-hot`、`/settings/*`
@@ -100,7 +102,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 反馈池与草稿池动作：`POST /actions/feedback-pool/:id/create-draft`、`POST /actions/feedback-pool/:id/delete`、`POST /actions/feedback-pool/clear`、`POST /actions/strategy-drafts/:id/save`、`POST /actions/strategy-drafts/:id/delete`
 - 内容导航已收口为 AI-first：`/` 与 `/ai-new` 等同 `AI 新讯`，`/ai-hot` 承接 `AI 热点`，`/articles` 已移除
 
-统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。auth 开启后，内容菜单保持公开可读，但系统菜单和所有写操作仍然要求登录；`content_sources.is_enabled` 决定哪些 source 参与采集，`content_sources.show_all_when_selected` 决定该 source 在内容页被显式勾选时是否全量展示；`/settings/sources` 现在可以直接启用/停用 source、切换“选中时全量展示”，并分别手动执行一次采集或手动发送最新报告；内容页顶部的来源筛选、排序和标题搜索只影响当前浏览结果，不会改 source 启用状态；legacy `/control` 也同步提供采集与发信动作。
+统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。auth 开启后，内容菜单保持公开可读，但系统菜单和所有写操作仍然要求登录；`content_sources.is_enabled` 决定哪些 source 参与采集，`content_sources.show_all_when_selected` 决定该 source 在内容页被显式勾选时是否全量展示；`/settings/sources` 现在可以直接启用/停用 source、切换“选中时全量展示”，并分别手动执行一次采集或手动发送最新报告；内容页顶部的来源筛选和排序只影响当前浏览结果，不会改 source 启用状态；legacy `/control` 也同步提供采集与发信动作。
 
 当前内置 RSS 源包括：
 

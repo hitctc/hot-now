@@ -14,7 +14,6 @@ import {
   listFeedbackPoolEntries,
   saveFeedbackPoolEntry
 } from "./core/feedback/feedbackPoolRepository.js";
-import { saveFavorite, saveReaction } from "./core/feedback/feedbackRepository.js";
 import { fetchAndExtractArticle } from "./core/fetch/extractArticle.js";
 import { createLlmProvider, type ResolveLlmProviderResult } from "./core/llm/createLlmProvider.js";
 import {
@@ -505,8 +504,6 @@ const app = createServer({
       includeNlEvaluations: isNlFeatureAvailable()
     }),
   listContentSources: async () => listContentSources(db),
-  saveFavorite: async (contentItemId, isFavorited) => saveFavorite(db, contentItemId, isFavorited),
-  saveReaction: async (contentItemId, reaction) => saveReaction(db, contentItemId, reaction),
   saveContentFeedback: async (contentItemId, input) => saveFeedbackPoolEntry(db, { contentItemId, ...input }),
   listRatingDimensions: async () => listRatingDimensions(db),
   saveRatings: async (contentItemId, scores) => saveRatings(db, contentItemId, scores),

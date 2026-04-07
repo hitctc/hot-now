@@ -43,7 +43,6 @@ export type SettingsFeedbackPoolItem = {
   contentTitle: string;
   canonicalUrl: string;
   sourceName: string;
-  reactionSnapshot: string;
   freeText: string | null;
   suggestedEffect: string | null;
   strengthLevel: string | null;
@@ -100,9 +99,9 @@ export type SettingsSourceItem = {
   publishedTodayCount?: number;
   collectedTodayCount?: number;
   viewStats?: {
-    hot: { todayCandidateCount: number; todayVisibleCount: number; todayVisibleShare: number };
-    articles: { todayCandidateCount: number; todayVisibleCount: number; todayVisibleShare: number };
-    ai: { todayCandidateCount: number; todayVisibleCount: number; todayVisibleShare: number };
+    hot: { candidateCount: number; visibleCount: number; visibleShare: number };
+    articles: { candidateCount: number; visibleCount: number; visibleShare: number };
+    ai: { candidateCount: number; visibleCount: number; visibleShare: number };
   };
 };
 

@@ -142,6 +142,11 @@ function normalizeSelectedSourceKinds(selectedSourceKinds: string[]): string[] {
     .filter((kind, index, array) => kind.length > 0 && array.indexOf(kind) === index);
 }
 
+// 搜索词会通过自定义 header 传给内容 API，这里先转成 ASCII 安全格式，避免中文等字符触发 ByteString 异常。
+function encodeSearchKeywordHeaderValue(searchKeyword: string): string {
+  return encodeURIComponent(searchKeyword);
+}
+
 function createContentPageRequestHeaders(
   selectedSourceKinds: string[] | undefined,
   sortMode: ContentSortMode | undefined,
@@ -159,7 +164,7 @@ function createContentPageRequestHeaders(
 
   const normalizedSearchKeyword = typeof searchKeyword === "string" ? searchKeyword.trim() : "";
   if (normalizedSearchKeyword.length > 0) {
-    headers["x-hot-now-content-search"] = normalizedSearchKeyword;
+    headers["x-hot-now-content-search"] = encodeSearchKeywordHeaderValue(normalizedSearchKeyword);
   }
 
   return Object.keys(headers).length > 0 ? headers : undefined;

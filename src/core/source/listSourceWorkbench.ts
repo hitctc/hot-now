@@ -1,4 +1,4 @@
-import { buildContentViewSelection } from "../content/buildContentViewSelection.js";
+import { collectIndependentStatsBySourceForView } from "../content/buildContentViewSelection.js";
 import type { SqliteDatabase } from "../db/openDatabase.js";
 import { listSourceCards } from "./listSourceCards.js";
 
@@ -10,9 +10,9 @@ type SourceCountRow = {
 };
 
 type SourceViewStats = {
-  todayCandidateCount: number;
-  todayVisibleCount: number;
-  todayVisibleShare: number;
+  candidateCount: number;
+  visibleCount: number;
+  visibleShare: number;
 };
 
 export type SourceWorkbenchRow = {
@@ -44,14 +44,25 @@ export function listSourceWorkbench(
   const sourceCards = listSourceCards(db);
   const countMap = readSourceCountMap(db, referenceTime);
   const enabledSources = sourceCards.filter((source) => source.isEnabled);
-  const hotStats = readIndependentTodayStatsBySource(db, enabledSources.map((source) => source.kind), "hot", referenceTime);
-  const articleStats = readIndependentTodayStatsBySource(
+  const enabledSourceKinds = enabledSources.map((source) => source.kind);
+  const hotStats = collectIndependentStatsBySourceForView(
     db,
-    enabledSources.map((source) => source.kind),
-    "articles",
-    referenceTime
+    "hot",
+    enabledSourceKinds,
+    { referenceTime, countWindow: "all" }
   );
-  const aiStats = readIndependentTodayStatsBySource(db, enabledSources.map((source) => source.kind), "ai", referenceTime);
+  const articleStats = collectIndependentStatsBySourceForView(
+    db,
+    "articles",
+    enabledSourceKinds,
+    { referenceTime, countWindow: "today" }
+  );
+  const aiStats = collectIndependentStatsBySourceForView(
+    db,
+    "ai",
+    enabledSourceKinds,
+    { referenceTime, countWindow: "last_24_hours" }
+  );
 
   return sourceCards.map((sourceCard) => ({
     ...sourceCard,
@@ -59,9 +70,9 @@ export function listSourceWorkbench(
     publishedTodayCount: countMap.get(sourceCard.kind)?.publishedTodayCount ?? 0,
     collectedTodayCount: countMap.get(sourceCard.kind)?.collectedTodayCount ?? 0,
     viewStats: {
-      hot: hotStats.get(sourceCard.kind) ?? { todayCandidateCount: 0, todayVisibleCount: 0, todayVisibleShare: 0 },
-      articles: articleStats.get(sourceCard.kind) ?? { todayCandidateCount: 0, todayVisibleCount: 0, todayVisibleShare: 0 },
-      ai: aiStats.get(sourceCard.kind) ?? { todayCandidateCount: 0, todayVisibleCount: 0, todayVisibleShare: 0 }
+      hot: hotStats.get(sourceCard.kind) ?? { candidateCount: 0, visibleCount: 0, visibleShare: 0 },
+      articles: articleStats.get(sourceCard.kind) ?? { candidateCount: 0, visibleCount: 0, visibleShare: 0 },
+      ai: aiStats.get(sourceCard.kind) ?? { candidateCount: 0, visibleCount: 0, visibleShare: 0 }
     }
   }));
 }
@@ -84,44 +95,6 @@ function readSourceCountMap(db: SqliteDatabase, referenceTime: Date) {
     .all(shanghaiDayStart, shanghaiNextDayStart, shanghaiDayStart, shanghaiNextDayStart) as SourceCountRow[];
 
   return new Map(rows.map((row) => [row.sourceKind, row]));
-}
-
-function readIndependentTodayStatsBySource(
-  db: SqliteDatabase,
-  sourceKinds: string[],
-  viewKey: "hot" | "articles" | "ai",
-  referenceTime: Date
-) {
-  const stats = new Map<string, SourceViewStats>();
-  let totalVisibleCount = 0;
-
-  for (const sourceKind of sourceKinds) {
-    const selection = buildContentViewSelection(db, viewKey, {
-      referenceTime,
-      selectedSourceKinds: [sourceKind]
-    });
-    const metrics = selection.currentPageMetricsBySourceKind[sourceKind] ?? {
-      todayCandidateCount: 0,
-      todayVisibleCount: 0,
-      todayVisibleShare: 0
-    };
-
-    stats.set(sourceKind, {
-      todayCandidateCount: metrics.todayCandidateCount,
-      todayVisibleCount: metrics.todayVisibleCount,
-      todayVisibleShare: 0
-    });
-    totalVisibleCount += metrics.todayVisibleCount;
-  }
-
-  for (const [sourceKind, entry] of stats.entries()) {
-    stats.set(sourceKind, {
-      ...entry,
-      todayVisibleShare: totalVisibleCount > 0 ? entry.todayVisibleCount / totalVisibleCount : 0
-    });
-  }
-
-  return stats;
 }
 
 function buildShanghaiDayRange(referenceTime: Date) {

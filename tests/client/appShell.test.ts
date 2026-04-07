@@ -23,8 +23,21 @@ const settingsApiMocks = vi.hoisted(() => ({
   triggerManualCollect: vi.fn(),
   triggerManualSendLatestEmail: vi.fn()
 }));
+const httpMocks = vi.hoisted(() => ({
+  requestJson: vi.fn()
+}));
 
 vi.mock("../../src/client/services/settingsApi", () => settingsApiMocks);
+vi.mock("../../src/client/services/http", async () => {
+  const actual = await vi.importActual<typeof import("../../src/client/services/http")>(
+    "../../src/client/services/http"
+  );
+
+  return {
+    ...actual,
+    requestJson: httpMocks.requestJson
+  };
+});
 
 describe("client app shell", () => {
   beforeEach(() => {
@@ -35,6 +48,7 @@ describe("client app shell", () => {
       email: "admin@example.com",
       loggedIn: true
     });
+    httpMocks.requestJson.mockResolvedValue({ ok: true });
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: vi.fn().mockImplementation((query: string) => ({
@@ -242,6 +256,12 @@ describe("client app shell", () => {
     expect(wrapper.get("[data-shell-logout-form]").attributes("action")).toBe("/logout");
     expect(wrapper.get("[data-shell-logout-form]").attributes("method")).toBe("post");
     expect(wrapper.get("[data-shell-logout-button]").text()).toContain("退出登录");
+    expect(wrapper.get("[data-shell-account-username]").text()).toBe("@admin");
+    expect(wrapper.get("[data-shell-account-status]").text()).toContain("已登录");
+    expect(wrapper.get("[data-shell-account-panel]").text()).not.toContain("系统管理员");
+    expect(wrapper.get("[data-shell-account-panel]").text()).not.toContain("admin@example.com");
+    expect(wrapper.get("[data-shell-account-actions]").text()).toContain("已登录");
+    expect(wrapper.get("[data-shell-account-actions]").text()).toContain("退出登录");
 
     await wrapper.get("[data-mobile-system-toggle]").trigger("click");
     await flushPromises();
@@ -249,6 +269,32 @@ describe("client app shell", () => {
     expect(wrapper.get("[data-mobile-logout-form]").attributes("action")).toBe("/logout");
     expect(wrapper.get("[data-mobile-logout-form]").attributes("method")).toBe("post");
     expect(wrapper.get("[data-mobile-logout-button]").text()).toContain("退出登录");
+    expect(wrapper.get("[data-mobile-account-username]").text()).toBe("@admin");
+    expect(wrapper.get("[data-mobile-account-status]").text()).toContain("已登录");
+    expect(wrapper.get("[data-mobile-account-panel]").text()).not.toContain("系统管理员");
+    expect(wrapper.get("[data-mobile-account-actions]").text()).toContain("已登录");
+    expect(wrapper.get("[data-mobile-account-actions]").text()).toContain("退出登录");
+  });
+
+  it("keeps logout inside the shell by returning system pages to / instead of jumping to /login", async () => {
+    const router = createAppRouter();
+
+    await router.push("/settings/profile");
+    await router.isReady();
+
+    const wrapper = mount(App, {
+      global: {
+        plugins: [Antd, router]
+      }
+    });
+
+    await flushPromises();
+    await wrapper.get("[data-shell-logout-form]").trigger("submit");
+    await vi.dynamicImportSettled();
+    await flushPromises();
+
+    expect(httpMocks.requestJson).toHaveBeenCalledWith("/logout", { method: "POST" });
+    expect(router.currentRoute.value.fullPath).toBe("/");
   });
 
   it("shows a login entry when the current visitor is anonymous", async () => {
@@ -272,5 +318,6 @@ describe("client app shell", () => {
     expect(wrapper.find("[data-mobile-system-toggle]").exists()).toBe(false);
     expect(wrapper.find("[data-mobile-system-drawer]").exists()).toBe(false);
     expect(wrapper.find("[data-mobile-login-link]").exists()).toBe(false);
+    expect(wrapper.get("[data-shell-account-panel]").text()).not.toContain("你现在看到的是公开内容");
   });
 });

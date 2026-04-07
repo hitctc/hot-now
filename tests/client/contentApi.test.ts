@@ -143,6 +143,33 @@ describe("contentApi", () => {
     });
   });
 
+  it("encodes non-ascii title search keywords before sending the content header", async () => {
+    requestJson.mockResolvedValue({
+      pageKey: "ai-new",
+      sourceFilter: undefined,
+      featuredCard: null,
+      cards: [],
+      pagination: null,
+      emptyState: null
+    });
+
+    const { readAiNewPage } = await import("../../src/client/services/contentApi");
+
+    await readAiNewPage({
+      selectedSourceKinds: ["ithome"],
+      sortMode: "published_at",
+      searchKeyword: "特斯拉 AI"
+    });
+
+    expect(requestJson).toHaveBeenCalledWith("/api/content/ai-new", {
+      headers: {
+        "x-hot-now-source-filter": "ithome",
+        "x-hot-now-content-sort": "published_at",
+        "x-hot-now-content-search": "%E7%89%B9%E6%96%AF%E6%8B%89%20AI"
+      }
+    });
+  });
+
   it("sends the shared title search keyword through ai-hot header", async () => {
     requestJson.mockResolvedValue({
       pageKey: "ai-hot",

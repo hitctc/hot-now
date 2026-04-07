@@ -136,20 +136,6 @@
 
     const action = button.dataset.contentAction;
 
-    if (action === "favorite") {
-      event.preventDefault();
-      await handleFavorite(button, contentId);
-      closeMobileSystemDrawer();
-      return;
-    }
-
-    if (action === "reaction") {
-      event.preventDefault();
-      await handleReaction(card, button, contentId);
-      closeMobileSystemDrawer();
-      return;
-    }
-
     if (action === "feedback-panel-toggle") {
       event.preventDefault();
       toggleFeedbackPanel(card, button);
@@ -254,56 +240,6 @@
     void navigateShellPage(window.location.pathname + window.location.search, { pushHistory: false });
   });
 
-  async function handleFavorite(button, contentId) {
-    // Favorite toggles between one persisted state and no state, matching backend delete+insert semantics.
-    const currentlyFavorited = button.dataset.favorited === "true";
-    const nextFavorited = !currentlyFavorited;
-    const response = await postJson(`/actions/content/${contentId}/favorite`, { isFavorited: nextFavorited });
-
-    if (!response.ok) {
-      showStatus(await readActionError(response, "收藏操作失败，请稍后再试。"), "error");
-      return;
-    }
-
-    button.dataset.favorited = nextFavorited ? "true" : "false";
-    button.setAttribute("aria-pressed", nextFavorited ? "true" : "false");
-    button.textContent = nextFavorited ? "已收藏" : "收藏";
-    showStatus(nextFavorited ? "已加入收藏。" : "已取消收藏。", "success");
-  }
-
-  async function handleReaction(card, button, contentId) {
-    // Clicking an already-selected reaction clears it, so users can undo feedback in one tap.
-    const desiredReaction = button.dataset.reaction;
-
-    if (desiredReaction !== "like" && desiredReaction !== "dislike") {
-      return;
-    }
-
-    const currentPressed = button.getAttribute("aria-pressed") === "true";
-    const nextReaction = currentPressed ? "none" : desiredReaction;
-    const response = await postJson(`/actions/content/${contentId}/reaction`, { reaction: nextReaction });
-
-    if (!response.ok) {
-      showStatus(await readActionError(response, "反馈提交失败，请稍后再试。"), "error");
-      return;
-    }
-
-    const actionButtons = card.querySelectorAll('button[data-content-action="reaction"]');
-
-    for (const actionButton of actionButtons) {
-      if (!(actionButton instanceof HTMLButtonElement)) {
-        continue;
-      }
-
-      const reaction = actionButton.dataset.reaction;
-      const isPressed = reaction === nextReaction;
-      actionButton.setAttribute("aria-pressed", isPressed ? "true" : "false");
-    }
-
-    setFeedbackPanelOpen(card, true);
-    showStatus(nextReaction === "none" ? "已清除反馈。" : "反馈已保存。", "success");
-  }
-
   async function handleContentFeedbackSave(form) {
     const card = form.closest("[data-content-id]");
 
@@ -319,7 +255,7 @@
       return;
     }
 
-    const payload = readContentFeedbackPayload(form, card);
+    const payload = readContentFeedbackPayload(form);
     const response = await postJson(`/actions/content/${contentId}/feedback-pool`, payload);
 
     if (!response.ok) {
@@ -616,27 +552,6 @@
     } catch {
       return { ok: false };
     }
-  }
-
-  async function readActionError(response, fallbackMessage) {
-    // Error parsing centralizes route-specific reasons so each handler can keep one concise fallback path.
-    if (!response || typeof response !== "object") {
-      return fallbackMessage;
-    }
-
-    if (typeof response.status === "number") {
-      if (response.status === 401) {
-        return "请先登录后再操作。";
-      }
-
-      if (response.status === 404) {
-        return "内容不存在，可能已被删除。";
-      }
-    }
-
-    const payload = await safeJson(response);
-
-    return fallbackMessage;
   }
 
   async function readSystemActionError(response, fallbackMessage, systemAction) {
@@ -976,33 +891,16 @@
     }
   }
 
-  function readContentFeedbackPayload(form, card) {
+  function readContentFeedbackPayload(form) {
     const formData = new FormData(form);
 
     return {
-      reactionSnapshot: readCurrentReactionSnapshot(card),
       freeText: String(formData.get("freeText") || ""),
       suggestedEffect: normalizeNullableValue(formData.get("suggestedEffect")),
       strengthLevel: normalizeNullableValue(formData.get("strengthLevel")),
       positiveKeywords: parseKeywordInput(String(formData.get("positiveKeywords") || "")),
       negativeKeywords: parseKeywordInput(String(formData.get("negativeKeywords") || ""))
     };
-  }
-
-  function readCurrentReactionSnapshot(card) {
-    const reactionButtons = card.querySelectorAll('[data-content-action="reaction"]');
-
-    for (const button of reactionButtons) {
-      if (!(button instanceof HTMLButtonElement)) {
-        continue;
-      }
-
-      if (button.getAttribute("aria-pressed") === "true") {
-        return button.dataset.reaction === "dislike" ? "dislike" : "like";
-      }
-    }
-
-    return "none";
   }
 
   function parseKeywordInput(value) {

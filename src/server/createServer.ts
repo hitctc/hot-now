@@ -59,9 +59,9 @@ type SourceCard = {
   publishedTodayCount?: number;
   collectedTodayCount?: number;
   viewStats?: {
-    hot: { todayCandidateCount: number; todayVisibleCount: number; todayVisibleShare: number };
-    articles: { todayCandidateCount: number; todayVisibleCount: number; todayVisibleShare: number };
-    ai: { todayCandidateCount: number; todayVisibleCount: number; todayVisibleShare: number };
+    hot: { candidateCount: number; visibleCount: number; visibleShare: number };
+    articles: { candidateCount: number; visibleCount: number; visibleShare: number };
+    ai: { candidateCount: number; visibleCount: number; visibleShare: number };
   };
 };
 type SourcesOperationSummary = {
@@ -300,13 +300,18 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.redirect("/");
     });
 
-    app.post("/logout", async (_request, reply) => {
+    app.post("/logout", async (request, reply) => {
       reply.header(
         "set-cookie",
         serializeClearedSessionCookie({
           secure: authConfig?.secureCookie
         })
       );
+
+      if (request.headers.accept?.includes("application/json")) {
+        return reply.send({ ok: true });
+      }
+
       return reply.redirect("/login");
     });
 
@@ -1331,12 +1336,25 @@ function deriveDefaultSelectedSourceKinds(sourceOptions: ContentSourceOption[]):
   return sourceOptions.filter((source) => !source.showAllWhenSelected).map((source) => source.kind);
 }
 
-// header 允许客户端带空格；这里统一规整后再决定是否透传给模型层。
+// 搜索 header 先按客户端编码规则解码，再统一规整空白；旧客户端发纯 ASCII 时也能保持兼容。
 function readContentSearchHeader(headerValue: string | string[] | undefined) {
   const rawValue = Array.isArray(headerValue) ? headerValue[0] : headerValue;
-  const normalizedKeyword = normalizeSearchKeyword(rawValue);
+  const decodedValue = decodeContentSearchHeaderValue(rawValue);
+  const normalizedKeyword = normalizeSearchKeyword(decodedValue);
 
-  return normalizedKeyword === "" ? undefined : rawValue?.trim();
+  return normalizedKeyword === "" ? undefined : decodedValue?.trim();
+}
+
+function decodeContentSearchHeaderValue(headerValue: string | undefined) {
+  if (typeof headerValue !== "string") {
+    return undefined;
+  }
+
+  try {
+    return decodeURIComponent(headerValue);
+  } catch {
+    return headerValue;
+  }
 }
 
 // 这个判断用于空态分支，确保空白关键词不会误触发“搜索无结果”提示。

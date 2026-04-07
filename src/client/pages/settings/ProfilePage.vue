@@ -44,7 +44,7 @@ onMounted(() => {
       <h1 class="m-0 text-2xl font-semibold tracking-[-0.02em] text-editorial-text-main">
         当前登录用户
       </h1>
-      <p class="m-0 max-w-3xl text-sm leading-6 text-editorial-text-body">
+      <p class="m-0 text-sm leading-6 text-editorial-text-body">
         查看当前账号、会话状态和联系信息。
       </p>
     </section>

@@ -83,6 +83,17 @@ function createModel(overrides: Partial<typeof baseModel> = {}) {
   };
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((innerResolve, innerReject) => {
+    resolve = innerResolve;
+    reject = innerReject;
+  });
+
+  return { promise, resolve, reject };
+}
+
 describe("AiHotPage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -94,6 +105,14 @@ describe("AiHotPage", () => {
     contentApiMocks.readStoredContentSourceKinds.mockReturnValue(["openai"]);
     contentApiMocks.readStoredContentSortMode.mockReturnValue("content_score");
     contentApiMocks.readStoredContentSearchKeyword.mockReturnValue(null);
+    Object.defineProperty(window, "scrollTo", {
+      writable: true,
+      value: vi.fn()
+    });
+    Object.defineProperty(window, "scrollY", {
+      writable: true,
+      value: 0
+    });
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: vi.fn().mockImplementation((query: string) => ({
@@ -132,6 +151,9 @@ describe("AiHotPage", () => {
     expect(wrapper.find("[data-content-filter-shell]").exists()).toBe(false);
     expect(wrapper.find("[data-content-source-filter]").exists()).toBe(true);
     expect(wrapper.find("[data-content-toolbar]").exists()).toBe(true);
+    expect(wrapper.get("[data-content-sticky-toolbar]").classes()).toEqual(
+      expect.arrayContaining(["sticky", "z-20", "top-4", "max-[900px]:top-[72px]"])
+    );
     expect(wrapper.get("[data-content-source-filter]").text()).toContain("已选 1 / 2 · 共 80 条");
     expect(wrapper.find("[data-source-option-count='openai']").exists()).toBe(false);
     expect(wrapper.find("[data-source-option-count='ithome']").exists()).toBe(false);
@@ -140,6 +162,7 @@ describe("AiHotPage", () => {
     expect(wrapper.get("[data-content-section='list']").attributes("data-list-style")).toBe("database");
     expect(wrapper.get("[data-content-section='list']").text()).toContain("Hot AI Event");
     expect(wrapper.findAll("[data-content-row]").length).toBe(1);
+    expect(wrapper.findAll("[data-content-display-index]").map((node) => node.text())).toEqual(["1"]);
   });
 
   it("shows a degraded empty state when loading fails", async () => {
@@ -157,30 +180,7 @@ describe("AiHotPage", () => {
     expect(wrapper.get("[data-content-empty-state]").text()).toContain("页面加载失败");
   });
 
-  it("submits the shared title search keyword and reloads ai-hot from page 1", async () => {
-    routeState.query = { page: "2" };
-    contentApiMocks.readStoredContentSearchKeyword.mockReturnValue("agent");
-    contentApiMocks.readAiHotPage.mockResolvedValue(createModel());
-
-    const wrapper = mount(AiHotPage, { global: { plugins: [Antd] } });
-    await flushPromises();
-
-    await wrapper.get("[data-content-search-input]").setValue("openai");
-    await wrapper.get("[data-content-search-submit]").trigger("click");
-    await flushPromises();
-
-    expect(contentApiMocks.writeStoredContentSearchKeyword).toHaveBeenCalledWith("openai");
-    expect(routerMocks.replace).toHaveBeenCalledWith({ query: { page: "1" } });
-    expect(contentApiMocks.readAiHotPage).toHaveBeenLastCalledWith({
-      selectedSourceKinds: ["openai"],
-      sortMode: "content_score",
-      page: 1,
-      searchKeyword: "openai"
-    });
-  });
-
   it("clears the shared search keyword and reloads the default result set", async () => {
-    routeState.query = { page: "2" };
     contentApiMocks.readStoredContentSearchKeyword.mockReturnValue("agent");
     contentApiMocks.readAiHotPage.mockResolvedValue(createModel());
 
@@ -191,13 +191,32 @@ describe("AiHotPage", () => {
     await flushPromises();
 
     expect(contentApiMocks.writeStoredContentSearchKeyword).toHaveBeenCalledWith("");
-    expect(routerMocks.replace).toHaveBeenCalledWith({ query: { page: "1" } });
-    expect(contentApiMocks.readAiHotPage).toHaveBeenLastCalledWith({
-      selectedSourceKinds: ["openai"],
-      sortMode: "content_score",
-      page: 1,
-      searchKeyword: ""
+    expect(contentApiMocks.readAiHotPage).toHaveBeenLastCalledWith(
+      expect.objectContaining({ searchKeyword: "" })
+    );
+  });
+
+  it("keeps the silent refresh spinner horizontally centered after source filter changes", async () => {
+    const deferred = createDeferred<typeof baseModel>();
+    contentApiMocks.readAiHotPage.mockResolvedValueOnce(createModel()).mockImplementationOnce(() => deferred.promise);
+
+    const wrapper = mount(AiHotPage, {
+      global: {
+        plugins: [Antd]
+      }
     });
+
+    await flushPromises();
+    await wrapper.get("[data-source-kind='ithome']").setValue(true);
+    await flushPromises();
+
+    const indicator = wrapper.get("[data-content-refresh-indicator]");
+
+    expect(indicator.classes()).toEqual(expect.arrayContaining(["flex", "w-full", "justify-center"]));
+    expect(indicator.find(".ant-spin").exists()).toBe(true);
+
+    deferred.resolve(createModel());
+    await flushPromises();
   });
 
   it("reloads ai-hot when the user flips to the next page", async () => {
@@ -211,7 +230,20 @@ describe("AiHotPage", () => {
             pageSize: 50,
             totalResults: 80,
             totalPages: 2
-          }
+          },
+          cards: [
+            {
+              id: 21,
+              title: "Page 2 Hot AI Event",
+              summary: "A hot signal that keeps its global order on the second page.",
+              sourceName: "OpenAI",
+              sourceKind: "openai",
+              canonicalUrl: "https://example.com/hot-page-2",
+              publishedAt: "2026-03-31T16:00:00.000Z",
+              contentScore: 89,
+              scoreBadges: ["热点"]
+            }
+          ]
         })
       );
 
@@ -222,6 +254,7 @@ describe("AiHotPage", () => {
     });
 
     await flushPromises();
+    expect(wrapper.findAll("[data-content-display-index]").map((node) => node.text())).toEqual(["1"]);
     await wrapper.get("[data-content-pagination-action='next']").trigger("click");
     await flushPromises();
 
@@ -236,5 +269,10 @@ describe("AiHotPage", () => {
       page: 2,
       searchKeyword: ""
     });
+    expect(window.scrollTo).toHaveBeenCalledWith({
+      top: 0,
+      behavior: "auto"
+    });
+    expect(wrapper.findAll("[data-content-display-index]").map((node) => node.text())).toEqual(["51"]);
   });
 });

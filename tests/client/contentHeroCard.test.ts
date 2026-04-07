@@ -12,8 +12,6 @@ vi.mock("../../src/client/services/contentApi", async () => {
 
   return {
     ...actual,
-    saveFavorite: vi.fn(),
-    saveReaction: vi.fn(),
     saveFeedbackPoolEntry: vi.fn()
   };
 });
@@ -28,8 +26,6 @@ const card: ContentCard = {
   sourceKind: "openai",
   canonicalUrl: "https://example.com/ai-weekly",
   publishedAt: "2026-03-31T10:00:00.000Z",
-  isFavorited: false,
-  reaction: "none",
   contentScore: 94,
   scoreBadges: ["24h 内", "官方源"],
   feedbackEntry: {
@@ -59,9 +55,7 @@ describe("ContentHeroCard", () => {
     });
   });
 
-  it("renders featured content and calls the action endpoints", async () => {
-    vi.mocked(contentApi.saveFavorite).mockResolvedValue({ ok: true, contentItemId: 101, isFavorited: true });
-    vi.mocked(contentApi.saveReaction).mockResolvedValue({ ok: true, contentItemId: 101, reaction: "like" });
+  it("renders featured content with only the feedback action and saves feedback payloads", async () => {
     vi.mocked(contentApi.saveFeedbackPoolEntry).mockResolvedValue({ ok: true, contentItemId: 101, entryId: 1 });
 
     const wrapper = mount(ContentHeroCard, {
@@ -78,6 +72,8 @@ describe("ContentHeroCard", () => {
     expect(wrapper.get("[data-content-hero]").text()).toContain("AI Weekly Insight");
     expect(wrapper.get("[data-content-hero-title]").text()).toContain("AI Weekly Insight");
     expect(wrapper.get("[data-content-hero-summary]").text()).toContain("Roundup of recent AI and product updates.");
+    expect(wrapper.get("[data-content-hero-summary]").attributes("data-content-summary-expanded")).toBe("false");
+    expect(wrapper.find("[data-content-summary-toggle]").exists()).toBe(false);
     expect(wrapper.get("[data-content-hero]").classes()).toEqual(
       expect.arrayContaining(["rounded-editorial-lg", "border", "border-editorial-border", "bg-editorial-panel"])
     );
@@ -85,33 +81,56 @@ describe("ContentHeroCard", () => {
     expect(wrapper.text()).toContain("AI Weekly Insight");
     expect(wrapper.text()).toContain("保留 agent workflow 内容");
     expect(wrapper.text()).toContain("已同步到内容池");
-
-    await wrapper.get("[data-content-action='favorite']").trigger("click");
-    await flushPromises();
-    expect(contentApi.saveFavorite).toHaveBeenCalledWith(101, true);
-    expect(wrapper.text()).toContain("已加入收藏");
-    expect(wrapper.get("[data-content-action='favorite']").attributes("class")).toContain("!select-none");
-    expect(wrapper.get("[data-content-action='favorite']").attributes("class")).toContain("!bg-editorial-link-active");
-    expect(wrapper.get("[data-content-action='favorite']").attributes("class")).toContain("!text-editorial-text-main");
-
-    await wrapper.get("[data-content-action='reaction'][data-reaction='like']").trigger("click");
-    await flushPromises();
-    expect(contentApi.saveReaction).toHaveBeenCalledWith(101, "like");
-    expect(wrapper.text()).toContain("已记录点赞，可以继续补充原因");
-    expect(wrapper.text()).toContain("反馈说明");
-    expect(wrapper.get("[data-content-action='reaction'][data-reaction='like']").attributes("class")).toContain(
-      "!bg-editorial-link-active"
-    );
-    expect(wrapper.get("[data-content-action='reaction'][data-reaction='like']").attributes("class")).toContain(
-      "!text-editorial-text-main"
-    );
-
-    await wrapper.get("[data-content-action='feedback-panel-toggle']").trigger("click");
-    await flushPromises();
-    expect(wrapper.text()).not.toContain("反馈说明");
+    expect(wrapper.find("[data-content-action='favorite']").exists()).toBe(false);
+    expect(wrapper.find("[data-content-action='reaction']").exists()).toBe(false);
 
     await wrapper.get("[data-content-action='feedback-panel-toggle']").trigger("click");
     await flushPromises();
     expect(wrapper.text()).toContain("反馈说明");
+
+    await wrapper.get("textarea").setValue("保留 agent workflow 内容");
+
+    const inputs = wrapper.findAll("input");
+    await inputs[0]?.setValue("agent, workflow");
+    await inputs[1]?.setValue("融资");
+    wrapper.findComponent({ name: "AForm" }).vm.$emit("finish");
+    await flushPromises();
+
+    expect(contentApi.saveFeedbackPoolEntry).toHaveBeenCalledWith(
+      101,
+      expect.objectContaining({
+      freeText: "保留 agent workflow 内容",
+      positiveKeywords: ["agent", "workflow"],
+      suggestedEffect: "boost",
+      strengthLevel: "high"
+      })
+    );
+    expect(vi.mocked(contentApi.saveFeedbackPoolEntry).mock.calls[0]?.[1]).not.toHaveProperty("reactionSnapshot");
+  });
+
+  it("shows expand and collapse controls for long featured summaries", async () => {
+    const wrapper = mount(ContentHeroCard, {
+      props: {
+        card: {
+          ...card,
+          summary: "Long featured summary ".repeat(32)
+        }
+      },
+      global: {
+        plugins: [Antd]
+      }
+    });
+
+    await flushPromises();
+
+    expect(wrapper.get("[data-content-summary-toggle]").text()).toBe("展开");
+    expect(wrapper.get("[data-content-hero-summary]").attributes("class")).toContain("[-webkit-line-clamp:6]");
+
+    await wrapper.get("[data-content-summary-toggle]").trigger("click");
+    await flushPromises();
+
+    expect(wrapper.get("[data-content-summary-toggle]").text()).toBe("收起");
+    expect(wrapper.get("[data-content-hero-summary]").attributes("data-content-summary-expanded")).toBe("true");
+    expect(wrapper.get("[data-content-hero-summary]").attributes("class")).not.toContain("[-webkit-line-clamp:6]");
   });
 });

@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { RouterLink, RouterView, useRoute } from "vue-router";
+import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 
 import EditorialEmptyState from "../components/content/EditorialEmptyState.vue";
 import { useTheme, type ThemeMode } from "../composables/useTheme";
-import { HttpError } from "../services/http";
+import { HttpError, requestJson } from "../services/http";
 import { readSettingsProfile, type SettingsProfile } from "../services/settingsApi";
 import { shellPageMetas } from "../router";
 
 type ProfileLoadState = "idle" | "loading" | "loaded" | "empty" | "error";
 
 const route = useRoute();
+const router = useRouter();
 const { themeMode, isDarkMode, setThemeMode } = useTheme();
 const profile = ref<SettingsProfile | null>(null);
 const profileLoadState = ref<ProfileLoadState>("idle");
@@ -86,6 +87,30 @@ function closeMobileSystemDrawer(): void {
 
 function toggleMobileSystemDrawer(): void {
   mobileSystemDrawerOpen.value = !mobileSystemDrawerOpen.value;
+}
+
+// 登出优先走异步请求，这样内容页可以原地刷新，系统页也能平滑退回公开首页而不是跳登录页。
+async function handleLogout(): Promise<void> {
+  try {
+    await requestJson<{ ok: true }>("/logout", {
+      method: "POST"
+    });
+  } catch (error) {
+    profileError.value = error instanceof Error ? error.message : "退出登录失败";
+    profileLoadState.value = "error";
+    return;
+  }
+
+  profile.value = buildGuestProfile();
+  profileLoadState.value = "loaded";
+  closeMobileSystemDrawer();
+
+  if (route.path.startsWith("/settings/")) {
+    await router.replace("/");
+    return;
+  }
+
+  window.location.reload();
 }
 
 // 抽屉打开时锁住 body 滚动，避免移动端出现侧层打开但页面还能一起滑动的错位感。
@@ -276,38 +301,30 @@ onBeforeUnmount(() => {
 
             <template v-else-if="loggedInProfile">
               <div class="flex flex-col gap-2">
-                <p class="m-0 text-sm font-semibold leading-6 text-editorial-text-main">
-                  {{ loggedInProfile.displayName }}
-                </p>
-                <p class="m-0 text-sm leading-6 text-editorial-text-body">
+                <p class="m-0 text-sm font-semibold leading-6 text-editorial-text-main" data-shell-account-username>
                   @{{ loggedInProfile.username }}
                 </p>
-                <div class="flex flex-wrap gap-2 text-xs text-editorial-text-muted">
-                  <span class="inline-flex rounded-editorial-pill bg-editorial-link px-2.5 py-1">
-                    {{ loggedInProfile.role }}
-                  </span>
-                  <span class="inline-flex rounded-editorial-pill bg-editorial-link px-2.5 py-1">
+                <div class="flex flex-wrap items-center gap-2 text-xs text-editorial-text-muted" data-shell-account-actions>
+                  <span class="inline-flex rounded-editorial-pill bg-editorial-link px-2.5 py-1" data-shell-account-status>
                     已登录
                   </span>
-                </div>
-                <p v-if="loggedInProfile.email" class="m-0 text-sm leading-6 text-editorial-text-body">
-                  邮箱：{{ loggedInProfile.email }}
-                </p>
-                <form
-                  method="post"
-                  action="/logout"
-                  enctype="text/plain"
-                  class="pt-1"
-                  data-shell-logout-form
-                >
-                  <button
-                    type="submit"
-                    class="inline-flex items-center rounded-editorial-sm border border-editorial-border bg-editorial-panel px-3 py-2 text-sm font-medium text-editorial-text-main transition hover:bg-editorial-link-active"
-                    data-shell-logout-button
+                  <form
+                    method="post"
+                    action="/logout"
+                    enctype="text/plain"
+                    class="inline-flex"
+                    data-shell-logout-form
+                    @submit.prevent="handleLogout"
                   >
-                    退出登录
-                  </button>
-                </form>
+                    <button
+                      type="submit"
+                      class="inline-flex items-center rounded-editorial-pill border border-editorial-border bg-editorial-panel px-2.5 py-1 text-xs font-medium text-editorial-text-main transition hover:bg-editorial-link-active"
+                      data-shell-logout-button
+                    >
+                      退出登录
+                    </button>
+                  </form>
+                </div>
               </div>
             </template>
 
@@ -321,9 +338,6 @@ onBeforeUnmount(() => {
                     公开访问
                   </span>
                 </div>
-                <p class="m-0 text-sm leading-6 text-editorial-text-body">
-                  你现在看到的是公开内容。登录后才能进入系统菜单、保存策略和执行采集动作。
-                </p>
                 <a href="/login" class="inline-flex" data-shell-login-link>
                   <span
                     class="inline-flex items-center rounded-editorial-sm border border-editorial-border bg-editorial-panel px-3 py-2 text-sm font-medium text-editorial-text-main transition hover:bg-editorial-link-active"
@@ -348,9 +362,9 @@ onBeforeUnmount(() => {
     </aside>
 
     <main class="min-w-0 flex-1">
-      <div class="mx-auto flex w-full flex-1 flex-col px-4 pb-10 pt-2 min-[901px]:px-6 min-[901px]:pt-5">
+      <div class="flex w-full flex-1 flex-col px-4 pb-10 pt-2 min-[901px]:px-6 min-[901px]:pt-5">
         <header
-          class="mx-auto flex w-full max-w-editorial-shell flex-col gap-2 border-b border-editorial-border pb-4 pt-2"
+          class="flex w-full flex-col gap-2 border-b border-editorial-border pb-4 pt-2"
           data-page-header
         >
           <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
@@ -362,12 +376,12 @@ onBeforeUnmount(() => {
           >
             {{ currentPageTitle }}
           </h2>
-          <p class="m-0 max-w-3xl text-sm leading-6 text-editorial-text-body" data-page-header-description>
+          <p class="m-0 text-sm leading-6 text-editorial-text-body" data-page-header-description>
             {{ currentPageDescription }}
           </p>
         </header>
 
-        <div class="mx-auto w-full max-w-editorial-shell pt-6">
+        <div class="w-full pt-6">
           <RouterView v-slot="{ Component }">
             <component :is="Component" />
           </RouterView>
@@ -440,7 +454,10 @@ onBeforeUnmount(() => {
               </div>
             </section>
 
-            <section class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-3">
+            <section
+              class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-3"
+              data-mobile-account-panel
+            >
               <p class="mb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
                 当前登录用户
               </p>
@@ -449,35 +466,33 @@ onBeforeUnmount(() => {
               </template>
               <template v-else-if="loggedInProfile">
                 <div class="flex flex-col gap-2">
-                  <p class="m-0 text-sm font-semibold leading-6 text-editorial-text-main">
-                    {{ loggedInProfile.displayName }}
-                  </p>
-                  <p class="m-0 text-sm leading-6 text-editorial-text-body">
+                  <p class="m-0 text-sm font-semibold leading-6 text-editorial-text-main" data-mobile-account-username>
                     @{{ loggedInProfile.username }}
                   </p>
-                  <div class="flex flex-wrap gap-2 text-xs text-editorial-text-muted">
-                    <span class="inline-flex rounded-editorial-pill bg-editorial-link px-2.5 py-1">
-                      {{ loggedInProfile.role }}
-                    </span>
-                    <span class="inline-flex rounded-editorial-pill bg-editorial-link px-2.5 py-1">
+                  <div
+                    class="flex flex-wrap items-center gap-2 text-xs text-editorial-text-muted"
+                    data-mobile-account-actions
+                  >
+                    <span class="inline-flex rounded-editorial-pill bg-editorial-link px-2.5 py-1" data-mobile-account-status>
                       已登录
                     </span>
-                  </div>
-                  <form
-                    method="post"
-                    action="/logout"
-                    enctype="text/plain"
-                    class="pt-1"
-                    data-mobile-logout-form
-                  >
-                    <button
-                      type="submit"
-                      class="inline-flex items-center rounded-editorial-sm border border-editorial-border bg-editorial-panel px-3 py-2 text-sm font-medium text-editorial-text-main transition hover:bg-editorial-link-active"
-                      data-mobile-logout-button
+                    <form
+                      method="post"
+                      action="/logout"
+                      enctype="text/plain"
+                      class="inline-flex"
+                      data-mobile-logout-form
+                      @submit.prevent="handleLogout"
                     >
-                      退出登录
-                    </button>
-                  </form>
+                      <button
+                        type="submit"
+                        class="inline-flex items-center rounded-editorial-pill border border-editorial-border bg-editorial-panel px-2.5 py-1 text-xs font-medium text-editorial-text-main transition hover:bg-editorial-link-active"
+                        data-mobile-logout-button
+                      >
+                        退出登录
+                      </button>
+                    </form>
+                  </div>
                 </div>
               </template>
               <template v-else-if="profileLoadState === 'error'">

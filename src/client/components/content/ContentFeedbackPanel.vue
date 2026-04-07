@@ -3,17 +3,15 @@ import { reactive, watch } from "vue";
 
 import { editorialContentSubpanelClass } from "./contentCardShared";
 
-import type { ContentFeedbackEntry, ContentFeedbackSuggestedEffect, ContentFeedbackStrengthLevel, ContentReaction } from "../../services/contentApi";
+import type { ContentFeedbackEntry, ContentFeedbackSuggestedEffect, ContentFeedbackStrengthLevel } from "../../services/contentApi";
 
 const props = defineProps<{
   modelValue?: ContentFeedbackEntry;
-  reactionSnapshot: ContentReaction;
   submitting?: boolean;
 }>();
 
 const emit = defineEmits<{
   submit: [payload: {
-    reactionSnapshot: ContentReaction;
     freeText: string;
     suggestedEffect: ContentFeedbackSuggestedEffect;
     strengthLevel: ContentFeedbackStrengthLevel;
@@ -47,7 +45,6 @@ function splitKeywords(rawValue: string): string[] {
 
 function handleSubmit(): void {
   emit("submit", {
-    reactionSnapshot: props.reactionSnapshot,
     freeText: formState.freeText.trim(),
     suggestedEffect: formState.suggestedEffect,
     strengthLevel: formState.strengthLevel,

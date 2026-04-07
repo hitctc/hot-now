@@ -138,19 +138,24 @@ describe("listSourceWorkbench", () => {
       collectedTodayCount: 3
     });
     expect(openaiRow?.viewStats.hot).toEqual({
-      todayCandidateCount: 2,
-      todayVisibleCount: 2,
-      todayVisibleShare: 2 / 3
+      candidateCount: 3,
+      visibleCount: 3,
+      visibleShare: 3 / 4
     });
     expect(openaiRow?.viewStats.ai).toEqual({
-      todayCandidateCount: 2,
-      todayVisibleCount: 2,
-      todayVisibleShare: 2 / 3
+      candidateCount: 3,
+      visibleCount: 3,
+      visibleShare: 3 / 4
     });
     expect(kr36Row?.viewStats.hot).toEqual({
-      todayCandidateCount: 1,
-      todayVisibleCount: 1,
-      todayVisibleShare: 1 / 3
+      candidateCount: 1,
+      visibleCount: 1,
+      visibleShare: 1 / 4
+    });
+    expect(kr36Row?.viewStats.ai).toEqual({
+      candidateCount: 1,
+      visibleCount: 1,
+      visibleShare: 1 / 4
     });
   });
 
@@ -189,14 +194,14 @@ describe("listSourceWorkbench", () => {
       collectedTodayCount: 1
     });
     expect(juyaRow?.viewStats.hot).toEqual({
-      todayCandidateCount: 1,
-      todayVisibleCount: 1,
-      todayVisibleShare: 1
+      candidateCount: 1,
+      visibleCount: 1,
+      visibleShare: 1
     });
     expect(juyaRow?.viewStats.ai).toEqual({
-      todayCandidateCount: 1,
-      todayVisibleCount: 1,
-      todayVisibleShare: 1
+      candidateCount: 1,
+      visibleCount: 1,
+      visibleShare: 1
     });
   });
 
@@ -229,14 +234,14 @@ describe("listSourceWorkbench", () => {
     const openaiRow = workbench.find((row) => row.kind === "openai");
 
     expect(openaiRow?.viewStats.hot).toEqual({
-      todayCandidateCount: 0,
-      todayVisibleCount: 0,
-      todayVisibleShare: 0
+      candidateCount: 0,
+      visibleCount: 0,
+      visibleShare: 0
     });
     expect(openaiRow?.viewStats.ai).toEqual({
-      todayCandidateCount: 0,
-      todayVisibleCount: 0,
-      todayVisibleShare: 0
+      candidateCount: 0,
+      visibleCount: 0,
+      visibleShare: 0
     });
   });
 
@@ -260,14 +265,116 @@ describe("listSourceWorkbench", () => {
     const openaiRow = workbench.find((row) => row.kind === "openai");
 
     expect(openaiRow?.viewStats.hot).toEqual({
-      todayCandidateCount: 25,
-      todayVisibleCount: 25,
-      todayVisibleShare: 1
+      candidateCount: 25,
+      visibleCount: 25,
+      visibleShare: 1
     });
     expect(openaiRow?.viewStats.ai).toEqual({
-      todayCandidateCount: 25,
-      todayVisibleCount: 25,
-      todayVisibleShare: 1
+      candidateCount: 25,
+      visibleCount: 25,
+      visibleShare: 1
+    });
+  });
+
+  it("counts hot workbench stats from the full hot pool instead of only today's content", async () => {
+    const db = await createTestDatabase(databasesToClose);
+    const openai = resolveSourceByKind(db, "openai");
+    const kr36 = resolveSourceByKind(db, "kr36");
+
+    upsertContentItems(db, {
+      sourceId: openai!.id,
+      items: [
+        {
+          title: "OpenAI old hot item",
+          canonicalUrl: "https://example.com/openai-old-hot-item",
+          summary: "OpenAI old hot summary",
+          bodyMarkdown: "OpenAI old hot body",
+          publishedAt: "2026-03-28T08:00:00.000Z",
+          fetchedAt: "2026-03-28T08:05:00.000Z"
+        },
+        {
+          title: "OpenAI today hot item",
+          canonicalUrl: "https://example.com/openai-today-hot-item",
+          summary: "OpenAI today hot summary",
+          bodyMarkdown: "OpenAI today hot body",
+          publishedAt: "2026-03-31T01:00:00.000Z",
+          fetchedAt: "2026-03-31T01:05:00.000Z"
+        }
+      ]
+    });
+    upsertContentItems(db, {
+      sourceId: kr36!.id,
+      items: [
+        {
+          title: "36Kr today hot item",
+          canonicalUrl: "https://example.com/36kr-today-hot-item",
+          summary: "36Kr today hot summary",
+          bodyMarkdown: "36Kr today hot body",
+          publishedAt: "2026-03-31T02:00:00.000Z",
+          fetchedAt: "2026-03-31T02:05:00.000Z"
+        }
+      ]
+    });
+
+    const workbench = listSourceWorkbench(db);
+    const openaiRow = workbench.find((row) => row.kind === "openai");
+    const kr36Row = workbench.find((row) => row.kind === "kr36");
+
+    expect(openaiRow?.viewStats.hot).toEqual({
+      candidateCount: 2,
+      visibleCount: 2,
+      visibleShare: 2 / 3
+    });
+    expect(openaiRow?.viewStats.ai).toEqual({
+      candidateCount: 1,
+      visibleCount: 1,
+      visibleShare: 1 / 2
+    });
+    expect(kr36Row?.viewStats.hot).toEqual({
+      candidateCount: 1,
+      visibleCount: 1,
+      visibleShare: 1 / 3
+    });
+    expect(kr36Row?.viewStats.ai).toEqual({
+      candidateCount: 1,
+      visibleCount: 1,
+      visibleShare: 1 / 2
+    });
+  });
+
+  it("aligns ai workbench stats with the rolling 24-hour window used by the ai-new page", async () => {
+    const db = await createTestDatabase(databasesToClose);
+    const ithome = resolveSourceByKind(db, "ithome");
+
+    upsertContentItems(db, {
+      sourceId: ithome!.id,
+      items: [
+        {
+          title: "Within last 24 hours but before Shanghai day start",
+          canonicalUrl: "https://example.com/within-last-24-hours",
+          summary: "Within last 24 hours summary",
+          bodyMarkdown: "Within last 24 hours body",
+          publishedAt: "2026-03-30T15:30:00.000Z",
+          fetchedAt: "2026-03-30T15:35:00.000Z"
+        },
+        {
+          title: "Within Shanghai day",
+          canonicalUrl: "https://example.com/within-shanghai-day",
+          summary: "Within Shanghai day summary",
+          bodyMarkdown: "Within Shanghai day body",
+          publishedAt: "2026-03-31T01:30:00.000Z",
+          fetchedAt: "2026-03-31T01:35:00.000Z"
+        }
+      ]
+    });
+
+    const workbench = listSourceWorkbench(db);
+    const ithomeRow = workbench.find((row) => row.kind === "ithome");
+
+    expect(ithomeRow?.viewStats.ai).toEqual({
+      candidateCount: 2,
+      visibleCount: 2,
+      visibleShare: 1
     });
   });
 });

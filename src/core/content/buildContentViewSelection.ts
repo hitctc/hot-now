@@ -30,6 +30,12 @@ export type CurrentPageSourceMetrics = {
   todayVisibleShare: number;
 };
 
+export type IndependentSourceViewMetrics = {
+  candidateCount: number;
+  visibleCount: number;
+  visibleShare: number;
+};
+
 export type ContentViewSelection = {
   candidateCards: RankedContentCardView[];
   visibleCards: RankedContentCardView[];
@@ -172,6 +178,31 @@ export function collectIndependentTodayStatsBySourceForView(
   sourceKinds: string[],
   options: Pick<ContentViewSelectionOptions, "includeNlEvaluations" | "referenceTime"> = {}
 ): Map<string, CurrentPageSourceMetrics> {
+  const metrics = collectIndependentStatsBySourceForView(db, viewKey, sourceKinds, {
+    ...options,
+    countWindow: "today"
+  });
+
+  return new Map(
+    [...metrics.entries()].map(([sourceKind, metric]) => [
+      sourceKind,
+      {
+        todayCandidateCount: metric.candidateCount,
+        todayVisibleCount: metric.visibleCount,
+        todayVisibleShare: metric.visibleShare
+      }
+    ])
+  );
+}
+
+export function collectIndependentStatsBySourceForView(
+  db: SqliteDatabase,
+  viewKey: ContentViewKey,
+  sourceKinds: string[],
+  options: Pick<ContentViewSelectionOptions, "includeNlEvaluations" | "referenceTime"> & {
+    countWindow?: "today" | "all" | "last_24_hours";
+  } = {}
+): Map<string, IndependentSourceViewMetrics> {
   // Source workbench only needs per-source independent metrics, so one grouped pass per view is enough.
   if (sourceKinds.length === 0) {
     return new Map();
@@ -211,8 +242,8 @@ export function collectIndependentTodayStatsBySourceForView(
   }
 
   const { shanghaiDayStart, shanghaiNextDayStart } = buildShanghaiDayRange(referenceTime);
-  const independentMetrics = new Map<string, CurrentPageSourceMetrics>();
-  let currentPageTodayVisibleCount = 0;
+  const independentMetrics = new Map<string, IndependentSourceViewMetrics>();
+  let currentPageVisibleCount = 0;
 
   for (const [sourceKind, cards] of candidatesBySourceKind.entries()) {
     cards.sort(compareByRanking);
@@ -222,13 +253,19 @@ export function collectIndependentTodayStatsBySourceForView(
         ? cards
         : cards.slice(0, resolveVisibleLimit(viewKey, viewRuleConfig.limit));
     const metrics = {
-      todayCandidateCount: countCardsWithinShanghaiDay(cards, shanghaiDayStart, shanghaiNextDayStart),
-      todayVisibleCount: countCardsWithinShanghaiDay(visibleCards, shanghaiDayStart, shanghaiNextDayStart),
-      todayVisibleShare: 0
+      candidateCount: countCardsForWindow(cards, referenceTime, options.countWindow, shanghaiDayStart, shanghaiNextDayStart),
+      visibleCount: countCardsForWindow(
+        visibleCards,
+        referenceTime,
+        options.countWindow,
+        shanghaiDayStart,
+        shanghaiNextDayStart
+      ),
+      visibleShare: 0
     };
 
     independentMetrics.set(sourceKind, metrics);
-    currentPageTodayVisibleCount += metrics.todayVisibleCount;
+    currentPageVisibleCount += metrics.visibleCount;
   }
 
   return new Map(
@@ -236,13 +273,31 @@ export function collectIndependentTodayStatsBySourceForView(
       sourceKind,
       {
         ...metrics,
-        todayVisibleShare:
-          currentPageTodayVisibleCount > 0
-            ? metrics.todayVisibleCount / currentPageTodayVisibleCount
+        visibleShare:
+          currentPageVisibleCount > 0
+            ? metrics.visibleCount / currentPageVisibleCount
             : 0
       }
     ])
   );
+}
+
+function countCardsForWindow(
+  cards: Array<Pick<RankedContentCardView, "publishedAt" | "rankingTimestamp">>,
+  referenceTime: Date,
+  countWindow: "today" | "all" | "last_24_hours" | undefined,
+  shanghaiDayStart: string,
+  shanghaiNextDayStart: string
+) {
+  if (countWindow === "all") {
+    return cards.length;
+  }
+
+  if (countWindow === "last_24_hours") {
+    return countCardsWithinLastHours(cards, referenceTime, 24);
+  }
+
+  return countCardsWithinShanghaiDay(cards, shanghaiDayStart, shanghaiNextDayStart);
 }
 
 function countStableVisibleCardsBySourceKind(
@@ -318,6 +373,15 @@ function countCardsWithinShanghaiDay(
   return cards.filter((card) =>
     isWithinShanghaiDay(card.publishedAt ?? card.rankingTimestamp, shanghaiDayStart, shanghaiNextDayStart)
   ).length;
+}
+
+function countCardsWithinLastHours(
+  cards: Array<Pick<RankedContentCardView, "publishedAt" | "rankingTimestamp">>,
+  referenceTime: Date,
+  hours: number
+): number {
+  // Rolling-hour counting is used when workbench stats must align with AI 新讯 page semantics instead of Shanghai natural days.
+  return cards.filter((card) => isWithinLastHours(card.publishedAt ?? card.rankingTimestamp, referenceTime, hours)).length;
 }
 
 function applyCurrentPageVisibleShares(

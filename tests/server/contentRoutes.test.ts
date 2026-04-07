@@ -88,7 +88,7 @@ describe("content routes", () => {
       headers: {
         "x-hot-now-source-filter": "openai,missing",
         "x-hot-now-content-sort": "content_score",
-        "x-hot-now-content-search": "weekly"
+        "x-hot-now-content-search": "AI%20Weekly"
       }
     });
     const aiNewPayload = aiNewResponse.json() as {
@@ -204,6 +204,36 @@ describe("content routes", () => {
       sortMode: "published_at",
       page: 2,
       searchKeyword: "agent"
+    });
+  });
+
+  it("decodes encoded search headers before passing the keyword to the content model", async () => {
+    const getContentPageModel = vi.fn().mockResolvedValue({
+      pageKey: "ai-new",
+      sourceFilter: undefined,
+      featuredCard: null,
+      cards: [],
+      pagination: null,
+      emptyState: null
+    });
+    const app = createContentTestServer({
+      getContentPageModel
+    } as never);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/content/ai-new",
+      headers: {
+        "x-hot-now-content-search": "%E7%89%B9%E6%96%AF%E6%8B%89%20AI"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(getContentPageModel).toHaveBeenCalledWith("ai-new", {
+      selectedSourceKinds: undefined,
+      sortMode: undefined,
+      page: 1,
+      searchKeyword: "特斯拉 AI"
     });
   });
 

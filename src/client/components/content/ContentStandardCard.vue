@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch } from "vue";
 
 import ContentActionBar from "./ContentActionBar.vue";
 import ContentFeedbackPanel from "./ContentFeedbackPanel.vue";
+import { useSummaryDisclosure } from "./useSummaryDisclosure";
 import {
   cloneContentCard,
   editorialContentBadgeClass,
@@ -15,15 +16,14 @@ import {
   readSafeUrl
 } from "./contentCardShared";
 import {
-  saveFavorite,
   saveFeedbackPoolEntry,
-  saveReaction,
   type ContentCard,
   type SaveFeedbackPoolEntryPayload
 } from "../../services/contentApi";
 
 const props = defineProps<{
   card: ContentCard;
+  displayIndex?: number | null;
   statusText?: string | null;
 }>();
 
@@ -47,35 +47,6 @@ watch(
   },
   { immediate: true }
 );
-
-async function handleFavorite(): Promise<void> {
-  isBusy.value = true;
-
-  try {
-    const response = await saveFavorite(cardState.id, !cardState.isFavorited);
-    cardState.isFavorited = response.isFavorited;
-    statusText.value = response.isFavorited ? "已加入收藏" : "已取消收藏";
-  } catch {
-    statusText.value = "收藏失败，请稍后重试。";
-  } finally {
-    isBusy.value = false;
-  }
-}
-
-async function handleReaction(nextReaction: "like" | "dislike"): Promise<void> {
-  isBusy.value = true;
-
-  try {
-    const response = await saveReaction(cardState.id, nextReaction);
-    cardState.reaction = response.reaction;
-    feedbackOpen.value = true;
-    statusText.value = nextReaction === "like" ? "已记录点赞，可以继续补充原因" : "已记录点踩，可以继续补充原因";
-  } catch {
-    statusText.value = "反馈操作失败，请稍后重试。";
-  } finally {
-    isBusy.value = false;
-  }
-}
 
 async function handleFeedbackSubmit(payload: SaveFeedbackPoolEntryPayload): Promise<void> {
   isBusy.value = true;
@@ -102,6 +73,13 @@ watch(() => props.card, syncCardState, { deep: true });
 const safeUrl = computed(() => readSafeUrl(cardState.canonicalUrl));
 const publishedText = computed(() => formatPublishedAt(cardState.publishedAt));
 const feedbackSummary = computed(() => formatFeedbackSummary(cardState.feedbackEntry));
+const {
+  summaryElement,
+  summaryExpanded,
+  summaryOverflowed,
+  summaryBodyClass,
+  toggleSummaryExpanded
+} = useSummaryDisclosure(() => cardState.summary, 5, 220);
 </script>
 
 <template>
@@ -118,22 +96,51 @@ const feedbackSummary = computed(() => formatFeedbackSummary(cardState.feedbackE
         <span :class="editorialContentScoreBadgeClass">系统分 {{ cardState.contentScore }}</span>
       </div>
 
-      <h3 class="text-[17px] font-medium leading-7 text-editorial-text-main">
-        <a
-          v-if="safeUrl"
-          :href="safeUrl"
-          target="_blank"
-          rel="noreferrer"
-          class="text-current no-underline transition hover:underline hover:no-underline"
+      <div class="flex items-start gap-3">
+        <span
+          v-if="props.displayIndex !== undefined && props.displayIndex !== null"
+          class="inline-flex min-w-[2rem] shrink-0 items-center justify-center rounded-editorial-pill border border-editorial-border bg-editorial-link px-2.5 py-1 text-[11px] font-semibold leading-5 text-editorial-text-muted"
+          data-content-display-index
         >
-          {{ cardState.title }}
-        </a>
-        <span v-else>{{ cardState.title }}</span>
-      </h3>
+          {{ props.displayIndex }}
+        </span>
 
-      <p class="m-0 text-sm leading-6 text-editorial-text-body">
-        {{ cardState.summary }}
-      </p>
+        <h3 class="m-0 min-w-0 flex-1 text-[17px] font-medium leading-7 text-editorial-text-main">
+          <a
+            v-if="safeUrl"
+            :href="safeUrl"
+            target="_blank"
+            rel="noreferrer"
+            class="text-current no-underline transition hover:underline hover:no-underline"
+          >
+            {{ cardState.title }}
+          </a>
+          <span v-else>{{ cardState.title }}</span>
+        </h3>
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <p
+          ref="summaryElement"
+          :class="['m-0 text-sm leading-6 text-editorial-text-body [overflow-wrap:anywhere] break-words', ...summaryBodyClass]"
+          :data-content-summary-expanded="summaryExpanded ? 'true' : 'false'"
+          data-content-standard-summary
+          data-content-summary-body
+        >
+          {{ cardState.summary }}
+        </p>
+
+        <button
+          v-if="summaryOverflowed"
+          type="button"
+          class="inline-flex w-fit items-center rounded-editorial-sm border border-editorial-border bg-editorial-panel px-3 py-1.5 text-xs font-medium text-editorial-text-main transition hover:bg-editorial-link-active"
+          :aria-expanded="summaryExpanded ? 'true' : 'false'"
+          data-content-summary-toggle
+          @click="toggleSummaryExpanded"
+        >
+          {{ summaryExpanded ? "收起" : "展开" }}
+        </button>
+      </div>
 
       <div class="flex flex-wrap gap-2">
         <span v-for="badge in cardState.scoreBadges" :key="badge" :class="editorialContentBadgeClass">
@@ -142,13 +149,9 @@ const feedbackSummary = computed(() => formatFeedbackSummary(cardState.feedbackE
       </div>
 
       <ContentActionBar
-        :is-favorited="cardState.isFavorited"
-        :reaction="cardState.reaction"
         :is-busy="isBusy"
         :feedback-open="feedbackOpen"
         :status-text="statusText"
-        @favorite="handleFavorite"
-        @reaction="handleReaction"
         @toggle-feedback="feedbackOpen = !feedbackOpen"
       />
 
@@ -162,7 +165,6 @@ const feedbackSummary = computed(() => formatFeedbackSummary(cardState.feedbackE
       <ContentFeedbackPanel
         v-if="feedbackOpen"
         :model-value="cardState.feedbackEntry"
-        :reaction-snapshot="cardState.reaction"
         :submitting="isBusy"
         @submit="handleFeedbackSubmit"
       />

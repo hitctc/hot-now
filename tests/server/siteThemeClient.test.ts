@@ -328,7 +328,7 @@ describe("site theme runtime", () => {
     });
   });
 
-  it("opens the local feedback panel after reaction clicks and submits feedback form payloads", async () => {
+  it("opens the local feedback panel from the dedicated toggle and submits payloads without reaction snapshots", async () => {
     const dom = new JSDOM(
       `<!doctype html>
 <html data-theme="dark">
@@ -336,7 +336,6 @@ describe("site theme runtime", () => {
     <button type="button" data-theme-choice="dark" aria-pressed="true">深色模式</button>
     <button type="button" data-theme-choice="light" aria-pressed="false">浅色模式</button>
     <article data-content-id="42">
-      <button type="button" data-content-action="reaction" data-reaction="like" aria-pressed="false">点赞</button>
       <button type="button" data-content-action="feedback-panel-toggle" aria-expanded="false">补充反馈</button>
       <div data-role="feedback-panel" hidden>
         <form data-content-feedback-form>
@@ -368,16 +367,12 @@ describe("site theme runtime", () => {
       .fn()
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ ok: true })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
         json: async () => ({ ok: true, entryId: 9 })
       });
     window.fetch = fetchMock as typeof window.fetch;
     window.eval(siteScript);
 
-    const likeButton = window.document.querySelector('[data-content-action="reaction"][data-reaction="like"]');
+    const toggleButton = window.document.querySelector('[data-content-action="feedback-panel-toggle"]');
     const feedbackPanel = window.document.querySelector("[data-role='feedback-panel']");
     const feedbackForm = window.document.querySelector("[data-content-feedback-form]");
     const freeText = feedbackForm?.querySelector('[name="freeText"]') as HTMLTextAreaElement | null;
@@ -386,7 +381,7 @@ describe("site theme runtime", () => {
     const positiveKeywords = feedbackForm?.querySelector('[name="positiveKeywords"]') as HTMLInputElement | null;
     const negativeKeywords = feedbackForm?.querySelector('[name="negativeKeywords"]') as HTMLInputElement | null;
 
-    likeButton?.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+    toggleButton?.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
     await new Promise((resolve) => window.setTimeout(resolve, 0));
 
     expect(feedbackPanel?.hasAttribute("hidden")).toBe(false);
@@ -406,18 +401,10 @@ describe("site theme runtime", () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      "/actions/content/42/reaction",
-      expect.objectContaining({
-        method: "POST"
-      })
-    );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
       "/actions/content/42/feedback-pool",
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({
-          reactionSnapshot: "like",
           freeText: "保留 agent workflow 内容",
           suggestedEffect: "boost",
           strengthLevel: "high",

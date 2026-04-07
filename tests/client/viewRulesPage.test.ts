@@ -49,7 +49,6 @@ function createWorkbench() {
         contentTitle: "Agent 工作流总结",
         canonicalUrl: "https://example.com/agent",
         sourceName: "OpenAI",
-        reactionSnapshot: "like",
         freeText: "这类内容应该更靠前。",
         suggestedEffect: "提高权重",
         strengthLevel: "high",
@@ -146,6 +145,8 @@ describe("ViewRulesPage", () => {
     expect(wrapper.find("[data-settings-section='feedback-pool']").exists()).toBe(true);
     expect(wrapper.get("[data-view-rules-section='feedback-pool']").text()).toContain("Agent 工作流总结");
     expect(wrapper.get("[data-feedback-row]").text()).toContain("Agent 工作流总结");
+    expect(wrapper.get("[data-feedback-row]").text()).toContain("OpenAI");
+    expect(wrapper.get("[data-feedback-row]").text()).toContain("这类内容应该更靠前。");
     expect(wrapper.get("[data-action='copy-feedback-pool']").text()).toContain("复制全部反馈");
     expect(wrapper.get("[data-action='clear-feedback-pool']").text()).toContain("清空全部反馈");
     expect(wrapper.find("[data-settings-section='strategy-drafts']").exists()).toBe(true);
@@ -218,5 +219,111 @@ describe("ViewRulesPage", () => {
     expect(draftEmptyState.text()).toContain("可以先把反馈转成草稿。");
     expect(draftEmptyState.classes()).toContain("rounded-editorial-lg");
     expect(draftEmptyState.classes()).toContain("bg-editorial-panel");
+  });
+
+  it("requires popconfirm before deleting the current provider settings", async () => {
+    vi.mocked(settingsApi.readSettingsViewRules)
+      .mockResolvedValueOnce(createWorkbench())
+      .mockResolvedValueOnce(createWorkbench());
+    vi.mocked(settingsApi.deleteProviderSettings).mockResolvedValue({ ok: true });
+
+    const wrapper = mountWithApp(ViewRulesPage);
+
+    await flushPromises();
+
+    await wrapper.get("[data-action='delete-provider-settings']").trigger("click");
+    expect(settingsApi.deleteProviderSettings).not.toHaveBeenCalled();
+
+    const providerDeleteConfirm = wrapper
+      .findAllComponents({ name: "APopconfirm" })
+      .find((component) => component.text().includes("删除当前厂商配置"));
+
+    expect(providerDeleteConfirm).toBeTruthy();
+
+    providerDeleteConfirm!.vm.$emit("confirm");
+    await flushPromises();
+
+    expect(settingsApi.deleteProviderSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it("requires popconfirm before deleting a feedback entry", async () => {
+    vi.mocked(settingsApi.readSettingsViewRules)
+      .mockResolvedValueOnce(createWorkbench())
+      .mockResolvedValueOnce(createWorkbench());
+    vi.mocked(settingsApi.deleteFeedbackEntry).mockResolvedValue({
+      ok: true,
+      feedbackId: 201
+    });
+
+    const wrapper = mountWithApp(ViewRulesPage);
+
+    await flushPromises();
+
+    await wrapper.get("[data-action='delete-feedback-201']").trigger("click");
+    expect(settingsApi.deleteFeedbackEntry).not.toHaveBeenCalled();
+
+    const feedbackDeleteConfirm = wrapper
+      .findAllComponents({ name: "APopconfirm" })
+      .find((component) => component.find('[data-action="delete-feedback-201"]').exists());
+
+    expect(feedbackDeleteConfirm).toBeTruthy();
+
+    feedbackDeleteConfirm!.vm.$emit("confirm");
+    await flushPromises();
+
+    expect(settingsApi.deleteFeedbackEntry).toHaveBeenCalledWith(201);
+  });
+
+  it("requires popconfirm before clearing the feedback pool", async () => {
+    vi.mocked(settingsApi.readSettingsViewRules)
+      .mockResolvedValueOnce(createWorkbench())
+      .mockResolvedValueOnce(createEmptyWorkbench());
+    vi.mocked(settingsApi.clearFeedbackPool).mockResolvedValue({ ok: true, cleared: 1 });
+
+    const wrapper = mountWithApp(ViewRulesPage);
+
+    await flushPromises();
+
+    await wrapper.get("[data-action='clear-feedback-pool']").trigger("click");
+    expect(settingsApi.clearFeedbackPool).not.toHaveBeenCalled();
+
+    const clearFeedbackConfirm = wrapper
+      .findAllComponents({ name: "APopconfirm" })
+      .find((component) => component.find('[data-action="clear-feedback-pool"]').exists());
+
+    expect(clearFeedbackConfirm).toBeTruthy();
+
+    clearFeedbackConfirm!.vm.$emit("confirm");
+    await flushPromises();
+
+    expect(settingsApi.clearFeedbackPool).toHaveBeenCalledTimes(1);
+  });
+
+  it("requires popconfirm before deleting a draft", async () => {
+    vi.mocked(settingsApi.readSettingsViewRules)
+      .mockResolvedValueOnce(createWorkbench())
+      .mockResolvedValueOnce(createEmptyWorkbench());
+    vi.mocked(settingsApi.deleteStrategyDraft).mockResolvedValue({
+      ok: true,
+      draftId: 301
+    });
+
+    const wrapper = mountWithApp(ViewRulesPage);
+
+    await flushPromises();
+
+    await wrapper.get("[data-action='delete-draft-301']").trigger("click");
+    expect(settingsApi.deleteStrategyDraft).not.toHaveBeenCalled();
+
+    const draftDeleteConfirm = wrapper
+      .findAllComponents({ name: "APopconfirm" })
+      .find((component) => component.find('[data-action="delete-draft-301"]').exists());
+
+    expect(draftDeleteConfirm).toBeTruthy();
+
+    draftDeleteConfirm!.vm.$emit("confirm");
+    await flushPromises();
+
+    expect(settingsApi.deleteStrategyDraft).toHaveBeenCalledWith(301);
   });
 });

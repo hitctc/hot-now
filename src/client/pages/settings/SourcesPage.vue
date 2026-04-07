@@ -27,9 +27,9 @@ const analyticsColumns = [
   { title: "总条数", key: "totalCount", align: "center" as const },
   { title: "今天发布", key: "publishedTodayCount", align: "center" as const },
   { title: "今天抓取", key: "collectedTodayCount", align: "center" as const },
-  { title: "AI 新讯今日候选 / 今日展示", key: "aiStats", align: "center" as const },
+  { title: "AI 新讯24小时候选 / 24小时展示", key: "aiStats", align: "center" as const },
   { title: "AI 新讯独立展示占比", key: "aiShare", align: "center" as const },
-  { title: "AI 热点今日候选 / 今日展示", key: "hotStats", align: "center" as const },
+  { title: "AI 热点候选 / 展示", key: "hotStats", align: "center" as const },
   { title: "AI 热点独立展示占比", key: "hotShare", align: "center" as const }
 ];
 const inventoryColumns = [
@@ -91,26 +91,26 @@ function formatDateTime(value: string | null | undefined): string {
 // 三个内容视图的候选 / 展示统计都用同一格式输出，便于在表格里横向比较。
 function formatViewStats(
   stats:
-    | { todayCandidateCount: number; todayVisibleCount: number; todayVisibleShare: number }
+    | { candidateCount: number; visibleCount: number; visibleShare: number }
     | undefined
 ): string {
   if (!stats) {
     return "0 / 0";
   }
 
-  return `${stats.todayCandidateCount} / ${stats.todayVisibleCount}`;
+  return `${stats.candidateCount} / ${stats.visibleCount}`;
 }
 
 function formatViewShare(
   stats:
-    | { todayCandidateCount: number; todayVisibleCount: number; todayVisibleShare: number }
+    | { candidateCount: number; visibleCount: number; visibleShare: number }
     | undefined
 ): string {
   if (!stats) {
     return "0.0%";
   }
 
-  return `${(stats.todayVisibleShare * 100).toFixed(1)}%`;
+  return `${(stats.visibleShare * 100).toFixed(1)}%`;
 }
 
 // 最近抓取状态保留原始枚举给后端和数据库，页面统一翻译成中文给用户看。
@@ -308,7 +308,7 @@ onMounted(() => {
         <h1 class="m-0 text-2xl font-semibold tracking-[-0.02em] text-editorial-text-main">
           数据收集
         </h1>
-        <p class="m-0 max-w-3xl text-sm leading-6 text-editorial-text-body">
+        <p class="m-0 text-sm leading-6 text-editorial-text-body">
           查看来源状态、执行采集动作和当前统计口径。
         </p>
       </section>

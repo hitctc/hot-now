@@ -1649,24 +1649,27 @@ function renderLoginPage() {
     <link rel="stylesheet" href="/assets/site.css" />
   </head>
   <body class="login-page">
-    <main class="login-card">
-      <h1>登录 HotNow</h1>
-      <p class="login-subtitle">统一站点已启用账号校验，请使用管理员账号继续。</p>
-      <form id="login-form">
-        <label class="field-label" for="username">用户名</label>
-        <input id="username" class="field-input" name="username" autocomplete="username" required />
-        <label class="field-label" for="password">密码</label>
-        <input
-          id="password"
-          class="field-input"
-          name="password"
-          type="password"
-          autocomplete="current-password"
-          required
-        />
-        <button class="primary-button" type="submit">登录</button>
-      </form>
-      <p id="login-error" class="form-error"></p>
+    <main class="login-shell">
+      <section class="login-card">
+        <p class="login-kicker">HotNow Workspace</p>
+        <h1>登录 HotNow</h1>
+        <p class="login-subtitle">统一站点已启用账号校验，请使用管理员账号继续。</p>
+        <form id="login-form">
+          <label class="field-label" for="username">用户名</label>
+          <input id="username" class="field-input" name="username" autocomplete="username" required />
+          <label class="field-label" for="password">密码</label>
+          <input
+            id="password"
+            class="field-input"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            required
+          />
+          <button class="primary-button" type="submit">登录</button>
+        </form>
+        <p id="login-error" class="form-error"></p>
+      </section>
     </main>
     <script>
       const form = document.getElementById("login-form");

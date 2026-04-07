@@ -20,9 +20,13 @@ export function renderNoticePage(title: string, message: string) {
   return renderLegacyDocument({
     pageKind: "notice",
     title,
+    eyebrow: "Legacy Notice",
+    subtitle: "共享主题下的轻量提示页。",
     bodyHtml: `
-      <h1>${escapeHtml(title)}</h1>
-      <p>${escapeHtml(message)}</p>
+      <section class="legacy-section">
+        <h2 class="legacy-section-title">说明</h2>
+        <p class="legacy-callout">${escapeHtml(message)}</p>
+      </section>
     `
   });
 }
@@ -39,19 +43,45 @@ export function renderControlPage(config: RenderConfig = {}, running: boolean) {
   return renderLegacyDocument({
     pageKind: "control",
     title: "HotNow 控制台",
+    eyebrow: "Operations",
+    subtitle: "查看当前任务状态并执行手动操作。",
     bodyHtml: `
-      <h1>HotNow 控制台</h1>
-      <p>采集周期：${escapeHtml(collectionInterval)}</p>
-      <p>发信时间：${escapeHtml(String(mailTime))}</p>
-      <p>报告目录：${escapeHtml(String(dataDir))}</p>
-      <p>收件邮箱：${escapeHtml(String(recipient))}</p>
-      <p>任务状态：${running ? "执行中" : "空闲"}</p>
-      <form method="post" action="/actions/collect">
-        <button type="submit"${canTriggerManualCollect && !running ? "" : " disabled"}>手动执行采集</button>
-      </form>
-      <form method="post" action="/actions/send-latest-email">
-        <button type="submit"${canTriggerManualSendLatestEmail && !running ? "" : " disabled"}>手动发送最新报告</button>
-      </form>
+      <section class="legacy-section">
+        <h2 class="legacy-section-title">运行摘要</h2>
+        <dl class="legacy-meta-list">
+          <div>
+            <dt>采集周期</dt>
+            <dd>${escapeHtml(collectionInterval)}</dd>
+          </div>
+          <div>
+            <dt>发信时间</dt>
+            <dd>${escapeHtml(String(mailTime))}</dd>
+          </div>
+          <div>
+            <dt>报告目录</dt>
+            <dd>${escapeHtml(String(dataDir))}</dd>
+          </div>
+          <div>
+            <dt>收件邮箱</dt>
+            <dd>${escapeHtml(String(recipient))}</dd>
+          </div>
+          <div>
+            <dt>任务状态</dt>
+            <dd>${running ? "执行中" : "空闲"}</dd>
+          </div>
+        </dl>
+      </section>
+      <section class="legacy-section">
+        <h2 class="legacy-section-title">手动操作</h2>
+        <div class="legacy-actions">
+          <form method="post" action="/actions/collect">
+            <button type="submit"${canTriggerManualCollect && !running ? "" : " disabled"}>手动执行采集</button>
+          </form>
+          <form method="post" action="/actions/send-latest-email">
+            <button type="submit"${canTriggerManualSendLatestEmail && !running ? "" : " disabled"}>手动发送最新报告</button>
+          </form>
+        </div>
+      </section>
     `
   });
 }
@@ -75,9 +105,13 @@ export function renderHistoryPage(entries: ReportSummary[]) {
   return renderLegacyDocument({
     pageKind: "history",
     title: "HotNow 历史报告",
+    eyebrow: "Archive",
+    subtitle: "查看已生成报告并快速跳转到对应日期。",
     bodyHtml: `
-      <h1>历史报告</h1>
-      <ul>${items}</ul>
+      <section class="legacy-section">
+        <h2 class="legacy-section-title">报告列表</h2>
+        <ul class="legacy-list">${items}</ul>
+      </section>
     `
   });
 }
@@ -87,6 +121,8 @@ type LegacyPageKind = "notice" | "control" | "history";
 type LegacyDocumentConfig = {
   pageKind: LegacyPageKind;
   title: string;
+  eyebrow: string;
+  subtitle: string;
   bodyHtml: string;
 };
 
@@ -103,6 +139,11 @@ function renderLegacyDocument(config: LegacyDocumentConfig) {
   </head>
   <body class="legacy-page legacy-page--${config.pageKind}">
     <main class="legacy-shell legacy-shell--${config.pageKind}">
+      <header class="legacy-header legacy-header--${config.pageKind}">
+        <p class="legacy-eyebrow">${escapeHtml(config.eyebrow)}</p>
+        <h1>${escapeHtml(config.title)}</h1>
+        <p class="legacy-subtitle">${escapeHtml(config.subtitle)}</p>
+      </header>
       <section class="legacy-card legacy-card--${config.pageKind}">
         ${config.bodyHtml}
       </section>

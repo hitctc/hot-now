@@ -280,6 +280,26 @@ describe("createServer", () => {
     expect(response.headers.location).toBe("/login");
   });
 
+  it("renders the shared workspace login page when auth is enabled", async () => {
+    const app = createServer({
+      auth: {
+        requireLogin: true,
+        sessionSecret: "test-secret",
+        verifyLogin: vi.fn().mockResolvedValue(null)
+      }
+    });
+
+    const response = await app.inject({ method: "GET", url: "/login" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('class="login-page"');
+    expect(response.body).toContain('class="login-shell"');
+    expect(response.body).toContain('class="login-card"');
+    expect(response.body).toContain("HotNow Workspace");
+    expect(response.body).toContain('id="login-form"');
+    expect(response.body).toContain('<link rel="stylesheet" href="/assets/site.css" />');
+  });
+
   it("rejects anonymous collect actions when unified shell auth is enabled", async () => {
     const app = createServer({
       auth: {

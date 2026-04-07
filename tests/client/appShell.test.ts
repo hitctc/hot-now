@@ -82,7 +82,7 @@ describe("client app shell", () => {
       expect.arrayContaining(["border-b", "border-editorial-border"])
     );
     expect(wrapper.find("[data-shell-page-summary]").exists()).toBe(false);
-    expect(wrapper.get("[data-workspace-sidebar]").exists()).toBe(true);
+    expect(wrapper.find("[data-workspace-sidebar]").exists()).toBe(true);
     expect(wrapper.get("[data-workspace-brand]").text()).toContain("AI Workspace");
     expect(wrapper.find("[data-page-header-title]").text()).toBe("当前用户");
     expect(wrapper.find("[data-page-header-description]").text()).toContain("当前登录账号");

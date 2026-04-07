@@ -141,12 +141,12 @@ describe("ViewRulesPage", () => {
     expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("基础入池门");
     expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("AI 热点入池门");
     expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("AI 新讯入池门");
-    expect(wrapper.get("[data-settings-section='feedback-pool']").exists()).toBe(true);
+    expect(wrapper.find("[data-settings-section='feedback-pool']").exists()).toBe(true);
     expect(wrapper.get("[data-view-rules-section='feedback-pool']").text()).toContain("Agent 工作流总结");
     expect(wrapper.get("[data-feedback-row]").text()).toContain("Agent 工作流总结");
     expect(wrapper.get("[data-action='copy-feedback-pool']").text()).toContain("复制全部反馈");
     expect(wrapper.get("[data-action='clear-feedback-pool']").text()).toContain("清空全部反馈");
-    expect(wrapper.get("[data-settings-section='strategy-drafts']").exists()).toBe(true);
+    expect(wrapper.find("[data-settings-section='strategy-drafts']").exists()).toBe(true);
     expect(wrapper.get("[data-draft-row]").text()).toContain("草稿 #301");
     expect(
       (wrapper.get("[data-draft-form='301'] textarea").element as HTMLTextAreaElement).value

@@ -5,9 +5,7 @@ import { useRoute, useRouter } from "vue-router";
 import ContentEmptyState from "../../components/content/ContentEmptyState.vue";
 import ContentBackToTopButton from "../../components/content/ContentBackToTopButton.vue";
 import ContentPaginationBar from "../../components/content/ContentPaginationBar.vue";
-import ContentSearchControl from "../../components/content/ContentSearchControl.vue";
-import ContentSourceFilterBar from "../../components/content/ContentSourceFilterBar.vue";
-import ContentSortControl from "../../components/content/ContentSortControl.vue";
+import ContentToolbarCard from "../../components/content/ContentToolbarCard.vue";
 import ContentStandardCard from "../../components/content/ContentStandardCard.vue";
 import { useContentPageScroll } from "../../components/content/useContentPageScroll";
 import {
@@ -223,29 +221,21 @@ onMounted(() => {
 
     <div
       v-if="sourceFilter"
-      class="sticky top-4 z-20 flex flex-col gap-3 max-[900px]:top-[72px]"
+      class="sticky top-4 z-20 max-[900px]:top-[72px]"
       data-content-sticky-toolbar
     >
-      <ContentSourceFilterBar
+      <ContentToolbarCard
         :options="sourceFilter.options"
         :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
         :visible-result-count="visibleResultCount"
-        @change="handleSourceKindsChange"
+        :sort-mode="sortMode"
+        :keyword="appliedSearchKeyword"
+        :is-loading="isRefreshing"
+        @change-source="handleSourceKindsChange"
+        @change-sort="handleSortModeChange"
+        @search="handleSearchSubmit"
+        @clear="handleSearchClear"
       />
-
-      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <ContentSortControl
-          :sort-mode="sortMode"
-          @change="handleSortModeChange"
-        />
-
-        <ContentSearchControl
-          :keyword="appliedSearchKeyword"
-          :is-loading="isRefreshing"
-          @search="handleSearchSubmit"
-          @clear="handleSearchClear"
-        />
-      </div>
     </div>
 
     <a-skeleton v-if="isLoading" active :paragraph="{ rows: 6 }" />

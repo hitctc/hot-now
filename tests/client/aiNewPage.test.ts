@@ -160,15 +160,19 @@ describe("AiNewPage", () => {
       expect.arrayContaining(["flex", "flex-col", "gap-6"])
     );
     expect(wrapper.find("[data-content-filter-shell]").exists()).toBe(false);
-    expect(wrapper.find("[data-content-source-filter]").exists()).toBe(true);
-    expect(wrapper.find("[data-content-toolbar]").exists()).toBe(true);
+    expect(wrapper.findAll("[data-content-toolbar-card]").length).toBe(1);
     expect(wrapper.get("[data-content-sticky-toolbar]").classes()).toEqual(
       expect.arrayContaining(["sticky", "z-20", "top-4", "max-[900px]:top-[72px]"])
     );
-    expect(wrapper.get("[data-content-source-filter]").text()).toContain("已选 1 / 2 · 共 120 条");
-    expect(wrapper.find("[data-source-option-count='openai']").exists()).toBe(false);
-    expect(wrapper.find("[data-source-option-count='ithome']").exists()).toBe(false);
+    expect((wrapper.get("[data-content-toolbar-source-panel]").element as HTMLElement).style.display).toBe("none");
+    expect(wrapper.get("[data-content-toolbar-summary]").attributes("aria-expanded")).toBe("false");
+    expect(wrapper.get("[data-content-toolbar-source-toggle]").text()).toContain("展开来源");
+    await wrapper.get("[data-content-toolbar-summary]").trigger("click");
+    await flushPromises();
+    expect((wrapper.get("[data-content-toolbar-source-panel]").element as HTMLElement).style.display).toBe("");
+    expect(wrapper.get("[data-content-toolbar-source-toggle]").text()).toContain("收起来源");
     expect(wrapper.find("[data-content-sort-control]").exists()).toBe(true);
+    expect(wrapper.get("[data-content-source-filter]").text()).toContain("已选 1 / 2 · 共 120 条");
     expect(wrapper.get("[data-content-pagination-summary]").text()).toContain("第 1 / 3 页 · 共 120 条");
     expect(wrapper.get("[data-content-section='list']").attributes("data-list-style")).toBe("database");
     expect(wrapper.find("[data-content-section='featured']").exists()).toBe(false);
@@ -222,6 +226,8 @@ describe("AiNewPage", () => {
 
     await flushPromises();
 
+    await wrapper.get("[data-content-toolbar-summary]").trigger("click");
+    await flushPromises();
     await wrapper.get("[data-source-kind='ithome']").setValue(true);
     await flushPromises();
 

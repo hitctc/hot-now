@@ -31,6 +31,7 @@ describe("ContentToolbarCard", () => {
     expect(mainRow.find("[data-content-toolbar-summary]").exists()).toBe(true);
     expect(mainRow.find("[data-content-sort-control]").exists()).toBe(true);
     expect(mainRow.find("[data-content-search-control]").exists()).toBe(true);
+    expect(wrapper.get("[data-content-toolbar-summary]").classes()).not.toContain("flex-col");
     expect(wrapper.get("[data-content-toolbar-summary]").text()).toContain("来源：未选择");
     expect(wrapper.get("[data-content-toolbar-summary]").attributes("aria-expanded")).toBe("false");
     expect(wrapper.get("[data-content-toolbar-source-toggle]").text()).toContain("展开来源");

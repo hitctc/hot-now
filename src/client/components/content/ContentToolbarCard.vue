@@ -86,16 +86,16 @@ function handleClear(): void {
         <div class="flex min-w-0 flex-wrap items-start gap-2">
           <button
             type="button"
-            class="flex min-w-0 flex-1 flex-col gap-1 text-left"
+            class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-left"
             :aria-expanded="isSourceExpanded"
             :aria-controls="sourcePanelId"
             data-content-toolbar-summary
             @click="toggleSourcePanel"
           >
-            <span class="text-sm font-medium leading-6 text-editorial-text-main">
+            <span class="min-w-0 text-sm font-medium leading-6 text-editorial-text-main">
               {{ sourceSummaryText }}
             </span>
-            <span class="text-[11px] leading-5 text-editorial-text-muted">
+            <span class="whitespace-nowrap text-[11px] leading-5 text-editorial-text-muted">
               {{ sourceCountText }}
             </span>
           </button>

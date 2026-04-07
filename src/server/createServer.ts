@@ -1079,6 +1079,7 @@ async function buildContentPageModelFromDependencies(
       pageKey,
       featuredCard: null,
       cards: [],
+      pagination: null,
       emptyState: {
         title: pageKey === "ai-hot" ? "暂无 AI 热点" : "暂无 AI 新讯",
         description: "可以稍后刷新，或先检查数据源采集状态。",

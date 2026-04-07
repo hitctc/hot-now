@@ -2,13 +2,51 @@ import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { CLIENT_ASSET_BASE } from "./src/client/appBases";
 
+// Vite 传进来的模块 ID 可能带平台分隔符，先统一成 POSIX 风格，后面的分组规则才不会漏判。
+function normalizeModuleId(id: string): string {
+  return id.replaceAll("\\", "/");
+}
+
+// 先把 Vue 运行时和 Ant Design Vue 生态拆开，避免它们继续跟业务入口滚成一个超大的主 chunk。
+export function chunkClientDependency(id: string): string | undefined {
+  const normalizedId = normalizeModuleId(id);
+
+  if (!normalizedId.includes("/node_modules/")) {
+    return undefined;
+  }
+
+  if (normalizedId.includes("/node_modules/vue/")
+    || normalizedId.includes("/node_modules/vue-router/")) {
+    return "vue-vendor";
+  }
+
+  if (normalizedId.includes("/node_modules/ant-design-vue/")
+    || normalizedId.includes("/node_modules/@ant-design")
+    || normalizedId.includes("/node_modules/@babel/runtime/")
+    || normalizedId.includes("/node_modules/@ctrl/tinycolor/")
+    || normalizedId.includes("/node_modules/async-validator/")
+    || normalizedId.includes("/node_modules/dayjs/")
+    || normalizedId.includes("/node_modules/rc-")) {
+    return "antd-vendor";
+  }
+
+  return "vendor";
+}
+
 export default defineConfig({
   root: "src/client",
   base: CLIENT_ASSET_BASE,
   plugins: [vue()],
   build: {
     outDir: "../../dist/client",
-    emptyOutDir: true
+    emptyOutDir: true,
+    // 路由和三方依赖已经按主职责拆开，剩下这块是共享 UI 运行时，这里把告警阈值放宽到当前项目接受的范围。
+    chunkSizeWarningLimit: 2000,
+    rollupOptions: {
+      output: {
+        manualChunks: chunkClientDependency
+      }
+    }
   },
   server: {
     host: "127.0.0.1",

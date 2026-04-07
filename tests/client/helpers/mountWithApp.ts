@@ -5,7 +5,7 @@ import { defineComponent, h, type Component } from "vue";
 import { createEditorialProviderTheme } from "../../../src/client/theme/editorialTheme";
 
 // 客户端页面测试统一包一层 ConfigProvider，避免每个测试各自补 AntD 上下文导致 prefixCls 注入不稳定。
-export function mountWithApp(component: Component, options: MountingOptions<unknown> = {}) {
+export function mountWithApp(component: Component, options: MountingOptions<any> = {}) {
   const { global, props, slots, ...restOptions } = options;
   const RootHost = defineComponent({
     name: "MountWithAppHost",

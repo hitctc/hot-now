@@ -1,7 +1,7 @@
 import { parseArticleFeed } from "./parseArticleFeed.js";
 import { parseJuyaIssue } from "./parseJuyaIssue.js";
 import { BUILTIN_SOURCES } from "./sourceCatalog.js";
-import type { SourceAdapter, SourceKind } from "./types.js";
+import type { BuiltinSourceKind, SourceAdapter } from "./types.js";
 
 export const sourceAdapters = {
   juya: parseJuyaIssue,
@@ -12,4 +12,10 @@ export const sourceAdapters = {
   techcrunch_ai: (feedXml: string) => parseArticleFeed(feedXml, BUILTIN_SOURCES.techcrunch_ai),
   aifanr: (feedXml: string) => parseArticleFeed(feedXml, BUILTIN_SOURCES.aifanr),
   ithome: (feedXml: string) => parseArticleFeed(feedXml, BUILTIN_SOURCES.ithome)
-} satisfies Record<SourceKind, SourceAdapter>;
+} satisfies Record<BuiltinSourceKind, SourceAdapter>;
+
+// Loader code asks this helper before using the hand-written adapter registry so unknown user
+// sources can fall back to the generic RSS parser without pretending to be built-ins.
+export function hasBuiltinSourceAdapter(kind: string): kind is BuiltinSourceKind {
+  return Object.hasOwn(sourceAdapters, kind);
+}

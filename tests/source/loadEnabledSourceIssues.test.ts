@@ -132,4 +132,68 @@ describe("loadEnabledSourceIssues", () => {
 
     await expect(loadEnabledSourceIssues(db)).rejects.toThrow("RSS request failed with 500 for openai");
   });
+
+  it("falls back to the generic article parser for enabled custom rss sources", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-enabled-sources-"));
+    const db = openDatabase(path.join(tempDir, "hot-now.sqlite"));
+    databasesToClose.push(db);
+    runMigrations(db);
+    seedInitialData(db, { username: "admin", password: "bootstrap-password" });
+
+    db.prepare("UPDATE content_sources SET is_enabled = 0").run();
+    db.prepare(
+      `
+        INSERT INTO content_sources (
+          kind,
+          name,
+          site_url,
+          rss_url,
+          is_enabled,
+          is_builtin,
+          source_type,
+          bridge_kind,
+          bridge_config_json
+        )
+        VALUES (?, ?, ?, ?, 1, 0, 'rss', NULL, NULL)
+      `
+    ).run(
+      "custom-feed",
+      "Custom Feed",
+      "https://example.com",
+      "https://example.com/rss.xml"
+    );
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        status: 200,
+        text: vi.fn().mockResolvedValue(
+          `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Custom Feed</title><link>https://example.com/feed</link><item><title>Fresh item</title><link>https://example.com/post-1</link><guid isPermaLink="false">custom-1</guid><pubDate>Tue, 08 Apr 2026 02:00:00 GMT</pubDate><description><![CDATA[<p>来自自定义 RSS 来源。</p>]]></description></item></channel></rss>`
+        )
+      })
+    );
+
+    const issues = await loadEnabledSourceIssues(db);
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toEqual({
+      date: "2026-04-08",
+      issueUrl: "https://example.com/feed",
+      sourceKind: "custom-feed",
+      sourceType: "aggregator",
+      sourcePriority: 60,
+      items: [
+        {
+          rank: 1,
+          category: "外部来源",
+          title: "Fresh item",
+          sourceUrl: "https://example.com/post-1",
+          sourceName: "Custom Feed",
+          externalId: "custom-1",
+          publishedAt: "2026-04-08T02:00:00.000Z",
+          summary: "来自自定义 RSS 来源。"
+        }
+      ]
+    });
+  });
 });

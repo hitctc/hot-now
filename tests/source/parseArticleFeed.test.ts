@@ -222,7 +222,7 @@ describe("loadActiveSourceIssue", () => {
     );
   });
 
-  it("fails with a clear error when the active row has an unknown source kind", async () => {
+  it("falls back to the generic article parser when the active row uses a custom kind", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-source-db-"));
     const db = openDatabase(path.join(tempDir, "hot-now.sqlite"));
     databasesToClose.push(db);
@@ -237,8 +237,31 @@ describe("loadActiveSourceIssue", () => {
     db.prepare("UPDATE content_sources SET is_active = 0").run();
     db.prepare("UPDATE content_sources SET is_active = 1 WHERE kind = 'mystery_feed'").run();
 
-    await expect(loadActiveSourceIssue(db)).rejects.toThrow(
-      'Unsupported content source kind: "mystery_feed"'
-    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      status: 200,
+      text: vi.fn().mockResolvedValue(
+        `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Mystery Feed</title><link>https://example.com/feed</link><item><title>Custom item</title><link>https://example.com/post-1</link><guid isPermaLink="false">mystery-1</guid><pubDate>Tue, 08 Apr 2026 05:00:00 GMT</pubDate><description><![CDATA[<p>自定义来源内容。</p>]]></description></item></channel></rss>`
+      )
+    }));
+
+    await expect(loadActiveSourceIssue(db)).resolves.toEqual({
+      date: "2026-04-08",
+      issueUrl: "https://example.com/feed",
+      sourceKind: "mystery_feed",
+      sourceType: "aggregator",
+      sourcePriority: 60,
+      items: [
+        {
+          rank: 1,
+          category: "外部来源",
+          title: "Custom item",
+          sourceUrl: "https://example.com/post-1",
+          sourceName: "Mystery Feed",
+          externalId: "mystery-1",
+          publishedAt: "2026-04-08T05:00:00.000Z",
+          summary: "自定义来源内容。"
+        }
+      ]
+    });
   });
 });

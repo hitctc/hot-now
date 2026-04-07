@@ -1,11 +1,15 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
-import { BUILTIN_SOURCES } from "./sourceCatalog.js";
-import { sourceAdapters } from "./sourceAdapters.js";
+import { parseArticleFeed } from "./parseArticleFeed.js";
+import { hasBuiltinSourceAdapter, sourceAdapters } from "./sourceAdapters.js";
+import { resolveRuntimeSourcePriority, toRuntimeArticleSourceDefinition } from "./sourceRuntimeMetadata.js";
 import type { LoadedIssue, SourceKind } from "./types.js";
 
 type EnabledSourceRow = {
   kind: SourceKind;
+  name: string;
+  site_url: string;
   rss_url: string | null;
+  source_type: string | null;
 };
 
 export type SourceLoadFailure = {
@@ -29,7 +33,7 @@ export async function loadEnabledSourceIssues(db: SqliteDatabase): Promise<Loade
   const orderedSources = enabledSources
     .map((source) => ({
       ...source,
-      sourcePriority: getSourcePriority(source.kind)
+      sourcePriority: resolveRuntimeSourcePriority(source)
     }))
     .sort((left, right) => {
       const priorityDiff = right.sourcePriority - left.sourcePriority;
@@ -42,7 +46,7 @@ export async function loadEnabledSourceIssues(db: SqliteDatabase): Promise<Loade
     });
 
   const results = await Promise.allSettled(
-    orderedSources.map(async (source) => await loadEnabledSourceIssue(source.kind, source.rss_url))
+    orderedSources.map(async (source) => await loadEnabledSourceIssue(source))
   );
   const loadedIssues = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
   const failures = results.flatMap((result, index) => {
@@ -67,12 +71,12 @@ export async function loadEnabledSourceIssues(db: SqliteDatabase): Promise<Loade
   return Object.assign(loadedIssues, { failures });
 }
 
-async function loadEnabledSourceIssue(kind: SourceKind, rssUrl: string | null): Promise<LoadedIssue> {
-  const adapter = readSourceAdapter(kind);
-  const normalizedRssUrl = rssUrl?.trim();
+async function loadEnabledSourceIssue(source: EnabledSourceRow): Promise<LoadedIssue> {
+  const adapter = readSourceAdapter(source);
+  const normalizedRssUrl = source.rss_url?.trim();
 
   if (!normalizedRssUrl) {
-    throw new Error(`Content source ${kind} does not have an rss_url`);
+    throw new Error(`Content source ${source.kind} does not have an rss_url`);
   }
 
   const response = await fetch(normalizedRssUrl);
@@ -80,7 +84,7 @@ async function loadEnabledSourceIssue(kind: SourceKind, rssUrl: string | null): 
   // The loader stays strict about 200-only responses so one broken source does not silently
   // masquerade as fresh content in the merged digest run.
   if (response.status !== 200) {
-    throw new Error(`RSS request failed with ${response.status} for ${kind}`);
+    throw new Error(`RSS request failed with ${response.status} for ${source.kind}`);
   }
 
   return await adapter(await response.text());
@@ -90,13 +94,13 @@ function readEnabledSourceRows(db: SqliteDatabase): EnabledSourceRow[] {
   const hasEnabledColumn = hasIsEnabledColumn(db);
   const query = hasEnabledColumn
     ? `
-      SELECT kind, rss_url
+      SELECT kind, name, site_url, rss_url, source_type
       FROM content_sources
       WHERE is_enabled = 1
       ORDER BY id ASC
     `
     : `
-      SELECT kind, rss_url
+      SELECT kind, name, site_url, rss_url, source_type
       FROM content_sources
       ORDER BY id ASC
     `;
@@ -112,15 +116,12 @@ function hasIsEnabledColumn(db: SqliteDatabase): boolean {
   return columns.some((column) => column.name === "is_enabled");
 }
 
-function readSourceAdapter(kind: string) {
-  if (!Object.hasOwn(sourceAdapters, kind)) {
-    throw new Error(`Unsupported content source kind: "${kind}"`);
+// Built-ins keep their tuned adapters, while user-defined sources fall back to one generic
+// article-feed path so source CRUD no longer requires code changes per publisher.
+function readSourceAdapter(source: EnabledSourceRow) {
+  if (hasBuiltinSourceAdapter(source.kind)) {
+    return sourceAdapters[source.kind];
   }
 
-  return sourceAdapters[kind as SourceKind];
-}
-
-function getSourcePriority(kind: string): number {
-  const source = BUILTIN_SOURCES[kind as SourceKind];
-  return source?.sourcePriority ?? 0;
+  return (feedXml: string) => parseArticleFeed(feedXml, toRuntimeArticleSourceDefinition(source));
 }

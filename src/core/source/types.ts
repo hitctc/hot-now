@@ -1,4 +1,4 @@
-export type SourceKind =
+export type BuiltinSourceKind =
   | "juya"
   | "openai"
   | "google_ai"
@@ -7,6 +7,8 @@ export type SourceKind =
   | "kr36_newsflash"
   | "aifanr"
   | "ithome";
+
+export type SourceKind = BuiltinSourceKind | (string & {});
 
 export type SourceDefinition = {
   kind: SourceKind;

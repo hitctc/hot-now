@@ -1,11 +1,16 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
+import { parseArticleFeed } from "./parseArticleFeed.js";
 import { BUILTIN_SOURCES } from "./sourceCatalog.js";
-import { sourceAdapters } from "./sourceAdapters.js";
+import { hasBuiltinSourceAdapter, sourceAdapters } from "./sourceAdapters.js";
+import { toRuntimeArticleSourceDefinition } from "./sourceRuntimeMetadata.js";
 import type { LoadedIssue, SourceKind } from "./types.js";
 
 type SourceRow = {
   kind: SourceKind;
+  name: string;
+  site_url: string;
   rss_url: string | null;
+  source_type: string | null;
 };
 
 // The loader resolves whichever source is currently active and hands the fetched XML to the
@@ -19,7 +24,7 @@ export async function loadActiveSourceIssue(db: SqliteDatabase): Promise<LoadedI
     );
   }
 
-  const adapter = readSourceAdapter(activeSource.kind);
+  const adapter = readSourceAdapter(activeSource);
 
   const rssUrl = activeSource.rss_url?.trim();
   if (!rssUrl) {
@@ -45,7 +50,7 @@ function readActiveSourceRow(db: SqliteDatabase): SourceRow | undefined {
     return db
       .prepare(
         `
-          SELECT kind, rss_url
+          SELECT kind, name, site_url, rss_url, source_type
           FROM content_sources
           WHERE is_active = 1
           LIMIT 1
@@ -59,7 +64,7 @@ function readActiveSourceRow(db: SqliteDatabase): SourceRow | undefined {
   return db
     .prepare(
       `
-        SELECT kind, rss_url
+        SELECT kind, name, site_url, rss_url, source_type
         FROM content_sources
         WHERE kind = ?
         LIMIT 1
@@ -78,12 +83,12 @@ function hasIsActiveColumn(db: SqliteDatabase): boolean {
   return columns.some((column) => column.name === "is_active");
 }
 
-// The adapter registry is explicit, so unexpected DB values should fail with a targeted message
-// instead of falling through to an undefined function call.
-function readSourceAdapter(kind: string) {
-  if (!Object.hasOwn(sourceAdapters, kind)) {
-    throw new Error(`Unsupported content source kind: "${kind}"`);
+// Built-ins keep their tuned adapters here too, while custom rows reuse the same generic article
+// parser metadata as the multi-source loader.
+function readSourceAdapter(source: SourceRow) {
+  if (hasBuiltinSourceAdapter(source.kind)) {
+    return sourceAdapters[source.kind];
   }
 
-  return sourceAdapters[kind as SourceKind];
+  return (feedXml: string) => parseArticleFeed(feedXml, toRuntimeArticleSourceDefinition(source));
 }

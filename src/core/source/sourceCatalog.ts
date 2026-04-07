@@ -1,6 +1,6 @@
-import type { SourceDefinition, SourceKind } from "./types.js";
+import type { BuiltinSourceKind, SourceDefinition } from "./types.js";
 
-export const BUILTIN_SOURCES: Record<SourceKind, SourceDefinition> = {
+export const BUILTIN_SOURCES: Record<BuiltinSourceKind, SourceDefinition> = {
   // The catalog keeps the built-in source metadata in one place so adapters and tests do not
   // drift away from the SQLite seed defaults.
   juya: {
@@ -85,8 +85,14 @@ export const BUILTIN_SOURCES: Record<SourceKind, SourceDefinition> = {
   }
 };
 
+// Built-in source checks stay centralized here so loader code can decide whether to use a
+// hand-tuned adapter or fall back to the generic RSS parser for user-defined rows.
+export function isBuiltinSourceKind(kind: string): kind is BuiltinSourceKind {
+  return Object.hasOwn(BUILTIN_SOURCES, kind);
+}
+
 export function resolveBuiltinSourceDefinition(kind: string): SourceDefinition {
-  const source = BUILTIN_SOURCES[kind as SourceKind];
+  const source = isBuiltinSourceKind(kind) ? BUILTIN_SOURCES[kind] : undefined;
 
   if (!source) {
     throw new Error(`Unsupported content source kind: "${kind}"`);

@@ -1,12 +1,6 @@
-import { type Component } from "vue";
 import { createRouter, createWebHistory, type RouteRecordRaw, type RouterHistory } from "vue-router";
 
 import { APP_ROUTE_BASE } from "./appBases";
-import AiHotPage from "./pages/content/AiHotPage.vue";
-import AiNewPage from "./pages/content/AiNewPage.vue";
-import ProfilePage from "./pages/settings/ProfilePage.vue";
-import SourcesPage from "./pages/settings/SourcesPage.vue";
-import ViewRulesPage from "./pages/settings/ViewRulesPage.vue";
 
 export type ShellPageKey = "ai-new" | "ai-hot" | "view-rules" | "sources" | "profile";
 
@@ -24,8 +18,8 @@ const aiNewPageMeta = {
   path: "/ai-new",
   section: "content",
   navLabel: "AI 新讯",
-  title: "AI 新讯工作台",
-  description: "这里会展示最新 AI 新闻、模型、事件与智能体信号。"
+  title: "AI 新讯",
+  description: "最近采集到的 AI 新消息、模型更新和产品动态。"
 } as const satisfies ShellPageMeta;
 
 const aiNewRootPageMeta = {
@@ -38,8 +32,8 @@ const aiHotPageMeta = {
   path: "/ai-hot",
   section: "content",
   navLabel: "AI 热点",
-  title: "AI 热点工作台",
-  description: "这里会承接已经开始形成热度的 AI 热点内容。"
+  title: "AI 热点",
+  description: "已经形成热度、值得继续追踪的 AI 信号。"
 } as const satisfies ShellPageMeta;
 
 const viewRulesPageMeta = {
@@ -47,8 +41,8 @@ const viewRulesPageMeta = {
   path: "/settings/view-rules",
   section: "system",
   navLabel: "筛选策略",
-  title: "筛选策略工作台",
-  description: "当前会承载 AI 新讯与 AI 热点的筛选规则。"
+  title: "筛选策略",
+  description: "维护自然语言规则、反馈池、草稿池和重算状态。"
 } as const satisfies ShellPageMeta;
 
 const sourcesPageMeta = {
@@ -56,8 +50,8 @@ const sourcesPageMeta = {
   path: "/settings/sources",
   section: "system",
   navLabel: "数据收集",
-  title: "数据收集工作台",
-  description: "当前会承载 source 启用状态与手动采集动作。"
+  title: "数据收集",
+  description: "查看来源状态、采集动作和当前展示口径。"
 } as const satisfies ShellPageMeta;
 
 const profilePageMeta = {
@@ -65,12 +59,14 @@ const profilePageMeta = {
   path: "/settings/profile",
   section: "system",
   navLabel: "当前用户",
-  title: "当前登录用户页",
-  description: "当前会展示登录用户摘要和会话上下文。"
+  title: "当前用户",
+  description: "当前登录账号、会话状态和联系信息。"
 } as const satisfies ShellPageMeta;
 
 export const shellPageMetas = [aiNewPageMeta, aiHotPageMeta, sourcesPageMeta, viewRulesPageMeta, profilePageMeta] as const satisfies readonly ShellPageMeta[];
 export const systemShellPageMetas = [sourcesPageMeta, viewRulesPageMeta, profilePageMeta] as const satisfies readonly ShellPageMeta[];
+
+type ShellRouteComponent = () => Promise<unknown>;
 
 declare module "vue-router" {
   interface RouteMeta {
@@ -87,7 +83,8 @@ function createRouteName(meta: ShellPageMeta): string {
   return `${meta.key}-${pathSegment}`;
 }
 
-function createShellRoute(meta: ShellPageMeta, component: Component): RouteRecordRaw {
+// 壳层页面统一走懒加载，这样 Vite 可以按路由拆 chunk，而不是把所有页面都塞进首屏入口。
+function createShellRoute(meta: ShellPageMeta, component: ShellRouteComponent): RouteRecordRaw {
   return {
     path: meta.path,
     name: createRouteName(meta),
@@ -105,11 +102,11 @@ function createRouteMeta(meta: ShellPageMeta) {
   };
 }
 
-const viewRulesPage = ViewRulesPage;
-const sourcesPage = SourcesPage;
-const profilePage = ProfilePage;
-const aiNewPage = AiNewPage;
-const aiHotPage = AiHotPage;
+const viewRulesPage = () => import("./pages/settings/ViewRulesPage.vue");
+const sourcesPage = () => import("./pages/settings/SourcesPage.vue");
+const profilePage = () => import("./pages/settings/ProfilePage.vue");
+const aiNewPage = () => import("./pages/content/AiNewPage.vue");
+const aiHotPage = () => import("./pages/content/AiHotPage.vue");
 
 const routes: RouteRecordRaw[] = [
   createShellRoute(aiNewRootPageMeta, aiNewPage),

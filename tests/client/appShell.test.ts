@@ -68,26 +68,30 @@ describe("client app shell", () => {
 
     await flushPromises();
 
-    expect(wrapper.text()).toContain("HotNow Editorial Desk");
-    expect(wrapper.text()).toContain("AI-first 工作台壳层");
-    expect(wrapper.text()).toContain("当前登录用户页");
-    expect(wrapper.text()).toContain("当前会展示登录用户摘要和会话上下文");
+    expect(wrapper.text()).toContain("HotNow");
+    expect(wrapper.text()).toContain("AI Workspace");
+    expect(wrapper.text()).toContain("当前用户");
+    expect(wrapper.text()).toContain("当前登录账号、会话状态和联系信息。");
     expect(wrapper.get("[data-shell-root]").classes()).toEqual(
-      expect.arrayContaining(["min-h-screen", "text-editorial-text-main"])
+      expect.arrayContaining(["min-h-screen", "bg-editorial-page", "text-editorial-text-main"])
     );
     expect(wrapper.get("[data-mobile-shell-nav]").classes()).toEqual(
-      expect.arrayContaining(["sticky", "top-0", "z-30", "hidden", "max-[900px]:block"])
+      expect.arrayContaining(["sticky", "top-0", "z-30", "hidden", "border-b", "max-[900px]:block"])
     );
-    expect(wrapper.get("[data-shell-page-summary]").classes()).toEqual(
-      expect.arrayContaining(["rounded-editorial-xl"])
+    expect(wrapper.get("[data-page-header]").classes()).toEqual(
+      expect.arrayContaining(["border-b", "border-editorial-border"])
     );
-    expect(wrapper.find("[data-shell-page-title]").text()).toBe("当前登录用户页");
-    expect(wrapper.find("[data-shell-page-description]").text()).toContain("登录用户摘要");
+    expect(wrapper.find("[data-shell-page-summary]").exists()).toBe(false);
+    expect(wrapper.get("[data-workspace-sidebar]").exists()).toBe(true);
+    expect(wrapper.get("[data-workspace-brand]").text()).toContain("AI Workspace");
+    expect(wrapper.find("[data-page-header-title]").text()).toBe("当前用户");
+    expect(wrapper.find("[data-page-header-description]").text()).toContain("当前登录账号");
     expect(wrapper.find("[data-shell-theme-toggle]").exists()).toBe(true);
+    expect(wrapper.text()).toContain("当前：深色");
 
     const navLinks = wrapper.findAll("[data-shell-nav-link]");
     const activeNavLink = wrapper.get('[data-shell-nav-link="/settings/profile"]');
-    const sidebar = wrapper.get("aside");
+    const sidebar = wrapper.get("[data-workspace-sidebar]");
 
     expect(navLinks.map((node) => node.attributes("href"))).toEqual([
       "/ai-new",
@@ -108,20 +112,16 @@ describe("client app shell", () => {
     ]);
 
     expect(sidebar.classes()).toEqual(
-      expect.arrayContaining(["min-[901px]:flex", "min-[901px]:w-[248px]", "min-[1081px]:w-[280px]"])
+      expect.arrayContaining(["min-[901px]:flex", "min-[901px]:w-[244px]", "border-r"])
     );
 
     expect(activeNavLink.classes()).toEqual(
       expect.arrayContaining([
+        "group",
         "select-none",
-        "border-editorial-border-strong",
         "bg-editorial-link-active",
-        "text-editorial-text-sidebar",
-        "ring-1",
-        "ring-editorial-ring",
-        "before:bg-editorial-accent",
-        "before:content-['']",
-        "shadow-editorial-accent"
+        "text-editorial-text-main",
+        "rounded-editorial-sm"
       ])
     );
     expect(activeNavLink.find("span.text-xs").classes()).toEqual(
@@ -129,7 +129,7 @@ describe("client app shell", () => {
     );
   });
 
-  it("keeps shell navigation highlights in the editorial paper style instead of a solid accent block", async () => {
+  it("keeps shell navigation highlights in a light workspace style instead of the old accented panel treatment", async () => {
     const router = createAppRouter();
 
     await router.push("/ai-hot");
@@ -149,14 +149,13 @@ describe("client app shell", () => {
       expect.arrayContaining([
         "select-none",
         "bg-editorial-link-active",
-        "border-editorial-border-strong",
-        "text-editorial-text-sidebar",
-        "ring-1",
-        "ring-editorial-ring",
-        "shadow-editorial-accent"
+        "text-editorial-text-main",
+        "rounded-editorial-sm"
       ])
     );
     expect(activeNavLink.classes()).not.toEqual(expect.arrayContaining(["text-editorial-text-on-accent"]));
+    expect(activeNavLink.classes()).not.toEqual(expect.arrayContaining(["shadow-editorial-accent"]));
+    expect(activeNavLink.classes()).not.toEqual(expect.arrayContaining(["border-editorial-border-strong"]));
   });
 
   it("keeps the /client/ asset base separate from the /settings/ route base while mounting AI content routes in the same app", async () => {
@@ -174,6 +173,18 @@ describe("client app shell", () => {
     expect(router.getRoutes().some((route) => route.path === "/ai-new")).toBe(true);
     expect(router.getRoutes().some((route) => route.path === "/ai-hot")).toBe(true);
     expect(router.getRoutes().some((route) => route.path === "/articles")).toBe(false);
+  });
+
+  it("registers shell pages as lazy route components so the client build can split them into separate chunks", async () => {
+    const router = createAppRouter();
+    const shellRoutePaths = ["/", "/ai-new", "/ai-hot", "/settings/view-rules", "/settings/sources", "/settings/profile"];
+
+    for (const path of shellRoutePaths) {
+      const route = router.getRoutes().find((item) => item.path === path);
+
+      expect(route, `missing route for ${path}`).toBeDefined();
+      expect(route?.components?.default, `route ${path} should use a lazy component factory`).toBeTypeOf("function");
+    }
   });
 
   it("renders the mobile AI-first tabs and closes the system drawer after navigation", async () => {
@@ -194,8 +205,12 @@ describe("client app shell", () => {
     expect(
       wrapper.findAll("[data-mobile-content-tab]").map((node) => node.text().trim())
     ).toEqual(["AI 新讯", "AI 热点"]);
-    expect(wrapper.get("[data-mobile-system-toggle]").classes()).toEqual(expect.arrayContaining(["select-none"]));
-    expect(wrapper.get('[data-mobile-content-tab="/ai-new"]').classes()).toEqual(expect.arrayContaining(["select-none"]));
+    expect(wrapper.get("[data-mobile-system-toggle]").classes()).toEqual(
+      expect.arrayContaining(["select-none", "rounded-editorial-sm"])
+    );
+    expect(wrapper.get('[data-mobile-content-tab="/ai-new"]').classes()).toEqual(
+      expect.arrayContaining(["select-none", "rounded-editorial-sm"])
+    );
 
     await wrapper.get("[data-mobile-system-toggle]").trigger("click");
     await flushPromises();
@@ -203,10 +218,37 @@ describe("client app shell", () => {
     expect(wrapper.find("[data-mobile-system-drawer]").exists()).toBe(true);
 
     await wrapper.get('[data-mobile-drawer-link="/settings/view-rules"]').trigger("click");
+    await vi.dynamicImportSettled();
     await flushPromises();
 
     expect(router.currentRoute.value.fullPath).toBe("/settings/view-rules");
     expect(wrapper.find("[data-mobile-system-drawer]").exists()).toBe(false);
+  });
+
+  it("shows logout actions in both desktop and mobile account panels when the current visitor is authenticated", async () => {
+    const router = createAppRouter();
+
+    await router.push("/settings/profile");
+    await router.isReady();
+
+    const wrapper = mount(App, {
+      global: {
+        plugins: [Antd, router]
+      }
+    });
+
+    await flushPromises();
+
+    expect(wrapper.get("[data-shell-logout-form]").attributes("action")).toBe("/logout");
+    expect(wrapper.get("[data-shell-logout-form]").attributes("method")).toBe("post");
+    expect(wrapper.get("[data-shell-logout-button]").text()).toContain("退出登录");
+
+    await wrapper.get("[data-mobile-system-toggle]").trigger("click");
+    await flushPromises();
+
+    expect(wrapper.get("[data-mobile-logout-form]").attributes("action")).toBe("/logout");
+    expect(wrapper.get("[data-mobile-logout-form]").attributes("method")).toBe("post");
+    expect(wrapper.get("[data-mobile-logout-button]").text()).toContain("退出登录");
   });
 
   it("shows a login entry when the current visitor is anonymous", async () => {
@@ -226,10 +268,9 @@ describe("client app shell", () => {
     await flushPromises();
 
     expect(wrapper.get("[data-shell-login-link]").attributes("href")).toBe("/login");
-
-    await wrapper.get("[data-mobile-system-toggle]").trigger("click");
-    await flushPromises();
-
-    expect(wrapper.get("[data-mobile-login-link]").attributes("href")).toBe("/login");
+    expect(wrapper.find('nav[aria-label="系统菜单"]').exists()).toBe(false);
+    expect(wrapper.find("[data-mobile-system-toggle]").exists()).toBe(false);
+    expect(wrapper.find("[data-mobile-system-drawer]").exists()).toBe(false);
+    expect(wrapper.find("[data-mobile-login-link]").exists()).toBe(false);
   });
 });

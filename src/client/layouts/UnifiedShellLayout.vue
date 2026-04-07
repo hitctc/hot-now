@@ -31,6 +31,7 @@ const currentPageDescription = computed(
 );
 const loggedInProfile = computed(() => (profile.value?.loggedIn ? profile.value : null));
 const guestProfile = computed(() => (profile.value && !profile.value.loggedIn ? profile.value : null));
+const shouldShowSystemMenu = computed(() => Boolean(loggedInProfile.value));
 
 function buildGuestProfile(): SettingsProfile {
   return {
@@ -49,26 +50,26 @@ function isActiveContentPath(path: string): boolean {
 // 导航选中态直接靠 Tailwind class 切换，不再依赖 a-menu 的内部选中结构。
 function getShellNavLinkClasses(isActive: boolean): string[] {
   return [
-    "group relative flex min-w-0 select-none flex-col gap-1 overflow-hidden rounded-editorial-lg border px-4 py-3 text-left no-underline transition duration-150 ease-out",
+    "group flex min-w-0 select-none flex-col gap-1 rounded-editorial-sm px-3 py-2 text-left no-underline transition duration-150 ease-out",
     isActive
-      ? "border-editorial-border-strong bg-editorial-link-active text-editorial-text-sidebar shadow-editorial-accent ring-1 ring-inset ring-editorial-ring before:absolute before:bottom-3 before:left-0 before:top-3 before:w-1 before:rounded-r-full before:bg-editorial-accent before:content-['']"
-      : "border-editorial-border bg-editorial-link text-editorial-text-sidebar hover:-translate-y-px hover:border-editorial-border-strong hover:bg-editorial-control-hover hover:shadow-editorial-floating hover:no-underline"
+      ? "bg-editorial-link-active text-editorial-text-main"
+      : "text-editorial-text-body hover:bg-editorial-link-active hover:text-editorial-text-main hover:no-underline"
   ];
 }
 
 // 移动端顶部 tab 只保留更紧凑的 pill 形态， active 态依旧从同一份路由判断里拿。
 function getMobileTabClasses(isActive: boolean): string[] {
   return [
-    "flex shrink-0 select-none items-center rounded-editorial-pill border px-3 py-2 text-[13px] font-semibold leading-5 no-underline transition duration-150 ease-out whitespace-nowrap",
+    "flex shrink-0 select-none items-center rounded-editorial-sm px-3 py-2 text-[13px] font-medium leading-5 no-underline transition duration-150 ease-out whitespace-nowrap",
     isActive
-      ? "border-editorial-border-strong bg-editorial-link-active text-editorial-text-main shadow-editorial-accent ring-1 ring-inset ring-editorial-ring"
-      : "border-editorial-border bg-editorial-link text-editorial-text-sidebar hover:-translate-y-px hover:border-editorial-border-strong hover:bg-editorial-control-hover hover:shadow-editorial-floating hover:no-underline"
+      ? "bg-editorial-link-active text-editorial-text-main"
+      : "text-editorial-text-body hover:bg-editorial-link-active hover:text-editorial-text-main hover:no-underline"
   ];
 }
 
 // 激活态辅助文案改回正文色，避免导航在选中时又退回成 dashboard 式的白字蓝块。
 function getShellNavDescriptionClasses(isActive: boolean): string {
-  return isActive ? "text-editorial-text-body" : "text-editorial-text-sidebar-muted";
+  return isActive ? "text-editorial-text-body" : "text-editorial-text-muted";
 }
 
 // 主题切换只改唯一状态源，不直接碰 DOM，避免双向同步逻辑散到模板里。
@@ -129,6 +130,12 @@ watch(mobileSystemDrawerOpen, (isOpen) => {
   syncMobileDrawerBodyScroll(isOpen);
 });
 
+watch(shouldShowSystemMenu, (isVisible) => {
+  if (!isVisible) {
+    closeMobileSystemDrawer();
+  }
+});
+
 onBeforeUnmount(() => {
   syncMobileDrawerBodyScroll(false);
 });
@@ -137,77 +144,62 @@ onBeforeUnmount(() => {
 <template>
   <div class="flex min-h-0 flex-1 flex-col min-[901px]:flex-row">
     <div
-      class="sticky top-0 z-30 hidden px-4 pt-4 max-[900px]:block"
+      class="sticky top-0 z-30 hidden border-b border-editorial-border bg-editorial-page/95 px-4 py-3 backdrop-blur max-[900px]:block"
       data-mobile-shell-nav
     >
-      <div
-        class="flex items-center gap-3 rounded-editorial-xl border border-editorial-border bg-editorial-panel px-3 py-3 shadow-editorial-card backdrop-blur-xl"
-      >
-        <nav
-          class="flex min-w-0 flex-1 gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          aria-label="内容菜单"
-        >
-          <RouterLink
-            v-for="page in contentNavPages"
-            :key="page.path"
-            :to="page.path"
-            :class="getMobileTabClasses(isActiveContentPath(page.path))"
-            :data-mobile-content-tab="page.path"
-            @click="closeMobileSystemDrawer"
+      <div class="flex items-center gap-3">
+        <div class="min-w-0 flex-1">
+          <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">HotNow</p>
+          <nav
+            class="mt-2 flex min-w-0 flex-1 gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            aria-label="内容菜单"
           >
-            {{ page.navLabel }}
-          </RouterLink>
-        </nav>
+            <RouterLink
+              v-for="page in contentNavPages"
+              :key="page.path"
+              :to="page.path"
+              :class="getMobileTabClasses(isActiveContentPath(page.path))"
+              :data-mobile-content-tab="page.path"
+              @click="closeMobileSystemDrawer"
+            >
+              {{ page.navLabel }}
+            </RouterLink>
+          </nav>
+        </div>
 
         <button
+          v-if="shouldShowSystemMenu"
           type="button"
-          class="shrink-0 select-none rounded-editorial-pill border border-editorial-border bg-editorial-control px-3 py-2 text-sm font-semibold text-editorial-text-main shadow-editorial-card transition hover:border-editorial-border-strong hover:bg-editorial-control-hover"
+          class="shrink-0 select-none rounded-editorial-sm border border-editorial-border bg-editorial-panel px-3 py-2 text-sm font-medium text-editorial-text-main transition hover:bg-editorial-link-active"
           data-mobile-system-toggle
           :aria-expanded="mobileSystemDrawerOpen ? 'true' : 'false'"
           aria-controls="mobile-system-drawer"
           @click="toggleMobileSystemDrawer"
         >
-          系统菜单
+          系统
         </button>
       </div>
     </div>
 
     <aside
-      class="sticky top-0 hidden h-[100dvh] w-[248px] flex-none flex-col overflow-y-auto border-r border-editorial-border-strong bg-editorial-sidebar px-[18px] py-6 shadow-editorial-page backdrop-blur-[18px] min-[901px]:flex min-[901px]:min-w-[248px] min-[901px]:max-w-[248px] min-[901px]:w-[248px] min-[1081px]:min-w-[280px] min-[1081px]:max-w-[280px] min-[1081px]:w-[280px]"
+      class="sticky top-0 hidden h-[100dvh] w-[244px] flex-none flex-col overflow-y-auto border-r border-editorial-border bg-editorial-sidebar px-3 py-4 min-[901px]:flex min-[901px]:w-[244px]"
+      data-workspace-sidebar
     >
-      <div class="flex min-h-0 flex-1 flex-col gap-4">
-        <section class="rounded-editorial-xl border border-editorial-border bg-editorial-sidebar-panel px-4 py-5 shadow-editorial-card">
-          <p class="mb-1.5 inline-block text-xs font-semibold uppercase tracking-[0.12em] text-editorial-text-sidebar-muted">
-            HotNow Editorial Desk
+      <div class="flex min-h-0 flex-1 flex-col gap-5">
+        <section class="px-3 py-2" data-workspace-brand>
+          <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
+            HotNow
           </p>
-          <h1 class="mb-1 text-xl font-semibold leading-tight text-editorial-text-sidebar">
-            AI-first 工作台壳层
+          <h1 class="mt-1 text-[20px] font-semibold tracking-[-0.01em] text-editorial-text-main">
+            AI Workspace
           </h1>
-          <p class="mb-0 text-sm leading-6 text-editorial-text-body">
-            AI 新讯、AI 热点和系统工作台共享同一套 Editorial Desk 主题 token 与导航语义。
-          </p>
         </section>
 
-        <section
-          class="rounded-editorial-xl border border-editorial-border bg-editorial-sidebar-panel px-4 py-4 shadow-editorial-card"
-          data-shell-page-summary
-        >
-          <p class="mb-1.5 inline-block text-xs font-semibold uppercase tracking-[0.12em] text-editorial-text-sidebar-muted">
-            当前页面
-          </p>
-          <h2 class="mb-1.5 text-lg font-semibold leading-tight text-editorial-text-sidebar" data-shell-page-title>
-            {{ currentPageTitle }}
-          </h2>
-          <p class="mb-0 text-sm leading-6 text-editorial-text-body" data-shell-page-description>
-            {{ currentPageDescription }}
-          </p>
-        </section>
-
-        <section class="flex flex-col gap-2">
-          <p class="pl-1 text-xs font-semibold uppercase tracking-[0.12em] text-editorial-text-sidebar-muted">
+        <section class="flex flex-col gap-1">
+          <p class="px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
             内容菜单
           </p>
-          <nav class="flex flex-col gap-2" aria-label="内容菜单">
+          <nav class="flex flex-col gap-1" aria-label="内容菜单">
             <RouterLink
               v-for="page in contentNavPages"
               :key="page.path"
@@ -215,7 +207,7 @@ onBeforeUnmount(() => {
               :class="getShellNavLinkClasses(isActiveContentPath(page.path))"
               :data-shell-nav-link="page.path"
             >
-              <span class="text-sm font-semibold leading-5">{{ page.navLabel }}</span>
+              <span class="text-sm font-medium leading-5">{{ page.navLabel }}</span>
               <span :class="getShellNavDescriptionClasses(isActiveContentPath(page.path))" class="text-xs leading-5">
                 {{ page.description }}
               </span>
@@ -223,73 +215,50 @@ onBeforeUnmount(() => {
           </nav>
         </section>
 
-        <section class="flex flex-col gap-2">
-          <p class="pl-1 text-xs font-semibold uppercase tracking-[0.12em] text-editorial-text-sidebar-muted">
+        <section v-if="shouldShowSystemMenu" class="flex flex-col gap-1">
+          <p class="px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
             系统菜单
           </p>
-          <nav class="flex flex-col gap-2" aria-label="系统菜单">
-            <template v-if="profile?.loggedIn">
-              <RouterLink
-                v-for="page in systemNavPages"
-                :key="page.key"
-                :to="page.path"
-                :class="getShellNavLinkClasses(route.path === page.path)"
-                :data-shell-nav-link="page.path"
-              >
-                <span class="text-sm font-semibold leading-5">{{ page.navLabel }}</span>
-                <span :class="getShellNavDescriptionClasses(route.path === page.path)" class="text-xs leading-5">
-                  {{ page.description }}
-                </span>
-              </RouterLink>
-            </template>
-            <template v-else>
-              <a
-                v-for="page in systemNavPages"
-                :key="page.key"
-                :href="page.path"
-                :class="getShellNavLinkClasses(route.path === page.path)"
-                :data-shell-nav-link="page.path"
-              >
-                <span class="text-sm font-semibold leading-5">{{ page.navLabel }}</span>
-                <span :class="getShellNavDescriptionClasses(route.path === page.path)" class="text-xs leading-5">
-                  {{ page.description }}
-                </span>
-              </a>
-            </template>
+          <nav class="flex flex-col gap-1" aria-label="系统菜单">
+            <RouterLink
+              v-for="page in systemNavPages"
+              :key="page.key"
+              :to="page.path"
+              :class="getShellNavLinkClasses(route.path === page.path)"
+              :data-shell-nav-link="page.path"
+            >
+              <span class="text-sm font-medium leading-5">{{ page.navLabel }}</span>
+              <span :class="getShellNavDescriptionClasses(route.path === page.path)" class="text-xs leading-5">
+                {{ page.description }}
+              </span>
+            </RouterLink>
           </nav>
         </section>
 
         <div class="mt-auto flex flex-col gap-3 pt-2">
           <section
-            class="rounded-editorial-xl border border-editorial-border bg-editorial-panel px-4 py-4 shadow-editorial-card"
+            class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-3"
             data-shell-theme-toggle
           >
-            <p class="mb-1.5 inline-block text-xs font-semibold uppercase tracking-[0.12em] text-editorial-text-sidebar-muted">
+            <p class="mb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
               界面主题
             </p>
-            <div class="flex flex-col gap-3">
+            <div class="flex flex-col gap-2">
               <a-segmented
                 :value="themeMode"
                 :options="themeOptions"
                 class="w-full select-none"
                 @change="handleThemeModeChange"
               />
-              <div class="inline-flex items-center">
-                <span
-                  class="inline-flex items-center rounded-editorial-pill border border-editorial-border bg-editorial-control px-3 py-1 text-xs font-semibold"
-                  :class="isDarkMode ? 'text-sky-300' : 'text-emerald-700'"
-                >
-                  {{ isDarkMode ? "深色模式" : "浅色模式" }}
-                </span>
-              </div>
+              <p class="m-0 text-xs text-editorial-text-muted">{{ isDarkMode ? "当前：深色" : "当前：浅色" }}</p>
             </div>
           </section>
 
           <section
-            class="rounded-editorial-xl border border-editorial-border bg-editorial-panel px-4 py-4 shadow-editorial-card"
+            class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-3"
             data-shell-account-panel
           >
-            <p class="mb-1.5 inline-block text-xs font-semibold uppercase tracking-[0.12em] text-editorial-text-sidebar-muted">
+            <p class="mb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
               当前登录用户
             </p>
 
@@ -313,28 +282,51 @@ onBeforeUnmount(() => {
                 <p class="m-0 text-sm leading-6 text-editorial-text-body">
                   @{{ loggedInProfile.username }}
                 </p>
-                <div class="flex flex-wrap gap-2">
-                  <a-tag color="blue">{{ loggedInProfile.role }}</a-tag>
-                  <a-tag color="green">已登录</a-tag>
+                <div class="flex flex-wrap gap-2 text-xs text-editorial-text-muted">
+                  <span class="inline-flex rounded-editorial-pill bg-editorial-link px-2.5 py-1">
+                    {{ loggedInProfile.role }}
+                  </span>
+                  <span class="inline-flex rounded-editorial-pill bg-editorial-link px-2.5 py-1">
+                    已登录
+                  </span>
                 </div>
                 <p v-if="loggedInProfile.email" class="m-0 text-sm leading-6 text-editorial-text-body">
                   邮箱：{{ loggedInProfile.email }}
                 </p>
+                <form
+                  method="post"
+                  action="/logout"
+                  enctype="text/plain"
+                  class="pt-1"
+                  data-shell-logout-form
+                >
+                  <button
+                    type="submit"
+                    class="inline-flex items-center rounded-editorial-sm border border-editorial-border bg-editorial-panel px-3 py-2 text-sm font-medium text-editorial-text-main transition hover:bg-editorial-link-active"
+                    data-shell-logout-button
+                  >
+                    退出登录
+                  </button>
+                </form>
               </div>
             </template>
 
             <template v-else-if="guestProfile">
               <div class="flex flex-col gap-3">
-                <div class="flex flex-wrap gap-2">
-                  <a-tag color="blue">{{ guestProfile.role }}</a-tag>
-                  <a-tag color="gold">公开访问</a-tag>
+                <div class="flex flex-wrap gap-2 text-xs text-editorial-text-muted">
+                  <span class="inline-flex rounded-editorial-pill bg-editorial-link px-2.5 py-1">
+                    {{ guestProfile.role }}
+                  </span>
+                  <span class="inline-flex rounded-editorial-pill bg-editorial-link px-2.5 py-1">
+                    公开访问
+                  </span>
                 </div>
                 <p class="m-0 text-sm leading-6 text-editorial-text-body">
                   你现在看到的是公开内容。登录后才能进入系统菜单、保存策略和执行采集动作。
                 </p>
                 <a href="/login" class="inline-flex" data-shell-login-link>
                   <span
-                    class="inline-flex items-center rounded-editorial-pill border border-editorial-border bg-editorial-control px-4 py-2 text-sm font-semibold text-editorial-text-main shadow-editorial-card transition hover:border-editorial-border-strong hover:bg-editorial-control-hover"
+                    class="inline-flex items-center rounded-editorial-sm border border-editorial-border bg-editorial-panel px-3 py-2 text-sm font-medium text-editorial-text-main transition hover:bg-editorial-link-active"
                   >
                     去登录
                   </span>
@@ -356,14 +348,30 @@ onBeforeUnmount(() => {
     </aside>
 
     <main class="min-w-0 flex-1">
-      <div class="mx-auto flex w-full max-w-editorial-shell flex-1 flex-col px-4 py-4 min-[901px]:px-[18px] min-[901px]:py-[18px] min-[1081px]:px-6 min-[1081px]:py-6">
-        <section class="rounded-editorial-xl border border-editorial-border bg-editorial-panel shadow-editorial-card">
-          <div class="p-4 min-[901px]:px-[22px] min-[901px]:py-[20px]">
-            <RouterView v-slot="{ Component }">
-              <component :is="Component" />
-            </RouterView>
-          </div>
-        </section>
+      <div class="mx-auto flex w-full flex-1 flex-col px-4 pb-10 pt-2 min-[901px]:px-6 min-[901px]:pt-5">
+        <header
+          class="mx-auto flex w-full max-w-editorial-shell flex-col gap-2 border-b border-editorial-border pb-4 pt-2"
+          data-page-header
+        >
+          <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
+            {{ route.meta.navLabel }}
+          </p>
+          <h2
+            class="m-0 text-[32px] font-semibold tracking-[-0.03em] text-editorial-text-main"
+            data-page-header-title
+          >
+            {{ currentPageTitle }}
+          </h2>
+          <p class="m-0 max-w-3xl text-sm leading-6 text-editorial-text-body" data-page-header-description>
+            {{ currentPageDescription }}
+          </p>
+        </header>
+
+        <div class="mx-auto w-full max-w-editorial-shell pt-6">
+          <RouterView v-slot="{ Component }">
+            <component :is="Component" />
+          </RouterView>
+        </div>
       </div>
     </main>
 
@@ -376,20 +384,20 @@ onBeforeUnmount(() => {
       leave-to-class="opacity-0"
     >
       <div
-        v-if="mobileSystemDrawerOpen"
-        class="fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-sm"
+        v-if="shouldShowSystemMenu && mobileSystemDrawerOpen"
+        class="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
         data-mobile-drawer-backdrop
         @click="closeMobileSystemDrawer"
       >
         <section
           id="mobile-system-drawer"
-          class="absolute left-4 right-4 top-[74px] max-h-[calc(100dvh-90px)] overflow-y-auto rounded-editorial-xl border border-editorial-border-strong bg-editorial-panel-strong p-4 shadow-editorial-page"
+          class="absolute left-4 right-4 top-[66px] max-h-[calc(100dvh-82px)] overflow-y-auto rounded-editorial-lg border border-editorial-border bg-editorial-panel p-4 shadow-editorial-floating"
           data-mobile-system-drawer
           @click.stop
         >
           <div class="flex flex-col gap-4">
             <div class="flex flex-col gap-1.5">
-              <p class="m-0 text-xs font-semibold uppercase tracking-[0.12em] text-editorial-text-sidebar-muted">
+              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
                 系统菜单
               </p>
               <h2 class="m-0 text-lg font-semibold leading-tight text-editorial-text-main">
@@ -400,65 +408,40 @@ onBeforeUnmount(() => {
               </p>
             </div>
 
-            <nav class="flex flex-col gap-2" aria-label="移动端系统菜单">
-              <template v-if="profile?.loggedIn">
-                <RouterLink
-                  v-for="page in systemNavPages"
-                  :key="page.key"
-                  :to="page.path"
-                  :class="getShellNavLinkClasses(route.path === page.path)"
-                  :data-mobile-drawer-link="page.path"
-                  :data-shell-nav-link="page.path"
-                  @click="closeMobileSystemDrawer"
-                >
-                  <span class="text-sm font-semibold leading-5">{{ page.navLabel }}</span>
-                  <span :class="getShellNavDescriptionClasses(route.path === page.path)" class="text-xs leading-5">
-                    {{ page.description }}
-                  </span>
-                </RouterLink>
-              </template>
-              <template v-else>
-                <a
-                  v-for="page in systemNavPages"
-                  :key="page.key"
-                  :href="page.path"
-                  :class="getShellNavLinkClasses(route.path === page.path)"
-                  :data-mobile-drawer-link="page.path"
-                  :data-shell-nav-link="page.path"
-                  @click="closeMobileSystemDrawer"
-                >
-                  <span class="text-sm font-semibold leading-5">{{ page.navLabel }}</span>
-                  <span :class="getShellNavDescriptionClasses(route.path === page.path)" class="text-xs leading-5">
-                    {{ page.description }}
-                  </span>
-                </a>
-              </template>
+            <nav class="flex flex-col gap-1" aria-label="移动端系统菜单">
+              <RouterLink
+                v-for="page in systemNavPages"
+                :key="page.key"
+                :to="page.path"
+                :class="getShellNavLinkClasses(route.path === page.path)"
+                :data-mobile-drawer-link="page.path"
+                :data-shell-nav-link="page.path"
+                @click="closeMobileSystemDrawer"
+              >
+                <span class="text-sm font-semibold leading-5">{{ page.navLabel }}</span>
+                <span :class="getShellNavDescriptionClasses(route.path === page.path)" class="text-xs leading-5">
+                  {{ page.description }}
+                </span>
+              </RouterLink>
             </nav>
 
-            <section class="rounded-editorial-xl border border-editorial-border bg-editorial-panel px-4 py-4 shadow-editorial-card">
-              <p class="mb-1.5 inline-block text-xs font-semibold uppercase tracking-[0.12em] text-editorial-text-sidebar-muted">
+            <section class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-3">
+              <p class="mb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
                 界面主题
               </p>
-              <div class="flex flex-col gap-3">
+              <div class="flex flex-col gap-2">
                 <a-segmented
                   :value="themeMode"
                   :options="themeOptions"
                   class="w-full"
                   @change="handleThemeModeChange"
                 />
-                <div class="inline-flex items-center">
-                  <span
-                    class="inline-flex items-center rounded-editorial-pill border border-editorial-border bg-editorial-control px-3 py-1 text-xs font-semibold"
-                    :class="isDarkMode ? 'text-sky-300' : 'text-emerald-700'"
-                  >
-                    {{ isDarkMode ? "深色模式" : "浅色模式" }}
-                  </span>
-                </div>
+                <p class="m-0 text-xs text-editorial-text-muted">{{ isDarkMode ? "当前：深色" : "当前：浅色" }}</p>
               </div>
             </section>
 
-            <section class="rounded-editorial-xl border border-editorial-border bg-editorial-panel px-4 py-4 shadow-editorial-card">
-              <p class="mb-1.5 inline-block text-xs font-semibold uppercase tracking-[0.12em] text-editorial-text-sidebar-muted">
+            <section class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-3">
+              <p class="mb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
                 当前登录用户
               </p>
               <template v-if="profileLoadState === 'loading'">
@@ -472,28 +455,29 @@ onBeforeUnmount(() => {
                   <p class="m-0 text-sm leading-6 text-editorial-text-body">
                     @{{ loggedInProfile.username }}
                   </p>
-                  <div class="flex flex-wrap gap-2">
-                    <a-tag color="blue">{{ loggedInProfile.role }}</a-tag>
-                    <a-tag color="green">已登录</a-tag>
-                  </div>
-                </div>
-              </template>
-              <template v-else-if="guestProfile">
-                <div class="flex flex-col gap-3">
-                  <div class="flex flex-wrap gap-2">
-                    <a-tag color="blue">{{ guestProfile.role }}</a-tag>
-                    <a-tag color="gold">公开访问</a-tag>
-                  </div>
-                  <p class="m-0 text-sm leading-6 text-editorial-text-body">
-                    登录后才能进入系统菜单和工作台操作。
-                  </p>
-                  <a href="/login" class="inline-flex" data-mobile-login-link>
-                    <span
-                    class="inline-flex items-center rounded-editorial-pill border border-editorial-border bg-editorial-control px-4 py-2 text-sm font-semibold text-editorial-text-main shadow-editorial-card transition hover:border-editorial-border-strong hover:bg-editorial-control-hover"
-                    >
-                      去登录
+                  <div class="flex flex-wrap gap-2 text-xs text-editorial-text-muted">
+                    <span class="inline-flex rounded-editorial-pill bg-editorial-link px-2.5 py-1">
+                      {{ loggedInProfile.role }}
                     </span>
-                  </a>
+                    <span class="inline-flex rounded-editorial-pill bg-editorial-link px-2.5 py-1">
+                      已登录
+                    </span>
+                  </div>
+                  <form
+                    method="post"
+                    action="/logout"
+                    enctype="text/plain"
+                    class="pt-1"
+                    data-mobile-logout-form
+                  >
+                    <button
+                      type="submit"
+                      class="inline-flex items-center rounded-editorial-sm border border-editorial-border bg-editorial-panel px-3 py-2 text-sm font-medium text-editorial-text-main transition hover:bg-editorial-link-active"
+                      data-mobile-logout-button
+                    >
+                      退出登录
+                    </button>
+                  </form>
                 </div>
               </template>
               <template v-else-if="profileLoadState === 'error'">

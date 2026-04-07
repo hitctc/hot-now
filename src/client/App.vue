@@ -9,7 +9,7 @@ const { themeConfig } = useTheme();
 
 <template>
   <ConfigProvider :theme="themeConfig">
-    <div class="min-h-screen text-editorial-text-main" data-shell-root>
+    <div class="min-h-screen bg-editorial-page text-editorial-text-main" data-shell-root>
       <UnifiedShellLayout />
     </div>
   </ConfigProvider>

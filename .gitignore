@@ -2,6 +2,7 @@ node_modules
 dist
 .env
 .env.local
+.playwright-cli
 *.sqlite-shm
 *.sqlite-wal
 data/hot-now.sqlite

@@ -13,9 +13,9 @@
 本设计的目标是：
 
 - 继续保留 HotNow 主链路的 `RSS-first` 语义。
-- 在仓库内新增一个“微信公众号桥接模块”，把第三方公众号转换成 HotNow 可消费的 feed。
+- 在仓库内新增一个“微信公众号桥接模块”，在来源保存时把第三方公众号文章链接解析成 HotNow 可消费的 feed。
 - 让 `/settings/sources` 支持可视化维护这类公众号来源。
-- 第一阶段只做最小可行实现，不引入多 provider 扩展面板、批量导入或复杂健康检查。
+- 第一阶段只做最小可行实现，不引入多 provider 扩展面板、批量导入、待解析状态机或复杂健康检查。
 
 ## 2. 设计结论
 
@@ -25,9 +25,13 @@
 - 为来源新增类型语义，至少区分：
   - `rss`
   - `wechat_bridge`
-- 对于 `wechat_bridge` 类型，HotNow 不直接抓取公众号页面，而是先通过仓库内置 bridge 模块生成可消费的 feed 地址。
-- 采集链路继续只认“feed 输入”，不让微信抓取细节渗透到后续聚类、评分、报告和内容页模型。
+- 对于 `wechat_bridge` 类型，HotNow 不直接抓取公众号页面，而是在**保存来源时**通过仓库内置 bridge 模块调用外部 bridge 服务，把“公众号文章链接”解析成最终 feed 地址。
+- 一旦保存成功，最终 feed 会落到 `content_sources.rss_url`，后续采集链路继续只认 `rss_url`。
 - `/settings/sources` 提供统一来源列表和统一新增/编辑弹窗，允许维护 RSS 来源和公众号桥接来源。
+- 微信公众号来源表单第一阶段支持两种输入方式：
+  - 已存在的 `feed URL`
+  - 公众号文章链接
+- bridge 服务不可用或解析失败时，来源保存**直接失败，不保存待解析脏数据**。
 
 这意味着本轮不会把整个 source 系统升级成“任意 source adapter 框架”。微信公众号接入只是作为现有 `RSS-first` 体系上的一层 bridge 扩展。
 
@@ -66,17 +70,28 @@
   - 语义与现状一致
   - 继续直接使用 `rss_url`
 - `source_type = wechat_bridge`
-  - `rss_url` 不再是人工录入的主字段
+  - `rss_url` 保存最终可采集的 feed 地址
   - `bridge_kind` 决定桥接 provider
-  - `bridge_config_json` 保存公众号标识和桥接所需参数
+  - `bridge_config_json` 保存原始输入模式和原始桥接输入
 
 ### 3.3 第一阶段 bridge 配置结构
 
-第一阶段只支持一种 bridge provider，因此配置结构保持最小：
+第一阶段只支持一种 bridge provider，因此配置结构保持最小，并只保留两种输入模式：
 
 ```json
 {
-  "accountId": "provider-specific-id"
+  "inputMode": "feed_url",
+  "feedUrl": "https://bridge.example.com/feed/123.xml"
+}
+```
+
+或
+
+```json
+{
+  "inputMode": "article_url",
+  "articleUrl": "https://mp.weixin.qq.com/s?...",
+  "resolvedFrom": "wechat2rss"
 }
 ```
 
@@ -92,17 +107,18 @@
 
 建议新增文件：
 
-- `resolveWechatBridgeFeed.ts`
+- `registerWechatBridgeSource.ts`
 - `wechatBridgeProviders.ts`
 - `wechatBridgeTypes.ts`
 
 职责划分：
 
-- `resolveWechatBridgeFeed`
-  - 输入一条 `wechat_bridge` source 记录
-  - 输出一个最终 feed 地址
+- `registerWechatBridgeSource`
+  - 输入表单里的 bridge 来源输入
+  - 如果是 `feed_url`，直接校验并返回最终 feed
+  - 如果是 `article_url`，调用外部 bridge 服务并返回最终 feed
 - `wechatBridgeProviders`
-  - 根据 `bridge_kind` 生成具体 feed 地址
+  - 根据 `bridge_kind` 调用具体 provider 的注册接口
 - `wechatBridgeTypes`
   - 定义 bridge 来源类型和配置结构
 
@@ -118,7 +134,7 @@ bridge 模块本轮不负责：
 
 bridge 模块只负责一件事：
 
-- **把第三方公众号来源转成 HotNow 现有链路能理解的 feed 输入**
+- **在来源保存时，把第三方公众号来源转成最终 feed 地址**
 
 ### 4.3 Provider 范围
 
@@ -126,11 +142,31 @@ bridge 模块只负责一件事：
 
 选择原则：
 
-- 能稳定生成 feed 地址
-- 参数结构简单
+- 能通过文章链接注册订阅
+- 能返回最终 feed 地址
+- 支持服务端 token 鉴权
 - 不要求 HotNow 自己去模拟公众号页面抓取
 
 第一阶段不做多 provider UI，也不做 provider 优先级切换。后续需要扩展时，再在 `bridge_kind` 上继续加。
+
+### 4.4 运行时配置
+
+为了支持“公众号文章链接 -> 自动生成 feed”，HotNow 需要新增两个环境变量：
+
+- `WECHAT_BRIDGE_BASE_URL`
+- `WECHAT_BRIDGE_TOKEN`
+
+语义：
+
+- `WECHAT_BRIDGE_BASE_URL`
+  - bridge 服务地址
+- `WECHAT_BRIDGE_TOKEN`
+  - bridge 服务鉴权 token
+
+如果这两个配置缺失：
+
+- `feed_url` 输入模式仍可用
+- `article_url` 输入模式必须禁用，或在保存时返回明确错误
 
 ## 5. 采集链路改造
 
@@ -138,14 +174,13 @@ bridge 模块只负责一件事：
 
 当前 `loadEnabledSourceIssues` / `loadActiveSourceIssue` 是按 `rss_url` 直接拉源。
 
-本轮调整为：
+本轮保持这条链路不变。
 
-- 如果 `source_type = rss`
-  - 继续按当前逻辑直接使用 `rss_url`
-- 如果 `source_type = wechat_bridge`
-  - 先调用 `resolveWechatBridgeFeed`
-  - 得到最终 feed 地址
-  - 再沿用现有 feed 拉取与解析逻辑
+也就是说：
+
+- 所有 bridge 解析都发生在 `/settings/sources` 保存时
+- 真正入库后的 `wechat_bridge` source 仍然有可直接采集的 `rss_url`
+- 采集阶段不再感知“文章链接”和 bridge 注册行为
 
 ### 5.2 兼容原则
 
@@ -167,7 +202,7 @@ RSS 来源行为保持不变。
 
 - `来源类型`
 - 如果为公众号桥接源，则展示 `桥接方式摘要`
-- 如果为公众号桥接源，则展示 `公众号标识摘要`
+- 如果为公众号桥接源，则展示 `bridge 输入摘要`
 
 ### 6.2 新增来源
 
@@ -188,7 +223,13 @@ RSS 来源行为保持不变。
 当来源类型为 `微信公众号`：
 
 - `桥接方式`
-- `公众号标识`
+- `输入方式`
+  - `现成 feed URL`
+  - `公众号文章链接`
+- 如果输入方式为 `现成 feed URL`
+  - `feed URL`
+- 如果输入方式为 `公众号文章链接`
+  - `公众号文章链接`
 
 ### 6.3 编辑与删除
 
@@ -210,24 +251,30 @@ RSS 来源行为保持不变。
 ### 7.2 微信公众号桥接来源
 
 - `bridge_kind` 必填
-- `公众号标识` 必填
-- 服务端必须能基于配置成功生成 bridge feed 地址
-- 如果 feed 地址生成失败，则保存失败并返回明确错误信息
+- `inputMode` 必填
+- 如果是 `feed_url`
+  - `feed URL` 必填且必须是合法 URL
+- 如果是 `article_url`
+  - `文章链接` 必填且必须是合法 URL
+  - 必须存在 `WECHAT_BRIDGE_BASE_URL` 和 `WECHAT_BRIDGE_TOKEN`
+  - 服务端必须能调用 bridge 服务并拿到最终 feed
+- 如果最终 feed 生成失败，则保存失败并返回明确错误信息
 
 ### 7.3 第一阶段不做的校验
 
 本轮不做：
 
-- 保存时的实时联网抓取校验
+- 采集时的 bridge 即时解析
 - provider 健康检查面板
 - 失败重试配置
 - 自动兜底切换其他 bridge provider
+- 待解析状态来源
 
 理由：
 
-- 第三方桥接本身可能瞬时不可用
-- 保存表单时做联网拉取会恶化交互体验
-- 第一阶段的目标是让 source 能被正确维护和被采集链路识别，而不是一次性把可观测性做满
+- 只在保存时做一次 bridge 注册，能最大程度保护现有采集链路
+- 一旦保存成功，后续采集会回到普通 feed 语义
+- 引入“待解析状态”会把 sources 工作台复杂度显著抬高，本轮不值得
 
 ## 8. 测试门禁
 
@@ -237,8 +284,9 @@ RSS 来源行为保持不变。
 
 - source CRUD API 能保存和读取 `wechat_bridge`
 - `listSourceWorkbench` / `listSourceCards` 能正确展示 `source_type`
-- `loadEnabledSourceIssues` 能区分 `rss` 和 `wechat_bridge`
+- `article_url` 模式在 bridge 注册成功时会保存最终 `rss_url`
 - bridge 配置非法时能返回明确错误
+- 缺失 `WECHAT_BRIDGE_BASE_URL` / `WECHAT_BRIDGE_TOKEN` 时，`article_url` 模式会被拒绝
 
 ### 8.2 客户端
 
@@ -262,14 +310,15 @@ RSS 来源行为保持不变。
 
 1. 在 `/settings/sources` 新增一个公众号桥接来源
 2. 保存后确认该来源出现在列表
-3. 执行一次手动采集，确认采集链路能够识别该来源
+3. 如果输入的是文章链接，确认保存后该来源已经拥有最终 `rss_url`
+4. 执行一次手动采集，确认采集链路按普通 feed 识别该来源
 
 ## 9. 范围边界
 
 本轮明确不做：
 
 - 批量导入公众号
-- 自动发现公众号标识
+- 自动发现公众号来源输入
 - 多 provider 并行回退
 - 公众号 bridge 监控面板
 - 独立于 `content_sources` 的第二套来源体系
@@ -278,8 +327,8 @@ RSS 来源行为保持不变。
 ## 10. 推荐实施顺序
 
 1. 先扩展 `content_sources` 数据模型与读写模型
-2. 再增加 bridge 模块与 source loader 分支
+2. 再增加 bridge 注册模块与运行时配置
 3. 再接 `/settings/sources` 的新增/编辑/删除交互
 4. 最后补测试、文档和 smoke test
 
-这样可以最大限度把改动控制在“source 维护”和“feed 解析入口”两层，不把不相关模块一起拖进来。
+这样可以最大限度把改动控制在“source 维护”和“来源保存时的 bridge 注册”两层，不把采集主链路一起拖进来。

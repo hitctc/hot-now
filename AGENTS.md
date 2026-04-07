@@ -82,7 +82,7 @@
 - `/settings/sources`：统一站点数据迭代收集页（登录后，由 `Vue 3 + Ant Design Vue` 驱动，可启用/停用 source、切换“选中该来源时全量展示”，并分别手动执行采集 / 手动发送最新报告；页面会展示总条数、今天发布、今天抓取，以及 `AI 新讯 / AI 热点` 入池与展示统计）
 - `/settings/profile`：统一站点当前登录用户页（登录后，由 `Vue 3 + Ant Design Vue` 驱动，展示会话状态、账号摘要和联系邮箱）
 - 统一站点左侧导航底部支持深色 / 浅色主题切换，偏好写入浏览器本地 `localStorage` 并在刷新后保持
-- `unified shell` 页面（`/`、`/ai-new`、`/ai-hot`、`/settings/*`）已完整切换到 `Editorial Signal Desk` 双主题
+- `unified shell` 页面（`/`、`/ai-new`、`/ai-hot`、`/settings/*`）已完整切换到 `Notion Workspace` 风格的黑白灰双主题
 - 内容导航已收口为 AI-first：`/` 与 `/ai-new` 等同 `AI 新讯`，`/ai-hot` 承接 `AI 热点`，`/articles` 已移除
 - `/`、`/ai-new`、`/ai-hot` 顶部新增共享 source 复选过滤条，支持 `全选 / 全不选`，浏览偏好写入浏览器本地 `localStorage['hot-now-content-sources']`
 - `/`、`/ai-new`、`/ai-hot` 同时提供共享排序切换：`按发布时间`、`按评分`，偏好写入浏览器本地 `localStorage['hot-now-content-sort']`
@@ -229,10 +229,10 @@ SQLite 可靠性约定：
 - 采集和发信已拆成两个独立功能：默认配置下采集每 `10` 分钟执行一次，发信每天 `10:00` 执行一次；两者都支持手动触发，并共用同一把运行锁
 - 系统菜单已收口到多源语义：`/settings/sources` 支持 source 启用/停用、source 级“选中时全量展示”策略、逐 source 最近抓取状态展示，以及统一站点内手动执行采集 / 手动发送最新报告；`/settings/view-rules` 现在是四道门策略工作台，只保留 `base / ai_new / ai_hot / hero` 四个正式 gate scope，并继续承载 LLM 厂商配置、反馈池和草稿池；当前登录用户信息已并到侧边栏底部
 - `/settings/sources` 现在会基于共享内容选择器实时展示 source 工作台总览表，口径包含总条数、今天发布、今天抓取，以及 `AI 新讯 / AI 热点` 的入池与展示统计
-- unified shell 已去掉顶部 header，页面信息和账号区都收进左侧侧边栏；视觉母版已从赛博控制台切换为浅色纸感的 `Editorial Signal Desk`，主题切换与 localStorage 持久化已落地
+- unified shell 已去掉顶部 header，页面信息和账号区都收进左侧侧边栏；视觉母版已切到高还原 `Notion Workspace` 的黑白灰双主题，主题切换与 localStorage 持久化已落地
 - `/settings/*` 现在统一走 Fastify 返回的客户端入口，由 `src/client/` 下的 `Vue 3 + Vite + Ant Design Vue` 页面接管，不再继续叠加新的服务端拼表单 HTML
 - `/`、`/ai-new`、`/ai-hot` 现在也统一走 Fastify 返回的客户端入口，由 `src/client/pages/content/` 下的 Vue 页面读取内容 API 渲染；`/articles` 已移除
-- unified shell 内容页已切到“首页主卡 + 标准卡”的混合卡片体系；系统页卡片则统一收口为 workbench / inventory panel 语义
+- unified shell 内容页已切到更接近 Notion page + database list 的层级；系统页和 legacy/login 页面也统一收口到同一套轻量 settings / document 语义
 - 内容页顶部现在会渲染共享 source 过滤条与共享排序切换；勾选结果通过 `localStorage['hot-now-content-sources'] + x-hot-now-source-filter` header 驱动内容 API 过滤，排序偏好通过 `localStorage['hot-now-content-sort'] + x-hot-now-content-sort` header 驱动内容 API 排序，只影响当前浏览结果，不参与系统页统计口径
 - 开启“选中时全量展示”的 source 在内容页首次进入时默认不勾选；只有用户显式勾选后，该 source 才会免受普通 view limit 截断
 - 内容页现在会把当前反馈池条目回填到局部反馈面板，内容交互形成 `点赞/点踩 -> 反馈池 -> 草稿池 -> 正式自然语言策略 -> 全量 / 增量重算` 的闭环

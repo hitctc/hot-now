@@ -70,7 +70,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 内容卡片保留 `收藏 / 点赞 / 点踩`，并新增局部 `补充反馈` 面板；点赞 / 点踩后会自动展开反馈面板，反馈会先进入反馈池，不会直接改正式策略
 - 如果本地 `data/hot-now.sqlite` 内容库损坏，内容页会降级显示错误提示，而不是直接返回 `500`
 - 统一站点左侧导航底部支持深色 / 浅色主题切换，主题偏好保存在浏览器本地 `localStorage`，刷新后保持
-- `unified shell` 页面已完整接入以浅色为母版的 `Editorial Signal Desk` 双主题：`/`、`/ai-new`、`/ai-hot`、`/settings/*`
+- `unified shell` 页面已完整切到 `Notion Workspace` 风格的黑白灰双主题：`/`、`/ai-new`、`/ai-hot`、`/settings/*`
 - Vue 客户端样式栈现在是 `Vue 3 + Vite + Ant Design Vue + Tailwind CSS`；统一主题源收口到 `src/client/theme/editorialTokens.ts`
 - `src/client/styles/tailwind.css` 只保留基础样式、主题变量和少量 AntD 深层覆写，不再新增大型 CSS 皮肤文件
 - 统一站点保留左侧品牌块、浅深主题切换和本地 `localStorage` 持久化

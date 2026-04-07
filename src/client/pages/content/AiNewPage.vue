@@ -2,11 +2,11 @@
 import { computed, onMounted, ref } from "vue";
 
 import ContentEmptyState from "../../components/content/ContentEmptyState.vue";
+import ContentHeroCard from "../../components/content/ContentHeroCard.vue";
 import ContentSourceFilterBar from "../../components/content/ContentSourceFilterBar.vue";
 import ContentSortControl from "../../components/content/ContentSortControl.vue";
 import ContentStandardCard from "../../components/content/ContentStandardCard.vue";
 import {
-  editorialContentIntroSectionClass,
   editorialContentListSectionClass,
   editorialContentPageClass
 } from "../../components/content/contentCardShared";
@@ -100,6 +100,7 @@ async function handleSortModeChange(nextSortMode: ContentSortMode): Promise<void
 }
 
 const listCards = computed(() => pageModel.value?.cards ?? []);
+const featuredCard = computed(() => pageModel.value?.featuredCard ?? null);
 const visibleResultCount = computed(() => listCards.value.length);
 const sourceFilter = computed(() => pageModel.value?.sourceFilter ?? null);
 const displayState = computed(() => {
@@ -126,41 +127,39 @@ onMounted(() => {
 
 <template>
   <div :class="editorialContentPageClass" data-content-page="ai-new">
-    <section :class="editorialContentIntroSectionClass">
-      <p class="m-0 text-xs font-semibold uppercase tracking-[0.24em] text-editorial-text-muted">AI 新讯</p>
-      <h1 class="mt-3 text-3xl font-semibold tracking-tight text-editorial-text-main">
-        最快发现新一批 AI 信号
-      </h1>
-      <p class="mt-3 max-w-3xl text-base leading-7 text-editorial-text-body">
-        这里直接按统一标准卡浏览最新 AI 新闻、模型、事件和智能体线索，不再额外拆首条精选。
-      </p>
-    </section>
-
     <a-alert v-if="hasLoadError && pageModel" type="warning" show-icon :message="loadError" banner />
 
-    <ContentSourceFilterBar
-      v-if="sourceFilter"
-      :options="sourceFilter.options"
-      :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
-      :visible-result-count="visibleResultCount"
-      @change="handleSourceKindsChange"
-    />
+    <div v-if="sourceFilter" class="flex flex-col gap-3">
+      <ContentSourceFilterBar
+        :options="sourceFilter.options"
+        :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
+        :visible-result-count="visibleResultCount"
+        @change="handleSourceKindsChange"
+      />
 
-    <ContentSortControl
-      v-if="sourceFilter"
-      :sort-mode="sortMode"
-      @change="handleSortModeChange"
-    />
+      <ContentSortControl
+        :sort-mode="sortMode"
+        @change="handleSortModeChange"
+      />
+    </div>
 
     <a-skeleton v-if="isLoading" active :paragraph="{ rows: 7 }" />
 
     <ContentEmptyState v-else-if="displayState" :state="displayState" data-content-empty-state />
 
     <template v-else-if="pageModel">
+      <ContentHeroCard
+        v-if="featuredCard"
+        :card="featuredCard"
+        data-content-section="featured"
+      />
+
       <section
         v-if="listCards.length > 0"
         :class="editorialContentListSectionClass"
         data-content-section="list"
+        data-content-list
+        data-list-style="database"
       >
         <ContentStandardCard v-for="card in listCards" :key="card.id" :card="card" />
       </section>

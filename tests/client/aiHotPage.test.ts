@@ -95,18 +95,19 @@ describe("AiHotPage", () => {
     await flushPromises();
 
     expect(contentApiMocks.readAiHotPage).toHaveBeenCalledWith(["openai"], "content_score");
-    expect(wrapper.get("[data-content-page='ai-hot']").text()).toContain("AI 热点");
     expect(wrapper.get("[data-content-page='ai-hot']").classes()).toEqual(
       expect.arrayContaining(["flex", "flex-col", "gap-6"])
     );
     expect(wrapper.find("[data-content-filter-shell]").exists()).toBe(false);
     expect(wrapper.find("[data-content-source-filter]").exists()).toBe(true);
+    expect(wrapper.find("[data-content-toolbar]").exists()).toBe(true);
     expect(wrapper.get("[data-content-source-filter]").text()).toContain("已选 1 / 2 · 共 1 条");
     expect(wrapper.find("[data-source-option-count='openai']").exists()).toBe(false);
     expect(wrapper.find("[data-source-option-count='ithome']").exists()).toBe(false);
     expect(wrapper.find("[data-content-sort-control]").exists()).toBe(true);
-    expect(wrapper.get("[data-content-section='list']").classes()).toContain("grid");
+    expect(wrapper.get("[data-content-section='list']").attributes("data-list-style")).toBe("database");
     expect(wrapper.get("[data-content-section='list']").text()).toContain("Hot AI Event");
+    expect(wrapper.findAll("[data-content-row]").length).toBe(1);
   });
 
   it("shows a degraded empty state when loading fails", async () => {

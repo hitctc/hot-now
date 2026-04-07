@@ -108,20 +108,21 @@ describe("AiNewPage", () => {
     await flushPromises();
 
     expect(contentApiMocks.readAiNewPage).toHaveBeenCalledWith(["openai"], "published_at");
-    expect(wrapper.get("[data-content-page='ai-new']").text()).toContain("AI 新讯");
     expect(wrapper.get("[data-content-page='ai-new']").classes()).toEqual(
       expect.arrayContaining(["flex", "flex-col", "gap-6"])
     );
     expect(wrapper.find("[data-content-filter-shell]").exists()).toBe(false);
     expect(wrapper.find("[data-content-source-filter]").exists()).toBe(true);
+    expect(wrapper.find("[data-content-toolbar]").exists()).toBe(true);
     expect(wrapper.get("[data-content-source-filter]").text()).toContain("已选 1 / 2 · 共 2 条");
     expect(wrapper.find("[data-source-option-count='openai']").exists()).toBe(false);
     expect(wrapper.find("[data-source-option-count='ithome']").exists()).toBe(false);
     expect(wrapper.find("[data-content-sort-control]").exists()).toBe(true);
-    expect(wrapper.get("[data-content-section='list']").classes()).toContain("grid");
+    expect(wrapper.get("[data-content-section='list']").attributes("data-list-style")).toBe("database");
     expect(wrapper.find("[data-content-section='featured']").exists()).toBe(false);
     expect(wrapper.get("[data-content-section='list']").text()).toContain("AI Weekly Insight");
     expect(wrapper.get("[data-content-section='list']").text()).toContain("AI Agent Launch");
+    expect(wrapper.findAll("[data-content-row]").length).toBe(2);
   });
 
   it("persists source selections and reloads with the updated filter", async () => {
@@ -174,6 +175,7 @@ describe("AiNewPage", () => {
     expect(wrapper.find("[data-content-section='featured']").exists()).toBe(false);
     expect(wrapper.get("[data-content-source-filter]").text()).toContain("已选 2 / 2 · 共 1 条");
     expect(wrapper.get("[data-content-section='list']").text()).toContain("New OpenAI Model");
+    expect(wrapper.findAll("[data-content-row]").length).toBe(1);
   });
 
   it("persists sort mode changes and reloads with the shared sort preference", async () => {

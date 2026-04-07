@@ -6,7 +6,6 @@ import ContentSourceFilterBar from "../../components/content/ContentSourceFilter
 import ContentSortControl from "../../components/content/ContentSortControl.vue";
 import ContentStandardCard from "../../components/content/ContentStandardCard.vue";
 import {
-  editorialContentIntroSectionClass,
   editorialContentListSectionClass,
   editorialContentPageClass
 } from "../../components/content/contentCardShared";
@@ -126,31 +125,21 @@ onMounted(() => {
 
 <template>
   <div :class="editorialContentPageClass" data-content-page="ai-hot">
-    <section :class="editorialContentIntroSectionClass">
-      <p class="m-0 text-xs font-semibold uppercase tracking-[0.24em] text-editorial-text-muted">AI 热点</p>
-      <h1 class="mt-3 text-3xl font-semibold tracking-tight text-editorial-text-main">
-        AI 热度已经起来了，再来这里看聚合结果
-      </h1>
-      <p class="mt-3 max-w-3xl text-base leading-7 text-editorial-text-body">
-        这里承接已经形成热度的 AI 新闻、模型、事件和智能体，按卡片流快速浏览，再决定要不要深入。
-      </p>
-    </section>
-
     <a-alert v-if="hasLoadError && pageModel" type="warning" show-icon :message="loadError" banner />
 
-    <ContentSourceFilterBar
-      v-if="sourceFilter"
-      :options="sourceFilter.options"
-      :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
-      :visible-result-count="visibleResultCount"
-      @change="handleSourceKindsChange"
-    />
+    <div v-if="sourceFilter" class="flex flex-col gap-3">
+      <ContentSourceFilterBar
+        :options="sourceFilter.options"
+        :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
+        :visible-result-count="visibleResultCount"
+        @change="handleSourceKindsChange"
+      />
 
-    <ContentSortControl
-      v-if="sourceFilter"
-      :sort-mode="sortMode"
-      @change="handleSortModeChange"
-    />
+      <ContentSortControl
+        :sort-mode="sortMode"
+        @change="handleSortModeChange"
+      />
+    </div>
 
     <a-skeleton v-if="isLoading" active :paragraph="{ rows: 6 }" />
 
@@ -161,6 +150,8 @@ onMounted(() => {
         v-if="listCards.length > 0"
         :class="editorialContentListSectionClass"
         data-content-section="list"
+        data-content-list
+        data-list-style="database"
       >
         <ContentStandardCard v-for="card in listCards" :key="card.id" :card="card" />
       </section>

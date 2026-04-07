@@ -25,14 +25,13 @@ function emitChange(nextSortMode: ContentSortMode): void {
 </script>
 
 <template>
-  <a-card
-    :bordered="false"
-    :class="[editorialContentFloatingPanelClass, 'backdrop-blur-xl']"
+  <section
+    :class="[editorialContentFloatingPanelClass, 'flex flex-col gap-3 px-4 py-4']"
     data-content-sort-control
   >
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div class="space-y-1">
-        <p class="m-0 text-xs font-semibold uppercase tracking-[0.24em] text-editorial-text-muted">排序方式</p>
+        <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">排序方式</p>
         <p class="m-0 text-sm leading-6 text-editorial-text-body">
           三个内容页共享这一组浏览顺序偏好。
         </p>
@@ -63,5 +62,5 @@ function emitChange(nextSortMode: ContentSortMode): void {
         </a-button>
       </div>
     </div>
-  </a-card>
+  </section>
 </template>

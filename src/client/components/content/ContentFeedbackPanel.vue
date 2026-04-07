@@ -60,7 +60,12 @@ watch(() => props.modelValue, syncFormState, { immediate: true, deep: true });
 </script>
 
 <template>
-  <a-form layout="vertical" :class="[editorialContentSubpanelClass, 'flex flex-col gap-4 px-4 py-4']" @finish="handleSubmit">
+  <a-form
+    layout="vertical"
+    :class="[editorialContentSubpanelClass, 'mt-3 flex flex-col gap-4 px-4 py-4']"
+    data-feedback-panel
+    @finish="handleSubmit"
+  >
     <a-form-item class="!mb-0" label="反馈说明">
       <a-textarea v-model:value="formState.freeText" :rows="3" placeholder="补充为什么值得加分、减分或屏蔽。" />
     </a-form-item>
@@ -98,7 +103,7 @@ watch(() => props.modelValue, syncFormState, { immediate: true, deep: true });
       type="primary"
       html-type="submit"
       :loading="submitting"
-      class="!w-full !rounded-editorial-pill !px-4 !py-2 !text-sm !font-semibold md:!w-auto"
+      class="!w-full !rounded-editorial-sm !border !border-editorial-border !bg-editorial-link-active !px-4 !py-2 !text-sm !font-medium !text-editorial-text-main !shadow-none md:!w-auto"
     >
       保存反馈池建议
     </a-button>

@@ -106,35 +106,38 @@ const feedbackSummary = computed(() => formatFeedbackSummary(cardState.feedbackE
 </script>
 
 <template>
-  <a-card
-    :bordered="false"
-    :class="[editorialContentCardClass, 'overflow-hidden']"
+  <article
+    :class="[editorialContentCardClass, 'overflow-hidden px-6 py-6']"
     :data-content-id="cardState.id"
+    data-content-hero
     data-content-variant="hero"
   >
-    <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-6">
+    <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_288px] lg:gap-8">
       <div class="flex flex-col gap-4">
         <div :class="editorialContentMetaClass">
-          <span :class="editorialContentBadgeClass">{{ cardState.sourceName }}</span>
+          <span>{{ cardState.sourceName }}</span>
           <span>{{ publishedText }}</span>
           <span :class="editorialContentScoreBadgeClass">系统分 {{ cardState.contentScore }}</span>
         </div>
 
         <div class="flex flex-col gap-3">
-          <h2 class="text-[1.85rem] font-semibold leading-tight tracking-tight text-editorial-text-main md:text-[2rem]">
+          <h2
+            class="text-[1.9rem] font-semibold leading-tight tracking-[-0.03em] text-editorial-text-main md:text-[2.15rem]"
+            data-content-hero-title
+          >
             <a
               v-if="safeUrl"
               :href="safeUrl"
               target="_blank"
               rel="noreferrer"
-              class="text-current no-underline transition hover:text-editorial-accent hover:no-underline"
+              class="text-current no-underline transition hover:underline hover:no-underline"
             >
               {{ cardState.title }}
             </a>
             <span v-else>{{ cardState.title }}</span>
           </h2>
 
-          <p class="m-0 text-base leading-7 text-editorial-text-body">
+          <p class="m-0 max-w-3xl text-sm leading-7 text-editorial-text-body" data-content-hero-summary>
             {{ cardState.summary }}
           </p>
         </div>
@@ -174,5 +177,5 @@ const feedbackSummary = computed(() => formatFeedbackSummary(cardState.feedbackE
         />
       </div>
     </div>
-  </a-card>
+  </article>
 </template>

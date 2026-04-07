@@ -2,50 +2,51 @@ import type { ContentCard, ContentFeedbackEntry } from "../../services/contentAp
 
 // 这些常量把内容页常用的卡片、标签和按钮样式集中起来，避免每个组件重复拼一长串 Tailwind class。
 export const editorialContentPanelClass =
-  "rounded-editorial-xl border border-editorial-border bg-editorial-panel";
+  "rounded-editorial-lg border border-editorial-border bg-editorial-panel";
 
 export const editorialContentCardClass = `${editorialContentPanelClass} shadow-editorial-card`;
 
-export const editorialContentFloatingPanelClass = `${editorialContentPanelClass} shadow-editorial-floating`;
+export const editorialContentFloatingPanelClass =
+  "rounded-editorial-md border border-editorial-border bg-editorial-panel";
 
 export const editorialContentInsetPanelClass =
-  "rounded-editorial-lg border border-editorial-border bg-editorial-control";
+  "rounded-editorial-md border border-editorial-border bg-editorial-panel";
 
 export const editorialContentSubpanelClass =
-  "rounded-editorial-lg border border-editorial-border bg-editorial-panel-strong";
+  "rounded-editorial-md border border-editorial-border bg-editorial-panel";
 
 export const editorialContentMetaClass =
-  "flex flex-wrap items-center gap-2 text-xs font-medium text-editorial-text-muted";
+  "flex flex-wrap items-center gap-2 text-[11px] font-medium text-editorial-text-muted";
 
 export const editorialContentBadgeClass =
-  "inline-flex items-center rounded-editorial-pill border border-editorial-border bg-editorial-control px-3 py-1 text-xs font-semibold leading-5 text-editorial-text-body";
+  "inline-flex items-center rounded-editorial-pill bg-editorial-link px-2.5 py-1 text-[11px] font-medium leading-5 text-editorial-text-body";
 
 export const editorialContentScoreBadgeClass =
-  "inline-flex items-center rounded-editorial-pill bg-editorial-link px-3 py-1 text-xs font-semibold leading-5 text-editorial-accent";
+  "inline-flex items-center rounded-editorial-pill bg-editorial-link-active px-2.5 py-1 text-[11px] font-medium leading-5 text-editorial-text-main";
 
 export const editorialContentFeedbackSummaryClass =
-  "flex flex-col gap-2 rounded-editorial-lg border border-editorial-border bg-editorial-control px-4 py-3";
+  "flex flex-col gap-2 rounded-editorial-md border border-editorial-border bg-editorial-link px-4 py-3";
 
 export const editorialContentControlButtonClass =
-  "!inline-flex !select-none !items-center !rounded-editorial-pill !border !px-3 !py-1.5 !text-xs !font-semibold !leading-5 !shadow-editorial-card !transition";
+  "!inline-flex !select-none !items-center !rounded-editorial-sm !border !px-3 !py-1.5 !text-xs !font-medium !leading-5 !transition";
 
 export const editorialContentControlButtonIdleClass =
-  "!border-editorial-border !bg-editorial-control !text-editorial-text-main hover:!border-editorial-border-strong hover:!bg-editorial-control-hover hover:!text-editorial-text-main";
+  "!border-editorial-border !bg-editorial-panel !text-editorial-text-body hover:!border-editorial-border hover:!bg-editorial-link-active hover:!text-editorial-text-main";
 
 export const editorialContentControlButtonDangerClass =
-  "!border-editorial-danger !bg-transparent !text-editorial-danger hover:!border-editorial-danger hover:!bg-editorial-control-hover hover:!text-editorial-danger";
+  "!border-editorial-border !bg-transparent !text-editorial-text-body hover:!border-editorial-border hover:!bg-editorial-link-active hover:!text-editorial-text-main";
 
 export const editorialContentControlButtonActiveClass =
-  "!border-editorial-border-strong !bg-editorial-link-active !text-editorial-text-main !shadow-editorial-accent !ring-1 !ring-inset !ring-editorial-ring hover:!border-editorial-border-strong hover:!bg-editorial-link-active hover:!text-editorial-text-main";
+  "!border-editorial-border !bg-editorial-link-active !text-editorial-text-main hover:!border-editorial-border hover:!bg-editorial-link-active hover:!text-editorial-text-main";
 
 export const editorialContentPageClass = "flex w-full flex-col gap-6";
 
 export const editorialContentIntroSectionClass =
-  "rounded-editorial-xl border border-editorial-border bg-editorial-panel px-6 py-6 shadow-editorial-page sm:px-8";
+  "flex flex-col gap-3";
 
 export const editorialContentFeaturedSectionClass = "grid gap-6";
 
-export const editorialContentListSectionClass = "grid gap-4 xl:grid-cols-2";
+export const editorialContentListSectionClass = "flex flex-col gap-1";
 
 export function cloneContentCard(card: ContentCard): ContentCard {
   return {

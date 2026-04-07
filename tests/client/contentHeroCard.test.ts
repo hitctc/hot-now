@@ -75,11 +75,13 @@ describe("ContentHeroCard", () => {
       }
     });
 
-    expect(wrapper.get("[data-content-id='101']").text()).toContain("AI Weekly Insight");
-    expect(wrapper.get("[data-content-id='101']").classes()).toEqual(
-      expect.arrayContaining(["rounded-editorial-xl", "border", "border-editorial-border", "bg-editorial-panel"])
+    expect(wrapper.get("[data-content-hero]").text()).toContain("AI Weekly Insight");
+    expect(wrapper.get("[data-content-hero-title]").text()).toContain("AI Weekly Insight");
+    expect(wrapper.get("[data-content-hero-summary]").text()).toContain("Roundup of recent AI and product updates.");
+    expect(wrapper.get("[data-content-hero]").classes()).toEqual(
+      expect.arrayContaining(["rounded-editorial-lg", "border", "border-editorial-border", "bg-editorial-panel"])
     );
-    expect(wrapper.get("[data-content-id='101']").classes()).toContain("shadow-editorial-card");
+    expect(wrapper.get("[data-content-hero]").classes()).toContain("shadow-editorial-card");
     expect(wrapper.text()).toContain("AI Weekly Insight");
     expect(wrapper.text()).toContain("保留 agent workflow 内容");
     expect(wrapper.text()).toContain("已同步到内容池");

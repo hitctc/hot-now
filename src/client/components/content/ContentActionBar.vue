@@ -76,7 +76,7 @@ const emit = defineEmits<{
       </a-button>
     </div>
 
-    <p v-if="statusText" class="m-0 text-xs leading-5 text-editorial-text-muted">
+    <p v-if="statusText" class="m-0 text-[11px] leading-5 text-editorial-text-muted">
       {{ statusText }}
     </p>
   </div>

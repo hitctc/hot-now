@@ -55,32 +55,32 @@ function handleToggleAll(): void {
 </script>
 
 <template>
-  <a-card
-    :bordered="false"
-    :class="[editorialContentFloatingPanelClass, 'sticky top-0 z-10 backdrop-blur-xl']"
+  <section
+    :class="[editorialContentFloatingPanelClass, 'flex flex-col gap-3 px-4 py-4']"
     data-content-source-filter
+    data-content-toolbar
   >
-    <div class="flex items-center gap-3">
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       <div class="shrink-0">
-        <p class="m-0 text-[11px] font-semibold uppercase tracking-[0.22em] text-editorial-text-muted">
+        <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
           来源筛选
         </p>
-        <p class="m-0 text-sm font-medium text-editorial-text-body">
+        <p class="m-0 text-sm text-editorial-text-body">
           已选 {{ selectedCount }} / {{ options.length }} · 共 {{ visibleResultCount }} 条
         </p>
       </div>
 
       <div class="min-w-0 flex-1 overflow-x-auto">
-        <div class="flex w-max items-center gap-3 pr-1">
+        <div class="flex w-max items-center gap-2 pr-1">
           <label
             v-for="option in options"
             :key="option.kind"
             :data-source-option="option.kind"
             :class="[
-              'inline-flex shrink-0 cursor-pointer select-none items-center gap-3 rounded-editorial-pill border px-3 py-2 text-sm font-semibold transition',
+              'inline-flex shrink-0 cursor-pointer select-none items-center gap-2 rounded-editorial-sm px-3 py-2 text-sm transition',
               selectedSet.has(option.kind)
-                ? 'border-editorial-border-strong bg-editorial-link-active text-editorial-text-main shadow-editorial-accent ring-1 ring-inset ring-editorial-ring'
-                : 'border-editorial-border bg-editorial-control text-editorial-text-main hover:border-editorial-border-strong hover:bg-editorial-control-hover'
+                ? 'bg-editorial-link-active text-editorial-text-main'
+                : 'text-editorial-text-body hover:bg-editorial-link-active hover:text-editorial-text-main'
             ]"
           >
             <input
@@ -106,5 +106,5 @@ function handleToggleAll(): void {
         </a-button>
       </div>
     </div>
-  </a-card>
+  </section>
 </template>

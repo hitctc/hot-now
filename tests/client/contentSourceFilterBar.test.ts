@@ -57,19 +57,16 @@ describe("ContentSourceFilterBar", () => {
     expect(wrapper.text()).not.toContain("浏览偏好只影响当前内容页");
     expect(wrapper.text()).toContain("已选 2 / 2 · 共 3 条");
     expect(wrapper.get("[data-content-source-filter]").classes()).toEqual(
-      expect.arrayContaining(["rounded-editorial-xl", "border", "border-editorial-border", "bg-editorial-panel"])
+      expect.arrayContaining(["rounded-editorial-md", "border", "border-editorial-border", "bg-editorial-panel"])
     );
     expect(wrapper.find("[data-source-option-count='openai']").exists()).toBe(false);
     expect(wrapper.find("[data-source-option-count='ithome']").exists()).toBe(false);
     expect(wrapper.get("[data-source-option='openai']").classes()).toEqual(
       expect.arrayContaining([
         "select-none",
-        "border-editorial-border-strong",
         "bg-editorial-link-active",
         "text-editorial-text-main",
-        "ring-1",
-        "ring-editorial-ring",
-        "shadow-editorial-accent"
+        "rounded-editorial-sm"
       ])
     );
     expect(wrapper.get("[data-source-option='openai']").classes()).not.toEqual(

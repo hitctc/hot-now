@@ -7,11 +7,17 @@ import {
   editorialContentFloatingPanelClass
 } from "./contentCardShared";
 
-const props = defineProps<{
-  options: { kind: string; name: string; currentPageVisibleCount: number }[];
-  selectedSourceKinds: string[];
-  visibleResultCount: number;
-}>();
+const props = withDefaults(
+  defineProps<{
+    options: { kind: string; name: string; currentPageVisibleCount: number }[];
+    selectedSourceKinds: string[];
+    visibleResultCount: number;
+    compact?: boolean;
+  }>(),
+  {
+    compact: false
+  }
+);
 
 const emit = defineEmits<{
   change: [selectedSourceKinds: string[]];
@@ -22,11 +28,22 @@ const selectedCount = computed(() => props.selectedSourceKinds.length);
 const hasSelectedAllSources = computed(
   () => props.options.length > 0 && props.selectedSourceKinds.length === props.options.length
 );
+const rootClass = computed(() =>
+  props.compact
+    ? "flex flex-col gap-3"
+    : `${editorialContentFloatingPanelClass} flex flex-col gap-3 px-4 py-4`
+);
+const headerClass = computed(() =>
+  props.compact
+    ? "flex flex-col gap-2"
+    : "flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
+);
 
 function emitSelection(nextKinds: string[]): void {
   emit("change", nextKinds);
 }
 
+// 勾选某个来源时顺手去重，避免父层传回重复值后把按钮状态算歪。
 function handleOptionToggle(kind: string, checked: boolean): void {
   const nextKinds = checked
     ? [...props.selectedSourceKinds, kind]
@@ -56,11 +73,11 @@ function handleToggleAll(): void {
 
 <template>
   <section
-    :class="[editorialContentFloatingPanelClass, 'flex flex-col gap-3 px-4 py-4']"
+    :class="rootClass"
     data-content-source-filter
     data-content-toolbar
   >
-    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <div :class="headerClass">
       <div class="shrink-0">
         <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
           来源筛选

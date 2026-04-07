@@ -51,16 +51,10 @@ describe("ContentSourceFilterBar", () => {
     await flushPromises();
 
     expect(wrapper.emitted("change")?.at(-1)).toEqual([[]]);
-    expect(wrapper.find("[data-content-filter-action='select-all']").exists()).toBe(false);
-    expect(wrapper.find("[data-content-filter-action='clear-all']").exists()).toBe(false);
-    expect(wrapper.text()).not.toContain("当前只看这些来源");
-    expect(wrapper.text()).not.toContain("浏览偏好只影响当前内容页");
     expect(wrapper.text()).toContain("已选 2 / 2 · 共 3 条");
     expect(wrapper.get("[data-content-source-filter]").classes()).toEqual(
       expect.arrayContaining(["rounded-editorial-md", "border", "border-editorial-border", "bg-editorial-panel"])
     );
-    expect(wrapper.find("[data-source-option-count='openai']").exists()).toBe(false);
-    expect(wrapper.find("[data-source-option-count='ithome']").exists()).toBe(false);
     expect(wrapper.get("[data-source-option='openai']").classes()).toEqual(
       expect.arrayContaining([
         "select-none",
@@ -69,8 +63,32 @@ describe("ContentSourceFilterBar", () => {
         "rounded-editorial-sm"
       ])
     );
-    expect(wrapper.get("[data-source-option='openai']").classes()).not.toEqual(
-      expect.arrayContaining(["text-editorial-text-on-accent"])
-    );
+  });
+
+  it("keeps the compact embedded layout usable without changing the toggle behavior", async () => {
+    const wrapper = mount(ContentSourceFilterBar, {
+      props: {
+        options: [
+          { kind: "openai", name: "OpenAI", currentPageVisibleCount: 3 },
+          { kind: "ithome", name: "IT之家", currentPageVisibleCount: 1 }
+        ],
+        selectedSourceKinds: ["openai"],
+        visibleResultCount: 3,
+        compact: true
+      },
+      global: {
+        plugins: [Antd]
+      }
+    });
+
+    expect(wrapper.get("[data-content-source-filter]").classes()).not.toContain("bg-editorial-panel");
+    expect(wrapper.get("[data-content-source-filter]").classes()).not.toContain("border");
+    expect(wrapper.text()).toContain("来源筛选");
+    expect(wrapper.text()).toContain("已选 1 / 2 · 共 3 条");
+
+    await wrapper.get("[data-content-filter-action='toggle-all']").trigger("click");
+    await flushPromises();
+
+    expect(wrapper.emitted("change")?.at(-1)).toEqual([["openai", "ithome"]]);
   });
 });

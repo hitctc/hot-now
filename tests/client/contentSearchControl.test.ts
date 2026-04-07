@@ -62,4 +62,23 @@ describe("ContentSearchControl", () => {
     expect((wrapper.get("[data-content-search-input]").element as HTMLInputElement).value).toBe("");
     expect(wrapper.find("[data-content-search-clear]").exists()).toBe(false);
   });
+
+  it("keeps the compact mode usable for embedded toolbars", async () => {
+    const wrapper = mount(ContentSearchControl, {
+      props: {
+        keyword: "  agent  ",
+        compact: true
+      },
+      global: {
+        plugins: [Antd]
+      }
+    });
+
+    expect(wrapper.get("[data-content-search-control]").classes()).toContain("w-full");
+
+    await wrapper.get("[data-content-search-submit]").trigger("click");
+    await flushPromises();
+
+    expect(wrapper.emitted("search")?.at(-1)).toEqual(["agent"]);
+  });
 });

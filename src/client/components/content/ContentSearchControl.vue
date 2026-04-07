@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 
-const props = defineProps<{
-  keyword: string;
-  isLoading?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    keyword: string;
+    isLoading?: boolean;
+    compact?: boolean;
+  }>(),
+  {
+    isLoading: false,
+    compact: false
+  }
+);
 
 const emit = defineEmits<{
   search: [keyword: string];
@@ -21,6 +28,8 @@ watch(
 );
 
 const hasDraftKeyword = computed(() => draftKeyword.value.trim().length > 0);
+const rootClass = computed(() => (props.compact ? "flex w-full items-center gap-2" : "flex items-center gap-2"));
+const inputClass = computed(() => (props.compact ? "min-w-0 flex-1" : undefined));
 
 // 统一把关键词裁掉首尾空白后再抛给页面层，保证后续 header 与持久化口径一致。
 function submitSearch(): void {
@@ -35,10 +44,11 @@ function clearSearch(): void {
 </script>
 
 <template>
-  <div class="flex items-center gap-2" data-content-search-control>
+  <div :class="rootClass" data-content-search-control>
     <a-input
       v-model:value="draftKeyword"
       size="small"
+      :class="inputClass"
       placeholder="搜索标题"
       data-content-search-input
       @pressEnter="submitSearch"

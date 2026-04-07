@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from "vue";
+
 import type { ContentSortMode } from "../../services/contentApi";
 import {
   editorialContentControlButtonActiveClass,
@@ -7,13 +9,30 @@ import {
   editorialContentFloatingPanelClass
 } from "./contentCardShared";
 
-const props = defineProps<{
-  sortMode: ContentSortMode;
-}>();
+const props = withDefaults(
+  defineProps<{
+    sortMode: ContentSortMode;
+    compact?: boolean;
+  }>(),
+  {
+    compact: false
+  }
+);
 
 const emit = defineEmits<{
   change: [sortMode: ContentSortMode];
 }>();
+
+const rootClass = computed(() =>
+  props.compact
+    ? "flex flex-col gap-2"
+    : `${editorialContentFloatingPanelClass} flex flex-col gap-3 px-4 py-4`
+);
+const contentClass = computed(() =>
+  props.compact
+    ? "flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+    : "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+);
 
 function emitChange(nextSortMode: ContentSortMode): void {
   if (nextSortMode === props.sortMode) {
@@ -26,13 +45,13 @@ function emitChange(nextSortMode: ContentSortMode): void {
 
 <template>
   <section
-    :class="[editorialContentFloatingPanelClass, 'flex flex-col gap-3 px-4 py-4']"
+    :class="rootClass"
     data-content-sort-control
   >
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div :class="contentClass">
       <div class="space-y-1">
         <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">排序方式</p>
-        <p class="m-0 text-sm leading-6 text-editorial-text-body">
+        <p v-if="!compact" class="m-0 text-sm leading-6 text-editorial-text-body">
           三个内容页共享这一组浏览顺序偏好。
         </p>
       </div>

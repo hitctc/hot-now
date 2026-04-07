@@ -141,6 +141,8 @@ describe("ViewRulesPage", () => {
     expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("基础入池门");
     expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("AI 热点入池门");
     expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("AI 新讯入池门");
+    expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("AI 新讯固定按最近 24 小时窗口构建结果集");
+    expect(wrapper.get("[data-view-rules-section='nl-rules']").text()).toContain("AI 热点继续按热点形成逻辑筛选");
     expect(wrapper.find("[data-settings-section='feedback-pool']").exists()).toBe(true);
     expect(wrapper.get("[data-view-rules-section='feedback-pool']").text()).toContain("Agent 工作流总结");
     expect(wrapper.get("[data-feedback-row]").text()).toContain("Agent 工作流总结");

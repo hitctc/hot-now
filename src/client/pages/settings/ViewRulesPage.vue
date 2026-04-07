@@ -656,6 +656,12 @@ onMounted(() => {
               data-view-rules-form="nl-rules"
               @submit.prevent="handleNlRulesSave"
             >
+              <a-alert
+                class="mb-4"
+                type="info"
+                show-icon
+                message="AI 新讯固定按最近 24 小时窗口构建结果集；AI 热点继续按热点形成逻辑筛选，不会被额外压成 24 小时。"
+              />
               <a-form-item label="基础入池门">
                 <a-switch v-model:checked="nlRuleForm.base.enabled" class="mb-3" />
                 <a-textarea

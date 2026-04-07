@@ -48,8 +48,9 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 
 ## 本地数据库可靠性
 
-- `data/hot-now.sqlite` 是运行中的 live 库，不再作为常规 git 产物提交
-- 跨设备开发、服务器初始化或坏库恢复，只使用 `data/recovery-backups/<timestamp>/hot-now.sqlite`
+- `data/` 整个目录现在都作为本地运行产物忽略，不再提交到 git
+- `data/hot-now.sqlite` 是运行中的 live 库，只在当前设备本地使用
+- 跨设备开发、服务器初始化或坏库恢复，需要手动复制 `data/recovery-backups/<timestamp>/hot-now.sqlite`
 - 每份标准快照都应带同目录下的 `manifest.json`
 - 新增数据库维护命令：
   - `npm run db:check`
@@ -132,10 +133,14 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - `report.html`：展示“多源热点汇总”页面，而不是单一日报文案
 - `run-meta.json`：包含 `mailStatus`；采集链路写入 `not-sent-by-collection`，独立发信成功后才会出现 `sent`
 
+这些报告产物只保留在本地 `data/` 目录，不再作为 git 产物提交。
+
 默认恢复快照目录是 `data/recovery-backups/<YYYYMMDD-HHmmss>/`，其中会保存：
 
 - `hot-now.sqlite`：已通过完整性校验的 verified snapshot
 - `manifest.json`：快照时间、源库路径、完整性结果和表计数摘要
+
+这些恢复快照同样默认只保留在本地 `data/` 目录；如需跨设备使用，手动复制快照文件即可。
 
 ## 验证
 

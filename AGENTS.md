@@ -118,7 +118,7 @@
 - `data/recovery-backups/<YYYYMMDD-HHmmss>/hot-now.sqlite`：已通过完整性校验的 verified snapshot
 - `data/recovery-backups/<YYYYMMDD-HHmmss>/manifest.json`：快照时间、源库路径、完整性结果和表计数摘要
 
-当前仓库允许把示例报告产物提交进版本库，用来直观看到阶段性成果；live `data/hot-now.sqlite` 不再作为常规 git 产物提交，跨设备和服务器初始化统一使用 verified snapshot。如果后续重新改回忽略策略，必须同步更新本文档、`README.md` 和 `.gitignore`。
+当前仓库不再跟踪 `data/` 目录下的任何运行产物；live `data/hot-now.sqlite`、`data/reports/*` 和 `data/recovery-backups/*` 都只保留在本地。跨设备和服务器初始化如需使用快照，统一手动复制 verified snapshot。如果后续重新改回提交策略，必须同步更新本文档、`README.md` 和 `.gitignore`。
 
 如果你改了页面入口、路由、产物路径或产物格式，必须同步更新本文档和 `README.md`。
 
@@ -142,10 +142,11 @@
 
 SQLite 可靠性约定：
 
-1. `data/hot-now.sqlite` 是运行中的 live 库，只给当前设备本地运行使用，不再直接跨设备同步或常规提交。
-2. 跨设备开发、服务器初始化和坏库恢复，统一使用 `data/recovery-backups/<timestamp>/hot-now.sqlite + manifest.json`。
-3. `.sqlite-wal` 与 `.sqlite-shm` 继续保持忽略，不纳入 git。
-4. 启动报损坏时，先跑 `npm run db:check`，再用 `npm run db:restore -- <snapshot-file>` 恢复。
+1. `data/` 整个目录都是本地运行产物目录，不再纳入 git。
+2. `data/hot-now.sqlite` 是运行中的 live 库，只给当前设备本地运行使用，不再直接跨设备同步或常规提交。
+3. 跨设备开发、服务器初始化和坏库恢复，统一手动复制 `data/recovery-backups/<timestamp>/hot-now.sqlite + manifest.json`。
+4. `.sqlite-wal` 与 `.sqlite-shm` 继续保持忽略，不纳入 git。
+5. 启动报损坏时，先跑 `npm run db:check`，再用 `npm run db:restore -- <snapshot-file>` 恢复。
 
 推荐验证顺序：
 
@@ -254,7 +255,7 @@ SQLite 可靠性约定：
 - 启动入口现在会对 `data/hot-now.sqlite` 做 SQLite 健康检查；如果主库损坏，会提示最近的 verified snapshot 和 `npm run db:restore -- <snapshot-file>` 恢复命令
 - graceful shutdown 现在会执行真实的 `wal_checkpoint(TRUNCATE)`，减少把 live 库直接当普通文件同步时产生坏快照的风险
 - 已新增 `npm run db:check`、`npm run db:snapshot`、`npm run db:restore -- <snapshot-file>`，并把 verified snapshot 目录收口为 `data/recovery-backups/<timestamp>/`
-- live `data/hot-now.sqlite` 已收口为运行时文件，不再作为常规 git 产物；跨设备和服务器只流转 verified snapshot
+- `data/` 目录下的 live 库、报告产物和 verified snapshot 都已收口为本地运行文件，不再作为常规 git 产物；跨设备和服务器如需使用快照，改为手动复制 verified snapshot
 - 自然语言匹配目前走预计算模式；已接入 `DeepSeek`、`MiniMax`、`Kimi`，每个厂商会分别保存自己的 API key，但同一时间只允许一个启用厂商；API key 通过页面录入后会优先使用 `LLM_SETTINGS_MASTER_KEY` 加密落库；未显式配置时回退使用 `SESSION_SECRET`
 - 报告层已切到多源语义：`report.json` / `report.html` / 邮件正文会保留 `sourceKinds`、`issueUrls`、失败 source 数量等信息，不再把输出描述成单一日报
 - legacy `/history`、`/reports/:date`、`/control` 与 unified shell 共存，且相关测试和文档已同步

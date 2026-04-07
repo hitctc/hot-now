@@ -1,8 +1,0 @@
-{
-  "date": "2026-03-27",
-  "trigger": "scheduled",
-  "generatedAt": "2026-03-28T00:00:09.184Z",
-  "mailStatus": "sent",
-  "degraded": true,
-  "topicCount": 10
-}

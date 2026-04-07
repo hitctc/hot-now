@@ -5,8 +5,7 @@ dist
 .playwright-cli
 *.sqlite-shm
 *.sqlite-wal
-data/hot-now.sqlite
-data/recovery-backups/*/*.original*
 .worktrees/
 
 .DS_Store
+/data/

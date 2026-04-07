@@ -8,7 +8,6 @@ import { openDatabase } from "../../src/core/db/openDatabase.js";
 import { runMigrations } from "../../src/core/db/runMigrations.js";
 import { seedInitialData } from "../../src/core/db/seedInitialData.js";
 import { saveFeedbackPoolEntry } from "../../src/core/feedback/feedbackPoolRepository.js";
-import { saveFavorite, saveReaction } from "../../src/core/feedback/feedbackRepository.js";
 import { saveNlEvaluations } from "../../src/core/strategy/nlEvaluationRepository.js";
 
 describe("listContentView", () => {
@@ -48,11 +47,8 @@ describe("listContentView", () => {
     });
 
     const itemId = findContentIdByTitle(db, "Breaking quick blurb");
-    saveFavorite(db, itemId, true);
-    saveReaction(db, itemId, "dislike");
     saveFeedbackPoolEntry(db, {
       contentItemId: itemId,
-      reactionSnapshot: "dislike",
       freeText: "保留 agent workflow 内容",
       suggestedEffect: "boost",
       strengthLevel: "high",
@@ -69,8 +65,6 @@ describe("listContentView", () => {
       sourceName: "OpenAI",
       sourceKind: "openai",
       canonicalUrl: "https://example.com/breaking",
-      isFavorited: true,
-      reaction: "dislike",
       feedbackEntry: {
         freeText: "保留 agent workflow 内容",
         suggestedEffect: "boost",
@@ -82,11 +76,13 @@ describe("listContentView", () => {
     expect(card?.contentScore).toBeGreaterThan(0);
     expect(card?.contentScore).toBeLessThanOrEqual(100);
     expect(card?.scoreBadges).toEqual(expect.arrayContaining(["24h 内", "官方源", "正文完整"]));
+    expect(card).not.toHaveProperty("isFavorited");
+    expect(card).not.toHaveProperty("reaction");
     expect(card).not.toHaveProperty("averageRating");
     expect(card).not.toHaveProperty("rankingScore");
   });
 
-  it("keeps one content pool but orders at least one view differently", async () => {
+  it("keeps hot and articles on the same pool while ai-new now has its own 24-hour window", async () => {
     const db = await createTestDatabase();
     const source = resolveSourceByKind(db, "openai");
 
@@ -110,8 +106,8 @@ describe("listContentView", () => {
           canonicalUrl: "https://example.com/breaking",
           summary: "short",
           bodyMarkdown: "",
-          publishedAt: "2026-03-28T09:00:00.000Z",
-          fetchedAt: "2026-03-28T09:05:00.000Z"
+          publishedAt: "2026-03-29T09:00:00.000Z",
+          fetchedAt: "2026-03-29T09:05:00.000Z"
         },
         {
           title: "AI agent system roundup",
@@ -129,10 +125,10 @@ describe("listContentView", () => {
     const aiCards = listContentView(db, "ai");
 
     expect(extractSortedIds(hotCards)).toEqual(extractSortedIds(articleCards));
-    expect(extractSortedIds(hotCards)).toEqual(extractSortedIds(aiCards));
+    expect(extractSortedIds(aiCards)).toEqual([2]);
     expect(hotCards[0]?.title).toBe("Breaking quick blurb");
     expect(articleCards[0]?.title).toBe("AI agent system roundup");
-    expect(aiCards[0]?.title).toBe("AI agent system roundup");
+    expect(aiCards[0]?.title).toBe("Breaking quick blurb");
   });
 
   it("keeps old but highly complete articles in the articles view when the pool exceeds the configured limit", async () => {
@@ -200,7 +196,7 @@ describe("listContentView", () => {
     expect(hotCards[1]?.title).toBe("Older hot item");
   });
 
-  it("keeps the hot view capped by the fixed internal limit and ignores persisted numeric rows", async () => {
+  it("no longer caps the hot view at the old fixed limit even if a stale numeric row says otherwise", async () => {
     const db = await createTestDatabase();
     const source = resolveSourceByKind(db, "openai");
 
@@ -236,7 +232,53 @@ describe("listContentView", () => {
       })
     );
 
-    expect(listContentView(db, "hot")).toHaveLength(20);
+    expect(listContentView(db, "hot")).toHaveLength(30);
+  });
+
+  it("keeps ai-new results inside the last 24 hours while hot can keep older hotspot candidates", async () => {
+    const db = await createTestDatabase();
+    const source = resolveSourceByKind(db, "openai");
+
+    expect(source).toBeDefined();
+
+    upsertContentItems(db, {
+      sourceId: source!.id,
+      items: [
+        {
+          title: "Within AI window",
+          canonicalUrl: "https://example.com/within-ai-window",
+          summary: "Short neutral summary.",
+          bodyMarkdown: "Compact neutral body text.",
+          publishedAt: "2026-03-29T10:30:00.000Z",
+          fetchedAt: "2026-03-29T10:35:00.000Z"
+        },
+        {
+          title: "Fetched fallback within AI window",
+          canonicalUrl: "https://example.com/fetched-fallback-within-ai-window",
+          summary: "Short neutral summary.",
+          bodyMarkdown: "Compact neutral body text.",
+          publishedAt: null,
+          fetchedAt: "2026-03-29T09:30:00.000Z"
+        },
+        {
+          title: "Older hotspot candidate",
+          canonicalUrl: "https://example.com/older-hotspot-candidate",
+          summary: "Short neutral summary.",
+          bodyMarkdown: "Compact neutral body text.",
+          publishedAt: "2026-03-28T08:00:00.000Z",
+          fetchedAt: "2026-03-28T08:05:00.000Z"
+        }
+      ]
+    });
+
+    const aiCards = listContentView(db, "ai");
+    const hotCards = listContentView(db, "hot");
+
+    expect(aiCards.map((card) => card.title)).toEqual([
+      "Within AI window",
+      "Fetched fallback within AI window"
+    ]);
+    expect(hotCards.map((card) => card.title)).toContain("Older hotspot candidate");
   });
 
   it("keeps the fixed hot ranking even if a stale numeric config row prefers completeness", async () => {

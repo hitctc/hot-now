@@ -38,7 +38,7 @@ describe("buildContentViewSelection", () => {
       ]
     });
 
-    const selection = buildContentViewSelection(db, "hot", { limitOverride: 2 });
+    const selection = buildContentViewSelection(db, "articles", { limitOverride: 2 });
 
     expect(selection.candidateCards).toHaveLength(3);
     expect(selection.visibleCards).toHaveLength(2);
@@ -178,6 +178,66 @@ describe("buildContentViewSelection", () => {
       "Older High Score",
       "Newer Low Score"
     ]);
+  });
+
+  it("keeps AI 新讯 strictly within the last 24 hours using published, fetched, then created timestamps", async () => {
+    const db = await createTestDatabase(databasesToClose);
+    const openai = resolveSourceByKind(db, "openai");
+
+    upsertContentItems(db, {
+      sourceId: openai!.id,
+      items: [
+        buildItem("Within published", "2026-03-31T03:00:00.000Z"),
+        {
+          title: "Within fetched fallback",
+          canonicalUrl: "https://example.com/within-fetched-fallback",
+          summary: "fallback summary",
+          bodyMarkdown: "fallback body",
+          publishedAt: null,
+          fetchedAt: "2026-03-31T02:00:00.000Z"
+        },
+        {
+          title: "Too old for ai-new",
+          canonicalUrl: "https://example.com/too-old-for-ai-new",
+          summary: "old summary",
+          bodyMarkdown: "old body",
+          publishedAt: "2026-03-29T00:00:00.000Z",
+          fetchedAt: "2026-03-29T00:05:00.000Z"
+        }
+      ]
+    });
+
+    const aiSelection = buildContentViewSelection(db, "ai");
+    const hotSelection = buildContentViewSelection(db, "hot");
+
+    expect(aiSelection.visibleCards.map((card) => card.title)).toEqual([
+      "Within published",
+      "Within fetched fallback"
+    ]);
+    expect(hotSelection.visibleCards.map((card) => card.title)).toContain("Too old for ai-new");
+  });
+
+  it("no longer caps hot and ai result sets at the old fixed limit", async () => {
+    const db = await createTestDatabase(databasesToClose);
+    const openai = resolveSourceByKind(db, "openai");
+
+    upsertContentItems(db, {
+      sourceId: openai!.id,
+      items: Array.from({ length: 60 }, (_, index) => ({
+        title: `Result ${index + 1}`,
+        canonicalUrl: `https://example.com/result-${index + 1}`,
+        summary: "summary",
+        bodyMarkdown: "body",
+        publishedAt: new Date(Date.UTC(2026, 2, 31, 3, 59 - index, 0)).toISOString(),
+        fetchedAt: new Date(Date.UTC(2026, 2, 31, 3, 59 - index, 5)).toISOString()
+      }))
+    });
+
+    const hotSelection = buildContentViewSelection(db, "hot");
+    const aiSelection = buildContentViewSelection(db, "ai");
+
+    expect(hotSelection.visibleCards).toHaveLength(60);
+    expect(aiSelection.visibleCards).toHaveLength(60);
   });
 
   it("keeps ranking order from the internal defaults and ignores persisted numeric rule rows", async () => {

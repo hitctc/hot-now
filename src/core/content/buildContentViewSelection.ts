@@ -53,8 +53,6 @@ type ContentCardRow = {
   showAllWhenSelected: number;
   canonicalUrl: string;
   publishedAt: string | null;
-  favoriteValue: string | null;
-  reactionValue: string | null;
   feedbackEntryId: number | null;
   feedbackFreeText: string | null;
   feedbackSuggestedEffect: string | null;
@@ -71,36 +69,6 @@ type ContentCardRow = {
 const matchingSourceViewBonus = 120;
 
 const contentSelectSql = `
-  WITH latest_favorite AS (
-    SELECT content_item_id, feedback_value
-    FROM (
-      SELECT
-        content_item_id,
-        feedback_value,
-        ROW_NUMBER() OVER (
-          PARTITION BY content_item_id
-          ORDER BY datetime(created_at) DESC, id DESC
-        ) AS row_num
-      FROM content_feedback
-      WHERE feedback_kind = 'favorite'
-    ) ranked_favorite
-    WHERE ranked_favorite.row_num = 1
-  ),
-  latest_reaction AS (
-    SELECT content_item_id, feedback_value
-    FROM (
-      SELECT
-        content_item_id,
-        feedback_value,
-        ROW_NUMBER() OVER (
-          PARTITION BY content_item_id
-          ORDER BY datetime(created_at) DESC, id DESC
-        ) AS row_num
-      FROM content_feedback
-      WHERE feedback_kind = 'reaction'
-    ) ranked_reaction
-    WHERE ranked_reaction.row_num = 1
-  )
   SELECT
     ci.id AS id,
     ci.title AS title,
@@ -111,8 +79,6 @@ const contentSelectSql = `
     cs.show_all_when_selected AS showAllWhenSelected,
     ci.canonical_url AS canonicalUrl,
     ci.published_at AS publishedAt,
-    latest_favorite.feedback_value AS favoriteValue,
-    latest_reaction.feedback_value AS reactionValue,
     fp.id AS feedbackEntryId,
     fp.free_text AS feedbackFreeText,
     fp.suggested_effect AS feedbackSuggestedEffect,
@@ -126,8 +92,6 @@ const contentSelectSql = `
     COALESCE(ci.published_at, ci.fetched_at, ci.created_at) AS rankingTimestamp
   FROM content_items ci
   JOIN content_sources cs ON cs.id = ci.source_id
-  LEFT JOIN latest_favorite ON latest_favorite.content_item_id = ci.id
-  LEFT JOIN latest_reaction ON latest_reaction.content_item_id = ci.id
   LEFT JOIN feedback_pool fp ON fp.content_item_id = ci.id
   LEFT JOIN content_nl_evaluations base_eval
     ON base_eval.content_item_id = ci.id
@@ -165,7 +129,7 @@ export function buildContentViewSelection(
   const rankedCards = rankedCandidates
     .filter((card) => selectedSourceKinds === null || selectedSourceKinds.has(card.sourceKind))
     .sort(compareByRanking);
-  const limit = options.limitOverride ?? viewRuleConfig.limit;
+  const limit = resolveVisibleLimit(viewKey, options.limitOverride ?? viewRuleConfig.limit);
   const fullDisplaySourceKinds =
     selectedSourceKinds === null
       ? new Set<string>()
@@ -200,6 +164,85 @@ export function buildContentViewSelection(
     ),
     currentPageTodayVisibleCount
   };
+}
+
+export function collectIndependentTodayStatsBySourceForView(
+  db: SqliteDatabase,
+  viewKey: ContentViewKey,
+  sourceKinds: string[],
+  options: Pick<ContentViewSelectionOptions, "includeNlEvaluations" | "referenceTime"> = {}
+): Map<string, CurrentPageSourceMetrics> {
+  // Source workbench only needs per-source independent metrics, so one grouped pass per view is enough.
+  if (sourceKinds.length === 0) {
+    return new Map();
+  }
+
+  const viewRuleConfig = getInternalViewRuleConfig(viewKey);
+  const referenceTime = options.referenceTime ?? new Date();
+  const includeNlEvaluations = options.includeNlEvaluations ?? true;
+  const sourceKindSet = new Set(sourceKinds);
+  const rows = db
+    .prepare(contentSelectSql)
+    .all({ viewScope: mapViewScope(viewKey) }) as ContentCardRow[];
+  const rankedCandidates = rows
+    .map((row) =>
+      buildRankedCardCandidate(row, {
+        viewKey,
+        viewRuleConfig,
+        referenceTime,
+        includeNlEvaluations
+      })
+    )
+    .filter((card) => !card.isBlocked && sourceKindSet.has(card.sourceKind));
+  const candidatesBySourceKind = new Map<string, RankedContentCardCandidate[]>();
+
+  for (const sourceKind of sourceKinds) {
+    candidatesBySourceKind.set(sourceKind, []);
+  }
+
+  for (const card of rankedCandidates) {
+    const cards = candidatesBySourceKind.get(card.sourceKind);
+
+    if (!cards) {
+      continue;
+    }
+
+    cards.push(card);
+  }
+
+  const { shanghaiDayStart, shanghaiNextDayStart } = buildShanghaiDayRange(referenceTime);
+  const independentMetrics = new Map<string, CurrentPageSourceMetrics>();
+  let currentPageTodayVisibleCount = 0;
+
+  for (const [sourceKind, cards] of candidatesBySourceKind.entries()) {
+    cards.sort(compareByRanking);
+
+    const visibleCards =
+      cards.length > 0 && cards[0]?.showAllWhenSelected
+        ? cards
+        : cards.slice(0, resolveVisibleLimit(viewKey, viewRuleConfig.limit));
+    const metrics = {
+      todayCandidateCount: countCardsWithinShanghaiDay(cards, shanghaiDayStart, shanghaiNextDayStart),
+      todayVisibleCount: countCardsWithinShanghaiDay(visibleCards, shanghaiDayStart, shanghaiNextDayStart),
+      todayVisibleShare: 0
+    };
+
+    independentMetrics.set(sourceKind, metrics);
+    currentPageTodayVisibleCount += metrics.todayVisibleCount;
+  }
+
+  return new Map(
+    [...independentMetrics.entries()].map(([sourceKind, metrics]) => [
+      sourceKind,
+      {
+        ...metrics,
+        todayVisibleShare:
+          currentPageTodayVisibleCount > 0
+            ? metrics.todayVisibleCount / currentPageTodayVisibleCount
+            : 0
+      }
+    ])
+  );
 }
 
 function countStableVisibleCardsBySourceKind(
@@ -266,6 +309,17 @@ function countCurrentPageMetricsBySourceKind(
   return Object.fromEntries(metrics.entries());
 }
 
+function countCardsWithinShanghaiDay(
+  cards: Array<Pick<RankedContentCardView, "publishedAt" | "rankingTimestamp">>,
+  shanghaiDayStart: string,
+  shanghaiNextDayStart: string
+): number {
+  // Shared day counting keeps workbench metrics and page metrics on the same Shanghai-day boundary.
+  return cards.filter((card) =>
+    isWithinShanghaiDay(card.publishedAt ?? card.rankingTimestamp, shanghaiDayStart, shanghaiNextDayStart)
+  ).length;
+}
+
 function applyCurrentPageVisibleShares(
   metricsBySourceKind: Record<string, CurrentPageSourceMetrics>,
   currentPageTodayVisibleCount: number
@@ -323,8 +377,6 @@ function buildRankedCardCandidate(
     showAllWhenSelected: row.showAllWhenSelected === 1,
     canonicalUrl: row.canonicalUrl,
     publishedAt: row.publishedAt,
-    isFavorited: row.favoriteValue === "1",
-    reaction: normalizeReaction(row.reactionValue),
     contentScore: score.contentScore,
     scoreBadges: score.badges,
     feedbackEntry: row.feedbackEntryId
@@ -347,9 +399,46 @@ function buildRankedCardCandidate(
     ),
     rankingTimestamp: row.rankingTimestamp,
     isBlocked:
-      context.includeNlEvaluations &&
-      (normalizeNlDecision(row.baseDecision) === "block" || normalizeNlDecision(row.viewDecision) === "block")
+      shouldBlockByTimeWindow(context.viewKey, row, context.referenceTime) ||
+      (context.includeNlEvaluations &&
+        (normalizeNlDecision(row.baseDecision) === "block" || normalizeNlDecision(row.viewDecision) === "block"))
   };
+}
+
+function resolveVisibleLimit(viewKey: ContentViewKey, limit: number): number {
+  // AI 新讯和 AI 热点都改成“完整结果集 + 后续分页”，只有文章流继续保留稳定的总量截断。
+  return viewKey === "articles" ? limit : Number.MAX_SAFE_INTEGER;
+}
+
+function shouldBlockByTimeWindow(
+  viewKey: ContentViewKey,
+  row: Pick<ContentCardRow, "publishedAt" | "rankingTimestamp">,
+  referenceTime: Date
+): boolean {
+  // AI 新讯固定只保留最近 24 小时内的内容，时间戳优先 published_at，再回退到抓取/创建时间。
+  if (viewKey !== "ai") {
+    return false;
+  }
+
+  const timestamp = row.publishedAt ?? row.rankingTimestamp;
+  return !isWithinLastHours(timestamp, referenceTime, 24);
+}
+
+function isWithinLastHours(value: string | null, referenceTime: Date, hours: number): boolean {
+  if (!value) {
+    return false;
+  }
+
+  const parsed = Date.parse(value);
+
+  if (!Number.isFinite(parsed)) {
+    return false;
+  }
+
+  const referenceTimestamp = referenceTime.getTime();
+  const windowStart = referenceTimestamp - hours * 60 * 60 * 1000;
+
+  return parsed >= windowStart && parsed <= referenceTimestamp;
 }
 
 function normalizeSelectedSourceKinds(selectedSourceKinds?: string[]) {
@@ -373,11 +462,6 @@ function compareByRanking(left: RankedContentCardCandidate, right: RankedContent
   }
 
   return right.id - left.id;
-}
-
-function normalizeReaction(value: string | null): "like" | "dislike" | "none" {
-  // Unknown legacy values degrade to `none` so view rendering stays stable.
-  return value === "like" || value === "dislike" ? value : "none";
 }
 
 // 旧内容 view key 仍保留在内部排序层，正式自然语言策略只再认新的 gate scope。

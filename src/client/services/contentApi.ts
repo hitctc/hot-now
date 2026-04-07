@@ -65,11 +65,13 @@ export type SaveFeedbackPoolEntryPayload = {
 
 export const CONTENT_SOURCE_STORAGE_KEY = "hot-now-content-sources";
 export const CONTENT_SORT_STORAGE_KEY = "hot-now-content-sort";
+export const CONTENT_SEARCH_STORAGE_KEY = "hot-now-content-search";
 
 export type ReadContentPageOptions = {
   selectedSourceKinds?: string[];
   sortMode?: ContentSortMode;
   page?: number;
+  searchKeyword?: string;
 };
 
 // 内容筛选偏好只允许 string[]，其他脏数据一律回落到 null，交给页面决定默认行为。
@@ -142,7 +144,8 @@ function normalizeSelectedSourceKinds(selectedSourceKinds: string[]): string[] {
 
 function createContentPageRequestHeaders(
   selectedSourceKinds: string[] | undefined,
-  sortMode: ContentSortMode | undefined
+  sortMode: ContentSortMode | undefined,
+  searchKeyword: string | undefined
 ): HeadersInit | undefined {
   const headers: Record<string, string> = {};
 
@@ -152,6 +155,11 @@ function createContentPageRequestHeaders(
 
   if (sortMode !== undefined) {
     headers["x-hot-now-content-sort"] = sortMode;
+  }
+
+  const normalizedSearchKeyword = typeof searchKeyword === "string" ? searchKeyword.trim() : "";
+  if (normalizedSearchKeyword.length > 0) {
+    headers["x-hot-now-content-search"] = normalizedSearchKeyword;
   }
 
   return Object.keys(headers).length > 0 ? headers : undefined;
@@ -171,7 +179,7 @@ async function readContentPage(
   options: ReadContentPageOptions = {}
 ): Promise<ContentPageModel> {
   return requestJson<ContentPageModel>(path, {
-    headers: createContentPageRequestHeaders(options.selectedSourceKinds, options.sortMode)
+    headers: createContentPageRequestHeaders(options.selectedSourceKinds, options.sortMode, options.searchKeyword)
   });
 }
 
@@ -199,6 +207,16 @@ export function writeStoredContentSortMode(sortMode: ContentSortMode): void {
   writePersistedStringValue(CONTENT_SORT_STORAGE_KEY, sortMode);
 }
 
+// 共享搜索词使用同一套 storage key，保证不同内容页切换时保留用户最近一次输入。
+export function readStoredContentSearchKeyword(): string | null {
+  return readPersistedStringValue(CONTENT_SEARCH_STORAGE_KEY);
+}
+
+// 持久化前会裁掉首尾空白，避免空格关键词污染 header 与本地偏好。
+export function writeStoredContentSearchKeyword(keyword: string): void {
+  writePersistedStringValue(CONTENT_SEARCH_STORAGE_KEY, keyword.trim());
+}
+
 export function deriveInitialSelectedSourceKinds(
   options: ContentSourceFilter["options"],
   storedKinds: string[] | null
@@ -215,7 +233,8 @@ export function readAiNewPage(
 ): Promise<ContentPageModel> {
   return readContentPage(buildContentPagePath("/api/content/ai-new", options.page), {
     selectedSourceKinds: options.selectedSourceKinds,
-    sortMode: options.sortMode ?? "published_at"
+    sortMode: options.sortMode ?? "published_at",
+    searchKeyword: options.searchKeyword
   });
 }
 
@@ -224,7 +243,8 @@ export function readAiHotPage(
 ): Promise<ContentPageModel> {
   return readContentPage(buildContentPagePath("/api/content/ai-hot", options.page), {
     selectedSourceKinds: options.selectedSourceKinds,
-    sortMode: options.sortMode ?? "published_at"
+    sortMode: options.sortMode ?? "published_at",
+    searchKeyword: options.searchKeyword
   });
 }
 

@@ -106,6 +106,43 @@ describe("contentApi", () => {
     ).toEqual(["juya"]);
   });
 
+  it("stores and reads the shared content search keyword from localStorage", async () => {
+    const { CONTENT_SEARCH_STORAGE_KEY, readStoredContentSearchKeyword, writeStoredContentSearchKeyword } =
+      await import("../../src/client/services/contentApi");
+
+    writeStoredContentSearchKeyword("agent");
+
+    expect(window.localStorage.getItem(CONTENT_SEARCH_STORAGE_KEY)).toBe("agent");
+    expect(readStoredContentSearchKeyword()).toBe("agent");
+  });
+
+  it("sends the shared title search keyword through the content header", async () => {
+    requestJson.mockResolvedValue({
+      pageKey: "ai-new",
+      sourceFilter: undefined,
+      featuredCard: null,
+      cards: [],
+      pagination: null,
+      emptyState: null
+    });
+
+    const { readAiNewPage } = await import("../../src/client/services/contentApi");
+
+    await readAiNewPage({
+      selectedSourceKinds: ["openai"],
+      sortMode: "published_at",
+      searchKeyword: "agent"
+    });
+
+    expect(requestJson).toHaveBeenCalledWith("/api/content/ai-new", {
+      headers: {
+        "x-hot-now-source-filter": "openai",
+        "x-hot-now-content-sort": "published_at",
+        "x-hot-now-content-search": "agent"
+      }
+    });
+  });
+
   it("only posts feedback pool actions and no longer exports favorite or reaction helpers", async () => {
     requestJson.mockResolvedValue({ ok: true });
 

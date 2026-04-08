@@ -97,7 +97,7 @@ function createSourcesModel() {
     },
     capability: {
       wechatArticleUrlEnabled: true,
-      wechatArticleUrlMessage: "当前已配置公众号 resolver，可直接填写公众号名称，或补一篇文章链接帮助系统更快定位来源。"
+      wechatArticleUrlMessage: "公众号来源已开启，可直接填写公众号名称，或补一篇文章链接帮助系统更快定位来源。"
     }
   } satisfies settingsApi.SettingsSourcesResponse;
 }

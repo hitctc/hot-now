@@ -6,7 +6,7 @@
 
 1. 安装依赖：`npm install`
 2. 检查配置文件：`config/hot-now.config.json`
-3. 准备本地环境变量，推荐直接写到 `.env.local`
+3. 准备本地环境变量，推荐直接写到 `.env`
 
 ```bash
 export SMTP_HOST="smtp.qq.com"
@@ -24,7 +24,8 @@ export HOT_NOW_CLIENT_DEV_ORIGIN="http://127.0.0.1:5173"
 ```
 
 `LLM_SETTINGS_MASTER_KEY` 现在是可选覆盖项；如果你不单独配置，系统会回退使用 `SESSION_SECRET` 继续加密保存厂商 API key。
-`HOT_NOW_CLIENT_DEV_ORIGIN` 也是可选开发辅助项；`npm run dev` / `npm run dev:local` 会默认按这个地址拉起并接入 Vite dev server，让 `3030` 页面直接拿到 HMR 和 Vue DevTools。
+`HOT_NOW_CLIENT_DEV_ORIGIN` 也是可选开发辅助项；`npm run dev` 会默认按这个地址拉起并接入 Vite dev server，让 `3030` 页面直接拿到 HMR 和 Vue DevTools。
+本地开发不再要求手工配置 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`；`npm run dev` 会自动拉起仓库内置的本地公众号解析 sidecar。只有你想覆盖到远端 relay 时，才需要显式配置这两个环境变量。
 
 4. 如果这次改动涉及 unified shell 客户端页面，先构建最新客户端资源：`npm run build:client`
 5. 启动开发服务：
@@ -32,14 +33,11 @@ export HOT_NOW_CLIENT_DEV_ORIGIN="http://127.0.0.1:5173"
 - 标准方式：
 
 ```bash
-set -a
-source .env.local
-set +a
 npm run dev
 ```
 
-  这条命令现在会一起拉起 Fastify 和 Vite dev server；继续打开 `http://127.0.0.1:3030/...` 即可直接使用 Vue DevTools，不需要再手动开第二个终端。
-  如果仓库根目录存在 `.env.local`，`npm run dev` 会自动读取它；如果 `HOT_NOW_CLIENT_DEV_ORIGIN` 指向的端口上已经有 HotNow 的 Vite dev server，也会直接复用，不再因为 `5173` 已占用而退出。
+  这条命令现在会一起拉起 Fastify、Vite dev server 和本地公众号解析 sidecar；继续打开 `http://127.0.0.1:3030/...` 即可直接使用 Vue DevTools，不需要再手动开第二个终端。
+  `npm run dev` 会优先读取仓库根目录的 `.env`；如果没有 `.env` 但存在旧的 `.env.local`，会继续兼容读取。默认情况下它会自动回收本地 `3030` 端口，并在未显式配置远端 resolver 时自动启用本地 sidecar。
 
 - 仅启动 Vite 客户端调试时：
 
@@ -55,7 +53,7 @@ npm run dev:client
 npm run dev:local
 ```
 
-`dev` 和 `dev:local` 现在都会先准备最新 client bundle，再同时启动 Fastify 和 Vite dev server。`dev` 会自动读取 `.env.local`（如果存在），并在 `HOT_NOW_CLIENT_DEV_ORIGIN` 上已经检测到 HotNow 的 Vite dev server 时直接复用；`dev:local` 则会先检查本地 `3030` 与 `5173` 端口，如果已有旧的开发监听进程占着这两个端口，会先停掉旧进程，再启动新的服务。
+`dev:local` 现在只保留为兼容入口，内部会直接转发到 `npm run dev` 并提示后续统一使用 `npm run dev`。
 
 QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 
@@ -97,7 +95,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - `/`、`/ai-new`、`/ai-hot` 现在也通过 Fastify 返回统一客户端入口，再由 `Vue 3 + Ant Design Vue` 内容页读取 `/api/content/ai-new`、`/api/content/ai-hot` 渲染
 - `/settings/view-rules` 已升级为门槛型策略工作台：只保留 `基础入池门 / AI 新讯入池门 / AI 热点入池门 / 首条精选门` 四道门，每道门只维护 `启用开关 + 自然语言规则文本`，并继续收口 LLM 厂商设置、反馈池、草稿池；全量重算运行中可手动中断，已完成的评估结果会继续保留
 - `/settings/sources` 现在会展示即时操作卡、来源统计概览表和 source 库存表，包含总条数、今天发布、今天抓取，以及 `AI 新讯 / AI 热点` 的入池与展示统计
-- `/settings/sources` 现在支持可视化新增 / 编辑 / 删除自定义来源：RSS 来源只需要填写 `RSS URL`；微信公众号桥接来源只需要填写 `公众号名称`，文章链接可选但建议一起填写，其余 `kind / 来源名称 / 来源主页 / bridge 细节` 由系统在保存时自动生成
+- `/settings/sources` 现在支持可视化新增 / 编辑 / 删除自定义来源：RSS 来源只需要填写 `RSS URL`；公众号来源只需要填写 `公众号名称`，文章链接可选但建议一起填写，其余 `kind / 来源名称 / 来源主页 / bridge 细节` 由系统在保存时自动生成；本地开发默认使用仓库内置公众号解析 sidecar
 - `/settings/sources` 现在支持逐 source 配置“选中该来源时全量展示”；开启后，该来源不会在内容页首次默认勾选，只有用户显式勾选后才会按全量模式展示
 - `/settings/profile` 现在会展示会话状态、用户名、角色和联系邮箱，不再停留在占位页
 - 正式自然语言策略现在只认 `base / ai_new / ai_hot / hero` 四个内部 gate scope：
@@ -133,7 +131,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 ## 配置
 
 - `config/hot-now.config.json`：服务端口、`collectionSchedule` 采集周期、`mailSchedule` 发信时间、`manualActions` 手动动作开关、报告目录，以及兼容旧逻辑的 `source.rssUrl`
-- 环境变量：SMTP 主机、端口、发件人、授权码、收件人、网页基础地址、统一站点登录凭据与会话密钥、作为独立覆盖项的 `LLM_SETTINGS_MASTER_KEY`，以及用于微信公众号 relay 解析的 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`
+- 环境变量：SMTP 主机、端口、发件人、授权码、收件人、网页基础地址、统一站点登录凭据与会话密钥、作为独立覆盖项的 `LLM_SETTINGS_MASTER_KEY`，以及用于覆盖本地公众号解析 sidecar 或接入远端 relay 的 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`
 
 默认配置下：
 

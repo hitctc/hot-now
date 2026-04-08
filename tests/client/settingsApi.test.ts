@@ -28,7 +28,7 @@ describe("settingsApi", () => {
       },
       capability: {
         wechatArticleUrlEnabled: false,
-        wechatArticleUrlMessage: "当前未配置公众号 resolver。"
+        wechatArticleUrlMessage: "当前环境未启用公众号来源解析。"
       }
     });
 

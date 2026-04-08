@@ -1147,8 +1147,8 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
     capability: {
       wechatArticleUrlEnabled: wechatResolverConfigured,
       wechatArticleUrlMessage: wechatResolverConfigured
-        ? "当前已配置公众号 resolver，可直接填写公众号名称，或补一篇文章链接帮助系统更快定位来源。"
-        : "当前未配置公众号 resolver；RSS 仍可直接新增，但公众号来源暂时不可用。"
+        ? "公众号来源已开启，可直接填写公众号名称，或补一篇文章链接帮助系统更快定位来源。"
+        : "当前环境未启用公众号来源解析；RSS 仍可直接新增。"
     }
   };
 }

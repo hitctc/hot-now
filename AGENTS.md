@@ -60,6 +60,8 @@
   负责按配置启动每日定时任务。
 - `src/server/`
   负责页面路由、legacy 服务端渲染 HTML，以及 `/settings/*` 的客户端入口分发和系统页读模型 API。
+- `src/wechatResolver/`
+  负责本地开发时自动启动的公众号解析 sidecar；当前默认通过公开索引解析公众号名称，再把最终 `rss_url` 返回给主应用。
 - `tests/`
   负责单元测试与轻量集成测试。
 - `config/hot-now.config.json`
@@ -133,14 +135,14 @@
 - 系统页客户端构建：`npm run build:client`
 - 开发启动：`npm run dev`
 - 仅启动 Vite 客户端调试：`npm run dev:client`
-- 本地便捷启动：`npm run dev:local`
+- 兼容入口：`npm run dev:local`
 - 数据库检查：`npm run db:check`
 - 生成 verified snapshot：`npm run db:snapshot`
 - 从快照恢复主库：`npm run db:restore -- <snapshot-file>`
 - 类型构建：`npm run build`
 - 测试：`npm run test`
 
-`npm run dev` 和 `npm run dev:local` 现在都会在启动前准备最新 client bundle，并同时拉起 Fastify 与 Vite dev server。`npm run dev` 会自动读取 `.env.local`（如果存在），并在 `HOT_NOW_CLIENT_DEV_ORIGIN` 指向的端口上已经检测到 HotNow 的 Vite dev server 时直接复用；`npm run dev:local` 还会检查本地 `3030` 和 `5173` 端口，如果已有旧的监听进程占着这些端口，会先停止旧进程，再启动新的本地开发服务。当前 `3030` 页面会优先尝试接入 `HOT_NOW_CLIENT_DEV_ORIGIN` 指向的 Vite dev server，成功时可直接使用 Vue DevTools，失败时自动回退到 `dist/client` 构建产物；`npm run dev:client` 仍保留给只调前端时单独使用。
+`npm run dev` 现在是唯一主开发入口：启动前会准备最新 client bundle，并同时拉起 Fastify、Vite dev server 和本地公众号解析 sidecar。脚本会优先读取根目录 `.env`；如果没有 `.env` 但存在旧的 `.env.local`，会继续兼容读取。未显式配置 `WECHAT_RESOLVER_BASE_URL` / `WECHAT_RESOLVER_TOKEN` 时，`npm run dev` 会自动注入本地默认值并启动 sidecar；只有想改接远端 relay 时才需要覆盖这两个环境变量。`npm run dev:local` 已退回兼容入口，只负责转发到 `npm run dev` 并提示后续统一使用 `dev`。当前 `3030` 页面会优先尝试接入 `HOT_NOW_CLIENT_DEV_ORIGIN` 指向的 Vite dev server，成功时可直接使用 Vue DevTools，失败时自动回退到 `dist/client` 构建产物；`npm run dev:client` 仍保留给只调前端时单独使用。
 
 SQLite 可靠性约定：
 
@@ -188,8 +190,8 @@ SQLite 可靠性约定：
 - `SESSION_SECRET`
 - `LLM_SETTINGS_MASTER_KEY`
 - `HOT_NOW_CLIENT_DEV_ORIGIN`
-- `WECHAT_RESOLVER_BASE_URL`
-- `WECHAT_RESOLVER_TOKEN`
+- `WECHAT_RESOLVER_BASE_URL`（可选覆盖项；本地开发默认由 `npm run dev` 自动注入 `http://127.0.0.1:4040`）
+- `WECHAT_RESOLVER_TOKEN`（可选覆盖项；本地开发默认由 `npm run dev` 自动注入本地 sidecar token）
 
 如果新增、删除或重命名环境变量，必须同步更新：
 
@@ -247,7 +249,8 @@ SQLite 可靠性约定：
 - 多源采集后端已完成：`loadEnabledSourceIssues` / `runDailyDigest` 已接入多源并行汇总，单个 feed 失败不会阻断整次日报，只有全部 enabled sources 都失败时才会硬失败
 - 内置 RSS 源已扩展到 8 个，覆盖聚合日报、国际官方 AI 博客、国内热点资讯 / 快讯与科技媒体；新增国内源默认作为 built-in source 写入 `content_sources`
 - 采集和发信已拆成两个独立功能：默认配置下采集每 `10` 分钟执行一次，发信每天 `10:00` 执行一次；两者都支持手动触发，并共用同一把运行锁
-- 系统菜单已收口到多源语义：`/settings/sources` 支持 source 启用/停用、source 级“选中时全量展示”策略、逐 source 最近抓取状态展示，以及统一站点内手动执行采集 / 手动发送最新报告；同时支持可视化新增 / 编辑 / 删除自定义 RSS 来源与微信公众号桥接来源，其中 RSS 只要求录入 `RSS URL`，公众号只要求录入 `公众号名称` 和可选的 `公众号文章链接`，其余内部字段由系统自动生成与解析；`/settings/view-rules` 现在是四道门策略工作台，只保留 `base / ai_new / ai_hot / hero` 四个正式 gate scope，并继续承载 LLM 厂商配置、反馈池和草稿池；当前登录用户信息已并到侧边栏底部
+- 系统菜单已收口到多源语义：`/settings/sources` 支持 source 启用/停用、source 级“选中时全量展示”策略、逐 source 最近抓取状态展示，以及统一站点内手动执行采集 / 手动发送最新报告；同时支持可视化新增 / 编辑 / 删除自定义 RSS 来源与公众号来源，其中 RSS 只要求录入 `RSS URL`，公众号只要求录入 `公众号名称` 和可选的 `公众号文章链接`，其余内部字段由系统自动生成与解析；本地开发默认由仓库内置公众号解析 sidecar 处理公众号输入，后续如需 IP 隔离再切远端 relay；`/settings/view-rules` 现在是四道门策略工作台，只保留 `base / ai_new / ai_hot / hero` 四个正式 gate scope，并继续承载 LLM 厂商配置、反馈池和草稿池；当前登录用户信息已并到侧边栏底部
+- 本地开发入口已收口到 `npm run dev`：脚本会自动拉起 Fastify、Vite dev server 和公众号解析 sidecar；`npm run dev:local` 只保留兼容转发，不再作为主调试入口
 - `/settings/sources` 现在会基于共享内容选择器实时展示 source 工作台总览表，口径包含总条数、今天发布、今天抓取，以及 `AI 新讯 / AI 热点` 的入池与展示统计
 - unified shell 已去掉顶部 header，页面信息和账号区都收进左侧侧边栏；视觉母版已切到高还原 `Notion Workspace` 的黑白灰双主题，主题切换与 localStorage 持久化已落地
 - `/settings/*` 现在统一走 Fastify 返回的客户端入口，由 `src/client/` 下的 `Vue 3 + Vite + Ant Design Vue` 页面接管，不再继续叠加新的服务端拼表单 HTML

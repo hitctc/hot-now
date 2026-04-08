@@ -7,6 +7,7 @@
     "dev": "zsh ./scripts/dev.sh",
     "dev:local": "zsh ./scripts/dev-local.sh",
     "dev:client": "vite --config vite.config.ts",
+    "dev:wechat-resolver": "tsx watch src/wechatResolver/main.ts",
     "start": "node dist/server/main.js",
     "build": "rm -rf dist && npm run build:client && tsc -p tsconfig.json",
     "build:client": "npm run typecheck:client && vite build --config vite.config.ts",

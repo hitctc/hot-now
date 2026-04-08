@@ -4,28 +4,51 @@ set -euo pipefail
 
 mode="${1:-standard}"
 
-if [ "${mode}" = "local" ] && [ ! -f .env.local ]; then
-  echo ".env.local not found. Create it before running npm run dev:local." >&2
-  exit 1
-fi
-
-if [ -f .env.local ]; then
-  # 本地开发默认沿用 .env.local，避免 dev 和 dev:local 在环境装载上出现两套语义。
+if [ -f .env ]; then
+  # npm run dev 现在是唯一主入口，优先读取 .env，让本地开发和后续部署的环境语义保持一致。
+  set -a
+  . ./.env
+  set +a
+elif [ -f .env.local ]; then
+  # 兼容旧工作区里还没迁移的本地环境文件，避免这轮脚本升级直接把开发启动打断。
   set -a
   . ./.env.local
   set +a
+fi
+
+if [ "${mode}" = "local" ]; then
+  echo "npm run dev:local 已退回兼容入口，后续开发和调试请直接使用 npm run dev。"
 fi
 
 echo "Preparing client bundle..."
 npm run build:client
 
 export HOT_NOW_CLIENT_DEV_ORIGIN="${HOT_NOW_CLIENT_DEV_ORIGIN:-http://127.0.0.1:5173}"
+resolver_autostart="false"
+
+if [ -z "${WECHAT_RESOLVER_BASE_URL:-}" ] && [ -z "${WECHAT_RESOLVER_TOKEN:-}" ]; then
+  export WECHAT_RESOLVER_BASE_URL="http://127.0.0.1:4040"
+  export WECHAT_RESOLVER_TOKEN="hot-now-dev-resolver-token"
+  resolver_autostart="true"
+  echo "Using built-in local wechat resolver at ${WECHAT_RESOLVER_BASE_URL}."
+elif [ -n "${WECHAT_RESOLVER_BASE_URL:-}" ] && [ -n "${WECHAT_RESOLVER_TOKEN:-}" ]; then
+  echo "Using configured wechat resolver at ${WECHAT_RESOLVER_BASE_URL}."
+else
+  echo "WECHAT_RESOLVER_BASE_URL and WECHAT_RESOLVER_TOKEN must be provided together." >&2
+  exit 1
+fi
 
 client_dev_host="$(
   node -e "const url = new URL(process.argv[1]); console.log(url.hostname);" "${HOT_NOW_CLIENT_DEV_ORIGIN}"
 )"
 client_dev_port="$(
   node -e "const url = new URL(process.argv[1]); console.log(url.port || (url.protocol === 'https:' ? '443' : '80'));" "${HOT_NOW_CLIENT_DEV_ORIGIN}"
+)"
+resolver_host="$(
+  node -e "const url = new URL(process.argv[1]); console.log(url.hostname === 'localhost' ? '127.0.0.1' : url.hostname);" "${WECHAT_RESOLVER_BASE_URL}"
+)"
+resolver_port="$(
+  node -e "const url = new URL(process.argv[1]); console.log(url.port || (url.protocol === 'https:' ? '443' : '80'));" "${WECHAT_RESOLVER_BASE_URL}"
 )"
 server_port="${PORT:-3030}"
 
@@ -71,19 +94,18 @@ reclaim_listen_port() {
   fi
 }
 
-if [ "${mode}" = "local" ]; then
-  # dev:local 是固定端口的便捷入口，所以前后端两个监听端口都要抢回。
-  reclaim_listen_port "${server_port}"
-  reclaim_listen_port "${client_dev_port}"
-fi
-
 client_pid=""
 server_pid=""
+resolver_pid=""
 reused_client_dev_server="false"
 
 cleanup() {
   if [ -n "${server_pid}" ] && kill -0 "${server_pid}" 2>/dev/null; then
     kill "${server_pid}" 2>/dev/null || true
+  fi
+
+  if [ -n "${resolver_pid}" ] && kill -0 "${resolver_pid}" 2>/dev/null; then
+    kill "${resolver_pid}" 2>/dev/null || true
   fi
 
   if [ -n "${client_pid}" ] && kill -0 "${client_pid}" 2>/dev/null; then
@@ -92,6 +114,12 @@ cleanup() {
 }
 
 trap cleanup EXIT INT TERM
+
+reclaim_listen_port "${server_port}"
+
+if [ "${resolver_autostart}" = "true" ]; then
+  reclaim_listen_port "${resolver_port}"
+fi
 
 if [ "${mode}" != "local" ] && has_listening_port "${client_dev_port}"; then
   if curl -fsS "${HOT_NOW_CLIENT_DEV_ORIGIN}/client/@vite/client" >/dev/null 2>&1; then
@@ -104,7 +132,34 @@ if [ "${mode}" != "local" ] && has_listening_port "${client_dev_port}"; then
   fi
 fi
 
+if [ "${resolver_autostart}" = "true" ]; then
+  echo "Starting local wechat resolver on ${WECHAT_RESOLVER_BASE_URL}..."
+  npm run dev:wechat-resolver &
+  resolver_pid=$!
+fi
+
+if [ -n "${resolver_pid}" ]; then
+  for _ in {1..60}; do
+    if curl -fsS "${WECHAT_RESOLVER_BASE_URL}/health" >/dev/null 2>&1; then
+      break
+    fi
+
+    if ! kill -0 "${resolver_pid}" 2>/dev/null; then
+      wait "${resolver_pid}"
+      exit $?
+    fi
+
+    sleep 0.5
+  done
+
+  if ! curl -fsS "${WECHAT_RESOLVER_BASE_URL}/health" >/dev/null 2>&1; then
+    echo "Timed out waiting for local wechat resolver at ${WECHAT_RESOLVER_BASE_URL}/health" >&2
+    exit 1
+  fi
+fi
+
 if [ "${reused_client_dev_server}" != "true" ]; then
+  reclaim_listen_port "${client_dev_port}"
   echo "Starting Vite dev server on ${HOT_NOW_CLIENT_DEV_ORIGIN}..."
   npm run dev:client -- --host "${client_dev_host}" --port "${client_dev_port}" --strictPort &
   client_pid=$!
@@ -133,6 +188,11 @@ tsx watch src/main.ts &
 server_pid=$!
 
 while true; do
+  if [ -n "${resolver_pid}" ] && ! kill -0 "${resolver_pid}" 2>/dev/null; then
+    wait "${resolver_pid}"
+    exit $?
+  fi
+
   if [ -n "${client_pid}" ] && ! kill -0 "${client_pid}" 2>/dev/null; then
     wait "${client_pid}"
     exit $?

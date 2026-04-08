@@ -44,11 +44,7 @@ describe("settingsApi", () => {
 
     await createSource({
       sourceType: "wechat_bridge",
-      kind: "wechat_demo",
-      name: "微信 Demo",
-      siteUrl: "https://mp.weixin.qq.com/",
-      bridgeKind: "wechat2rss",
-      inputMode: "article_url",
+      wechatName: "微信 Demo",
       articleUrl: "https://mp.weixin.qq.com/s?__biz=abc"
     });
 
@@ -56,11 +52,7 @@ describe("settingsApi", () => {
       method: "POST",
       body: JSON.stringify({
         sourceType: "wechat_bridge",
-        kind: "wechat_demo",
-        name: "微信 Demo",
-        siteUrl: "https://mp.weixin.qq.com/",
-        bridgeKind: "wechat2rss",
-        inputMode: "article_url",
+        wechatName: "微信 Demo",
         articleUrl: "https://mp.weixin.qq.com/s?__biz=abc"
       })
     });
@@ -74,8 +66,6 @@ describe("settingsApi", () => {
     await updateSource({
       sourceType: "rss",
       kind: "wechat_demo",
-      name: "微信 Demo",
-      siteUrl: "https://example.com",
       rssUrl: "https://example.com/feed.xml"
     });
 
@@ -84,8 +74,6 @@ describe("settingsApi", () => {
       body: JSON.stringify({
         sourceType: "rss",
         kind: "wechat_demo",
-        name: "微信 Demo",
-        siteUrl: "https://example.com",
         rssUrl: "https://example.com/feed.xml"
       })
     });

@@ -99,7 +99,7 @@ export type SettingsSourceItem = {
   sourceType: string;
   bridgeKind: string | null;
   bridgeConfigSummary: string | null;
-  bridgeInputMode: "feed_url" | "article_url" | null;
+  bridgeInputMode: "feed_url" | "article_url" | "name_lookup" | null;
   bridgeInputValue: string | null;
   lastCollectedAt: string | null;
   lastCollectionStatus: string | null;
@@ -224,28 +224,23 @@ export type UpdateSourceDisplayModeResponse = {
 export type SaveSourcePayload =
   | {
       sourceType: "rss";
-      kind: string;
-      name: string;
-      siteUrl: string;
       rssUrl: string;
     }
   | {
       sourceType: "wechat_bridge";
-      kind: string;
-      name: string;
-      siteUrl: string;
-      bridgeKind: "wechat2rss";
-      inputMode: "feed_url";
-      feedUrl: string;
+      wechatName: string;
+      articleUrl?: string;
     }
   | {
-      sourceType: "wechat_bridge";
       kind: string;
-      name: string;
-      siteUrl: string;
-      bridgeKind: "wechat2rss";
-      inputMode: "article_url";
-      articleUrl: string;
+      sourceType: "rss";
+      rssUrl: string;
+    }
+  | {
+      kind: string;
+      sourceType: "wechat_bridge";
+      wechatName: string;
+      articleUrl?: string;
     };
 
 export type SaveSourceResponse = {

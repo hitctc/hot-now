@@ -28,12 +28,9 @@ type PageNotice = { tone: AlertTone; message: string };
 type SourceModalMode = "create" | "update";
 type SourceFormState = {
   kind: string;
-  name: string;
-  siteUrl: string;
   sourceType: "rss" | "wechat_bridge";
   rssUrl: string;
-  bridgeInputMode: "feed_url" | "article_url";
-  feedUrl: string;
+  wechatName: string;
   articleUrl: string;
 };
 
@@ -78,7 +75,7 @@ const wechatArticleUrlAvailable = computed(
 const wechatArticleUrlMessage = computed(
   () =>
     sourcesModel.value?.capability.wechatArticleUrlMessage ??
-    "当前未配置 bridge 服务；你仍可新增 RSS 或填写现成 feed URL，但“公众号文章链接”模式暂不可用。"
+    "当前未配置 bridge 服务；RSS 仍可直接新增，但公众号来源暂时不可用。"
 );
 
 // 页面提示统一通过一层 notice 管理，操作后同时保留页内 Alert 和全局 toast。
@@ -117,12 +114,9 @@ function isActionPending(actionKey: string): boolean {
 function createEmptySourceForm(): SourceFormState {
   return {
     kind: "",
-    name: "",
-    siteUrl: "",
     sourceType: "rss",
     rssUrl: "",
-    bridgeInputMode: "article_url",
-    feedUrl: "",
+    wechatName: "",
     articleUrl: ""
   };
 }
@@ -130,10 +124,6 @@ function createEmptySourceForm(): SourceFormState {
 // 每次打开弹窗都从同一套初始值开始，避免上一次编辑残留到下一次新增。
 function resetSourceForm(): void {
   Object.assign(sourceForm, createEmptySourceForm());
-  // 未配置 bridge 时直接回到可用的 feed URL 模式，避免用户一打开公众号模式就落在必失败的分支上。
-  if (!wechatArticleUrlAvailable.value) {
-    sourceForm.bridgeInputMode = "feed_url";
-  }
   sourceFormError.value = null;
 }
 
@@ -149,20 +139,13 @@ function openEditSourceModal(source: SettingsSourceItem): void {
   sourceModalMode.value = "update";
   resetSourceForm();
   sourceForm.kind = source.kind;
-  sourceForm.name = source.name;
-  sourceForm.siteUrl = source.siteUrl;
   sourceForm.sourceType = source.sourceType === "wechat_bridge" ? "wechat_bridge" : "rss";
 
   if (sourceForm.sourceType === "rss") {
     sourceForm.rssUrl = source.rssUrl ?? "";
   } else {
-    sourceForm.bridgeInputMode = source.bridgeInputMode ?? "article_url";
-
-    if (sourceForm.bridgeInputMode === "feed_url") {
-      sourceForm.feedUrl = source.bridgeInputValue ?? source.rssUrl ?? "";
-    } else {
-      sourceForm.articleUrl = source.bridgeInputValue ?? "";
-    }
+    sourceForm.wechatName = source.name;
+    sourceForm.articleUrl = source.bridgeInputMode === "article_url" ? source.bridgeInputValue ?? "" : "";
   }
 
   isSourceModalOpen.value = true;
@@ -176,22 +159,11 @@ function closeSourceModal(): void {
 
 // 类型切换只负责收口当前可见字段，真正的 payload 仍由提交时统一构建。
 function selectSourceType(sourceType: "rss" | "wechat_bridge"): void {
-  sourceForm.sourceType = sourceType;
-
   if (sourceType === "wechat_bridge" && !wechatArticleUrlAvailable.value) {
-    sourceForm.bridgeInputMode = "feed_url";
-  }
-
-  sourceFormError.value = null;
-}
-
-// 公众号 bridge 录入先只支持“现成 feed”与“文章链接”两种模式，不额外引入 provider id。
-function selectBridgeInputMode(inputMode: "feed_url" | "article_url"): void {
-  if (inputMode === "article_url" && !wechatArticleUrlAvailable.value) {
     return;
   }
 
-  sourceForm.bridgeInputMode = inputMode;
+  sourceForm.sourceType = sourceType;
   sourceFormError.value = null;
 }
 
@@ -294,14 +266,6 @@ function readActionErrorMessage(
 
 // 表单提交前先统一整理 payload，这样 create / update 共用一条来源保存路径。
 function buildSourceSavePayload(): { ok: true; payload: SaveSourcePayload } | { ok: false; message: string } {
-  const kind = sourceForm.kind.trim();
-  const name = sourceForm.name.trim();
-  const siteUrl = sourceForm.siteUrl.trim();
-
-  if (!kind || !name || !siteUrl) {
-    return { ok: false, message: "请先完整填写来源 kind、名称和主页地址。" };
-  }
-
   if (sourceForm.sourceType === "rss") {
     const rssUrl = sourceForm.rssUrl.trim();
 
@@ -311,54 +275,43 @@ function buildSourceSavePayload(): { ok: true; payload: SaveSourcePayload } | { 
 
     return {
       ok: true,
-      payload: {
-        sourceType: "rss",
-        kind,
-        name,
-        siteUrl,
-        rssUrl
-      }
+      payload:
+        sourceModalMode.value === "update"
+          ? {
+              kind: sourceForm.kind,
+              sourceType: "rss",
+              rssUrl
+            }
+          : {
+              sourceType: "rss",
+              rssUrl
+            }
     };
   }
 
-  if (sourceForm.bridgeInputMode === "feed_url") {
-    const feedUrl = sourceForm.feedUrl.trim();
+  const wechatName = sourceForm.wechatName.trim();
 
-    if (!feedUrl) {
-      return { ok: false, message: "请填写现成 bridge feed URL。" };
-    }
-
-    return {
-      ok: true,
-      payload: {
-        sourceType: "wechat_bridge",
-        kind,
-        name,
-        siteUrl,
-        bridgeKind: "wechat2rss",
-        inputMode: "feed_url",
-        feedUrl
-      }
-    };
+  if (!wechatName) {
+    return { ok: false, message: "请填写公众号名称。" };
   }
 
   const articleUrl = sourceForm.articleUrl.trim();
 
-  if (!articleUrl) {
-    return { ok: false, message: "请填写公众号文章链接。" };
-  }
-
   return {
     ok: true,
-    payload: {
-      sourceType: "wechat_bridge",
-      kind,
-      name,
-      siteUrl,
-      bridgeKind: "wechat2rss",
-      inputMode: "article_url",
-      articleUrl
-    }
+    payload:
+      sourceModalMode.value === "update"
+        ? {
+            kind: sourceForm.kind,
+            sourceType: "wechat_bridge",
+            wechatName,
+            ...(articleUrl ? { articleUrl } : {})
+          }
+        : {
+            sourceType: "wechat_bridge",
+            wechatName,
+            ...(articleUrl ? { articleUrl } : {})
+          }
   };
 }
 
@@ -531,12 +484,14 @@ async function handleSubmitSource(): Promise<void> {
       error,
       sourceModalMode.value === "create" ? "来源保存失败，请稍后再试。" : "来源更新失败，请稍后再试。",
       {
-        "already-exists": "该来源 kind 已存在，请更换后重试。",
+        "already-exists": "系统生成的来源标识已存在，请换一个链接或名称后重试。",
         "not-found": "对应来源不存在，可能已被移除。",
         "built-in": "内置来源不允许编辑。",
         "invalid-input": "来源配置不合法，请检查后重试。",
-        "wechat-bridge-disabled": "当前未配置公众号 bridge 服务，无法通过文章链接生成 feed。",
-        "bridge-registration-failed": "公众号文章链接解析失败，请检查 bridge 服务或改用现成 feed URL。"
+        "invalid-rss-feed": "这个 RSS 地址暂时无法识别，请检查链接是否正确。",
+        "wechat-bridge-disabled": "当前未配置公众号 bridge 服务，暂时无法新增公众号来源。",
+        "wechat-bridge-not-found": "没有找到这个公众号的可用来源，请检查名称或补一篇文章链接。",
+        "bridge-registration-failed": "这篇文章暂时无法生成订阅源，请换一篇文章再试。"
       }
     );
 
@@ -755,9 +710,6 @@ onMounted(() => {
                     <a-tag :color="record.sourceType === 'wechat_bridge' ? 'blue' : 'default'">
                       {{ record.sourceType === "wechat_bridge" ? "公众号桥接" : "RSS" }}
                     </a-tag>
-                    <a-typography-text v-if="record.bridgeConfigSummary" type="secondary">
-                      {{ record.bridgeConfigSummary }}
-                    </a-typography-text>
                   </a-space>
                 </div>
               </template>
@@ -850,8 +802,17 @@ onMounted(() => {
             class="editorial-inline-alert editorial-inline-alert--info"
             type="info"
             show-icon
-            message="新增来源统一在这一个弹窗里完成：先选 RSS 或 微信公众号，再填写对应接入信息。"
+            message="这里只收用户输入：RSS 只填链接，公众号只填名称，可选再补一篇文章链接。"
             data-source-modal-intro
+          />
+
+          <a-alert
+            v-if="!wechatArticleUrlAvailable"
+            class="editorial-inline-alert editorial-inline-alert--info"
+            type="info"
+            show-icon
+            :message="wechatArticleUrlMessage"
+            data-source-wechat-capability
           />
 
           <div class="flex flex-col gap-2">
@@ -867,41 +828,13 @@ onMounted(() => {
               <a-button
                 :type="sourceForm.sourceType === 'wechat_bridge' ? 'primary' : 'default'"
                 data-source-type="wechat_bridge"
+                :disabled="!wechatArticleUrlAvailable"
                 @click="selectSourceType('wechat_bridge')"
               >
                 微信公众号
               </a-button>
             </div>
           </div>
-
-          <div class="grid gap-4 md:grid-cols-2">
-            <label class="flex flex-col gap-2">
-              <span class="text-sm font-medium text-editorial-text-main">来源 kind</span>
-              <input
-                v-model="sourceForm.kind"
-                data-source-form="kind"
-                class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
-                :disabled="sourceModalMode === 'update'"
-              />
-            </label>
-            <label class="flex flex-col gap-2">
-              <span class="text-sm font-medium text-editorial-text-main">来源名称</span>
-              <input
-                v-model="sourceForm.name"
-                data-source-form="name"
-                class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
-              />
-            </label>
-          </div>
-
-          <label class="flex flex-col gap-2">
-            <span class="text-sm font-medium text-editorial-text-main">来源主页</span>
-            <input
-              v-model="sourceForm.siteUrl"
-              data-source-form="site-url"
-              class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
-            />
-          </label>
 
           <template v-if="sourceForm.sourceType === 'rss'">
             <label class="flex flex-col gap-2">
@@ -923,42 +856,22 @@ onMounted(() => {
               data-source-wechat-capability
             />
 
-            <div class="flex flex-col gap-2">
-              <p class="m-0 text-sm font-medium text-editorial-text-main">公众号接入方式</p>
-              <div class="flex flex-wrap gap-2">
-                <a-button
-                  :type="sourceForm.bridgeInputMode === 'article_url' ? 'primary' : 'default'"
-                  data-bridge-input-mode="article_url"
-                  :disabled="!wechatArticleUrlAvailable"
-                  @click="selectBridgeInputMode('article_url')"
-                >
-                  公众号文章链接
-                </a-button>
-                <a-button
-                  :type="sourceForm.bridgeInputMode === 'feed_url' ? 'primary' : 'default'"
-                  data-bridge-input-mode="feed_url"
-                  @click="selectBridgeInputMode('feed_url')"
-                >
-                  现成 feed URL
-                </a-button>
-              </div>
-            </div>
+            <label class="flex flex-col gap-2">
+              <span class="text-sm font-medium text-editorial-text-main">公众号名称</span>
+              <input
+                v-model="sourceForm.wechatName"
+                data-source-form="wechat-name"
+                class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
+              />
+            </label>
 
-            <label v-if="sourceForm.bridgeInputMode === 'article_url'" class="flex flex-col gap-2">
+            <label class="flex flex-col gap-2">
               <span class="text-sm font-medium text-editorial-text-main">公众号文章链接</span>
               <input
                 v-model="sourceForm.articleUrl"
                 data-source-form="article-url"
                 class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
-              />
-            </label>
-
-            <label v-else class="flex flex-col gap-2">
-              <span class="text-sm font-medium text-editorial-text-main">现成 bridge feed URL</span>
-              <input
-                v-model="sourceForm.feedUrl"
-                data-source-form="feed-url"
-                class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
+                placeholder="可选，建议填写一篇文章链接帮助系统更快定位来源"
               />
             </label>
           </template>

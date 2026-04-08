@@ -432,7 +432,7 @@ describe("SourcesPage", () => {
     expect(findModalNode("[data-source-form='article-url']")).toBeNull();
   });
 
-  it("deletes a custom source and refreshes the latest model", async () => {
+  it("requires popconfirm before deleting a custom source", async () => {
     vi.mocked(settingsApi.readSettingsSources)
       .mockResolvedValueOnce({
         ...createSourcesModel(),
@@ -463,6 +463,15 @@ describe("SourcesPage", () => {
     await flushPromises();
 
     await wrapper.get("[data-source-delete='wechat_demo']").trigger("click");
+    expect(settingsApi.deleteSource).not.toHaveBeenCalled();
+
+    const sourceDeleteConfirm = wrapper
+      .findAllComponents({ name: "APopconfirm" })
+      .find((component) => component.find('[data-source-delete="wechat_demo"]').exists());
+
+    expect(sourceDeleteConfirm).toBeTruthy();
+
+    sourceDeleteConfirm!.vm.$emit("confirm");
     await flushPromises();
 
     expect(settingsApi.deleteSource).toHaveBeenCalledWith("wechat_demo");

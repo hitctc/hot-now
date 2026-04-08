@@ -775,16 +775,22 @@ onMounted(() => {
                     >
                       编辑
                     </a-button>
-                    <a-button
-                      type="link"
-                      size="small"
-                      danger
-                      :loading="isActionPending(`delete:${record.kind}`)"
-                      :data-source-delete="record.kind"
-                      @click="handleDeleteSource(record)"
+                    <a-popconfirm
+                      title="确认删除这个自定义来源吗？"
+                      ok-text="确认删除"
+                      cancel-text="取消"
+                      @confirm="handleDeleteSource(record)"
                     >
-                      删除
-                    </a-button>
+                      <a-button
+                        type="link"
+                        size="small"
+                        danger
+                        :loading="isActionPending(`delete:${record.kind}`)"
+                        :data-source-delete="record.kind"
+                      >
+                        删除
+                      </a-button>
+                    </a-popconfirm>
                 </div>
                 <span v-else class="text-editorial-text-muted">-</span>
               </template>

@@ -1,4 +1,4 @@
-import { flushPromises } from "@vue/test-utils";
+import { DOMWrapper, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { message } from "ant-design-vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -27,6 +27,38 @@ vi.mock("../../src/client/services/settingsApi", async () => {
     triggerManualSendLatestEmail: vi.fn()
   };
 });
+
+const mountedWrappers: VueWrapper[] = [];
+
+function mountSourcesPage() {
+  const wrapper = mountWithApp(SourcesPage, {
+    global: {
+      stubs: {
+        teleport: false
+      }
+    }
+  });
+
+  mountedWrappers.push(wrapper);
+  return wrapper;
+}
+
+// 来源弹窗现在使用真实 Teleport 浮层挂到 body，测试要从全局 DOM 里取节点。
+function getModalNode(selector: string) {
+  const node = document.body.querySelector(selector);
+
+  if (!(node instanceof HTMLElement)) {
+    throw new Error(`Expected modal node for selector "${selector}" to exist.`);
+  }
+
+  return new DOMWrapper(node);
+}
+
+// 某些断言只需要判断弹窗节点是否存在，用轻量查询避免误把页面主体当成 modal 内容。
+function findModalNode(selector: string) {
+  const node = document.body.querySelector(selector);
+  return node instanceof HTMLElement ? new DOMWrapper(node) : null;
+}
 
 function createSourcesModel() {
   return {
@@ -62,6 +94,10 @@ function createSourcesModel() {
       canTriggerManualCollect: true,
       canTriggerManualSendLatestEmail: true,
       isRunning: false
+    },
+    capability: {
+      wechatArticleUrlEnabled: true,
+      wechatArticleUrlMessage: "当前已配置 bridge 服务，可直接粘贴公众号文章链接自动生成 feed。"
     }
   } satisfies settingsApi.SettingsSourcesResponse;
 }
@@ -93,17 +129,19 @@ describe("SourcesPage", () => {
   });
 
   afterEach(() => {
+    mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount());
+    document.body.innerHTML = "";
     vi.unstubAllGlobals();
   });
 
   it("renders operation cards and source tables from the api model", async () => {
     vi.mocked(settingsApi.readSettingsSources).mockResolvedValue(createSourcesModel());
 
-    const wrapper = mountWithApp(SourcesPage);
+    const wrapper = mountSourcesPage();
 
     await flushPromises();
 
-    expect(wrapper.get("[data-settings-intro='sources']").text()).toContain("Source Inventory");
+    expect(wrapper.find("[data-settings-intro='sources']").exists()).toBe(false);
     expect(wrapper.get("[data-sources-section='overview']").findAll("article")).toHaveLength(4);
     expect(wrapper.get("[data-sources-section='overview']").text()).toContain("接入来源");
     expect(wrapper.get("[data-sources-section='overview']").text()).toContain("已启用来源");
@@ -144,7 +182,7 @@ describe("SourcesPage", () => {
       enable: false
     });
 
-    const wrapper = mountWithApp(SourcesPage);
+    const wrapper = mountSourcesPage();
 
     await flushPromises();
     await wrapper.get("[data-source-toggle='openai']").trigger("click");
@@ -165,7 +203,7 @@ describe("SourcesPage", () => {
       action: "collect"
     });
 
-    const wrapper = mountWithApp(SourcesPage);
+    const wrapper = mountSourcesPage();
 
     await flushPromises();
     await wrapper.get("[data-action='manual-collect']").trigger("click");
@@ -188,7 +226,7 @@ describe("SourcesPage", () => {
       showAllWhenSelected: false
     });
 
-    const wrapper = mountWithApp(SourcesPage);
+    const wrapper = mountSourcesPage();
 
     await flushPromises();
     await wrapper.get("[data-source-display-mode='openai']").trigger("click");
@@ -203,17 +241,19 @@ describe("SourcesPage", () => {
     vi.mocked(settingsApi.readSettingsSources).mockResolvedValue(createSourcesModel());
     vi.mocked(settingsApi.createSource).mockResolvedValue({ ok: true, kind: "wechat_demo" });
 
-    const wrapper = mountWithApp(SourcesPage);
+    const wrapper = mountSourcesPage();
     await flushPromises();
 
     await wrapper.get("[data-action='add-source']").trigger("click");
-    await wrapper.get("[data-source-type='wechat_bridge']").trigger("click");
-    await wrapper.get("[data-bridge-input-mode='article_url']").trigger("click");
-    await wrapper.get("[data-source-form='kind']").setValue("wechat_demo");
-    await wrapper.get("[data-source-form='name']").setValue("微信 Demo");
-    await wrapper.get("[data-source-form='site-url']").setValue("https://mp.weixin.qq.com/");
-    await wrapper.get("[data-source-form='article-url']").setValue("https://mp.weixin.qq.com/s?__biz=abc");
-    await wrapper.get("[data-source-form='submit']").trigger("click");
+    await flushPromises();
+
+    await getModalNode("[data-source-type='wechat_bridge']").trigger("click");
+    await getModalNode("[data-bridge-input-mode='article_url']").trigger("click");
+    await getModalNode("[data-source-form='kind']").setValue("wechat_demo");
+    await getModalNode("[data-source-form='name']").setValue("微信 Demo");
+    await getModalNode("[data-source-form='site-url']").setValue("https://mp.weixin.qq.com/");
+    await getModalNode("[data-source-form='article-url']").setValue("https://mp.weixin.qq.com/s?__biz=abc");
+    await getModalNode("[data-source-form='submit']").trigger("click");
     await flushPromises();
 
     expect(settingsApi.createSource).toHaveBeenCalledWith(
@@ -225,21 +265,51 @@ describe("SourcesPage", () => {
     );
   });
 
+  it("submits an rss source from the same create modal", async () => {
+    vi.mocked(settingsApi.readSettingsSources).mockResolvedValue(createSourcesModel());
+    vi.mocked(settingsApi.createSource).mockResolvedValue({ ok: true, kind: "rss_demo" });
+
+    const wrapper = mountSourcesPage();
+    await flushPromises();
+
+    await wrapper.get("[data-action='add-source']").trigger("click");
+    await flushPromises();
+
+    await getModalNode("[data-source-type='rss']").trigger("click");
+    await getModalNode("[data-source-form='kind']").setValue("rss_demo");
+    await getModalNode("[data-source-form='name']").setValue("RSS Demo");
+    await getModalNode("[data-source-form='site-url']").setValue("https://example.com");
+    await getModalNode("[data-source-form='rss-url']").setValue("https://example.com/feed.xml");
+    await getModalNode("[data-source-form='submit']").trigger("click");
+    await flushPromises();
+
+    expect(getModalNode("[data-source-modal-intro]").text()).toContain("新增来源统一在这一个弹窗里完成");
+    expect(settingsApi.createSource).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceType: "rss",
+        kind: "rss_demo",
+        rssUrl: "https://example.com/feed.xml"
+      })
+    );
+  });
+
   it("submits a wechat bridge source from feed-url mode", async () => {
     vi.mocked(settingsApi.readSettingsSources).mockResolvedValue(createSourcesModel());
     vi.mocked(settingsApi.createSource).mockResolvedValue({ ok: true, kind: "wechat_demo" });
 
-    const wrapper = mountWithApp(SourcesPage);
+    const wrapper = mountSourcesPage();
     await flushPromises();
 
     await wrapper.get("[data-action='add-source']").trigger("click");
-    await wrapper.get("[data-source-type='wechat_bridge']").trigger("click");
-    await wrapper.get("[data-bridge-input-mode='feed_url']").trigger("click");
-    await wrapper.get("[data-source-form='kind']").setValue("wechat_demo");
-    await wrapper.get("[data-source-form='name']").setValue("微信 Demo");
-    await wrapper.get("[data-source-form='site-url']").setValue("https://mp.weixin.qq.com/");
-    await wrapper.get("[data-source-form='feed-url']").setValue("https://bridge.example.test/feed/demo.xml");
-    await wrapper.get("[data-source-form='submit']").trigger("click");
+    await flushPromises();
+
+    await getModalNode("[data-source-type='wechat_bridge']").trigger("click");
+    await getModalNode("[data-bridge-input-mode='feed_url']").trigger("click");
+    await getModalNode("[data-source-form='kind']").setValue("wechat_demo");
+    await getModalNode("[data-source-form='name']").setValue("微信 Demo");
+    await getModalNode("[data-source-form='site-url']").setValue("https://mp.weixin.qq.com/");
+    await getModalNode("[data-source-form='feed-url']").setValue("https://bridge.example.test/feed/demo.xml");
+    await getModalNode("[data-source-form='submit']").trigger("click");
     await flushPromises();
 
     expect(settingsApi.createSource).toHaveBeenCalledWith(
@@ -276,12 +346,14 @@ describe("SourcesPage", () => {
     });
     vi.mocked(settingsApi.updateSource).mockResolvedValue({ ok: true, kind: "wechat_demo" });
 
-    const wrapper = mountWithApp(SourcesPage);
+    const wrapper = mountSourcesPage();
     await flushPromises();
 
     await wrapper.get("[data-source-edit='wechat_demo']").trigger("click");
-    await wrapper.get("[data-source-form='name']").setValue("微信 Demo 新版");
-    await wrapper.get("[data-source-form='submit']").trigger("click");
+    await flushPromises();
+
+    await getModalNode("[data-source-form='name']").setValue("微信 Demo 新版");
+    await getModalNode("[data-source-form='submit']").trigger("click");
     await flushPromises();
 
     expect(settingsApi.updateSource).toHaveBeenCalledWith(
@@ -292,6 +364,30 @@ describe("SourcesPage", () => {
         inputMode: "article_url"
       })
     );
+  });
+
+  it("falls back to feed-url mode and disables article-url mode when bridge capability is unavailable", async () => {
+    vi.mocked(settingsApi.readSettingsSources).mockResolvedValue({
+      ...createSourcesModel(),
+      capability: {
+        wechatArticleUrlEnabled: false,
+        wechatArticleUrlMessage: "当前未配置 bridge 服务；你仍可新增 RSS 或填写现成 feed URL，但“公众号文章链接”模式暂不可用。"
+      }
+    });
+
+    const wrapper = mountSourcesPage();
+    await flushPromises();
+
+    await wrapper.get("[data-action='add-source']").trigger("click");
+    await flushPromises();
+
+    await getModalNode("[data-source-type='wechat_bridge']").trigger("click");
+    await flushPromises();
+
+    expect(getModalNode("[data-source-wechat-capability]").text()).toContain("公众号文章链接");
+    expect(getModalNode("[data-bridge-input-mode='article_url']").attributes("disabled")).toBeDefined();
+    expect(findModalNode("[data-source-form='feed-url']")?.exists()).toBe(true);
+    expect(findModalNode("[data-source-form='article-url']")).toBeNull();
   });
 
   it("deletes a custom source and refreshes the latest model", async () => {
@@ -321,7 +417,7 @@ describe("SourcesPage", () => {
       .mockResolvedValueOnce(createSourcesModel());
     vi.mocked(settingsApi.deleteSource).mockResolvedValue({ ok: true, kind: "wechat_demo" });
 
-    const wrapper = mountWithApp(SourcesPage);
+    const wrapper = mountSourcesPage();
     await flushPromises();
 
     await wrapper.get("[data-source-delete='wechat_demo']").trigger("click");

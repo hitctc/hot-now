@@ -132,6 +132,7 @@
 - 安装依赖：`npm install`
 - 系统页客户端构建：`npm run build:client`
 - 开发启动：`npm run dev`
+- 仅启动 Vite 客户端调试：`npm run dev:client`
 - 本地便捷启动：`npm run dev:local`
 - 数据库检查：`npm run db:check`
 - 生成 verified snapshot：`npm run db:snapshot`
@@ -139,7 +140,7 @@
 - 类型构建：`npm run build`
 - 测试：`npm run test`
 
-`npm run dev` 和 `npm run dev:local` 现在都会在启动前准备最新 client bundle。`npm run dev:local` 还会检查本地 `3030` 端口；如果已有旧的监听进程占着这个端口，会先停止旧进程，再启动新的本地开发服务。
+`npm run dev` 和 `npm run dev:local` 现在都会在启动前准备最新 client bundle，并同时拉起 Fastify 与 Vite dev server。`npm run dev` 会自动读取 `.env.local`（如果存在），并在 `HOT_NOW_CLIENT_DEV_ORIGIN` 指向的端口上已经检测到 HotNow 的 Vite dev server 时直接复用；`npm run dev:local` 还会检查本地 `3030` 和 `5173` 端口，如果已有旧的监听进程占着这些端口，会先停止旧进程，再启动新的本地开发服务。当前 `3030` 页面会优先尝试接入 `HOT_NOW_CLIENT_DEV_ORIGIN` 指向的 Vite dev server，成功时可直接使用 Vue DevTools，失败时自动回退到 `dist/client` 构建产物；`npm run dev:client` 仍保留给只调前端时单独使用。
 
 SQLite 可靠性约定：
 
@@ -186,6 +187,7 @@ SQLite 可靠性约定：
 - `AUTH_PASSWORD`
 - `SESSION_SECRET`
 - `LLM_SETTINGS_MASTER_KEY`
+- `HOT_NOW_CLIENT_DEV_ORIGIN`
 - `WECHAT_BRIDGE_BASE_URL`
 - `WECHAT_BRIDGE_TOKEN`
 
@@ -205,6 +207,7 @@ SQLite 可靠性约定：
 - Git 提交信息默认使用 `英文类型：中文正文`，包含碎片提交、临时提交和最终交付提交；除非用户明确要求其他语言或其他格式，否则不要改成纯英文、纯中文或其他提交标题格式。
 - 默认直接在 `main` 分支开发，不单独开功能分支或 worktree；只有用户明确要求隔离开发、走分支 / PR 流程，或有其他特殊说明时，才切到非 `main` 分支工作。
 - 完成一次“最小可验证改动”后，默认创建本地 git commit；这里的“最小可验证改动”至少要求本轮最相关测试、构建或文档自检已经完成，不把纯分析、纯 spec / plan、半成品实验或明显中间态代码直接提交。
+- 如果因为工作区混有无关脏改、提交边界不清或验证未完成而暂时不能提交，必须在回复里明确说明原因；不要在已完成最小可验证改动后静默跳过本地 commit。
 - 如果本轮改动已经通过最相关验证、提交边界清晰、工作区没有混入无关脏改，且用户没有明确要求暂停同步，则默认继续将当前分支推送到远程；本项目默认直接在 `main` 工作，因此 push 前必须先确认这几个条件都成立。
 - 以下情况禁止自动 push：相关验证未通过；工作区混有未整理的无关修改；只完成了分析 / 设计 / 计划而没有形成可交付代码；改动包含 live 数据库、凭据、临时恢复文件或其他不应入库的本地产物；当前提交边界仍不清楚。
 - 对外可见行为变化时，更新文档，不要让 README 和 AGENTS 落后于代码。

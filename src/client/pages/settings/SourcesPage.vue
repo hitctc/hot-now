@@ -71,6 +71,14 @@ const enabledSourceCount = computed(
   () => sourcesModel.value?.sources.filter((source) => source.isEnabled).length ?? 0
 );
 const totalSourceCount = computed(() => sourcesModel.value?.sources.length ?? 0);
+const wechatArticleUrlAvailable = computed(
+  () => sourcesModel.value?.capability.wechatArticleUrlEnabled ?? false
+);
+const wechatArticleUrlMessage = computed(
+  () =>
+    sourcesModel.value?.capability.wechatArticleUrlMessage ??
+    "当前未配置 bridge 服务；你仍可新增 RSS 或填写现成 feed URL，但“公众号文章链接”模式暂不可用。"
+);
 
 // 页面提示统一通过一层 notice 管理，操作后同时保留页内 Alert 和全局 toast。
 function showNotice(tone: AlertTone, noticeMessage: string): void {
@@ -121,6 +129,10 @@ function createEmptySourceForm(): SourceFormState {
 // 每次打开弹窗都从同一套初始值开始，避免上一次编辑残留到下一次新增。
 function resetSourceForm(): void {
   Object.assign(sourceForm, createEmptySourceForm());
+  // 未配置 bridge 时直接回到可用的 feed URL 模式，避免用户一打开公众号模式就落在必失败的分支上。
+  if (!wechatArticleUrlAvailable.value) {
+    sourceForm.bridgeInputMode = "feed_url";
+  }
   sourceFormError.value = null;
 }
 
@@ -164,11 +176,20 @@ function closeSourceModal(): void {
 // 类型切换只负责收口当前可见字段，真正的 payload 仍由提交时统一构建。
 function selectSourceType(sourceType: "rss" | "wechat_bridge"): void {
   sourceForm.sourceType = sourceType;
+
+  if (sourceType === "wechat_bridge" && !wechatArticleUrlAvailable.value) {
+    sourceForm.bridgeInputMode = "feed_url";
+  }
+
   sourceFormError.value = null;
 }
 
 // 公众号 bridge 录入先只支持“现成 feed”与“文章链接”两种模式，不额外引入 provider id。
 function selectBridgeInputMode(inputMode: "feed_url" | "article_url"): void {
+  if (inputMode === "article_url" && !wechatArticleUrlAvailable.value) {
+    return;
+  }
+
   sourceForm.bridgeInputMode = inputMode;
   sourceFormError.value = null;
 }
@@ -546,23 +567,6 @@ onMounted(() => {
 <template>
   <a-spin :spinning="isRefreshing">
     <div :class="editorialContentPageClass" data-settings-page="sources">
-      <section class="flex flex-col gap-2" data-settings-intro="sources">
-        <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
-          Source Inventory
-        </p>
-        <h1 class="m-0 text-2xl font-semibold tracking-[-0.02em] text-editorial-text-main">
-          数据收集
-        </h1>
-        <p class="m-0 text-sm leading-6 text-editorial-text-body">
-          查看来源状态、维护自定义来源，并执行采集动作。
-        </p>
-        <div class="pt-1">
-          <a-button type="primary" data-action="add-source" @click="openCreateSourceModal">
-            新增来源
-          </a-button>
-        </div>
-      </section>
-
       <a-alert
         v-if="pageNotice"
         :class="['editorial-inline-alert', `editorial-inline-alert--${pageNotice.tone}`]"
@@ -572,6 +576,12 @@ onMounted(() => {
         closable
         @close="pageNotice = null"
       />
+
+      <div class="flex justify-start">
+        <a-button type="primary" data-action="add-source" @click="openCreateSourceModal">
+          新增来源
+        </a-button>
+      </div>
 
       <a-skeleton v-if="isLoading" active :paragraph="{ rows: 8 }" />
 
@@ -796,16 +806,26 @@ onMounted(() => {
         :open="isSourceModalOpen"
         :title="sourceModalMode === 'create' ? '新增来源' : '编辑来源'"
         :footer="null"
-        :get-container="false"
+        centered
+        :width="760"
         destroy-on-close
         @cancel="closeSourceModal"
       >
         <div class="flex flex-col gap-4" data-source-modal="source">
           <a-alert
             v-if="sourceFormError"
+            class="editorial-inline-alert editorial-inline-alert--error"
             type="error"
             show-icon
             :message="sourceFormError"
+          />
+
+          <a-alert
+            class="editorial-inline-alert editorial-inline-alert--info"
+            type="info"
+            show-icon
+            message="新增来源统一在这一个弹窗里完成：先选 RSS 或 微信公众号，再填写对应接入信息。"
+            data-source-modal-intro
           />
 
           <div class="flex flex-col gap-2">
@@ -869,12 +889,21 @@ onMounted(() => {
           </template>
 
           <template v-else>
+            <a-alert
+              class="editorial-inline-alert editorial-inline-alert--info"
+              type="info"
+              show-icon
+              :message="wechatArticleUrlMessage"
+              data-source-wechat-capability
+            />
+
             <div class="flex flex-col gap-2">
               <p class="m-0 text-sm font-medium text-editorial-text-main">公众号接入方式</p>
               <div class="flex flex-wrap gap-2">
                 <a-button
                   :type="sourceForm.bridgeInputMode === 'article_url' ? 'primary' : 'default'"
                   data-bridge-input-mode="article_url"
+                  :disabled="!wechatArticleUrlAvailable"
                   @click="selectBridgeInputMode('article_url')"
                 >
                   公众号文章链接

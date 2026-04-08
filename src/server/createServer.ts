@@ -1136,6 +1136,7 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
   const operationSummary = deps.getSourcesOperationSummary
     ? await deps.getSourcesOperationSummary()
     : { lastCollectionRunAt: null, lastSendLatestEmailAt: null };
+  const wechatBridgeConfigured = Boolean(deps.config?.wechatBridge?.baseUrl && deps.config?.wechatBridge?.token);
 
   return {
     sources,
@@ -1145,6 +1146,12 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
       canTriggerManualCollect: typeof (deps.triggerManualCollect ?? deps.triggerManualRun) === "function",
       canTriggerManualSendLatestEmail: typeof deps.triggerManualSendLatestEmail === "function",
       isRunning: deps.isRunning?.() ?? false
+    },
+    capability: {
+      wechatArticleUrlEnabled: wechatBridgeConfigured,
+      wechatArticleUrlMessage: wechatBridgeConfigured
+        ? "当前已配置 bridge 服务，可直接粘贴公众号文章链接自动生成 feed。"
+        : "当前未配置 bridge 服务；你仍可新增 RSS 或填写现成 feed URL，但“公众号文章链接”模式暂不可用。"
     }
   };
 }

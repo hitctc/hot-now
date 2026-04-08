@@ -121,9 +121,15 @@ export type SettingsSourcesOperations = {
   isRunning: boolean;
 };
 
+export type SettingsSourcesCapability = {
+  wechatArticleUrlEnabled: boolean;
+  wechatArticleUrlMessage: string;
+};
+
 export type SettingsSourcesResponse = {
   sources: SettingsSourceItem[];
   operations: SettingsSourcesOperations;
+  capability: SettingsSourcesCapability;
 };
 
 export type SaveProviderSettingsPayload = {

@@ -25,6 +25,10 @@ describe("settingsApi", () => {
         canTriggerManualCollect: true,
         canTriggerManualSendLatestEmail: true,
         isRunning: false
+      },
+      capability: {
+        wechatArticleUrlEnabled: false,
+        wechatArticleUrlMessage: "当前未配置 bridge 服务。"
       }
     });
 

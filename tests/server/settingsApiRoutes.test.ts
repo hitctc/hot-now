@@ -155,6 +155,9 @@ describe("settings api routes", () => {
         canTriggerManualCollect: true,
         canTriggerManualSendLatestEmail: false,
         isRunning: false
+      },
+      capability: {
+        wechatArticleUrlEnabled: false
       }
     });
   });

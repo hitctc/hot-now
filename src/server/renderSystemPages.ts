@@ -97,9 +97,15 @@ export type SourcesSettingsOperationsView = {
   lastSendLatestEmailAt: string | null;
 };
 
+export type SourcesCapabilityView = {
+  wechatArticleUrlEnabled: boolean;
+  wechatArticleUrlMessage: string;
+};
+
 export type SourcesSettingsView = {
   sources: SourceItem[];
   operations: SourcesSettingsOperationsView;
+  capability: SourcesCapabilityView;
 };
 
 export type ProfileView = {

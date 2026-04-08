@@ -36,6 +36,7 @@ import { listContentSources } from "./core/source/listContentSources.js";
 import { listSourceWorkbench } from "./core/source/listSourceWorkbench.js";
 import { readSourcesOperationSummary } from "./core/source/readSourcesOperationSummary.js";
 import { loadEnabledSourceIssues } from "./core/source/loadEnabledSourceIssues.js";
+import { hydrateSourceContent } from "./core/source/hydrateSourceContent.js";
 import {
   deleteSource as removeSource,
   saveSource as persistSource,
@@ -515,6 +516,28 @@ const triggerManualSendLatestEmail = config.manualActions.sendLatestEmailEnabled
     }
   : undefined;
 
+// 新增来源后先只补这一条 source 的内容入库，避免为了拿到首批数据就把整轮全站采集串进保存接口。
+async function saveAndHydrateSource(input: Parameters<typeof persistSource>[1]) {
+  const result = await persistSource(db, input, {
+    wechatResolver: config.wechatResolver ?? null
+  });
+
+  if (!result.ok) {
+    return result;
+  }
+
+  try {
+    await hydrateSourceContent(db, result.kind, {
+      fetchArticle: fetchAndExtractArticle,
+      runNlEvaluationCycle: async (nlInput) => await runNlEvaluationTask(nlInput)
+    });
+  } catch {
+    // 来源保存不应该因为首轮补拉失败而回滚；后续定时采集仍然会继续尝试刷新这条 source。
+  }
+
+  return result;
+}
+
 const app = createServer({
   config,
   clientDevOrigin: process.env.HOT_NOW_CLIENT_DEV_ORIGIN?.trim() || undefined,
@@ -586,14 +609,8 @@ const app = createServer({
   deleteStrategyDraft: async (draftId) => deleteStrategyDraft(db, draftId),
   listSources: async () => listSourceWorkbench(db),
   getSourcesOperationSummary: async () => readSourcesOperationSummary(db),
-  createSource: async (input) =>
-    await persistSource(db, input, {
-      wechatResolver: config.wechatResolver ?? null
-    }),
-  updateSource: async (input) =>
-    await persistSource(db, input, {
-      wechatResolver: config.wechatResolver ?? null
-    }),
+  createSource: async (input) => await saveAndHydrateSource(input),
+  updateSource: async (input) => await saveAndHydrateSource(input),
   deleteSource: async (kind) => removeSource(db, kind),
   toggleSource: async (kind, enable) => persistSourceToggle(db, kind, enable),
   updateSourceDisplayMode: async (kind, showAllWhenSelected) =>

@@ -20,6 +20,11 @@ type CollectionRunRow = {
   notes: string | null;
 };
 
+type ContentFetchRow = {
+  sourceKind: string;
+  lastFetchedAt: string | null;
+};
+
 export type SourceCard = {
   kind: string;
   name: string;
@@ -60,10 +65,12 @@ export function listSourceCards(db: SqliteDatabase): SourceCard[] {
     )
     .all() as CollectionRunRow[];
   const latestRunBySourceKind = buildLatestRunIndex(runRows);
+  const latestFetchedAtBySourceKind = readLatestFetchedAtBySourceKind(db);
 
   return sourceRows.map((source) => {
     const latestRun = latestRunBySourceKind.get(source.kind);
     const bridgeConfig = parseBridgeConfig(source.bridge_config_json);
+    const fallbackFetchedAt = latestFetchedAtBySourceKind.get(source.kind) ?? null;
 
     return {
       kind: source.kind,
@@ -78,8 +85,8 @@ export function listSourceCards(db: SqliteDatabase): SourceCard[] {
       bridgeConfigSummary: bridgeConfig.summary,
       bridgeInputMode: bridgeConfig.inputMode,
       bridgeInputValue: bridgeConfig.inputValue,
-      lastCollectedAt: latestRun?.finishedAt ?? latestRun?.startedAt ?? null,
-      lastCollectionStatus: latestRun?.status ?? null
+      lastCollectedAt: latestRun?.finishedAt ?? latestRun?.startedAt ?? fallbackFetchedAt,
+      lastCollectionStatus: latestRun?.status ?? (fallbackFetchedAt ? "completed" : null)
     };
   });
 }
@@ -115,6 +122,28 @@ function buildLatestRunIndex(rows: CollectionRunRow[]): Map<string, LatestRunSum
   }
 
   return latestRunBySourceKind;
+}
+
+function readLatestFetchedAtBySourceKind(db: SqliteDatabase): Map<string, string> {
+  // 自动补拉新来源时不会生成整轮 collection_run，这里回退到内容真实入库时间，避免来源页一直显示“未抓取”。
+  const rows = db
+    .prepare(
+      `
+        SELECT
+          cs.kind AS sourceKind,
+          MAX(COALESCE(ci.fetched_at, ci.created_at)) AS lastFetchedAt
+        FROM content_items ci
+        JOIN content_sources cs ON cs.id = ci.source_id
+        GROUP BY cs.kind
+      `
+    )
+    .all() as ContentFetchRow[];
+
+  return new Map(
+    rows
+      .filter((row) => typeof row.sourceKind === "string" && typeof row.lastFetchedAt === "string" && row.lastFetchedAt)
+      .map((row) => [row.sourceKind, row.lastFetchedAt as string])
+  );
 }
 
 function parseSourceKinds(notes: string | null): string[] {

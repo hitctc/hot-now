@@ -231,4 +231,60 @@ describe("listSourceCards", () => {
       bridgeInputValue: "数字生命卡兹克"
     });
   });
+
+  it("falls back to the latest persisted content time when no collection run exists yet", async () => {
+    const db = await createTestDatabase();
+
+    db.prepare(
+      `
+        INSERT INTO content_sources (
+          kind,
+          name,
+          site_url,
+          rss_url,
+          is_enabled,
+          is_builtin,
+          show_all_when_selected,
+          source_type
+        )
+        VALUES (?, ?, ?, ?, 1, 0, 0, 'wechat_bridge')
+      `
+    ).run(
+      "wechat_demo",
+      "微信 Demo",
+      "https://mp.weixin.qq.com/",
+      "https://resolver.example.test/feed/demo.xml"
+    );
+    db.prepare(
+      `
+        INSERT INTO content_items (
+          source_id,
+          title,
+          canonical_url,
+          summary,
+          body_markdown,
+          published_at,
+          fetched_at
+        )
+        VALUES (
+          (SELECT id FROM content_sources WHERE kind = 'wechat_demo'),
+          ?, ?, ?, ?, ?, ?
+        )
+      `
+    ).run(
+      "A hydrated article",
+      "https://example.com/article-1",
+      "summary",
+      "body",
+      "2026-04-08T07:00:00.000Z",
+      "2026-04-08T07:05:00.000Z"
+    );
+
+    const cards = listSourceCards(db);
+
+    expect(cards.find((card) => card.kind === "wechat_demo")).toMatchObject({
+      lastCollectedAt: "2026-04-08T07:05:00.000Z",
+      lastCollectionStatus: "completed"
+    });
+  });
 });

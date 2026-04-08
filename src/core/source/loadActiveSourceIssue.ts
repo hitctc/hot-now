@@ -24,11 +24,35 @@ export async function loadActiveSourceIssue(db: SqliteDatabase): Promise<LoadedI
     );
   }
 
-  const adapter = readSourceAdapter(activeSource);
+  return await loadSourceIssueFromRow(activeSource);
+}
 
-  const rssUrl = activeSource.rss_url?.trim();
+// Source hydration and other targeted refresh flows need the same strict feed parsing path as the
+// old active-source loader, but scoped to one explicit source row instead of the legacy active flag.
+export async function loadSourceIssueByKind(db: SqliteDatabase, kind: SourceKind): Promise<LoadedIssue> {
+  const source = db
+    .prepare(
+      `
+        SELECT kind, name, site_url, rss_url, source_type
+        FROM content_sources
+        WHERE kind = ?
+        LIMIT 1
+      `
+    )
+    .get(kind) as SourceRow | undefined;
+
+  if (!source) {
+    throw new Error(`Content source ${kind} does not exist`);
+  }
+
+  return await loadSourceIssueFromRow(source);
+}
+
+async function loadSourceIssueFromRow(source: SourceRow): Promise<LoadedIssue> {
+  const adapter = readSourceAdapter(source);
+  const rssUrl = source.rss_url?.trim();
   if (!rssUrl) {
-    throw new Error(`Content source ${activeSource.kind} does not have an rss_url`);
+    throw new Error(`Content source ${source.kind} does not have an rss_url`);
   }
 
   const response = await fetch(rssUrl);
@@ -36,7 +60,7 @@ export async function loadActiveSourceIssue(db: SqliteDatabase): Promise<LoadedI
   // Source loading stays strict about 200-only responses so the caller does not silently parse
   // redirects, empty bodies, or partial upstream failures as valid content.
   if (response.status !== 200) {
-    throw new Error(`RSS request failed with ${response.status}`);
+    throw new Error(`RSS request failed with ${response.status} for ${source.kind}`);
   }
 
   const xml = await response.text();

@@ -97,4 +97,22 @@ describe("createWechatResolverServer", () => {
     expect(response.statusCode).toBe(404);
     expect(response.json()).toEqual({ ok: false, reason: "not_found" });
   });
+
+  it("renders a local wechat feed endpoint for dynamic provider fallbacks", async () => {
+    const app = createWechatResolverServer({
+      authToken: "resolver-secret",
+      resolveWechatSource: vi.fn(),
+      renderWechatFeed: vi.fn().mockResolvedValue(`<?xml version="1.0"?><rss><channel><title>demo</title></channel></rss>`)
+    });
+    apps.push(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/wechat/feed/sogou-articles.xml?wechatName=%E6%95%B0%E5%AD%97%E7%94%9F%E5%91%BD%E5%8D%A1%E5%85%B9%E5%85%8B&articleUrl=https%3A%2F%2Fmp.weixin.qq.com%2Fs%3F__biz%3Ddemo"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("application/rss+xml");
+    expect(response.body).toContain("<channel>");
+  });
 });

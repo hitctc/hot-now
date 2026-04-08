@@ -19,7 +19,8 @@ async function main() {
   // The sidecar keeps one dedicated token boundary even in local mode, so HotNow and the resolver
   // can later move apart without changing the contract.
   const app = createWechatResolverServer({
-    authToken: resolverToken
+    authToken: resolverToken,
+    publicBaseUrl: resolverBaseUrl
   });
 
   await app.listen({

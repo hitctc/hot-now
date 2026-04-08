@@ -61,7 +61,7 @@
 - `src/server/`
   负责页面路由、legacy 服务端渲染 HTML，以及 `/settings/*` 的客户端入口分发和系统页读模型 API。
 - `src/wechatResolver/`
-  负责本地开发时自动启动的公众号解析 sidecar；当前默认通过公开索引解析公众号名称，再把最终 `rss_url` 返回给主应用。
+  负责本地开发时自动启动的公众号解析 sidecar；当前默认先尝试公开索引，再用“文章页元数据 + 搜狗文章检索”做 fallback，最终把标准 `rss_url` 返回给主应用。
 - `tests/`
   负责单元测试与轻量集成测试。
 - `config/hot-now.config.json`

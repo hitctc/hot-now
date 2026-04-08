@@ -51,7 +51,7 @@ const sourcesPageMeta = {
   section: "system",
   navLabel: "数据收集",
   title: "数据收集",
-  description: "查看来源状态、采集动作和当前展示口径。"
+  description: "查看来源状态、维护自定义来源，并执行采集动作。"
 } as const satisfies ShellPageMeta;
 
 const profilePageMeta = {

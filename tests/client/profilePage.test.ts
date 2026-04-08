@@ -47,7 +47,7 @@ describe("ProfilePage", () => {
 
     await flushPromises();
 
-    expect(wrapper.get("[data-settings-intro='profile']").text()).toContain("Account Settings");
+    expect(wrapper.find("[data-settings-intro='profile']").exists()).toBe(false);
     expect(wrapper.get("[data-profile-section='overview']").findAll("article")).toHaveLength(3);
     expect(wrapper.get("[data-profile-section='summary']").text()).toContain("系统管理员");
     expect(wrapper.get("[data-profile-field='display-name']").text()).toBe("系统管理员");

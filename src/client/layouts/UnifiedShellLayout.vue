@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 
 import EditorialEmptyState from "../components/content/EditorialEmptyState.vue";
+import EditorialPageIntro from "../components/content/EditorialPageIntro.vue";
 import { useTheme, type ThemeMode } from "../composables/useTheme";
 import { HttpError, requestJson } from "../services/http";
 import { readSettingsProfile, type SettingsProfile } from "../services/settingsApi";
@@ -360,23 +361,11 @@ onBeforeUnmount(() => {
 
     <main class="min-w-0 flex-1">
       <div class="flex w-full flex-1 flex-col px-4 pb-10 pt-2 min-[901px]:px-6 min-[901px]:pt-5">
-        <header
-          class="flex w-full flex-col gap-2 border-b border-editorial-border pb-4 pt-2"
-          data-page-header
-        >
-          <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
-            {{ route.meta.navLabel }}
-          </p>
-          <h2
-            class="m-0 text-[32px] font-semibold tracking-[-0.03em] text-editorial-text-main"
-            data-page-header-title
-          >
-            {{ currentPageTitle }}
-          </h2>
-          <p class="m-0 text-sm leading-6 text-editorial-text-body" data-page-header-description>
-            {{ currentPageDescription }}
-          </p>
-        </header>
+        <EditorialPageIntro
+          :title="String(currentPageTitle)"
+          :description="String(currentPageDescription)"
+          tracking-prefix="page-header"
+        />
 
         <div class="w-full pt-6">
           <RouterView v-slot="{ Component }">
@@ -407,17 +396,12 @@ onBeforeUnmount(() => {
           @click.stop
         >
           <div class="flex flex-col gap-4">
-            <div class="flex flex-col gap-1.5">
-              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
-                系统菜单
-              </p>
-              <h2 class="m-0 text-lg font-semibold leading-tight text-editorial-text-main">
-                {{ currentPageTitle }}
-              </h2>
-              <p class="m-0 text-sm leading-6 text-editorial-text-body">
-                {{ currentPageDescription }}
-              </p>
-            </div>
+            <EditorialPageIntro
+              :title="String(currentPageTitle)"
+              :description="String(currentPageDescription)"
+              :compact="true"
+              tracking-prefix="mobile-page-header"
+            />
 
             <nav class="flex flex-col gap-1" aria-label="移动端系统菜单">
               <RouterLink

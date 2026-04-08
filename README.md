@@ -20,9 +20,11 @@ export AUTH_USERNAME="admin"
 export AUTH_PASSWORD="replace-with-strong-password"
 export SESSION_SECRET="replace-with-long-random-secret"
 export LLM_SETTINGS_MASTER_KEY="replace-with-local-master-key"
+export HOT_NOW_CLIENT_DEV_ORIGIN="http://127.0.0.1:5173"
 ```
 
 `LLM_SETTINGS_MASTER_KEY` 现在是可选覆盖项；如果你不单独配置，系统会回退使用 `SESSION_SECRET` 继续加密保存厂商 API key。
+`HOT_NOW_CLIENT_DEV_ORIGIN` 也是可选开发辅助项；`npm run dev` / `npm run dev:local` 会默认按这个地址拉起并接入 Vite dev server，让 `3030` 页面直接拿到 HMR 和 Vue DevTools。
 
 4. 如果这次改动涉及 unified shell 客户端页面，先构建最新客户端资源：`npm run build:client`
 5. 启动开发服务：
@@ -36,13 +38,24 @@ set +a
 npm run dev
 ```
 
+  这条命令现在会一起拉起 Fastify 和 Vite dev server；继续打开 `http://127.0.0.1:3030/...` 即可直接使用 Vue DevTools，不需要再手动开第二个终端。
+  如果仓库根目录存在 `.env.local`，`npm run dev` 会自动读取它；如果 `HOT_NOW_CLIENT_DEV_ORIGIN` 指向的端口上已经有 HotNow 的 Vite dev server，也会直接复用，不再因为 `5173` 已占用而退出。
+
+- 仅启动 Vite 客户端调试时：
+
+```bash
+npm run dev:client
+```
+
+  需要在浏览器里使用 Vue DevTools 点击组件并定位到源码时，优先用这条命令；当前项目会在 `dev:client` 下自动启用 `vite-plugin-vue-devtools`，生产构建不会注入这个调试工具。
+
 - 本地便捷方式：
 
 ```bash
 npm run dev:local
 ```
 
-`dev` 和 `dev:local` 现在都会先准备最新 client bundle，再启动 Fastify。`dev:local` 还会先检查本地 `3030` 端口；如果已有旧的开发监听进程占着这个端口，它会先停掉旧进程，再启动新的服务。
+`dev` 和 `dev:local` 现在都会先准备最新 client bundle，再同时启动 Fastify 和 Vite dev server。`dev` 会自动读取 `.env.local`（如果存在），并在 `HOT_NOW_CLIENT_DEV_ORIGIN` 上已经检测到 HotNow 的 Vite dev server 时直接复用；`dev:local` 则会先检查本地 `3030` 与 `5173` 端口，如果已有旧的开发监听进程占着这两个端口，会先停掉旧进程，再启动新的服务。
 
 QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 

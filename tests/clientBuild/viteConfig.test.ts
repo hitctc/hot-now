@@ -1,14 +1,38 @@
 import { describe, expect, it } from "vitest";
+import type { PluginOption } from "vite";
 
 import { CLIENT_ASSET_BASE } from "../../src/client/appBases";
-import viteConfig from "../../vite.config";
+import { createClientViteConfig } from "../../vite.config";
+
+function readPluginNames(plugins: PluginOption[] | undefined): string[] {
+  return (plugins ?? []).flatMap((plugin) => {
+    if (Array.isArray(plugin)) {
+      return plugin
+        .map((item) => item?.name)
+        .filter((name): name is string => typeof name === "string");
+    }
+
+    return typeof plugin?.name === "string" ? [plugin.name] : [];
+  });
+}
 
 describe("vite client config", () => {
+  it("enables vue devtools only for the dev server config", () => {
+    const serveConfig = createClientViteConfig({ command: "serve" });
+    const buildConfig = createClientViteConfig({ command: "build" });
+    const servePluginNames = readPluginNames(serveConfig.plugins);
+    const buildPluginNames = readPluginNames(buildConfig.plugins);
+
+    expect(servePluginNames.some((pluginName) => pluginName.includes("vue-devtools"))).toBe(true);
+    expect(buildPluginNames.some((pluginName) => pluginName.includes("vue-devtools"))).toBe(false);
+  });
+
   it("keeps the emitted asset base on /client/", () => {
-    expect(viteConfig.base).toBe(CLIENT_ASSET_BASE);
+    expect(createClientViteConfig({ command: "build" }).base).toBe(CLIENT_ASSET_BASE);
   });
 
   it("splits core vendors into dedicated chunks instead of leaving everything in the entry bundle", () => {
+    const viteConfig = createClientViteConfig({ command: "build" });
     const manualChunks = viteConfig.build?.rollupOptions?.output
       && !Array.isArray(viteConfig.build.rollupOptions.output)
       ? viteConfig.build.rollupOptions.output.manualChunks

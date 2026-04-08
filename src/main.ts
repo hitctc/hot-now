@@ -517,6 +517,7 @@ const triggerManualSendLatestEmail = config.manualActions.sendLatestEmailEnabled
 
 const app = createServer({
   config,
+  clientDevOrigin: process.env.HOT_NOW_CLIENT_DEV_ORIGIN?.trim() || undefined,
   auth: {
     requireLogin: true,
     sessionSecret: config.auth.sessionSecret,

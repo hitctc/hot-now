@@ -1,5 +1,6 @@
-import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
+import VueDevTools from "vite-plugin-vue-devtools";
+import { defineConfig, type PluginOption, type UserConfig } from "vite";
 import { CLIENT_ASSET_BASE } from "./src/client/appBases";
 
 // Vite 传进来的模块 ID 可能带平台分隔符，先统一成 POSIX 风格，后面的分组规则才不会漏判。
@@ -33,44 +34,54 @@ export function chunkClientDependency(id: string): string | undefined {
   return "vendor";
 }
 
-export default defineConfig({
-  root: "src/client",
-  base: CLIENT_ASSET_BASE,
-  plugins: [vue()],
-  build: {
-    outDir: "../../dist/client",
-    emptyOutDir: true,
-    // 路由和三方依赖已经按主职责拆开，剩下这块是共享 UI 运行时，这里把告警阈值放宽到当前项目接受的范围。
-    chunkSizeWarningLimit: 2000,
-    rollupOptions: {
-      output: {
-        manualChunks: chunkClientDependency
+// 这个插件只服务本地调试；生产构建不需要注入 devtools 客户端代码。
+function createClientPlugins(command: "serve" | "build"): PluginOption[] {
+  return command === "serve" ? [VueDevTools(), vue()] : [vue()];
+}
+
+// 把配置工厂导出来，方便测试直接校验开发态和构建态的差异。
+export function createClientViteConfig(options: { command: "serve" | "build" }): UserConfig {
+  return {
+    root: "src/client",
+    base: CLIENT_ASSET_BASE,
+    plugins: createClientPlugins(options.command),
+    build: {
+      outDir: "../../dist/client",
+      emptyOutDir: true,
+      // 路由和三方依赖已经按主职责拆开，剩下这块是共享 UI 运行时，这里把告警阈值放宽到当前项目接受的范围。
+      chunkSizeWarningLimit: 2000,
+      rollupOptions: {
+        output: {
+          manualChunks: chunkClientDependency
+        }
+      }
+    },
+    server: {
+      host: "127.0.0.1",
+      proxy: {
+        "/api": {
+          target: "http://127.0.0.1:3030",
+          changeOrigin: true
+        },
+        "/actions": {
+          target: "http://127.0.0.1:3030",
+          changeOrigin: true
+        },
+        "/health": {
+          target: "http://127.0.0.1:3030",
+          changeOrigin: true
+        },
+        "/login": {
+          target: "http://127.0.0.1:3030",
+          changeOrigin: true
+        },
+        "/logout": {
+          target: "http://127.0.0.1:3030",
+          changeOrigin: true
+        }
       }
     }
-  },
-  server: {
-    host: "127.0.0.1",
-    proxy: {
-      "/api": {
-        target: "http://127.0.0.1:3030",
-        changeOrigin: true
-      },
-      "/actions": {
-        target: "http://127.0.0.1:3030",
-        changeOrigin: true
-      },
-      "/health": {
-        target: "http://127.0.0.1:3030",
-        changeOrigin: true
-      },
-      "/login": {
-        target: "http://127.0.0.1:3030",
-        changeOrigin: true
-      },
-      "/logout": {
-        target: "http://127.0.0.1:3030",
-        changeOrigin: true
-      }
-    }
-  }
-});
+  };
+}
+
+export default defineConfig(({ command }) => createClientViteConfig({ command }));

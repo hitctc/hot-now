@@ -140,6 +140,21 @@ function readClientIndexHtml() {
   return readFileSync(fileURLToPath(new URL("../../dist/client/index.html", import.meta.url)), "utf8");
 }
 
+function createClientDevIndexHtml() {
+  return `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script type="module" src="/client/@vite/client"></script>
+    <script type="module" src="/client/main.ts"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>`;
+}
+
 function extractClientAssetPaths(html: string) {
   return [...html.matchAll(/\/client\/assets\/[^"' >]+\.(?:js|css)/g)].map((match) => match[0]);
 }
@@ -375,6 +390,37 @@ describe("createServer", () => {
     expect(shellResponse.body).not.toContain("系统管理员");
     expect(shellResponse.body).not.toContain("当前登录用户");
     expect(shellResponse.body).toBe(clientIndexHtml);
+  });
+
+  it("prefers the Vite dev client entry for content pages when a dev client origin is available", async () => {
+    const app = createServer({
+      clientDevOrigin: "http://127.0.0.1:5173",
+      readClientDevEntryHtml: vi.fn().mockResolvedValue(createClientDevIndexHtml()),
+      listContentView: vi.fn().mockResolvedValue([]),
+      listRatingDimensions: vi.fn().mockResolvedValue([])
+    });
+
+    const response = await app.inject({ method: "GET", url: "/ai-new" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('src="http://127.0.0.1:5173/client/@vite/client"');
+    expect(response.body).toContain('src="http://127.0.0.1:5173/client/main.ts"');
+    expect(response.body).not.toContain('/client/assets/');
+  });
+
+  it("falls back to the built client entry when the Vite dev client entry is unavailable", async () => {
+    const app = createServer({
+      clientDevOrigin: "http://127.0.0.1:5173",
+      readClientDevEntryHtml: vi.fn().mockResolvedValue(null),
+      listContentView: vi.fn().mockResolvedValue([]),
+      listRatingDimensions: vi.fn().mockResolvedValue([])
+    });
+
+    const response = await app.inject({ method: "GET", url: "/ai-new" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('/client/assets/');
+    expect(response.body).toContain('<script type="module" crossorigin src="/client/assets/');
   });
 
   it("serves built client assets under /client/assets and blocks path traversal", async () => {

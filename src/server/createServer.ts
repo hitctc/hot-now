@@ -125,6 +125,8 @@ type ContentPageModel = {
 
 type ServerDeps = {
   clientBuildRoot?: string;
+  clientDevOrigin?: string;
+  readClientDevEntryHtml?: () => Promise<string | null> | string | null;
   config?: Partial<RuntimeConfig>;
   listReportSummaries?: () => Promise<ReportSummary[]>;
   latestReportDate?: () => Promise<string | null>;
@@ -202,6 +204,7 @@ export function createServer(deps: ServerDeps = {}) {
   // Tests can override the client build root so missing-bundle scenarios do not mutate the process cwd.
   const clientBuildRoot = deps.clientBuildRoot ?? path.resolve(process.cwd(), "dist/client");
   const clientIndexPath = path.join(clientBuildRoot, "index.html");
+  const clientDevOrigin = normalizeClientDevOrigin(deps.clientDevOrigin ?? null);
 
   app.get("/health", async () => ({ ok: true }));
   app.get("/assets/site.css", async (_request, reply) => reply.type("text/css; charset=utf-8").send(siteCss));
@@ -356,11 +359,17 @@ export function createServer(deps: ServerDeps = {}) {
         }
 
         if (isClientSettingsPath(currentPage.path)) {
-          return serveClientSettingsShell(reply, clientIndexPath);
+          return await serveClientSettingsShell(reply, clientIndexPath, {
+            clientDevOrigin,
+            readClientDevEntryHtml: deps.readClientDevEntryHtml
+          });
         }
 
         if (currentPage.section === "content") {
-          return serveClientContentShell(reply, clientIndexPath);
+          return await serveClientContentShell(reply, clientIndexPath, {
+            clientDevOrigin,
+            readClientDevEntryHtml: deps.readClientDevEntryHtml
+          });
         }
 
         const contentHtml = await renderSystemPageForPath(deps, currentPage.path, Boolean(session));
@@ -393,11 +402,17 @@ export function createServer(deps: ServerDeps = {}) {
         }
 
         if (isClientSettingsPath(currentPage.path)) {
-          return serveClientSettingsShell(reply, clientIndexPath);
+          return await serveClientSettingsShell(reply, clientIndexPath, {
+            clientDevOrigin,
+            readClientDevEntryHtml: deps.readClientDevEntryHtml
+          });
         }
 
         if (currentPage.section === "content") {
-          return serveClientContentShell(reply, clientIndexPath);
+          return await serveClientContentShell(reply, clientIndexPath, {
+            clientDevOrigin,
+            readClientDevEntryHtml: deps.readClientDevEntryHtml
+          });
         }
 
         const contentHtml = await renderSystemPageForPath(deps, currentPage.path, false);
@@ -1154,7 +1169,19 @@ async function readSettingsProfileApiData(
   };
 }
 
-function readClientEntryHtml(clientIndexPath: string): string {
+async function readClientEntryHtml(
+  clientIndexPath: string,
+  options: {
+    clientDevOrigin: string | null;
+    readClientDevEntryHtml?: (() => Promise<string | null> | string | null) | undefined;
+  }
+): Promise<string> {
+  const devClientEntryHtml = await tryReadClientDevEntryHtml(options.clientDevOrigin, options.readClientDevEntryHtml);
+
+  if (devClientEntryHtml) {
+    return devClientEntryHtml;
+  }
+
   // Unified shell routes prefer the built client entry, but still need a readable fallback when the frontend bundle is absent.
   try {
     return readFileSync(clientIndexPath, "utf8");
@@ -1211,19 +1238,88 @@ function readClientEntryHtml(clientIndexPath: string): string {
   }
 }
 
+// 本地开发时允许 3030 页面直接借用 Vite dev server 的 HTML，这样入口路径不变也能拿到 HMR 和 Vue DevTools。
+async function tryReadClientDevEntryHtml(
+  clientDevOrigin: string | null,
+  readClientDevEntryHtml?: (() => Promise<string | null> | string | null) | undefined
+): Promise<string | null> {
+  if (!clientDevOrigin) {
+    return null;
+  }
+
+  const rawClientDevEntryHtml = readClientDevEntryHtml
+    ? await readClientDevEntryHtml()
+    : await fetchClientDevEntryHtml(clientDevOrigin);
+
+  if (!rawClientDevEntryHtml?.trim()) {
+    return null;
+  }
+
+  return rewriteClientDevEntryHtml(rawClientDevEntryHtml, clientDevOrigin);
+}
+
+// 这里只探测 Vite dev server 的根 HTML；失败时会自动回退到 dist/client，不把开发辅助能力变成硬依赖。
+async function fetchClientDevEntryHtml(clientDevOrigin: string): Promise<string | null> {
+  try {
+    const response = await fetch(`${clientDevOrigin}/client/`, {
+      headers: {
+        Accept: "text/html"
+      }
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return await response.text();
+  } catch {
+    return null;
+  }
+}
+
+// 开发态 HTML 会继续挂在 3030 域名下，所以这里把 /client/... 资源改写成 5173 绝对地址，避免还去命中构建产物。
+function rewriteClientDevEntryHtml(clientEntryHtml: string, clientDevOrigin: string): string {
+  const normalizedClientDevAssetBase = `${clientDevOrigin}/client/`;
+
+  return clientEntryHtml
+    .replaceAll('="/client/', `="${normalizedClientDevAssetBase}`)
+    .replaceAll("='/client/", `='${normalizedClientDevAssetBase}`);
+}
+
+// 开发态入口只接受 origin 级配置，尾部斜杠统一在这里收掉，后面拼接 /client/ 时就不会重复。
+function normalizeClientDevOrigin(clientDevOrigin: string | null): string | null {
+  const normalizedClientDevOrigin = clientDevOrigin?.trim().replace(/\/+$/, "") ?? "";
+
+  return normalizedClientDevOrigin ? normalizedClientDevOrigin : null;
+}
+
 function isClientSettingsPath(pathname: string) {
   // Settings routes still need a dedicated branch because legacy pages remain server-rendered.
   return pathname.startsWith("/settings/");
 }
 
-function serveClientSettingsShell(reply: FastifyReply, clientIndexPath: string) {
+async function serveClientSettingsShell(
+  reply: FastifyReply,
+  clientIndexPath: string,
+  options: {
+    clientDevOrigin: string | null;
+    readClientDevEntryHtml?: (() => Promise<string | null> | string | null) | undefined;
+  }
+) {
   // System pages should always render the latest available client entry.
-  return reply.type("text/html; charset=utf-8").send(readClientEntryHtml(clientIndexPath));
+  return reply.type("text/html; charset=utf-8").send(await readClientEntryHtml(clientIndexPath, options));
 }
 
-function serveClientContentShell(reply: FastifyReply, clientIndexPath: string) {
+async function serveClientContentShell(
+  reply: FastifyReply,
+  clientIndexPath: string,
+  options: {
+    clientDevOrigin: string | null;
+    readClientDevEntryHtml?: (() => Promise<string | null> | string | null) | undefined;
+  }
+) {
   // Content routes use the same live client entry and recover as soon as a client build exists.
-  return reply.type("text/html; charset=utf-8").send(readClientEntryHtml(clientIndexPath));
+  return reply.type("text/html; charset=utf-8").send(await readClientEntryHtml(clientIndexPath, options));
 }
 
 function normalizeClientAssetPath(rawAssetPath: string): string | null {

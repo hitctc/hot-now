@@ -368,6 +368,43 @@ describe("SourcesPage", () => {
     );
   });
 
+  it("renders custom source actions on the last line of the inventory entry", async () => {
+    vi.mocked(settingsApi.readSettingsSources).mockResolvedValue({
+      ...createSourcesModel(),
+      sources: [
+        ...createSourcesModel().sources,
+        {
+          kind: "wechat_demo",
+          name: "微信 Demo",
+          siteUrl: "https://mp.weixin.qq.com/",
+          rssUrl: "https://bridge.example.test/feed/demo.xml",
+          isEnabled: true,
+          isBuiltIn: false,
+          showAllWhenSelected: false,
+          sourceType: "wechat_bridge",
+          bridgeKind: "wechat2rss",
+          bridgeConfigSummary: "公众号文章链接",
+          bridgeInputMode: "article_url" as const,
+          bridgeInputValue: "https://mp.weixin.qq.com/s?__biz=abc",
+          lastCollectedAt: null,
+          lastCollectionStatus: null
+        }
+      ]
+    });
+
+    const wrapper = mountSourcesPage();
+    await flushPromises();
+
+    const sourceCell = wrapper.get("[data-source-cell='wechat_demo']");
+    const actionsRow = wrapper.get("[data-source-actions='wechat_demo']");
+
+    expect(sourceCell.get("[data-source-meta='wechat_demo']").text()).toContain("微信 Demo");
+    expect(sourceCell.get("[data-source-badges='wechat_demo']").text()).toContain("公众号桥接");
+    expect(actionsRow.text()).toContain("编辑");
+    expect(actionsRow.text()).toContain("删除");
+    expect(sourceCell.element.lastElementChild).toBe(actionsRow.element);
+  });
+
   it("falls back to feed-url mode and disables article-url mode when bridge capability is unavailable", async () => {
     vi.mocked(settingsApi.readSettingsSources).mockResolvedValue({
       ...createSourcesModel(),

@@ -733,12 +733,24 @@ onMounted(() => {
           >
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'name'">
-                <div class="flex flex-col items-center gap-2">
-                  <a-space direction="vertical" size="small">
+                <div
+                  :data-source-cell="record.kind"
+                  class="flex min-h-[7.5rem] flex-col items-center gap-2"
+                >
+                  <a-space
+                    direction="vertical"
+                    size="small"
+                    :data-source-meta="record.kind"
+                  >
                     <a-typography-text strong>{{ record.name }}</a-typography-text>
                     <a-typography-text type="secondary">{{ record.kind }}</a-typography-text>
                   </a-space>
-                  <a-space wrap size="small" class="justify-center">
+                  <a-space
+                    wrap
+                    size="small"
+                    class="justify-center"
+                    :data-source-badges="record.kind"
+                  >
                     <a-tag :color="record.sourceType === 'wechat_bridge' ? 'blue' : 'default'">
                       {{ record.sourceType === "wechat_bridge" ? "公众号桥接" : "RSS" }}
                     </a-tag>
@@ -746,7 +758,11 @@ onMounted(() => {
                       {{ record.bridgeConfigSummary }}
                     </a-typography-text>
                   </a-space>
-                  <div v-if="!record.isBuiltIn" class="flex flex-wrap justify-center gap-2">
+                  <div
+                    v-if="!record.isBuiltIn"
+                    :data-source-actions="record.kind"
+                    class="mt-auto flex flex-wrap justify-center gap-2"
+                  >
                     <a-button
                       type="link"
                       size="small"

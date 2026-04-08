@@ -3,7 +3,7 @@ import {
   resolveSourceUserInput,
   type SourceUserInput
 } from "./resolveSourceUserInput.js";
-import type { WechatBridgeRuntimeConfig } from "../wechat/wechatBridgeTypes.js";
+import type { WechatResolverRuntimeConfig } from "../wechat/wechatResolverClient.js";
 
 type BridgeFetch = typeof fetch;
 
@@ -17,9 +17,9 @@ export type SaveSourceResult =
         | "not-found"
         | "already-exists"
         | "built-in"
-        | "wechat-bridge-disabled"
-        | "wechat-bridge-not-found"
-        | "bridge-registration-failed"
+        | "wechat-resolver-disabled"
+        | "wechat-resolver-not-found"
+        | "resolver-unavailable"
         | "invalid-input"
         | "invalid-rss-feed";
     };
@@ -57,7 +57,7 @@ export async function saveSource(
   db: SqliteDatabase,
   input: SaveSourceInput,
   deps: {
-    wechatBridge: WechatBridgeRuntimeConfig | null;
+    wechatResolver: WechatResolverRuntimeConfig | null;
     fetch?: BridgeFetch;
   }
 ): Promise<SaveSourceResult> {
@@ -145,12 +145,16 @@ export async function saveSource(
       return { ok: true, kind: fields.kind };
     })(normalized);
   } catch (error) {
-    if (error instanceof Error && error.message === "wechat-bridge-disabled") {
-      return { ok: false, reason: "wechat-bridge-disabled" };
+    if (error instanceof Error && error.message === "wechat-resolver-disabled") {
+      return { ok: false, reason: "wechat-resolver-disabled" };
     }
 
-    if (error instanceof Error && error.message === "wechat-bridge-not-found") {
-      return { ok: false, reason: "wechat-bridge-not-found" };
+    if (error instanceof Error && error.message === "wechat-resolver-not-found") {
+      return { ok: false, reason: "wechat-resolver-not-found" };
+    }
+
+    if (error instanceof Error && error.message === "resolver-unavailable") {
+      return { ok: false, reason: "resolver-unavailable" };
     }
 
     if (error instanceof Error && error.message === "invalid-rss-feed") {
@@ -161,7 +165,7 @@ export async function saveSource(
       return { ok: false, reason: "invalid-input" };
     }
 
-    return { ok: false, reason: "bridge-registration-failed" };
+    return { ok: false, reason: "resolver-unavailable" };
   }
 }
 

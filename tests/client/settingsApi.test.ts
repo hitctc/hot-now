@@ -28,7 +28,7 @@ describe("settingsApi", () => {
       },
       capability: {
         wechatArticleUrlEnabled: false,
-        wechatArticleUrlMessage: "当前未配置 bridge 服务。"
+        wechatArticleUrlMessage: "当前未配置公众号 resolver。"
       }
     });
 

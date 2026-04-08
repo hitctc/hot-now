@@ -165,7 +165,7 @@ describe("listSourceCards", () => {
           bridge_kind,
           bridge_config_json
         )
-        VALUES (?, ?, ?, ?, 1, 0, 0, 'wechat_bridge', 'wechat2rss', ?)
+        VALUES (?, ?, ?, ?, 1, 0, 0, 'wechat_bridge', 'resolver', ?)
       `
     ).run(
       "wechat_demo",
@@ -175,7 +175,7 @@ describe("listSourceCards", () => {
       JSON.stringify({
         inputMode: "article_url",
         articleUrl: "https://mp.weixin.qq.com/s?__biz=abc",
-        resolvedFrom: "wechat2rss"
+        resolvedFrom: "resolved-via:article-url"
       })
     );
 
@@ -183,7 +183,7 @@ describe("listSourceCards", () => {
 
     expect(cards.find((card) => card.kind === "wechat_demo")).toMatchObject({
       sourceType: "wechat_bridge",
-      bridgeKind: "wechat2rss",
+      bridgeKind: "resolver",
       bridgeConfigSummary: "公众号文章链接",
       bridgeInputMode: "article_url",
       bridgeInputValue: "https://mp.weixin.qq.com/s?__biz=abc"
@@ -207,7 +207,7 @@ describe("listSourceCards", () => {
           bridge_kind,
           bridge_config_json
         )
-        VALUES (?, ?, ?, ?, 1, 0, 0, 'wechat_bridge', 'wechat2rss', ?)
+        VALUES (?, ?, ?, ?, 1, 0, 0, 'wechat_bridge', 'resolver', ?)
       `
     ).run(
       "wechat_lookup",
@@ -217,7 +217,7 @@ describe("listSourceCards", () => {
       JSON.stringify({
         inputMode: "name_lookup",
         wechatName: "数字生命卡兹克",
-        resolvedFrom: "wechat2rss"
+        resolvedFrom: "resolved-via:name-lookup"
       })
     );
 
@@ -225,7 +225,7 @@ describe("listSourceCards", () => {
 
     expect(cards.find((card) => card.kind === "wechat_lookup")).toMatchObject({
       sourceType: "wechat_bridge",
-      bridgeKind: "wechat2rss",
+      bridgeKind: "resolver",
       bridgeConfigSummary: "公众号名称检索",
       bridgeInputMode: "name_lookup",
       bridgeInputValue: "数字生命卡兹克"

@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import { readFeedMetadata } from "./readFeedMetadata.js";
-import { registerWechatBridgeSource } from "../wechat/registerWechatBridgeSource.js";
-import type { WechatBridgeRuntimeConfig } from "../wechat/wechatBridgeTypes.js";
+import {
+  resolveWechatSourceViaRelay,
+  type WechatResolverRuntimeConfig
+} from "../wechat/wechatResolverClient.js";
 
 type InputFetch = typeof fetch;
 
@@ -46,7 +48,7 @@ export type ResolvedSourceUserInput = {
   name: string;
   siteUrl: string;
   rssUrl: string;
-  bridgeKind: "wechat2rss" | null;
+  bridgeKind: "resolver" | null;
   bridgeConfigJson: string | null;
   isEnabled?: boolean;
   showAllWhenSelected?: boolean;
@@ -57,7 +59,7 @@ export type ResolvedSourceUserInput = {
 export async function resolveSourceUserInput(
   input: SourceUserInput,
   deps: {
-    wechatBridge: WechatBridgeRuntimeConfig | null;
+    wechatResolver: WechatResolverRuntimeConfig | null;
     fetch?: InputFetch;
   }
 ): Promise<ResolvedSourceUserInput> {
@@ -93,35 +95,40 @@ async function resolveRssInput(
 async function resolveWechatInput(
   input: Extract<SourceUserInput, { sourceType: "wechat_bridge" }>,
   deps: {
-    wechatBridge: WechatBridgeRuntimeConfig | null;
+    wechatResolver: WechatResolverRuntimeConfig | null;
     fetch?: InputFetch;
   }
 ): Promise<ResolvedSourceUserInput> {
   const name = normalizeDisplayName(input.wechatName);
-  const registered = await registerWechatBridgeSource(
-    input.articleUrl
-      ? {
-          bridgeKind: "wechat2rss",
-          inputMode: "article_url",
-          articleUrl: normalizeHttpUrl(input.articleUrl)
-        }
-      : {
-          bridgeKind: "wechat2rss",
-          inputMode: "name_lookup",
-          wechatName: name
-        },
-    deps
+
+  if (!deps.wechatResolver) {
+    throw new Error("wechat-resolver-disabled");
+  }
+
+  const normalizedArticleUrl = input.articleUrl ? normalizeHttpUrl(input.articleUrl) : undefined;
+  const resolved = await resolveWechatSourceViaRelay(
+    {
+      wechatName: name,
+      ...(normalizedArticleUrl ? { articleUrl: normalizedArticleUrl } : {})
+    },
+    deps.wechatResolver,
+    deps.fetch
   );
 
   return {
     mode: input.mode,
     sourceType: "wechat_bridge",
-    kind: input.mode === "update" ? normalizeKind(input.kind) : buildWechatKind(name),
-    name,
-    siteUrl: "https://mp.weixin.qq.com/",
-    rssUrl: registered.rssUrl,
-    bridgeKind: "wechat2rss",
-    bridgeConfigJson: registered.bridgeConfigJson,
+    kind: input.mode === "update" ? normalizeKind(input.kind) : buildWechatKind(resolved.resolvedName),
+    name: resolved.resolvedName,
+    siteUrl: resolved.siteUrl,
+    rssUrl: resolved.rssUrl,
+    bridgeKind: "resolver",
+    bridgeConfigJson: JSON.stringify({
+      inputMode: normalizedArticleUrl ? "article_url" : "name_lookup",
+      wechatName: name,
+      ...(normalizedArticleUrl ? { articleUrl: normalizedArticleUrl } : {}),
+      resolvedFrom: resolved.resolverSummary
+    }),
     isEnabled: input.isEnabled,
     showAllWhenSelected: input.showAllWhenSelected
   };

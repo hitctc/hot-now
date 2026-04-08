@@ -1051,16 +1051,16 @@ function sendSourceSaveResult(reply: FastifyReply, result: SaveSourceResult) {
       return reply.code(404).send({ ok: false, reason: "not-found" });
     }
 
-    if (result.reason === "wechat-bridge-disabled") {
-      return reply.code(503).send({ ok: false, reason: "wechat-bridge-disabled" });
+    if (result.reason === "wechat-resolver-disabled") {
+      return reply.code(503).send({ ok: false, reason: "wechat-resolver-disabled" });
     }
 
-    if (result.reason === "wechat-bridge-not-found") {
-      return reply.code(404).send({ ok: false, reason: "wechat-bridge-not-found" });
+    if (result.reason === "wechat-resolver-not-found") {
+      return reply.code(404).send({ ok: false, reason: "wechat-resolver-not-found" });
     }
 
-    if (result.reason === "bridge-registration-failed") {
-      return reply.code(502).send({ ok: false, reason: "bridge-registration-failed" });
+    if (result.reason === "resolver-unavailable") {
+      return reply.code(502).send({ ok: false, reason: "resolver-unavailable" });
     }
 
     if (result.reason === "invalid-rss-feed") {
@@ -1131,7 +1131,9 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
   const operationSummary = deps.getSourcesOperationSummary
     ? await deps.getSourcesOperationSummary()
     : { lastCollectionRunAt: null, lastSendLatestEmailAt: null };
-  const wechatBridgeConfigured = Boolean(deps.config?.wechatBridge?.baseUrl && deps.config?.wechatBridge?.token);
+  const wechatResolverConfigured = Boolean(
+    deps.config?.wechatResolver?.baseUrl && deps.config?.wechatResolver?.token
+  );
 
   return {
     sources,
@@ -1143,10 +1145,10 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
       isRunning: deps.isRunning?.() ?? false
     },
     capability: {
-      wechatArticleUrlEnabled: wechatBridgeConfigured,
-      wechatArticleUrlMessage: wechatBridgeConfigured
-        ? "当前已配置 bridge 服务，可直接填写公众号名称，或补一篇文章链接帮助系统更快定位来源。"
-        : "当前未配置 bridge 服务；RSS 仍可直接新增，但公众号来源暂时不可用。"
+      wechatArticleUrlEnabled: wechatResolverConfigured,
+      wechatArticleUrlMessage: wechatResolverConfigured
+        ? "当前已配置公众号 resolver，可直接填写公众号名称，或补一篇文章链接帮助系统更快定位来源。"
+        : "当前未配置公众号 resolver；RSS 仍可直接新增，但公众号来源暂时不可用。"
     }
   };
 }

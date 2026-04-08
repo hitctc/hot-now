@@ -588,11 +588,11 @@ const app = createServer({
   getSourcesOperationSummary: async () => readSourcesOperationSummary(db),
   createSource: async (input) =>
     await persistSource(db, input, {
-      wechatBridge: config.wechatBridge ?? null
+      wechatResolver: config.wechatResolver ?? null
     }),
   updateSource: async (input) =>
     await persistSource(db, input, {
-      wechatBridge: config.wechatBridge ?? null
+      wechatResolver: config.wechatResolver ?? null
     }),
   deleteSource: async (kind) => removeSource(db, kind),
   toggleSource: async (kind, enable) => persistSourceToggle(db, kind, enable),

@@ -106,7 +106,7 @@
 - `POST /actions/view-rules/provider-settings/delete`：删除指定厂商配置
 - `POST /actions/view-rules/nl-rules`：保存 `base / ai_new / ai_hot / hero` 四道门正式自然语言策略（每道门结构为 `enabled + ruleText`），并立即触发当前内容库全量重算；`hero` 只参与 `/` 与 `/ai-new` 的精选主卡挑选
 - `POST /actions/view-rules/nl-rules/cancel`：对正在运行的全量自然语言重算发送协作式中断请求；当前正在评估的内容会先完成，已跑完的结果继续生效
-- `POST /actions/sources/create`、`POST /actions/sources/update`、`POST /actions/sources/delete`：新增、编辑、删除自定义 source；当前支持普通 RSS 与 `wechat2rss` 桥接来源
+- `POST /actions/sources/create`、`POST /actions/sources/update`、`POST /actions/sources/delete`：新增、编辑、删除自定义 source；当前支持普通 RSS 与经 relay 解析的公众号来源
 - `POST /actions/feedback-pool/:id/create-draft`、`POST /actions/feedback-pool/:id/delete`、`POST /actions/feedback-pool/clear`：反馈池转草稿、删单条、清空全部
 - `POST /actions/strategy-drafts/:id/save`、`POST /actions/strategy-drafts/:id/delete`：草稿池保存与删除
 - 兼容约定：真实应用默认启用 `requireLogin=true` 的 unified shell；auth 开启时内容菜单仍允许匿名查看，但系统菜单、legacy 路由和所有写操作都需要登录；测试或未注入 auth 的场景仍可保持 legacy `/ -> 最新报告` 与 legacy 路由公开行为
@@ -188,8 +188,8 @@ SQLite 可靠性约定：
 - `SESSION_SECRET`
 - `LLM_SETTINGS_MASTER_KEY`
 - `HOT_NOW_CLIENT_DEV_ORIGIN`
-- `WECHAT_BRIDGE_BASE_URL`
-- `WECHAT_BRIDGE_TOKEN`
+- `WECHAT_RESOLVER_BASE_URL`
+- `WECHAT_RESOLVER_TOKEN`
 
 如果新增、删除或重命名环境变量，必须同步更新：
 

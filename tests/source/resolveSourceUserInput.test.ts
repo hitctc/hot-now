@@ -24,7 +24,7 @@ describe("resolveSourceUserInput", () => {
           sourceType: "rss",
           rssUrl: "https://example.com/feed.xml"
         },
-        { fetch: fetchMock, wechatBridge: null }
+        { fetch: fetchMock, wechatResolver: null }
       )
     ).resolves.toEqual(
       expect.objectContaining({
@@ -40,11 +40,21 @@ describe("resolveSourceUserInput", () => {
     );
   });
 
-  it("resolves simplified wechat input from article url", async () => {
+  it("resolves simplified wechat input from relay-backed article url", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ err: "", data: "https://bridge.example.test/feed/123.xml" }), {
-        status: 200
-      })
+      new Response(
+        JSON.stringify({
+          ok: true,
+          rssUrl: "https://resolver.example.test/feed/123.xml",
+          resolvedName: "数字生命卡兹克",
+          siteUrl: "https://mp.weixin.qq.com/",
+          resolverSummary: "resolved-via:article-url"
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        }
+      )
     );
 
     await expect(
@@ -57,7 +67,7 @@ describe("resolveSourceUserInput", () => {
         },
         {
           fetch: fetchMock,
-          wechatBridge: { baseUrl: "https://bridge.example.test", token: "secret-token" }
+          wechatResolver: { baseUrl: "https://resolver.example.test", token: "resolver-secret" }
         }
       )
     ).resolves.toEqual(
@@ -67,29 +77,37 @@ describe("resolveSourceUserInput", () => {
         kind: expect.stringMatching(/^wechat_[a-z0-9_]+$/),
         name: "数字生命卡兹克",
         siteUrl: "https://mp.weixin.qq.com/",
-        rssUrl: "https://bridge.example.test/feed/123.xml",
-        bridgeKind: "wechat2rss"
+        rssUrl: "https://resolver.example.test/feed/123.xml",
+        bridgeKind: "resolver"
       })
     );
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://bridge.example.test/addurl?url=https%3A%2F%2Fmp.weixin.qq.com%2Fs%3F__biz%3Dabc&k=secret-token"
+      "https://resolver.example.test/wechat/resolve-source",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "content-type": "application/json",
+          authorization: "Bearer resolver-secret"
+        }),
+        body: JSON.stringify({
+          wechatName: "数字生命卡兹克",
+          articleUrl: "https://mp.weixin.qq.com/s?__biz=abc"
+        })
+      })
     );
   });
 
-  it("resolves simplified wechat input from name lookup", async () => {
+  it("resolves simplified wechat input from relay-backed name lookup", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
-          err: "",
-          data: [
-            {
-              id: 12345,
-              name: "数字生命卡兹克",
-              link: "https://bridge.example.test/feed/987.xml"
-            }
-          ]
+          ok: true,
+          rssUrl: "https://resolver.example.test/feed/987.xml",
+          resolvedName: "数字生命卡兹克",
+          siteUrl: "https://mp.weixin.qq.com/",
+          resolverSummary: "resolved-via:name-lookup"
         }),
-        { status: 200 }
+        { status: 200, headers: { "content-type": "application/json" } }
       )
     );
 
@@ -102,7 +120,7 @@ describe("resolveSourceUserInput", () => {
         },
         {
           fetch: fetchMock,
-          wechatBridge: { baseUrl: "https://bridge.example.test", token: "secret-token" }
+          wechatResolver: { baseUrl: "https://resolver.example.test", token: "resolver-secret" }
         }
       )
     ).resolves.toEqual(
@@ -112,12 +130,22 @@ describe("resolveSourceUserInput", () => {
         kind: expect.stringMatching(/^wechat_[a-z0-9_]+$/),
         name: "数字生命卡兹克",
         siteUrl: "https://mp.weixin.qq.com/",
-        rssUrl: "https://bridge.example.test/feed/987.xml",
-        bridgeKind: "wechat2rss"
+        rssUrl: "https://resolver.example.test/feed/987.xml",
+        bridgeKind: "resolver"
       })
     );
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://bridge.example.test/list?name=%E6%95%B0%E5%AD%97%E7%94%9F%E5%91%BD%E5%8D%A1%E5%85%B9%E5%85%8B&k=secret-token"
+      "https://resolver.example.test/wechat/resolve-source",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "content-type": "application/json",
+          authorization: "Bearer resolver-secret"
+        }),
+        body: JSON.stringify({
+          wechatName: "数字生命卡兹克"
+        })
+      })
     );
   });
 });

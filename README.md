@@ -133,7 +133,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 ## 配置
 
 - `config/hot-now.config.json`：服务端口、`collectionSchedule` 采集周期、`mailSchedule` 发信时间、`manualActions` 手动动作开关、报告目录，以及兼容旧逻辑的 `source.rssUrl`
-- 环境变量：SMTP 主机、端口、发件人、授权码、收件人、网页基础地址、统一站点登录凭据与会话密钥、作为独立覆盖项的 `LLM_SETTINGS_MASTER_KEY`，以及用于微信公众号桥接来源的 `WECHAT_BRIDGE_BASE_URL`、`WECHAT_BRIDGE_TOKEN`
+- 环境变量：SMTP 主机、端口、发件人、授权码、收件人、网页基础地址、统一站点登录凭据与会话密钥、作为独立覆盖项的 `LLM_SETTINGS_MASTER_KEY`，以及用于微信公众号 relay 解析的 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`
 
 默认配置下：
 

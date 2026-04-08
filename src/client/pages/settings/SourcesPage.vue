@@ -75,7 +75,7 @@ const wechatArticleUrlAvailable = computed(
 const wechatArticleUrlMessage = computed(
   () =>
     sourcesModel.value?.capability.wechatArticleUrlMessage ??
-    "当前未配置 bridge 服务；RSS 仍可直接新增，但公众号来源暂时不可用。"
+    "当前未配置公众号 resolver；RSS 仍可直接新增，但公众号来源暂时不可用。"
 );
 
 // 页面提示统一通过一层 notice 管理，操作后同时保留页内 Alert 和全局 toast。
@@ -151,7 +151,7 @@ function openEditSourceModal(source: SettingsSourceItem): void {
   isSourceModalOpen.value = true;
 }
 
-// 关闭弹窗时顺手清掉局部错误，避免旧的 bridge 保存失败提示粘在下一次操作里。
+// 关闭弹窗时顺手清掉局部错误，避免旧的 resolver 保存失败提示粘在下一次操作里。
 function closeSourceModal(): void {
   isSourceModalOpen.value = false;
   sourceFormError.value = null;
@@ -444,7 +444,7 @@ async function handleManualSendLatestEmail(): Promise<void> {
   });
 }
 
-// 来源保存沿用现有 notice + toast 约定，同时把 bridge 失败原因翻译成工作台可读提示。
+// 来源保存沿用现有 notice + toast 约定，同时把 resolver 失败原因翻译成工作台可读提示。
 async function handleSubmitSource(): Promise<void> {
   if (isActionPending("source:submit")) {
     return;
@@ -489,9 +489,9 @@ async function handleSubmitSource(): Promise<void> {
         "built-in": "内置来源不允许编辑。",
         "invalid-input": "来源配置不合法，请检查后重试。",
         "invalid-rss-feed": "这个 RSS 地址暂时无法识别，请检查链接是否正确。",
-        "wechat-bridge-disabled": "当前未配置公众号 bridge 服务，暂时无法新增公众号来源。",
-        "wechat-bridge-not-found": "没有找到这个公众号的可用来源，请检查名称或补一篇文章链接。",
-        "bridge-registration-failed": "这篇文章暂时无法生成订阅源，请换一篇文章再试。"
+        "wechat-resolver-disabled": "当前未配置公众号 resolver，暂时无法新增公众号来源。",
+        "wechat-resolver-not-found": "没有找到这个公众号的可用来源，请检查名称或补一篇文章链接。",
+        "resolver-unavailable": "公众号解析服务暂时不可用，请稍后再试。"
       }
     );
 
@@ -708,7 +708,7 @@ onMounted(() => {
                     :data-source-badges="record.kind"
                   >
                     <a-tag :color="record.sourceType === 'wechat_bridge' ? 'blue' : 'default'">
-                      {{ record.sourceType === "wechat_bridge" ? "公众号桥接" : "RSS" }}
+                      {{ record.sourceType === "wechat_bridge" ? "公众号" : "RSS" }}
                     </a-tag>
                   </a-space>
                 </div>

@@ -97,7 +97,7 @@ function createSourcesModel() {
     },
     capability: {
       wechatArticleUrlEnabled: true,
-      wechatArticleUrlMessage: "当前已配置 bridge 服务，可直接填写公众号名称，或补一篇文章链接帮助系统更快定位来源。"
+      wechatArticleUrlMessage: "当前已配置公众号 resolver，可直接填写公众号名称，或补一篇文章链接帮助系统更快定位来源。"
     }
   } satisfies settingsApi.SettingsSourcesResponse;
 }
@@ -237,7 +237,7 @@ describe("SourcesPage", () => {
     expect(wrapper.text()).toContain("已关闭选中时全量展示");
   });
 
-  it("submits a wechat bridge source from the simplified modal", async () => {
+  it("submits a wechat source from the simplified modal", async () => {
     vi.mocked(settingsApi.readSettingsSources).mockResolvedValue(createSourcesModel());
     vi.mocked(settingsApi.createSource).mockResolvedValue({ ok: true, kind: "wechat_demo" });
 
@@ -288,7 +288,7 @@ describe("SourcesPage", () => {
     );
   });
 
-  it("updates a custom bridge source with the existing modal", async () => {
+  it("updates a custom wechat source with the existing modal", async () => {
     vi.mocked(settingsApi.readSettingsSources).mockResolvedValue({
       ...createSourcesModel(),
       sources: [
@@ -302,7 +302,7 @@ describe("SourcesPage", () => {
           isBuiltIn: false,
           showAllWhenSelected: false,
           sourceType: "wechat_bridge",
-          bridgeKind: "wechat2rss",
+          bridgeKind: "resolver",
           bridgeConfigSummary: "公众号文章链接",
           bridgeInputMode: "article_url" as const,
           bridgeInputValue: "https://mp.weixin.qq.com/s?__biz=abc",
@@ -347,7 +347,7 @@ describe("SourcesPage", () => {
           isBuiltIn: false,
           showAllWhenSelected: false,
           sourceType: "wechat_bridge",
-          bridgeKind: "wechat2rss",
+          bridgeKind: "resolver",
           bridgeConfigSummary: "公众号文章链接",
           bridgeInputMode: "article_url" as const,
           bridgeInputValue: "https://mp.weixin.qq.com/s?__biz=abc",
@@ -365,7 +365,7 @@ describe("SourcesPage", () => {
     const inventoryHeaderCells = wrapper.get("[data-sources-section='inventory']").findAll("thead th");
 
     expect(sourceCell.get("[data-source-meta='wechat_demo']").text()).toContain("微信 Demo");
-    expect(sourceCell.get("[data-source-badges='wechat_demo']").text()).toContain("公众号桥接");
+    expect(sourceCell.get("[data-source-badges='wechat_demo']").text()).toContain("公众号");
     expect(sourceCell.text()).not.toContain("编辑");
     expect(sourceCell.text()).not.toContain("删除");
     expect(actionsRow.text()).toContain("编辑");
@@ -409,7 +409,7 @@ describe("SourcesPage", () => {
             isBuiltIn: false,
             showAllWhenSelected: false,
             sourceType: "wechat_bridge",
-            bridgeKind: "wechat2rss",
+            bridgeKind: "resolver",
             bridgeConfigSummary: "公众号文章链接",
             bridgeInputMode: "article_url" as const,
             bridgeInputValue: "https://mp.weixin.qq.com/s?__biz=abc",

@@ -41,8 +41,9 @@ export type RuntimeConfig = {
     // LLM master key, otherwise reuse the local session secret as the fallback secret.
     settingsMasterKey: string | null;
   };
-  wechatBridge?: {
-    // Source saves only need one bridge endpoint and token to translate article URLs into feeds.
+  wechatResolver?: {
+    // Wechat source saves only need one internal resolver endpoint and token; third-party providers
+    // stay behind that relay so local runtime never talks to them directly.
     baseUrl: string;
     token: string;
   } | null;

@@ -20,8 +20,8 @@ export async function loadRuntimeConfig(options: Options = {}): Promise<RuntimeC
   const databaseFile = path.resolve(path.dirname(configPath), fileConfig.database.file);
   const smtpPort = parseSmtpPort(required(env.SMTP_PORT, "SMTP_PORT"));
   const smtpSecure = parseSmtpSecure(required(env.SMTP_SECURE, "SMTP_SECURE"));
-  const wechatBridgeBaseUrl = env.WECHAT_BRIDGE_BASE_URL?.trim();
-  const wechatBridgeToken = env.WECHAT_BRIDGE_TOKEN?.trim();
+  const wechatResolverBaseUrl = env.WECHAT_RESOLVER_BASE_URL?.trim();
+  const wechatResolverToken = env.WECHAT_RESOLVER_TOKEN?.trim();
 
   return {
     ...fileConfig,
@@ -54,13 +54,13 @@ export async function loadRuntimeConfig(options: Options = {}): Promise<RuntimeC
       // override the shared session secret while missing env falls back to SESSION_SECRET.
       settingsMasterKey: env.LLM_SETTINGS_MASTER_KEY ?? required(env.SESSION_SECRET, "SESSION_SECRET")
     },
-    wechatBridge:
-      // Bridge registration is optional: direct feed URLs should keep working even when article-link
-      // registration is not configured in the current environment.
-      wechatBridgeBaseUrl && wechatBridgeToken
+    wechatResolver:
+      // Wechat source resolution stays optional: RSS sources still work when the internal resolver
+      // is not configured in the current environment.
+      wechatResolverBaseUrl && wechatResolverToken
         ? {
-            baseUrl: wechatBridgeBaseUrl,
-            token: wechatBridgeToken
+            baseUrl: wechatResolverBaseUrl,
+            token: wechatResolverToken
           }
         : null
   };

@@ -53,7 +53,8 @@ const inventoryColumns = [
   { title: "启用", key: "enabled", align: "center" as const },
   { title: "最近抓取时间", key: "lastCollectedAt", align: "center" as const },
   { title: "最近抓取状态", key: "lastCollectionStatus", align: "center" as const },
-  { title: "RSS", key: "rssUrl", align: "center" as const }
+  { title: "RSS", key: "rssUrl", align: "center" as const },
+  { title: "操作", key: "actions", align: "center" as const }
 ];
 
 const isLoading = ref(true);
@@ -735,7 +736,7 @@ onMounted(() => {
               <template v-if="column.key === 'name'">
                 <div
                   :data-source-cell="record.kind"
-                  class="flex min-h-[7.5rem] flex-col items-center gap-2"
+                  class="flex flex-col items-center gap-2"
                 >
                   <a-space
                     direction="vertical"
@@ -758,11 +759,14 @@ onMounted(() => {
                       {{ record.bridgeConfigSummary }}
                     </a-typography-text>
                   </a-space>
-                  <div
-                    v-if="!record.isBuiltIn"
-                    :data-source-actions="record.kind"
-                    class="mt-auto flex flex-wrap justify-center gap-2"
-                  >
+                </div>
+              </template>
+              <template v-else-if="column.key === 'actions'">
+                <div
+                  v-if="!record.isBuiltIn"
+                  :data-source-actions="record.kind"
+                  class="flex flex-wrap justify-center gap-2"
+                >
                     <a-button
                       type="link"
                       size="small"
@@ -781,8 +785,8 @@ onMounted(() => {
                     >
                       删除
                     </a-button>
-                  </div>
                 </div>
+                <span v-else class="text-editorial-text-muted">-</span>
               </template>
               <template v-else-if="column.key === 'enabled'">
                 <a-switch

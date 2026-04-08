@@ -368,7 +368,7 @@ describe("SourcesPage", () => {
     );
   });
 
-  it("renders custom source actions on the last line of the inventory entry", async () => {
+  it("renders custom source actions in the last inventory column", async () => {
     vi.mocked(settingsApi.readSettingsSources).mockResolvedValue({
       ...createSourcesModel(),
       sources: [
@@ -397,12 +397,15 @@ describe("SourcesPage", () => {
 
     const sourceCell = wrapper.get("[data-source-cell='wechat_demo']");
     const actionsRow = wrapper.get("[data-source-actions='wechat_demo']");
+    const inventoryHeaderCells = wrapper.get("[data-sources-section='inventory']").findAll("thead th");
 
     expect(sourceCell.get("[data-source-meta='wechat_demo']").text()).toContain("微信 Demo");
     expect(sourceCell.get("[data-source-badges='wechat_demo']").text()).toContain("公众号桥接");
+    expect(sourceCell.text()).not.toContain("编辑");
+    expect(sourceCell.text()).not.toContain("删除");
     expect(actionsRow.text()).toContain("编辑");
     expect(actionsRow.text()).toContain("删除");
-    expect(sourceCell.element.lastElementChild).toBe(actionsRow.element);
+    expect(inventoryHeaderCells.at(-1)?.text()).toContain("操作");
   });
 
   it("falls back to feed-url mode and disables article-url mode when bridge capability is unavailable", async () => {

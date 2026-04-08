@@ -768,8 +768,11 @@ onMounted(() => {
                 <a
                   v-if="record.rssUrl"
                   :href="record.rssUrl"
+                  :title="record.rssUrl"
                   target="_blank"
                   rel="noreferrer"
+                  :data-source-rss-link="record.kind"
+                  class="inline-block max-w-[240px] truncate align-middle text-left"
                 >
                   {{ record.rssUrl }}
                 </a>

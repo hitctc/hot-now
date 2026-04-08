@@ -160,6 +160,11 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-sources-section='inventory']").classes()).toContain("bg-editorial-panel");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("已完成");
     expect(wrapper.get("[data-sources-section='inventory']").text()).not.toContain("选中时全量");
+    expect(wrapper.get("[data-source-rss-link='openai']").attributes("href")).toBe("https://openai.com/news/rss.xml");
+    expect(wrapper.get("[data-source-rss-link='openai']").attributes("title")).toBe("https://openai.com/news/rss.xml");
+    expect(wrapper.get("[data-source-rss-link='openai']").classes()).toEqual(
+      expect.arrayContaining(["inline-block", "truncate", "text-left"])
+    );
 
     const analyticsHeaderCells = wrapper.get("[data-sources-section='analytics']").findAll("thead th");
     const inventoryHeaderCells = wrapper.get("[data-sources-section='inventory']").findAll("thead th");

@@ -247,6 +247,8 @@ describe("SourcesPage", () => {
     await wrapper.get("[data-action='add-source']").trigger("click");
     await flushPromises();
 
+    expect(document.body.querySelector(".ant-modal-root")).not.toBeNull();
+
     await getModalNode("[data-source-type='wechat_bridge']").trigger("click");
     await getModalNode("[data-bridge-input-mode='article_url']").trigger("click");
     await getModalNode("[data-source-form='kind']").setValue("wechat_demo");

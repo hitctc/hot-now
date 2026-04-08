@@ -68,7 +68,7 @@ type SourceCard = {
   sourceType: string;
   bridgeKind: string | null;
   bridgeConfigSummary: string | null;
-  bridgeInputMode: "feed_url" | "article_url" | null;
+  bridgeInputMode: "feed_url" | "article_url" | "name_lookup" | null;
   bridgeInputValue: string | null;
   lastCollectedAt: string | null;
   lastCollectionStatus: string | null;
@@ -883,13 +883,13 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.code(503).send({ ok: false, reason: "sources-disabled" });
     }
 
-    const payload = parseSourceSavePayload(request.body);
+    const payload = parseSourceSavePayload(request.body, "create");
 
     if (!payload) {
       return reply.code(400).send({ ok: false, reason: "invalid-source-payload" });
     }
 
-    const result = await deps.createSource({ ...payload, mode: "create" });
+    const result = await deps.createSource(payload);
     return sendSourceSaveResult(reply, result);
   });
 
@@ -902,13 +902,13 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.code(503).send({ ok: false, reason: "sources-disabled" });
     }
 
-    const payload = parseSourceSavePayload(request.body);
+    const payload = parseSourceSavePayload(request.body, "update");
 
     if (!payload) {
       return reply.code(400).send({ ok: false, reason: "invalid-source-payload" });
     }
 
-    const result = await deps.updateSource({ ...payload, mode: "update" });
+    const result = await deps.updateSource(payload);
     return sendSourceSaveResult(reply, result);
   });
 
@@ -974,20 +974,16 @@ export function createServer(deps: ServerDeps = {}) {
   return app;
 }
 
-function parseSourceSavePayload(body: unknown): SaveSourceInput | null {
+function parseSourceSavePayload(
+  body: unknown,
+  mode: "create" | "update"
+): SaveSourceInput | null {
   if (!body || typeof body !== "object") {
     return null;
   }
 
   const payload = body as Record<string, unknown>;
   const sourceType = typeof payload.sourceType === "string" ? payload.sourceType.trim() : "";
-  const kind = typeof payload.kind === "string" ? payload.kind.trim() : "";
-  const name = typeof payload.name === "string" ? payload.name.trim() : "";
-  const siteUrl = typeof payload.siteUrl === "string" ? payload.siteUrl.trim() : "";
-
-  if (!kind || !name || !siteUrl) {
-    return null;
-  }
 
   if (sourceType === "rss") {
     const rssUrl = typeof payload.rssUrl === "string" ? payload.rssUrl.trim() : "";
@@ -996,12 +992,22 @@ function parseSourceSavePayload(body: unknown): SaveSourceInput | null {
       return null;
     }
 
+    const kind = typeof payload.kind === "string" ? payload.kind.trim() : "";
+
+    if (mode === "update") {
+      return kind
+        ? {
+            mode: "update",
+            sourceType: "rss",
+            kind,
+            rssUrl
+          }
+        : null;
+    }
+
     return {
       mode: "create",
       sourceType: "rss",
-      kind,
-      name,
-      siteUrl,
       rssUrl
     };
   }
@@ -1010,52 +1016,33 @@ function parseSourceSavePayload(body: unknown): SaveSourceInput | null {
     return null;
   }
 
-  const bridgeKind = typeof payload.bridgeKind === "string" ? payload.bridgeKind.trim() : "";
-  const inputMode = typeof payload.inputMode === "string" ? payload.inputMode.trim() : "";
+  const wechatName = typeof payload.wechatName === "string" ? payload.wechatName.trim() : "";
 
-  if (bridgeKind !== "wechat2rss") {
+  if (!wechatName) {
     return null;
   }
 
-  if (inputMode === "feed_url") {
-    const feedUrl = typeof payload.feedUrl === "string" ? payload.feedUrl.trim() : "";
+  const articleUrl = typeof payload.articleUrl === "string" ? payload.articleUrl.trim() : "";
+  const kind = typeof payload.kind === "string" ? payload.kind.trim() : "";
 
-    if (!feedUrl) {
-      return null;
-    }
-
-    return {
-      mode: "create",
-      sourceType: "wechat_bridge",
-      kind,
-      name,
-      siteUrl,
-      bridgeKind: "wechat2rss",
-      inputMode: "feed_url",
-      feedUrl
-    };
+  if (mode === "update") {
+    return kind
+      ? {
+          mode: "update",
+          sourceType: "wechat_bridge",
+          kind,
+          wechatName,
+          ...(articleUrl ? { articleUrl } : {})
+        }
+      : null;
   }
 
-  if (inputMode === "article_url") {
-    const articleUrl = typeof payload.articleUrl === "string" ? payload.articleUrl.trim() : "";
-
-    if (!articleUrl) {
-      return null;
-    }
-
-    return {
-      mode: "create",
-      sourceType: "wechat_bridge",
-      kind,
-      name,
-      siteUrl,
-      bridgeKind: "wechat2rss",
-      inputMode: "article_url",
-      articleUrl
-    };
-  }
-
-  return null;
+  return {
+    mode: "create",
+    sourceType: "wechat_bridge",
+    wechatName,
+    ...(articleUrl ? { articleUrl } : {})
+  };
 }
 
 function sendSourceSaveResult(reply: FastifyReply, result: SaveSourceResult) {
@@ -1068,8 +1055,16 @@ function sendSourceSaveResult(reply: FastifyReply, result: SaveSourceResult) {
       return reply.code(503).send({ ok: false, reason: "wechat-bridge-disabled" });
     }
 
+    if (result.reason === "wechat-bridge-not-found") {
+      return reply.code(404).send({ ok: false, reason: "wechat-bridge-not-found" });
+    }
+
     if (result.reason === "bridge-registration-failed") {
       return reply.code(502).send({ ok: false, reason: "bridge-registration-failed" });
+    }
+
+    if (result.reason === "invalid-rss-feed") {
+      return reply.code(400).send({ ok: false, reason: "invalid-rss-feed" });
     }
 
     return reply.code(409).send({ ok: false, reason: result.reason });
@@ -1150,8 +1145,8 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
     capability: {
       wechatArticleUrlEnabled: wechatBridgeConfigured,
       wechatArticleUrlMessage: wechatBridgeConfigured
-        ? "当前已配置 bridge 服务，可直接粘贴公众号文章链接自动生成 feed。"
-        : "当前未配置 bridge 服务；你仍可新增 RSS 或填写现成 feed URL，但“公众号文章链接”模式暂不可用。"
+        ? "当前已配置 bridge 服务，可直接填写公众号名称，或补一篇文章链接帮助系统更快定位来源。"
+        : "当前未配置 bridge 服务；RSS 仍可直接新增，但公众号来源暂时不可用。"
     }
   };
 }

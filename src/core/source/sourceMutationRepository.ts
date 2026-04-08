@@ -1,48 +1,28 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
-import { registerWechatBridgeSource } from "../wechat/registerWechatBridgeSource.js";
+import {
+  resolveSourceUserInput,
+  type SourceUserInput
+} from "./resolveSourceUserInput.js";
 import type { WechatBridgeRuntimeConfig } from "../wechat/wechatBridgeTypes.js";
 
 type BridgeFetch = typeof fetch;
 
-export type SaveSourceInput =
-  | {
-      mode: "create" | "update";
-      sourceType: "rss";
-      kind: string;
-      name: string;
-      siteUrl: string;
-      rssUrl: string;
-      isEnabled?: boolean;
-      showAllWhenSelected?: boolean;
-    }
-  | {
-      mode: "create" | "update";
-      sourceType: "wechat_bridge";
-      kind: string;
-      name: string;
-      siteUrl: string;
-      bridgeKind: "wechat2rss";
-      inputMode: "feed_url";
-      feedUrl: string;
-      isEnabled?: boolean;
-      showAllWhenSelected?: boolean;
-    }
-  | {
-      mode: "create" | "update";
-      sourceType: "wechat_bridge";
-      kind: string;
-      name: string;
-      siteUrl: string;
-      bridgeKind: "wechat2rss";
-      inputMode: "article_url";
-      articleUrl: string;
-      isEnabled?: boolean;
-      showAllWhenSelected?: boolean;
-    };
+export type SaveSourceInput = SourceUserInput;
 
 export type SaveSourceResult =
   | { ok: true; kind: string }
-  | { ok: false; reason: "not-found" | "already-exists" | "built-in" | "wechat-bridge-disabled" | "bridge-registration-failed" | "invalid-input" };
+  | {
+      ok: false;
+      reason:
+        | "not-found"
+        | "already-exists"
+        | "built-in"
+        | "wechat-bridge-disabled"
+        | "wechat-bridge-not-found"
+        | "bridge-registration-failed"
+        | "invalid-input"
+        | "invalid-rss-feed";
+    };
 
 export type DeleteSourceResult =
   | { ok: true; kind: string }
@@ -71,8 +51,8 @@ type PersistedSourceFields = {
   showAllWhenSelected?: boolean;
 };
 
-// Save centralizes custom source persistence so the rest of the app can treat create and update
-// as one validated operation, including bridge registration when needed.
+// Save centralizes custom source persistence so the rest of the app can accept tiny user-facing
+// payloads while this repository resolves and stores the full source row in one transaction.
 export async function saveSource(
   db: SqliteDatabase,
   input: SaveSourceInput,
@@ -82,7 +62,7 @@ export async function saveSource(
   }
 ): Promise<SaveSourceResult> {
   try {
-    const normalized = await normalizePersistedSourceFields(input, deps);
+    const normalized = await resolveSourceUserInput(input, deps);
 
     return db.transaction((fields: PersistedSourceFields): SaveSourceResult => {
       const existing = readSourceRowByKind(db, fields.kind);
@@ -169,6 +149,14 @@ export async function saveSource(
       return { ok: false, reason: "wechat-bridge-disabled" };
     }
 
+    if (error instanceof Error && error.message === "wechat-bridge-not-found") {
+      return { ok: false, reason: "wechat-bridge-not-found" };
+    }
+
+    if (error instanceof Error && error.message === "invalid-rss-feed") {
+      return { ok: false, reason: "invalid-rss-feed" };
+    }
+
     if (error instanceof Error && error.message === "invalid-input") {
       return { ok: false, reason: "invalid-input" };
     }
@@ -253,46 +241,6 @@ export function updateSourceDisplayMode(
   })(normalizeSourceKind(kind), showAllWhenSelected);
 }
 
-async function normalizePersistedSourceFields(
-  input: SaveSourceInput,
-  deps: {
-    wechatBridge: WechatBridgeRuntimeConfig | null;
-    fetch?: BridgeFetch;
-  }
-): Promise<PersistedSourceFields> {
-  const kind = normalizeSourceKind(input.kind);
-  const name = normalizeRequiredText(input.name);
-  const siteUrl = normalizeHttpUrl(input.siteUrl);
-
-  if (input.sourceType === "rss") {
-    return {
-      kind,
-      name,
-      siteUrl,
-      rssUrl: normalizeHttpUrl(input.rssUrl),
-      sourceType: "rss",
-      bridgeKind: null,
-      bridgeConfigJson: null,
-      isEnabled: input.isEnabled,
-      showAllWhenSelected: input.showAllWhenSelected
-    };
-  }
-
-  const registered = await registerWechatBridgeSource(input, deps);
-
-  return {
-    kind,
-    name,
-    siteUrl,
-    rssUrl: registered.rssUrl,
-    sourceType: "wechat_bridge",
-    bridgeKind: input.bridgeKind,
-    bridgeConfigJson: registered.bridgeConfigJson,
-    isEnabled: input.isEnabled,
-    showAllWhenSelected: input.showAllWhenSelected
-  };
-}
-
 function readSourceRowByKind(db: SqliteDatabase, kind: string): SourceRow | undefined {
   return db
     .prepare(
@@ -316,35 +264,4 @@ function normalizeSourceKind(value: string): string {
   }
 
   return normalized;
-}
-
-function normalizeRequiredText(value: string): string {
-  const normalized = value.trim();
-
-  if (!normalized) {
-    throw new Error("invalid-input");
-  }
-
-  return normalized;
-}
-
-function normalizeHttpUrl(value: string): string {
-  const normalized = value.trim();
-
-  if (!normalized) {
-    throw new Error("invalid-input");
-  }
-
-  let url: URL;
-  try {
-    url = new URL(normalized);
-  } catch {
-    throw new Error("invalid-input");
-  }
-
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("invalid-input");
-  }
-
-  return url.toString();
 }

@@ -15,23 +15,35 @@ describe("sourceMutationRepository", () => {
   it("creates a bridge source from an existing feed url", async () => {
     const handle = await createTestDatabase("hot-now-feed-url-source-");
     handles.push(handle);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            err: "",
+            data: [{ id: 12345, name: "微信 Demo", link: "https://bridge.example.test/feed/demo.xml" }]
+          }),
+          { status: 200 }
+        )
+      );
 
     const result = await saveSource(
       handle.db,
       {
         mode: "create",
         sourceType: "wechat_bridge",
-        kind: "wechat_demo",
-        name: "微信 Demo",
-        siteUrl: "https://mp.weixin.qq.com/",
-        bridgeKind: "wechat2rss",
-        inputMode: "feed_url",
-        feedUrl: "https://bridge.example.test/feed/demo.xml"
+        wechatName: "微信 Demo"
       },
-      { wechatBridge: null }
+      {
+        wechatBridge: { baseUrl: "https://bridge.example.test", token: "secret-token" },
+        fetch: fetchMock
+      }
     );
 
     expect(result).toEqual({ ok: true, kind: "wechat_demo" });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://bridge.example.test/list?name=%E5%BE%AE%E4%BF%A1%20Demo&k=secret-token"
+    );
     expect(
       handle.db
         .prepare("SELECT source_type, rss_url, bridge_kind, bridge_config_json FROM content_sources WHERE kind = ?")
@@ -41,8 +53,9 @@ describe("sourceMutationRepository", () => {
       rss_url: "https://bridge.example.test/feed/demo.xml",
       bridge_kind: "wechat2rss",
       bridge_config_json: JSON.stringify({
-        inputMode: "feed_url",
-        feedUrl: "https://bridge.example.test/feed/demo.xml"
+        inputMode: "name_lookup",
+        wechatName: "微信 Demo",
+        resolvedFrom: "wechat2rss"
       })
     });
   });
@@ -59,11 +72,7 @@ describe("sourceMutationRepository", () => {
       {
         mode: "create",
         sourceType: "wechat_bridge",
-        kind: "wechat_demo",
-        name: "微信 Demo",
-        siteUrl: "https://mp.weixin.qq.com/",
-        bridgeKind: "wechat2rss",
-        inputMode: "article_url",
+        wechatName: "微信 Demo",
         articleUrl: "https://mp.weixin.qq.com/s?__biz=abc"
       },
       {
@@ -99,11 +108,7 @@ describe("sourceMutationRepository", () => {
       {
         mode: "create",
         sourceType: "wechat_bridge",
-        kind: "wechat_demo",
-        name: "微信 Demo",
-        siteUrl: "https://mp.weixin.qq.com/",
-        bridgeKind: "wechat2rss",
-        inputMode: "article_url",
+        wechatName: "微信 Demo",
         articleUrl: "https://mp.weixin.qq.com/s?__biz=abc"
       },
       { wechatBridge: null }
@@ -121,14 +126,25 @@ describe("sourceMutationRepository", () => {
       {
         mode: "create",
         sourceType: "rss",
-        kind: "custom_demo",
-        name: "自定义源",
-        siteUrl: "https://example.com",
         rssUrl: "https://example.com/feed.xml",
         isEnabled: false,
         showAllWhenSelected: true
       },
-      { wechatBridge: null }
+      {
+        wechatBridge: null,
+        fetch: vi.fn().mockResolvedValue(
+          new Response(
+            `<?xml version="1.0" encoding="UTF-8"?>
+            <rss version="2.0">
+              <channel>
+                <title>Custom Demo</title>
+                <link>https://example.com/home</link>
+              </channel>
+            </rss>`,
+            { status: 200 }
+          )
+        )
+      }
     );
 
     const result = await saveSource(
@@ -137,11 +153,23 @@ describe("sourceMutationRepository", () => {
         mode: "update",
         sourceType: "rss",
         kind: "custom_demo",
-        name: "自定义源新名字",
-        siteUrl: "https://example.com/home",
         rssUrl: "https://example.com/feed-2.xml"
       },
-      { wechatBridge: null }
+      {
+        wechatBridge: null,
+        fetch: vi.fn().mockResolvedValue(
+          new Response(
+            `<?xml version="1.0" encoding="UTF-8"?>
+            <rss version="2.0">
+              <channel>
+                <title>Custom Demo Updated</title>
+                <link>https://example.com/home</link>
+              </channel>
+            </rss>`,
+            { status: 200 }
+          )
+        )
+      }
     );
 
     expect(result).toEqual({ ok: true, kind: "custom_demo" });
@@ -152,7 +180,7 @@ describe("sourceMutationRepository", () => {
         )
         .get("custom_demo")
     ).toEqual({
-      name: "自定义源新名字",
+      name: "Custom Demo Updated",
       site_url: "https://example.com/home",
       rss_url: "https://example.com/feed-2.xml",
       is_enabled: 0,
@@ -169,12 +197,23 @@ describe("sourceMutationRepository", () => {
       {
         mode: "create",
         sourceType: "rss",
-        kind: "custom_demo",
-        name: "自定义源",
-        siteUrl: "https://example.com",
         rssUrl: "https://example.com/feed.xml"
       },
-      { wechatBridge: null }
+      {
+        wechatBridge: null,
+        fetch: vi.fn().mockResolvedValue(
+          new Response(
+            `<?xml version="1.0" encoding="UTF-8"?>
+            <rss version="2.0">
+              <channel>
+                <title>Custom Demo</title>
+                <link>https://example.com</link>
+              </channel>
+            </rss>`,
+            { status: 200 }
+          )
+        )
+      }
     );
     insertTestContentItem(handle.db, {
       sourceKind: "custom_demo",

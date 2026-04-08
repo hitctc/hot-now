@@ -31,7 +31,7 @@ export type SourceCard = {
   sourceType: string;
   bridgeKind: string | null;
   bridgeConfigSummary: string | null;
-  bridgeInputMode: "feed_url" | "article_url" | null;
+  bridgeInputMode: "feed_url" | "article_url" | "name_lookup" | null;
   bridgeInputValue: string | null;
   lastCollectedAt: string | null;
   lastCollectionStatus: string | null;
@@ -140,7 +140,7 @@ function parseSourceKinds(notes: string | null): string[] {
 
 function parseBridgeConfig(value: string | null): {
   summary: string | null;
-  inputMode: "feed_url" | "article_url" | null;
+  inputMode: "feed_url" | "article_url" | "name_lookup" | null;
   inputValue: string | null;
 } {
   if (!value?.trim()) {
@@ -152,6 +152,7 @@ function parseBridgeConfig(value: string | null): {
       inputMode?: unknown;
       feedUrl?: unknown;
       articleUrl?: unknown;
+      wechatName?: unknown;
     };
 
     if (parsed.inputMode === "feed_url") {
@@ -167,6 +168,14 @@ function parseBridgeConfig(value: string | null): {
         summary: "公众号文章链接",
         inputMode: "article_url",
         inputValue: typeof parsed.articleUrl === "string" ? parsed.articleUrl : null
+      };
+    }
+
+    if (parsed.inputMode === "name_lookup") {
+      return {
+        summary: "公众号名称检索",
+        inputMode: "name_lookup",
+        inputValue: typeof parsed.wechatName === "string" ? parsed.wechatName : null
       };
     }
 

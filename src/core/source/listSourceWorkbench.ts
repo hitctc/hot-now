@@ -26,7 +26,7 @@ export type SourceWorkbenchRow = {
   sourceType: string;
   bridgeKind: string | null;
   bridgeConfigSummary: string | null;
-  bridgeInputMode: "feed_url" | "article_url" | null;
+  bridgeInputMode: "feed_url" | "article_url" | "name_lookup" | null;
   bridgeInputValue: string | null;
   lastCollectedAt: string | null;
   lastCollectionStatus: string | null;

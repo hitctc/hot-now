@@ -243,11 +243,7 @@ describe("system routes", () => {
       url: "/actions/sources/create",
       payload: {
         sourceType: "wechat_bridge",
-        kind: "wechat_demo",
-        name: "微信 Demo",
-        siteUrl: "https://mp.weixin.qq.com/",
-        bridgeKind: "wechat2rss",
-        inputMode: "article_url",
+        wechatName: "微信 Demo",
         articleUrl: "https://mp.weixin.qq.com/s?__biz=abc"
       }
     });
@@ -256,7 +252,7 @@ describe("system routes", () => {
     expect(createSource).toHaveBeenCalledWith(
       expect.objectContaining({
         sourceType: "wechat_bridge",
-        inputMode: "article_url",
+        wechatName: "微信 Demo",
         articleUrl: "https://mp.weixin.qq.com/s?__biz=abc"
       })
     );

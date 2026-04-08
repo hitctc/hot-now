@@ -189,4 +189,46 @@ describe("listSourceCards", () => {
       bridgeInputValue: "https://mp.weixin.qq.com/s?__biz=abc"
     });
   });
+
+  it("recognizes name-lookup bridge configs for custom bridge rows", async () => {
+    const db = await createTestDatabase();
+
+    db.prepare(
+      `
+        INSERT INTO content_sources (
+          kind,
+          name,
+          site_url,
+          rss_url,
+          is_enabled,
+          is_builtin,
+          show_all_when_selected,
+          source_type,
+          bridge_kind,
+          bridge_config_json
+        )
+        VALUES (?, ?, ?, ?, 1, 0, 0, 'wechat_bridge', 'wechat2rss', ?)
+      `
+    ).run(
+      "wechat_lookup",
+      "数字生命卡兹克",
+      "https://mp.weixin.qq.com/",
+      "https://bridge.example.test/feed/lookup.xml",
+      JSON.stringify({
+        inputMode: "name_lookup",
+        wechatName: "数字生命卡兹克",
+        resolvedFrom: "wechat2rss"
+      })
+    );
+
+    const cards = listSourceCards(db);
+
+    expect(cards.find((card) => card.kind === "wechat_lookup")).toMatchObject({
+      sourceType: "wechat_bridge",
+      bridgeKind: "wechat2rss",
+      bridgeConfigSummary: "公众号名称检索",
+      bridgeInputMode: "name_lookup",
+      bridgeInputValue: "数字生命卡兹克"
+    });
+  });
 });

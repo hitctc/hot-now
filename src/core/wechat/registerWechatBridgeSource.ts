@@ -1,4 +1,4 @@
-import { registerWechat2rssArticleUrl } from "./wechatBridgeProviders.js";
+import { lookupWechat2rssFeedByName, registerWechat2rssArticleUrl } from "./wechatBridgeProviders.js";
 import type { WechatBridgeInput, WechatBridgeRuntimeConfig } from "./wechatBridgeTypes.js";
 
 type BridgeFetch = typeof fetch;
@@ -28,14 +28,28 @@ export async function registerWechatBridgeSource(
     throw new Error("wechat-bridge-disabled");
   }
 
-  const articleUrl = normalizeHttpUrl(input.articleUrl);
-  const rssUrl = await registerWechat2rssArticleUrl(articleUrl, deps.wechatBridge, deps.fetch);
+  if (input.inputMode === "article_url") {
+    const articleUrl = normalizeHttpUrl(input.articleUrl);
+    const rssUrl = await registerWechat2rssArticleUrl(articleUrl, deps.wechatBridge, deps.fetch);
+
+    return {
+      rssUrl,
+      bridgeConfigJson: JSON.stringify({
+        inputMode: "article_url",
+        articleUrl,
+        resolvedFrom: "wechat2rss"
+      })
+    };
+  }
+
+  const wechatName = normalizeRequiredText(input.wechatName);
+  const rssUrl = await lookupWechat2rssFeedByName(wechatName, deps.wechatBridge, deps.fetch);
 
   return {
     rssUrl,
     bridgeConfigJson: JSON.stringify({
-      inputMode: "article_url",
-      articleUrl,
+      inputMode: "name_lookup",
+      wechatName,
       resolvedFrom: "wechat2rss"
     })
   };
@@ -54,4 +68,14 @@ function normalizeHttpUrl(value: string): string {
   }
 
   return url.toString();
+}
+
+function normalizeRequiredText(value: string): string {
+  const normalized = value.trim();
+
+  if (!normalized) {
+    throw new Error("invalid-input");
+  }
+
+  return normalized;
 }

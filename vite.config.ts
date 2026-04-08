@@ -3,6 +3,8 @@ import VueDevTools from "vite-plugin-vue-devtools";
 import { defineConfig, type PluginOption, type UserConfig } from "vite";
 import { CLIENT_ASSET_BASE } from "./src/client/appBases";
 
+export const CLIENT_DEVTOOLS_EDITOR = "code";
+
 // Vite 传进来的模块 ID 可能带平台分隔符，先统一成 POSIX 风格，后面的分组规则才不会漏判。
 function normalizeModuleId(id: string): string {
   return id.replaceAll("\\", "/");
@@ -35,8 +37,11 @@ export function chunkClientDependency(id: string): string | undefined {
 }
 
 // 这个插件只服务本地调试；生产构建不需要注入 devtools 客户端代码。
+// 开发机上可能同时装了多个编辑器，这里固定走 VSCode 的 code CLI，避免 Inspector 跳到别的应用。
 function createClientPlugins(command: "serve" | "build"): PluginOption[] {
-  return command === "serve" ? [VueDevTools(), vue()] : [vue()];
+  return command === "serve"
+    ? [VueDevTools({ launchEditor: CLIENT_DEVTOOLS_EDITOR }), vue()]
+    : [vue()];
 }
 
 // 把配置工厂导出来，方便测试直接校验开发态和构建态的差异。

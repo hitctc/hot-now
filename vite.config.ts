@@ -1,9 +1,19 @@
+import { existsSync } from "node:fs";
 import vue from "@vitejs/plugin-vue";
 import VueDevTools from "vite-plugin-vue-devtools";
 import { defineConfig, type PluginOption, type UserConfig } from "vite";
 import { CLIENT_ASSET_BASE } from "./src/client/appBases";
 
-export const CLIENT_DEVTOOLS_EDITOR = "code";
+export const VSCODE_EDITOR_CANDIDATES = [
+  "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
+] as const;
+
+// 这层只负责给本地调试挑一个稳定可执行的编辑器入口；优先走 VSCode 真正的 CLI，避免被其他应用占掉 /usr/local/bin/code。
+export function resolveClientDevtoolsEditor(fileExists: (path: string) => boolean = existsSync): string {
+  return VSCODE_EDITOR_CANDIDATES.find((candidate) => fileExists(candidate)) ?? "code";
+}
+
+export const CLIENT_DEVTOOLS_EDITOR = resolveClientDevtoolsEditor();
 
 // Vite 传进来的模块 ID 可能带平台分隔符，先统一成 POSIX 风格，后面的分组规则才不会漏判。
 function normalizeModuleId(id: string): string {

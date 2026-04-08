@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { PluginOption } from "vite";
 
 import { CLIENT_ASSET_BASE } from "../../src/client/appBases";
-import { CLIENT_DEVTOOLS_EDITOR, createClientViteConfig } from "../../vite.config";
+import {
+  CLIENT_DEVTOOLS_EDITOR,
+  VSCODE_EDITOR_CANDIDATES,
+  createClientViteConfig,
+  resolveClientDevtoolsEditor
+} from "../../vite.config";
 
 function readPluginNames(plugins: PluginOption[] | undefined): string[] {
   return (plugins ?? []).flatMap((plugin) => {
@@ -22,6 +27,16 @@ function findPluginByName(plugins: PluginOption[] | undefined, name: string): Pl
 }
 
 describe("vite client config", () => {
+  it("prefers the real VS Code CLI over a reused code symlink when it is installed", () => {
+    const editor = resolveClientDevtoolsEditor((filePath) => filePath === VSCODE_EDITOR_CANDIDATES[0]);
+
+    expect(editor).toBe(VSCODE_EDITOR_CANDIDATES[0]);
+  });
+
+  it("falls back to the generic code command when VS Code is not installed in the default app path", () => {
+    expect(resolveClientDevtoolsEditor(() => false)).toBe("code");
+  });
+
   it("enables vue devtools only for the dev server config", () => {
     const serveConfig = createClientViteConfig({ command: "serve" });
     const buildConfig = createClientViteConfig({ command: "build" });

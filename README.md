@@ -97,7 +97,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - `/`、`/ai-new`、`/ai-hot` 现在也通过 Fastify 返回统一客户端入口，再由 `Vue 3 + Ant Design Vue` 内容页读取 `/api/content/ai-new`、`/api/content/ai-hot` 渲染
 - `/settings/view-rules` 已升级为门槛型策略工作台：只保留 `基础入池门 / AI 新讯入池门 / AI 热点入池门 / 首条精选门` 四道门，每道门只维护 `启用开关 + 自然语言规则文本`，并继续收口 LLM 厂商设置、反馈池、草稿池；全量重算运行中可手动中断，已完成的评估结果会继续保留
 - `/settings/sources` 现在会展示即时操作卡、来源统计概览表和 source 库存表，包含总条数、今天发布、今天抓取，以及 `AI 新讯 / AI 热点` 的入池与展示统计
-- `/settings/sources` 现在支持可视化新增 / 编辑 / 删除自定义来源：既支持普通 RSS，也支持微信公众号桥接来源；桥接来源既可以直接录入现成 feed URL，也可以录入公众号文章链接后调用 bridge 服务解析出最终 feed
+- `/settings/sources` 现在支持可视化新增 / 编辑 / 删除自定义来源：RSS 来源只需要填写 `RSS URL`；微信公众号桥接来源只需要填写 `公众号名称`，文章链接可选但建议一起填写，其余 `kind / 来源名称 / 来源主页 / bridge 细节` 由系统在保存时自动生成
 - `/settings/sources` 现在支持逐 source 配置“选中该来源时全量展示”；开启后，该来源不会在内容页首次默认勾选，只有用户显式勾选后才会按全量模式展示
 - `/settings/profile` 现在会展示会话状态、用户名、角色和联系邮箱，不再停留在占位页
 - 正式自然语言策略现在只认 `base / ai_new / ai_hot / hero` 四个内部 gate scope：
@@ -117,7 +117,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 反馈池与草稿池动作：`POST /actions/feedback-pool/:id/create-draft`、`POST /actions/feedback-pool/:id/delete`、`POST /actions/feedback-pool/clear`、`POST /actions/strategy-drafts/:id/save`、`POST /actions/strategy-drafts/:id/delete`
 - 内容导航已收口为 AI-first：`/` 与 `/ai-new` 等同 `AI 新讯`，`/ai-hot` 承接 `AI 热点`，`/articles` 已移除
 
-统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。auth 开启后，内容菜单保持公开可读，但系统菜单和所有写操作仍然要求登录；`content_sources.is_enabled` 决定哪些 source 参与采集，`content_sources.show_all_when_selected` 决定该 source 在内容页被显式勾选时是否全量展示；`/settings/sources` 现在可以直接启用/停用 source、切换“选中时全量展示”、新增 / 编辑 / 删除自定义 RSS 或微信公众号桥接来源，并分别手动执行一次采集或手动发送最新报告；内容页顶部的来源筛选和排序只影响当前浏览结果，不会改 source 启用状态；legacy `/control` 也同步提供采集与发信动作。
+统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。auth 开启后，内容菜单保持公开可读，但系统菜单和所有写操作仍然要求登录；`content_sources.is_enabled` 决定哪些 source 参与采集，`content_sources.show_all_when_selected` 决定该 source 在内容页被显式勾选时是否全量展示；`/settings/sources` 现在可以直接启用/停用 source、切换“选中时全量展示”、新增 / 编辑 / 删除自定义 RSS 或微信公众号桥接来源，其中 RSS 只需要 `RSS URL`，公众号只需要 `公众号名称` 和可选文章链接，其余内部字段会在保存时自动生成，并分别手动执行一次采集或手动发送最新报告；内容页顶部的来源筛选和排序只影响当前浏览结果，不会改 source 启用状态；legacy `/control` 也同步提供采集与发信动作。
 
 当前内置 RSS 源包括：
 

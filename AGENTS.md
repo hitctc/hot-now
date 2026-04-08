@@ -79,7 +79,7 @@
 - `/ai-new`：统一站点 AI 新讯页（未登录也可访问）
 - `/ai-hot`：统一站点 AI 热点页（未登录也可访问）
 - `/settings/view-rules`：统一站点筛选策略工作台（登录后，由 `Vue 3 + Ant Design Vue` 驱动，当前只保留 `基础入池门 / AI 新讯入池门 / AI 热点入池门 / 首条精选门` 四道门；每道门维护 `启用开关 + 自然语言规则文本`，并继续收口 LLM 设置、反馈池、草稿池；全量重算运行中支持手动中断，已跑完的结果保持生效）
-- `/settings/sources`：统一站点数据迭代收集页（登录后，由 `Vue 3 + Ant Design Vue` 驱动，可启用/停用 source、切换“选中该来源时全量展示”，并支持可视化新增 / 编辑 / 删除自定义 RSS 来源与微信公众号桥接来源；公众号桥接来源支持录入现成 feed URL，或通过文章链接调用 bridge 服务生成 feed；页面会展示总条数、今天发布、今天抓取，以及 `AI 新讯 / AI 热点` 入池与展示统计）
+- `/settings/sources`：统一站点数据迭代收集页（登录后，由 `Vue 3 + Ant Design Vue` 驱动，可启用/停用 source、切换“选中该来源时全量展示”，并支持可视化新增 / 编辑 / 删除自定义 RSS 来源与微信公众号桥接来源；新增 RSS 时只需要填写 `RSS URL`，新增公众号时只需要填写 `公众号名称`，文章链接可选但建议一起填，其余 `kind / 来源名称 / 来源主页 / bridge 细节` 都由系统内部自动生成；页面会展示总条数、今天发布、今天抓取，以及 `AI 新讯 / AI 热点` 入池与展示统计）
 - `/settings/profile`：统一站点当前登录用户页（登录后，由 `Vue 3 + Ant Design Vue` 驱动，展示会话状态、账号摘要和联系邮箱）
 - 统一站点左侧导航底部支持深色 / 浅色主题切换，偏好写入浏览器本地 `localStorage` 并在刷新后保持
 - `unified shell` 页面（`/`、`/ai-new`、`/ai-hot`、`/settings/*`）已完整切换到 `Notion Workspace` 风格的黑白灰双主题
@@ -247,7 +247,7 @@ SQLite 可靠性约定：
 - 多源采集后端已完成：`loadEnabledSourceIssues` / `runDailyDigest` 已接入多源并行汇总，单个 feed 失败不会阻断整次日报，只有全部 enabled sources 都失败时才会硬失败
 - 内置 RSS 源已扩展到 8 个，覆盖聚合日报、国际官方 AI 博客、国内热点资讯 / 快讯与科技媒体；新增国内源默认作为 built-in source 写入 `content_sources`
 - 采集和发信已拆成两个独立功能：默认配置下采集每 `10` 分钟执行一次，发信每天 `10:00` 执行一次；两者都支持手动触发，并共用同一把运行锁
-- 系统菜单已收口到多源语义：`/settings/sources` 支持 source 启用/停用、source 级“选中时全量展示”策略、逐 source 最近抓取状态展示，以及统一站点内手动执行采集 / 手动发送最新报告；同时支持可视化新增 / 编辑 / 删除自定义 RSS 来源与微信公众号桥接来源，公众号桥接来源既可直接录入现成 feed URL，也可录入文章链接后调用 bridge 服务解析成最终 feed；`/settings/view-rules` 现在是四道门策略工作台，只保留 `base / ai_new / ai_hot / hero` 四个正式 gate scope，并继续承载 LLM 厂商配置、反馈池和草稿池；当前登录用户信息已并到侧边栏底部
+- 系统菜单已收口到多源语义：`/settings/sources` 支持 source 启用/停用、source 级“选中时全量展示”策略、逐 source 最近抓取状态展示，以及统一站点内手动执行采集 / 手动发送最新报告；同时支持可视化新增 / 编辑 / 删除自定义 RSS 来源与微信公众号桥接来源，其中 RSS 只要求录入 `RSS URL`，公众号只要求录入 `公众号名称` 和可选的 `公众号文章链接`，其余内部字段由系统自动生成与解析；`/settings/view-rules` 现在是四道门策略工作台，只保留 `base / ai_new / ai_hot / hero` 四个正式 gate scope，并继续承载 LLM 厂商配置、反馈池和草稿池；当前登录用户信息已并到侧边栏底部
 - `/settings/sources` 现在会基于共享内容选择器实时展示 source 工作台总览表，口径包含总条数、今天发布、今天抓取，以及 `AI 新讯 / AI 热点` 的入池与展示统计
 - unified shell 已去掉顶部 header，页面信息和账号区都收进左侧侧边栏；视觉母版已切到高还原 `Notion Workspace` 的黑白灰双主题，主题切换与 localStorage 持久化已落地
 - `/settings/*` 现在统一走 Fastify 返回的客户端入口，由 `src/client/` 下的 `Vue 3 + Vite + Ant Design Vue` 页面接管，不再继续叠加新的服务端拼表单 HTML

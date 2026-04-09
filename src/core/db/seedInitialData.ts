@@ -56,6 +56,84 @@ const builtinSources = [
     name: "IT之家",
     siteUrl: "https://www.ithome.com/",
     rssUrl: "https://www.ithome.com/rss/"
+  },
+  {
+    kind: "zhihu_daily",
+    name: "知乎每日精选",
+    siteUrl: "https://www.zhihu.com/",
+    rssUrl: "https://www.zhihu.com/rss"
+  },
+  {
+    kind: "sspai",
+    name: "少数派",
+    siteUrl: "https://sspai.com/",
+    rssUrl: "https://sspai.com/feed"
+  },
+  {
+    kind: "chinaz",
+    name: "站长之家",
+    siteUrl: "https://www.chinaz.com/",
+    rssUrl: "https://app.chinaz.com/?app=rss"
+  },
+  {
+    kind: "huxiu",
+    name: "虎嗅网",
+    siteUrl: "https://www.huxiu.com/",
+    rssUrl: "https://www.huxiu.com/rss/0.xml"
+  },
+  {
+    kind: "dgtle",
+    name: "数字尾巴",
+    siteUrl: "https://www.dgtle.com/",
+    rssUrl: "https://www.dgtle.com/rss/dgtle.xml"
+  },
+  {
+    kind: "cnblogs",
+    name: "Cnblogs",
+    siteUrl: "https://www.cnblogs.com/",
+    rssUrl: "https://feed.cnblogs.com/blog/sitehome/rss"
+  },
+  {
+    kind: "v2ex",
+    name: "V2EX",
+    siteUrl: "https://www.v2ex.com/",
+    rssUrl: "https://www.v2ex.com/feed/tab/tech.xml"
+  },
+  {
+    kind: "cyzone",
+    name: "创业邦",
+    siteUrl: "https://www.cyzone.cn/",
+    rssUrl: "https://www.cyzone.cn/rss/"
+  },
+  {
+    kind: "geekpark",
+    name: "极客公园",
+    siteUrl: "https://www.geekpark.net/",
+    rssUrl: "https://www.geekpark.net/rss"
+  },
+  {
+    kind: "appinn",
+    name: "小众软件",
+    siteUrl: "https://www.appinn.com/",
+    rssUrl: "https://feeds.appinn.com/appinns/"
+  },
+  {
+    kind: "wikipedia",
+    name: "维基百科",
+    siteUrl: "https://www.wikipedia.org/",
+    rssUrl: "https://feedx.net/rss/wikiindex.xml"
+  },
+  {
+    kind: "guangming_daily",
+    name: "光明日报",
+    siteUrl: "https://www.gmw.cn/",
+    rssUrl: "https://feedx.net/rss/guangmingribao.xml"
+  },
+  {
+    kind: "williamlong_blog",
+    name: "月光博客",
+    siteUrl: "https://www.williamlong.info/",
+    rssUrl: "https://www.williamlong.info/rss.xml"
   }
 ] as const;
 

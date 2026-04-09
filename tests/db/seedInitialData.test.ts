@@ -58,13 +58,26 @@ describe("seedInitialData", () => {
 
     expect(enabledRows).toEqual([
       { kind: "aifanr", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
+      { kind: "appinn", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
+      { kind: "chinaz", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
+      { kind: "cnblogs", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
+      { kind: "cyzone", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
+      { kind: "dgtle", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
+      { kind: "geekpark", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
       { kind: "google_ai", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
+      { kind: "guangming_daily", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
+      { kind: "huxiu", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
       { kind: "ithome", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
       { kind: "juya", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
       { kind: "kr36", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
       { kind: "kr36_newsflash", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
       { kind: "openai", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
-      { kind: "techcrunch_ai", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null }
+      { kind: "sspai", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
+      { kind: "techcrunch_ai", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
+      { kind: "v2ex", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
+      { kind: "wikipedia", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
+      { kind: "williamlong_blog", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
+      { kind: "zhihu_daily", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null }
     ]);
 
     const activeRows = db

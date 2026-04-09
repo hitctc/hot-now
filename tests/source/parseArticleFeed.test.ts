@@ -140,13 +140,26 @@ describe("sourceAdapters", () => {
   it("registers all built-in source kinds", () => {
     expect(Object.keys(sourceAdapters).sort()).toEqual([
       "aifanr",
+      "appinn",
+      "chinaz",
+      "cnblogs",
+      "cyzone",
+      "dgtle",
+      "geekpark",
       "google_ai",
+      "guangming_daily",
+      "huxiu",
       "ithome",
       "juya",
       "kr36",
       "kr36_newsflash",
       "openai",
-      "techcrunch_ai"
+      "sspai",
+      "techcrunch_ai",
+      "v2ex",
+      "wikipedia",
+      "williamlong_blog",
+      "zhihu_daily"
     ]);
   });
 });

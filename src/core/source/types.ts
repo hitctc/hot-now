@@ -6,7 +6,20 @@ export type BuiltinSourceKind =
   | "kr36"
   | "kr36_newsflash"
   | "aifanr"
-  | "ithome";
+  | "ithome"
+  | "zhihu_daily"
+  | "sspai"
+  | "chinaz"
+  | "huxiu"
+  | "dgtle"
+  | "cnblogs"
+  | "v2ex"
+  | "cyzone"
+  | "geekpark"
+  | "appinn"
+  | "wikipedia"
+  | "guangming_daily"
+  | "williamlong_blog";
 
 export type SourceKind = BuiltinSourceKind | (string & {});
 

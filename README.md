@@ -127,6 +127,19 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - `TechCrunch AI`：`https://techcrunch.com/category/artificial-intelligence/feed/`
 - `爱范儿`：`https://www.ifanr.com/feed`
 - `IT之家`：`https://www.ithome.com/rss/`
+- `知乎每日精选`：`https://www.zhihu.com/rss`
+- `少数派`：`https://sspai.com/feed`
+- `站长之家`：`https://app.chinaz.com/?app=rss`
+- `虎嗅网`：`https://www.huxiu.com/rss/0.xml`
+- `数字尾巴`：`https://www.dgtle.com/rss/dgtle.xml`
+- `Cnblogs`：`https://feed.cnblogs.com/blog/sitehome/rss`
+- `V2EX`：`https://www.v2ex.com/feed/tab/tech.xml`
+- `创业邦`：`https://www.cyzone.cn/rss/`
+- `极客公园`：`https://www.geekpark.net/rss`
+- `小众软件`：`https://feeds.appinn.com/appinns/`
+- `维基百科`：`https://feedx.net/rss/wikiindex.xml`
+- `光明日报`：`https://feedx.net/rss/guangmingribao.xml`
+- `月光博客`：`https://www.williamlong.info/rss.xml`
 
 ## 配置
 

@@ -9,6 +9,7 @@ import { openDatabase } from "../../src/core/db/openDatabase.js";
 import { runMigrations } from "../../src/core/db/runMigrations.js";
 import { seedInitialData } from "../../src/core/db/seedInitialData.js";
 import { saveNlEvaluations } from "../../src/core/strategy/nlEvaluationRepository.js";
+import { getInternalViewRuleConfig } from "../../src/core/viewRules/viewRuleConfig.js";
 
 describe("buildContentViewSelection", () => {
   const databasesToClose: ReturnType<typeof openDatabase>[] = [];
@@ -217,6 +218,28 @@ describe("buildContentViewSelection", () => {
     expect(hotSelection.visibleCards.map((card) => card.title)).toContain("Too old for ai-new");
   });
 
+  it("stops blocking old ai content when enableTimeWindow is false", async () => {
+    const db = await createTestDatabase(databasesToClose);
+    const openai = resolveSourceByKind(db, "openai");
+
+    upsertContentItems(db, {
+      sourceId: openai!.id,
+      items: [
+        buildItem("Within published", "2026-03-31T03:00:00.000Z"),
+        buildItem("Too old but allowed", "2026-03-29T00:00:00.000Z")
+      ]
+    });
+
+    const selection = buildContentViewSelection(db, "ai", {
+      ruleConfig: {
+        ...getInternalViewRuleConfig("ai"),
+        enableTimeWindow: false
+      }
+    });
+
+    expect(selection.visibleCards.map((card) => card.title)).toContain("Too old but allowed");
+  });
+
   it("no longer caps hot and ai result sets at the old fixed limit", async () => {
     const db = await createTestDatabase(databasesToClose);
     const openai = resolveSourceByKind(db, "openai");
@@ -238,6 +261,91 @@ describe("buildContentViewSelection", () => {
 
     expect(hotSelection.visibleCards).toHaveLength(60);
     expect(aiSelection.visibleCards).toHaveLength(60);
+  });
+
+  it("falls back to publish-time ordering when enableScoreRanking is false", async () => {
+    const db = await createTestDatabase(databasesToClose);
+    const openai = resolveSourceByKind(db, "openai");
+
+    upsertContentItems(db, {
+      sourceId: openai!.id,
+      items: [
+        {
+          title: "Older High Score",
+          canonicalUrl: "https://example.com/order-older-high-score",
+          summary: "launch report analysis agent workflow summary with enough detail to score high",
+          bodyMarkdown: "launch report analysis agent workflow ".repeat(24),
+          publishedAt: "2026-03-29T02:00:00.000Z",
+          fetchedAt: "2026-03-29T02:00:00.000Z"
+        },
+        {
+          title: "Newest Low Score",
+          canonicalUrl: "https://example.com/order-newest-low-score",
+          summary: "brief",
+          bodyMarkdown: "",
+          publishedAt: "2026-03-31T03:00:00.000Z",
+          fetchedAt: "2026-03-31T03:00:00.000Z"
+        }
+      ]
+    });
+
+    const selection = buildContentViewSelection(db, "hot", {
+      ruleConfig: {
+        ...getInternalViewRuleConfig("hot"),
+        enableScoreRanking: false
+      }
+    });
+
+    expect(selection.visibleCards.map((card) => card.title)).toEqual(["Newest Low Score", "Older High Score"]);
+  });
+
+  it("removes matching source view bonus when enableSourceViewBonus is false", async () => {
+    const db = await createTestDatabase(databasesToClose);
+    const openai = resolveSourceByKind(db, "openai");
+    const kr36 = resolveSourceByKind(db, "kr36");
+
+    upsertContentItems(db, {
+      sourceId: openai!.id,
+      items: [
+        {
+          title: "OpenAI newer",
+          canonicalUrl: "https://example.com/source-bonus-openai",
+          summary: "brief",
+          bodyMarkdown: "",
+          publishedAt: "2026-03-31T03:00:00.000Z",
+          fetchedAt: "2026-03-31T03:00:00.000Z"
+        }
+      ]
+    });
+    upsertContentItems(db, {
+      sourceId: kr36!.id,
+      items: [
+        {
+          title: "36Kr score winner",
+          canonicalUrl: "https://example.com/source-bonus-kr36",
+          summary: "breaking update launch release announcement report roundup hot trending 发布 上线 更新 快讯 周报 热点 速览 深度 洞察",
+          bodyMarkdown: "breaking update launch release announcement report roundup hot trending ".repeat(12),
+          publishedAt: "2026-03-31T02:59:00.000Z",
+          fetchedAt: "2026-03-31T02:59:00.000Z"
+        }
+      ]
+    });
+
+    const rankedWithBonus = buildContentViewSelection(db, "ai", {
+      ruleConfig: {
+        ...getInternalViewRuleConfig("ai"),
+        enableSourceViewBonus: true
+      }
+    });
+    const rankedWithoutBonus = buildContentViewSelection(db, "ai", {
+      ruleConfig: {
+        ...getInternalViewRuleConfig("ai"),
+        enableSourceViewBonus: false
+      }
+    });
+
+    expect(rankedWithBonus.visibleCards[0]?.title).toBe("OpenAI newer");
+    expect(rankedWithoutBonus.visibleCards[0]?.title).toBe("36Kr score winner");
   });
 
   it("keeps ranking order from the internal defaults and ignores persisted numeric rule rows", async () => {

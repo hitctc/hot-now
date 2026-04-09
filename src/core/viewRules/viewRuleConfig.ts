@@ -10,6 +10,12 @@ export type ViewRuleConfigValues = {
   completenessWeight: number;
   aiWeight: number;
   heatWeight: number;
+  enableTimeWindow: boolean;
+  enableSourceViewBonus: boolean;
+  enableAiKeywordWeight: boolean;
+  enableHeatKeywordWeight: boolean;
+  enableFreshnessWeight: boolean;
+  enableScoreRanking: boolean;
 };
 
 export type ViewRuleFieldDefinition = {
@@ -98,7 +104,13 @@ export const defaultViewRuleDefinitions: DefaultViewRuleDefinition[] = [
       sourceWeight: 0.1,
       completenessWeight: 0.1,
       aiWeight: 0.05,
-      heatWeight: 0.4
+      heatWeight: 0.4,
+      enableTimeWindow: false,
+      enableSourceViewBonus: true,
+      enableAiKeywordWeight: true,
+      enableHeatKeywordWeight: true,
+      enableFreshnessWeight: true,
+      enableScoreRanking: true
     },
     seedConfig: {
       limit: 20,
@@ -107,7 +119,13 @@ export const defaultViewRuleDefinitions: DefaultViewRuleDefinition[] = [
       sourceWeight: 0.1,
       completenessWeight: 0.1,
       aiWeight: 0.05,
-      heatWeight: 0.4
+      heatWeight: 0.4,
+      enableTimeWindow: false,
+      enableSourceViewBonus: true,
+      enableAiKeywordWeight: true,
+      enableHeatKeywordWeight: true,
+      enableFreshnessWeight: true,
+      enableScoreRanking: true
     }
   },
   {
@@ -120,7 +138,13 @@ export const defaultViewRuleDefinitions: DefaultViewRuleDefinition[] = [
       sourceWeight: 0.3,
       completenessWeight: 0.35,
       aiWeight: 0.05,
-      heatWeight: 0.15
+      heatWeight: 0.15,
+      enableTimeWindow: false,
+      enableSourceViewBonus: true,
+      enableAiKeywordWeight: true,
+      enableHeatKeywordWeight: true,
+      enableFreshnessWeight: true,
+      enableScoreRanking: true
     },
     seedConfig: {
       limit: 20,
@@ -129,7 +153,13 @@ export const defaultViewRuleDefinitions: DefaultViewRuleDefinition[] = [
       sourceWeight: 0.3,
       completenessWeight: 0.35,
       aiWeight: 0.05,
-      heatWeight: 0.15
+      heatWeight: 0.15,
+      enableTimeWindow: false,
+      enableSourceViewBonus: true,
+      enableAiKeywordWeight: true,
+      enableHeatKeywordWeight: true,
+      enableFreshnessWeight: true,
+      enableScoreRanking: true
     }
   },
   {
@@ -142,7 +172,13 @@ export const defaultViewRuleDefinitions: DefaultViewRuleDefinition[] = [
       sourceWeight: 0.1,
       completenessWeight: 0.15,
       aiWeight: 0.5,
-      heatWeight: 0.15
+      heatWeight: 0.15,
+      enableTimeWindow: true,
+      enableSourceViewBonus: true,
+      enableAiKeywordWeight: true,
+      enableHeatKeywordWeight: true,
+      enableFreshnessWeight: true,
+      enableScoreRanking: true
     },
     seedConfig: {
       limit: 20,
@@ -151,7 +187,13 @@ export const defaultViewRuleDefinitions: DefaultViewRuleDefinition[] = [
       sourceWeight: 0.1,
       completenessWeight: 0.15,
       aiWeight: 0.5,
-      heatWeight: 0.15
+      heatWeight: 0.15,
+      enableTimeWindow: true,
+      enableSourceViewBonus: true,
+      enableAiKeywordWeight: true,
+      enableHeatKeywordWeight: true,
+      enableFreshnessWeight: true,
+      enableScoreRanking: true
     }
   }
 ];
@@ -185,8 +227,18 @@ export function normalizeViewRuleConfig(ruleKey: string, config: unknown): ViewR
     sourceWeight: readNonNegativeNumber(config.sourceWeight, defaults.sourceWeight),
     completenessWeight: readNonNegativeNumber(config.completenessWeight, defaults.completenessWeight),
     aiWeight: readNonNegativeNumber(config.aiWeight, defaults.aiWeight),
-    heatWeight: readNonNegativeNumber(config.heatWeight, defaults.heatWeight)
+    heatWeight: readNonNegativeNumber(config.heatWeight, defaults.heatWeight),
+    enableTimeWindow: readBoolean(config.enableTimeWindow, defaults.enableTimeWindow),
+    enableSourceViewBonus: readBoolean(config.enableSourceViewBonus, defaults.enableSourceViewBonus),
+    enableAiKeywordWeight: readBoolean(config.enableAiKeywordWeight, defaults.enableAiKeywordWeight),
+    enableHeatKeywordWeight: readBoolean(config.enableHeatKeywordWeight, defaults.enableHeatKeywordWeight),
+    enableFreshnessWeight: readBoolean(config.enableFreshnessWeight, defaults.enableFreshnessWeight),
+    enableScoreRanking: readBoolean(config.enableScoreRanking, defaults.enableScoreRanking)
   };
+}
+
+function readBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
 }
 
 function readPositiveInteger(value: unknown, fallback: number): number {

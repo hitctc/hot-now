@@ -206,7 +206,13 @@ describe("seedInitialData", () => {
       sourceWeight: 0.3,
       completenessWeight: 0.35,
       aiWeight: 0.05,
-      heatWeight: 0.15
+      heatWeight: 0.15,
+      enableTimeWindow: false,
+      enableSourceViewBonus: true,
+      enableAiKeywordWeight: true,
+      enableHeatKeywordWeight: true,
+      enableFreshnessWeight: true,
+      enableScoreRanking: true
     });
     expect(JSON.parse(rows.find((row) => row.rule_key === "ai")?.config_json ?? "{}")).toEqual({
       limit: 20,
@@ -215,7 +221,13 @@ describe("seedInitialData", () => {
       sourceWeight: 0.1,
       completenessWeight: 0.15,
       aiWeight: 0.5,
-      heatWeight: 0.15
+      heatWeight: 0.15,
+      enableTimeWindow: true,
+      enableSourceViewBonus: true,
+      enableAiKeywordWeight: true,
+      enableHeatKeywordWeight: true,
+      enableFreshnessWeight: true,
+      enableScoreRanking: true
     });
   });
 
@@ -247,7 +259,13 @@ describe("seedInitialData", () => {
           sourceWeight: 0.1,
           completenessWeight: 0.15,
           aiWeight: 0.5,
-          heatWeight: 0.15
+          heatWeight: 0.15,
+          enableTimeWindow: true,
+          enableSourceViewBonus: true,
+          enableAiKeywordWeight: true,
+          enableHeatKeywordWeight: true,
+          enableFreshnessWeight: true,
+          enableScoreRanking: true
         })
       },
       {
@@ -259,7 +277,13 @@ describe("seedInitialData", () => {
           sourceWeight: 0.3,
           completenessWeight: 0.35,
           aiWeight: 0.05,
-          heatWeight: 0.15
+          heatWeight: 0.15,
+          enableTimeWindow: false,
+          enableSourceViewBonus: true,
+          enableAiKeywordWeight: true,
+          enableHeatKeywordWeight: true,
+          enableFreshnessWeight: true,
+          enableScoreRanking: true
         })
       },
       {
@@ -271,7 +295,13 @@ describe("seedInitialData", () => {
           sourceWeight: 0.1,
           completenessWeight: 0.1,
           aiWeight: 0.05,
-          heatWeight: 0.4
+          heatWeight: 0.4,
+          enableTimeWindow: false,
+          enableSourceViewBonus: true,
+          enableAiKeywordWeight: true,
+          enableHeatKeywordWeight: true,
+          enableFreshnessWeight: true,
+          enableScoreRanking: true
         })
       }
     ]);

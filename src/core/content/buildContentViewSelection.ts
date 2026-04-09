@@ -15,6 +15,7 @@ export type ContentViewSelectionOptions = {
   referenceTime?: Date;
   limitOverride?: number;
   sortMode?: ContentSortMode;
+  ruleConfig?: ViewRuleConfigValues;
 };
 
 export type ContentSortMode = "published_at" | "content_score";
@@ -114,7 +115,7 @@ export function buildContentViewSelection(
   options: ContentViewSelectionOptions = {}
 ): ContentViewSelection {
   // Shared selection keeps one exact candidate/visible pipeline for content pages and system analytics.
-  const viewRuleConfig = getInternalViewRuleConfig(viewKey);
+  const viewRuleConfig = options.ruleConfig ?? getInternalViewRuleConfig(viewKey);
   const referenceTime = options.referenceTime ?? new Date();
   const includeNlEvaluations = options.includeNlEvaluations ?? true;
   const sortMode = options.sortMode;
@@ -134,7 +135,7 @@ export function buildContentViewSelection(
     .filter((card) => !card.isBlocked);
   const rankedCards = rankedCandidates
     .filter((card) => selectedSourceKinds === null || selectedSourceKinds.has(card.sourceKind))
-    .sort(compareByRanking);
+    .sort((left, right) => compareBySelectionOrder(viewRuleConfig, left, right));
   const limit = resolveVisibleLimit(viewKey, options.limitOverride ?? viewRuleConfig.limit);
   const fullDisplaySourceKinds =
     selectedSourceKinds === null
@@ -148,7 +149,7 @@ export function buildContentViewSelection(
     ...rankedCards.filter((card) => fullDisplaySourceKinds.has(card.sourceKind)),
     ...rankedCards.filter((card) => !fullDisplaySourceKinds.has(card.sourceKind)).slice(0, limit)
   ]
-    .sort((left, right) => compareVisibleCards(sortMode, left, right))
+    .sort((left, right) => compareVisibleCards(sortMode, viewRuleConfig, left, right))
     .map(stripInternalSelectionCard);
   // 旧来源 tag 仍暂时保留稳定单来源口径，便于旧调用方在这轮迁移里逐步切换。
   const visibleCountsBySourceKind = countStableVisibleCardsBySourceKind(rankedCandidates, limit);
@@ -201,6 +202,7 @@ export function collectIndependentStatsBySourceForView(
   sourceKinds: string[],
   options: Pick<ContentViewSelectionOptions, "includeNlEvaluations" | "referenceTime"> & {
     countWindow?: "today" | "all" | "last_24_hours";
+    ruleConfig?: ViewRuleConfigValues;
   } = {}
 ): Map<string, IndependentSourceViewMetrics> {
   // Source workbench only needs per-source independent metrics, so one grouped pass per view is enough.
@@ -208,7 +210,7 @@ export function collectIndependentStatsBySourceForView(
     return new Map();
   }
 
-  const viewRuleConfig = getInternalViewRuleConfig(viewKey);
+  const viewRuleConfig = options.ruleConfig ?? getInternalViewRuleConfig(viewKey);
   const referenceTime = options.referenceTime ?? new Date();
   const includeNlEvaluations = options.includeNlEvaluations ?? true;
   const sourceKindSet = new Set(sourceKinds);
@@ -246,7 +248,7 @@ export function collectIndependentStatsBySourceForView(
   let currentPageVisibleCount = 0;
 
   for (const [sourceKind, cards] of candidatesBySourceKind.entries()) {
-    cards.sort(compareByRanking);
+    cards.sort((left, right) => compareBySelectionOrder(viewRuleConfig, left, right));
 
     const visibleCards =
       cards.length > 0 && cards[0]?.showAllWhenSelected
@@ -463,7 +465,7 @@ function buildRankedCardCandidate(
     ),
     rankingTimestamp: row.rankingTimestamp,
     isBlocked:
-      shouldBlockByTimeWindow(context.viewKey, row, context.referenceTime) ||
+      shouldBlockByTimeWindow(context.viewKey, row, context.referenceTime, context.viewRuleConfig) ||
       (context.includeNlEvaluations &&
         (normalizeNlDecision(row.baseDecision) === "block" || normalizeNlDecision(row.viewDecision) === "block"))
   };
@@ -477,10 +479,11 @@ function resolveVisibleLimit(viewKey: ContentViewKey, limit: number): number {
 function shouldBlockByTimeWindow(
   viewKey: ContentViewKey,
   row: Pick<ContentCardRow, "publishedAt" | "rankingTimestamp">,
-  referenceTime: Date
+  referenceTime: Date,
+  viewRuleConfig: ViewRuleConfigValues
 ): boolean {
   // AI 新讯固定只保留最近 24 小时内的内容，时间戳优先 published_at，再回退到抓取/创建时间。
-  if (viewKey !== "ai") {
+  if (viewKey !== "ai" || !viewRuleConfig.enableTimeWindow) {
     return false;
   }
 
@@ -559,22 +562,37 @@ function calculateViewRankingScore(
   nlScoreDelta: number
 ): number {
   // The saved rule config controls both the ranking mix and the freshness window.
-  const freshnessScore = calculateFreshnessWindowScore(
-    rankingTimestamp,
-    referenceTime,
-    viewRuleConfig.freshnessWindowDays,
-    score.freshnessScore
-  );
+  const freshnessScore = viewRuleConfig.enableFreshnessWeight
+    ? calculateFreshnessWindowScore(
+        rankingTimestamp,
+        referenceTime,
+        viewRuleConfig.freshnessWindowDays,
+        score.freshnessScore
+      )
+    : 0;
+  const aiScore = viewRuleConfig.enableAiKeywordWeight ? score.aiScore : 0;
+  const heatScore = viewRuleConfig.enableHeatKeywordWeight ? score.heatScore : 0;
+  const sourceViewBonus = viewRuleConfig.enableSourceViewBonus
+    ? calculateMatchingSourceViewBonus(viewKey, sourceKind)
+    : 0;
 
   return (
     freshnessScore * viewRuleConfig.freshnessWeight +
     score.sourceScore * viewRuleConfig.sourceWeight +
     score.completenessScore * viewRuleConfig.completenessWeight +
-    score.aiScore * viewRuleConfig.aiWeight +
-    score.heatScore * viewRuleConfig.heatWeight +
+    aiScore * viewRuleConfig.aiWeight +
+    heatScore * viewRuleConfig.heatWeight +
     nlScoreDelta +
-    calculateMatchingSourceViewBonus(viewKey, sourceKind)
+    sourceViewBonus
   );
+}
+
+function compareBySelectionOrder(
+  viewRuleConfig: ViewRuleConfigValues,
+  left: RankedContentCardCandidate,
+  right: RankedContentCardCandidate
+): number {
+  return viewRuleConfig.enableScoreRanking ? compareByRanking(left, right) : compareByPublishedAtDesc(left, right);
 }
 
 function normalizeNlDecision(value: string | null): "boost" | "penalize" | "block" | "neutral" {
@@ -619,10 +637,15 @@ function calculateFreshnessWindowScore(
   return Math.max(0, Math.min(100, 100 - (ageDays / windowDays) * 100));
 }
 
-function compareVisibleCards(sortMode: ContentSortMode | undefined, left: RankedContentCardCandidate, right: RankedContentCardCandidate): number {
+function compareVisibleCards(
+  sortMode: ContentSortMode | undefined,
+  viewRuleConfig: ViewRuleConfigValues,
+  left: RankedContentCardCandidate,
+  right: RankedContentCardCandidate
+): number {
   // Core selection keeps the legacy ranking order unless a caller explicitly asks for a user-facing sort.
   if (sortMode === undefined) {
-    return compareByRanking(left, right);
+    return compareBySelectionOrder(viewRuleConfig, left, right);
   }
 
   if (sortMode === "content_score") {
@@ -636,7 +659,7 @@ function compareVisibleCards(sortMode: ContentSortMode | undefined, left: Ranked
       return publishedDelta;
     }
 
-    return compareByRanking(left, right);
+    return compareBySelectionOrder(viewRuleConfig, left, right);
   }
 
   const publishedDelta = toTimestampMs(right.publishedAt ?? right.rankingTimestamp) - toTimestampMs(left.publishedAt ?? left.rankingTimestamp);
@@ -649,7 +672,17 @@ function compareVisibleCards(sortMode: ContentSortMode | undefined, left: Ranked
     return right.contentScore - left.contentScore;
   }
 
-  return compareByRanking(left, right);
+  return compareBySelectionOrder(viewRuleConfig, left, right);
+}
+
+function compareByPublishedAtDesc(left: RankedContentCardCandidate, right: RankedContentCardCandidate): number {
+  const publishedDelta = toTimestampMs(right.publishedAt ?? right.rankingTimestamp) - toTimestampMs(left.publishedAt ?? left.rankingTimestamp);
+
+  if (publishedDelta !== 0) {
+    return publishedDelta;
+  }
+
+  return right.id - left.id;
 }
 
 function toTimestampMs(value: string | null): number {

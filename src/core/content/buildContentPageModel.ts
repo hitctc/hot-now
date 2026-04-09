@@ -1,4 +1,5 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
+import { getViewRuleConfig, type ViewRuleConfig } from "../viewRules/viewRuleRepository.js";
 import { listContentSources, type ContentSourceOption } from "../source/listContentSources.js";
 import {
   buildContentViewSelection,
@@ -23,6 +24,10 @@ export type ContentPageModel = {
   };
   featuredCard: ContentCardView | null;
   cards: ContentCardView[];
+  strategySummary: {
+    pageKey: ContentPageKey;
+    items: string[];
+  };
   pagination: ContentPagination | null;
   emptyState: {
     title: string;
@@ -51,11 +56,15 @@ export function buildContentPageModel(
   const selectedSourceKinds = normalizeSelectedSourceKinds(options.selectedSourceKinds, sourceOptions);
   const effectiveSelectedSourceKinds = selectedSourceKinds ?? deriveDefaultSelectedSourceKinds(sourceOptions);
 
+  const viewRuleKey = pageKey === "ai-hot" ? "hot" : "ai";
+  const viewRuleConfig = getViewRuleConfig(db, viewRuleKey);
+
   try {
-    const selection = buildContentViewSelection(db, pageKey === "ai-hot" ? "hot" : "ai", {
+    const selection = buildContentViewSelection(db, viewRuleKey, {
       includeNlEvaluations: options.includeNlEvaluations,
       selectedSourceKinds: effectiveSelectedSourceKinds,
-      sortMode: options.sortMode ?? "published_at"
+      sortMode: options.sortMode ?? "published_at",
+      ruleConfig: viewRuleConfig
     });
     const allCards = selection.visibleCards.map(stripRankedCard);
     const filteredCards = filterCardsByTitleKeyword(allCards, options.searchKeyword);
@@ -79,6 +88,7 @@ export function buildContentPageModel(
       // 客户端内容页已经不再拆首条精选卡，这里保留空字段只为了兼容现有接口模型。
       featuredCard: null,
       cards: pagination.cards,
+      strategySummary: buildStrategySummary(pageKey, viewRuleConfig),
       pagination: pagination.meta,
       emptyState:
         effectiveSelectedSourceKinds.length === 0
@@ -112,6 +122,7 @@ export function buildContentPageModel(
       pageKey,
       featuredCard: null,
       cards: [],
+      strategySummary: buildStrategySummary(pageKey, viewRuleConfig),
       pagination: null,
       emptyState: {
         title: "内容暂不可用",
@@ -120,6 +131,33 @@ export function buildContentPageModel(
       }
     };
   }
+}
+
+function buildStrategySummary(pageKey: ContentPageKey, viewRuleConfig: ViewRuleConfig["config"]) {
+  const items = pageKey === "ai-new"
+    ? [
+        `24 小时窗口 ${formatToggleStatus(viewRuleConfig.enableTimeWindow)}`,
+        `来源偏置 ${formatToggleStatus(viewRuleConfig.enableSourceViewBonus)}`,
+        `AI 关键词 ${formatToggleStatus(viewRuleConfig.enableAiKeywordWeight)}`,
+        `热点关键词 ${formatToggleStatus(viewRuleConfig.enableHeatKeywordWeight)}`,
+        `评分排序 ${formatToggleStatus(viewRuleConfig.enableScoreRanking)}`
+      ]
+    : [
+        `来源偏置 ${formatToggleStatus(viewRuleConfig.enableSourceViewBonus)}`,
+        `AI 关键词 ${formatToggleStatus(viewRuleConfig.enableAiKeywordWeight)}`,
+        `热点关键词 ${formatToggleStatus(viewRuleConfig.enableHeatKeywordWeight)}`,
+        `新鲜度 ${formatToggleStatus(viewRuleConfig.enableFreshnessWeight)}`,
+        `评分排序 ${formatToggleStatus(viewRuleConfig.enableScoreRanking)}`
+      ];
+
+  return {
+    pageKey,
+    items
+  };
+}
+
+function formatToggleStatus(enabled: boolean) {
+  return enabled ? "开" : "关";
 }
 
 function stripRankedCard({

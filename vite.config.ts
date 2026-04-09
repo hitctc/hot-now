@@ -93,6 +93,14 @@ export function createClientViteConfig(options: { command: "serve" | "build" }):
         "/logout": {
           target: "http://127.0.0.1:3030",
           changeOrigin: true
+        },
+        "/brand": {
+          target: "http://127.0.0.1:3030",
+          changeOrigin: true
+        },
+        "/favicon.ico": {
+          target: "http://127.0.0.1:3030",
+          changeOrigin: true
         }
       }
     }

@@ -210,6 +210,39 @@ export function createServer(deps: ServerDeps = {}) {
   app.get("/health", async () => ({ ok: true }));
   app.get("/assets/site.css", async (_request, reply) => reply.type("text/css; charset=utf-8").send(siteCss));
   app.get("/assets/site.js", async (_request, reply) => reply.type("application/javascript; charset=utf-8").send(siteJs));
+  app.get("/favicon.ico", async (_request, reply) => {
+    const faviconPath = path.resolve(process.cwd(), "src/server/public/brand/hotnow-logo-sd.png");
+
+    try {
+      return reply.type("image/png").send(readFileSync(faviconPath));
+    } catch {
+      return reply.code(404).type("text/plain; charset=utf-8").send("Not Found");
+    }
+  });
+  app.get("/brand/*", async (request, reply) => {
+    const { "*": rawAssetPath = "" } = request.params as { "*": string };
+    const normalizedAssetPath = normalizeClientAssetPath(rawAssetPath);
+
+    if (!normalizedAssetPath || path.extname(normalizedAssetPath).toLowerCase() !== ".png") {
+      return reply.code(404).type("text/plain; charset=utf-8").send("Not Found");
+    }
+
+    const brandRoot = path.resolve(process.cwd(), "src/server/public/brand");
+    const resolvedAssetPath = path.resolve(brandRoot, normalizedAssetPath);
+    const brandRootWithSeparator = `${brandRoot}${path.sep}`;
+
+    // 品牌静态资源只允许读取 brand 目录下的 png，避免请求路径越界到工作区其他文件。
+    if (!resolvedAssetPath.startsWith(brandRootWithSeparator) && resolvedAssetPath !== brandRoot) {
+      return reply.code(404).type("text/plain; charset=utf-8").send("Not Found");
+    }
+
+    try {
+      const assetBody = readFileSync(resolvedAssetPath);
+      return reply.type("image/png").send(assetBody);
+    } catch {
+      return reply.code(404).type("text/plain; charset=utf-8").send("Not Found");
+    }
+  });
   app.get("/client/*", async (request, reply) => {
     const { "*": rawAssetPath = "" } = request.params as { "*": string };
     const normalizedAssetPath = normalizeClientAssetPath(rawAssetPath);
@@ -1289,6 +1322,8 @@ function rewriteClientDevEntryHtml(clientEntryHtml: string, clientDevOrigin: str
   const normalizedClientDevAssetBase = `${clientDevOrigin}/client/`;
 
   return clientEntryHtml
+    .replaceAll('="/client/brand/', '="/brand/')
+    .replaceAll("='/client/brand/", "='/brand/")
     .replaceAll('="/client/', `="${normalizedClientDevAssetBase}`)
     .replaceAll("='/client/", `='${normalizedClientDevAssetBase}`);
 }
@@ -2029,6 +2064,7 @@ function renderLoginPage() {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>登录 | HotNow</title>
+    <link rel="icon" type="image/png" href="/brand/hotnow-logo-sd.png" />
     <link rel="stylesheet" href="/assets/site.css" />
   </head>
   <body class="login-page">

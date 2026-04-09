@@ -146,6 +146,7 @@ function createClientDevIndexHtml() {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/client/brand/hotnow-logo-sd.png" />
     <script type="module" src="/client/@vite/client"></script>
     <script type="module" src="/client/main.ts"></script>
   </head>
@@ -405,6 +406,8 @@ describe("createServer", () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain('src="http://127.0.0.1:35173/client/@vite/client"');
     expect(response.body).toContain('src="http://127.0.0.1:35173/client/main.ts"');
+    expect(response.body).toContain('href="/brand/hotnow-logo-sd.png"');
+    expect(response.body).not.toContain('href="/client/brand/hotnow-logo-sd.png"');
     expect(response.body).not.toContain('/client/assets/');
   });
 
@@ -447,6 +450,20 @@ describe("createServer", () => {
     expect(cssResponse.headers["content-type"]).toContain("text/css");
     expect(cssResponse.body.length).toBeGreaterThan(0);
     expect(traversalResponse.statusCode).toBe(404);
+  });
+
+  it("serves brand png assets and a favicon alias for shell pages", async () => {
+    const app = createServer();
+
+    const brandResponse = await app.inject({ method: "GET", url: "/brand/hotnow-logo-sd.png" });
+    const faviconResponse = await app.inject({ method: "GET", url: "/favicon.ico" });
+
+    expect(brandResponse.statusCode).toBe(200);
+    expect(brandResponse.headers["content-type"]).toContain("image/png");
+    expect(brandResponse.rawPayload.length).toBeGreaterThan(0);
+    expect(faviconResponse.statusCode).toBe(200);
+    expect(faviconResponse.headers["content-type"]).toContain("image/png");
+    expect(faviconResponse.rawPayload.length).toBeGreaterThan(0);
   });
 
   it("clears the session cookie on logout", async () => {

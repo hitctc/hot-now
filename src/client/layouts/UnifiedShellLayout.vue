@@ -31,6 +31,7 @@ const currentPageTitle = computed(() => route.meta.title ?? "系统页底座");
 const currentPageDescription = computed(
   () => route.meta.description ?? "承接系统页的统一布局、主题和导航。"
 );
+const shellLogoSrc = "/brand/hotnow-logo-sd.png";
 const loggedInProfile = computed(() => (profile.value?.loggedIn ? profile.value : null));
 const guestProfile = computed(() => (profile.value && !profile.value.loggedIn ? profile.value : null));
 const shouldShowSystemMenu = computed(() => Boolean(loggedInProfile.value));
@@ -212,9 +213,17 @@ onBeforeUnmount(() => {
     >
       <div class="flex min-h-0 flex-1 flex-col gap-5">
         <section class="px-3 py-2" data-workspace-brand>
-          <h1 class="mt-1 text-[20px] font-semibold tracking-[-0.01em] text-editorial-text-main">
-            热讯
-          </h1>
+          <div class="mt-1 flex items-center gap-3">
+            <img
+              :src="shellLogoSrc"
+              alt="HotNow logo"
+              class="h-10 w-10 shrink-0 rounded-[12px] border border-editorial-border bg-editorial-panel object-cover"
+              data-workspace-brand-logo
+            />
+            <h1 class="text-[20px] font-semibold tracking-[-0.01em] text-editorial-text-main">
+              热讯
+            </h1>
+          </div>
         </section>
 
         <section class="flex flex-col gap-1">

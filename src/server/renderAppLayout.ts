@@ -72,6 +72,7 @@ export function renderAppLayout(view: AppShellView): string {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(view.page.title)} | HotNow</title>
+    <link rel="icon" type="image/png" href="/brand/hotnow-logo-sd.png" />
     <link rel="stylesheet" href="/assets/site.css" />
     <script src="/assets/site.js" defer></script>
   </head>

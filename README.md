@@ -37,7 +37,7 @@ npm run dev
 ```
 
   这条命令现在会一起拉起 Fastify、Vite dev server 和本地公众号解析 sidecar；继续打开 `http://127.0.0.1:3030/...` 即可直接使用 Vue DevTools，不需要再手动开第二个终端。
-  `npm run dev` 会优先读取仓库根目录的 `.env`；如果没有 `.env` 但存在旧的 `.env.local`，会继续兼容读取。默认情况下它会自动回收本地 `3030` 端口，并在未显式配置远端 resolver 时自动启用本地 sidecar。
+  `npm run dev` 会先读取仓库根目录的 `.env`，再读取 `.env.local` 做本机覆盖；推荐把共享的非敏感配置放在 `.env`，把每台设备自己的账号、口令等敏感项放在 `.env.local`。默认情况下它会自动回收本地 `3030` 端口，并在未显式配置远端 resolver 时自动启用本地 sidecar。
 
 - 仅启动 Vite 客户端调试时：
 

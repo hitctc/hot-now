@@ -121,7 +121,7 @@ const {
             :href="safeUrl"
             target="_blank"
             rel="noreferrer"
-            class="text-current no-underline transition hover:underline hover:no-underline"
+            class="text-current no-underline transition hover:underline"
           >
             {{ cardState.title }}
           </a>
@@ -132,7 +132,7 @@ const {
       <div class="flex flex-col gap-2">
         <p
           ref="summaryElement"
-          :class="['m-0 text-sm leading-6 text-editorial-text-body [overflow-wrap:anywhere] break-words', ...summaryBodyClass]"
+          :class="['m-0 text-sm leading-6 text-editorial-text-body [overflow-wrap:anywhere]', ...summaryBodyClass]"
           :data-content-summary-expanded="summaryExpanded ? 'true' : 'false'"
           data-content-standard-summary
           data-content-summary-body

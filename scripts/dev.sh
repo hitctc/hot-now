@@ -4,18 +4,15 @@ set -euo pipefail
 
 mode="${1:-standard}"
 
-# npm run dev 会先读共享的 .env，再让 .env.local 覆盖本机敏感项；这样两台设备都能复用同一套启动方式。
+# npm run dev 现在只认根目录 .env，避免双文件并存时到底哪份生效变得不透明。
 if [ -f .env ]; then
   set -a
   . ./.env
   set +a
 fi
 
-# 本地覆盖项永远后加载，避免共享 .env 把每台设备自己的账号、口令和端口习惯盖掉。
 if [ -f .env.local ]; then
-  set -a
-  . ./.env.local
-  set +a
+  echo "Ignoring deprecated .env.local; please move all local settings into .env." >&2
 fi
 
 if [ "${mode}" = "local" ]; then

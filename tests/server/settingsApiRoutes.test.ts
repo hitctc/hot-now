@@ -13,6 +13,12 @@ function pickCookieValue(setCookieHeader: string | string[] | undefined) {
 
 function createAuthenticatedServer() {
   return createServer({
+    config: {
+      collectionSchedule: {
+        enabled: true,
+        intervalMinutes: 10
+      }
+    },
     auth: {
       requireLogin: true,
       sessionSecret: "test-secret",
@@ -152,6 +158,7 @@ describe("settings api routes", () => {
       operations: {
         lastCollectionRunAt: "2026-03-31T03:00:00.000Z",
         lastSendLatestEmailAt: "2026-03-31T03:10:00.000Z",
+        nextCollectionRunAt: expect.any(String),
         canTriggerManualCollect: true,
         canTriggerManualSendLatestEmail: false,
         isRunning: false

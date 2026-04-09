@@ -91,6 +91,7 @@ function createSourcesModel() {
     operations: {
       lastCollectionRunAt: "2026-03-31T08:10:00.000Z",
       lastSendLatestEmailAt: "2026-03-31T08:30:00.000Z",
+      nextCollectionRunAt: "2026-03-31T10:40:00.000Z",
       canTriggerManualCollect: true,
       canTriggerManualSendLatestEmail: true,
       isRunning: false
@@ -132,20 +133,26 @@ describe("SourcesPage", () => {
     mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount());
     document.body.innerHTML = "";
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it("renders operation cards and source tables from the api model", async () => {
     vi.mocked(settingsApi.readSettingsSources).mockResolvedValue(createSourcesModel());
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-31T10:34:00.000Z"));
 
     const wrapper = mountSourcesPage();
 
     await flushPromises();
 
     expect(wrapper.find("[data-settings-intro='sources']").exists()).toBe(false);
-    expect(wrapper.get("[data-sources-section='overview']").findAll("article")).toHaveLength(4);
+    expect(wrapper.get("[data-sources-section='overview']").findAll("article")).toHaveLength(5);
     expect(wrapper.get("[data-sources-section='overview']").text()).toContain("接入来源");
     expect(wrapper.get("[data-sources-section='overview']").text()).toContain("已启用来源");
+    expect(wrapper.get("[data-sources-section='overview']").text()).toContain("下一次采集");
+    expect(wrapper.get("[data-sources-section='overview']").text()).toContain("18:40（还有 6 分钟）");
     expect(wrapper.get("[data-sources-section='manual-collect']").text()).toContain("手动执行采集");
+    expect(wrapper.get("[data-sources-section='manual-collect']").text()).toContain("下一次自动采集：18:40（还有 6 分钟）");
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 新讯24小时候选 / 24小时展示");
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 新讯独立展示占比");
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 热点独立展示占比");
@@ -171,6 +178,22 @@ describe("SourcesPage", () => {
 
     expect(analyticsHeaderCells.every((cell) => (cell.attributes("style") || "").includes("text-align: center"))).toBe(true);
     expect(inventoryHeaderCells.every((cell) => (cell.attributes("style") || "").includes("text-align: center"))).toBe(true);
+  });
+
+  it("shows disabled schedule copy when the next collection time is unavailable", async () => {
+    vi.mocked(settingsApi.readSettingsSources).mockResolvedValue({
+      ...createSourcesModel(),
+      operations: {
+        ...createSourcesModel().operations,
+        nextCollectionRunAt: null
+      }
+    });
+
+    const wrapper = mountSourcesPage();
+    await flushPromises();
+
+    expect(wrapper.get("[data-sources-section='overview']").text()).toContain("未启用定时采集");
+    expect(wrapper.get("[data-sources-section='manual-collect']").text()).toContain("未启用定时采集");
   });
 
   it("toggles a source and reloads the latest sources model", async () => {

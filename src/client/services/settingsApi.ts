@@ -116,6 +116,7 @@ export type SettingsSourceItem = {
 export type SettingsSourcesOperations = {
   lastCollectionRunAt: string | null;
   lastSendLatestEmailAt: string | null;
+  nextCollectionRunAt: string | null;
   canTriggerManualCollect: boolean;
   canTriggerManualSendLatestEmail: boolean;
   isRunning: boolean;

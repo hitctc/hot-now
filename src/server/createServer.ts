@@ -25,6 +25,7 @@ import type { NlRuleScope } from "../core/strategy/nlRuleRepository.js";
 import type { RunNlEvaluationCycleResult } from "../core/strategy/runNlEvaluationCycle.js";
 import type { UpdateStrategyDraftInput, UpdateStrategyDraftResult } from "../core/strategy/strategyDraftRepository.js";
 import type { RuntimeConfig } from "../core/types/appConfig.js";
+import { readNextCollectionRunAt } from "../core/scheduler/readNextCollectionRunAt.js";
 import {
   createSessionToken,
   readSessionCookieToken,
@@ -1131,6 +1132,7 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
   const operationSummary = deps.getSourcesOperationSummary
     ? await deps.getSourcesOperationSummary()
     : { lastCollectionRunAt: null, lastSendLatestEmailAt: null };
+  const nextCollectionRunAt = readNextCollectionRunAt(deps.config?.collectionSchedule);
   const wechatResolverConfigured = Boolean(
     deps.config?.wechatResolver?.baseUrl && deps.config?.wechatResolver?.token
   );
@@ -1140,6 +1142,7 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
     operations: {
       lastCollectionRunAt: operationSummary.lastCollectionRunAt,
       lastSendLatestEmailAt: operationSummary.lastSendLatestEmailAt,
+      nextCollectionRunAt,
       canTriggerManualCollect: typeof (deps.triggerManualCollect ?? deps.triggerManualRun) === "function",
       canTriggerManualSendLatestEmail: typeof deps.triggerManualSendLatestEmail === "function",
       isRunning: deps.isRunning?.() ?? false
@@ -1744,13 +1747,15 @@ async function renderSystemPageForPath(deps: ServerDeps, pathname: string, logge
     const operationSummary = deps.getSourcesOperationSummary
       ? await deps.getSourcesOperationSummary()
       : { lastCollectionRunAt: null, lastSendLatestEmailAt: null };
+    const nextCollectionRunAt = readNextCollectionRunAt(deps.config?.collectionSchedule);
 
     return renderSourcesPage(sources, {
       canTriggerManualCollect: typeof (deps.triggerManualCollect ?? deps.triggerManualRun) === "function",
       canTriggerManualSendLatestEmail: typeof deps.triggerManualSendLatestEmail === "function",
       isRunning: deps.isRunning?.() ?? false,
       lastCollectionRunAt: operationSummary.lastCollectionRunAt,
-      lastSendLatestEmailAt: operationSummary.lastSendLatestEmailAt
+      lastSendLatestEmailAt: operationSummary.lastSendLatestEmailAt,
+      nextCollectionRunAt
     });
   }
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { message } from "ant-design-vue";
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 
 import {
   editorialContentCardClass,
@@ -64,6 +64,8 @@ const isSourceModalOpen = ref(false);
 const sourceModalMode = ref<SourceModalMode>("create");
 const sourceFormError = ref<string | null>(null);
 const sourceForm = reactive<SourceFormState>(createEmptySourceForm());
+const relativeNow = ref(Date.now());
+let nextCollectionTimer: number | null = null;
 
 const enabledSourceCount = computed(
   () => sourcesModel.value?.sources.filter((source) => source.isEnabled).length ?? 0
@@ -186,6 +188,33 @@ function formatDateTime(value: string | null | undefined): string {
     hour: "2-digit",
     minute: "2-digit"
   }).format(date);
+}
+
+// 下一次采集统一展示成“绝对时间 + 剩余分钟”，让工作台既能看节奏也能看实时感。
+function formatNextCollectionText(value: string | null | undefined): string {
+  if (!value?.trim()) {
+    return "未启用定时采集";
+  }
+
+  const nextDate = new Date(value);
+
+  if (Number.isNaN(nextDate.getTime())) {
+    return "暂时无法计算";
+  }
+
+  const diffMinutes = Math.floor((nextDate.getTime() - relativeNow.value) / 60_000);
+  const timeLabel = new Intl.DateTimeFormat("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Shanghai"
+  }).format(nextDate);
+
+  if (diffMinutes <= 0) {
+    return `${timeLabel}（即将执行）`;
+  }
+
+  return `${timeLabel}（还有 ${diffMinutes} 分钟）`;
 }
 
 // 三个内容视图的候选 / 展示统计都用同一格式输出，便于在表格里横向比较。
@@ -516,7 +545,19 @@ async function handleDeleteSource(source: SettingsSourceItem): Promise<void> {
 }
 
 onMounted(() => {
+  // 只做分钟级刷新，避免把 sources 工作台做成秒级跳动的监控面板。
+  relativeNow.value = Date.now();
+  nextCollectionTimer = window.setInterval(() => {
+    relativeNow.value = Date.now();
+  }, 60_000);
   void loadSources();
+});
+
+onUnmounted(() => {
+  if (nextCollectionTimer !== null) {
+    window.clearInterval(nextCollectionTimer);
+    nextCollectionTimer = null;
+  }
 });
 </script>
 
@@ -553,7 +594,7 @@ onMounted(() => {
       </a-result>
 
       <template v-else-if="sourcesModel">
-        <section class="grid gap-3 md:grid-cols-2 xl:grid-cols-4" data-sources-section="overview">
+        <section class="grid gap-3 md:grid-cols-2 xl:grid-cols-5" data-sources-section="overview">
           <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
             <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">接入来源</p>
             <p class="mt-2 mb-0 text-xl font-medium text-editorial-text-main">{{ totalSourceCount }}</p>
@@ -570,6 +611,12 @@ onMounted(() => {
             <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">最近发信</p>
             <p class="mt-2 mb-0 text-sm text-editorial-text-main">{{ formatDateTime(sourcesModel.operations.lastSendLatestEmailAt) }}</p>
           </article>
+          <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+            <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">下一次采集</p>
+            <p class="mt-2 mb-0 text-sm text-editorial-text-main">
+              {{ formatNextCollectionText(sourcesModel.operations.nextCollectionRunAt) }}
+            </p>
+          </article>
         </section>
 
         <section class="grid gap-4 xl:grid-cols-2">
@@ -583,6 +630,9 @@ onMounted(() => {
                 <a-typography-paragraph type="secondary">
                   当前会对所有已启用 source 发起一次采集，并刷新最新内容库。
                 </a-typography-paragraph>
+                <p class="m-0 text-xs leading-5 text-editorial-text-muted">
+                  下一次自动采集：{{ formatNextCollectionText(sourcesModel.operations.nextCollectionRunAt) }}
+                </p>
                 <a-button
                   type="primary"
                   data-action="manual-collect"

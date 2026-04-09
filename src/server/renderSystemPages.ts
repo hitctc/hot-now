@@ -95,6 +95,7 @@ export type SourcesSettingsOperationsView = {
   isRunning: boolean;
   lastCollectionRunAt: string | null;
   lastSendLatestEmailAt: string | null;
+  nextCollectionRunAt: string | null;
 };
 
 export type SourcesCapabilityView = {

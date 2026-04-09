@@ -23,7 +23,8 @@ fi
 echo "Preparing client bundle..."
 npm run build:client
 
-export HOT_NOW_CLIENT_DEV_ORIGIN="${HOT_NOW_CLIENT_DEV_ORIGIN:-http://127.0.0.1:5173}"
+# 开发态默认把 Vite dev server 挪到一个不常和现有前端工具链冲突的高位端口，减少本机端口撞车。
+export HOT_NOW_CLIENT_DEV_ORIGIN="${HOT_NOW_CLIENT_DEV_ORIGIN:-http://127.0.0.1:35173}"
 resolver_autostart="false"
 
 if [ -z "${WECHAT_RESOLVER_BASE_URL:-}" ] && [ -z "${WECHAT_RESOLVER_TOKEN:-}" ]; then

@@ -394,7 +394,7 @@ describe("createServer", () => {
 
   it("prefers the Vite dev client entry for content pages when a dev client origin is available", async () => {
     const app = createServer({
-      clientDevOrigin: "http://127.0.0.1:5173",
+      clientDevOrigin: "http://127.0.0.1:35173",
       readClientDevEntryHtml: vi.fn().mockResolvedValue(createClientDevIndexHtml()),
       listContentView: vi.fn().mockResolvedValue([]),
       listRatingDimensions: vi.fn().mockResolvedValue([])
@@ -403,14 +403,14 @@ describe("createServer", () => {
     const response = await app.inject({ method: "GET", url: "/ai-new" });
 
     expect(response.statusCode).toBe(200);
-    expect(response.body).toContain('src="http://127.0.0.1:5173/client/@vite/client"');
-    expect(response.body).toContain('src="http://127.0.0.1:5173/client/main.ts"');
+    expect(response.body).toContain('src="http://127.0.0.1:35173/client/@vite/client"');
+    expect(response.body).toContain('src="http://127.0.0.1:35173/client/main.ts"');
     expect(response.body).not.toContain('/client/assets/');
   });
 
   it("falls back to the built client entry when the Vite dev client entry is unavailable", async () => {
     const app = createServer({
-      clientDevOrigin: "http://127.0.0.1:5173",
+      clientDevOrigin: "http://127.0.0.1:35173",
       readClientDevEntryHtml: vi.fn().mockResolvedValue(null),
       listContentView: vi.fn().mockResolvedValue([]),
       listRatingDimensions: vi.fn().mockResolvedValue([])

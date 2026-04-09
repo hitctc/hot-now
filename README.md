@@ -20,11 +20,11 @@ export AUTH_USERNAME="admin"
 export AUTH_PASSWORD="replace-with-strong-password"
 export SESSION_SECRET="replace-with-long-random-secret"
 export LLM_SETTINGS_MASTER_KEY="replace-with-local-master-key"
-export HOT_NOW_CLIENT_DEV_ORIGIN="http://127.0.0.1:5173"
+export HOT_NOW_CLIENT_DEV_ORIGIN="http://127.0.0.1:35173"
 ```
 
 `LLM_SETTINGS_MASTER_KEY` 现在是可选覆盖项；如果你不单独配置，系统会回退使用 `SESSION_SECRET` 继续加密保存厂商 API key。
-`HOT_NOW_CLIENT_DEV_ORIGIN` 也是可选开发辅助项；`npm run dev` 会默认按这个地址拉起并接入 Vite dev server，让 `3030` 页面直接拿到 HMR 和 Vue DevTools。
+`HOT_NOW_CLIENT_DEV_ORIGIN` 也是可选开发辅助项；`npm run dev` 默认会把 Vite dev server 拉到 `http://127.0.0.1:35173`，并按这个地址接入，让 `3030` 页面直接拿到 HMR 和 Vue DevTools。只有你想改成别的开发端口时，才需要显式覆盖它。
 本地开发不再要求手工配置 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`；`npm run dev` 会自动拉起仓库内置的本地公众号解析 sidecar。只有你想覆盖到远端 relay 时，才需要显式配置这两个环境变量。
 
 4. 如果这次改动涉及 unified shell 客户端页面，先构建最新客户端资源：`npm run build:client`

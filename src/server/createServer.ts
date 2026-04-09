@@ -1281,7 +1281,7 @@ async function fetchClientDevEntryHtml(clientDevOrigin: string): Promise<string 
   }
 }
 
-// 开发态 HTML 会继续挂在 3030 域名下，所以这里把 /client/... 资源改写成 5173 绝对地址，避免还去命中构建产物。
+// 开发态 HTML 会继续挂在 3030 域名下，所以这里把 /client/... 资源改写成当前 clientDevOrigin 绝对地址，避免还去命中构建产物。
 function rewriteClientDevEntryHtml(clientEntryHtml: string, clientDevOrigin: string): string {
   const normalizedClientDevAssetBase = `${clientDevOrigin}/client/`;
 

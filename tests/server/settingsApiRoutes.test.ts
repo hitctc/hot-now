@@ -29,6 +29,48 @@ function createAuthenticatedServer() {
       })
     },
     getViewRulesWorkbenchData: vi.fn().mockResolvedValue({
+      filterWorkbench: {
+        aiRule: {
+          ruleKey: "ai",
+          displayName: "AI 新讯筛选",
+          summary: "当前 AI 新讯会优先保留最近 24 小时内容。",
+          toggles: {
+            enableTimeWindow: true,
+            enableSourceViewBonus: true,
+            enableAiKeywordWeight: true,
+            enableHeatKeywordWeight: true,
+            enableFreshnessWeight: true,
+            enableScoreRanking: true
+          },
+          weights: {
+            freshnessWeight: 0.1,
+            sourceWeight: 0.1,
+            completenessWeight: 0.15,
+            aiWeight: 0.5,
+            heatWeight: 0.15
+          }
+        },
+        hotRule: {
+          ruleKey: "hot",
+          displayName: "AI 热点筛选",
+          summary: "当前 AI 热点不会强行限制 24 小时。",
+          toggles: {
+            enableTimeWindow: false,
+            enableSourceViewBonus: true,
+            enableAiKeywordWeight: true,
+            enableHeatKeywordWeight: true,
+            enableFreshnessWeight: true,
+            enableScoreRanking: true
+          },
+          weights: {
+            freshnessWeight: 0.35,
+            sourceWeight: 0.1,
+            completenessWeight: 0.1,
+            aiWeight: 0.05,
+            heatWeight: 0.4
+          }
+        }
+      },
       providerSettings: [
         {
           providerKind: "deepseek",
@@ -100,6 +142,20 @@ describe("settings api routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
+      filterWorkbench: {
+        aiRule: {
+          displayName: "AI 新讯筛选",
+          toggles: {
+            enableTimeWindow: true
+          }
+        },
+        hotRule: {
+          displayName: "AI 热点筛选",
+          toggles: {
+            enableScoreRanking: true
+          }
+        }
+      },
       providerSettings: [
         {
           providerKind: "deepseek",

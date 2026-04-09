@@ -27,6 +27,29 @@ export type SettingsProviderCapability = {
   message: string;
 };
 
+export type SettingsContentFilterToggles = {
+  enableTimeWindow: boolean;
+  enableSourceViewBonus: boolean;
+  enableAiKeywordWeight: boolean;
+  enableHeatKeywordWeight: boolean;
+  enableFreshnessWeight: boolean;
+  enableScoreRanking: boolean;
+};
+
+export type SettingsContentFilterRule = {
+  ruleKey: "ai" | "hot";
+  displayName: string;
+  summary: string;
+  toggles: SettingsContentFilterToggles;
+  weights: {
+    freshnessWeight: number;
+    sourceWeight: number;
+    completenessWeight: number;
+    aiWeight: number;
+    heatWeight: number;
+  };
+};
+
 export type SettingsFeedbackPoolItem = {
   id: number;
   contentItemId: number;
@@ -43,9 +66,21 @@ export type SettingsFeedbackPoolItem = {
 };
 
 export type SettingsViewRulesResponse = {
+  filterWorkbench: {
+    aiRule: SettingsContentFilterRule;
+    hotRule: SettingsContentFilterRule;
+  };
   providerSettings: SettingsProviderSettingsSummary[];
   providerCapability: SettingsProviderCapability;
   feedbackPool: SettingsFeedbackPoolItem[];
+};
+export type SaveContentFilterRulePayload = {
+  ruleKey: "ai" | "hot";
+  toggles: SettingsContentFilterToggles;
+};
+export type SaveContentFilterRuleResponse = {
+  ok: true;
+  ruleKey: "ai" | "hot";
 };
 export type SettingsSourceItem = {
   kind: string;
@@ -196,6 +231,12 @@ export async function readSettingsProfile(): Promise<SettingsProfile | null> {
 // 预留给后续系统页工作区的数据读取接口，当前只做最小签名，不提前绑定业务视图。
 export function readSettingsViewRules(): Promise<SettingsViewRulesResponse> {
   return requestJson<SettingsViewRulesResponse>("/api/settings/view-rules");
+}
+
+export function saveContentFilterRule(
+  payload: SaveContentFilterRulePayload
+): Promise<SaveContentFilterRuleResponse> {
+  return postSettingsAction<SaveContentFilterRuleResponse>("/actions/view-rules/content-filters", payload);
 }
 
 // sources 工作台现在使用独立来源统计，不再复用内容页当前筛选上下文。

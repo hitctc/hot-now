@@ -54,6 +54,10 @@ const baseModel = {
     selectedSourceKinds: ["openai"]
   },
   featuredCard: null,
+  strategySummary: {
+    pageKey: "ai-hot" as const,
+    items: ["来源偏置 开", "AI 关键词 关", "热点关键词 开", "新鲜度 开", "评分排序 开"]
+  },
   pagination: {
     page: 1,
     pageSize: 50,
@@ -149,6 +153,8 @@ describe("AiHotPage", () => {
       expect.arrayContaining(["flex", "flex-col", "gap-6"])
     );
     expect(wrapper.find("[data-content-filter-shell]").exists()).toBe(false);
+    expect(wrapper.get("[data-content-strategy-summary='ai-hot']").text()).toContain("当前 AI 热点");
+    expect(wrapper.get("[data-content-strategy-summary='ai-hot']").text()).toContain("来源偏置 开");
     expect(wrapper.findAll("[data-content-toolbar-card]").length).toBe(1);
     const toolbarMainRow = wrapper.get("[data-content-toolbar-main-row]");
     expect(toolbarMainRow.find("[data-content-toolbar-summary]").exists()).toBe(true);

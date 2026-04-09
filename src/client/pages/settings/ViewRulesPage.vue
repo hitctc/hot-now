@@ -16,8 +16,11 @@ import {
   deleteFeedbackEntry,
   deleteProviderSettings,
   readSettingsViewRules,
+  saveContentFilterRule,
   saveProviderSettings,
   updateProviderSettingsActivation,
+  type SettingsContentFilterRule,
+  type SettingsContentFilterToggles,
   type SettingsFeedbackPoolItem,
   type SettingsProviderKind,
   type SettingsProviderSettingsSummary,
@@ -39,10 +42,17 @@ const loadError = ref<string | null>(null);
 const pageNotice = ref<PageNotice | null>(null);
 const workbench = ref<SettingsViewRulesResponse | null>(null);
 const pendingActions = reactive<Record<string, boolean>>({});
+const filterForms = reactive<Record<"ai" | "hot", SettingsContentFilterToggles>>({
+  ai: createFilterToggleDraft(),
+  hot: createFilterToggleDraft()
+});
 const providerForm = reactive({
   providerKind: "deepseek" as SettingsProviderKind | string,
   apiKey: ""
 });
+
+const aiFilterRule = computed(() => workbench.value?.filterWorkbench.aiRule ?? null);
+const hotFilterRule = computed(() => workbench.value?.filterWorkbench.hotRule ?? null);
 
 const providerCapabilityTone = computed<AlertTone>(() => {
   if (!workbench.value) {
@@ -96,6 +106,58 @@ const selectedProviderStatus = computed(() => {
 const feedbackCopyText = computed(() =>
   (workbench.value?.feedbackPool ?? []).map((entry) => buildFeedbackCopyText(entry)).join("\n\n---\n\n")
 );
+
+function createFilterToggleDraft(): SettingsContentFilterToggles {
+  return {
+    enableTimeWindow: false,
+    enableSourceViewBonus: true,
+    enableAiKeywordWeight: true,
+    enableHeatKeywordWeight: true,
+    enableFreshnessWeight: true,
+    enableScoreRanking: true
+  };
+}
+
+function syncFilterForms(nextWorkbench: SettingsViewRulesResponse | null): void {
+  if (!nextWorkbench) {
+    return;
+  }
+
+  filterForms.ai = { ...nextWorkbench.filterWorkbench.aiRule.toggles };
+  filterForms.hot = { ...nextWorkbench.filterWorkbench.hotRule.toggles };
+}
+
+function readFilterOverviewItems(rule: SettingsContentFilterRule): string[] {
+  return rule.ruleKey === "ai"
+    ? [
+        `24 小时窗口 ${formatToggleText(rule.toggles.enableTimeWindow)}`,
+        `来源偏置 ${formatToggleText(rule.toggles.enableSourceViewBonus)}`,
+        `AI 关键词 ${formatToggleText(rule.toggles.enableAiKeywordWeight)}`,
+        `热点关键词 ${formatToggleText(rule.toggles.enableHeatKeywordWeight)}`,
+        `评分排序 ${formatToggleText(rule.toggles.enableScoreRanking)}`
+      ]
+    : [
+        `来源偏置 ${formatToggleText(rule.toggles.enableSourceViewBonus)}`,
+        `AI 关键词 ${formatToggleText(rule.toggles.enableAiKeywordWeight)}`,
+        `热点关键词 ${formatToggleText(rule.toggles.enableHeatKeywordWeight)}`,
+        `新鲜度 ${formatToggleText(rule.toggles.enableFreshnessWeight)}`,
+        `评分排序 ${formatToggleText(rule.toggles.enableScoreRanking)}`
+      ];
+}
+
+function readFilterWeightItems(rule: SettingsContentFilterRule) {
+  return [
+    `新鲜度 ${rule.weights.freshnessWeight.toFixed(2)}`,
+    `来源 ${rule.weights.sourceWeight.toFixed(2)}`,
+    `完整度 ${rule.weights.completenessWeight.toFixed(2)}`,
+    `AI ${rule.weights.aiWeight.toFixed(2)}`,
+    `热点 ${rule.weights.heatWeight.toFixed(2)}`
+  ];
+}
+
+function formatToggleText(enabled: boolean) {
+  return enabled ? "开" : "关";
+}
 
 // 页内提示统一从这里走，避免每个动作各自拼 message 分支而把交互结果写散。
 function showNotice(tone: AlertTone, noticeMessage: string): void {
@@ -228,8 +290,9 @@ async function loadWorkbench(options: { silent?: boolean } = {}): Promise<void> 
   try {
     const nextWorkbench = await readSettingsViewRules();
     workbench.value = nextWorkbench;
+    syncFilterForms(nextWorkbench);
   } catch (error) {
-    const failureMessage = resolveActionErrorMessage(error, "反馈池页面加载失败，请稍后再试。");
+    const failureMessage = resolveActionErrorMessage(error, "筛选策略页面加载失败，请稍后再试。");
 
     if (options.silent) {
       showNotice("error", failureMessage);
@@ -290,6 +353,21 @@ async function handleProviderSave(): Promise<void> {
       afterSuccess: () => {
         providerForm.apiKey = "";
       }
+    }
+  );
+}
+
+async function handleSaveContentFilterRule(ruleKey: "ai" | "hot"): Promise<void> {
+  await runWorkbenchAction(
+    `content-filter:save:${ruleKey}`,
+    () =>
+      saveContentFilterRule({
+        ruleKey,
+        toggles: { ...filterForms[ruleKey] }
+      }),
+    {
+      successMessage: `${ruleKey === "ai" ? "AI 新讯" : "AI 热点"} 筛选开关已保存。`,
+      fallbackMessage: "保存内容筛选开关失败，请稍后再试。"
     }
   );
 }
@@ -379,7 +457,7 @@ onMounted(() => {
       <a-result
         v-else-if="loadError"
         status="error"
-        title="反馈池页面加载失败"
+        title="筛选策略页面加载失败"
         :sub-title="loadError"
       >
         <template #extra>
@@ -388,26 +466,184 @@ onMounted(() => {
       </a-result>
 
       <template v-else-if="workbench">
-        <section class="grid gap-3 md:grid-cols-3" data-settings-section="overview">
-          <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
-            <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">反馈池</p>
-            <p class="mt-2 mb-0 text-xl font-medium text-editorial-text-main">{{ workbench.feedbackPool.length }}</p>
-            <p class="mt-2 mb-0 text-xs leading-5 text-editorial-text-muted">内容页写入的反馈词会集中保留在这里。</p>
-          </article>
-          <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
-            <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">已保存厂商</p>
-            <p class="mt-2 mb-0 text-xl font-medium text-editorial-text-main">{{ workbench.providerSettings.length }}</p>
-            <p class="mt-2 mb-0 text-xs leading-5 text-editorial-text-muted">
-              {{ enabledProviderSettings ? `当前启用：${formatProviderLabel(enabledProviderSettings.providerKind)}` : "当前没有启用中的厂商" }}
+        <section class="flex flex-col gap-3" data-settings-section="filter-overview">
+          <div class="flex flex-col gap-1">
+            <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">当前筛选总览</p>
+            <h2 class="m-0 text-xl font-semibold text-editorial-text-main">先看清 AI 新讯和 AI 热点现在到底怎么筛</h2>
+            <p class="m-0 text-sm leading-6 text-editorial-text-body">
+              这里先展示当前启用的真实筛选方向，再按页面分别调整开关，不再把内容筛选逻辑藏在内部代码里。
             </p>
-          </article>
-          <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
-            <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">LLM 设置</p>
-            <p class="mt-2 mb-0 text-xl font-medium text-editorial-text-main">暂未使用</p>
-            <p class="mt-2 mb-0 text-xs leading-5 text-editorial-text-muted">
-              当前只保留厂商配置入口，后续真正接入时会复用这里的设置。
-            </p>
-          </article>
+          </div>
+
+          <div class="grid gap-3 lg:grid-cols-2" data-settings-section="overview">
+            <article
+              v-if="aiFilterRule"
+              class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4"
+              data-filter-overview-card="ai"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">AI 新讯</p>
+                  <p class="mt-2 mb-0 text-base font-semibold text-editorial-text-main">{{ aiFilterRule.displayName }}</p>
+                </div>
+                <a-tag color="blue">当前生效</a-tag>
+              </div>
+              <p class="mt-3 mb-0 text-sm leading-6 text-editorial-text-body">{{ aiFilterRule.summary }}</p>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <a-tag v-for="item in readFilterOverviewItems(aiFilterRule)" :key="`ai:${item}`">{{ item }}</a-tag>
+              </div>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <a-tag v-for="item in readFilterWeightItems(aiFilterRule)" :key="`ai-weight:${item}`" color="default">{{ item }}</a-tag>
+              </div>
+            </article>
+
+            <article
+              v-if="hotFilterRule"
+              class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4"
+              data-filter-overview-card="hot"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">AI 热点</p>
+                  <p class="mt-2 mb-0 text-base font-semibold text-editorial-text-main">{{ hotFilterRule.displayName }}</p>
+                </div>
+                <a-tag color="blue">当前生效</a-tag>
+              </div>
+              <p class="mt-3 mb-0 text-sm leading-6 text-editorial-text-body">{{ hotFilterRule.summary }}</p>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <a-tag v-for="item in readFilterOverviewItems(hotFilterRule)" :key="`hot:${item}`">{{ item }}</a-tag>
+              </div>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <a-tag v-for="item in readFilterWeightItems(hotFilterRule)" :key="`hot-weight:${item}`" color="default">{{ item }}</a-tag>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section data-settings-section="filter-ai">
+          <a-card :class="editorialContentCardClass" title="AI 新讯筛选" size="small">
+            <div v-if="aiFilterRule" class="flex flex-col gap-4">
+              <p class="m-0 text-sm leading-6 text-editorial-text-body">
+                {{ aiFilterRule.summary }}
+              </p>
+
+              <div class="grid gap-3 md:grid-cols-2">
+                <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+                  <div>
+                    <p class="m-0 text-sm font-semibold text-editorial-text-main">24 小时窗口</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">关闭后，AI 新讯不再强行只看最近 24 小时内容。</p>
+                  </div>
+                  <a-switch v-model:checked="filterForms.ai.enableTimeWindow" />
+                </label>
+                <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+                  <div>
+                    <p class="m-0 text-sm font-semibold text-editorial-text-main">来源页面偏置</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">关闭后，AI 原生来源不再拿到额外加分。</p>
+                  </div>
+                  <a-switch v-model:checked="filterForms.ai.enableSourceViewBonus" />
+                </label>
+                <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+                  <div>
+                    <p class="m-0 text-sm font-semibold text-editorial-text-main">AI 关键词权重</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">关闭后，AI 关键词命中不再影响排序。</p>
+                  </div>
+                  <a-switch v-model:checked="filterForms.ai.enableAiKeywordWeight" />
+                </label>
+                <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+                  <div>
+                    <p class="m-0 text-sm font-semibold text-editorial-text-main">热点关键词权重</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">关闭后，快讯和热点词不再参与 AI 新讯排序。</p>
+                  </div>
+                  <a-switch v-model:checked="filterForms.ai.enableHeatKeywordWeight" />
+                </label>
+                <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4 md:col-span-2">
+                  <div>
+                    <p class="m-0 text-sm font-semibold text-editorial-text-main">评分排序</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">关闭后，AI 新讯会退回按发布时间倒序，而不是按综合评分排序。</p>
+                  </div>
+                  <a-switch v-model:checked="filterForms.ai.enableScoreRanking" />
+                </label>
+              </div>
+
+              <div class="flex flex-wrap gap-2">
+                <a-tag v-for="item in readFilterWeightItems(aiFilterRule)" :key="`ai-inline-weight:${item}`">{{ item }}</a-tag>
+              </div>
+
+              <div class="flex justify-end">
+                <a-button
+                  type="primary"
+                  data-save-content-filter="ai"
+                  :loading="isActionPending('content-filter:save:ai')"
+                  @click="handleSaveContentFilterRule('ai')"
+                >
+                  保存 AI 新讯筛选
+                </a-button>
+              </div>
+            </div>
+          </a-card>
+        </section>
+
+        <section data-settings-section="filter-hot">
+          <a-card :class="editorialContentCardClass" title="AI 热点筛选" size="small">
+            <div v-if="hotFilterRule" class="flex flex-col gap-4">
+              <p class="m-0 text-sm leading-6 text-editorial-text-body">
+                {{ hotFilterRule.summary }}
+              </p>
+
+              <div class="grid gap-3 md:grid-cols-2">
+                <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+                  <div>
+                    <p class="m-0 text-sm font-semibold text-editorial-text-main">来源页面偏置</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">关闭后，热点原生来源不再拿到额外加分。</p>
+                  </div>
+                  <a-switch v-model:checked="filterForms.hot.enableSourceViewBonus" />
+                </label>
+                <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+                  <div>
+                    <p class="m-0 text-sm font-semibold text-editorial-text-main">AI 关键词权重</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">关闭后，AI 词信号不再帮助热点排序。</p>
+                  </div>
+                  <a-switch v-model:checked="filterForms.hot.enableAiKeywordWeight" />
+                </label>
+                <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+                  <div>
+                    <p class="m-0 text-sm font-semibold text-editorial-text-main">热点关键词权重</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">关闭后，热点词命中不再推动 AI 热点排序。</p>
+                  </div>
+                  <a-switch v-model:checked="filterForms.hot.enableHeatKeywordWeight" />
+                </label>
+                <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+                  <div>
+                    <p class="m-0 text-sm font-semibold text-editorial-text-main">时间新鲜度加权</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">关闭后，发布时间新近程度不再影响热点排序。</p>
+                  </div>
+                  <a-switch v-model:checked="filterForms.hot.enableFreshnessWeight" />
+                </label>
+                <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4 md:col-span-2">
+                  <div>
+                    <p class="m-0 text-sm font-semibold text-editorial-text-main">评分排序</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">关闭后，AI 热点会退回按发布时间倒序，而不是按综合评分排序。</p>
+                  </div>
+                  <a-switch v-model:checked="filterForms.hot.enableScoreRanking" />
+                </label>
+              </div>
+
+              <div class="flex flex-wrap gap-2">
+                <a-tag v-for="item in readFilterWeightItems(hotFilterRule)" :key="`hot-inline-weight:${item}`">{{ item }}</a-tag>
+              </div>
+
+              <div class="flex justify-end">
+                <a-button
+                  type="primary"
+                  data-save-content-filter="hot"
+                  :loading="isActionPending('content-filter:save:hot')"
+                  @click="handleSaveContentFilterRule('hot')"
+                >
+                  保存 AI 热点筛选
+                </a-button>
+              </div>
+            </div>
+          </a-card>
         </section>
 
         <section data-settings-section="feedback-pool">

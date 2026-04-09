@@ -37,6 +37,99 @@ describe("settingsApi", () => {
     expect(requestJson).toHaveBeenCalledWith("/api/settings/sources");
   });
 
+  it("reads the content filter workbench from the view-rules api", async () => {
+    const { readSettingsViewRules } = await import("../../src/client/services/settingsApi");
+
+    requestJson.mockResolvedValue({
+      filterWorkbench: {
+        aiRule: {
+          ruleKey: "ai",
+          displayName: "AI 新讯筛选",
+          summary: "当前 AI 新讯会优先保留最近 24 小时内容。",
+          toggles: {
+            enableTimeWindow: true,
+            enableSourceViewBonus: true,
+            enableAiKeywordWeight: true,
+            enableHeatKeywordWeight: true,
+            enableFreshnessWeight: true,
+            enableScoreRanking: true
+          },
+          weights: {
+            freshnessWeight: 0.1,
+            sourceWeight: 0.1,
+            completenessWeight: 0.15,
+            aiWeight: 0.5,
+            heatWeight: 0.15
+          }
+        },
+        hotRule: {
+          ruleKey: "hot",
+          displayName: "AI 热点筛选",
+          summary: "当前 AI 热点不会强行限制 24 小时。",
+          toggles: {
+            enableTimeWindow: false,
+            enableSourceViewBonus: true,
+            enableAiKeywordWeight: true,
+            enableHeatKeywordWeight: true,
+            enableFreshnessWeight: true,
+            enableScoreRanking: true
+          },
+          weights: {
+            freshnessWeight: 0.35,
+            sourceWeight: 0.1,
+            completenessWeight: 0.1,
+            aiWeight: 0.05,
+            heatWeight: 0.4
+          }
+        }
+      },
+      providerSettings: [],
+      providerCapability: {
+        featureAvailable: false,
+        hasMasterKey: true,
+        message: "未使用"
+      },
+      feedbackPool: []
+    });
+
+    await readSettingsViewRules();
+
+    expect(requestJson).toHaveBeenCalledWith("/api/settings/view-rules");
+  });
+
+  it("posts content filter toggle payloads to the dedicated save action", async () => {
+    const { saveContentFilterRule } = await import("../../src/client/services/settingsApi");
+
+    requestJson.mockResolvedValue({ ok: true, ruleKey: "ai" });
+
+    await saveContentFilterRule({
+      ruleKey: "ai",
+      toggles: {
+        enableTimeWindow: false,
+        enableSourceViewBonus: true,
+        enableAiKeywordWeight: true,
+        enableHeatKeywordWeight: false,
+        enableFreshnessWeight: true,
+        enableScoreRanking: true
+      }
+    });
+
+    expect(requestJson).toHaveBeenCalledWith("/actions/view-rules/content-filters", {
+      method: "POST",
+      body: JSON.stringify({
+        ruleKey: "ai",
+        toggles: {
+          enableTimeWindow: false,
+          enableSourceViewBonus: true,
+          enableAiKeywordWeight: true,
+          enableHeatKeywordWeight: false,
+          enableFreshnessWeight: true,
+          enableScoreRanking: true
+        }
+      })
+    });
+  });
+
   it("posts create source payloads to the sources create action", async () => {
     const { createSource } = await import("../../src/client/services/settingsApi");
 

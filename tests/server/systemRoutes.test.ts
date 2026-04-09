@@ -380,6 +380,42 @@ describe("system routes", () => {
     expect(deleteProviderSettings).toHaveBeenCalledWith("deepseek");
   });
 
+  it("calls saveContentFilterRule for the dedicated content-filter action", async () => {
+    const saveContentFilterRule = vi.fn().mockResolvedValue({ ok: true, ruleKey: "ai" });
+    const app = createSystemTestServer({
+      saveContentFilterRule
+    } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/view-rules/content-filters",
+      payload: {
+        ruleKey: "ai",
+        toggles: {
+          enableTimeWindow: false,
+          enableSourceViewBonus: true,
+          enableAiKeywordWeight: true,
+          enableHeatKeywordWeight: false,
+          enableFreshnessWeight: true,
+          enableScoreRanking: true
+        }
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(saveContentFilterRule).toHaveBeenCalledWith({
+      ruleKey: "ai",
+      toggles: {
+        enableTimeWindow: false,
+        enableSourceViewBonus: true,
+        enableAiKeywordWeight: true,
+        enableHeatKeywordWeight: false,
+        enableFreshnessWeight: true,
+        enableScoreRanking: true
+      }
+    });
+  });
+
   it("removes the old nl-rules and draft action routes", async () => {
     const app = createSystemTestServer({} as never);
 

@@ -182,6 +182,7 @@ const listCards = computed(() => pageModel.value?.cards ?? []);
 const featuredCard = computed(() => pageModel.value?.featuredCard ?? null);
 const visibleResultCount = computed(() => pageModel.value?.pagination?.totalResults ?? listCards.value.length);
 const sourceFilter = computed(() => pageModel.value?.sourceFilter ?? null);
+const strategySummary = computed(() => pageModel.value?.strategySummary.items ?? []);
 const pagination = computed(() => pageModel.value?.pagination ?? null);
 const displayIndexOffset = computed(() => {
   const currentPagination = pagination.value;
@@ -246,6 +247,15 @@ onMounted(() => {
         @clear="handleSearchClear"
       />
     </div>
+
+    <section
+      v-if="strategySummary.length > 0"
+      class="flex flex-wrap items-center gap-2"
+      data-content-strategy-summary="ai-new"
+    >
+      <span class="text-sm font-medium text-editorial-text-muted">当前 AI 新讯：</span>
+      <a-tag v-for="item in strategySummary" :key="item">{{ item }}</a-tag>
+    </section>
 
     <a-skeleton v-if="isLoading" active :paragraph="{ rows: 7 }" />
 

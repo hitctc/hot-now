@@ -93,7 +93,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 统一站点保留左侧品牌块、浅深主题切换和本地 `localStorage` 持久化
 - `/settings/*` 现在通过 Fastify 返回统一客户端入口，再由 `Vue 3 + Ant Design Vue` 接管页面渲染
 - `/`、`/ai-new`、`/ai-hot` 现在也通过 Fastify 返回统一客户端入口，再由 `Vue 3 + Ant Design Vue` 内容页读取 `/api/content/ai-new`、`/api/content/ai-hot` 渲染
-- `/settings/view-rules` 已收口为反馈池工作台：页面只保留 `反馈池` 与标记为 `暂未使用` 的 `LLM 设置`；四道门、草稿池、正式自然语言规则和重算入口都已移除
+- `/settings/view-rules` 现在是内容筛选工作台：页面会解释并控制 `AI 新讯 / AI 热点` 的真实筛选开关，同时保留 `反馈池` 与标记为 `暂未使用` 的 `LLM 设置`
 - `/settings/sources` 现在会展示即时操作卡、来源统计概览表和 source 库存表，包含总条数、今天发布、今天抓取，以及 `AI 新讯 / AI 热点` 的入池与展示统计；概览区还会显示系统真实下一次自动采集时间，格式为 `18:40（还有 6 分钟）`
 - `/settings/sources` 现在支持可视化新增 / 编辑 / 删除自定义来源：RSS 来源只需要填写 `RSS URL`；公众号来源只需要填写 `公众号名称`，文章链接可选但建议一起填写，其余 `kind / 来源名称 / 来源主页 / bridge 细节` 由系统在保存时自动生成；本地开发默认使用仓库内置公众号解析 sidecar，保存成功后会立即自动补拉这条新来源的首批内容
 - `/settings/sources` 现在支持逐 source 配置“选中该来源时全量展示”；开启后，该来源不会在内容页首次默认勾选，只有用户显式勾选后才会按全量模式展示
@@ -106,6 +106,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 兼容别名：`POST /actions/run`（等价于手动采集）
 - 内容反馈写入：`POST /actions/content/:id/feedback-pool`
 - LLM 设置动作：`POST /actions/view-rules/provider-settings`、`POST /actions/view-rules/provider-settings/activation`、`POST /actions/view-rules/provider-settings/delete`
+- 内容筛选动作：`POST /actions/view-rules/content-filters`
 - 反馈池动作：`POST /actions/feedback-pool/:id/delete`、`POST /actions/feedback-pool/clear`
 - 内容导航已收口为 AI-first：`/` 与 `/ai-new` 等同 `AI 新讯`，`/ai-hot` 承接 `AI 热点`，`/articles` 已移除
 
@@ -168,4 +169,4 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 类型构建：已通过
 - 系统页客户端构建：已通过
 - Playwright MCP 本地验收通过：`/login` 登录成功；`/`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常；浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持；内容页来源筛选写入 `localStorage['hot-now-content-sources']`、排序偏好写入 `localStorage['hot-now-content-sort']`、标题搜索词写入 `localStorage['hot-now-content-search']` 后刷新仍保留
-- 如果要手动验证 `/settings/view-rules`，直接检查反馈池的复制 / 删除 / 清空，以及 LLM 设置的保存 / 启用 / 删除是否正常；如需把厂商配置和会话密钥分开管理，再额外配置 `LLM_SETTINGS_MASTER_KEY`
+- 如果要手动验证 `/settings/view-rules`，先检查 `AI 新讯 / AI 热点` 筛选总览与开关保存，再检查反馈池的复制 / 删除 / 清空，以及 LLM 设置的保存 / 启用 / 删除是否正常；如需把厂商配置和会话密钥分开管理，再额外配置 `LLM_SETTINGS_MASTER_KEY`

@@ -179,6 +179,7 @@ async function handlePaginationChange(nextPage: number): Promise<void> {
 
 const sourceFilter = computed(() => pageModel.value?.sourceFilter ?? null);
 const listCards = computed(() => pageModel.value?.cards ?? []);
+const strategySummary = computed(() => pageModel.value?.strategySummary.items ?? []);
 const visibleResultCount = computed(() => pageModel.value?.pagination?.totalResults ?? listCards.value.length);
 const pagination = computed(() => pageModel.value?.pagination ?? null);
 const displayIndexOffset = computed(() => {
@@ -244,6 +245,15 @@ onMounted(() => {
         @clear="handleSearchClear"
       />
     </div>
+
+    <section
+      v-if="strategySummary.length > 0"
+      class="flex flex-wrap items-center gap-2"
+      data-content-strategy-summary="ai-hot"
+    >
+      <span class="text-sm font-medium text-editorial-text-muted">当前 AI 热点：</span>
+      <a-tag v-for="item in strategySummary" :key="item">{{ item }}</a-tag>
+    </section>
 
     <a-skeleton v-if="isLoading" active :paragraph="{ rows: 6 }" />
 

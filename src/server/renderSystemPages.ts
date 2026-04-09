@@ -26,7 +26,32 @@ type FeedbackPoolItem = {
   updatedAt: string;
 };
 
+type FilterRuleWorkbenchView = {
+  ruleKey: "ai" | "hot";
+  displayName: string;
+  summary: string;
+  toggles: {
+    enableTimeWindow: boolean;
+    enableSourceViewBonus: boolean;
+    enableAiKeywordWeight: boolean;
+    enableHeatKeywordWeight: boolean;
+    enableFreshnessWeight: boolean;
+    enableScoreRanking: boolean;
+  };
+  weights: {
+    freshnessWeight: number;
+    sourceWeight: number;
+    completenessWeight: number;
+    aiWeight: number;
+    heatWeight: number;
+  };
+};
+
 export type ViewRulesWorkbenchView = {
+  filterWorkbench: {
+    aiRule: FilterRuleWorkbenchView;
+    hotRule: FilterRuleWorkbenchView;
+  };
   providerSettings: ProviderSettingsSummaryView[];
   providerCapability: ProviderCapabilityView;
   feedbackPool: FeedbackPoolItem[];
@@ -82,13 +107,13 @@ export function renderViewRulesPage(rules: ViewRulesWorkbenchView): string {
   return `
     <section class="content-intro content-intro--system">
       <p class="content-kicker">系统菜单</p>
-      <p class="content-description">筛选策略：当前只保留反馈池和暂未使用的 LLM 设置入口。</p>
+      <p class="content-description">筛选策略：这里会解释并控制 AI 新讯与 AI 热点的内容筛选开关，同时保留反馈池和暂未使用的 LLM 设置。</p>
     </section>
     <section class="system-section system-section--workbench" data-system-section="view-rules">
       <header class="system-section-header">
-        <p class="system-section-kicker">反馈池工作台</p>
-        <h3 class="system-section-title">查看反馈池并保留厂商配置入口</h3>
-        <p class="system-section-description">自然语言规则、草稿池和重算链路已移除，当前只保留反馈池与暂未使用的 LLM 设置。</p>
+        <p class="system-section-kicker">内容筛选工作台</p>
+        <h3 class="system-section-title">查看 AI 新讯与 AI 热点的真实筛选规则</h3>
+        <p class="system-section-description">客户端会展示当前筛选总览、分页面开关、反馈池，以及暂未使用的 LLM 设置。</p>
       </header>
       <div class="system-stack system-stack--control system-stack--workbench">
         ${renderLegacyViewRulesFeedbackCard(rules.feedbackPool)}

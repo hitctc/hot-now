@@ -41,6 +41,10 @@ import {
   updateSourceDisplayMode as persistSourceDisplayMode
 } from "./core/source/sourceMutationRepository.js";
 import { listReportDates, readTextFile } from "./core/storage/reportStore.js";
+import {
+  getViewRuleConfig,
+  saveViewRuleConfig
+} from "./core/viewRules/viewRuleRepository.js";
 import { createServer } from "./server/createServer.js";
 
 type ReportSummary = {
@@ -176,11 +180,128 @@ function getCurrentUserProfile() {
 }
 
 function getViewRulesWorkbenchData() {
+  const aiRule = getViewRuleConfig(db, "ai");
+  const hotRule = getViewRuleConfig(db, "hot");
+
   return {
+    filterWorkbench: {
+      aiRule: buildFilterWorkbenchRule("ai", aiRule),
+      hotRule: buildFilterWorkbenchRule("hot", hotRule)
+    },
     providerSettings: listProviderSettingsSummaries(db),
     providerCapability: readProviderCapability(),
     feedbackPool: listFeedbackPoolEntries(db)
   };
+}
+
+function buildFilterWorkbenchRule(
+  ruleKey: "ai" | "hot",
+  config: ReturnType<typeof getViewRuleConfig>
+) {
+  return {
+    ruleKey,
+    displayName: ruleKey === "ai" ? "AI 新讯筛选" : "AI 热点筛选",
+    summary: ruleKey === "ai"
+      ? buildAiRuleSummary(config)
+      : buildHotRuleSummary(config),
+    toggles: {
+      enableTimeWindow: config.enableTimeWindow,
+      enableSourceViewBonus: config.enableSourceViewBonus,
+      enableAiKeywordWeight: config.enableAiKeywordWeight,
+      enableHeatKeywordWeight: config.enableHeatKeywordWeight,
+      enableFreshnessWeight: config.enableFreshnessWeight,
+      enableScoreRanking: config.enableScoreRanking
+    },
+    weights: {
+      freshnessWeight: config.freshnessWeight,
+      sourceWeight: config.sourceWeight,
+      completenessWeight: config.completenessWeight,
+      aiWeight: config.aiWeight,
+      heatWeight: config.heatWeight
+    }
+  };
+}
+
+function buildAiRuleSummary(config: ReturnType<typeof getViewRuleConfig>) {
+  return `当前 AI 新讯会${config.enableTimeWindow ? "" : "不"}优先保留最近 24 小时内容，并按${readEnabledAiSignals(config)}排序。`;
+}
+
+function buildHotRuleSummary(config: ReturnType<typeof getViewRuleConfig>) {
+  return `当前 AI 热点${config.enableTimeWindow ? "会" : "不会"}强行限制 24 小时，并按${readEnabledHotSignals(config)}排序。`;
+}
+
+function readEnabledAiSignals(config: ReturnType<typeof getViewRuleConfig>) {
+  const parts = [
+    config.enableAiKeywordWeight ? "AI 关键词" : null,
+    config.enableHeatKeywordWeight ? "热点关键词" : null,
+    config.enableSourceViewBonus ? "来源偏置" : null,
+    config.enableScoreRanking ? "综合评分" : "发布时间"
+  ].filter((value): value is string => typeof value === "string");
+
+  return parts.join("、");
+}
+
+function readEnabledHotSignals(config: ReturnType<typeof getViewRuleConfig>) {
+  const parts = [
+    config.enableHeatKeywordWeight ? "热点关键词" : null,
+    config.enableAiKeywordWeight ? "AI 关键词" : null,
+    config.enableFreshnessWeight ? "新鲜度" : null,
+    config.enableSourceViewBonus ? "来源偏置" : null,
+    config.enableScoreRanking ? "综合评分" : "发布时间"
+  ].filter((value): value is string => typeof value === "string");
+
+  return parts.join("、");
+}
+
+function saveContentFilterRule(input: { ruleKey: string; toggles: unknown }) {
+  const normalizedRuleKey = input.ruleKey.trim();
+
+  if ((normalizedRuleKey !== "ai" && normalizedRuleKey !== "hot") || !isTogglePatch(input.toggles)) {
+    return { ok: false as const, reason: "invalid-content-filter-config" };
+  }
+
+  const ruleKey: "ai" | "hot" = normalizedRuleKey;
+
+  const currentConfig = getViewRuleConfig(db, ruleKey);
+  const result = saveViewRuleConfig(db, ruleKey, {
+    ...currentConfig,
+    ...input.toggles
+  });
+
+  if (!result.ok) {
+    return { ok: false as const, reason: result.reason };
+  }
+
+  return {
+    ok: true as const,
+    ruleKey
+  };
+}
+
+function isTogglePatch(value: unknown): value is {
+  enableTimeWindow?: boolean;
+  enableSourceViewBonus?: boolean;
+  enableAiKeywordWeight?: boolean;
+  enableHeatKeywordWeight?: boolean;
+  enableFreshnessWeight?: boolean;
+  enableScoreRanking?: boolean;
+} {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  return Object.entries(value).every(
+    ([key, entryValue]) =>
+      (
+        key === "enableTimeWindow" ||
+        key === "enableSourceViewBonus" ||
+        key === "enableAiKeywordWeight" ||
+        key === "enableHeatKeywordWeight" ||
+        key === "enableFreshnessWeight" ||
+        key === "enableScoreRanking"
+      ) &&
+      typeof entryValue === "boolean"
+  );
 }
 
 function readProviderCapability() {
@@ -303,6 +424,7 @@ const app = createServer({
   listRatingDimensions: async () => listRatingDimensions(db),
   saveRatings: async (contentItemId, scores) => saveRatings(db, contentItemId, scores),
   getViewRulesWorkbenchData: async () => getViewRulesWorkbenchData(),
+  saveContentFilterRule: async (input) => saveContentFilterRule(input),
   saveProviderSettings: async (input) =>
     persistProviderSettings(db, input, {
       settingsMasterKey: config.llm?.settingsMasterKey ?? null

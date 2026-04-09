@@ -18,6 +18,7 @@ vi.mock("../../src/client/services/settingsApi", async () => {
   return {
     ...actual,
     readSettingsViewRules: vi.fn(),
+    saveContentFilterRule: vi.fn(),
     saveProviderSettings: vi.fn(),
     updateProviderSettingsActivation: vi.fn(),
     deleteProviderSettings: vi.fn(),
@@ -28,6 +29,48 @@ vi.mock("../../src/client/services/settingsApi", async () => {
 
 function createWorkbench() {
   return {
+    filterWorkbench: {
+      aiRule: {
+        ruleKey: "ai",
+        displayName: "AI 新讯筛选",
+        summary: "当前 AI 新讯会优先保留最近 24 小时内容，并按 AI 关键词、来源偏置和综合评分排序。",
+        toggles: {
+          enableTimeWindow: true,
+          enableSourceViewBonus: true,
+          enableAiKeywordWeight: true,
+          enableHeatKeywordWeight: false,
+          enableFreshnessWeight: true,
+          enableScoreRanking: true
+        },
+        weights: {
+          freshnessWeight: 0.1,
+          sourceWeight: 0.1,
+          completenessWeight: 0.15,
+          aiWeight: 0.5,
+          heatWeight: 0.15
+        }
+      },
+      hotRule: {
+        ruleKey: "hot",
+        displayName: "AI 热点筛选",
+        summary: "当前 AI 热点不会强行限制 24 小时，但会按热点关键词、新鲜度和来源偏置排序。",
+        toggles: {
+          enableTimeWindow: false,
+          enableSourceViewBonus: true,
+          enableAiKeywordWeight: false,
+          enableHeatKeywordWeight: true,
+          enableFreshnessWeight: true,
+          enableScoreRanking: true
+        },
+        weights: {
+          freshnessWeight: 0.35,
+          sourceWeight: 0.1,
+          completenessWeight: 0.1,
+          aiWeight: 0.05,
+          heatWeight: 0.4
+        }
+      }
+    },
     providerSettings: [
       {
         providerKind: "deepseek",
@@ -105,7 +148,7 @@ describe("ViewRulesPage", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders feedback pool and llm settings while removing nl-rules and draft workbench sections", async () => {
+  it("renders the content filter workbench above feedback pool and llm settings", async () => {
     vi.mocked(settingsApi.readSettingsViewRules).mockResolvedValue(createWorkbench());
 
     const wrapper = mountWithApp(ViewRulesPage);
@@ -113,8 +156,13 @@ describe("ViewRulesPage", () => {
     await flushPromises();
 
     expect(settingsApi.readSettingsViewRules).toHaveBeenCalledTimes(1);
-    expect(wrapper.get("[data-settings-section='overview']").text()).toContain("反馈池");
-    expect(wrapper.get("[data-settings-section='overview']").text()).toContain("LLM 设置");
+    expect(wrapper.get("[data-settings-section='filter-overview']").text()).toContain("当前筛选总览");
+    expect(wrapper.get("[data-filter-overview-card='ai']").text()).toContain("AI 新讯筛选");
+    expect(wrapper.get("[data-filter-overview-card='hot']").text()).toContain("AI 热点筛选");
+    expect(wrapper.get("[data-settings-section='filter-ai']").text()).toContain("24 小时窗口");
+    expect(wrapper.get("[data-settings-section='filter-hot']").text()).toContain("时间新鲜度加权");
+    expect(wrapper.get("[data-save-content-filter='ai']").text()).toContain("保存 AI 新讯筛选");
+    expect(wrapper.get("[data-save-content-filter='hot']").text()).toContain("保存 AI 热点筛选");
     expect(wrapper.get("[data-view-rules-section='feedback-pool']").text()).toContain("Agent 工作流总结");
     expect(wrapper.get("[data-feedback-row]").text()).toContain("这类内容应该更靠前。");
     expect(wrapper.get("[data-action='copy-feedback-pool']").text()).toContain("复制全部反馈");
@@ -126,6 +174,49 @@ describe("ViewRulesPage", () => {
     expect(wrapper.find("[data-settings-section='strategy-drafts']").exists()).toBe(false);
     expect(wrapper.text()).not.toContain("正式自然语言策略");
     expect(wrapper.text()).not.toContain("草稿池");
+  });
+
+  it("saves ai and hot content filter toggles independently", async () => {
+    vi.mocked(settingsApi.readSettingsViewRules)
+      .mockResolvedValueOnce(createWorkbench())
+      .mockResolvedValueOnce(createWorkbench())
+      .mockResolvedValueOnce(createWorkbench());
+    vi.mocked(settingsApi.saveContentFilterRule)
+      .mockResolvedValueOnce({ ok: true, ruleKey: "ai" })
+      .mockResolvedValueOnce({ ok: true, ruleKey: "hot" });
+
+    const wrapper = mountWithApp(ViewRulesPage);
+
+    await flushPromises();
+    await wrapper.get("[data-save-content-filter='ai']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.saveContentFilterRule).toHaveBeenCalledWith({
+      ruleKey: "ai",
+      toggles: {
+        enableTimeWindow: true,
+        enableSourceViewBonus: true,
+        enableAiKeywordWeight: true,
+        enableHeatKeywordWeight: false,
+        enableFreshnessWeight: true,
+        enableScoreRanking: true
+      }
+    });
+
+    await wrapper.get("[data-save-content-filter='hot']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.saveContentFilterRule).toHaveBeenCalledWith({
+      ruleKey: "hot",
+      toggles: {
+        enableTimeWindow: false,
+        enableSourceViewBonus: true,
+        enableAiKeywordWeight: false,
+        enableHeatKeywordWeight: true,
+        enableFreshnessWeight: true,
+        enableScoreRanking: true
+      }
+    });
   });
 
   it("copies all feedback entries from the feedback pool", async () => {

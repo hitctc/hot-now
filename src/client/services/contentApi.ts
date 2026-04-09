@@ -36,6 +36,10 @@ export type ContentPageModel = {
   sourceFilter?: ContentSourceFilter;
   featuredCard: ContentCard | null;
   cards: ContentCard[];
+  strategySummary: {
+    pageKey: ContentPageKey;
+    items: string[];
+  };
   pagination: {
     page: number;
     pageSize: number;

@@ -104,6 +104,10 @@ type ContentPageModel = {
   };
   featuredCard: ContentCardView | null;
   cards: ContentCardView[];
+  strategySummary: {
+    pageKey: ContentPageKey;
+    items: string[];
+  };
   pagination: {
     page: number;
     pageSize: number;
@@ -116,6 +120,11 @@ type ContentPageModel = {
     tone: "default" | "degraded" | "filtered";
   } | null;
 };
+type SaveContentFilterRuleInput = {
+  ruleKey: string;
+  toggles: unknown;
+};
+type SaveContentFilterRuleResult = { ok: true; ruleKey: "ai" | "hot" } | { ok: false; reason: string };
 
 type ServerDeps = {
   clientBuildRoot?: string;
@@ -141,6 +150,9 @@ type ServerDeps = {
   listRatingDimensions?: () => Promise<RatingDimension[]> | RatingDimension[];
   saveRatings?: (contentItemId: number, scores: Record<string, number>) => Promise<SaveRatingsResult> | SaveRatingsResult;
   getViewRulesWorkbenchData?: () => Promise<ViewRulesWorkbenchView> | ViewRulesWorkbenchView;
+  saveContentFilterRule?: (
+    input: SaveContentFilterRuleInput
+  ) => Promise<SaveContentFilterRuleResult> | SaveContentFilterRuleResult;
   saveProviderSettings?: (input: SaveProviderSettingsInput) => Promise<SaveProviderSettingsResult> | SaveProviderSettingsResult;
   updateProviderSettingsActivation?: (
     input: UpdateProviderSettingsActivationInput
@@ -267,6 +279,25 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     return reply.send(await readSettingsViewRulesApiData(deps));
+  });
+
+  app.post("/actions/view-rules/content-filters", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    const body = request.body as { ruleKey?: unknown; toggles?: unknown } | undefined;
+    const ruleKey = typeof body?.ruleKey === "string" ? body.ruleKey.trim() : "";
+    const result = await deps.saveContentFilterRule?.({
+      ruleKey,
+      toggles: body?.toggles
+    });
+
+    if (!result || result.ok === false) {
+      return reply.code(400).send({ ok: false, reason: "invalid-content-filter-config" });
+    }
+
+    return reply.send({ ok: true, ruleKey: result.ruleKey });
   });
 
   app.get("/api/settings/sources", async (request, reply) => {
@@ -998,6 +1029,48 @@ async function readSettingsViewRulesApiData(deps: ServerDeps): Promise<ViewRules
 
   if (!workbench) {
     return {
+      filterWorkbench: {
+        aiRule: {
+          ruleKey: "ai",
+          displayName: "AI 新讯筛选",
+          summary: "当前没有可读取的 AI 新讯筛选配置。",
+          toggles: {
+            enableTimeWindow: true,
+            enableSourceViewBonus: true,
+            enableAiKeywordWeight: true,
+            enableHeatKeywordWeight: true,
+            enableFreshnessWeight: true,
+            enableScoreRanking: true
+          },
+          weights: {
+            freshnessWeight: 0.1,
+            sourceWeight: 0.1,
+            completenessWeight: 0.15,
+            aiWeight: 0.5,
+            heatWeight: 0.15
+          }
+        },
+        hotRule: {
+          ruleKey: "hot",
+          displayName: "AI 热点筛选",
+          summary: "当前没有可读取的 AI 热点筛选配置。",
+          toggles: {
+            enableTimeWindow: false,
+            enableSourceViewBonus: true,
+            enableAiKeywordWeight: true,
+            enableHeatKeywordWeight: true,
+            enableFreshnessWeight: true,
+            enableScoreRanking: true
+          },
+          weights: {
+            freshnessWeight: 0.35,
+            sourceWeight: 0.1,
+            completenessWeight: 0.1,
+            aiWeight: 0.05,
+            heatWeight: 0.4
+          }
+        }
+      },
       providerSettings: [],
       providerCapability: {
         hasMasterKey: false,
@@ -1319,6 +1392,10 @@ async function buildContentPageModelFromDependencies(
       pageKey,
       featuredCard: null,
       cards: [],
+      strategySummary: {
+        pageKey,
+        items: []
+      },
       pagination: null,
       emptyState: {
         title: pageKey === "ai-hot" ? "暂无 AI 热点" : "暂无 AI 新讯",
@@ -1359,6 +1436,10 @@ async function buildContentPageModelFromDependencies(
       // AI 新讯和 AI 热点都统一成标准卡流，保留 featuredCard 仅作兼容空字段。
       featuredCard: null,
       cards: pagination.cards,
+      strategySummary: {
+        pageKey,
+        items: []
+      },
       pagination: pagination.meta,
       emptyState:
         effectiveSelectedSourceKinds.length === 0
@@ -1392,6 +1473,10 @@ async function buildContentPageModelFromDependencies(
       pageKey,
       featuredCard: null,
       cards: [],
+      strategySummary: {
+        pageKey,
+        items: []
+      },
       pagination: null,
       emptyState: {
         title: "内容暂不可用",

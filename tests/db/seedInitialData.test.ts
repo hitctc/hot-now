@@ -120,6 +120,34 @@ describe("seedInitialData", () => {
     expect(activeRows).toEqual([{ kind: "openai" }]);
   });
 
+  it("refreshes built-in rss urls on reseed when the catalog changes", async () => {
+    const db = await createTestDatabase();
+
+    seedInitialData(db, { username: "admin", password: "bootstrap-password" });
+
+    db.prepare(
+      `
+        UPDATE content_sources
+        SET rss_url = 'https://v2ex.com/feed/rss.xml'
+        WHERE kind = 'v2ex'
+      `
+    ).run();
+
+    seedInitialData(db, { username: "admin", password: "bootstrap-password" });
+
+    const row = db
+      .prepare(
+        `
+          SELECT rss_url
+          FROM content_sources
+          WHERE kind = 'v2ex'
+        `
+      )
+      .get() as { rss_url: string };
+
+    expect(row.rss_url).toBe("https://www.v2ex.com/feed/tab/tech.xml");
+  });
+
   it("keeps show_all_when_selected disabled by default for all built-in sources", async () => {
     const db = await createTestDatabase();
 

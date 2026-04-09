@@ -139,7 +139,7 @@ const builtinSources = [
 
 export function seedInitialData(db: SqliteDatabase, authBootstrap?: AuthBootstrap): void {
   // Built-in source definitions belong to the app itself, so rerunning the seed should refresh
-  // stable metadata without overwriting source URLs that later tasks or operators may have edited.
+  // stable metadata, including canonical site and RSS URLs, when the built-in catalog changes.
   // The seed also keeps one bootstrap admin row aligned with the runtime auth values so
   // the unified-site schema is coherent before dedicated user management lands.
   ensureContentSourcesEnabledColumn(db);
@@ -168,6 +168,7 @@ export function seedInitialData(db: SqliteDatabase, authBootstrap?: AuthBootstra
       ON CONFLICT(kind) DO UPDATE SET
         name = excluded.name,
         site_url = excluded.site_url,
+        rss_url = excluded.rss_url,
         source_type = 'rss',
         bridge_kind = NULL,
         bridge_config_json = NULL,

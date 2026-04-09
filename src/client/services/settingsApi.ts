@@ -13,8 +13,6 @@ export type SettingsProfileResponse = {
 };
 
 export type SettingsProviderKind = "deepseek" | "minimax" | "kimi";
-export type SettingsStrategyGateScope = "base" | "ai_new" | "ai_hot";
-export type SettingsStrategyDraftScope = SettingsStrategyGateScope | "unspecified";
 
 export type SettingsProviderSettingsSummary = {
   providerKind: SettingsProviderKind | string;
@@ -27,14 +25,6 @@ export type SettingsProviderCapability = {
   hasMasterKey: boolean;
   featureAvailable: boolean;
   message: string;
-};
-
-export type SettingsNlRuleItem = {
-  scope: SettingsStrategyGateScope;
-  enabled: boolean;
-  ruleText: string;
-  createdAt: string;
-  updatedAt: string;
 };
 
 export type SettingsFeedbackPoolItem = {
@@ -52,41 +42,10 @@ export type SettingsFeedbackPoolItem = {
   updatedAt: string;
 };
 
-export type SettingsStrategyDraftItem = {
-  id: number;
-  sourceFeedbackId: number | null;
-  draftText: string;
-  suggestedScope: SettingsStrategyDraftScope;
-  draftEffectSummary: string | null;
-  positiveKeywords: string[];
-  negativeKeywords: string[];
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type SettingsNlEvaluationRun = {
-  id: number;
-  runType: string;
-  status: string;
-  providerKind: string | null;
-  startedAt: string;
-  finishedAt: string | null;
-  itemCount: number;
-  successCount: number;
-  failureCount: number;
-  notes: string | null;
-  createdAt: string;
-};
-
 export type SettingsViewRulesResponse = {
   providerSettings: SettingsProviderSettingsSummary[];
   providerCapability: SettingsProviderCapability;
-  nlRules: SettingsNlRuleItem[];
   feedbackPool: SettingsFeedbackPoolItem[];
-  strategyDrafts: SettingsStrategyDraftItem[];
-  latestEvaluationRun: SettingsNlEvaluationRun | null;
-  isEvaluationRunning: boolean;
-  isEvaluationStopRequested: boolean;
 };
 export type SettingsSourceItem = {
   kind: string;
@@ -154,34 +113,6 @@ export type UpdateProviderSettingsActivationResponse = {
   isEnabled: boolean;
 };
 
-export type SaveNlRuleGatePayload = {
-  enabled: boolean;
-  ruleText: string;
-};
-
-export type SaveNlRulesPayload = Record<SettingsStrategyGateScope, SaveNlRuleGatePayload>;
-export type SaveNlRulesResponse = {
-  ok: true;
-  run?: {
-    runId?: number;
-    status?: string;
-    itemCount?: number;
-    successCount?: number;
-    failureCount?: number;
-  };
-};
-
-export type CancelNlEvaluationResponse = {
-  ok: true;
-  accepted: boolean;
-  status: "idle" | "cancelling";
-};
-
-export type CreateDraftFromFeedbackResponse = {
-  ok: true;
-  draftId: number;
-};
-
 export type DeleteFeedbackEntryResponse = {
   ok: true;
   feedbackId: number;
@@ -190,24 +121,6 @@ export type DeleteFeedbackEntryResponse = {
 export type ClearFeedbackPoolResponse = {
   ok: true;
   cleared: number;
-};
-
-export type SaveStrategyDraftPayload = {
-  suggestedScope: SettingsStrategyDraftScope;
-  draftText: string;
-  draftEffectSummary: string;
-  positiveKeywords: string[];
-  negativeKeywords: string[];
-};
-
-export type SaveStrategyDraftResponse = {
-  ok: true;
-  draftId: number;
-};
-
-export type DeleteStrategyDraftResponse = {
-  ok: true;
-  draftId: number;
 };
 
 export type ToggleSourceResponse = {
@@ -320,26 +233,6 @@ export function deleteProviderSettings(providerKind: SettingsProviderKind | stri
   return postSettingsAction<{ ok: true }>("/actions/view-rules/provider-settings/delete", { providerKind });
 }
 
-// 正式自然语言策略保存后，后端会按当前配置尝试触发一次重算。
-export function saveNlRules(rules: SaveNlRulesPayload): Promise<SaveNlRulesResponse> {
-  return postSettingsAction<SaveNlRulesResponse>("/actions/view-rules/nl-rules", { rules });
-}
-
-// 中断请求采用协作式停止：当前项跑完后就不会继续评估后续内容。
-export function cancelNlEvaluation(): Promise<CancelNlEvaluationResponse> {
-  return postSettingsAction<CancelNlEvaluationResponse>("/actions/view-rules/nl-rules/cancel", {});
-}
-
-// 反馈转草稿沿用现有单条动作接口，成功后刷新整个工作台。
-export function createDraftFromFeedback(
-  feedbackId: number
-): Promise<CreateDraftFromFeedbackResponse> {
-  return postSettingsAction<CreateDraftFromFeedbackResponse>(
-    `/actions/feedback-pool/${encodeURIComponent(String(feedbackId))}/create-draft`,
-    {}
-  );
-}
-
 // 删除单条反馈时保留后端返回的 feedbackId，便于调用方做轻量校验。
 export function deleteFeedbackEntry(
   feedbackId: number
@@ -353,27 +246,6 @@ export function deleteFeedbackEntry(
 // 清空反馈池会返回清掉的数量，页面可以直接拿它提示用户。
 export function clearFeedbackPool(): Promise<ClearFeedbackPoolResponse> {
   return postSettingsAction<ClearFeedbackPoolResponse>("/actions/feedback-pool/clear", {});
-}
-
-// 草稿保存继续使用后端现有结构，关键词数组由页面先切好再提交。
-export function saveStrategyDraft(
-  draftId: number,
-  payload: SaveStrategyDraftPayload
-): Promise<SaveStrategyDraftResponse> {
-  return postSettingsAction<SaveStrategyDraftResponse>(
-    `/actions/strategy-drafts/${encodeURIComponent(String(draftId))}/save`,
-    payload
-  );
-}
-
-// 草稿删除后直接刷新工作台，避免前端本地状态和后端脱节。
-export function deleteStrategyDraft(
-  draftId: number
-): Promise<DeleteStrategyDraftResponse> {
-  return postSettingsAction<DeleteStrategyDraftResponse>(
-    `/actions/strategy-drafts/${encodeURIComponent(String(draftId))}/delete`,
-    {}
-  );
 }
 
 // source 切换使用显式 enable 布尔值，避免前端和后端对“下一状态”产生歧义。

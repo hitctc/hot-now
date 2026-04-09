@@ -62,16 +62,16 @@ async function handleFeedbackSubmit(payload: SaveFeedbackPoolEntryPayload): Prom
       positiveKeywords: payload.positiveKeywords,
       negativeKeywords: payload.negativeKeywords
     };
-    statusText.value = "反馈池建议已保存";
-    void message.success("反馈池建议已保存");
+    statusText.value = "反馈词已保存到反馈池";
+    void message.success("反馈词已保存到反馈池");
   } catch (error) {
     // 内容页允许公开浏览，401 更可能是用户未登录而不是后端异常，需要给出明确提示。
     if (error instanceof HttpError && error.status === 401) {
-      statusText.value = "请先登录后再保存反馈池建议。";
-      void message.warning("请先登录后再保存反馈池建议。");
+      statusText.value = "请先登录后再保存反馈词。";
+      void message.warning("请先登录后再保存反馈词。");
     } else {
-      statusText.value = "反馈池建议保存失败，请稍后重试。";
-      void message.error("反馈池建议保存失败，请稍后重试。");
+      statusText.value = "反馈词保存失败，请稍后重试。";
+      void message.error("反馈词保存失败，请稍后重试。");
     }
   } finally {
     isBusy.value = false;
@@ -155,7 +155,7 @@ const {
         </div>
 
         <div v-if="feedbackSummary" :class="editorialContentFeedbackSummaryClass">
-          <span class="text-xs font-semibold uppercase tracking-[0.18em] text-editorial-text-muted">反馈池建议</span>
+          <span class="text-xs font-semibold uppercase tracking-[0.18em] text-editorial-text-muted">反馈词</span>
           <p class="m-0 text-sm leading-6 text-editorial-text-body">
             {{ feedbackSummary }}
           </p>

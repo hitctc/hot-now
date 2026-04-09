@@ -26,7 +26,7 @@
 ## 3. 关键目录与职责
 
 - `src/main.ts`
-  负责启动配置加载、运行锁、Fastify 服务和定时任务，并装配反馈工作台与自然语言重算链路，是应用入口。
+  负责启动配置加载、运行锁、Fastify 服务和定时任务，并装配 unified shell、反馈池工作台与来源工作台，是应用入口。
 - `src/client/`
   负责 `/settings/*` 系统页的 Vue 3 客户端入口、路由、页面组件、主题和前端 service 封装。
   客户端样式栈固定为 `Vue 3 + Vite + Ant Design Vue + Tailwind CSS`；统一主题源收口到 `src/client/theme/editorialTokens.ts`，`src/client/styles/tailwind.css` 只保留基础样式、主题变量和少量 AntD 深层覆写，不要再长出新的大型 CSS 皮肤文件。
@@ -37,13 +37,13 @@
 - `src/core/fetch/`
   负责抓取原文和正文提取。
 - `src/core/feedback/`
-  负责内容反馈池与草稿池相关数据的读写。
+  负责内容反馈池相关数据的读写。
 - `src/core/llm/`
-  负责厂商配置加密存储、provider 适配与自然语言评估调用。
+  负责厂商配置加密存储；当前版本先只保留 LLM 设置入口，不再接入筛选策略链路。
 - `src/core/topics/`
   负责热点归并、排序和摘要整理。
 - `src/core/strategy/`
-  负责正式自然语言策略、草稿池、评估结果和评估运行记录。
+  保留历史自然语言策略与评估相关实现；当前版本不再从 `view-rules` 页面装配或触发这条链路。
 - `src/core/report/`
   负责生成结构化报告和 HTML 报告。
 - `src/core/pipeline/runCollectionCycle.ts`
@@ -80,7 +80,7 @@
 - `/`：统一站点 AI 新讯首页（未登录也可访问，等同 `/ai-new`）
 - `/ai-new`：统一站点 AI 新讯页（未登录也可访问）
 - `/ai-hot`：统一站点 AI 热点页（未登录也可访问）
-- `/settings/view-rules`：统一站点筛选策略工作台（登录后，由 `Vue 3 + Ant Design Vue` 驱动，当前只保留 `基础入池门 / AI 新讯入池门 / AI 热点入池门 / 首条精选门` 四道门；每道门维护 `启用开关 + 自然语言规则文本`，并继续收口 LLM 设置、反馈池、草稿池；全量重算运行中支持手动中断，已跑完的结果保持生效）
+- `/settings/view-rules`：统一站点反馈池工作台（登录后，由 `Vue 3 + Ant Design Vue` 驱动；当前只保留 `反馈池` 与标记为 `暂未使用` 的 `LLM 设置`，四道门、草稿池、正式自然语言规则与重算入口都已移除）
 - `/settings/sources`：统一站点数据迭代收集页（登录后，由 `Vue 3 + Ant Design Vue` 驱动，可启用/停用 source、切换“选中该来源时全量展示”，并支持可视化新增 / 编辑 / 删除自定义 RSS 来源与微信公众号桥接来源；新增 RSS 时只需要填写 `RSS URL`，新增公众号时只需要填写 `公众号名称`，文章链接可选但建议一起填，其余 `kind / 来源名称 / 来源主页 / bridge 细节` 都由系统内部自动生成；来源保存成功后会立即自动补拉这条来源的首批内容；页面会展示总条数、今天发布、今天抓取，以及 `AI 新讯 / AI 热点` 入池与展示统计，并按真实调度回显 `下一次采集：18:40（还有 6 分钟）` 这类分钟级文案）
 - `/settings/profile`：统一站点当前登录用户页（登录后，由 `Vue 3 + Ant Design Vue` 驱动，展示会话状态、账号摘要和联系邮箱）
 - 统一站点左侧导航底部支持深色 / 浅色主题切换，偏好写入浏览器本地 `localStorage` 并在刷新后保持
@@ -93,7 +93,7 @@
 - `/api/content/ai-new?page=<n>` 与 `/api/content/ai-hot?page=<n>` 现在支持分页，固定 `50` 条 / 页；缺失、非法或越界页码会回退到有效页
 - `AI 新讯` 固定按最近 `24` 小时窗口和 `ai_new` 门规则构建结果集；`AI 热点` 固定按 `ai_hot` 门规则与热点形成逻辑构建结果集，不会被额外压成 `24` 小时
 - `AI 新讯` 与 `AI 热点` 的标准内容卡片会在标题左侧显示连续排序序号；序号按全量分页结果延续，不会在翻页后重新从 `1` 开始
-- 内容卡片现在只保留局部 `补充反馈` 面板；反馈进入反馈池，不会直接修改正式策略
+- 内容卡片现在只保留局部 `补充反馈` 面板；反馈词进入反馈池，不会直接修改正式策略或生成草稿
 - 如果本地 `data/hot-now.sqlite` 内容库损坏，内容页会降级显示提示，不再直接以 `500` 打断 unified shell
 - `/history`：历史报告（legacy，当前仍保留）
 - `/reports/:date`：指定日期报告（legacy，当前仍保留）
@@ -106,11 +106,8 @@
 - `POST /actions/view-rules/provider-settings`：按厂商保存或更新 API key
 - `POST /actions/view-rules/provider-settings/activation`：单独启用 / 停用某个已保存厂商，系统同一时间只保留一个启用厂商
 - `POST /actions/view-rules/provider-settings/delete`：删除指定厂商配置
-- `POST /actions/view-rules/nl-rules`：保存 `base / ai_new / ai_hot / hero` 四道门正式自然语言策略（每道门结构为 `enabled + ruleText`），并立即触发当前内容库全量重算；`hero` 只参与 `/` 与 `/ai-new` 的精选主卡挑选
-- `POST /actions/view-rules/nl-rules/cancel`：对正在运行的全量自然语言重算发送协作式中断请求；当前正在评估的内容会先完成，已跑完的结果继续生效
 - `POST /actions/sources/create`、`POST /actions/sources/update`、`POST /actions/sources/delete`：新增、编辑、删除自定义 source；当前支持普通 RSS 与经 relay 解析的公众号来源
-- `POST /actions/feedback-pool/:id/create-draft`、`POST /actions/feedback-pool/:id/delete`、`POST /actions/feedback-pool/clear`：反馈池转草稿、删单条、清空全部
-- `POST /actions/strategy-drafts/:id/save`、`POST /actions/strategy-drafts/:id/delete`：草稿池保存与删除
+- `POST /actions/feedback-pool/:id/delete`、`POST /actions/feedback-pool/clear`：删除单条反馈词、清空全部反馈池
 - 兼容约定：真实应用默认启用 `requireLogin=true` 的 unified shell；auth 开启时内容菜单仍允许匿名查看，但系统菜单、legacy 路由和所有写操作都需要登录；测试或未注入 auth 的场景仍可保持 legacy `/ -> 最新报告` 与 legacy 路由公开行为
 
 当前报告产物目录：
@@ -164,10 +161,10 @@ SQLite 可靠性约定：
 1. 准备 `SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_USER`、`SMTP_PASS`、`MAIL_TO`、`BASE_URL`、`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET`；如需让厂商 API key 使用独立加密密钥，再额外准备 `LLM_SETTINGS_MASTER_KEY`
 2. 启动 `npm run dev`
 3. 打开 `/login` 并完成登录
-4. 如需验证自然语言链路，先进入 `/settings/view-rules` 为目标厂商保存 API key，再单独启用该厂商并保存正式规则，确认页面出现最新重算结果
+4. 如需验证反馈池工作台，先进入 `/settings/view-rules` 保存或切换厂商设置，再检查 `反馈池` 的复制 / 删除 / 清空是否正常；`LLM 设置` 当前只保留配置入口，不会触发策略或重算
 5. 进入 `/settings/sources` 或 legacy `/control`，先手动执行一次采集；需要验证发信时，再单独触发一次“发送最新报告”
 6. 检查是否生成报告目录与 `report.json`、`report.html`、`run-meta.json`
-7. 检查 `/`、`/ai-new`、`/ai-hot`、`/settings/view-rules`、`/settings/sources`、`/history`、`/reports/:date` 是否正常显示，并验证内容页 source 过滤条、共享排序切换、共享标题搜索、内容卡片反馈面板、反馈池、草稿池和正式规则编辑区
+7. 检查 `/`、`/ai-new`、`/ai-hot`、`/settings/view-rules`、`/settings/sources`、`/history`、`/reports/:date` 是否正常显示，并验证内容页 source 过滤条、共享排序切换、共享标题搜索、内容卡片反馈面板、反馈池和 LLM 设置占位文案
 
 ## 6. 配置与安全约束
 
@@ -249,7 +246,7 @@ SQLite 可靠性约定：
 - 多源采集后端已完成：`loadEnabledSourceIssues` / `runDailyDigest` 已接入多源并行汇总，单个 feed 失败不会阻断整次日报，只有全部 enabled sources 都失败时才会硬失败
 - 内置 RSS 源已扩展到 21 个，覆盖聚合日报、国际官方 AI 博客、国内热点资讯 / 快讯、科技媒体、开发者社区、创投资讯与综合新闻；新增内置源会作为 built-in source 写入 `content_sources`
 - 采集和发信已拆成两个独立功能：默认配置下采集每 `10` 分钟执行一次，发信每天 `10:00` 执行一次；两者都支持手动触发，并共用同一把运行锁
-- 系统菜单已收口到多源语义：`/settings/sources` 支持 source 启用/停用、source 级“选中时全量展示”策略、逐 source 最近抓取状态展示，以及统一站点内手动执行采集 / 手动发送最新报告；同时支持可视化新增 / 编辑 / 删除自定义 RSS 来源与公众号来源，其中 RSS 只要求录入 `RSS URL`，公众号只要求录入 `公众号名称` 和可选的 `公众号文章链接`，其余内部字段由系统自动生成与解析；来源保存成功后会立即自动补拉这条来源的首批内容；本地开发默认由仓库内置公众号解析 sidecar 处理公众号输入，后续如需 IP 隔离再切远端 relay；`/settings/view-rules` 现在是四道门策略工作台，只保留 `base / ai_new / ai_hot / hero` 四个正式 gate scope，并继续承载 LLM 厂商配置、反馈池和草稿池；当前登录用户信息已并到侧边栏底部
+- 系统菜单已收口到多源语义：`/settings/sources` 支持 source 启用/停用、source 级“选中时全量展示”策略、逐 source 最近抓取状态展示，以及统一站点内手动执行采集 / 手动发送最新报告；同时支持可视化新增 / 编辑 / 删除自定义 RSS 来源与公众号来源，其中 RSS 只要求录入 `RSS URL`，公众号只要求录入 `公众号名称` 和可选的 `公众号文章链接`，其余内部字段由系统自动生成与解析；来源保存成功后会立即自动补拉这条来源的首批内容；本地开发默认由仓库内置公众号解析 sidecar 处理公众号输入，后续如需 IP 隔离再切远端 relay；`/settings/view-rules` 现在只保留 `反馈池` 与 `LLM 设置（暂未使用）`；当前登录用户信息已并到侧边栏底部
 - 本地开发入口已收口到 `npm run dev`：脚本会自动拉起 Fastify、Vite dev server 和公众号解析 sidecar；`npm run dev:local` 只保留兼容转发，不再作为主调试入口
 - `/settings/sources` 现在会基于共享内容选择器实时展示 source 工作台总览表，口径包含总条数、今天发布、今天抓取，以及 `AI 新讯 / AI 热点` 的入池与展示统计
 - `/settings/sources` 现在还会根据真实采集调度展示下一次自动采集时间；前端只做分钟级剩余时间回显，不自己推算调度边界
@@ -261,14 +258,14 @@ SQLite 可靠性约定：
 - 内容页顶部现在还会渲染共享标题搜索框；生效关键词通过 `localStorage['hot-now-content-search'] + x-hot-now-content-search` header 驱动内容 API 做标题过滤，再进入分页切片
 - 内容页现在同时支持 `page` query 分页；翻页状态写在 URL 中，不写入 `localStorage`，筛选或排序变化后会自动回到第一页
 - 开启“选中时全量展示”的 source 在内容页首次进入时默认不勾选；只有用户显式勾选后，该 source 才会免受普通 view limit 截断
-- 内容页现在会把当前反馈池条目回填到局部反馈面板，内容交互形成 `补充反馈 -> 反馈池 -> 草稿池 -> 正式自然语言策略 -> 全量 / 增量重算` 的闭环
-- 正式自然语言策略保存后会立即触发当前内容库全量重算；运行中的全量重算支持页面内手动中断，已完成的结果会保留；采集链路在落库后会自动触发增量自然语言评估
+- 内容页现在会把当前反馈池条目回填到局部反馈面板，内容交互形成 `补充反馈 -> 反馈池` 的轻量闭环
+- `/settings/view-rules` 不再提供正式自然语言策略、草稿池或重算入口；`LLM 设置` 当前只保留配置，不参与内容页筛选和采集后的自动评估
 - 内容页现在对本地内容库损坏做了降级兜底：检测到 `SQLITE_CORRUPT` / `SQLITE_NOTADB` 时继续渲染统一站点，并提示修复或重建 `data/hot-now.sqlite`
 - 启动入口现在会对 `data/hot-now.sqlite` 做 SQLite 健康检查；如果主库损坏，会提示最近的 verified snapshot 和 `npm run db:restore -- <snapshot-file>` 恢复命令
 - graceful shutdown 现在会执行真实的 `wal_checkpoint(TRUNCATE)`，减少把 live 库直接当普通文件同步时产生坏快照的风险
 - 已新增 `npm run db:check`、`npm run db:snapshot`、`npm run db:restore -- <snapshot-file>`，并把 verified snapshot 目录收口为 `data/recovery-backups/<timestamp>/`
 - `data/` 目录下的 live 库、报告产物和 verified snapshot 都已收口为本地运行文件，不再作为常规 git 产物；跨设备和服务器如需使用快照，改为手动复制 verified snapshot
-- 自然语言匹配目前走预计算模式；已接入 `DeepSeek`、`MiniMax`、`Kimi`，每个厂商会分别保存自己的 API key，但同一时间只允许一个启用厂商；API key 通过页面录入后会优先使用 `LLM_SETTINGS_MASTER_KEY` 加密落库；未显式配置时回退使用 `SESSION_SECRET`
+- 已接入 `DeepSeek`、`MiniMax`、`Kimi` 三个厂商配置项；每个厂商会分别保存自己的 API key，但同一时间只允许一个启用厂商；API key 通过页面录入后会优先使用 `LLM_SETTINGS_MASTER_KEY` 加密落库；当前版本先只保留配置入口，不参与内容筛选
 - 报告层已切到多源语义：`report.json` / `report.html` / 邮件正文会保留 `sourceKinds`、`issueUrls`、失败 source 数量等信息，不再把输出描述成单一日报
 - legacy `/history`、`/reports/:date`、`/control` 与 unified shell 共存，且相关测试和文档已同步
 

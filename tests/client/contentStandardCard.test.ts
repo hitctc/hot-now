@@ -122,8 +122,8 @@ describe("ContentStandardCard", () => {
     await wrapper.get("[data-feedback-panel] button").trigger("click");
     await flushPromises();
 
-    expect(wrapper.text()).toContain("请先登录后再保存反馈池建议。");
-    expect(warningSpy).toHaveBeenCalledWith("请先登录后再保存反馈池建议。");
+    expect(wrapper.text()).toContain("请先登录后再保存反馈词。");
+    expect(warningSpy).toHaveBeenCalledWith("请先登录后再保存反馈词。");
   });
 
   it("shows a global success message after feedback save succeeds", async () => {
@@ -145,7 +145,7 @@ describe("ContentStandardCard", () => {
     await wrapper.get("[data-feedback-panel] button").trigger("click");
     await flushPromises();
 
-    expect(successSpy).toHaveBeenCalledWith("反馈池建议已保存");
-    expect(wrapper.text()).toContain("反馈池建议已保存");
+    expect(successSpy).toHaveBeenCalledWith("反馈词已保存到反馈池");
+    expect(wrapper.text()).toContain("反馈词已保存到反馈池");
   });
 });

@@ -203,7 +203,7 @@ function renderFeedbackPanel(feedbackEntry?: ContentFeedbackEntryView): string {
           </label>
         </div>
         <div class="content-feedback-actions">
-          <button type="submit" class="primary-mini-button">保存反馈池建议</button>
+          <button type="submit" class="primary-mini-button">保存反馈词</button>
         </div>
       </form>
     </div>

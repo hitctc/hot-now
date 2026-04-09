@@ -48,16 +48,7 @@ function createAuthenticatedServer() {
         featureAvailable: true,
         message: "已配置可用厂商"
       },
-      nlRules: [
-        { scope: "base", enabled: true, ruleText: "", createdAt: "", updatedAt: "" },
-        { scope: "ai_new", enabled: true, ruleText: "", createdAt: "", updatedAt: "" },
-        { scope: "ai_hot", enabled: true, ruleText: "", createdAt: "", updatedAt: "" }
-      ],
-      feedbackPool: [],
-      strategyDrafts: [],
-      latestEvaluationRun: null,
-      isEvaluationRunning: false,
-      isEvaluationStopRequested: false
+      feedbackPool: []
     }),
     listSources: vi.fn().mockResolvedValue([
       {
@@ -124,12 +115,7 @@ describe("settings api routes", () => {
       providerCapability: {
         hasMasterKey: true,
         featureAvailable: true
-      },
-      nlRules: [
-        { scope: "base", enabled: true },
-        { scope: "ai_new", enabled: true },
-        { scope: "ai_hot", enabled: true }
-      ]
+      }
     });
   });
 

@@ -15,12 +15,9 @@ import {
   saveFeedbackPoolEntry
 } from "./core/feedback/feedbackPoolRepository.js";
 import { fetchAndExtractArticle } from "./core/fetch/extractArticle.js";
-import { createLlmProvider, type ResolveLlmProviderResult } from "./core/llm/createLlmProvider.js";
 import {
   deleteProviderSettings as removeProviderSettings,
-  getEnabledProviderSettingsSummary,
   listProviderSettingsSummaries,
-  readEnabledProviderSettings,
   saveProviderSettings as persistProviderSettings,
   updateProviderSettingsActivation as persistProviderSettingsActivation
 } from "./core/llm/providerSettingsRepository.js";
@@ -43,19 +40,6 @@ import {
   toggleSource as persistSourceToggle,
   updateSourceDisplayMode as persistSourceDisplayMode
 } from "./core/source/sourceMutationRepository.js";
-import { listNlEvaluationRuns } from "./core/strategy/nlEvaluationRepository.js";
-import { listNlRuleSets, saveNlRuleSet, type NlRuleScope } from "./core/strategy/nlRuleRepository.js";
-import {
-  runNlEvaluationCycle,
-  type RunNlEvaluationCycleInput,
-  type RunNlEvaluationCycleResult
-} from "./core/strategy/runNlEvaluationCycle.js";
-import {
-  createStrategyDraft,
-  deleteStrategyDraft,
-  listStrategyDrafts,
-  updateStrategyDraft
-} from "./core/strategy/strategyDraftRepository.js";
 import { listReportDates, readTextFile } from "./core/storage/reportStore.js";
 import { createServer } from "./server/createServer.js";
 
@@ -92,8 +76,6 @@ seedInitialData(db, {
   juyaRssUrl: config.source.rssUrl
 });
 const lock = createRunLock();
-const nlEvaluationLock = createRunLock();
-let nlEvaluationStopRequested = false;
 const readAdminProfile = db.prepare(
   `
     SELECT username, password_hash, role, display_name
@@ -113,8 +95,7 @@ async function runCollectionTask(triggerType: DailyReportTrigger) {
   return await runCollectionCycle(config, triggerType, {
     db,
     loadEnabledSourceIssues: async () => await loadEnabledSourceIssues(db),
-    fetchArticle: fetchAndExtractArticle,
-    runNlEvaluationCycle: async (input) => await runNlEvaluationTask(input)
+    fetchArticle: fetchAndExtractArticle
   });
 }
 
@@ -195,252 +176,41 @@ function getCurrentUserProfile() {
 }
 
 function getViewRulesWorkbenchData() {
-  // The strategy workbench now exposes only gate-based NL settings plus provider, feedback, and drafts.
-  const latestEvaluationRun = listNlEvaluationRuns(db)[0] ?? null;
-
   return {
     providerSettings: listProviderSettingsSummaries(db),
     providerCapability: readProviderCapability(),
-    nlRules: listNlRuleSets(db),
-    feedbackPool: listFeedbackPoolEntries(db),
-    strategyDrafts: listStrategyDrafts(db),
-    latestEvaluationRun,
-    // Only the in-memory lock can prove a recompute is still alive in this local single-process app.
-    // Database rows that stayed on running after a restart should be treated as stale history, not live work.
-    isEvaluationRunning: nlEvaluationLock.isRunning(),
-    isEvaluationStopRequested: nlEvaluationStopRequested
+    feedbackPool: listFeedbackPoolEntries(db)
   };
 }
 
 function readProviderCapability() {
-  // Natural language matching stays opt-in: missing master key or provider config should disable only this feature.
+  // 当前版本只保留厂商配置入口，因此这里描述的是“配置能否保存和展示”，而不是策略可用性。
   const settingsMasterKey = config.llm?.settingsMasterKey ?? null;
 
   if (!settingsMasterKey) {
     return {
       hasMasterKey: false,
       featureAvailable: false,
-      message: "未配置 LLM_SETTINGS_MASTER_KEY，无法保存厂商 API key。"
+      message: "未配置 LLM_SETTINGS_MASTER_KEY，当前无法新增或更新厂商 API key。"
     };
   }
 
-  const providerSummary = getEnabledProviderSettingsSummary(db);
+  const providerSettings = listProviderSettingsSummaries(db);
+  const enabledProvider = providerSettings.find((settings) => settings.isEnabled) ?? null;
 
-  if (!providerSummary || !providerSummary.isEnabled) {
+  if (!enabledProvider) {
     return {
       hasMasterKey: true,
       featureAvailable: false,
-      message: "已保存正式规则，但当前没有启用中的厂商，暂不启用自然语言匹配。"
-    };
-  }
-
-  const resolvedSettings = readEnabledProviderSettings(db, { settingsMasterKey });
-
-  if (!resolvedSettings.ok) {
-    return {
-      hasMasterKey: true,
-      featureAvailable: false,
-      message:
-        resolvedSettings.reason === "decrypt-failed"
-          ? "当前厂商配置无法解密，请重新保存 API key。"
-          : "已保存正式规则，但当前没有启用中的厂商，暂不启用自然语言匹配。"
-    };
-  }
-
-  if (!resolvedSettings.settings || !resolvedSettings.settings.isEnabled) {
-    return {
-      hasMasterKey: true,
-      featureAvailable: false,
-      message: "已保存正式规则，但当前没有启用中的厂商，暂不启用自然语言匹配。"
+      message: providerSettings.length > 0 ? "已保存厂商配置，但当前没有启用中的厂商。" : "当前还没有保存任何厂商配置。"
     };
   }
 
   return {
     hasMasterKey: true,
     featureAvailable: true,
-    message: `当前已启用 ${formatProviderLabel(resolvedSettings.settings.providerKind)}，保存正式规则后会自动重算内容库。`
+    message: `当前已启用 ${formatProviderLabel(enabledProvider.providerKind)}，但这份设置暂未接入反馈池或筛选逻辑。`
   };
-}
-
-function isNlFeatureAvailable(): boolean {
-  return readProviderCapability().featureAvailable;
-}
-
-async function resolveConfiguredLlmProvider(): Promise<ResolveLlmProviderResult> {
-  // Provider resolution is centralized here so collection and settings-triggered recomputes reuse one rule set.
-  const resolvedSettings = readEnabledProviderSettings(db, {
-    settingsMasterKey: config.llm?.settingsMasterKey ?? null
-  });
-
-  if (!resolvedSettings.ok) {
-    return resolvedSettings;
-  }
-
-  if (!resolvedSettings.settings || !resolvedSettings.settings.isEnabled) {
-    return { ok: false, reason: "missing-provider-settings" };
-  }
-
-  return {
-    ok: true,
-    provider: createLlmProvider(resolvedSettings.settings)
-  };
-}
-
-async function runNlEvaluationTask(input: RunNlEvaluationCycleInput) {
-  // Recomputes share one local single-flight lock so full and incremental runs do not overwrite each other mid-flight.
-  if (nlEvaluationLock.isRunning()) {
-    const latestRun = listNlEvaluationRuns(db)[0];
-
-    return {
-      runId: latestRun?.id ?? 0,
-      status: "skipped" as const,
-      itemCount: input.contentItemIds?.length ?? 0,
-      successCount: 0,
-      failureCount: 0
-    };
-  }
-
-  nlEvaluationStopRequested = false;
-
-  return await nlEvaluationLock.runExclusive(async () => {
-    try {
-      return await runNlEvaluationCycle(db, input, {
-        resolveProvider: async () => await resolveConfiguredLlmProvider(),
-        shouldStop: () => nlEvaluationStopRequested
-      });
-    } finally {
-      nlEvaluationStopRequested = false;
-    }
-  });
-}
-
-async function startNlEvaluationTask(input: RunNlEvaluationCycleInput): Promise<RunNlEvaluationCycleResult> {
-  // Settings saves should return immediately after the recompute has been accepted, while the heavy
-  // content-by-content evaluation continues in the background.
-  if (nlEvaluationLock.isRunning()) {
-    const latestRun = listNlEvaluationRuns(db)[0];
-
-    return {
-      runId: latestRun?.id ?? 0,
-      status: "skipped" as const,
-      itemCount: latestRun?.itemCount ?? input.contentItemIds?.length ?? 0,
-      successCount: latestRun?.successCount ?? 0,
-      failureCount: latestRun?.failureCount ?? 0
-    };
-  }
-
-  const latestRunIdBeforeStart = listNlEvaluationRuns(db)[0]?.id ?? 0;
-  const backgroundTask = runNlEvaluationTask(input);
-
-  void backgroundTask.catch((error) => {
-    console.error("[hot-now] nl evaluation task failed", error);
-  });
-
-  // Give the background task one microtask turn so provider resolution and the new run row can land
-  // before the settings page immediately refreshes its workbench model.
-  await Promise.resolve();
-
-  const latestRun = listNlEvaluationRuns(db)[0];
-
-  if (latestRun && latestRun.id > latestRunIdBeforeStart) {
-    return {
-      runId: latestRun.id,
-      status:
-        latestRun.status === "running" || latestRun.status === "completed" || latestRun.status === "failed"
-          ? latestRun.status
-          : ("skipped" as const),
-      itemCount: latestRun.itemCount,
-      successCount: latestRun.successCount,
-      failureCount: latestRun.failureCount
-    };
-  }
-
-  return {
-    runId: 0,
-    status: "running" as const,
-    itemCount: 0,
-    successCount: 0,
-    failureCount: 0
-  };
-}
-
-function cancelNlEvaluationTask() {
-  // Cancellation is cooperative: the current content item is allowed to finish so already-saved judgments stay valid.
-  if (!nlEvaluationLock.isRunning()) {
-    return {
-      ok: true as const,
-      accepted: false as const,
-      status: "idle" as const
-    };
-  }
-
-  nlEvaluationStopRequested = true;
-
-  return {
-    ok: true as const,
-    accepted: true as const,
-    status: "cancelling" as const
-  };
-}
-
-function createDraftFromFeedback(feedbackId: number) {
-  // Draft creation keeps the original feedback row intact and turns it into an editable starting point for admins.
-  const feedbackEntry = listFeedbackPoolEntries(db).find((entry) => entry.id === feedbackId);
-
-  if (!feedbackEntry) {
-    return { ok: false as const, reason: "not-found" as const };
-  }
-
-  const draftId = createStrategyDraft(db, {
-    sourceFeedbackId: feedbackEntry.id,
-    draftText: buildDraftTextFromFeedback(feedbackEntry),
-    suggestedScope: "unspecified",
-    draftEffectSummary: buildDraftEffectSummary(feedbackEntry),
-    positiveKeywords: feedbackEntry.positiveKeywords,
-    negativeKeywords: feedbackEntry.negativeKeywords
-  });
-
-  return { ok: true as const, draftId };
-}
-
-function buildDraftTextFromFeedback(entry: ReturnType<typeof listFeedbackPoolEntries>[number]): string {
-  const lines = [
-    `来源反馈：${entry.contentTitle}`,
-    `参考链接：${entry.canonicalUrl}`
-  ];
-
-  if (entry.freeText?.trim()) {
-    lines.push(entry.freeText.trim());
-  }
-
-  if (entry.suggestedEffect) {
-    const strengthText = entry.strengthLevel ? `，强度 ${formatStrengthLabel(entry.strengthLevel)}` : "";
-    lines.push(`建议动作：${formatEffectLabel(entry.suggestedEffect)}${strengthText}`);
-  }
-
-  if (entry.positiveKeywords.length > 0) {
-    lines.push(`优先考虑关键词：${entry.positiveKeywords.join("、")}`);
-  }
-
-  if (entry.negativeKeywords.length > 0) {
-    lines.push(`降低或屏蔽关键词：${entry.negativeKeywords.join("、")}`);
-  }
-
-  return lines.join("\n");
-}
-
-function buildDraftEffectSummary(entry: ReturnType<typeof listFeedbackPoolEntries>[number]): string | null {
-  const parts = [];
-
-  if (entry.suggestedEffect) {
-    parts.push(formatEffectLabel(entry.suggestedEffect));
-  }
-
-  if (entry.strengthLevel) {
-    parts.push(`强度 ${formatStrengthLabel(entry.strengthLevel)}`);
-  }
-
-  return parts.length > 0 ? parts.join(" / ") : null;
 }
 
 function formatProviderLabel(providerKind: string): string {
@@ -457,34 +227,6 @@ function formatProviderLabel(providerKind: string): string {
   }
 
   return providerKind;
-}
-
-function formatEffectLabel(effect: string): string {
-  if (effect === "boost") {
-    return "加分";
-  }
-
-  if (effect === "penalize") {
-    return "减分";
-  }
-
-  if (effect === "block") {
-    return "屏蔽";
-  }
-
-  return "无影响";
-}
-
-function formatStrengthLabel(strengthLevel: string): string {
-  if (strengthLevel === "high") {
-    return "高";
-  }
-
-  if (strengthLevel === "medium") {
-    return "中";
-  }
-
-  return "低";
 }
 
 // Manual collection stays lock-guarded so button clicks share the same exclusion rules as scheduled jobs.
@@ -528,8 +270,7 @@ async function saveAndHydrateSource(input: Parameters<typeof persistSource>[1]) 
 
   try {
     await hydrateSourceContent(db, result.kind, {
-      fetchArticle: fetchAndExtractArticle,
-      runNlEvaluationCycle: async (nlInput) => await runNlEvaluationTask(nlInput)
+      fetchArticle: fetchAndExtractArticle
     });
   } catch {
     // 来源保存不应该因为首轮补拉失败而回滚；后续定时采集仍然会继续尝试刷新这条 source。
@@ -550,12 +291,12 @@ const app = createServer({
   getContentPageModel: async (pageKey, options) =>
     buildContentPageModel(db, pageKey, {
       ...options,
-      includeNlEvaluations: isNlFeatureAvailable()
+      includeNlEvaluations: false
     }),
   listContentView: async (viewKey, options) =>
     listContentCards(db, viewKey, {
       ...options,
-      includeNlEvaluations: isNlFeatureAvailable()
+      includeNlEvaluations: false
     }),
   listContentSources: async () => listContentSources(db),
   saveContentFeedback: async (contentItemId, input) => saveFeedbackPoolEntry(db, { contentItemId, ...input }),
@@ -580,33 +321,8 @@ const app = createServer({
 
     return removeProviderSettings(db, normalizedProviderKind);
   },
-  saveNlRules: async (rules: Record<NlRuleScope, { enabled: boolean; ruleText: string }>) => {
-    for (const scope of Object.keys(rules) as NlRuleScope[]) {
-      saveNlRuleSet(db, scope, rules[scope]);
-    }
-
-    return {
-      ok: true as const,
-      run: await startNlEvaluationTask({ mode: "full-recompute" })
-    };
-  },
-  cancelNlEvaluation: async () => cancelNlEvaluationTask(),
-  createDraftFromFeedback: async (feedbackId) => createDraftFromFeedback(feedbackId),
   deleteFeedbackEntry: async (feedbackId) => deleteFeedbackPoolEntry(db, feedbackId),
   clearAllFeedback: async () => clearFeedbackPool(db),
-  saveStrategyDraft: async (input) => {
-    const existingDraft = listStrategyDrafts(db).find((draft) => draft.id === input.id);
-
-    if (!existingDraft) {
-      return { ok: false as const, reason: "not-found" as const };
-    }
-
-    return updateStrategyDraft(db, {
-      ...input,
-      sourceFeedbackId: existingDraft.sourceFeedbackId
-    });
-  },
-  deleteStrategyDraft: async (draftId) => deleteStrategyDraft(db, draftId),
   listSources: async () => listSourceWorkbench(db),
   getSourcesOperationSummary: async () => readSourcesOperationSummary(db),
   createSource: async (input) => await saveAndHydrateSource(input),
@@ -663,8 +379,8 @@ installGracefulShutdown({
   },
   scheduledTasks: [collectionScheduler, mailScheduler],
   waitForIdle: async () => {
-    // A running collection, mail, or NL recompute task should finish before we checkpoint and close SQLite.
-    while (lock.isRunning() || nlEvaluationLock.isRunning()) {
+    // 当前版本只需要等采集和发信任务收口，LLM 相关运行时已经不再参与主链路。
+    while (lock.isRunning()) {
       await wait(100);
     }
   },

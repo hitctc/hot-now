@@ -380,90 +380,40 @@ describe("system routes", () => {
     expect(deleteProviderSettings).toHaveBeenCalledWith("deepseek");
   });
 
-  it("calls saveNlRules and returns the recompute result", async () => {
-    const saveNlRules = vi.fn().mockResolvedValue({
-      ok: true,
-      run: {
-        runId: 5,
-        status: "completed",
-        itemCount: 10,
-        successCount: 10,
-        failureCount: 0
-      }
-    });
-    const app = createSystemTestServer({
-      saveNlRules
-    } as never);
+  it("removes the old nl-rules and draft action routes", async () => {
+    const app = createSystemTestServer({} as never);
 
-    const response = await app.inject({
+    const nlRulesResponse = await app.inject({
       method: "POST",
       url: "/actions/view-rules/nl-rules",
-      payload: {
-        rules: {
-          base: { enabled: true, ruleText: "暂不展示融资快讯。" },
-          ai_new: { enabled: true, ruleText: "优先展示 agent workflow。" },
-          ai_hot: { enabled: false, ruleText: "" }
-        }
-      }
+      payload: {}
     });
-
-    expect(response.statusCode).toBe(200);
-    expect(saveNlRules).toHaveBeenCalledWith({
-      base: { enabled: true, ruleText: "暂不展示融资快讯。" },
-      ai_new: { enabled: true, ruleText: "优先展示 agent workflow。" },
-      ai_hot: { enabled: false, ruleText: "" }
-    });
-    expect(response.json()).toEqual({
-      ok: true,
-      run: {
-        runId: 5,
-        status: "completed",
-        itemCount: 10,
-        successCount: 10,
-        failureCount: 0
-      }
-    });
-  });
-
-  it("calls cancelNlEvaluation and returns the accepted state", async () => {
-    const cancelNlEvaluation = vi.fn().mockResolvedValue({
-      ok: true,
-      accepted: true,
-      status: "cancelling"
-    });
-    const app = createSystemTestServer({
-      cancelNlEvaluation
-    } as never);
-
-    const response = await app.inject({
+    const cancelResponse = await app.inject({
       method: "POST",
       url: "/actions/view-rules/nl-rules/cancel",
       payload: {}
     });
-
-    expect(response.statusCode).toBe(200);
-    expect(cancelNlEvaluation).toHaveBeenCalledTimes(1);
-    expect(response.json()).toEqual({
-      ok: true,
-      accepted: true,
-      status: "cancelling"
-    });
-  });
-
-  it("returns 400 for invalid nl-rule payload", async () => {
-    const saveNlRules = vi.fn();
-    const app = createSystemTestServer({
-      saveNlRules
-    } as never);
-
-    const response = await app.inject({
+    const draftCreateResponse = await app.inject({
       method: "POST",
-      url: "/actions/view-rules/nl-rules",
-      payload: { rules: "invalid" }
+      url: "/actions/feedback-pool/201/create-draft",
+      payload: {}
+    });
+    const draftSaveResponse = await app.inject({
+      method: "POST",
+      url: "/actions/strategy-drafts/301/save",
+      payload: {}
+    });
+    const draftDeleteResponse = await app.inject({
+      method: "POST",
+      url: "/actions/strategy-drafts/301/delete",
+      payload: {}
     });
 
-    expect(response.statusCode).toBe(400);
-    expect(saveNlRules).not.toHaveBeenCalled();
+    expect(nlRulesResponse.statusCode).toBe(404);
+    expect(cancelResponse.statusCode).toBe(404);
+    expect(draftCreateResponse.statusCode).toBe(404);
+    expect(draftSaveResponse.statusCode).toBe(404);
+    expect(draftDeleteResponse.statusCode).toBe(404);
   });
 
   it("returns 401 for anonymous system actions when auth is enabled", async () => {
@@ -474,7 +424,7 @@ describe("system routes", () => {
         verifyLogin: vi.fn().mockResolvedValue(null)
       },
       toggleSource: vi.fn().mockResolvedValue({ ok: true }),
-      saveNlRules: vi.fn().mockResolvedValue({ ok: true, run: { status: "skipped" } })
+      clearAllFeedback: vi.fn().mockResolvedValue(1)
     } as never);
 
     const activateResponse = await app.inject({
@@ -482,20 +432,14 @@ describe("system routes", () => {
       url: "/actions/sources/toggle",
       payload: { kind: "openai", enable: true }
     });
-    const ruleResponse = await app.inject({
+    const feedbackResponse = await app.inject({
       method: "POST",
-      url: "/actions/view-rules/nl-rules",
-      payload: {
-        rules: {
-          base: { enabled: true, ruleText: "基础规则" },
-          ai_new: { enabled: true, ruleText: "" },
-          ai_hot: { enabled: true, ruleText: "" }
-        }
-      }
+      url: "/actions/feedback-pool/clear",
+      payload: {}
     });
 
     expect(activateResponse.statusCode).toBe(401);
-    expect(ruleResponse.statusCode).toBe(401);
+    expect(feedbackResponse.statusCode).toBe(401);
   });
 });
 

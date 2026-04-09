@@ -21,9 +21,6 @@ import type {
   ToggleSourceResult,
   UpdateSourceDisplayModeResult
 } from "../core/source/sourceMutationRepository.js";
-import type { NlRuleScope } from "../core/strategy/nlRuleRepository.js";
-import type { RunNlEvaluationCycleResult } from "../core/strategy/runNlEvaluationCycle.js";
-import type { UpdateStrategyDraftInput, UpdateStrategyDraftResult } from "../core/strategy/strategyDraftRepository.js";
 import type { RuntimeConfig } from "../core/types/appConfig.js";
 import { readNextCollectionRunAt } from "../core/scheduler/readNextCollectionRunAt.js";
 import {
@@ -96,12 +93,8 @@ type ManualCollectResult = { accepted: true; action: "collect" };
 type ManualSendLatestEmailResult =
   | { accepted: true; action: "send-latest-email" }
   | { accepted: false; reason: LatestReportEmailErrorReason };
-type SaveNlRulesResult = { ok: true; run: RunNlEvaluationCycleResult } | { ok: false; reason: string };
-type CancelNlEvaluationResult = { ok: true; accepted: boolean; status: "idle" | "cancelling" };
-type CreateDraftFromFeedbackResult = { ok: true; draftId: number } | { ok: false; reason: "not-found" };
 type DeleteFeedbackResult = boolean;
 type ClearFeedbackResult = number;
-type DeleteDraftResult = boolean;
 type ContentPageKey = "ai-new" | "ai-hot";
 type ContentPageModel = {
   pageKey: ContentPageKey;
@@ -153,15 +146,8 @@ type ServerDeps = {
     input: UpdateProviderSettingsActivationInput
   ) => Promise<UpdateProviderSettingsActivationResult> | UpdateProviderSettingsActivationResult;
   deleteProviderSettings?: (providerKind: string) => Promise<boolean> | boolean;
-  saveNlRules?: (
-    rules: Record<NlRuleScope, { enabled: boolean; ruleText: string }>
-  ) => Promise<SaveNlRulesResult> | SaveNlRulesResult;
-  cancelNlEvaluation?: () => Promise<CancelNlEvaluationResult> | CancelNlEvaluationResult;
-  createDraftFromFeedback?: (feedbackId: number) => Promise<CreateDraftFromFeedbackResult> | CreateDraftFromFeedbackResult;
   deleteFeedbackEntry?: (feedbackId: number) => Promise<DeleteFeedbackResult> | DeleteFeedbackResult;
   clearAllFeedback?: () => Promise<ClearFeedbackResult> | ClearFeedbackResult;
-  saveStrategyDraft?: (input: UpdateStrategyDraftInput) => Promise<UpdateStrategyDraftResult> | UpdateStrategyDraftResult;
-  deleteStrategyDraft?: (draftId: number) => Promise<DeleteDraftResult> | DeleteDraftResult;
   listSources?: () => Promise<SourceCard[]> | SourceCard[];
   getSourcesOperationSummary?: () => Promise<SourcesOperationSummary> | SourcesOperationSummary;
   createSource?: (input: SaveSourceInput) => Promise<SaveSourceResult> | SaveSourceResult;
@@ -712,72 +698,6 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.send({ ok: true });
   });
 
-  app.post("/actions/view-rules/nl-rules", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.saveNlRules) {
-      return reply.code(503).send({ ok: false, reason: "nl-rules-disabled" });
-    }
-
-    const body = request.body as { rules?: unknown } | undefined;
-
-    if (!isPlainObject(body?.rules)) {
-      return reply.code(400).send({ ok: false, reason: "invalid-nl-rules-payload" });
-    }
-
-    const rules = {
-      base: readNlGatePayload(body.rules.base),
-      ai_new: readNlGatePayload(body.rules.ai_new),
-      ai_hot: readNlGatePayload(body.rules.ai_hot)
-    } satisfies Record<NlRuleScope, { enabled: boolean; ruleText: string }>;
-
-    const result = await deps.saveNlRules(rules);
-
-    if (!result.ok) {
-      return reply.code(409).send({ ok: false, reason: result.reason });
-    }
-
-    return reply.send({ ok: true, run: result.run });
-  });
-
-  app.post("/actions/view-rules/nl-rules/cancel", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.cancelNlEvaluation) {
-      return reply.code(503).send({ ok: false, reason: "nl-rules-disabled" });
-    }
-
-    return reply.send(await deps.cancelNlEvaluation());
-  });
-
-  app.post("/actions/feedback-pool/:id/create-draft", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.createDraftFromFeedback) {
-      return reply.code(503).send({ ok: false, reason: "feedback-pool-disabled" });
-    }
-
-    const feedbackId = parseNumericRouteId(request.params, "id");
-
-    if (!feedbackId) {
-      return reply.code(400).send({ ok: false, reason: "invalid-feedback-id" });
-    }
-
-    const result = await deps.createDraftFromFeedback(feedbackId);
-
-    if (!result.ok) {
-      return reply.code(404).send({ ok: false, reason: "not-found" });
-    }
-
-    return reply.send({ ok: true, draftId: result.draftId });
-  });
-
   app.post("/actions/feedback-pool/:id/delete", async (request, reply) => {
     if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
       return;
@@ -813,69 +733,6 @@ export function createServer(deps: ServerDeps = {}) {
 
     const cleared = await deps.clearAllFeedback();
     return reply.send({ ok: true, cleared });
-  });
-
-  app.post("/actions/strategy-drafts/:id/save", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.saveStrategyDraft) {
-      return reply.code(503).send({ ok: false, reason: "strategy-drafts-disabled" });
-    }
-
-    const draftId = parseNumericRouteId(request.params, "id");
-
-    if (!draftId) {
-      return reply.code(400).send({ ok: false, reason: "invalid-draft-id" });
-    }
-
-    const body = request.body as Record<string, unknown> | undefined;
-    const positiveKeywords = parseStringArray(body?.positiveKeywords);
-    const negativeKeywords = parseStringArray(body?.negativeKeywords);
-
-    if (!positiveKeywords.ok || !negativeKeywords.ok || typeof body?.draftText !== "string") {
-      return reply.code(400).send({ ok: false, reason: "invalid-draft-payload" });
-    }
-
-    const result = await deps.saveStrategyDraft({
-      id: draftId,
-      draftText: body.draftText,
-      suggestedScope: isStrategyDraftScope(body?.suggestedScope) ? body.suggestedScope : "unspecified",
-      draftEffectSummary: typeof body?.draftEffectSummary === "string" ? body.draftEffectSummary : null,
-      positiveKeywords: positiveKeywords.values,
-      negativeKeywords: negativeKeywords.values
-    });
-
-    if (!result.ok) {
-      return reply.code(404).send({ ok: false, reason: "not-found" });
-    }
-
-    return reply.send({ ok: true, draftId });
-  });
-
-  app.post("/actions/strategy-drafts/:id/delete", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.deleteStrategyDraft) {
-      return reply.code(503).send({ ok: false, reason: "strategy-drafts-disabled" });
-    }
-
-    const draftId = parseNumericRouteId(request.params, "id");
-
-    if (!draftId) {
-      return reply.code(400).send({ ok: false, reason: "invalid-draft-id" });
-    }
-
-    const deleted = await deps.deleteStrategyDraft(draftId);
-
-    if (!deleted) {
-      return reply.code(404).send({ ok: false, reason: "not-found" });
-    }
-
-    return reply.send({ ok: true, draftId });
   });
 
   app.post("/actions/sources/toggle", async (request, reply) => {
@@ -1145,14 +1002,9 @@ async function readSettingsViewRulesApiData(deps: ServerDeps): Promise<ViewRules
       providerCapability: {
         hasMasterKey: false,
         featureAvailable: false,
-        message: "当前没有可读取的策略工作台数据。"
+        message: "当前没有可读取的反馈池数据。"
       },
-      nlRules: defaultNlRules(),
-      feedbackPool: [],
-      strategyDrafts: [],
-      latestEvaluationRun: null,
-      isEvaluationRunning: false,
-      isEvaluationStopRequested: false
+      feedbackPool: []
     };
   }
 
@@ -1990,29 +1842,6 @@ function isProviderKind(value: unknown): value is SaveProviderSettingsInput["pro
   return value === "deepseek" || value === "minimax" || value === "kimi";
 }
 
-function isStrategyDraftScope(value: unknown): value is NonNullable<UpdateStrategyDraftInput["suggestedScope"]> {
-  return value === "unspecified" || value === "base" || value === "ai_new" || value === "ai_hot";
-}
-
-function readNlGatePayload(value: unknown): { enabled: boolean; ruleText: string } {
-  if (!isPlainObject(value)) {
-    return { enabled: true, ruleText: "" };
-  }
-
-  return {
-    enabled: typeof value.enabled === "boolean" ? value.enabled : true,
-    ruleText: typeof value.ruleText === "string" ? value.ruleText : ""
-  };
-}
-
-function defaultNlRules(): ViewRulesWorkbenchView["nlRules"] {
-  return [
-    { scope: "base", enabled: true, ruleText: "", createdAt: "", updatedAt: "" },
-    { scope: "ai_new", enabled: true, ruleText: "", createdAt: "", updatedAt: "" },
-    { scope: "ai_hot", enabled: true, ruleText: "", createdAt: "", updatedAt: "" }
-  ];
-}
-
 function parseRatingScores(value: unknown): ParseRatingScoresResult {
   // Ratings payload is strict: one invalid entry invalidates the full request, so partial writes never happen.
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -2040,11 +1869,6 @@ function parseRatingScores(value: unknown): ParseRatingScoresResult {
   }
 
   return { ok: true, scores: parsedScores };
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  // System action payloads currently rely on JSON object shapes and reject arrays/primitives.
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function parseStringArray(value: unknown): { ok: true; values: string[] } | { ok: false } {

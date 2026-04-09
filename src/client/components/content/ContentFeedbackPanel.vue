@@ -102,7 +102,7 @@ watch(() => props.modelValue, syncFormState, { immediate: true, deep: true });
       class="!w-full !rounded-editorial-sm !border !border-editorial-border !bg-editorial-link-active !px-4 !py-2 !text-sm !font-medium !text-editorial-text-main !shadow-none md:!w-auto"
       @click="handleSubmit"
     >
-      保存反馈池建议
+      保存反馈词
     </a-button>
   </a-form>
 </template>

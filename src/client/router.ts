@@ -42,7 +42,7 @@ const viewRulesPageMeta = {
   section: "system",
   navLabel: "筛选策略",
   title: "筛选策略",
-  description: "维护自然语言规则、反馈池、草稿池和重算状态。"
+  description: "查看反馈池，并保留暂未使用的 LLM 设置入口。"
 } as const satisfies ShellPageMeta;
 
 const sourcesPageMeta = {

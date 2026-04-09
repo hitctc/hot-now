@@ -11,14 +11,6 @@ type ProviderCapabilityView = {
   message: string;
 };
 
-type NlRuleItem = {
-  scope: string;
-  enabled: boolean;
-  ruleText: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
 type FeedbackPoolItem = {
   id: number;
   contentItemId: number;
@@ -34,41 +26,10 @@ type FeedbackPoolItem = {
   updatedAt: string;
 };
 
-type StrategyDraftItem = {
-  id: number;
-  sourceFeedbackId: number | null;
-  draftText: string;
-  suggestedScope: string;
-  draftEffectSummary: string | null;
-  positiveKeywords: string[];
-  negativeKeywords: string[];
-  createdAt: string;
-  updatedAt: string;
-};
-
-type NlEvaluationRunItem = {
-  id: number;
-  runType: string;
-  status: string;
-  providerKind: string | null;
-  startedAt: string;
-  finishedAt: string | null;
-  itemCount: number;
-  successCount: number;
-  failureCount: number;
-  notes: string | null;
-  createdAt: string;
-};
-
 export type ViewRulesWorkbenchView = {
   providerSettings: ProviderSettingsSummaryView[];
   providerCapability: ProviderCapabilityView;
-  nlRules: NlRuleItem[];
   feedbackPool: FeedbackPoolItem[];
-  strategyDrafts: StrategyDraftItem[];
-  latestEvaluationRun: NlEvaluationRunItem | null;
-  isEvaluationRunning: boolean;
-  isEvaluationStopRequested: boolean;
 };
 
 type SourceItem = {
@@ -118,29 +79,20 @@ export type ProfileView = {
 };
 
 export function renderViewRulesPage(rules: ViewRulesWorkbenchView): string {
-  const workbench = normalizeViewRulesWorkbench(rules);
-
-  // The legacy renderer only exists as a fallback, so an empty gate model should still show a readable shell.
-  if (workbench.nlRules.length === 0) {
-    return renderEmptyState("筛选策略", "当前还没有可编辑的规则，请先完成系统初始化。");
-  }
-
   return `
     <section class="content-intro content-intro--system">
       <p class="content-kicker">系统菜单</p>
-      <p class="content-description">筛选策略：在同一工作台里维护数值权重、自然语言规则、反馈池、草稿池和 LLM 厂商配置。</p>
+      <p class="content-description">筛选策略：当前只保留反馈池和暂未使用的 LLM 设置入口。</p>
     </section>
     <section class="system-section system-section--workbench" data-system-section="view-rules">
       <header class="system-section-header">
-        <p class="system-section-kicker">策略工作台</p>
-        <h3 class="system-section-title">调整四道门策略与反馈链路</h3>
-        <p class="system-section-description">这里把基础入池、AI 新讯、AI 热点、首条精选四道门，以及反馈池、草稿池和 LLM 厂商设置收进同一个工作台。</p>
+        <p class="system-section-kicker">反馈池工作台</p>
+        <h3 class="system-section-title">查看反馈池并保留厂商配置入口</h3>
+        <p class="system-section-description">自然语言规则、草稿池和重算链路已移除，当前只保留反馈池与暂未使用的 LLM 设置。</p>
       </header>
       <div class="system-stack system-stack--control system-stack--workbench">
-        ${renderProviderSettingsCard(workbench)}
-        ${renderNlRulesCard(workbench)}
-        ${renderFeedbackPoolCard(workbench.feedbackPool)}
-        ${renderStrategyDraftsCard(workbench.strategyDrafts)}
+        ${renderLegacyViewRulesFeedbackCard(rules.feedbackPool)}
+        ${renderLegacyViewRulesProviderCard(rules)}
       </div>
     </section>
   `;
@@ -289,25 +241,20 @@ export function renderProfilePage(profile: ProfileView | null): string {
   `;
 }
 
-function renderProviderSettingsCard(workbench: ViewRulesWorkbenchView): string {
+function renderLegacyViewRulesProviderCard(workbench: ViewRulesWorkbenchView): string {
   const providerSettingsList = workbench.providerSettings;
   const enabledProviderSettings = providerSettingsList.find((settings) => settings.isEnabled) ?? null;
   const selectedProvider = enabledProviderSettings?.providerKind ?? providerSettingsList[0]?.providerKind ?? "deepseek";
   const selectedProviderSettings =
     providerSettingsList.find((settings) => settings.providerKind === selectedProvider) ?? null;
-  const latestRun = workbench.latestEvaluationRun;
-  const latestRunText = latestRun
-    ? `${formatProviderLabel(latestRun.providerKind)} · ${latestRun.status} · ${formatDateTime(latestRun.finishedAt ?? latestRun.startedAt)}`
-    : "暂无重算记录";
-  const availabilityText = workbench.providerCapability.message;
 
   return `
     <article class="system-card system-card--control system-card--provider system-card--panel system-card--form-panel" data-system-card="provider-settings">
       <header class="system-card-header">
         <h3 class="system-card-title">LLM 设置</h3>
+        <p class="system-card-meta">状态：暂未使用</p>
         <p class="system-card-meta">已启用厂商：${escapeHtml(formatProviderLabel(enabledProviderSettings?.providerKind ?? null))}</p>
-        <p class="system-card-meta">状态说明：${escapeHtml(availabilityText)}</p>
-        <p class="system-card-meta">上次重算：${escapeHtml(latestRunText)}${workbench.isEvaluationRunning ? " · 进行中" : ""}</p>
+        <p class="system-card-meta">${escapeHtml(workbench.providerCapability.message)}</p>
       </header>
       <form class="system-form" data-system-action="provider-settings-save">
         <label class="rating-field">
@@ -373,56 +320,21 @@ function renderProviderSettingsCard(workbench: ViewRulesWorkbenchView): string {
   `;
 }
 
-function renderNlRulesCard(workbench: ViewRulesWorkbenchView): string {
-  const ruleByScope = new Map(workbench.nlRules.map((rule) => [rule.scope, rule]));
-
-  return `
-    <article class="system-card system-card--control system-card--nl-rules system-card--panel system-card--form-panel" data-system-card="nl-rules">
-      <header class="system-card-header">
-        <h3 class="system-card-title">正式自然语言策略</h3>
-        <p class="system-card-meta">保存后会立即对当前内容库执行一次自然语言重算；每道门都可以单独启用或停用。</p>
-      </header>
-      <form class="system-form" data-system-action="nl-rules-save">
-        <label class="content-feedback-field">
-          <span>基础入池门</span>
-          <input type="checkbox" name="baseEnabled"${ruleByScope.get("base")?.enabled === false ? "" : " checked"} />
-          <textarea name="baseRuleText" rows="4" data-nl-rule-scope="base">${escapeHtml(ruleByScope.get("base")?.ruleText ?? "")}</textarea>
-        </label>
-        <label class="content-feedback-field">
-          <span>AI 新讯入池门</span>
-          <input type="checkbox" name="aiNewEnabled"${ruleByScope.get("ai_new")?.enabled === false ? "" : " checked"} />
-          <textarea name="aiNewRuleText" rows="3" data-nl-rule-scope="ai_new">${escapeHtml(ruleByScope.get("ai_new")?.ruleText ?? "")}</textarea>
-        </label>
-        <label class="content-feedback-field">
-          <span>AI 热点入池门</span>
-          <input type="checkbox" name="aiHotEnabled"${ruleByScope.get("ai_hot")?.enabled === false ? "" : " checked"} />
-          <textarea name="aiHotRuleText" rows="3" data-nl-rule-scope="ai_hot">${escapeHtml(ruleByScope.get("ai_hot")?.ruleText ?? "")}</textarea>
-        </label>
-        <div class="system-action-row">
-          <button type="submit" class="primary-mini-button">保存正式规则</button>
-        </div>
-        <div class="system-status-region">
-          <p class="action-status system-status" data-role="action-status" aria-live="polite"></p>
-        </div>
-      </form>
-    </article>
-  `;
-}
-
-function renderFeedbackPoolCard(entries: FeedbackPoolItem[]): string {
+function renderLegacyViewRulesFeedbackCard(entries: FeedbackPoolItem[]): string {
   const combinedCopyText = entries.map((entry) => buildFeedbackCopyText(entry)).join("\n\n---\n\n");
-  const bodyHtml = entries.length > 0
-    ? entries.map((entry) => renderFeedbackPoolEntry(entry)).join("")
-    : `<p class="system-card-meta">反馈池为空，内容页提交的新建议会出现在这里。</p>`;
+  const bodyHtml =
+    entries.length > 0
+      ? entries.map((entry) => renderLegacyFeedbackPoolEntry(entry)).join("")
+      : `<p class="system-card-meta">反馈池为空，内容页提交的新反馈词会出现在这里。</p>`;
 
   return `
     <article class="system-card system-card--control system-card--feedback-pool system-card--panel" data-system-card="feedback-pool">
       <header class="system-card-header">
         <h3 class="system-card-title">反馈池</h3>
-        <p class="system-card-meta">这里展示已收集、尚未整理成正式策略的当前反馈。</p>
+        <p class="system-card-meta">这里集中展示内容页写入的反馈词，不再转成草稿或正式策略。</p>
       </header>
       <div class="system-action-row">
-        <button type="button" class="secondary-mini-button" data-system-action="copy-text" data-copy-text="${escapeAttribute(combinedCopyText)}">一键复制全部反馈</button>
+        <button type="button" class="secondary-mini-button" data-system-action="copy-text" data-copy-text="${escapeAttribute(combinedCopyText)}">复制全部反馈</button>
       </div>
       <form class="system-form" data-system-action="feedback-clear-all">
         <div class="system-action-row">
@@ -439,7 +351,7 @@ function renderFeedbackPoolCard(entries: FeedbackPoolItem[]): string {
   `;
 }
 
-function renderFeedbackPoolEntry(entry: FeedbackPoolItem): string {
+function renderLegacyFeedbackPoolEntry(entry: FeedbackPoolItem): string {
   return `
     <article class="system-card system-card--control system-card--feedback-entry system-card--panel" data-feedback-id="${entry.id}">
       <header class="system-card-header">
@@ -452,7 +364,7 @@ function renderFeedbackPoolEntry(entry: FeedbackPoolItem): string {
           <dd>${renderOptionalLink(entry.canonicalUrl)}</dd>
         </div>
         <div class="system-detail-row">
-          <dt>说明</dt>
+          <dt>反馈词</dt>
           <dd>${escapeHtml(entry.freeText?.trim() || "未填写")}</dd>
         </div>
         <div class="system-detail-row">
@@ -469,85 +381,9 @@ function renderFeedbackPoolEntry(entry: FeedbackPoolItem): string {
       <div class="system-action-row">
         <button type="button" class="secondary-mini-button" data-system-action="copy-text" data-copy-text="${escapeAttribute(buildFeedbackCopyText(entry))}">复制</button>
       </div>
-      <form class="system-form" data-system-action="feedback-draft-create" data-feedback-id="${entry.id}">
-        <div class="system-action-row">
-          <button type="submit" class="primary-mini-button">转成草稿</button>
-        </div>
-        <div class="system-status-region">
-          <p class="action-status system-status" data-role="action-status" aria-live="polite"></p>
-        </div>
-      </form>
       <form class="system-form" data-system-action="feedback-delete" data-feedback-id="${entry.id}">
         <div class="system-action-row">
           <button type="submit" class="secondary-mini-button">删除</button>
-        </div>
-        <div class="system-status-region">
-          <p class="action-status system-status" data-role="action-status" aria-live="polite"></p>
-        </div>
-      </form>
-    </article>
-  `;
-}
-
-function renderStrategyDraftsCard(drafts: StrategyDraftItem[]): string {
-  const bodyHtml = drafts.length > 0
-    ? drafts.map((draft) => renderStrategyDraftEntry(draft)).join("")
-    : `<p class="system-card-meta">草稿池为空，可以先从反馈池把单条建议转成草稿。</p>`;
-
-  return `
-    <article class="system-card system-card--control system-card--strategy-drafts system-card--panel" data-system-card="strategy-drafts">
-      <header class="system-card-header">
-        <h3 class="system-card-title">草稿池</h3>
-        <p class="system-card-meta">草稿默认不自动生效，先在这里编辑，再决定是否写入正式规则编辑区。</p>
-      </header>
-      <div class="system-stack system-stack--control system-stack--inventory">
-        ${bodyHtml}
-      </div>
-    </article>
-  `;
-}
-
-function renderStrategyDraftEntry(draft: StrategyDraftItem): string {
-  return `
-    <article class="system-card system-card--control system-card--strategy-draft system-card--panel" data-draft-id="${draft.id}">
-      <form class="system-form" data-system-action="draft-save" data-draft-id="${draft.id}">
-        <label class="rating-field">
-          <span class="field-label">目标范围</span>
-          <select class="field-input" name="suggestedScope">
-            ${renderSelectOption("unspecified", "未指定", draft.suggestedScope)}
-            ${renderSelectOption("base", "基础入池门", draft.suggestedScope)}
-            ${renderSelectOption("ai_new", "AI 新讯入池门", draft.suggestedScope)}
-            ${renderSelectOption("ai_hot", "AI 热点入池门", draft.suggestedScope)}
-          </select>
-        </label>
-        <label class="content-feedback-field">
-          <span>草稿内容</span>
-          <textarea name="draftText" rows="4">${escapeHtml(draft.draftText)}</textarea>
-        </label>
-        <label class="rating-field">
-          <span class="field-label">效果摘要</span>
-          <input class="field-input" type="text" name="draftEffectSummary" value="${escapeHtml(draft.draftEffectSummary?.trim() || "")}" />
-        </label>
-        <label class="rating-field">
-          <span class="field-label">关键词加分</span>
-          <input class="field-input" type="text" name="positiveKeywords" value="${escapeHtml(draft.positiveKeywords.join(", "))}" />
-        </label>
-        <label class="rating-field">
-          <span class="field-label">关键词减分</span>
-          <input class="field-input" type="text" name="negativeKeywords" value="${escapeHtml(draft.negativeKeywords.join(", "))}" />
-        </label>
-        <div class="system-action-row">
-          <button type="submit" class="primary-mini-button">保存草稿</button>
-          <button type="button" class="secondary-mini-button" data-system-action="draft-apply">写入正式策略编辑器</button>
-          <button type="button" class="secondary-mini-button" data-system-action="copy-text" data-copy-text="${escapeAttribute(buildDraftCopyText(draft))}">复制</button>
-        </div>
-        <div class="system-status-region">
-          <p class="action-status system-status" data-role="action-status" aria-live="polite"></p>
-        </div>
-      </form>
-      <form class="system-form" data-system-action="draft-delete" data-draft-id="${draft.id}">
-        <div class="system-action-row">
-          <button type="submit" class="secondary-mini-button">删除草稿</button>
         </div>
         <div class="system-status-region">
           <p class="action-status system-status" data-role="action-status" aria-live="polite"></p>
@@ -685,30 +521,16 @@ function renderEmptyState(title: string, description: string): string {
   `;
 }
 
-function normalizeViewRulesWorkbench(input: ViewRulesWorkbenchView): ViewRulesWorkbenchView {
-  return input;
-}
-
 function buildFeedbackCopyText(entry: FeedbackPoolItem): string {
   return [
     `标题：${entry.contentTitle}`,
     `来源：${entry.sourceName}`,
     `链接：${entry.canonicalUrl}`,
-    `反馈说明：${entry.freeText?.trim() || "未填写"}`,
+    `反馈词：${entry.freeText?.trim() || "未填写"}`,
     `建议动作：${entry.suggestedEffect?.trim() || "未设置"}`,
     `强度：${entry.strengthLevel?.trim() || "未设置"}`,
     `关键词加分：${entry.positiveKeywords.join(", ") || "未设置"}`,
     `关键词减分：${entry.negativeKeywords.join(", ") || "未设置"}`
-  ].join("\n");
-}
-
-function buildDraftCopyText(draft: StrategyDraftItem): string {
-  return [
-    `目标范围：${draft.suggestedScope}`,
-    `草稿内容：${draft.draftText}`,
-    `效果摘要：${draft.draftEffectSummary?.trim() || "未设置"}`,
-    `关键词加分：${draft.positiveKeywords.join(", ") || "未设置"}`,
-    `关键词减分：${draft.negativeKeywords.join(", ") || "未设置"}`
   ].join("\n");
 }
 

@@ -112,7 +112,7 @@ describe("ContentHeroCard", () => {
       })
     );
     expect(vi.mocked(contentApi.saveFeedbackPoolEntry).mock.calls[0]?.[1]).not.toHaveProperty("reactionSnapshot");
-    expect(successSpy).toHaveBeenCalledWith("反馈池建议已保存");
+    expect(successSpy).toHaveBeenCalledWith("反馈词已保存到反馈池");
   });
 
   it("shows expand and collapse controls for long featured summaries", async () => {
@@ -162,7 +162,7 @@ describe("ContentHeroCard", () => {
     await wrapper.get("[data-feedback-panel] button").trigger("click");
     await flushPromises();
 
-    expect(wrapper.text()).toContain("请先登录后再保存反馈池建议。");
-    expect(warningSpy).toHaveBeenCalledWith("请先登录后再保存反馈池建议。");
+    expect(wrapper.text()).toContain("请先登录后再保存反馈词。");
+    expect(warningSpy).toHaveBeenCalledWith("请先登录后再保存反馈词。");
   });
 });

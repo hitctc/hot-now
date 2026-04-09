@@ -119,5 +119,5 @@ export function formatFeedbackSummary(entry: ContentFeedbackEntry | undefined): 
     segments.push(`关键词减分：${entry.negativeKeywords.join(", ")}`);
   }
 
-  return segments.length > 0 ? segments.join(" · ") : "已保存反馈池建议";
+  return segments.length > 0 ? segments.join(" · ") : "已保存到反馈池";
 }

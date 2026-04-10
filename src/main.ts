@@ -200,7 +200,7 @@ function buildFilterWorkbenchRule(
 ) {
   return {
     ruleKey,
-    displayName: ruleKey === "ai" ? "AI 新讯筛选" : "AI 热点筛选",
+    displayName: ruleKey === "ai" ? "AI 新讯怎么排" : "AI 热点怎么排",
     summary: ruleKey === "ai"
       ? buildAiRuleSummary(config)
       : buildHotRuleSummary(config),
@@ -223,19 +223,19 @@ function buildFilterWorkbenchRule(
 }
 
 function buildAiRuleSummary(config: ReturnType<typeof getViewRuleConfig>) {
-  return `当前 AI 新讯会${config.enableTimeWindow ? "" : "不"}优先保留最近 24 小时内容，并按${readEnabledAiSignals(config)}排序。`;
+  return `现在 AI 新讯${config.enableTimeWindow ? "默认只看最近 24 小时" : "不限制最近 24 小时"}，排序时会重点参考${readEnabledAiSignals(config)}。`;
 }
 
 function buildHotRuleSummary(config: ReturnType<typeof getViewRuleConfig>) {
-  return `当前 AI 热点${config.enableTimeWindow ? "会" : "不会"}强行限制 24 小时，并按${readEnabledHotSignals(config)}排序。`;
+  return `现在 AI 热点${config.enableTimeWindow ? "只看最近 24 小时" : "不限制 24 小时"}，排序时会重点参考${readEnabledHotSignals(config)}。`;
 }
 
 function readEnabledAiSignals(config: ReturnType<typeof getViewRuleConfig>) {
   const parts = [
-    config.enableAiKeywordWeight ? "AI 关键词" : null,
-    config.enableHeatKeywordWeight ? "热点关键词" : null,
-    config.enableSourceViewBonus ? "来源偏置" : null,
-    config.enableScoreRanking ? "综合评分" : "发布时间"
+    config.enableAiKeywordWeight ? "AI 相关程度" : null,
+    config.enableHeatKeywordWeight ? "热点词" : null,
+    config.enableSourceViewBonus ? "重点来源" : null,
+    config.enableScoreRanking ? "综合分" : "发布时间"
   ].filter((value): value is string => typeof value === "string");
 
   return parts.join("、");
@@ -243,11 +243,11 @@ function readEnabledAiSignals(config: ReturnType<typeof getViewRuleConfig>) {
 
 function readEnabledHotSignals(config: ReturnType<typeof getViewRuleConfig>) {
   const parts = [
-    config.enableHeatKeywordWeight ? "热点关键词" : null,
-    config.enableAiKeywordWeight ? "AI 关键词" : null,
-    config.enableFreshnessWeight ? "新鲜度" : null,
-    config.enableSourceViewBonus ? "来源偏置" : null,
-    config.enableScoreRanking ? "综合评分" : "发布时间"
+    config.enableHeatKeywordWeight ? "热点词" : null,
+    config.enableAiKeywordWeight ? "AI 相关程度" : null,
+    config.enableFreshnessWeight ? "新内容" : null,
+    config.enableSourceViewBonus ? "重点来源" : null,
+    config.enableScoreRanking ? "综合分" : "发布时间"
   ].filter((value): value is string => typeof value === "string");
 
   return parts.join("、");

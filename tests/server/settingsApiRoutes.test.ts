@@ -32,8 +32,8 @@ function createAuthenticatedServer() {
       filterWorkbench: {
         aiRule: {
           ruleKey: "ai",
-          displayName: "AI 新讯筛选",
-          summary: "当前 AI 新讯会优先保留最近 24 小时内容。",
+          displayName: "AI 新讯怎么排",
+          summary: "现在 AI 新讯默认只看最近 24 小时。",
           toggles: {
             enableTimeWindow: true,
             enableSourceViewBonus: true,
@@ -52,8 +52,8 @@ function createAuthenticatedServer() {
         },
         hotRule: {
           ruleKey: "hot",
-          displayName: "AI 热点筛选",
-          summary: "当前 AI 热点不会强行限制 24 小时。",
+          displayName: "AI 热点怎么排",
+          summary: "现在 AI 热点不限制 24 小时。",
           toggles: {
             enableTimeWindow: false,
             enableSourceViewBonus: true,
@@ -144,13 +144,13 @@ describe("settings api routes", () => {
     expect(response.json()).toMatchObject({
       filterWorkbench: {
         aiRule: {
-          displayName: "AI 新讯筛选",
+          displayName: "AI 新讯怎么排",
           toggles: {
             enableTimeWindow: true
           }
         },
         hotRule: {
-          displayName: "AI 热点筛选",
+          displayName: "AI 热点怎么排",
           toggles: {
             enableScoreRanking: true
           }

@@ -31,6 +31,8 @@ import { BUILTIN_SOURCES } from "../../../core/source/sourceCatalog";
 
 type AlertTone = "success" | "info" | "warning" | "error";
 type PageNotice = { tone: AlertTone; message: string };
+type FilterRuleKey = "ai" | "hot";
+type FilterWeightKey = keyof SettingsContentFilterWeights;
 
 const providerKindOptions = [
   { label: "DeepSeek", value: "deepseek" },
@@ -44,11 +46,11 @@ const loadError = ref<string | null>(null);
 const pageNotice = ref<PageNotice | null>(null);
 const workbench = ref<SettingsViewRulesResponse | null>(null);
 const pendingActions = reactive<Record<string, boolean>>({});
-const filterForms = reactive<Record<"ai" | "hot", SettingsContentFilterToggles>>({
+const filterForms = reactive<Record<FilterRuleKey, SettingsContentFilterToggles>>({
   ai: createFilterToggleDraft(),
   hot: createFilterToggleDraft()
 });
-const filterWeightForms = reactive<Record<"ai" | "hot", SettingsContentFilterWeights>>({
+const filterWeightForms = reactive<Record<FilterRuleKey, SettingsContentFilterWeights>>({
   ai: createFilterWeightDraft(),
   hot: createFilterWeightDraft()
 });
@@ -181,7 +183,7 @@ function readFilterWeightItems(rule: SettingsContentFilterRule) {
   ];
 }
 
-function readEditableWeightItems(ruleKey: "ai" | "hot") {
+function readEditableWeightItems(ruleKey: FilterRuleKey) {
   return [
     {
       key: "freshnessWeight",
@@ -216,7 +218,7 @@ function readEditableWeightItems(ruleKey: "ai" | "hot") {
   ] as const;
 }
 
-function readWeightTotal(ruleKey: "ai" | "hot") {
+function readWeightTotal(ruleKey: FilterRuleKey) {
   const weights = filterWeightForms[ruleKey];
 
   return (
@@ -228,11 +230,11 @@ function readWeightTotal(ruleKey: "ai" | "hot") {
   );
 }
 
-function formatWeightTotal(ruleKey: "ai" | "hot") {
+function formatWeightTotal(ruleKey: FilterRuleKey) {
   return readWeightTotal(ruleKey).toFixed(2);
 }
 
-function formatWeightRatio(ruleKey: "ai" | "hot", value: number) {
+function formatWeightRatio(ruleKey: FilterRuleKey, value: number) {
   const total = readWeightTotal(ruleKey);
 
   if (total <= 0) {
@@ -248,6 +250,21 @@ function normalizeWeightInput(value: number | null | undefined): number {
   }
 
   return Number(value.toFixed(2));
+}
+
+function parseWeightInput(rawValue: string): number {
+  const parsed = Number(rawValue.trim());
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0;
+  }
+
+  return normalizeWeightInput(parsed);
+}
+
+function handleWeightInput(ruleKey: FilterRuleKey, weightKey: FilterWeightKey, event: Event): void {
+  const nextValue = event.target instanceof HTMLInputElement ? parseWeightInput(event.target.value) : 0;
+  filterWeightForms[ruleKey][weightKey] = nextValue;
 }
 
 function formatToggleText(enabled: boolean) {
@@ -452,7 +469,7 @@ async function handleProviderSave(): Promise<void> {
   );
 }
 
-async function handleSaveContentFilterRule(ruleKey: "ai" | "hot"): Promise<void> {
+async function handleSaveContentFilterRule(ruleKey: FilterRuleKey): Promise<void> {
   await runWorkbenchAction(
     `content-filter:save:${ruleKey}`,
     () =>
@@ -773,15 +790,15 @@ onMounted(() => {
                       </div>
                       <div class="flex flex-wrap items-center gap-3">
                         <span class="text-xs font-medium text-editorial-text-body">直接输入分值</span>
-                        <a-input-number
-                          :value="item.value"
-                          :min="0"
-                          :step="0.01"
-                          :precision="2"
-                          size="small"
-                          class="editorial-weight-input"
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          inputmode="decimal"
+                          class="editorial-weight-number-input"
                           :data-weight-input="`ai:${item.key}`"
-                          @update:value="filterWeightForms.ai[item.key] = normalizeWeightInput($event)"
+                          :value="item.value.toFixed(2)"
+                          @input="handleWeightInput('ai', item.key, $event)"
                         />
                       </div>
                     </div>
@@ -897,15 +914,15 @@ onMounted(() => {
                       </div>
                       <div class="flex flex-wrap items-center gap-3">
                         <span class="text-xs font-medium text-editorial-text-body">直接输入分值</span>
-                        <a-input-number
-                          :value="item.value"
-                          :min="0"
-                          :step="0.01"
-                          :precision="2"
-                          size="small"
-                          class="editorial-weight-input"
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          inputmode="decimal"
+                          class="editorial-weight-number-input"
                           :data-weight-input="`hot:${item.key}`"
-                          @update:value="filterWeightForms.hot[item.key] = normalizeWeightInput($event)"
+                          :value="item.value.toFixed(2)"
+                          @input="handleWeightInput('hot', item.key, $event)"
                         />
                       </div>
                     </div>

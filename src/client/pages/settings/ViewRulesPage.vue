@@ -772,7 +772,7 @@ onMounted(() => {
                         <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">{{ item.description }}</p>
                       </div>
                       <a-input-number
-                        :model-value="item.value"
+                        :value="item.value"
                         :min="0"
                         :step="0.01"
                         :precision="2"
@@ -892,7 +892,7 @@ onMounted(() => {
                         <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">{{ item.description }}</p>
                       </div>
                       <a-input-number
-                        :model-value="item.value"
+                        :value="item.value"
                         :min="0"
                         :step="0.01"
                         :precision="2"

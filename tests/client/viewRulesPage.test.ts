@@ -310,6 +310,7 @@ describe("ViewRulesPage", () => {
     await flushPromises();
 
     const aiInput = wrapper.get("[data-weight-input='ai:aiWeight']");
+    expect((aiInput.element as HTMLInputElement).value).toBe("0.50");
     await aiInput.setValue("0.60");
     await aiInput.trigger("change");
     await flushPromises();

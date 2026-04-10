@@ -225,6 +225,52 @@ describe("ViewRulesPage", () => {
     });
   });
 
+  it("only toggles filters when the switch itself is clicked", async () => {
+    vi.mocked(settingsApi.readSettingsViewRules)
+      .mockResolvedValueOnce(createWorkbench())
+      .mockResolvedValue(createWorkbench());
+    vi.mocked(settingsApi.saveContentFilterRule)
+      .mockResolvedValue({ ok: true, ruleKey: "ai" });
+
+    const wrapper = mountWithApp(ViewRulesPage);
+
+    await flushPromises();
+
+    await wrapper.get("[data-filter-toggle-card='ai:timeWindow']").trigger("click");
+    await flushPromises();
+    await wrapper.get("[data-save-content-filter='ai']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.saveContentFilterRule).toHaveBeenNthCalledWith(1, {
+      ruleKey: "ai",
+      toggles: {
+        enableTimeWindow: true,
+        enableSourceViewBonus: true,
+        enableAiKeywordWeight: true,
+        enableHeatKeywordWeight: false,
+        enableFreshnessWeight: true,
+        enableScoreRanking: true
+      }
+    });
+
+    await wrapper.get("[data-filter-toggle-switch='ai:timeWindow']").trigger("click");
+    await flushPromises();
+    await wrapper.get("[data-save-content-filter='ai']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.saveContentFilterRule).toHaveBeenNthCalledWith(2, {
+      ruleKey: "ai",
+      toggles: {
+        enableTimeWindow: false,
+        enableSourceViewBonus: true,
+        enableAiKeywordWeight: true,
+        enableHeatKeywordWeight: false,
+        enableFreshnessWeight: true,
+        enableScoreRanking: true
+      }
+    });
+  });
+
   it("copies all feedback entries from the feedback pool", async () => {
     vi.mocked(settingsApi.readSettingsViewRules).mockResolvedValue(createWorkbench());
 

@@ -606,41 +606,56 @@ onMounted(() => {
               </p>
 
               <div class="grid gap-3 md:grid-cols-2">
-                <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+                <div
+                  class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4"
+                  data-filter-toggle-card="ai:timeWindow"
+                >
                   <div>
                     <p class="m-0 text-sm font-semibold text-editorial-text-main">只看最近 24 小时</p>
                     <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">打开后，只保留最近 24 小时的内容。</p>
                   </div>
-                  <a-switch v-model:checked="filterForms.ai.enableTimeWindow" />
-                </label>
-                <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+                  <a-switch v-model:checked="filterForms.ai.enableTimeWindow" data-filter-toggle-switch="ai:timeWindow" />
+                </div>
+                <div
+                  class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4"
+                  data-filter-toggle-card="ai:sourceViewBonus"
+                >
                   <div>
                     <p class="m-0 text-sm font-semibold text-editorial-text-main">优先显示 AI 新讯的重点来源</p>
                     <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">这里的重点来源，是系统预先认定更适合放在 AI 新讯里的来源，比如 OpenAI、Google AI、TechCrunch AI、爱范儿这些。</p>
                   </div>
-                  <a-switch v-model:checked="filterForms.ai.enableSourceViewBonus" />
-                </label>
-                <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+                  <a-switch v-model:checked="filterForms.ai.enableSourceViewBonus" data-filter-toggle-switch="ai:sourceViewBonus" />
+                </div>
+                <div
+                  class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4"
+                  data-filter-toggle-card="ai:aiKeywordWeight"
+                >
                   <div>
                     <p class="m-0 text-sm font-semibold text-editorial-text-main">更看重 AI 相关内容</p>
                     <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">系统会看标题、摘要、正文里有没有模型、Agent、产品更新、大模型、智能体这类信号。越像 AI 内容，越容易排前面。</p>
                   </div>
-                  <a-switch v-model:checked="filterForms.ai.enableAiKeywordWeight" />
-                </label>
-                <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+                  <a-switch v-model:checked="filterForms.ai.enableAiKeywordWeight" data-filter-toggle-switch="ai:aiKeywordWeight" />
+                </div>
+                <div
+                  class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4"
+                  data-filter-toggle-card="ai:heatKeywordWeight"
+                >
                   <div>
                     <p class="m-0 text-sm font-semibold text-editorial-text-main">更看重热点词</p>
                     <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">系统会看标题、摘要、正文里有没有“发布、上线、更新、快讯、周报、launch、release”这类词。命中越多，越容易排前面。</p>
                   </div>
-                  <a-switch v-model:checked="filterForms.ai.enableHeatKeywordWeight" />
-                </label>
-                <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4 md:col-span-2">
+                  <a-switch v-model:checked="filterForms.ai.enableHeatKeywordWeight" data-filter-toggle-switch="ai:heatKeywordWeight" />
+                </div>
+                <div
+                  class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4 md:col-span-2"
+                  data-filter-toggle-card="ai:scoreRanking"
+                >
                   <div>
                     <p class="m-0 text-sm font-semibold text-editorial-text-main">按综合分排序</p>
                     <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">综合分会把重点来源、内容完整度、AI 相关度、热点词这些因素一起算进去。打开后按总分排；关闭后改回按发布时间排。</p>
                   </div>
-                  <a-switch v-model:checked="filterForms.ai.enableScoreRanking" />
-                </label>
+                  <a-switch v-model:checked="filterForms.ai.enableScoreRanking" data-filter-toggle-switch="ai:scoreRanking" />
+                </div>
               </div>
 
               <div class="flex flex-wrap gap-2">
@@ -672,41 +687,56 @@ onMounted(() => {
               </p>
 
               <div class="grid gap-3 md:grid-cols-2">
-                <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+                <div
+                  class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4"
+                  data-filter-toggle-card="hot:sourceViewBonus"
+                >
                   <div>
                     <p class="m-0 text-sm font-semibold text-editorial-text-main">优先显示 AI 热点的重点来源</p>
                     <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">这里的重点来源，是系统预先认定更适合放在 AI 热点里的来源，比如 36氪、36氪快讯、虎嗅网、创业邦这些。</p>
                   </div>
-                  <a-switch v-model:checked="filterForms.hot.enableSourceViewBonus" />
-                </label>
-                <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+                  <a-switch v-model:checked="filterForms.hot.enableSourceViewBonus" data-filter-toggle-switch="hot:sourceViewBonus" />
+                </div>
+                <div
+                  class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4"
+                  data-filter-toggle-card="hot:aiKeywordWeight"
+                >
                   <div>
                     <p class="m-0 text-sm font-semibold text-editorial-text-main">更看重 AI 相关内容</p>
                     <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">系统会看标题、摘要、正文里是不是更像在讲模型、Agent、AI 产品更新、AI 应用案例这类内容。</p>
                   </div>
-                  <a-switch v-model:checked="filterForms.hot.enableAiKeywordWeight" />
-                </label>
-                <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+                  <a-switch v-model:checked="filterForms.hot.enableAiKeywordWeight" data-filter-toggle-switch="hot:aiKeywordWeight" />
+                </div>
+                <div
+                  class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4"
+                  data-filter-toggle-card="hot:heatKeywordWeight"
+                >
                   <div>
                     <p class="m-0 text-sm font-semibold text-editorial-text-main">更看重热点词</p>
                     <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">系统会看标题、摘要、正文里有没有“发布、上线、更新、快讯、周报、热点、analysis”这类热词。命中越多，越容易排前面。</p>
                   </div>
-                  <a-switch v-model:checked="filterForms.hot.enableHeatKeywordWeight" />
-                </label>
-                <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+                  <a-switch v-model:checked="filterForms.hot.enableHeatKeywordWeight" data-filter-toggle-switch="hot:heatKeywordWeight" />
+                </div>
+                <div
+                  class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4"
+                  data-filter-toggle-card="hot:freshnessWeight"
+                >
                   <div>
                     <p class="m-0 text-sm font-semibold text-editorial-text-main">更看重新内容</p>
                     <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">这里的新内容，就是发布时间更近的内容。系统主要按发布时间判断，越新越容易排前面。</p>
                   </div>
-                  <a-switch v-model:checked="filterForms.hot.enableFreshnessWeight" />
-                </label>
-                <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4 md:col-span-2">
+                  <a-switch v-model:checked="filterForms.hot.enableFreshnessWeight" data-filter-toggle-switch="hot:freshnessWeight" />
+                </div>
+                <div
+                  class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4 md:col-span-2"
+                  data-filter-toggle-card="hot:scoreRanking"
+                >
                   <div>
                     <p class="m-0 text-sm font-semibold text-editorial-text-main">按综合分排序</p>
                     <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">综合分会把重点来源、内容完整度、AI 相关度、热点词、新内容这些因素一起算进去。打开后按总分排；关闭后改回按发布时间排。</p>
                   </div>
-                  <a-switch v-model:checked="filterForms.hot.enableScoreRanking" />
-                </label>
+                  <a-switch v-model:checked="filterForms.hot.enableScoreRanking" data-filter-toggle-switch="hot:scoreRanking" />
+                </div>
               </div>
 
               <div class="flex flex-wrap gap-2">

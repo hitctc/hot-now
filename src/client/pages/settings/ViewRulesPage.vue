@@ -33,6 +33,7 @@ type AlertTone = "success" | "info" | "warning" | "error";
 type PageNotice = { tone: AlertTone; message: string };
 type FilterRuleKey = "ai" | "hot";
 type FilterWeightKey = keyof SettingsContentFilterWeights;
+const weightDisplayScale = 100;
 
 const providerKindOptions = [
   { label: "DeepSeek", value: "deepseek" },
@@ -175,11 +176,11 @@ function readFilterOverviewItems(rule: SettingsContentFilterRule): string[] {
 
 function readFilterWeightItems(rule: SettingsContentFilterRule) {
   return [
-    `新内容影响 ${rule.weights.freshnessWeight.toFixed(2)}`,
-    `重点来源影响 ${rule.weights.sourceWeight.toFixed(2)}`,
-    `内容完整度影响 ${rule.weights.completenessWeight.toFixed(2)}`,
-    `AI 内容影响 ${rule.weights.aiWeight.toFixed(2)}`,
-    `热点词影响 ${rule.weights.heatWeight.toFixed(2)}`
+    `新内容影响 ${formatWeightPoints(rule.weights.freshnessWeight)} 分`,
+    `重点来源影响 ${formatWeightPoints(rule.weights.sourceWeight)} 分`,
+    `内容完整度影响 ${formatWeightPoints(rule.weights.completenessWeight)} 分`,
+    `AI 内容影响 ${formatWeightPoints(rule.weights.aiWeight)} 分`,
+    `热点词影响 ${formatWeightPoints(rule.weights.heatWeight)} 分`
   ];
 }
 
@@ -230,10 +231,6 @@ function readWeightTotal(ruleKey: FilterRuleKey) {
   );
 }
 
-function formatWeightTotal(ruleKey: FilterRuleKey) {
-  return readWeightTotal(ruleKey).toFixed(2);
-}
-
 function formatWeightRatio(ruleKey: FilterRuleKey, value: number) {
   const total = readWeightTotal(ruleKey);
 
@@ -252,19 +249,25 @@ function normalizeWeightInput(value: number | null | undefined): number {
   return Number(value.toFixed(2));
 }
 
-function parseWeightInput(rawValue: string): number {
-  const parsed = Number(rawValue.trim());
-
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    return 0;
-  }
-
-  return normalizeWeightInput(parsed);
+function convertStoredWeightToPoints(value: number): number {
+  return Math.round(value * weightDisplayScale);
 }
 
-function handleWeightInput(ruleKey: FilterRuleKey, weightKey: FilterWeightKey, event: Event): void {
-  const nextValue = event.target instanceof HTMLInputElement ? parseWeightInput(event.target.value) : 0;
-  filterWeightForms[ruleKey][weightKey] = nextValue;
+function convertPointsToStoredWeight(value: number): number {
+  return normalizeWeightInput(value / weightDisplayScale);
+}
+
+function formatWeightPoints(value: number): string {
+  return convertStoredWeightToPoints(value).toString();
+}
+
+function formatWeightTotal(ruleKey: FilterRuleKey) {
+  return convertStoredWeightToPoints(readWeightTotal(ruleKey)).toString();
+}
+
+function handleWeightInput(ruleKey: FilterRuleKey, weightKey: FilterWeightKey, value: number | null): void {
+  const nextPoints = typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
+  filterWeightForms[ruleKey][weightKey] = convertPointsToStoredWeight(nextPoints);
 }
 
 function formatToggleText(enabled: boolean) {
@@ -771,10 +774,10 @@ onMounted(() => {
                   <div>
                     <p class="m-0 text-sm font-semibold text-editorial-text-main">调整排序分值</p>
                     <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">
-                      这 5 项加起来的当前总分是 {{ formatWeightTotal("ai") }}。总分只是方便你判断占比，不要求必须等于 1。
+                      这 5 项加起来的当前总分是 {{ formatWeightTotal("ai") }} 分。总分只是方便你判断占比，不要求必须等于 100 分。
                     </p>
                   </div>
-                  <a-tag color="blue">{{ `当前总分 ${formatWeightTotal("ai")}` }}</a-tag>
+                  <a-tag color="blue">{{ `当前总分 ${formatWeightTotal("ai")} 分` }}</a-tag>
                 </div>
 
                 <div class="mt-4 grid gap-3 md:grid-cols-2">
@@ -790,20 +793,20 @@ onMounted(() => {
                       </div>
                       <div class="flex flex-wrap items-center gap-3">
                         <span class="text-xs font-medium text-editorial-text-body">直接输入分值</span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          inputmode="decimal"
-                          class="editorial-weight-number-input"
+                        <a-input-number
+                          :value="convertStoredWeightToPoints(item.value)"
+                          :min="0"
+                          :step="1"
+                          :precision="0"
+                          size="small"
+                          class="editorial-weight-input"
                           :data-weight-input="`ai:${item.key}`"
-                          :value="item.value.toFixed(2)"
-                          @input="handleWeightInput('ai', item.key, $event)"
+                          @update:value="handleWeightInput('ai', item.key, $event)"
                         />
                       </div>
                     </div>
                     <p class="mt-3 mb-0 text-xs leading-5 text-editorial-text-muted">
-                      {{ `当前分值 ${item.value.toFixed(2)}，约占总分 ${formatWeightRatio('ai', item.value)}` }}
+                      {{ `当前分值 ${formatWeightPoints(item.value)} 分，约占总分 ${formatWeightRatio('ai', item.value)}` }}
                     </p>
                   </div>
                 </div>
@@ -895,10 +898,10 @@ onMounted(() => {
                   <div>
                     <p class="m-0 text-sm font-semibold text-editorial-text-main">调整排序分值</p>
                     <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">
-                      这 5 项加起来的当前总分是 {{ formatWeightTotal("hot") }}。总分只是方便你判断占比，不要求必须等于 1。
+                      这 5 项加起来的当前总分是 {{ formatWeightTotal("hot") }} 分。总分只是方便你判断占比，不要求必须等于 100 分。
                     </p>
                   </div>
-                  <a-tag color="blue">{{ `当前总分 ${formatWeightTotal("hot")}` }}</a-tag>
+                  <a-tag color="blue">{{ `当前总分 ${formatWeightTotal("hot")} 分` }}</a-tag>
                 </div>
 
                 <div class="mt-4 grid gap-3 md:grid-cols-2">
@@ -914,20 +917,20 @@ onMounted(() => {
                       </div>
                       <div class="flex flex-wrap items-center gap-3">
                         <span class="text-xs font-medium text-editorial-text-body">直接输入分值</span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          inputmode="decimal"
-                          class="editorial-weight-number-input"
+                        <a-input-number
+                          :value="convertStoredWeightToPoints(item.value)"
+                          :min="0"
+                          :step="1"
+                          :precision="0"
+                          size="small"
+                          class="editorial-weight-input"
                           :data-weight-input="`hot:${item.key}`"
-                          :value="item.value.toFixed(2)"
-                          @input="handleWeightInput('hot', item.key, $event)"
+                          @update:value="handleWeightInput('hot', item.key, $event)"
                         />
                       </div>
                     </div>
                     <p class="mt-3 mb-0 text-xs leading-5 text-editorial-text-muted">
-                      {{ `当前分值 ${item.value.toFixed(2)}，约占总分 ${formatWeightRatio('hot', item.value)}` }}
+                      {{ `当前分值 ${formatWeightPoints(item.value)} 分，约占总分 ${formatWeightRatio('hot', item.value)}` }}
                     </p>
                   </div>
                 </div>

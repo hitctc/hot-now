@@ -167,8 +167,8 @@ describe("ViewRulesPage", () => {
     expect(wrapper.get("[data-settings-section='filter-hot']").text()).toContain("更看重新内容");
     expect(wrapper.get("[data-settings-section='filter-ai']").text()).toContain("模型、Agent、产品更新、大模型、智能体");
     expect(wrapper.get("[data-settings-section='filter-hot']").text()).toContain("这里的新内容，就是发布时间更近的内容");
-    expect(wrapper.get("[data-filter-weight-editor='ai']").text()).toContain("当前总分 1.00");
-    expect(wrapper.get("[data-filter-weight-editor='hot']").text()).toContain("当前总分 1.00");
+    expect(wrapper.get("[data-filter-weight-editor='ai']").text()).toContain("当前总分 100 分");
+    expect(wrapper.get("[data-filter-weight-editor='hot']").text()).toContain("当前总分 100 分");
     expect(wrapper.get("[data-filter-weight-editor='ai']").text()).toContain("直接输入分值");
     expect(wrapper.get("[data-save-content-filter='ai']").text()).toContain("保存 AI 新讯设置");
     expect(wrapper.get("[data-save-content-filter='hot']").text()).toContain("保存 AI 热点设置");
@@ -311,13 +311,13 @@ describe("ViewRulesPage", () => {
     await flushPromises();
 
     const aiInput = wrapper.get("[data-weight-input='ai:aiWeight']");
-    expect((aiInput.element as HTMLInputElement).value).toBe("0.50");
-    await aiInput.setValue("0.60");
+    expect((aiInput.element as HTMLInputElement).value).toBe("50");
+    await aiInput.setValue("60");
     await aiInput.trigger("change");
     await flushPromises();
 
-    expect(wrapper.get("[data-filter-weight-editor='ai']").text()).toContain("当前总分 1.10");
-    expect(wrapper.get("[data-filter-weight-editor='ai']").text()).toContain("当前分值 0.60，约占总分 55%");
+    expect(wrapper.get("[data-filter-weight-editor='ai']").text()).toContain("当前总分 110 分");
+    expect(wrapper.get("[data-filter-weight-editor='ai']").text()).toContain("当前分值 60 分，约占总分 55%");
 
     await wrapper.get("[data-save-content-filter='ai']").trigger("click");
     await flushPromises();

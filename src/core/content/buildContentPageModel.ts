@@ -136,18 +136,18 @@ export function buildContentPageModel(
 function buildStrategySummary(pageKey: ContentPageKey, viewRuleConfig: ViewRuleConfig["config"]) {
   const items = pageKey === "ai-new"
     ? [
-        `24 小时窗口 ${formatToggleStatus(viewRuleConfig.enableTimeWindow)}`,
-        `来源偏置 ${formatToggleStatus(viewRuleConfig.enableSourceViewBonus)}`,
-        `AI 关键词 ${formatToggleStatus(viewRuleConfig.enableAiKeywordWeight)}`,
-        `热点关键词 ${formatToggleStatus(viewRuleConfig.enableHeatKeywordWeight)}`,
-        `评分排序 ${formatToggleStatus(viewRuleConfig.enableScoreRanking)}`
+        `只看最近 24 小时 ${formatToggleStatus(viewRuleConfig.enableTimeWindow)}`,
+        `AI 新讯重点来源优先 ${formatToggleStatus(viewRuleConfig.enableSourceViewBonus)}`,
+        `AI 内容优先 ${formatToggleStatus(viewRuleConfig.enableAiKeywordWeight)}`,
+        `热点词优先 ${formatToggleStatus(viewRuleConfig.enableHeatKeywordWeight)}`,
+        `按综合分排序 ${formatToggleStatus(viewRuleConfig.enableScoreRanking)}`
       ]
     : [
-        `来源偏置 ${formatToggleStatus(viewRuleConfig.enableSourceViewBonus)}`,
-        `AI 关键词 ${formatToggleStatus(viewRuleConfig.enableAiKeywordWeight)}`,
-        `热点关键词 ${formatToggleStatus(viewRuleConfig.enableHeatKeywordWeight)}`,
-        `新鲜度 ${formatToggleStatus(viewRuleConfig.enableFreshnessWeight)}`,
-        `评分排序 ${formatToggleStatus(viewRuleConfig.enableScoreRanking)}`
+        `AI 热点重点来源优先 ${formatToggleStatus(viewRuleConfig.enableSourceViewBonus)}`,
+        `AI 内容优先 ${formatToggleStatus(viewRuleConfig.enableAiKeywordWeight)}`,
+        `热点词优先 ${formatToggleStatus(viewRuleConfig.enableHeatKeywordWeight)}`,
+        `新内容优先 ${formatToggleStatus(viewRuleConfig.enableFreshnessWeight)}`,
+        `按综合分排序 ${formatToggleStatus(viewRuleConfig.enableScoreRanking)}`
       ];
 
   return {

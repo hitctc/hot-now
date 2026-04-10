@@ -45,7 +45,7 @@ describe("settingsApi", () => {
         aiRule: {
           ruleKey: "ai",
           displayName: "AI 新讯怎么排",
-          summary: "现在 AI 新讯默认只看最近 24 小时。",
+          summary: "现在 AI 新讯默认只看最近 24 小时。排序时主要看 AI 内容、AI 新讯重点来源、综合分，下面会把这些词的意思直接写清楚。",
           toggles: {
             enableTimeWindow: true,
             enableSourceViewBonus: true,
@@ -65,7 +65,7 @@ describe("settingsApi", () => {
         hotRule: {
           ruleKey: "hot",
           displayName: "AI 热点怎么排",
-          summary: "现在 AI 热点不限制 24 小时。",
+          summary: "现在 AI 热点不限制 24 小时。排序时主要看热点词、新内容、AI 热点重点来源、综合分，下面会把这些词的意思直接写清楚。",
           toggles: {
             enableTimeWindow: false,
             enableSourceViewBonus: true,

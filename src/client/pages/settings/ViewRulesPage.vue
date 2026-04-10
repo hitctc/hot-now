@@ -26,6 +26,7 @@ import {
   type SettingsProviderSettingsSummary,
   type SettingsViewRulesResponse
 } from "../../services/settingsApi";
+import { BUILTIN_SOURCES } from "../../../core/source/sourceCatalog";
 
 type AlertTone = "success" | "info" | "warning" | "error";
 type PageNotice = { tone: AlertTone; message: string };
@@ -53,6 +54,14 @@ const providerForm = reactive({
 
 const aiFilterRule = computed(() => workbench.value?.filterWorkbench.aiRule ?? null);
 const hotFilterRule = computed(() => workbench.value?.filterWorkbench.hotRule ?? null);
+const aiPrioritySourceNames = Object.values(BUILTIN_SOURCES)
+  .filter((source) => source.navigationViews.includes("ai"))
+  .map((source) => source.name);
+const hotPrioritySourceNames = Object.values(BUILTIN_SOURCES)
+  .filter((source) => source.navigationViews.includes("hot"))
+  .map((source) => source.name);
+const aiSignalExamples = ["AI", "LLM", "GPT", "Agent", "Model", "OpenAI", "Claude", "DeepSeek", "大模型", "智能体"];
+const heatSignalExamples = ["发布", "上线", "更新", "快讯", "周报", "热点", "洞察", "launch", "release", "update", "analysis"];
 
 const providerCapabilityTone = computed<AlertTone>(() => {
   if (!workbench.value) {
@@ -131,27 +140,27 @@ function readFilterOverviewItems(rule: SettingsContentFilterRule): string[] {
   return rule.ruleKey === "ai"
     ? [
         `只看最近 24 小时 ${formatToggleText(rule.toggles.enableTimeWindow)}`,
-        `优先显示重点来源 ${formatToggleText(rule.toggles.enableSourceViewBonus)}`,
-        `更看重 AI 相关内容 ${formatToggleText(rule.toggles.enableAiKeywordWeight)}`,
-        `更看重热点词 ${formatToggleText(rule.toggles.enableHeatKeywordWeight)}`,
+        `AI 新讯重点来源优先 ${formatToggleText(rule.toggles.enableSourceViewBonus)}`,
+        `AI 内容优先 ${formatToggleText(rule.toggles.enableAiKeywordWeight)}`,
+        `热点词优先 ${formatToggleText(rule.toggles.enableHeatKeywordWeight)}`,
         `按综合分排序 ${formatToggleText(rule.toggles.enableScoreRanking)}`
       ]
     : [
-        `优先显示重点来源 ${formatToggleText(rule.toggles.enableSourceViewBonus)}`,
-        `更看重 AI 相关内容 ${formatToggleText(rule.toggles.enableAiKeywordWeight)}`,
-        `更看重热点词 ${formatToggleText(rule.toggles.enableHeatKeywordWeight)}`,
-        `更看重新内容 ${formatToggleText(rule.toggles.enableFreshnessWeight)}`,
+        `AI 热点重点来源优先 ${formatToggleText(rule.toggles.enableSourceViewBonus)}`,
+        `AI 内容优先 ${formatToggleText(rule.toggles.enableAiKeywordWeight)}`,
+        `热点词优先 ${formatToggleText(rule.toggles.enableHeatKeywordWeight)}`,
+        `新内容优先 ${formatToggleText(rule.toggles.enableFreshnessWeight)}`,
         `按综合分排序 ${formatToggleText(rule.toggles.enableScoreRanking)}`
       ];
 }
 
 function readFilterWeightItems(rule: SettingsContentFilterRule) {
   return [
-    `新内容加分 ${rule.weights.freshnessWeight.toFixed(2)}`,
-    `重点来源加分 ${rule.weights.sourceWeight.toFixed(2)}`,
-    `内容完整程度 ${rule.weights.completenessWeight.toFixed(2)}`,
-    `AI 相关程度 ${rule.weights.aiWeight.toFixed(2)}`,
-    `热点程度 ${rule.weights.heatWeight.toFixed(2)}`
+    `新内容影响 ${rule.weights.freshnessWeight.toFixed(2)}`,
+    `重点来源影响 ${rule.weights.sourceWeight.toFixed(2)}`,
+    `内容完整度影响 ${rule.weights.completenessWeight.toFixed(2)}`,
+    `AI 内容影响 ${rule.weights.aiWeight.toFixed(2)}`,
+    `热点词影响 ${rule.weights.heatWeight.toFixed(2)}`
   ];
 }
 
@@ -520,11 +529,80 @@ onMounted(() => {
           </div>
         </section>
 
+        <section class="flex flex-col gap-3" data-settings-section="filter-glossary">
+          <div class="flex flex-col gap-1">
+            <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">名词解释</p>
+            <h2 class="m-0 text-xl font-semibold text-editorial-text-main">这些词到底是什么意思</h2>
+            <p class="m-0 text-sm leading-6 text-editorial-text-body">
+              下面这些解释就是系统现在真实在用的判断方式。你以后自己调开关时，可以直接照着这里理解，不用再猜术语是什么意思。
+            </p>
+          </div>
+
+          <div class="grid gap-3 lg:grid-cols-2">
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+              <p class="m-0 text-sm font-semibold text-editorial-text-main">AI 新讯里的重点来源</p>
+              <p class="mt-2 mb-0 text-sm leading-6 text-editorial-text-body">
+                这不是你手动勾选的来源，而是系统预先认定更适合放在 “AI 新讯” 里的来源。打开相关开关后，这些来源的内容会更容易排前面。
+              </p>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <a-tag v-for="sourceName in aiPrioritySourceNames" :key="`ai-priority:${sourceName}`">{{ sourceName }}</a-tag>
+              </div>
+            </article>
+
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+              <p class="m-0 text-sm font-semibold text-editorial-text-main">AI 热点里的重点来源</p>
+              <p class="mt-2 mb-0 text-sm leading-6 text-editorial-text-body">
+                这也是系统预先认定更适合放在 “AI 热点” 里的来源。打开相关开关后，这些来源的内容会更容易排前面。
+              </p>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <a-tag v-for="sourceName in hotPrioritySourceNames" :key="`hot-priority:${sourceName}`">{{ sourceName }}</a-tag>
+              </div>
+            </article>
+
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+              <p class="m-0 text-sm font-semibold text-editorial-text-main">什么叫 AI 相关内容</p>
+              <p class="mt-2 mb-0 text-sm leading-6 text-editorial-text-body">
+                系统会看标题、摘要、正文里是不是更像在讲 AI，比如模型、Agent、产品更新、应用案例、大模型、智能体这些内容。越像 AI 内容，越容易排前面。
+              </p>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <a-tag v-for="keyword in aiSignalExamples" :key="`ai-signal:${keyword}`">{{ keyword }}</a-tag>
+              </div>
+            </article>
+
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+              <p class="m-0 text-sm font-semibold text-editorial-text-main">什么叫热点词</p>
+              <p class="mt-2 mb-0 text-sm leading-6 text-editorial-text-body">
+                系统会看标题、摘要、正文里有没有一组内置热词，比如发布、上线、更新、快讯、周报、热点、洞察，以及 launch、release、update、analysis 这些词。命中越多，越容易排前面。
+              </p>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <a-tag v-for="keyword in heatSignalExamples" :key="`heat-signal:${keyword}`">{{ keyword }}</a-tag>
+              </div>
+            </article>
+
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+              <p class="m-0 text-sm font-semibold text-editorial-text-main">什么叫新内容</p>
+              <p class="mt-2 mb-0 text-sm leading-6 text-editorial-text-body">
+                就是发布时间更近的内容。系统现在主要按发布时间判断，越新越容易排前面；时间越久，这一项的影响会越来越小。
+              </p>
+            </article>
+
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+              <p class="m-0 text-sm font-semibold text-editorial-text-main">什么叫综合分</p>
+              <p class="mt-2 mb-0 text-sm leading-6 text-editorial-text-body">
+                这不是人工打分，而是系统把重点来源、内容完整度、AI 相关度、热点词、新内容这些因素一起算出来的总分。打开“按综合分排序”后，会优先按这个总分排。
+              </p>
+            </article>
+          </div>
+        </section>
+
         <section data-settings-section="filter-ai">
           <a-card :class="editorialContentCardClass" title="AI 新讯怎么排" size="small">
             <div v-if="aiFilterRule" class="flex flex-col gap-4">
               <p class="m-0 text-sm leading-6 text-editorial-text-body">
                 {{ aiFilterRule.summary }}
+              </p>
+              <p class="m-0 text-xs leading-5 text-editorial-text-muted">
+                下面这些数字表示每一项对排序的影响大小。数字越大，这一项越能左右最后的排序结果。
               </p>
 
               <div class="grid gap-3 md:grid-cols-2">
@@ -537,29 +615,29 @@ onMounted(() => {
                 </label>
                 <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
                   <div>
-                    <p class="m-0 text-sm font-semibold text-editorial-text-main">优先显示重点来源</p>
-                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">打开后，重点来源的内容会更容易排前面。</p>
+                    <p class="m-0 text-sm font-semibold text-editorial-text-main">优先显示 AI 新讯的重点来源</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">这里的重点来源，是系统预先认定更适合放在 AI 新讯里的来源，比如 OpenAI、Google AI、TechCrunch AI、爱范儿这些。</p>
                   </div>
                   <a-switch v-model:checked="filterForms.ai.enableSourceViewBonus" />
                 </label>
                 <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
                   <div>
                     <p class="m-0 text-sm font-semibold text-editorial-text-main">更看重 AI 相关内容</p>
-                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">打开后，更像 AI 新闻的内容会更容易排前面。</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">系统会看标题、摘要、正文里有没有模型、Agent、产品更新、大模型、智能体这类信号。越像 AI 内容，越容易排前面。</p>
                   </div>
                   <a-switch v-model:checked="filterForms.ai.enableAiKeywordWeight" />
                 </label>
                 <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
                   <div>
                     <p class="m-0 text-sm font-semibold text-editorial-text-main">更看重热点词</p>
-                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">打开后，带热点词的内容会更容易排前面。</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">系统会看标题、摘要、正文里有没有“发布、上线、更新、快讯、周报、launch、release”这类词。命中越多，越容易排前面。</p>
                   </div>
                   <a-switch v-model:checked="filterForms.ai.enableHeatKeywordWeight" />
                 </label>
                 <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4 md:col-span-2">
                   <div>
                     <p class="m-0 text-sm font-semibold text-editorial-text-main">按综合分排序</p>
-                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">打开后按综合分排；关闭后改回按发布时间排。</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">综合分会把重点来源、内容完整度、AI 相关度、热点词这些因素一起算进去。打开后按总分排；关闭后改回按发布时间排。</p>
                   </div>
                   <a-switch v-model:checked="filterForms.ai.enableScoreRanking" />
                 </label>
@@ -589,40 +667,43 @@ onMounted(() => {
               <p class="m-0 text-sm leading-6 text-editorial-text-body">
                 {{ hotFilterRule.summary }}
               </p>
+              <p class="m-0 text-xs leading-5 text-editorial-text-muted">
+                下面这些数字表示每一项对排序的影响大小。数字越大，这一项越能左右最后的排序结果。
+              </p>
 
               <div class="grid gap-3 md:grid-cols-2">
                 <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
                   <div>
-                    <p class="m-0 text-sm font-semibold text-editorial-text-main">优先显示重点来源</p>
-                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">打开后，重点来源的内容会更容易排前面。</p>
+                    <p class="m-0 text-sm font-semibold text-editorial-text-main">优先显示 AI 热点的重点来源</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">这里的重点来源，是系统预先认定更适合放在 AI 热点里的来源，比如 36氪、36氪快讯、虎嗅网、创业邦这些。</p>
                   </div>
                   <a-switch v-model:checked="filterForms.hot.enableSourceViewBonus" />
                 </label>
                 <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
                   <div>
                     <p class="m-0 text-sm font-semibold text-editorial-text-main">更看重 AI 相关内容</p>
-                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">打开后，和 AI 更相关的内容会更容易排前面。</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">系统会看标题、摘要、正文里是不是更像在讲模型、Agent、AI 产品更新、AI 应用案例这类内容。</p>
                   </div>
                   <a-switch v-model:checked="filterForms.hot.enableAiKeywordWeight" />
                 </label>
                 <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
                   <div>
                     <p class="m-0 text-sm font-semibold text-editorial-text-main">更看重热点词</p>
-                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">打开后，带热点词的内容会更容易排前面。</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">系统会看标题、摘要、正文里有没有“发布、上线、更新、快讯、周报、热点、analysis”这类热词。命中越多，越容易排前面。</p>
                   </div>
                   <a-switch v-model:checked="filterForms.hot.enableHeatKeywordWeight" />
                 </label>
                 <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
                   <div>
                     <p class="m-0 text-sm font-semibold text-editorial-text-main">更看重新内容</p>
-                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">打开后，越新的内容越容易排前面。</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">这里的新内容，就是发布时间更近的内容。系统主要按发布时间判断，越新越容易排前面。</p>
                   </div>
                   <a-switch v-model:checked="filterForms.hot.enableFreshnessWeight" />
                 </label>
                 <label class="flex items-start justify-between gap-3 rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4 md:col-span-2">
                   <div>
                     <p class="m-0 text-sm font-semibold text-editorial-text-main">按综合分排序</p>
-                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">打开后按综合分排；关闭后改回按发布时间排。</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">综合分会把重点来源、内容完整度、AI 相关度、热点词、新内容这些因素一起算进去。打开后按总分排；关闭后改回按发布时间排。</p>
                   </div>
                   <a-switch v-model:checked="filterForms.hot.enableScoreRanking" />
                 </label>

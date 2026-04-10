@@ -223,18 +223,18 @@ function buildFilterWorkbenchRule(
 }
 
 function buildAiRuleSummary(config: ReturnType<typeof getViewRuleConfig>) {
-  return `现在 AI 新讯${config.enableTimeWindow ? "默认只看最近 24 小时" : "不限制最近 24 小时"}，排序时会重点参考${readEnabledAiSignals(config)}。`;
+  return `现在 AI 新讯${config.enableTimeWindow ? "默认只看最近 24 小时" : "不限制最近 24 小时"}。排序时主要看${readEnabledAiSignals(config)}，下面会把这些词的意思直接写清楚。`;
 }
 
 function buildHotRuleSummary(config: ReturnType<typeof getViewRuleConfig>) {
-  return `现在 AI 热点${config.enableTimeWindow ? "只看最近 24 小时" : "不限制 24 小时"}，排序时会重点参考${readEnabledHotSignals(config)}。`;
+  return `现在 AI 热点${config.enableTimeWindow ? "只看最近 24 小时" : "不限制 24 小时"}。排序时主要看${readEnabledHotSignals(config)}，下面会把这些词的意思直接写清楚。`;
 }
 
 function readEnabledAiSignals(config: ReturnType<typeof getViewRuleConfig>) {
   const parts = [
-    config.enableAiKeywordWeight ? "AI 相关程度" : null,
+    config.enableAiKeywordWeight ? "AI 内容" : null,
     config.enableHeatKeywordWeight ? "热点词" : null,
-    config.enableSourceViewBonus ? "重点来源" : null,
+    config.enableSourceViewBonus ? "AI 新讯重点来源" : null,
     config.enableScoreRanking ? "综合分" : "发布时间"
   ].filter((value): value is string => typeof value === "string");
 
@@ -244,9 +244,9 @@ function readEnabledAiSignals(config: ReturnType<typeof getViewRuleConfig>) {
 function readEnabledHotSignals(config: ReturnType<typeof getViewRuleConfig>) {
   const parts = [
     config.enableHeatKeywordWeight ? "热点词" : null,
-    config.enableAiKeywordWeight ? "AI 相关程度" : null,
+    config.enableAiKeywordWeight ? "AI 内容" : null,
     config.enableFreshnessWeight ? "新内容" : null,
-    config.enableSourceViewBonus ? "重点来源" : null,
+    config.enableSourceViewBonus ? "AI 热点重点来源" : null,
     config.enableScoreRanking ? "综合分" : "发布时间"
   ].filter((value): value is string => typeof value === "string");
 

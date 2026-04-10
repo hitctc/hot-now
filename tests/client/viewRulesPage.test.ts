@@ -33,7 +33,7 @@ function createWorkbench() {
       aiRule: {
         ruleKey: "ai",
         displayName: "AI 新讯怎么排",
-        summary: "现在 AI 新讯默认只看最近 24 小时，排序时会重点参考 AI 相关程度、重点来源、综合分。",
+        summary: "现在 AI 新讯默认只看最近 24 小时。排序时主要看 AI 内容、AI 新讯重点来源、综合分，下面会把这些词的意思直接写清楚。",
         toggles: {
           enableTimeWindow: true,
           enableSourceViewBonus: true,
@@ -53,7 +53,7 @@ function createWorkbench() {
       hotRule: {
         ruleKey: "hot",
         displayName: "AI 热点怎么排",
-        summary: "现在 AI 热点不限制 24 小时，排序时会重点参考热点词、新内容、重点来源、综合分。",
+        summary: "现在 AI 热点不限制 24 小时。排序时主要看热点词、新内容、AI 热点重点来源、综合分，下面会把这些词的意思直接写清楚。",
         toggles: {
           enableTimeWindow: false,
           enableSourceViewBonus: true,
@@ -159,8 +159,14 @@ describe("ViewRulesPage", () => {
     expect(wrapper.get("[data-settings-section='filter-overview']").text()).toContain("当前筛选总览");
     expect(wrapper.get("[data-filter-overview-card='ai']").text()).toContain("AI 新讯怎么排");
     expect(wrapper.get("[data-filter-overview-card='hot']").text()).toContain("AI 热点怎么排");
+    expect(wrapper.get("[data-settings-section='filter-glossary']").text()).toContain("这些词到底是什么意思");
+    expect(wrapper.get("[data-settings-section='filter-glossary']").text()).toContain("OpenAI");
+    expect(wrapper.get("[data-settings-section='filter-glossary']").text()).toContain("36氪快讯");
+    expect(wrapper.get("[data-settings-section='filter-glossary']").text()).toContain("launch");
     expect(wrapper.get("[data-settings-section='filter-ai']").text()).toContain("只看最近 24 小时");
     expect(wrapper.get("[data-settings-section='filter-hot']").text()).toContain("更看重新内容");
+    expect(wrapper.get("[data-settings-section='filter-ai']").text()).toContain("模型、Agent、产品更新、大模型、智能体");
+    expect(wrapper.get("[data-settings-section='filter-hot']").text()).toContain("这里的新内容，就是发布时间更近的内容");
     expect(wrapper.get("[data-save-content-filter='ai']").text()).toContain("保存 AI 新讯设置");
     expect(wrapper.get("[data-save-content-filter='hot']").text()).toContain("保存 AI 热点设置");
     expect(wrapper.get("[data-view-rules-section='feedback-pool']").text()).toContain("Agent 工作流总结");

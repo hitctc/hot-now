@@ -56,7 +56,7 @@ const baseModel = {
   featuredCard: null,
   strategySummary: {
     pageKey: "ai-new" as const,
-    items: ["24 小时窗口 开", "来源偏置 开", "AI 关键词 开", "热点关键词 关", "评分排序 开"]
+    items: ["只看最近 24 小时 开", "AI 新讯重点来源优先 开", "AI 内容优先 开", "热点词优先 关", "按综合分排序 开"]
   },
   pagination: {
     page: 1,
@@ -165,7 +165,7 @@ describe("AiNewPage", () => {
     );
     expect(wrapper.find("[data-content-filter-shell]").exists()).toBe(false);
     expect(wrapper.get("[data-content-strategy-summary='ai-new']").text()).toContain("当前 AI 新讯");
-    expect(wrapper.get("[data-content-strategy-summary='ai-new']").text()).toContain("24 小时窗口 开");
+    expect(wrapper.get("[data-content-strategy-summary='ai-new']").text()).toContain("只看最近 24 小时 开");
     expect(wrapper.findAll("[data-content-toolbar-card]").length).toBe(1);
     const toolbarMainRow = wrapper.get("[data-content-toolbar-main-row]");
     expect(toolbarMainRow.find("[data-content-toolbar-summary]").exists()).toBe(true);

@@ -169,6 +169,7 @@ describe("ViewRulesPage", () => {
     expect(wrapper.get("[data-settings-section='filter-hot']").text()).toContain("这里的新内容，就是发布时间更近的内容");
     expect(wrapper.get("[data-filter-weight-editor='ai']").text()).toContain("当前总分 1.00");
     expect(wrapper.get("[data-filter-weight-editor='hot']").text()).toContain("当前总分 1.00");
+    expect(wrapper.get("[data-filter-weight-editor='ai']").text()).toContain("直接输入分值");
     expect(wrapper.get("[data-save-content-filter='ai']").text()).toContain("保存 AI 新讯设置");
     expect(wrapper.get("[data-save-content-filter='hot']").text()).toContain("保存 AI 热点设置");
     expect(wrapper.get("[data-view-rules-section='feedback-pool']").text()).toContain("Agent 工作流总结");

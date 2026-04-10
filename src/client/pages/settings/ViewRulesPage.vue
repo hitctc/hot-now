@@ -766,20 +766,24 @@ onMounted(() => {
                     :key="`ai-weight-input:${item.key}`"
                     class="rounded-editorial-md border border-editorial-border bg-editorial-link px-4 py-4"
                   >
-                    <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex flex-col gap-3">
                       <div>
                         <p class="m-0 text-sm font-semibold text-editorial-text-main">{{ item.label }}</p>
                         <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">{{ item.description }}</p>
                       </div>
-                      <a-input-number
-                        :value="item.value"
-                        :min="0"
-                        :step="0.01"
-                        :precision="2"
-                        size="small"
-                        :data-weight-input="`ai:${item.key}`"
-                        @update:value="filterWeightForms.ai[item.key] = normalizeWeightInput($event)"
-                      />
+                      <div class="flex flex-wrap items-center gap-3">
+                        <span class="text-xs font-medium text-editorial-text-body">直接输入分值</span>
+                        <a-input-number
+                          :value="item.value"
+                          :min="0"
+                          :step="0.01"
+                          :precision="2"
+                          size="small"
+                          class="editorial-weight-input"
+                          :data-weight-input="`ai:${item.key}`"
+                          @update:value="filterWeightForms.ai[item.key] = normalizeWeightInput($event)"
+                        />
+                      </div>
                     </div>
                     <p class="mt-3 mb-0 text-xs leading-5 text-editorial-text-muted">
                       {{ `当前分值 ${item.value.toFixed(2)}，约占总分 ${formatWeightRatio('ai', item.value)}` }}
@@ -886,20 +890,24 @@ onMounted(() => {
                     :key="`hot-weight-input:${item.key}`"
                     class="rounded-editorial-md border border-editorial-border bg-editorial-link px-4 py-4"
                   >
-                    <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex flex-col gap-3">
                       <div>
                         <p class="m-0 text-sm font-semibold text-editorial-text-main">{{ item.label }}</p>
                         <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">{{ item.description }}</p>
                       </div>
-                      <a-input-number
-                        :value="item.value"
-                        :min="0"
-                        :step="0.01"
-                        :precision="2"
-                        size="small"
-                        :data-weight-input="`hot:${item.key}`"
-                        @update:value="filterWeightForms.hot[item.key] = normalizeWeightInput($event)"
-                      />
+                      <div class="flex flex-wrap items-center gap-3">
+                        <span class="text-xs font-medium text-editorial-text-body">直接输入分值</span>
+                        <a-input-number
+                          :value="item.value"
+                          :min="0"
+                          :step="0.01"
+                          :precision="2"
+                          size="small"
+                          class="editorial-weight-input"
+                          :data-weight-input="`hot:${item.key}`"
+                          @update:value="filterWeightForms.hot[item.key] = normalizeWeightInput($event)"
+                        />
+                      </div>
                     </div>
                     <p class="mt-3 mb-0 text-xs leading-5 text-editorial-text-muted">
                       {{ `当前分值 ${item.value.toFixed(2)}，约占总分 ${formatWeightRatio('hot', item.value)}` }}

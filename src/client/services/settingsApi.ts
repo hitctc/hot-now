@@ -36,18 +36,20 @@ export type SettingsContentFilterToggles = {
   enableScoreRanking: boolean;
 };
 
+export type SettingsContentFilterWeights = {
+  freshnessWeight: number;
+  sourceWeight: number;
+  completenessWeight: number;
+  aiWeight: number;
+  heatWeight: number;
+};
+
 export type SettingsContentFilterRule = {
   ruleKey: "ai" | "hot";
   displayName: string;
   summary: string;
   toggles: SettingsContentFilterToggles;
-  weights: {
-    freshnessWeight: number;
-    sourceWeight: number;
-    completenessWeight: number;
-    aiWeight: number;
-    heatWeight: number;
-  };
+  weights: SettingsContentFilterWeights;
 };
 
 export type SettingsFeedbackPoolItem = {
@@ -77,6 +79,7 @@ export type SettingsViewRulesResponse = {
 export type SaveContentFilterRulePayload = {
   ruleKey: "ai" | "hot";
   toggles: SettingsContentFilterToggles;
+  weights: SettingsContentFilterWeights;
 };
 export type SaveContentFilterRuleResponse = {
   ok: true;

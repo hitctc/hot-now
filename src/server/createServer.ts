@@ -123,6 +123,7 @@ type ContentPageModel = {
 type SaveContentFilterRuleInput = {
   ruleKey: string;
   toggles: unknown;
+  weights: unknown;
 };
 type SaveContentFilterRuleResult = { ok: true; ruleKey: "ai" | "hot" } | { ok: false; reason: string };
 
@@ -286,11 +287,12 @@ export function createServer(deps: ServerDeps = {}) {
       return;
     }
 
-    const body = request.body as { ruleKey?: unknown; toggles?: unknown } | undefined;
+    const body = request.body as { ruleKey?: unknown; toggles?: unknown; weights?: unknown } | undefined;
     const ruleKey = typeof body?.ruleKey === "string" ? body.ruleKey.trim() : "";
     const result = await deps.saveContentFilterRule?.({
       ruleKey,
-      toggles: body?.toggles
+      toggles: body?.toggles,
+      weights: body?.weights
     });
 
     if (!result || result.ok === false) {

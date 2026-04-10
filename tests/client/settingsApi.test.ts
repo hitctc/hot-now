@@ -111,6 +111,13 @@ describe("settingsApi", () => {
         enableHeatKeywordWeight: false,
         enableFreshnessWeight: true,
         enableScoreRanking: true
+      },
+      weights: {
+        freshnessWeight: 0.1,
+        sourceWeight: 0.1,
+        completenessWeight: 0.15,
+        aiWeight: 0.5,
+        heatWeight: 0.15
       }
     });
 
@@ -125,6 +132,13 @@ describe("settingsApi", () => {
           enableHeatKeywordWeight: false,
           enableFreshnessWeight: true,
           enableScoreRanking: true
+        },
+        weights: {
+          freshnessWeight: 0.1,
+          sourceWeight: 0.1,
+          completenessWeight: 0.15,
+          aiWeight: 0.5,
+          heatWeight: 0.15
         }
       })
     });

@@ -21,6 +21,7 @@ import {
   updateProviderSettingsActivation,
   type SettingsContentFilterRule,
   type SettingsContentFilterToggles,
+  type SettingsContentFilterWeights,
   type SettingsFeedbackPoolItem,
   type SettingsProviderKind,
   type SettingsProviderSettingsSummary,
@@ -46,6 +47,10 @@ const pendingActions = reactive<Record<string, boolean>>({});
 const filterForms = reactive<Record<"ai" | "hot", SettingsContentFilterToggles>>({
   ai: createFilterToggleDraft(),
   hot: createFilterToggleDraft()
+});
+const filterWeightForms = reactive<Record<"ai" | "hot", SettingsContentFilterWeights>>({
+  ai: createFilterWeightDraft(),
+  hot: createFilterWeightDraft()
 });
 const providerForm = reactive({
   providerKind: "deepseek" as SettingsProviderKind | string,
@@ -127,6 +132,16 @@ function createFilterToggleDraft(): SettingsContentFilterToggles {
   };
 }
 
+function createFilterWeightDraft(): SettingsContentFilterWeights {
+  return {
+    freshnessWeight: 0,
+    sourceWeight: 0,
+    completenessWeight: 0,
+    aiWeight: 0,
+    heatWeight: 0
+  };
+}
+
 function syncFilterForms(nextWorkbench: SettingsViewRulesResponse | null): void {
   if (!nextWorkbench) {
     return;
@@ -134,6 +149,8 @@ function syncFilterForms(nextWorkbench: SettingsViewRulesResponse | null): void 
 
   filterForms.ai = { ...nextWorkbench.filterWorkbench.aiRule.toggles };
   filterForms.hot = { ...nextWorkbench.filterWorkbench.hotRule.toggles };
+  filterWeightForms.ai = { ...nextWorkbench.filterWorkbench.aiRule.weights };
+  filterWeightForms.hot = { ...nextWorkbench.filterWorkbench.hotRule.weights };
 }
 
 function readFilterOverviewItems(rule: SettingsContentFilterRule): string[] {
@@ -162,6 +179,75 @@ function readFilterWeightItems(rule: SettingsContentFilterRule) {
     `AI 内容影响 ${rule.weights.aiWeight.toFixed(2)}`,
     `热点词影响 ${rule.weights.heatWeight.toFixed(2)}`
   ];
+}
+
+function readEditableWeightItems(ruleKey: "ai" | "hot") {
+  return [
+    {
+      key: "freshnessWeight",
+      label: "新内容影响",
+      description: "发布时间越近，这一项加分越明显。",
+      value: filterWeightForms[ruleKey].freshnessWeight
+    },
+    {
+      key: "sourceWeight",
+      label: "重点来源影响",
+      description: "越偏向这个页面的重点来源，这一项影响越大。",
+      value: filterWeightForms[ruleKey].sourceWeight
+    },
+    {
+      key: "completenessWeight",
+      label: "内容完整度影响",
+      description: "标题、摘要、正文越完整，这一项影响越大。",
+      value: filterWeightForms[ruleKey].completenessWeight
+    },
+    {
+      key: "aiWeight",
+      label: "AI 内容影响",
+      description: "越像 AI 内容，这一项影响越大。",
+      value: filterWeightForms[ruleKey].aiWeight
+    },
+    {
+      key: "heatWeight",
+      label: "热点词影响",
+      description: "越命中热点词，这一项影响越大。",
+      value: filterWeightForms[ruleKey].heatWeight
+    }
+  ] as const;
+}
+
+function readWeightTotal(ruleKey: "ai" | "hot") {
+  const weights = filterWeightForms[ruleKey];
+
+  return (
+    weights.freshnessWeight +
+    weights.sourceWeight +
+    weights.completenessWeight +
+    weights.aiWeight +
+    weights.heatWeight
+  );
+}
+
+function formatWeightTotal(ruleKey: "ai" | "hot") {
+  return readWeightTotal(ruleKey).toFixed(2);
+}
+
+function formatWeightRatio(ruleKey: "ai" | "hot", value: number) {
+  const total = readWeightTotal(ruleKey);
+
+  if (total <= 0) {
+    return "0%";
+  }
+
+  return `${((value / total) * 100).toFixed(0)}%`;
+}
+
+function normalizeWeightInput(value: number | null | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return 0;
+  }
+
+  return Number(value.toFixed(2));
 }
 
 function formatToggleText(enabled: boolean) {
@@ -372,7 +458,8 @@ async function handleSaveContentFilterRule(ruleKey: "ai" | "hot"): Promise<void>
     () =>
       saveContentFilterRule({
         ruleKey,
-        toggles: { ...filterForms[ruleKey] }
+        toggles: { ...filterForms[ruleKey] },
+        weights: { ...filterWeightForms[ruleKey] }
       }),
     {
       successMessage: `${ruleKey === "ai" ? "AI 新讯" : "AI 热点"} 筛选开关已保存。`,
@@ -662,6 +749,45 @@ onMounted(() => {
                 <a-tag v-for="item in readFilterWeightItems(aiFilterRule)" :key="`ai-inline-weight:${item}`">{{ item }}</a-tag>
               </div>
 
+              <div class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4" data-filter-weight-editor="ai">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p class="m-0 text-sm font-semibold text-editorial-text-main">调整排序分值</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">
+                      这 5 项加起来的当前总分是 {{ formatWeightTotal("ai") }}。总分只是方便你判断占比，不要求必须等于 1。
+                    </p>
+                  </div>
+                  <a-tag color="blue">{{ `当前总分 ${formatWeightTotal("ai")}` }}</a-tag>
+                </div>
+
+                <div class="mt-4 grid gap-3 md:grid-cols-2">
+                  <div
+                    v-for="item in readEditableWeightItems('ai')"
+                    :key="`ai-weight-input:${item.key}`"
+                    class="rounded-editorial-md border border-editorial-border bg-editorial-link px-4 py-4"
+                  >
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p class="m-0 text-sm font-semibold text-editorial-text-main">{{ item.label }}</p>
+                        <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">{{ item.description }}</p>
+                      </div>
+                      <a-input-number
+                        :model-value="item.value"
+                        :min="0"
+                        :step="0.01"
+                        :precision="2"
+                        size="small"
+                        :data-weight-input="`ai:${item.key}`"
+                        @update:value="filterWeightForms.ai[item.key] = normalizeWeightInput($event)"
+                      />
+                    </div>
+                    <p class="mt-3 mb-0 text-xs leading-5 text-editorial-text-muted">
+                      {{ `当前分值 ${item.value.toFixed(2)}，约占总分 ${formatWeightRatio('ai', item.value)}` }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div class="flex justify-end">
                 <a-button
                   type="primary"
@@ -741,6 +867,45 @@ onMounted(() => {
 
               <div class="flex flex-wrap gap-2">
                 <a-tag v-for="item in readFilterWeightItems(hotFilterRule)" :key="`hot-inline-weight:${item}`">{{ item }}</a-tag>
+              </div>
+
+              <div class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4" data-filter-weight-editor="hot">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p class="m-0 text-sm font-semibold text-editorial-text-main">调整排序分值</p>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">
+                      这 5 项加起来的当前总分是 {{ formatWeightTotal("hot") }}。总分只是方便你判断占比，不要求必须等于 1。
+                    </p>
+                  </div>
+                  <a-tag color="blue">{{ `当前总分 ${formatWeightTotal("hot")}` }}</a-tag>
+                </div>
+
+                <div class="mt-4 grid gap-3 md:grid-cols-2">
+                  <div
+                    v-for="item in readEditableWeightItems('hot')"
+                    :key="`hot-weight-input:${item.key}`"
+                    class="rounded-editorial-md border border-editorial-border bg-editorial-link px-4 py-4"
+                  >
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p class="m-0 text-sm font-semibold text-editorial-text-main">{{ item.label }}</p>
+                        <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-muted">{{ item.description }}</p>
+                      </div>
+                      <a-input-number
+                        :model-value="item.value"
+                        :min="0"
+                        :step="0.01"
+                        :precision="2"
+                        size="small"
+                        :data-weight-input="`hot:${item.key}`"
+                        @update:value="filterWeightForms.hot[item.key] = normalizeWeightInput($event)"
+                      />
+                    </div>
+                    <p class="mt-3 mb-0 text-xs leading-5 text-editorial-text-muted">
+                      {{ `当前分值 ${item.value.toFixed(2)}，约占总分 ${formatWeightRatio('hot', item.value)}` }}
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div class="flex justify-end">

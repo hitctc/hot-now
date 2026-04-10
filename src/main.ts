@@ -253,10 +253,14 @@ function readEnabledHotSignals(config: ReturnType<typeof getViewRuleConfig>) {
   return parts.join("、");
 }
 
-function saveContentFilterRule(input: { ruleKey: string; toggles: unknown }) {
+function saveContentFilterRule(input: { ruleKey: string; toggles: unknown; weights: unknown }) {
   const normalizedRuleKey = input.ruleKey.trim();
 
-  if ((normalizedRuleKey !== "ai" && normalizedRuleKey !== "hot") || !isTogglePatch(input.toggles)) {
+  if (
+    (normalizedRuleKey !== "ai" && normalizedRuleKey !== "hot") ||
+    !isTogglePatch(input.toggles) ||
+    !isWeightPatch(input.weights)
+  ) {
     return { ok: false as const, reason: "invalid-content-filter-config" };
   }
 
@@ -265,7 +269,8 @@ function saveContentFilterRule(input: { ruleKey: string; toggles: unknown }) {
   const currentConfig = getViewRuleConfig(db, ruleKey);
   const result = saveViewRuleConfig(db, ruleKey, {
     ...currentConfig,
-    ...input.toggles
+    ...input.toggles,
+    ...input.weights
   });
 
   if (!result.ok) {
@@ -301,6 +306,32 @@ function isTogglePatch(value: unknown): value is {
         key === "enableScoreRanking"
       ) &&
       typeof entryValue === "boolean"
+  );
+}
+
+function isWeightPatch(value: unknown): value is {
+  freshnessWeight?: number;
+  sourceWeight?: number;
+  completenessWeight?: number;
+  aiWeight?: number;
+  heatWeight?: number;
+} {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  return Object.entries(value).every(
+    ([key, entryValue]) =>
+      (
+        key === "freshnessWeight" ||
+        key === "sourceWeight" ||
+        key === "completenessWeight" ||
+        key === "aiWeight" ||
+        key === "heatWeight"
+      ) &&
+      typeof entryValue === "number" &&
+      Number.isFinite(entryValue) &&
+      entryValue >= 0
   );
 }
 

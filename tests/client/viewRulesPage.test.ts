@@ -167,6 +167,8 @@ describe("ViewRulesPage", () => {
     expect(wrapper.get("[data-settings-section='filter-hot']").text()).toContain("更看重新内容");
     expect(wrapper.get("[data-settings-section='filter-ai']").text()).toContain("模型、Agent、产品更新、大模型、智能体");
     expect(wrapper.get("[data-settings-section='filter-hot']").text()).toContain("这里的新内容，就是发布时间更近的内容");
+    expect(wrapper.get("[data-filter-weight-editor='ai']").text()).toContain("当前总分 1.00");
+    expect(wrapper.get("[data-filter-weight-editor='hot']").text()).toContain("当前总分 1.00");
     expect(wrapper.get("[data-save-content-filter='ai']").text()).toContain("保存 AI 新讯设置");
     expect(wrapper.get("[data-save-content-filter='hot']").text()).toContain("保存 AI 热点设置");
     expect(wrapper.get("[data-view-rules-section='feedback-pool']").text()).toContain("Agent 工作流总结");
@@ -206,6 +208,13 @@ describe("ViewRulesPage", () => {
         enableHeatKeywordWeight: false,
         enableFreshnessWeight: true,
         enableScoreRanking: true
+      },
+      weights: {
+        freshnessWeight: 0.1,
+        sourceWeight: 0.1,
+        completenessWeight: 0.15,
+        aiWeight: 0.5,
+        heatWeight: 0.15
       }
     });
 
@@ -221,6 +230,13 @@ describe("ViewRulesPage", () => {
         enableHeatKeywordWeight: true,
         enableFreshnessWeight: true,
         enableScoreRanking: true
+      },
+      weights: {
+        freshnessWeight: 0.35,
+        sourceWeight: 0.1,
+        completenessWeight: 0.1,
+        aiWeight: 0.05,
+        heatWeight: 0.4
       }
     });
   });
@@ -250,6 +266,13 @@ describe("ViewRulesPage", () => {
         enableHeatKeywordWeight: false,
         enableFreshnessWeight: true,
         enableScoreRanking: true
+      },
+      weights: {
+        freshnessWeight: 0.1,
+        sourceWeight: 0.1,
+        completenessWeight: 0.15,
+        aiWeight: 0.5,
+        heatWeight: 0.15
       }
     });
 
@@ -267,6 +290,52 @@ describe("ViewRulesPage", () => {
         enableHeatKeywordWeight: false,
         enableFreshnessWeight: true,
         enableScoreRanking: true
+      },
+      weights: {
+        freshnessWeight: 0.1,
+        sourceWeight: 0.1,
+        completenessWeight: 0.15,
+        aiWeight: 0.5,
+        heatWeight: 0.15
+      }
+    });
+  });
+
+  it("lets users edit weights and shows the updated total before saving", async () => {
+    vi.mocked(settingsApi.readSettingsViewRules).mockResolvedValueOnce(createWorkbench());
+    vi.mocked(settingsApi.saveContentFilterRule).mockResolvedValue({ ok: true, ruleKey: "ai" });
+
+    const wrapper = mountWithApp(ViewRulesPage);
+
+    await flushPromises();
+
+    const aiInput = wrapper.get("[data-weight-input='ai:aiWeight']");
+    await aiInput.setValue("0.60");
+    await aiInput.trigger("change");
+    await flushPromises();
+
+    expect(wrapper.get("[data-filter-weight-editor='ai']").text()).toContain("当前总分 1.10");
+    expect(wrapper.get("[data-filter-weight-editor='ai']").text()).toContain("当前分值 0.60，约占总分 55%");
+
+    await wrapper.get("[data-save-content-filter='ai']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.saveContentFilterRule).toHaveBeenCalledWith({
+      ruleKey: "ai",
+      toggles: {
+        enableTimeWindow: true,
+        enableSourceViewBonus: true,
+        enableAiKeywordWeight: true,
+        enableHeatKeywordWeight: false,
+        enableFreshnessWeight: true,
+        enableScoreRanking: true
+      },
+      weights: {
+        freshnessWeight: 0.1,
+        sourceWeight: 0.1,
+        completenessWeight: 0.15,
+        aiWeight: 0.6,
+        heatWeight: 0.15
       }
     });
   });

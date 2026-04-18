@@ -185,6 +185,7 @@ HOT_NOW_REPORT_DATA_DIR=/srv/hot-now/shared/data/reports
 仓库内已经提供第一版部署模板：
 
 - `scripts/deploy-prod.sh`
+- `scripts/pull-prod-data.sh`
 - `.deploy.local.env.example`
 - `deploy/systemd/hot-now.service`
 - `deploy/nginx/hot-now.conf`
@@ -250,6 +251,29 @@ sudo visudo -cf /etc/sudoers.d/hot-now-systemctl
 - `/usr/bin/systemctl status hot-now --no-pager`
 
 不要把 `tctc` 配成全局免密 sudo。
+
+### 拉取生产数据副本到本地
+
+如果本地开发需要对照生产数据，优先拉一份单独副本，不要让开发环境直接读服务器上的 live 数据。
+
+默认命令：
+
+```bash
+./scripts/pull-prod-data.sh
+```
+
+这条脚本会：
+
+- 复用 `.deploy.local.env` 里的 `HOT_NOW_DEPLOY_HOST` 和 `HOT_NOW_DEPLOY_USER`
+- 从 `/srv/hot-now/shared/data` 拉取 `hot-now.sqlite`
+- 用 `rsync` 拉取 `reports/`
+- 把内容写到本地 `data/prod-sync/`
+
+这条脚本不会做的事：
+
+- 不会修改服务器上的任何文件
+- 不会覆盖你当前本地开发正在使用的 `data/` 根目录
+- 不会自动改你的本地 `.env`
 
 ## 验证
 

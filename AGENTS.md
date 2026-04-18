@@ -143,6 +143,7 @@
 - 生成 verified snapshot：`npm run db:snapshot`
 - 从快照恢复主库：`npm run db:restore -- <snapshot-file>`
 - 生产部署：`./scripts/deploy-prod.sh`（默认会先读取仓库根 `.deploy.local.env`；如需临时覆盖，再显式传 `HOT_NOW_DEPLOY_*`）
+- 拉取生产数据副本：`./scripts/pull-prod-data.sh`（默认从生产服务器拉 `hot-now.sqlite + reports/` 到本地 `data/prod-sync/`）
 - 类型构建：`npm run build`
 - 测试：`npm run test`
 
@@ -155,6 +156,7 @@ SQLite 可靠性约定：
 3. 跨设备开发、服务器初始化和坏库恢复，统一手动复制 `data/recovery-backups/<timestamp>/hot-now.sqlite + manifest.json`。
 4. `.sqlite-wal` 与 `.sqlite-shm` 继续保持忽略，不纳入 git。
 5. 启动报损坏时，先跑 `npm run db:check`，再用 `npm run db:restore -- <snapshot-file>` 恢复。
+6. 如果本地开发要对照生产数据，优先运行 `./scripts/pull-prod-data.sh` 把生产库和报告拉到 `data/prod-sync/`，不要让开发环境直接读服务器上的 live 数据目录。
 
 推荐验证顺序：
 
@@ -208,6 +210,11 @@ SQLite 可靠性约定：
 - `HOT_NOW_DEPLOY_HEALTH_URL`（可选，默认 `http://127.0.0.1:3030/health`）
 
 日常开发机推荐在仓库根目录维护一个本地私有的 `.deploy.local.env`，让 `scripts/deploy-prod.sh` 直接读取默认发布目标；仓库里只保留 `.deploy.local.env.example` 模板，真实 `.deploy.local.env` 必须继续忽略，不提交进仓库。
+
+拉取生产数据副本脚本可选覆盖项：
+
+- `HOT_NOW_PULL_REMOTE_DATA_DIR`（可选，默认 `/srv/hot-now/shared/data`）
+- `HOT_NOW_PULL_LOCAL_DIR`（可选，默认 `<repo>/data/prod-sync`）
 
 单机生产部署默认要求部署用户具备最小范围的免密 sudo，只放开：
 

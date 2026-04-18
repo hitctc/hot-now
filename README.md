@@ -188,6 +188,10 @@ HOT_NOW_REPORT_DATA_DIR=/srv/hot-now/shared/data/reports
 - `deploy/systemd/hot-now.service`
 - `deploy/nginx/hot-now.conf`
 
+如果需要按这次真实踩坑顺序逐步复现，详细操作记录见：
+
+- `docs/production-deploy-runbook.md`
+
 ### 首次部署准备
 
 1. 在服务器安装 `Node`、`npm`、`nginx`、`rsync` 和项目构建依赖

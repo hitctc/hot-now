@@ -290,6 +290,20 @@ sudo visudo -cf /etc/sudoers.d/hot-now-systemctl
 
 如果 `data/prod-sync/` 里还没有最新副本，脚本会直接提示你先执行 `./scripts/pull-prod-data.sh`。
 
+### 本地 SFTP 浏览模板
+
+如果你想在 VS Code 里浏览服务器上的 `/srv` 目录，仓库里提供一个可共享模板：
+
+- `.vscode/sftp.example.json`
+
+建议做法：
+
+1. 复制模板到你本地自己的 `.vscode/sftp.json`
+2. 按你的服务器地址、SSH 用户和私钥路径填写
+3. 只把模板提交进仓库，不把真实 `.vscode/sftp.json` 提交进仓库
+
+这样可以保留项目级参考配置，同时避免把机器绑定的私钥路径和个人连接信息写进版本库。
+
 ## 验证
 
 - 相关测试：已通过

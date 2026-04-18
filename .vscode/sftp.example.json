@@ -1,0 +1,30 @@
+[
+  {
+    "name": "ecs-your-server-ip-/srv",
+    "remotePath": "/srv",
+    "protocol": "sftp",
+    "uploadOnSave": false,
+    "interactiveAuth": true,
+    "connectTimeout": 30000,
+    "host": "your-server-ip",
+    "port": 22,
+    "username": "your-ssh-user",
+    "privateKeyPath": "/absolute/path/to/your/private-key",
+    "ignore": [
+      ".git",
+      ".vscode",
+      ".DS_Store",
+      "node_modules",
+      "dist"
+    ],
+    "remoteExplorer": {
+      "filesExclude": [
+        ".git",
+        ".vscode",
+        ".DS_Store",
+        "node_modules",
+        "dist"
+      ]
+    }
+  }
+]

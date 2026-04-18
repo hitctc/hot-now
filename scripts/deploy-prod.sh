@@ -37,7 +37,7 @@ rsync -az --delete \
   --exclude ".DS_Store" \
   ./ "${REMOTE_TARGET}:${DEPLOY_APP_DIR}/"
 
-ssh "${REMOTE_TARGET}" \
+ssh -tt "${REMOTE_TARGET}" \
   "set -euo pipefail
   cd '${DEPLOY_APP_DIR}'
   npm ci

@@ -29,6 +29,7 @@ cd "${REPO_ROOT}"
 
 rsync -az --delete \
   --exclude ".git" \
+  --exclude ".vscode" \
   --exclude "node_modules" \
   --exclude "dist" \
   --exclude "data" \

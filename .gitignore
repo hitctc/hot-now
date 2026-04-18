@@ -2,6 +2,7 @@ node_modules
 dist
 .env
 .env.local
+.deploy.local.env
 .playwright-cli
 *.sqlite-shm
 *.sqlite-wal

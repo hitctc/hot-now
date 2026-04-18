@@ -142,7 +142,7 @@
 - 数据库检查：`npm run db:check`
 - 生成 verified snapshot：`npm run db:snapshot`
 - 从快照恢复主库：`npm run db:restore -- <snapshot-file>`
-- 生产部署：`HOT_NOW_DEPLOY_HOST=<host> HOT_NOW_DEPLOY_USER=<user> ./scripts/deploy-prod.sh`
+- 生产部署：`./scripts/deploy-prod.sh`（默认会先读取仓库根 `.deploy.local.env`；如需临时覆盖，再显式传 `HOT_NOW_DEPLOY_*`）
 - 类型构建：`npm run build`
 - 测试：`npm run test`
 
@@ -206,6 +206,8 @@ SQLite 可靠性约定：
 - `HOT_NOW_DEPLOY_APP_DIR`（可选，默认 `/srv/hot-now/app`）
 - `HOT_NOW_DEPLOY_SERVICE`（可选，默认 `hot-now`）
 - `HOT_NOW_DEPLOY_HEALTH_URL`（可选，默认 `http://127.0.0.1:3030/health`）
+
+日常开发机推荐在仓库根目录维护一个本地私有的 `.deploy.local.env`，让 `scripts/deploy-prod.sh` 直接读取默认发布目标；仓库里只保留 `.deploy.local.env.example` 模板，真实 `.deploy.local.env` 必须继续忽略，不提交进仓库。
 
 单机生产部署默认要求部署用户具备最小范围的免密 sudo，只放开：
 

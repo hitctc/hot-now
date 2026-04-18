@@ -185,6 +185,7 @@ HOT_NOW_REPORT_DATA_DIR=/srv/hot-now/shared/data/reports
 仓库内已经提供第一版部署模板：
 
 - `scripts/deploy-prod.sh`
+- `.deploy.local.env.example`
 - `deploy/systemd/hot-now.service`
 - `deploy/nginx/hot-now.conf`
 - `deploy/sudoers/hot-now-systemctl`
@@ -208,13 +209,19 @@ HOT_NOW_REPORT_DATA_DIR=/srv/hot-now/shared/data/reports
 
 ### 日常发布
 
-本地发布命令：
+建议先在仓库根目录准备一个**本地不入库**的部署配置文件：
 
 ```bash
-HOT_NOW_DEPLOY_HOST=your-server-ip-or-domain \
-HOT_NOW_DEPLOY_USER=tctc \
+cp .deploy.local.env.example .deploy.local.env
+```
+
+然后把你的真实目标写进 `.deploy.local.env`。脚本会自动读取这个被 `.gitignore` 忽略的文件，这样日常发布就能收口成真正的一条命令：
+
+```bash
 ./scripts/deploy-prod.sh
 ```
+
+如果临时想改目标，命令前显式传入 `HOT_NOW_DEPLOY_*` 仍然会覆盖本地文件。
 
 这条脚本会：
 

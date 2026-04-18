@@ -137,10 +137,18 @@ curl -fsS http://127.0.0.1:3030/health
 标准发布方式：
 
 ```bash
-HOT_NOW_DEPLOY_HOST=8.130.144.201 \
-HOT_NOW_DEPLOY_USER=tctc \
 ./scripts/deploy-prod.sh
 ```
+
+前提是先在仓库根目录准备一个本地私有配置文件：
+
+```bash
+cp .deploy.local.env.example .deploy.local.env
+```
+
+然后把默认发布目标写进 `.deploy.local.env`。这个文件会被 `.gitignore` 忽略，不进入仓库，但脚本会自动读取它，所以日常发版可以真正收口成一条命令。
+
+如果临时想切别的服务器，仍然可以在命令前显式传入 `HOT_NOW_DEPLOY_*` 覆盖本地默认值。
 
 这条脚本会做这些事：
 

@@ -5,6 +5,13 @@ set -euo pipefail
 # shared/data and shared/.env stay manual so production state cannot be overwritten by release syncs.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+DEPLOY_LOCAL_ENV_FILE="${REPO_ROOT}/.deploy.local.env"
+
+# Load local deploy defaults from an ignored file so daily release can stay a one-command workflow.
+if [[ -f "${DEPLOY_LOCAL_ENV_FILE}" ]]; then
+  # shellcheck disable=SC1090
+  source "${DEPLOY_LOCAL_ENV_FILE}"
+fi
 
 DEPLOY_HOST="${HOT_NOW_DEPLOY_HOST:-}"
 DEPLOY_USER="${HOT_NOW_DEPLOY_USER:-}"

@@ -275,6 +275,21 @@ sudo visudo -cf /etc/sudoers.d/hot-now-systemctl
 - 不会覆盖你当前本地开发正在使用的 `data/` 根目录
 - 不会自动改你的本地 `.env`
 
+如果你想直接基于这份副本启动本地开发，不用再手写环境变量，推荐：
+
+```bash
+./scripts/dev-prod-sync.sh
+```
+
+这条脚本会：
+
+- 固定读取 `data/prod-sync/hot-now.sqlite`
+- 固定读取 `data/prod-sync/reports`
+- 自动导出 `HOT_NOW_DATABASE_FILE` 和 `HOT_NOW_REPORT_DATA_DIR`
+- 然后执行 `npm run dev`
+
+如果 `data/prod-sync/` 里还没有最新副本，脚本会直接提示你先执行 `./scripts/pull-prod-data.sh`。
+
 ## 验证
 
 - 相关测试：已通过

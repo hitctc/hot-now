@@ -144,6 +144,7 @@
 - 从快照恢复主库：`npm run db:restore -- <snapshot-file>`
 - 生产部署：`./scripts/deploy-prod.sh`（默认会先读取仓库根 `.deploy.local.env`；如需临时覆盖，再显式传 `HOT_NOW_DEPLOY_*`）
 - 拉取生产数据副本：`./scripts/pull-prod-data.sh`（默认从生产服务器拉 `hot-now.sqlite + reports/` 到本地 `data/prod-sync/`）
+- 基于生产副本启动本地开发：`./scripts/dev-prod-sync.sh`（固定使用本地 `data/prod-sync/`，不直连服务器 live 数据）
 - 类型构建：`npm run build`
 - 测试：`npm run test`
 
@@ -157,6 +158,7 @@ SQLite 可靠性约定：
 4. `.sqlite-wal` 与 `.sqlite-shm` 继续保持忽略，不纳入 git。
 5. 启动报损坏时，先跑 `npm run db:check`，再用 `npm run db:restore -- <snapshot-file>` 恢复。
 6. 如果本地开发要对照生产数据，优先运行 `./scripts/pull-prod-data.sh` 把生产库和报告拉到 `data/prod-sync/`，不要让开发环境直接读服务器上的 live 数据目录。
+7. 如果只是想基于这份副本排查或开发，优先运行 `./scripts/dev-prod-sync.sh`，不要每次手写 `HOT_NOW_DATABASE_FILE` 和 `HOT_NOW_REPORT_DATA_DIR`。
 
 推荐验证顺序：
 

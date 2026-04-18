@@ -1,0 +1,16 @@
+[Unit]
+Description=HotNow app service
+After=network.target
+
+[Service]
+Type=simple
+User=tctc
+Group=tctc
+WorkingDirectory=/srv/hot-now/app
+EnvironmentFile=/srv/hot-now/shared/.env
+ExecStart=/usr/bin/node dist/server/main.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

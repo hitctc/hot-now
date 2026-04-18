@@ -41,6 +41,34 @@ describe("loadRuntimeConfig", () => {
     });
   });
 
+  it("allows HOT_NOW_DATABASE_FILE and HOT_NOW_REPORT_DATA_DIR to override resolved runtime paths", async () => {
+    const config = await loadRuntimeConfig({
+      configPath: path.resolve("config/hot-now.config.json"),
+      env: {
+        ...baseEnv,
+        HOT_NOW_DATABASE_FILE: "/srv/hot-now/shared/data/hot-now.sqlite",
+        HOT_NOW_REPORT_DATA_DIR: "/srv/hot-now/shared/data/reports"
+      }
+    });
+
+    expect(config.database.file).toBe("/srv/hot-now/shared/data/hot-now.sqlite");
+    expect(config.report.dataDir).toBe("/srv/hot-now/shared/data/reports");
+  });
+
+  it("ignores blank HOT_NOW_* overrides and falls back to config paths", async () => {
+    const config = await loadRuntimeConfig({
+      configPath: path.resolve("config/hot-now.config.json"),
+      env: {
+        ...baseEnv,
+        HOT_NOW_DATABASE_FILE: "   ",
+        HOT_NOW_REPORT_DATA_DIR: ""
+      }
+    });
+
+    expect(config.database.file).toBe(path.resolve("data/hot-now.sqlite"));
+    expect(config.report.dataDir).toBe(path.resolve("data/reports"));
+  });
+
   it("throws when AUTH env values are missing", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-config-"));
     const configPath = path.join(tempDir, "hot-now.config.json");

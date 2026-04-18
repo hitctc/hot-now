@@ -16,8 +16,9 @@ export async function loadRuntimeConfig(options: Options = {}): Promise<RuntimeC
   const configPath = options.configPath ?? path.resolve("config/hot-now.config.json");
   const fileText = await readFile(configPath, "utf8");
   const fileConfig = parseRuntimeConfigFile(fileText);
-  const reportDir = path.resolve(path.dirname(configPath), fileConfig.report.dataDir);
-  const databaseFile = path.resolve(path.dirname(configPath), fileConfig.database.file);
+  const configDir = path.dirname(configPath);
+  const reportDir = resolveRuntimePath(configDir, fileConfig.report.dataDir, env.HOT_NOW_REPORT_DATA_DIR);
+  const databaseFile = resolveRuntimePath(configDir, fileConfig.database.file, env.HOT_NOW_DATABASE_FILE);
   const smtpPort = parseSmtpPort(required(env.SMTP_PORT, "SMTP_PORT"));
   const smtpSecure = parseSmtpSecure(required(env.SMTP_SECURE, "SMTP_SECURE"));
   const wechatResolverBaseUrl = env.WECHAT_RESOLVER_BASE_URL?.trim();
@@ -64,6 +65,18 @@ export async function loadRuntimeConfig(options: Options = {}): Promise<RuntimeC
           }
         : null
   };
+}
+
+function resolveRuntimePath(configDir: string, configValue: string, overrideValue: string | undefined) {
+  // Production deploys move mutable files out of the code tree, so explicit path overrides
+  // win when present while blank env values safely fall back to checked-in config defaults.
+  const trimmedOverride = overrideValue?.trim();
+
+  if (trimmedOverride) {
+    return path.resolve(trimmedOverride);
+  }
+
+  return path.resolve(configDir, configValue);
 }
 
 function required(value: string | undefined, key: string) {

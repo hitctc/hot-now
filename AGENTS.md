@@ -68,6 +68,8 @@
   负责单元测试与轻量集成测试。
 - `config/hot-now.config.json`
   负责非敏感运行配置。
+- `deploy/`
+  保存生产环境的 `systemd`、`nginx` 示例模板，供首次部署或服务器核对时复用。
 - `docs/superpowers/`
   保存现阶段的设计文档和实现计划，后续重大变更要一起维护。
 
@@ -140,6 +142,7 @@
 - 数据库检查：`npm run db:check`
 - 生成 verified snapshot：`npm run db:snapshot`
 - 从快照恢复主库：`npm run db:restore -- <snapshot-file>`
+- 生产部署：`HOT_NOW_DEPLOY_HOST=<host> HOT_NOW_DEPLOY_USER=<user> ./scripts/deploy-prod.sh`
 - 类型构建：`npm run build`
 - 测试：`npm run test`
 
@@ -190,9 +193,19 @@ SQLite 可靠性约定：
 - `AUTH_PASSWORD`
 - `SESSION_SECRET`
 - `LLM_SETTINGS_MASTER_KEY`
+- `HOT_NOW_DATABASE_FILE`（可选生产覆盖项；显式指定生产 SQLite 文件路径，例如 `/srv/hot-now/shared/data/hot-now.sqlite`）
+- `HOT_NOW_REPORT_DATA_DIR`（可选生产覆盖项；显式指定生产报告目录，例如 `/srv/hot-now/shared/data/reports`）
 - `HOT_NOW_CLIENT_DEV_ORIGIN`
 - `WECHAT_RESOLVER_BASE_URL`（可选覆盖项；本地开发默认由 `npm run dev` 自动注入 `http://127.0.0.1:4040`）
 - `WECHAT_RESOLVER_TOKEN`（可选覆盖项；本地开发默认由 `npm run dev` 自动注入本地 sidecar token）
+
+部署脚本专用环境变量：
+
+- `HOT_NOW_DEPLOY_HOST`
+- `HOT_NOW_DEPLOY_USER`
+- `HOT_NOW_DEPLOY_APP_DIR`（可选，默认 `/srv/hot-now/app`）
+- `HOT_NOW_DEPLOY_SERVICE`（可选，默认 `hot-now`）
+- `HOT_NOW_DEPLOY_HEALTH_URL`（可选，默认 `http://127.0.0.1:3030/health`）
 
 如果新增、删除或重命名环境变量，必须同步更新：
 

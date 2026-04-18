@@ -20,10 +20,13 @@ export AUTH_USERNAME="admin"
 export AUTH_PASSWORD="replace-with-strong-password"
 export SESSION_SECRET="replace-with-long-random-secret"
 export LLM_SETTINGS_MASTER_KEY="replace-with-local-master-key"
+export HOT_NOW_DATABASE_FILE="/srv/hot-now/shared/data/hot-now.sqlite"
+export HOT_NOW_REPORT_DATA_DIR="/srv/hot-now/shared/data/reports"
 export HOT_NOW_CLIENT_DEV_ORIGIN="http://127.0.0.1:35173"
 ```
 
 `LLM_SETTINGS_MASTER_KEY` 现在是可选覆盖项；如果你不单独配置，系统会回退使用 `SESSION_SECRET` 继续加密保存厂商 API key。
+`HOT_NOW_DATABASE_FILE`、`HOT_NOW_REPORT_DATA_DIR` 是可选生产覆盖项，用来把 SQLite 和报告目录从代码树移到 `/srv/hot-now/shared/data`；本地开发不填时，系统继续按 `config/hot-now.config.json` 里的相对路径运行。
 `HOT_NOW_CLIENT_DEV_ORIGIN` 也是可选开发辅助项；`npm run dev` 默认会把 Vite dev server 拉到 `http://127.0.0.1:35173`，并按这个地址接入，让 `3030` 页面直接拿到 HMR 和 Vue DevTools。只有你想改成别的开发端口时，才需要显式覆盖它。
 本地开发不再要求手工配置 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`；`npm run dev` 会自动拉起仓库内置的本地公众号解析 sidecar。只有你想覆盖到远端 relay 时，才需要显式配置这两个环境变量。
 
@@ -139,7 +142,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 ## 配置
 
 - `config/hot-now.config.json`：服务端口、`collectionSchedule` 采集周期、`mailSchedule` 发信时间、`manualActions` 手动动作开关、报告目录，以及兼容旧逻辑的 `source.rssUrl`
-- 环境变量：SMTP 主机、端口、发件人、授权码、收件人、网页基础地址、统一站点登录凭据与会话密钥、作为独立覆盖项的 `LLM_SETTINGS_MASTER_KEY`，以及用于覆盖本地公众号解析 sidecar 或接入远端 relay 的 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`
+- 环境变量：SMTP 主机、端口、发件人、授权码、收件人、网页基础地址、统一站点登录凭据与会话密钥、作为独立覆盖项的 `LLM_SETTINGS_MASTER_KEY`、生产路径覆盖项 `HOT_NOW_DATABASE_FILE` / `HOT_NOW_REPORT_DATA_DIR`，以及用于覆盖本地公众号解析 sidecar 或接入远端 relay 的 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`
 
 默认配置下：
 
@@ -162,6 +165,63 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - `manifest.json`：快照时间、源库路径、完整性结果和表计数摘要
 
 这些恢复快照同样默认只保留在本地 `data/` 目录；如需跨设备使用，手动复制快照文件即可。
+
+## 单机生产部署
+
+第一版生产部署约定固定为：
+
+- 代码目录：`/srv/hot-now/app`
+- 数据目录：`/srv/hot-now/shared/data`
+- 生产环境变量：`/srv/hot-now/shared/.env`
+- 发布方式：本地 `rsync` 上传源码，服务器本机构建，再由 `systemd` 重启
+
+生产环境至少需要补齐这两个路径覆盖项：
+
+```bash
+HOT_NOW_DATABASE_FILE=/srv/hot-now/shared/data/hot-now.sqlite
+HOT_NOW_REPORT_DATA_DIR=/srv/hot-now/shared/data/reports
+```
+
+仓库内已经提供第一版部署模板：
+
+- `scripts/deploy-prod.sh`
+- `deploy/systemd/hot-now.service`
+- `deploy/nginx/hot-now.conf`
+
+### 首次部署准备
+
+1. 在服务器安装 `Node`、`npm`、`nginx`、`rsync` 和项目构建依赖
+2. 创建目录：
+   - `/srv/hot-now/app`
+   - `/srv/hot-now/shared/data`
+   - `/srv/hot-now/shared/.env`
+3. 手工维护生产 `.env`，不要通过发布脚本覆盖
+4. 安装 `deploy/systemd/hot-now.service`
+5. 安装 `deploy/nginx/hot-now.conf`
+6. 确认云侧安全组和本机防火墙都放行 `80/443`
+
+### 日常发布
+
+本地发布命令：
+
+```bash
+HOT_NOW_DEPLOY_HOST=your-server-ip-or-domain \
+HOT_NOW_DEPLOY_USER=tctc \
+./scripts/deploy-prod.sh
+```
+
+这条脚本会：
+
+- 只同步代码到 `/srv/hot-now/app`
+- 明确排除 `.git`、`node_modules`、`dist`、`data`、`.env`
+- 在服务器执行 `npm ci` 和 `npm run build`
+- 重启 `hot-now` 服务
+- 最后调用 `http://127.0.0.1:3030/health` 做健康检查
+
+部署脚本不会触碰：
+
+- `/srv/hot-now/shared/data`
+- `/srv/hot-now/shared/.env`
 
 ## 验证
 

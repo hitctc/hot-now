@@ -1,0 +1,2 @@
+# Allow the deploy user to restart and inspect only the hot-now service without prompting for a password.
+tctc ALL=(root) NOPASSWD: /usr/bin/systemctl restart hot-now, /usr/bin/systemctl status hot-now --no-pager

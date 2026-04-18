@@ -187,6 +187,7 @@ HOT_NOW_REPORT_DATA_DIR=/srv/hot-now/shared/data/reports
 - `scripts/deploy-prod.sh`
 - `deploy/systemd/hot-now.service`
 - `deploy/nginx/hot-now.conf`
+- `deploy/sudoers/hot-now-systemctl`
 
 如果需要按这次真实踩坑顺序逐步复现，详细操作记录见：
 
@@ -202,7 +203,8 @@ HOT_NOW_REPORT_DATA_DIR=/srv/hot-now/shared/data/reports
 3. 手工维护生产 `.env`，不要通过发布脚本覆盖
 4. 安装 `deploy/systemd/hot-now.service`
 5. 安装 `deploy/nginx/hot-now.conf`
-6. 确认云侧安全组和本机防火墙都放行 `80/443`
+6. 安装 `deploy/sudoers/hot-now-systemctl`，让部署用户只对 `hot-now` 的 restart/status 拥有免密 sudo
+7. 确认云侧安全组和本机防火墙都放行 `80/443`
 
 ### 日常发布
 
@@ -219,13 +221,28 @@ HOT_NOW_DEPLOY_USER=tctc \
 - 只同步代码到 `/srv/hot-now/app`
 - 明确排除 `.git`、`node_modules`、`dist`、`data`、`.env`
 - 在服务器执行 `npm ci` 和 `npm run build`
-- 重启 `hot-now` 服务
+- 通过免密 `sudo -n systemctl` 重启并检查 `hot-now` 服务
 - 最后调用 `http://127.0.0.1:3030/health` 做健康检查
 
 部署脚本不会触碰：
 
 - `/srv/hot-now/shared/data`
 - `/srv/hot-now/shared/.env`
+
+部署前需要先安装 sudoers 规则，推荐用 `visudo` 落成独立文件：
+
+```bash
+sudo cp deploy/sudoers/hot-now-systemctl /etc/sudoers.d/hot-now-systemctl
+sudo chmod 440 /etc/sudoers.d/hot-now-systemctl
+sudo visudo -cf /etc/sudoers.d/hot-now-systemctl
+```
+
+这条规则只放开两条命令：
+
+- `/usr/bin/systemctl restart hot-now`
+- `/usr/bin/systemctl status hot-now --no-pager`
+
+不要把 `tctc` 配成全局免密 sudo。
 
 ## 验证
 

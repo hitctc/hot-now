@@ -69,7 +69,7 @@
 - `config/hot-now.config.json`
   负责非敏感运行配置。
 - `deploy/`
-  保存生产环境的 `systemd`、`nginx` 示例模板，供首次部署或服务器核对时复用。
+  保存生产环境的 `systemd`、`nginx`、sudoers 示例模板，供首次部署或服务器核对时复用。
 - `docs/superpowers/`
   保存现阶段的设计文档和实现计划，后续重大变更要一起维护。
 
@@ -206,6 +206,13 @@ SQLite 可靠性约定：
 - `HOT_NOW_DEPLOY_APP_DIR`（可选，默认 `/srv/hot-now/app`）
 - `HOT_NOW_DEPLOY_SERVICE`（可选，默认 `hot-now`）
 - `HOT_NOW_DEPLOY_HEALTH_URL`（可选，默认 `http://127.0.0.1:3030/health`）
+
+单机生产部署默认要求部署用户具备最小范围的免密 sudo，只放开：
+
+- `/usr/bin/systemctl restart hot-now`
+- `/usr/bin/systemctl status hot-now --no-pager`
+
+不要把部署用户配置成全局免密 sudo；优先复用 `deploy/sudoers/hot-now-systemctl` 模板。
 
 如果新增、删除或重命名环境变量，必须同步更新：
 

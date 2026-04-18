@@ -155,7 +155,26 @@ HOT_NOW_DEPLOY_USER=tctc \
 - `/srv/hot-now/shared/data`
 - `/srv/hot-now/shared/.env`
 
-当前脚本使用 `ssh -tt`，因为服务器上的 `sudo systemctl restart hot-now` 需要交互输入 `tctc` 的 sudo 密码。
+当前更推荐的最终收口方式是：为部署用户安装最小范围 sudoers 规则，让脚本直接走非交互 `sudo -n`。
+
+推荐规则文件：
+
+- `deploy/sudoers/hot-now-systemctl`
+
+建议安装方式：
+
+```bash
+sudo cp deploy/sudoers/hot-now-systemctl /etc/sudoers.d/hot-now-systemctl
+sudo chmod 440 /etc/sudoers.d/hot-now-systemctl
+sudo visudo -cf /etc/sudoers.d/hot-now-systemctl
+```
+
+只放开：
+
+- `/usr/bin/systemctl restart hot-now`
+- `/usr/bin/systemctl status hot-now --no-pager`
+
+不要给 `tctc` 全局免密 sudo。
 
 ### 3.1 首次正式发布时的实际现象
 
@@ -277,12 +296,7 @@ HOT_NOW_DEPLOY_USER=tctc \
 
 ### 5.1 部署脚本的 sudo 交互仍然存在
 
-目前 `[scripts/deploy-prod.sh](/Users/tc-nihao/100-tc/700-code/100-center/hot-now/scripts/deploy-prod.sh)` 会在远程重启服务时要求输入 `tctc` 的 sudo 密码。
-
-这不是 bug，但会影响“真正的一条命令无人值守发布”。后续如果想进一步收口，可以考虑：
-
-- 为 `tctc` 精细化配置特定命令的免密 sudo
-- 只放行 `systemctl restart hot-now` 这类最小权限
+当前仓库里的部署脚本已经改成优先使用 `sudo -n`。如果服务器还没安装 sudoers 规则，脚本会直接失败并提示去安装 `deploy/sudoers/hot-now-systemctl`，而不是半路卡在密码提示上。
 
 ### 5.2 生产备份策略还没正式形成
 

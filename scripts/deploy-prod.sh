@@ -37,13 +37,17 @@ rsync -az --delete \
   --exclude ".DS_Store" \
   ./ "${REMOTE_TARGET}:${DEPLOY_APP_DIR}/"
 
-ssh -tt "${REMOTE_TARGET}" \
+ssh "${REMOTE_TARGET}" \
   "set -euo pipefail
   cd '${DEPLOY_APP_DIR}'
   npm ci
   npm run build
-  sudo systemctl restart '${DEPLOY_SERVICE}'
-  sudo systemctl status '${DEPLOY_SERVICE}' --no-pager
+  if ! sudo -n systemctl restart '${DEPLOY_SERVICE}'; then
+    echo 'Passwordless sudo for systemctl restart is not configured.' >&2
+    echo 'Install the deploy sudoers rule from deploy/sudoers/hot-now-systemctl.' >&2
+    exit 1
+  fi
+  sudo -n systemctl status '${DEPLOY_SERVICE}' --no-pager
   for attempt in 1 2 3 4 5; do
     if curl -fsS '${DEPLOY_HEALTH_URL}'; then
       exit 0

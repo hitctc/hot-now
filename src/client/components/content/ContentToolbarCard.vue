@@ -77,7 +77,10 @@ function handleClear(): void {
 </script>
 
 <template>
-  <section :class="[editorialContentCardClass, 'flex flex-col gap-4 px-4 py-4']" data-content-toolbar-card>
+  <section
+    :class="[editorialContentCardClass, 'rounded-b-editorial-lg rounded-t-none flex flex-col gap-4 px-4 py-4']"
+    data-content-toolbar-card
+  >
     <div
       class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"
       data-content-toolbar-main-row

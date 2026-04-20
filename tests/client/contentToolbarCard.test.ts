@@ -24,7 +24,7 @@ describe("ContentToolbarCard", () => {
     });
 
     expect(wrapper.get("[data-content-toolbar-card]").classes()).toEqual(
-      expect.arrayContaining(["rounded-editorial-lg", "border", "bg-editorial-panel"])
+      expect.arrayContaining(["rounded-b-editorial-lg", "rounded-t-none", "border", "bg-editorial-panel"])
     );
     expect(wrapper.findAll("[data-content-toolbar-main-row]").length).toBe(1);
     const mainRow = wrapper.get("[data-content-toolbar-main-row]");

@@ -232,7 +232,7 @@ onMounted(() => {
 
     <div
       v-if="sourceFilter"
-      class="sticky top-0 z-20 w-full max-[900px]:top-[61px]"
+      class="sticky top-0 z-20 -mx-4 w-[calc(100%+2rem)] max-[900px]:top-[61px] min-[901px]:-mx-6 min-[901px]:w-[calc(100%+3rem)]"
       data-content-sticky-toolbar
     >
       <ContentToolbarCard

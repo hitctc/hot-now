@@ -172,7 +172,16 @@ describe("AiNewPage", () => {
     expect(toolbarMainRow.find("[data-content-sort-control]").exists()).toBe(true);
     expect(toolbarMainRow.find("[data-content-search-control]").exists()).toBe(true);
     expect(wrapper.get("[data-content-sticky-toolbar]").classes()).toEqual(
-      expect.arrayContaining(["sticky", "z-20", "w-full", "top-0", "max-[900px]:top-[61px]"])
+      expect.arrayContaining([
+        "sticky",
+        "z-20",
+        "top-0",
+        "-mx-4",
+        "w-[calc(100%+2rem)]",
+        "max-[900px]:top-[61px]",
+        "min-[901px]:-mx-6",
+        "min-[901px]:w-[calc(100%+3rem)]"
+      ])
     );
     expect((wrapper.get("[data-content-toolbar-source-panel]").element as HTMLElement).style.display).toBe("none");
     expect(wrapper.get("[data-content-toolbar-summary]").attributes("aria-expanded")).toBe("false");

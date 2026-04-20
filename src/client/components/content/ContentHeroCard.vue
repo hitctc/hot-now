@@ -3,17 +3,15 @@ import { message } from "ant-design-vue";
 import { computed, reactive, ref, watch } from "vue";
 
 import ContentActionBar from "./ContentActionBar.vue";
-import ContentFeedbackPanel from "./ContentFeedbackPanel.vue";
+import ContentFeedbackModal from "./ContentFeedbackModal.vue";
 import { useSummaryDisclosure } from "./useSummaryDisclosure";
 import {
   cloneContentCard,
   editorialContentBadgeClass,
   editorialContentCardClass,
-  editorialContentFeedbackSummaryClass,
   editorialContentInsetPanelClass,
   editorialContentMetaClass,
   editorialContentScoreBadgeClass,
-  formatFeedbackSummary,
   formatPublishedAt,
   readSafeUrl
 } from "./contentCardShared";
@@ -62,6 +60,7 @@ async function handleFeedbackSubmit(payload: SaveFeedbackPoolEntryPayload): Prom
       positiveKeywords: payload.positiveKeywords,
       negativeKeywords: payload.negativeKeywords
     };
+    feedbackOpen.value = false;
     statusText.value = "反馈词已保存到反馈池";
     void message.success("反馈词已保存到反馈池");
   } catch (error) {
@@ -82,7 +81,6 @@ watch(() => props.card, syncCardState, { deep: true });
 
 const safeUrl = computed(() => readSafeUrl(cardState.canonicalUrl));
 const publishedText = computed(() => formatPublishedAt(cardState.publishedAt));
-const feedbackSummary = computed(() => formatFeedbackSummary(cardState.feedbackEntry));
 const {
   summaryElement,
   summaryExpanded,
@@ -166,13 +164,6 @@ const {
             {{ badge }}
           </span>
         </div>
-
-        <div v-if="feedbackSummary" :class="editorialContentFeedbackSummaryClass">
-          <span class="text-xs font-semibold uppercase tracking-[0.18em] text-editorial-text-muted">反馈词</span>
-          <p class="m-0 text-sm leading-6 text-editorial-text-body">
-            {{ feedbackSummary }}
-          </p>
-        </div>
       </div>
 
       <div
@@ -186,10 +177,11 @@ const {
           @toggle-feedback="feedbackOpen = !feedbackOpen"
         />
 
-        <ContentFeedbackPanel
-          v-if="feedbackOpen"
+        <ContentFeedbackModal
+          :open="feedbackOpen"
           :model-value="cardState.feedbackEntry"
           :submitting="isBusy"
+          @close="feedbackOpen = false"
           @submit="handleFeedbackSubmit"
         />
       </div>

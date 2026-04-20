@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import Antd, { message } from "ant-design-vue";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import ContentStandardCard from "../../src/client/components/content/ContentStandardCard.vue";
 import type { ContentCard } from "../../src/client/services/contentApi";
@@ -52,6 +52,10 @@ describe("ContentStandardCard", () => {
     });
   });
 
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
   it("keeps short summaries expanded without rendering a toggle", async () => {
     const wrapper = mount(ContentStandardCard, {
       props: {
@@ -60,7 +64,8 @@ describe("ContentStandardCard", () => {
       },
       global: {
         plugins: [Antd]
-      }
+      },
+      attachTo: document.body
     });
 
     await flushPromises();
@@ -75,6 +80,7 @@ describe("ContentStandardCard", () => {
     expect(wrapper.find("[data-content-action='favorite']").exists()).toBe(false);
     expect(wrapper.find("[data-content-action='reaction']").exists()).toBe(false);
     expect(wrapper.get("[data-content-action='feedback-panel-toggle']").text()).toContain("补充反馈");
+    expect(wrapper.find("[data-content-feedback-modal]").exists()).toBe(false);
   });
 
   it("shows expand and collapse controls for long standard summaries", async () => {
@@ -87,7 +93,8 @@ describe("ContentStandardCard", () => {
       },
       global: {
         plugins: [Antd]
-      }
+      },
+      attachTo: document.body
     });
 
     await flushPromises();
@@ -116,13 +123,17 @@ describe("ContentStandardCard", () => {
       },
       global: {
         plugins: [Antd]
-      }
+      },
+      attachTo: document.body
     });
 
     await wrapper.get("[data-content-action='feedback-panel-toggle']").trigger("click");
     await flushPromises();
 
-    await wrapper.get("[data-feedback-panel] button").trigger("click");
+    expect(document.body.textContent).toContain("反馈说明");
+    const feedbackSubmitButton = document.body.querySelector("[data-feedback-panel] button");
+    expect(feedbackSubmitButton).not.toBeNull();
+    (feedbackSubmitButton as HTMLButtonElement).click();
     await flushPromises();
 
     expect(wrapper.text()).toContain("请先登录后再保存反馈词。");
@@ -139,16 +150,21 @@ describe("ContentStandardCard", () => {
       },
       global: {
         plugins: [Antd]
-      }
+      },
+      attachTo: document.body
     });
 
     await wrapper.get("[data-content-action='feedback-panel-toggle']").trigger("click");
     await flushPromises();
 
-    await wrapper.get("[data-feedback-panel] button").trigger("click");
+    expect(document.body.querySelector("[data-feedback-panel]")).not.toBeNull();
+    const feedbackSubmitButton = document.body.querySelector("[data-feedback-panel] button");
+    expect(feedbackSubmitButton).not.toBeNull();
+    (feedbackSubmitButton as HTMLButtonElement).click();
     await flushPromises();
 
     expect(successSpy).toHaveBeenCalledWith("反馈词已保存到反馈池");
     expect(wrapper.text()).toContain("反馈词已保存到反馈池");
+    expect(document.body.querySelector("[data-feedback-panel]")).toBeNull();
   });
 });

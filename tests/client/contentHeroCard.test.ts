@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import Antd, { message } from "ant-design-vue";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import ContentHeroCard from "../../src/client/components/content/ContentHeroCard.vue";
 import type { ContentCard } from "../../src/client/services/contentApi";
@@ -60,6 +60,10 @@ describe("ContentHeroCard", () => {
     });
   });
 
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
   it("renders featured content with only the feedback action and saves feedback payloads", async () => {
     const successSpy = vi.spyOn(message, "success").mockImplementation(() => createMockMessageHandle());
     vi.mocked(contentApi.saveFeedbackPoolEntry).mockResolvedValue({ ok: true, contentItemId: 101, entryId: 1 });
@@ -72,7 +76,8 @@ describe("ContentHeroCard", () => {
       },
       global: {
         plugins: [Antd]
-      }
+      },
+      attachTo: document.body
     });
 
     expect(wrapper.get("[data-content-hero]").text()).toContain("AI Weekly Insight");
@@ -87,21 +92,20 @@ describe("ContentHeroCard", () => {
     expect(wrapper.find("[data-content-hero-sidecar]").exists()).toBe(true);
     expect(wrapper.get("[data-content-hero]").classes()).toContain("shadow-editorial-card");
     expect(wrapper.text()).toContain("AI Weekly Insight");
-    expect(wrapper.text()).toContain("保留 agent workflow 内容");
     expect(wrapper.text()).toContain("已同步到内容池");
     expect(wrapper.find("[data-content-action='favorite']").exists()).toBe(false);
     expect(wrapper.find("[data-content-action='reaction']").exists()).toBe(false);
+    expect(document.body.querySelector("[data-feedback-panel]")).toBeNull();
 
     await wrapper.get("[data-content-action='feedback-panel-toggle']").trigger("click");
     await flushPromises();
-    expect(wrapper.text()).toContain("反馈说明");
-
-    await wrapper.get("textarea").setValue("保留 agent workflow 内容");
-
-    const inputs = wrapper.findAll("input");
-    await inputs[0]?.setValue("agent, workflow");
-    await inputs[1]?.setValue("融资");
-    await wrapper.get("[data-feedback-panel] button").trigger("click");
+    expect(document.body.textContent).toContain("反馈说明");
+    const textarea = document.body.querySelector("textarea");
+    expect(textarea).not.toBeNull();
+    expect((textarea as HTMLTextAreaElement).value).toBe("保留 agent workflow 内容");
+    const feedbackSubmitButton = document.body.querySelector("[data-feedback-panel] button");
+    expect(feedbackSubmitButton).not.toBeNull();
+    (feedbackSubmitButton as HTMLButtonElement).click();
     await flushPromises();
 
     expect(contentApi.saveFeedbackPoolEntry).toHaveBeenCalledWith(
@@ -115,6 +119,7 @@ describe("ContentHeroCard", () => {
     );
     expect(vi.mocked(contentApi.saveFeedbackPoolEntry).mock.calls[0]?.[1]).not.toHaveProperty("reactionSnapshot");
     expect(successSpy).toHaveBeenCalledWith("反馈词已保存到反馈池");
+    expect(document.body.querySelector("[data-feedback-panel]")).toBeNull();
   });
 
   it("shows expand and collapse controls for long featured summaries", async () => {
@@ -127,7 +132,8 @@ describe("ContentHeroCard", () => {
       },
       global: {
         plugins: [Antd]
-      }
+      },
+      attachTo: document.body
     });
 
     await flushPromises();
@@ -155,13 +161,17 @@ describe("ContentHeroCard", () => {
       },
       global: {
         plugins: [Antd]
-      }
+      },
+      attachTo: document.body
     });
 
     await wrapper.get("[data-content-action='feedback-panel-toggle']").trigger("click");
     await flushPromises();
 
-    await wrapper.get("[data-feedback-panel] button").trigger("click");
+    expect(document.body.querySelector("[data-feedback-panel]")).not.toBeNull();
+    const feedbackSubmitButton = document.body.querySelector("[data-feedback-panel] button");
+    expect(feedbackSubmitButton).not.toBeNull();
+    (feedbackSubmitButton as HTMLButtonElement).click();
     await flushPromises();
 
     expect(wrapper.text()).toContain("请先登录后再保存反馈词。");

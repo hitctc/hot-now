@@ -210,7 +210,7 @@ export function createServer(deps: ServerDeps = {}) {
   app.get("/assets/site.css", async (_request, reply) => reply.type("text/css; charset=utf-8").send(siteCss));
   app.get("/assets/site.js", async (_request, reply) => reply.type("application/javascript; charset=utf-8").send(siteJs));
   app.get("/favicon.ico", async (_request, reply) => {
-    const faviconPath = path.resolve(process.cwd(), "src/server/public/brand/hotnow-logo-sd.png");
+    const faviconPath = path.resolve(process.cwd(), "src/server/public/brand/hotnow-favicon.png");
 
     try {
       return reply.type("image/png").send(readFileSync(faviconPath));
@@ -1975,7 +1975,7 @@ function renderLoginPage() {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>登录 | HotNow</title>
-    <link rel="icon" type="image/png" href="/brand/hotnow-logo-sd.png" />
+    <link rel="icon" type="image/png" href="/brand/hotnow-favicon.png" />
     <link rel="stylesheet" href="/assets/site.css" />
   </head>
   <body class="login-page">
@@ -1984,7 +1984,7 @@ function renderLoginPage() {
         <div class="login-stage__halo" aria-hidden="true"></div>
         <p class="login-kicker">Spotlight Feed</p>
         <div class="login-stage__brandlock">
-          <img class="login-stage__logo" src="/brand/hotnow-logo-sd.png" alt="HotNow logo" />
+          <img class="login-stage__logo" src="/brand/hotnow-logo-mark.png" alt="HotNow logo" />
           <div>
             <p class="login-stage__title">HotNow</p>
             <p class="login-stage__eyebrow">AI 热点与新讯</p>

@@ -100,7 +100,7 @@ describe("client app shell", () => {
     expect(wrapper.find("[data-shell-page-summary]").exists()).toBe(false);
     expect(wrapper.find("[data-workspace-sidebar]").exists()).toBe(true);
     expect(wrapper.get("[data-workspace-brand]").text()).toContain("热讯");
-    expect(wrapper.get("[data-workspace-brand-logo]").attributes("src")).toBe("/brand/hotnow-logo-sd.png");
+    expect(wrapper.get("[data-workspace-brand-logo]").attributes("src")).toBe("/brand/hotnow-logo-mark.png");
     expect(wrapper.get("[data-workspace-brand-logo]").attributes("alt")).toBe("HotNow logo");
     expect(wrapper.get("[data-shell-brand-stage]").text()).toContain("HotNow");
     expect(wrapper.get("[data-shell-brand-stage]").text()).toContain("AI 热点与新讯");

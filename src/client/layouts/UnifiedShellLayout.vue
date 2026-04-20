@@ -31,7 +31,7 @@ const currentPageTitle = computed(() => route.meta.title ?? "系统页底座");
 const currentPageDescription = computed(
   () => route.meta.description ?? "承接系统页的统一布局、主题和导航。"
 );
-const shellLogoSrc = "/brand/hotnow-logo-sd.png";
+const shellLogoSrc = "/brand/hotnow-logo-mark.png";
 const loggedInProfile = computed(() => (profile.value?.loggedIn ? profile.value : null));
 const guestProfile = computed(() => (profile.value && !profile.value.loggedIn ? profile.value : null));
 const shouldShowSystemMenu = computed(() => Boolean(loggedInProfile.value));

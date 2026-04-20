@@ -134,7 +134,7 @@ function renderLegacyDocument(config: LegacyDocumentConfig) {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(config.title)}</title>
-    <link rel="icon" type="image/png" href="/brand/hotnow-logo-sd.png" />
+    <link rel="icon" type="image/png" href="/brand/hotnow-favicon.png" />
     <link rel="stylesheet" href="/assets/site.css" />
     <script src="/assets/site.js" defer></script>
   </head>
@@ -142,7 +142,7 @@ function renderLegacyDocument(config: LegacyDocumentConfig) {
     <main class="legacy-shell legacy-shell--${config.pageKind}">
       <header class="legacy-header legacy-header--${config.pageKind}">
         <div class="legacy-brand-lock">
-          <img src="/brand/hotnow-logo-sd.png" alt="HotNow logo" class="legacy-brand-lock__logo" />
+          <img src="/brand/hotnow-logo-mark.png" alt="HotNow logo" class="legacy-brand-lock__logo" />
           <span class="legacy-brand-lock__text">HotNow</span>
         </div>
         <p class="legacy-eyebrow">${escapeHtml(config.eyebrow)}</p>

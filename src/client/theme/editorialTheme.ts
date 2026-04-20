@@ -47,7 +47,8 @@ export function createEditorialProviderTheme(mode: EditorialThemeMode): Provider
       fontSize: 14,
       controlHeight: 36,
       boxShadow: palette.shadowCard,
-      boxShadowSecondary: palette.shadowFloating
+      boxShadowSecondary: palette.shadowFloating,
+      controlOutline: palette.ring
     }
   };
 }

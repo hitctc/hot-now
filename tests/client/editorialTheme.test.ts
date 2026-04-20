@@ -27,20 +27,23 @@ describe("editorial theme bridge", () => {
     expect(lightCssVariables["--editorial-bg-page"]).toBe(editorialTokens.light.bgPage);
     expect(lightCssVariables["--editorial-accent"]).toBe(editorialTokens.light.accent);
     expect(lightCssVariables["--editorial-shadow-card"]).toBe(editorialTokens.light.shadowCard);
-    expect(editorialTokens.light.bgPage).toBe("#fbfbfa");
-    expect(editorialTokens.light.bgSidebarPanel).toBe("#f7f7f5");
-    expect(editorialTokens.light.textMain).toBe("#37352f");
-    expect(editorialTokens.light.success).toBe("#2f2f2f");
-    expect(editorialTokens.light.warning).toBe("#2f2f2f");
-    expect(editorialTokens.light.danger).toBe("#2f2f2f");
-    expect(editorialTokens.light.border).toBe("rgba(55, 53, 47, 0.08)");
+    expect(editorialTokens.light.bgPage).toBe("#f4f7ff");
+    expect(editorialTokens.light.bgPageGlowA).toContain("rgba(87, 144, 255");
+    expect(editorialTokens.light.bgSidebarPanel).toBe("rgba(255, 255, 255, 0.6)");
+    expect(editorialTokens.light.bgPanel).toBe("rgba(255, 255, 255, 0.72)");
+    expect(editorialTokens.light.textMain).toBe("#10182a");
+    expect(editorialTokens.light.accent).toBe("#4d7dff");
+    expect(editorialTokens.light.border).toBe("rgba(116, 144, 205, 0.18)");
     expect(darkCssVariables["--editorial-bg-page"]).toBe(editorialTokens.dark.bgPage);
     expect(darkCssVariables["--editorial-accent"]).toBe(editorialTokens.dark.accent);
     expect(darkCssVariables["--editorial-shadow-card"]).toBe(editorialTokens.dark.shadowCard);
-    expect(editorialTokens.dark.bgPage).toBe("#191919");
-    expect(editorialTokens.dark.bgSidebarPanel).toBe("#202020");
+    expect(editorialTokens.dark.bgPage).toBe("#0a1020");
+    expect(editorialTokens.dark.bgPageGlowB).toContain("rgba(81, 220, 255");
+    expect(editorialTokens.dark.bgSidebarPanel).toBe("rgba(17, 24, 42, 0.72)");
+    expect(editorialTokens.dark.bgPanel).toBe("rgba(15, 22, 40, 0.76)");
     expect(editorialTokens.dark.textMain).toBe("#ffffff");
-    expect(editorialTokens.dark.border).toBe("rgba(255, 255, 255, 0.1)");
+    expect(editorialTokens.dark.accent).toBe("#7aa2ff");
+    expect(editorialTokens.dark.border).toBe("rgba(109, 132, 196, 0.26)");
 
     expect(tailwindExtend.fontFamily?.editorial).toEqual(["var(--editorial-font-ui)"]);
     expect(tailwindExtend.fontFamily?.["editorial-mono"]).toEqual(["var(--editorial-font-mono)"]);
@@ -68,6 +71,7 @@ describe("editorial theme bridge", () => {
     expect(lightProviderTheme.token?.borderRadius).toBe(Number.parseFloat(editorialTokens.light.radiusMd));
     expect(lightProviderTheme.token?.borderRadiusLG).toBe(Number.parseFloat(editorialTokens.light.radiusLg));
     expect(lightProviderTheme.token?.boxShadow).toBe(editorialTokens.light.shadowCard);
+    expect(lightProviderTheme.token?.boxShadowSecondary).toBe(editorialTokens.light.shadowFloating);
 
     expect(darkProviderTheme.algorithm).toBe(antTheme.darkAlgorithm);
     expect(darkProviderTheme.token?.colorPrimary).toBe(editorialTokens.dark.accent);
@@ -80,5 +84,6 @@ describe("editorial theme bridge", () => {
     expect(darkProviderTheme.token?.borderRadius).toBe(Number.parseFloat(editorialTokens.dark.radiusMd));
     expect(darkProviderTheme.token?.borderRadiusLG).toBe(Number.parseFloat(editorialTokens.dark.radiusLg));
     expect(darkProviderTheme.token?.boxShadow).toBe(editorialTokens.dark.shadowCard);
+    expect(darkProviderTheme.token?.boxShadowSecondary).toBe(editorialTokens.dark.shadowFloating);
   });
 });

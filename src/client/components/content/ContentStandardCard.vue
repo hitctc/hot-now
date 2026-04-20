@@ -9,7 +9,6 @@ import {
   cloneContentCard,
   editorialContentBadgeClass,
   editorialContentCardClass,
-  editorialContentInsetPanelClass,
   editorialContentMetaClass,
   editorialContentScoreBadgeClass,
   formatPublishedAt,
@@ -101,7 +100,7 @@ const {
     data-content-row
     data-content-variant="standard"
   >
-    <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_220px]" data-content-row-shell>
+    <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start" data-content-row-shell>
       <div class="flex flex-col gap-4">
       <div :class="editorialContentMetaClass">
         <span>{{ cardState.sourceName }}</span>
@@ -163,7 +162,7 @@ const {
 
       </div>
 
-      <div :class="[editorialContentInsetPanelClass, 'flex h-full flex-col justify-between gap-4 px-4 py-4']" data-content-row-sidecar>
+      <div class="flex h-auto flex-col items-start gap-2 pt-1 lg:min-w-[132px] lg:items-end" data-content-row-sidecar>
         <ContentActionBar
           :is-busy="isBusy"
           :feedback-open="feedbackOpen"

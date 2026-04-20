@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  editorialContentControlButtonActiveClass,
   editorialContentControlButtonClass,
   editorialContentControlButtonIdleClass
 } from "./contentCardShared";
@@ -16,23 +17,23 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="flex flex-col gap-3">
-    <div class="flex flex-wrap gap-2">
+  <div class="flex flex-col items-start gap-2 lg:items-end">
+    <div class="flex flex-wrap gap-2 lg:justify-end">
       <a-button
         data-content-action="feedback-panel-toggle"
         size="small"
         :class="[
           editorialContentControlButtonClass,
-          editorialContentControlButtonIdleClass
+          feedbackOpen ? editorialContentControlButtonActiveClass : editorialContentControlButtonIdleClass
         ]"
         :loading="isBusy"
         @click="emit('toggleFeedback')"
       >
-        {{ feedbackOpen ? "收起反馈" : "补充反馈" }}
+        补充反馈
       </a-button>
     </div>
 
-    <p v-if="statusText" class="m-0 text-[11px] leading-5 text-editorial-text-muted">
+    <p v-if="statusText" class="m-0 max-w-[13rem] text-[11px] leading-5 text-editorial-text-muted lg:text-right">
       {{ statusText }}
     </p>
   </div>

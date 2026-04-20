@@ -9,7 +9,6 @@ import {
   cloneContentCard,
   editorialContentBadgeClass,
   editorialContentCardClass,
-  editorialContentInsetPanelClass,
   editorialContentMetaClass,
   editorialContentScoreBadgeClass,
   formatPublishedAt,
@@ -104,7 +103,7 @@ const {
       class="pointer-events-none absolute left-[-44px] top-[-70px] h-48 w-48 rounded-full bg-[radial-gradient(circle,_rgba(122,162,255,0.34),_transparent_72%)] blur-3xl"
       aria-hidden="true"
     />
-    <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_288px] lg:gap-8">
+    <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-8">
       <div class="flex flex-col gap-4">
         <div class="flex flex-wrap items-center gap-2" data-content-hero-stage>
           <span class="rounded-editorial-pill border border-editorial-border bg-editorial-panel/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-editorial-text-muted">
@@ -166,10 +165,7 @@ const {
         </div>
       </div>
 
-      <div
-        :class="[editorialContentInsetPanelClass, 'flex h-full flex-col gap-4 px-4 py-4']"
-        data-content-hero-sidecar
-      >
+      <div class="flex h-auto flex-col items-start gap-2 pt-1 lg:min-w-[148px] lg:items-end" data-content-hero-sidecar>
         <ContentActionBar
           :is-busy="isBusy"
           :feedback-open="feedbackOpen"

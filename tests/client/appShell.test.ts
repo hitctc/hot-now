@@ -109,6 +109,7 @@ describe("client app shell", () => {
     expect(wrapper.find("[data-page-header-logo]").exists()).toBe(false);
     expect(wrapper.find("[data-shell-theme-toggle]").exists()).toBe(true);
     expect(wrapper.text()).toContain("当前：浅色");
+    expect(wrapper.findAll(".editorial-theme-segmented").length).toBeGreaterThan(0);
 
     const navLinks = wrapper.findAll("[data-shell-nav-link]");
     const activeNavLink = wrapper.get('[data-shell-nav-link="/settings/profile"]');

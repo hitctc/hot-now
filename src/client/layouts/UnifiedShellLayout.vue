@@ -303,7 +303,7 @@ onBeforeUnmount(() => {
               <a-segmented
                 :value="themeMode"
                 :options="themeOptions"
-                class="w-full select-none"
+                class="editorial-theme-segmented w-full select-none"
                 @change="handleThemeModeChange"
               />
               <p class="m-0 text-xs text-editorial-text-muted">{{ isDarkMode ? "当前：深色" : "当前：浅色" }}</p>
@@ -462,7 +462,7 @@ onBeforeUnmount(() => {
                 <a-segmented
                   :value="themeMode"
                   :options="themeOptions"
-                  class="w-full"
+                  class="editorial-theme-segmented w-full"
                   @change="handleThemeModeChange"
                 />
                 <p class="m-0 text-xs text-editorial-text-muted">{{ isDarkMode ? "当前：深色" : "当前：浅色" }}</p>
@@ -533,3 +533,22 @@ onBeforeUnmount(() => {
     </transition>
   </div>
 </template>
+
+<style scoped>
+.editorial-theme-segmented:deep(.ant-segmented-group) {
+  display: flex;
+  width: 100%;
+}
+
+.editorial-theme-segmented:deep(.ant-segmented-item) {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.editorial-theme-segmented:deep(.ant-segmented-item-label) {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+}
+</style>

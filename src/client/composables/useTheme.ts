@@ -28,17 +28,17 @@ function isThemeMode(value: string | null): value is ThemeMode {
   return value === "dark" || value === "light";
 }
 
-// 读取已保存的主题偏好，空值或非法值都会回落到默认的深色模式。
+// 读取已保存的主题偏好，空值或非法值都会回落到默认的浅色模式。
 function readPersistedThemeMode(): ThemeMode {
   if (typeof window === "undefined") {
-    return "dark";
+    return "light";
   }
 
   try {
     const storedValue = window.localStorage.getItem(THEME_STORAGE_KEY);
-    return isThemeMode(storedValue) ? storedValue : "dark";
+    return isThemeMode(storedValue) ? storedValue : "light";
   } catch {
-    return "dark";
+    return "light";
   }
 }
 

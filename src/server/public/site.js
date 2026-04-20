@@ -1010,9 +1010,9 @@
   }
 
   function applyInitialTheme() {
-    // Theme boot reads persisted preference first and falls back to the shell's dark default.
+    // Theme boot reads persisted preference first and falls back to the shell's light default.
     const savedTheme = readStoredTheme();
-    setTheme(savedTheme || "dark", false);
+    setTheme(savedTheme || "light", false);
   }
 
   function isShellNavigationEnabled() {

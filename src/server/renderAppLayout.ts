@@ -60,14 +60,14 @@ export function renderAppLayout(view: AppShellView): string {
   <section class="theme-dock" data-theme-toggle>
     <p class="theme-dock-title">界面主题</p>
     <div class="theme-switch" role="group" aria-label="界面主题切换">
-      <button type="button" class="theme-switch-button" data-theme-choice="dark" aria-pressed="true">深色模式</button>
-      <button type="button" class="theme-switch-button" data-theme-choice="light" aria-pressed="false">浅色模式</button>
+      <button type="button" class="theme-switch-button" data-theme-choice="dark" aria-pressed="false">深色模式</button>
+      <button type="button" class="theme-switch-button" data-theme-choice="light" aria-pressed="true">浅色模式</button>
     </div>
   </section>
 `;
 
   return `<!doctype html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />

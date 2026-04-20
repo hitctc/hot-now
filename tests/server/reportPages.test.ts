@@ -62,7 +62,7 @@ describe("report pages", () => {
     expect(response.body).toContain(">手动执行采集<");
     expect(response.body).toContain('action="/actions/send-latest-email"');
     expect(response.body).toContain(">手动发送最新报告<");
-    expect(response.body).toContain('data-theme="dark"');
+    expect(response.body).toContain('data-theme="light"');
     expect(response.body).toContain('<link rel="stylesheet" href="/assets/site.css" />');
     expect(response.body).toContain('<script src="/assets/site.js" defer></script>');
     expect(response.body).toContain('class="legacy-page legacy-page--control"');
@@ -87,7 +87,7 @@ describe("report pages", () => {
     expect(response.body).toContain("降级：是");
     expect(response.body).toContain("Archive");
     expect(response.body).toContain("报告列表");
-    expect(response.body).toContain('data-theme="dark"');
+    expect(response.body).toContain('data-theme="light"');
     expect(response.body).toContain('<link rel="stylesheet" href="/assets/site.css" />');
     expect(response.body).toContain('<script src="/assets/site.js" defer></script>');
     expect(response.body).toContain('class="legacy-page legacy-page--history"');
@@ -109,7 +109,7 @@ describe("report pages", () => {
     expect(response.body).toContain("报告内容暂不可用");
     expect(response.body).toContain("Legacy Notice");
     expect(response.body).toContain("说明");
-    expect(response.body).toContain('data-theme="dark"');
+    expect(response.body).toContain('data-theme="light"');
     expect(response.body).toContain('<link rel="stylesheet" href="/assets/site.css" />');
     expect(response.body).toContain('<script src="/assets/site.js" defer></script>');
     expect(response.body).toContain('class="legacy-page legacy-page--notice"');

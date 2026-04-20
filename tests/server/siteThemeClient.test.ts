@@ -5,6 +5,29 @@ import { describe, expect, it, vi } from "vitest";
 const siteScript = readFileSync(new URL("../../src/server/public/site.js", import.meta.url), "utf8");
 
 describe("site theme runtime", () => {
+  it("falls back to light theme when localStorage has no saved preference", () => {
+    const dom = new JSDOM(
+      `<!doctype html>
+<html data-theme="dark">
+  <body>
+    <button type="button" data-theme-choice="dark" aria-pressed="true">深色模式</button>
+    <button type="button" data-theme-choice="light" aria-pressed="false">浅色模式</button>
+  </body>
+</html>`,
+      {
+        url: "https://example.test/",
+        runScripts: "outside-only"
+      }
+    );
+
+    const { window } = dom;
+    window.eval(siteScript);
+
+    expect(window.document.documentElement.dataset.theme).toBe("light");
+    expect(window.document.querySelector('[data-theme-choice="dark"]')?.getAttribute("aria-pressed")).toBe("false");
+    expect(window.document.querySelector('[data-theme-choice="light"]')?.getAttribute("aria-pressed")).toBe("true");
+  });
+
   it("boots from localStorage and keeps theme buttons in sync", () => {
     const dom = new JSDOM(
       `<!doctype html>

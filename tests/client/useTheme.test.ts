@@ -31,6 +31,22 @@ describe("useTheme", () => {
     expect(document.documentElement.style.getPropertyValue("--editorial-accent")).toBe(lightTokens.accent);
   });
 
+  it("falls back to light theme when there is no stored preference", async () => {
+    const { bootstrapEditorialTheme, useTheme, THEME_STORAGE_KEY } = await import("../../src/client/composables/useTheme");
+    const theme = useTheme();
+    const lightTokens = editorialTokens.light;
+
+    bootstrapEditorialTheme();
+
+    expect(THEME_STORAGE_KEY).toBe("hot-now-theme");
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("light");
+    expect(theme.themeMode.value).toBe("light");
+    expect(theme.isDarkMode.value).toBe(false);
+    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(document.documentElement.style.colorScheme).toBe("light");
+    expect(document.documentElement.style.getPropertyValue("--editorial-bg-page")).toBe(lightTokens.bgPage);
+  });
+
   it("syncs the persisted theme mode with localStorage and document data-theme", async () => {
     window.localStorage.setItem("hot-now-theme", "light");
 

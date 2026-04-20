@@ -129,7 +129,7 @@ type LegacyDocumentConfig = {
 // A tiny wrapper keeps the old pages on the shared theme resources without turning them into the unified shell.
 function renderLegacyDocument(config: LegacyDocumentConfig) {
   return `<!doctype html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />

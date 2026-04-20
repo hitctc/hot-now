@@ -172,7 +172,7 @@ describe("AiNewPage", () => {
     expect(toolbarMainRow.find("[data-content-sort-control]").exists()).toBe(true);
     expect(toolbarMainRow.find("[data-content-search-control]").exists()).toBe(true);
     expect(wrapper.get("[data-content-sticky-toolbar]").classes()).toEqual(
-      expect.arrayContaining(["sticky", "z-20", "top-4", "max-[900px]:top-[72px]"])
+      expect.arrayContaining(["sticky", "z-20", "w-full", "top-0", "max-[900px]:top-[61px]"])
     );
     expect((wrapper.get("[data-content-toolbar-source-panel]").element as HTMLElement).style.display).toBe("none");
     expect(wrapper.get("[data-content-toolbar-summary]").attributes("aria-expanded")).toBe("false");
@@ -259,6 +259,25 @@ describe("AiNewPage", () => {
     expect(wrapper.get("[data-content-source-filter]").text()).toContain("已选 2 / 2 · 共 1 条");
     expect(wrapper.get("[data-content-section='list']").text()).toContain("New OpenAI Model");
     expect(wrapper.findAll("[data-content-row]").length).toBe(1);
+  });
+
+  it("tolerates a partial page model that omits strategy summary metadata", async () => {
+    contentApiMocks.readAiNewPage.mockResolvedValueOnce(
+      createModel({
+        strategySummary: undefined as never
+      })
+    );
+
+    const wrapper = mount(AiNewPage, {
+      global: {
+        plugins: [Antd]
+      }
+    });
+
+    await flushPromises();
+
+    expect(wrapper.find("[data-content-strategy-summary='ai-new']").exists()).toBe(false);
+    expect(wrapper.get("[data-content-section='list']").text()).toContain("AI Weekly Insight");
   });
 
   it("persists sort mode changes and reloads with the shared sort preference", async () => {

@@ -204,6 +204,15 @@ onBeforeUnmount(() => {
         >
           系统
         </button>
+
+        <a
+          v-else-if="guestProfile"
+          href="/login"
+          class="shrink-0 select-none rounded-editorial-sm border border-editorial-border bg-editorial-panel px-3 py-2 text-sm font-medium text-editorial-text-main no-underline transition hover:bg-editorial-link-active hover:text-editorial-text-main hover:no-underline"
+          data-mobile-login-link
+        >
+          登录
+        </a>
       </div>
     </div>
 

@@ -182,7 +182,8 @@ const listCards = computed(() => pageModel.value?.cards ?? []);
 const featuredCard = computed(() => pageModel.value?.featuredCard ?? null);
 const visibleResultCount = computed(() => pageModel.value?.pagination?.totalResults ?? listCards.value.length);
 const sourceFilter = computed(() => pageModel.value?.sourceFilter ?? null);
-const strategySummary = computed(() => pageModel.value?.strategySummary.items ?? []);
+// 接口偶发返回不完整读模型时，这里退回空数组，避免页面因为辅助摘要缺失而整块崩掉。
+const strategySummary = computed(() => pageModel.value?.strategySummary?.items ?? []);
 const pagination = computed(() => pageModel.value?.pagination ?? null);
 const displayIndexOffset = computed(() => {
   const currentPagination = pagination.value;
@@ -231,7 +232,7 @@ onMounted(() => {
 
     <div
       v-if="sourceFilter"
-      class="sticky top-4 z-20 max-[900px]:top-[72px]"
+      class="sticky top-0 z-20 w-full max-[900px]:top-[61px]"
       data-content-sticky-toolbar
     >
       <ContentToolbarCard

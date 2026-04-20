@@ -317,10 +317,11 @@ describe("client app shell", () => {
     await flushPromises();
 
     expect(wrapper.get("[data-shell-login-link]").attributes("href")).toBe("/login");
+    expect(wrapper.get("[data-mobile-login-link]").attributes("href")).toBe("/login");
     expect(wrapper.find('nav[aria-label="系统菜单"]').exists()).toBe(false);
     expect(wrapper.find("[data-mobile-system-toggle]").exists()).toBe(false);
     expect(wrapper.find("[data-mobile-system-drawer]").exists()).toBe(false);
-    expect(wrapper.find("[data-mobile-login-link]").exists()).toBe(false);
+    expect(wrapper.get("[data-mobile-login-link]").text()).toContain("登录");
     expect(wrapper.get("[data-shell-account-panel]").text()).not.toContain("你现在看到的是公开内容");
   });
 });

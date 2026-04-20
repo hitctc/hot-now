@@ -161,7 +161,7 @@ describe("AiHotPage", () => {
     expect(toolbarMainRow.find("[data-content-sort-control]").exists()).toBe(true);
     expect(toolbarMainRow.find("[data-content-search-control]").exists()).toBe(true);
     expect(wrapper.get("[data-content-sticky-toolbar]").classes()).toEqual(
-      expect.arrayContaining(["sticky", "z-20", "top-4", "max-[900px]:top-[72px]"])
+      expect.arrayContaining(["sticky", "z-20", "w-full", "top-0", "max-[900px]:top-[61px]"])
     );
     expect((wrapper.get("[data-content-toolbar-source-panel]").element as HTMLElement).style.display).toBe("none");
     expect(wrapper.get("[data-content-toolbar-summary]").attributes("aria-expanded")).toBe("false");
@@ -192,6 +192,25 @@ describe("AiHotPage", () => {
 
     expect(wrapper.text()).toContain("AI 热点加载失败，请稍后重试。");
     expect(wrapper.get("[data-content-empty-state]").text()).toContain("页面加载失败");
+  });
+
+  it("tolerates a partial page model that omits strategy summary metadata", async () => {
+    contentApiMocks.readAiHotPage.mockResolvedValueOnce(
+      createModel({
+        strategySummary: undefined as never
+      })
+    );
+
+    const wrapper = mount(AiHotPage, {
+      global: {
+        plugins: [Antd]
+      }
+    });
+
+    await flushPromises();
+
+    expect(wrapper.find("[data-content-strategy-summary='ai-hot']").exists()).toBe(false);
+    expect(wrapper.get("[data-content-section='list']").text()).toContain("Hot AI Event");
   });
 
   it("clears the shared search keyword, returns to page 1, and reloads the default result set", async () => {

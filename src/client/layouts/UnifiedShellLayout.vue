@@ -219,20 +219,36 @@ onBeforeUnmount(() => {
     <aside
       class="sticky top-0 hidden h-[100dvh] w-[244px] flex-none flex-col overflow-y-auto border-r border-editorial-border bg-editorial-sidebar px-3 py-4 min-[901px]:flex min-[901px]:w-[244px]"
       data-workspace-sidebar
+      data-shell-nav-rail
     >
       <div class="flex min-h-0 flex-1 flex-col gap-5">
-        <section class="px-3 py-2" data-workspace-brand>
-          <div class="mt-1 flex items-center gap-3">
+        <section
+          class="editorial-spotlight-card overflow-hidden px-4 py-4"
+          data-workspace-brand
+          data-shell-brand-stage
+        >
+          <div
+            class="pointer-events-none absolute inset-x-5 top-0 h-20 rounded-full bg-[radial-gradient(circle,_rgba(122,162,255,0.32),_transparent_72%)] blur-2xl"
+            aria-hidden="true"
+          />
+          <p class="relative z-[1] m-0 text-[11px] font-semibold uppercase tracking-[0.18em] text-editorial-text-muted">
+            Spotlight Feed
+          </p>
+          <div class="relative z-[1] mt-3 flex items-center gap-3">
             <img
               :src="shellLogoSrc"
               alt="HotNow logo"
-              class="h-10 w-10 shrink-0 rounded-[12px] border border-editorial-border bg-editorial-panel object-cover"
+              class="h-11 w-11 shrink-0 rounded-[16px] border border-editorial-border bg-editorial-panel/90 object-cover shadow-editorial-floating"
               data-workspace-brand-logo
             />
-            <h1 class="text-[20px] font-semibold tracking-[-0.01em] text-editorial-text-main">
-              热讯
-            </h1>
+            <div class="min-w-0">
+              <p class="m-0 text-[22px] font-semibold tracking-[-0.03em] text-editorial-text-main">HotNow</p>
+              <p class="mt-1 text-sm font-medium text-editorial-text-body">热讯</p>
+            </div>
           </div>
+          <p class="relative z-[1] mt-4 mb-0 text-[13px] leading-6 text-editorial-text-body">
+            AI 热点与新讯的聚光舞台，把公开内容浏览和系统操作收在同一层级里。
+          </p>
         </section>
 
         <section class="flex flex-col gap-1">

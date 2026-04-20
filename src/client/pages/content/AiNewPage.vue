@@ -10,6 +10,7 @@ import ContentToolbarCard from "../../components/content/ContentToolbarCard.vue"
 import ContentStandardCard from "../../components/content/ContentStandardCard.vue";
 import { useContentPageScroll } from "../../components/content/useContentPageScroll";
 import {
+  editorialContentIntroSectionClass,
   editorialContentListSectionClass,
   editorialContentPageClass
 } from "../../components/content/contentCardShared";
@@ -250,12 +251,37 @@ onMounted(() => {
     </div>
 
     <section
-      v-if="strategySummary.length > 0"
-      class="flex flex-wrap items-center gap-2"
-      data-content-strategy-summary="ai-new"
+      :class="editorialContentIntroSectionClass"
+      data-content-stage="ai-new"
     >
-      <span class="text-sm font-medium text-editorial-text-muted">当前 AI 新讯：</span>
-      <a-tag v-for="item in strategySummary" :key="item">{{ item }}</a-tag>
+      <div
+        class="pointer-events-none absolute right-[-56px] top-[-72px] h-48 w-48 rounded-full bg-[radial-gradient(circle,_rgba(81,220,255,0.22),_transparent_72%)] blur-3xl"
+        aria-hidden="true"
+      />
+      <div class="relative z-[1] flex flex-col gap-4">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="rounded-editorial-pill border border-editorial-border bg-editorial-panel/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-editorial-text-muted">
+            AI New Stage
+          </span>
+          <span class="text-xs leading-6 text-editorial-text-muted">优先展示最新进入内容池的 AI 动态与信号。</span>
+        </div>
+        <div class="flex flex-col gap-2">
+          <h3 class="m-0 text-[28px] font-semibold tracking-[-0.04em] text-editorial-text-main">
+            AI 新讯的第一阅读层
+          </h3>
+          <p class="m-0 max-w-3xl text-sm leading-7 text-editorial-text-body">
+            这里优先收拢最近 24 小时内值得先看的新模型、新产品和新动作，减少你在内容流里自己做第一轮筛选的成本。
+          </p>
+        </div>
+        <div
+          v-if="strategySummary.length > 0"
+          class="flex flex-wrap items-center gap-2"
+          data-content-strategy-summary="ai-new"
+        >
+          <span class="text-sm font-medium text-editorial-text-muted">当前 AI 新讯：</span>
+          <a-tag v-for="item in strategySummary" :key="item">{{ item }}</a-tag>
+        </div>
+      </div>
     </section>
 
     <a-skeleton v-if="isLoading" active :paragraph="{ rows: 7 }" />

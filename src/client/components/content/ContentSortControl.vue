@@ -25,7 +25,7 @@ const emit = defineEmits<{
 
 const rootClass = computed(() =>
   props.compact
-    ? "flex flex-col gap-2"
+    ? "flex flex-col gap-2 rounded-editorial-lg border border-editorial-border bg-editorial-panel/70 px-4 py-3 shadow-editorial-card"
     : `${editorialContentFloatingPanelClass} flex flex-col gap-3 px-4 py-4`
 );
 const contentClass = computed(() =>
@@ -53,6 +53,9 @@ function emitChange(nextSortMode: ContentSortMode): void {
         <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">排序方式</p>
         <p v-if="!compact" class="m-0 text-sm leading-6 text-editorial-text-body">
           三个内容页共享这一组浏览顺序偏好。
+        </p>
+        <p v-else class="m-0 text-[11px] leading-5 text-editorial-text-muted">
+          Shared order
         </p>
       </div>
 

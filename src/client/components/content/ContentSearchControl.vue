@@ -28,7 +28,11 @@ watch(
 );
 
 const hasDraftKeyword = computed(() => draftKeyword.value.trim().length > 0);
-const rootClass = computed(() => (props.compact ? "flex w-full items-center gap-2" : "flex items-center gap-2"));
+const rootClass = computed(() =>
+  props.compact
+    ? "flex w-full items-center gap-2 rounded-editorial-lg border border-editorial-border bg-editorial-panel/70 px-3 py-3 shadow-editorial-card"
+    : "flex items-center gap-2"
+);
 const inputClass = computed(() => (props.compact ? "min-w-0 flex-1" : undefined));
 
 // 统一把关键词裁掉首尾空白后再抛给页面层，保证后续 header 与持久化口径一致。
@@ -69,6 +73,7 @@ function clearSearch(): void {
     <a-button
       size="small"
       :loading="isLoading"
+      class="!rounded-editorial-pill !border-editorial-border !bg-editorial-link-active !px-3.5 !text-xs !font-semibold !text-editorial-text-main"
       data-content-search-submit
       @click="submitSearch"
     >

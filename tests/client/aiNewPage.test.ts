@@ -161,9 +161,10 @@ describe("AiNewPage", () => {
       searchKeyword: ""
     });
     expect(wrapper.get("[data-content-page='ai-new']").classes()).toEqual(
-      expect.arrayContaining(["flex", "flex-col", "gap-6"])
+      expect.arrayContaining(["flex", "flex-col", "gap-8"])
     );
     expect(wrapper.find("[data-content-filter-shell]").exists()).toBe(false);
+    expect(wrapper.find("[data-content-stage='ai-new']").exists()).toBe(true);
     expect(wrapper.get("[data-content-strategy-summary='ai-new']").text()).toContain("当前 AI 新讯");
     expect(wrapper.get("[data-content-strategy-summary='ai-new']").text()).toContain("只看最近 24 小时 开");
     expect(wrapper.findAll("[data-content-toolbar-card]").length).toBe(1);
@@ -286,6 +287,7 @@ describe("AiNewPage", () => {
     await flushPromises();
 
     expect(wrapper.find("[data-content-strategy-summary='ai-new']").exists()).toBe(false);
+    expect(wrapper.find("[data-content-stage='ai-new']").exists()).toBe(true);
     expect(wrapper.get("[data-content-section='list']").text()).toContain("AI Weekly Insight");
   });
 

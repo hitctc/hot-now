@@ -94,13 +94,26 @@ const {
 
 <template>
   <article
-    :class="[editorialContentCardClass, 'overflow-hidden px-6 py-6']"
+    :class="[
+      editorialContentCardClass,
+      'editorial-spotlight-card relative overflow-hidden rounded-editorial-xl border border-editorial-border-strong px-6 py-6'
+    ]"
     :data-content-id="cardState.id"
     data-content-hero
     data-content-variant="hero"
   >
+    <div
+      class="pointer-events-none absolute left-[-44px] top-[-70px] h-48 w-48 rounded-full bg-[radial-gradient(circle,_rgba(122,162,255,0.34),_transparent_72%)] blur-3xl"
+      aria-hidden="true"
+    />
     <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_288px] lg:gap-8">
       <div class="flex flex-col gap-4">
+        <div class="flex flex-wrap items-center gap-2" data-content-hero-stage>
+          <span class="rounded-editorial-pill border border-editorial-border bg-editorial-panel/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-editorial-text-muted">
+            Featured Lens
+          </span>
+          <span class="text-xs leading-6 text-editorial-text-muted">把当前最值得先看的 AI 内容放在第一视觉层。</span>
+        </div>
         <div :class="editorialContentMetaClass">
           <span>{{ cardState.sourceName }}</span>
           <span>{{ publishedText }}</span>
@@ -162,7 +175,10 @@ const {
         </div>
       </div>
 
-      <div :class="[editorialContentInsetPanelClass, 'flex h-full flex-col gap-4 px-4 py-4']">
+      <div
+        :class="[editorialContentInsetPanelClass, 'flex h-full flex-col gap-4 px-4 py-4']"
+        data-content-hero-sidecar
+      >
         <ContentActionBar
           :is-busy="isBusy"
           :feedback-open="feedbackOpen"

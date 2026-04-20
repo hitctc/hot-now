@@ -53,11 +53,13 @@ describe("ContentSourceFilterBar", () => {
     expect(wrapper.emitted("change")?.at(-1)).toEqual([[]]);
     expect(wrapper.text()).toContain("已选 2 / 2 · 共 3 条");
     expect(wrapper.get("[data-content-source-filter]").classes()).toEqual(
-      expect.arrayContaining(["rounded-editorial-md", "border", "border-editorial-border", "bg-editorial-panel"])
+      expect.arrayContaining(["rounded-editorial-md", "border", "border-editorial-border", "bg-editorial-panel/84"])
     );
     expect(wrapper.get("[data-source-option='openai']").classes()).toEqual(
       expect.arrayContaining([
         "select-none",
+        "border",
+        "border-editorial-border-strong",
         "bg-editorial-link-active",
         "text-editorial-text-main",
         "rounded-editorial-sm"

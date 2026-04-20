@@ -145,7 +145,7 @@ describe("SourcesPage", () => {
 
     await flushPromises();
 
-    expect(wrapper.find("[data-settings-intro='sources']").exists()).toBe(false);
+    expect(wrapper.find("[data-settings-intro='sources']").exists()).toBe(true);
     expect(wrapper.get("[data-sources-section='overview']").findAll("article")).toHaveLength(5);
     expect(wrapper.get("[data-sources-section='overview']").text()).toContain("接入来源");
     expect(wrapper.get("[data-sources-section='overview']").text()).toContain("已启用来源");
@@ -164,7 +164,7 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-sources-section='analytics']").text()).not.toContain("AI 热点今日候选 / 今日展示");
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("OpenAI");
     expect(wrapper.get("[data-sources-section='manual-send-latest-email']").text()).toContain("发送最新报告");
-    expect(wrapper.get("[data-sources-section='inventory']").classes()).toContain("bg-editorial-panel");
+    expect(wrapper.get("[data-sources-section='inventory']").classes()).toContain("editorial-glass-panel");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("已完成");
     expect(wrapper.get("[data-sources-section='inventory']").text()).not.toContain("选中时全量");
     expect(wrapper.get("[data-source-rss-link='openai']").attributes("href")).toBe("https://openai.com/news/rss.xml");

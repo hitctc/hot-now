@@ -3,6 +3,7 @@ import { onMounted, ref } from "vue";
 
 import EditorialEmptyState from "../../components/content/EditorialEmptyState.vue";
 import {
+  editorialContentIntroSectionClass,
   editorialContentPageClass
 } from "../../components/content/contentCardShared";
 import { HttpError } from "../../services/http";
@@ -58,16 +59,39 @@ onMounted(() => {
     />
 
     <template v-else>
+      <section :class="editorialContentIntroSectionClass" data-settings-intro="profile">
+        <div
+          class="pointer-events-none absolute right-[-56px] top-[-72px] h-48 w-48 rounded-full bg-[radial-gradient(circle,_rgba(122,162,255,0.24),_transparent_72%)] blur-3xl"
+          aria-hidden="true"
+        />
+        <div class="relative z-[1] flex flex-col gap-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="rounded-editorial-pill border border-editorial-border bg-editorial-panel/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-editorial-text-muted">
+              Profile Board
+            </span>
+            <span class="text-xs leading-6 text-editorial-text-muted">用统一壳层里的同一套视觉语言展示当前账号与会话状态。</span>
+          </div>
+          <div class="flex flex-col gap-2">
+            <h2 class="m-0 text-[28px] font-semibold tracking-[-0.04em] text-editorial-text-main">
+              当前账号资料卡
+            </h2>
+            <p class="m-0 max-w-3xl text-sm leading-7 text-editorial-text-body">
+              这页只负责确认当前会话、账号角色和联系信息，方便你判断系统菜单现在是不是以正确身份在工作。
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section class="grid gap-3 md:grid-cols-3" data-profile-section="overview">
-        <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+        <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/84 px-4 py-4 shadow-editorial-card backdrop-blur-xl">
           <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">用户名</p>
           <p class="mt-2 mb-0 text-base font-medium text-editorial-text-main">{{ profile.username }}</p>
         </article>
-        <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+        <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/84 px-4 py-4 shadow-editorial-card backdrop-blur-xl">
           <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">角色</p>
           <p class="mt-2 mb-0 text-base font-medium text-editorial-text-main">{{ profile.role }}</p>
         </article>
-        <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+        <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/84 px-4 py-4 shadow-editorial-card backdrop-blur-xl">
           <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">会话状态</p>
           <p class="mt-2 mb-0 text-base font-medium text-editorial-text-main">
             {{ profile.loggedIn ? "已登录" : "公开访问" }}
@@ -76,7 +100,7 @@ onMounted(() => {
       </section>
 
       <section
-        class="rounded-editorial-lg border border-editorial-border bg-editorial-panel px-5 py-5"
+        class="editorial-spotlight-card rounded-editorial-xl border border-editorial-border-strong px-5 py-5"
         data-profile-section="summary"
       >
         <div class="flex flex-col gap-4">

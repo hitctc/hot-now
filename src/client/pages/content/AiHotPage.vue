@@ -9,6 +9,7 @@ import ContentToolbarCard from "../../components/content/ContentToolbarCard.vue"
 import ContentStandardCard from "../../components/content/ContentStandardCard.vue";
 import { useContentPageScroll } from "../../components/content/useContentPageScroll";
 import {
+  editorialContentIntroSectionClass,
   editorialContentListSectionClass,
   editorialContentPageClass
 } from "../../components/content/contentCardShared";
@@ -248,12 +249,37 @@ onMounted(() => {
     </div>
 
     <section
-      v-if="strategySummary.length > 0"
-      class="flex flex-wrap items-center gap-2"
-      data-content-strategy-summary="ai-hot"
+      :class="editorialContentIntroSectionClass"
+      data-content-stage="ai-hot"
     >
-      <span class="text-sm font-medium text-editorial-text-muted">当前 AI 热点：</span>
-      <a-tag v-for="item in strategySummary" :key="item">{{ item }}</a-tag>
+      <div
+        class="pointer-events-none absolute right-[-56px] top-[-72px] h-48 w-48 rounded-full bg-[radial-gradient(circle,_rgba(122,162,255,0.24),_transparent_72%)] blur-3xl"
+        aria-hidden="true"
+      />
+      <div class="relative z-[1] flex flex-col gap-4">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="rounded-editorial-pill border border-editorial-border bg-editorial-panel/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-editorial-text-muted">
+            AI Hot Stage
+          </span>
+          <span class="text-xs leading-6 text-editorial-text-muted">聚焦已经形成讨论热度和持续传播势能的内容。</span>
+        </div>
+        <div class="flex flex-col gap-2">
+          <h3 class="m-0 text-[28px] font-semibold tracking-[-0.04em] text-editorial-text-main">
+            AI 热点的聚焦列表
+          </h3>
+          <p class="m-0 max-w-3xl text-sm leading-7 text-editorial-text-body">
+            这里不只看发布时间，而是把来源权重、热点词、新鲜度和综合分重新压到一个更适合快速判断的热度序列里。
+          </p>
+        </div>
+        <div
+          v-if="strategySummary.length > 0"
+          class="flex flex-wrap items-center gap-2"
+          data-content-strategy-summary="ai-hot"
+        >
+          <span class="text-sm font-medium text-editorial-text-muted">当前 AI 热点：</span>
+          <a-tag v-for="item in strategySummary" :key="item">{{ item }}</a-tag>
+        </div>
+      </div>
     </section>
 
     <a-skeleton v-if="isLoading" active :paragraph="{ rows: 6 }" />

@@ -311,7 +311,9 @@ describe("createServer", () => {
     expect(response.body).toContain('class="login-page"');
     expect(response.body).toContain('class="login-shell"');
     expect(response.body).toContain('class="login-card"');
-    expect(response.body).toContain("HotNow Workspace");
+    expect(response.body).toContain('data-login-stage="brand"');
+    expect(response.body).toContain('data-login-panel="form"');
+    expect(response.body).toContain("欢迎回到 HotNow");
     expect(response.body).toContain('id="login-form"');
     expect(response.body).toContain('<link rel="stylesheet" href="/assets/site.css" />');
   });

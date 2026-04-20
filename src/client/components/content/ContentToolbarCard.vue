@@ -78,24 +78,40 @@ function handleClear(): void {
 
 <template>
   <section
-    :class="[editorialContentCardClass, 'rounded-b-editorial-lg rounded-t-none flex flex-col gap-4 px-4 py-4']"
+    :class="[
+      editorialContentCardClass,
+      'editorial-spotlight-card relative flex flex-col gap-5 overflow-hidden rounded-editorial-xl border border-editorial-border-strong px-5 py-5'
+    ]"
     data-content-toolbar-card
   >
+    <div
+      class="pointer-events-none absolute right-[-48px] top-[-56px] h-44 w-44 rounded-full bg-[radial-gradient(circle,_rgba(122,162,255,0.34),_transparent_72%)] blur-3xl"
+      aria-hidden="true"
+    />
     <div
       class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"
       data-content-toolbar-main-row
     >
       <div class="flex min-w-0 flex-1 flex-col gap-2">
+        <div class="flex flex-wrap items-center gap-2" data-content-toolbar-stage>
+          <span class="rounded-editorial-pill border border-editorial-border bg-editorial-panel/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-editorial-text-muted">
+            Content Command
+          </span>
+          <span class="text-xs leading-6 text-editorial-text-muted">来源、排序与标题搜索共用同一组浏览上下文。</span>
+        </div>
         <div class="flex min-w-0 flex-wrap items-start gap-2">
           <button
             type="button"
-            class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-left"
+            class="flex min-w-0 flex-1 flex-col items-start gap-1 rounded-editorial-lg border border-editorial-border bg-editorial-panel/70 px-4 py-3 text-left shadow-editorial-card"
             :aria-expanded="isSourceExpanded"
             :aria-controls="sourcePanelId"
             data-content-toolbar-summary
             @click="toggleSourcePanel"
           >
-            <span class="min-w-0 text-sm font-medium leading-6 text-editorial-text-main">
+            <span class="text-[11px] font-semibold uppercase tracking-[0.14em] text-editorial-text-muted">
+              Source Scope
+            </span>
+            <span class="min-w-0 text-sm font-semibold leading-6 text-editorial-text-main">
               {{ sourceSummaryText }}
             </span>
             <span class="whitespace-nowrap text-[11px] leading-5 text-editorial-text-muted">

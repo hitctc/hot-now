@@ -36,7 +36,7 @@ const rootClass = computed(() =>
 const headerClass = computed(() =>
   props.compact
     ? "flex flex-col gap-2"
-    : "flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
+    : "flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"
 );
 
 function emitSelection(nextKinds: string[]): void {
@@ -82,7 +82,7 @@ function handleToggleAll(): void {
         <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
           来源筛选
         </p>
-        <p class="m-0 text-sm text-editorial-text-body">
+        <p class="m-0 text-sm font-medium text-editorial-text-body">
           已选 {{ selectedCount }} / {{ options.length }} · 共 {{ visibleResultCount }} 条
         </p>
       </div>
@@ -96,8 +96,8 @@ function handleToggleAll(): void {
             :class="[
               'inline-flex shrink-0 cursor-pointer select-none items-center gap-2 rounded-editorial-sm px-3 py-2 text-sm transition',
               selectedSet.has(option.kind)
-                ? 'bg-editorial-link-active text-editorial-text-main'
-                : 'text-editorial-text-body hover:bg-editorial-link-active hover:text-editorial-text-main'
+                ? 'border border-editorial-border-strong bg-editorial-link-active text-editorial-text-main shadow-editorial-accent'
+                : 'border border-transparent text-editorial-text-body hover:border-editorial-border hover:bg-editorial-link-active hover:text-editorial-text-main'
             ]"
           >
             <input

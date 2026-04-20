@@ -69,6 +69,8 @@ describe("ContentStandardCard", () => {
     expect(wrapper.get("[data-content-standard-summary]").attributes("data-content-summary-expanded")).toBe("false");
     expect(wrapper.get("[data-content-standard-summary]").attributes("class")).toContain("[-webkit-line-clamp:5]");
     expect(wrapper.get("[data-content-display-index]").text()).toBe("12");
+    expect(wrapper.find("[data-content-row-shell]").exists()).toBe(true);
+    expect(wrapper.find("[data-content-row-sidecar]").exists()).toBe(true);
     expect(wrapper.find("[data-content-summary-toggle]").exists()).toBe(false);
     expect(wrapper.find("[data-content-action='favorite']").exists()).toBe(false);
     expect(wrapper.find("[data-content-action='reaction']").exists()).toBe(false);
@@ -90,6 +92,7 @@ describe("ContentStandardCard", () => {
 
     await flushPromises();
 
+    expect(wrapper.get("[data-content-row]").classes()).toContain("group");
     expect(wrapper.get("[data-content-summary-toggle]").text()).toBe("展开");
     expect(wrapper.get("[data-content-standard-summary]").attributes("class")).toContain("[-webkit-line-clamp:5]");
 

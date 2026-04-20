@@ -1980,10 +1980,29 @@ function renderLoginPage() {
   </head>
   <body class="login-page">
     <main class="login-shell">
-      <section class="login-card">
-        <p class="login-kicker">HotNow Workspace</p>
-        <h1>登录 HotNow</h1>
-        <p class="login-subtitle">统一站点已启用账号校验，请使用管理员账号继续。</p>
+      <section class="login-stage" data-login-stage="brand">
+        <div class="login-stage__halo" aria-hidden="true"></div>
+        <p class="login-kicker">Spotlight Feed</p>
+        <div class="login-stage__brandlock">
+          <img class="login-stage__logo" src="/brand/hotnow-logo-sd.png" alt="HotNow logo" />
+          <div>
+            <p class="login-stage__title">HotNow</p>
+            <p class="login-stage__eyebrow">AI 热点与新讯</p>
+          </div>
+        </div>
+        <h1>欢迎回到 HotNow</h1>
+        <p class="login-subtitle">登录后继续管理来源、筛选规则和统一站点的系统能力。</p>
+        <ul class="login-stage__highlights">
+          <li>统一查看 AI 新讯、AI 热点和来源调度状态</li>
+          <li>在同一套深浅色主题里切换系统配置与内容工作台</li>
+          <li>把危险操作收口在受保护的系统菜单中，避免误触</li>
+        </ul>
+      </section>
+
+      <section class="login-card" data-login-panel="form">
+        <p class="login-card__eyebrow">账号验证</p>
+        <h2>登录 HotNow</h2>
+        <p class="login-card__summary">统一站点已启用账号校验，请使用管理员账号继续。</p>
         <form id="login-form">
           <label class="field-label" for="username">用户名</label>
           <input id="username" class="field-input" name="username" autocomplete="username" required />

@@ -156,6 +156,7 @@ describe("ViewRulesPage", () => {
     await flushPromises();
 
     expect(settingsApi.readSettingsViewRules).toHaveBeenCalledTimes(1);
+    expect(wrapper.find("[data-settings-intro='view-rules']").exists()).toBe(true);
     expect(wrapper.get("[data-settings-section='filter-overview']").text()).toContain("当前筛选总览");
     expect(wrapper.get("[data-filter-overview-card='ai']").text()).toContain("AI 新讯怎么排");
     expect(wrapper.get("[data-filter-overview-card='hot']").text()).toContain("AI 热点怎么排");

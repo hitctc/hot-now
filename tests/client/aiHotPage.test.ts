@@ -150,9 +150,10 @@ describe("AiHotPage", () => {
       searchKeyword: ""
     });
     expect(wrapper.get("[data-content-page='ai-hot']").classes()).toEqual(
-      expect.arrayContaining(["flex", "flex-col", "gap-6"])
+      expect.arrayContaining(["flex", "flex-col", "gap-8"])
     );
     expect(wrapper.find("[data-content-filter-shell]").exists()).toBe(false);
+    expect(wrapper.find("[data-content-stage='ai-hot']").exists()).toBe(true);
     expect(wrapper.get("[data-content-strategy-summary='ai-hot']").text()).toContain("当前 AI 热点");
     expect(wrapper.get("[data-content-strategy-summary='ai-hot']").text()).toContain("AI 热点重点来源优先 开");
     expect(wrapper.findAll("[data-content-toolbar-card]").length).toBe(1);
@@ -219,6 +220,7 @@ describe("AiHotPage", () => {
     await flushPromises();
 
     expect(wrapper.find("[data-content-strategy-summary='ai-hot']").exists()).toBe(false);
+    expect(wrapper.find("[data-content-stage='ai-hot']").exists()).toBe(true);
     expect(wrapper.get("[data-content-section='list']").text()).toContain("Hot AI Event");
   });
 

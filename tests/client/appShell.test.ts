@@ -82,13 +82,15 @@ describe("client app shell", () => {
 
     await flushPromises();
 
-    expect(wrapper.text()).not.toContain("HotNow");
+    expect(wrapper.text()).toContain("HotNow");
     expect(wrapper.text()).toContain("热讯");
     expect(wrapper.text()).toContain("当前用户");
     expect(wrapper.text()).toContain("当前登录账号、会话状态和联系信息。");
     expect(wrapper.get("[data-shell-root]").classes()).toEqual(
       expect.arrayContaining(["min-h-screen", "bg-editorial-page", "text-editorial-text-main"])
     );
+    expect(wrapper.find("[data-shell-brand-stage]").exists()).toBe(true);
+    expect(wrapper.find("[data-shell-nav-rail]").exists()).toBe(true);
     expect(wrapper.get("[data-mobile-shell-nav]").classes()).toEqual(
       expect.arrayContaining(["sticky", "top-0", "z-30", "hidden", "border-b", "max-[900px]:block"])
     );
@@ -100,6 +102,8 @@ describe("client app shell", () => {
     expect(wrapper.get("[data-workspace-brand]").text()).toContain("热讯");
     expect(wrapper.get("[data-workspace-brand-logo]").attributes("src")).toBe("/brand/hotnow-logo-sd.png");
     expect(wrapper.get("[data-workspace-brand-logo]").attributes("alt")).toBe("HotNow logo");
+    expect(wrapper.get("[data-shell-brand-stage]").text()).toContain("HotNow");
+    expect(wrapper.get("[data-shell-brand-stage]").text()).toContain("AI 热点与新讯");
     expect(wrapper.find("[data-page-header-title]").text()).toBe("当前用户");
     expect(wrapper.find("[data-page-header-description]").text()).toContain("当前登录账号");
     expect(wrapper.find("[data-page-header-logo]").exists()).toBe(false);

@@ -81,8 +81,10 @@ describe("ContentHeroCard", () => {
     expect(wrapper.get("[data-content-hero-summary]").attributes("data-content-summary-expanded")).toBe("false");
     expect(wrapper.find("[data-content-summary-toggle]").exists()).toBe(false);
     expect(wrapper.get("[data-content-hero]").classes()).toEqual(
-      expect.arrayContaining(["rounded-editorial-lg", "border", "border-editorial-border", "bg-editorial-panel"])
+      expect.arrayContaining(["editorial-spotlight-card", "rounded-editorial-xl", "border", "border-editorial-border-strong"])
     );
+    expect(wrapper.find("[data-content-hero-stage]").exists()).toBe(true);
+    expect(wrapper.find("[data-content-hero-sidecar]").exists()).toBe(true);
     expect(wrapper.get("[data-content-hero]").classes()).toContain("shadow-editorial-card");
     expect(wrapper.text()).toContain("AI Weekly Insight");
     expect(wrapper.text()).toContain("保留 agent workflow 内容");

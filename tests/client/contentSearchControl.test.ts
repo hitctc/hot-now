@@ -75,6 +75,7 @@ describe("ContentSearchControl", () => {
     });
 
     expect(wrapper.get("[data-content-search-control]").classes()).toContain("w-full");
+    expect(wrapper.get("[data-content-search-control]").classes()).toContain("bg-editorial-panel/70");
 
     await wrapper.get("[data-content-search-submit]").trigger("click");
     await flushPromises();

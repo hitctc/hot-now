@@ -3,31 +3,30 @@ import { LatestReportEmailError } from "../../src/core/pipeline/sendLatestReport
 import { createServer } from "../../src/server/createServer.js";
 
 describe("report pages", () => {
-  it("ships notion workspace theme tokens in the shared CSS asset", async () => {
+  it("ships cool spotlight theme tokens in the shared CSS asset", async () => {
     const app = createServer({} as never);
 
     const response = await app.inject({ method: "GET", url: "/assets/site.css" });
 
     expect(response.statusCode).toBe(200);
-    expect(response.body).toContain("--paper-base: #fbfbfa;");
-    expect(response.body).toContain("--paper-elevated: #ffffff;");
-    expect(response.body).toContain("--ink-strong: #37352f;");
-    expect(response.body).toContain("--signal-blue: #37352f;");
-    expect(response.body).toContain("--signal-orange: #6f6e69;");
-    expect(response.body).not.toContain("--signal-blue: #2352ff;");
-    expect(response.body).not.toContain("--signal-orange: #ff6a2a;");
-    expect(response.body).toContain("content: none;");
+    expect(response.body).toContain("--paper-base: #f4f7ff;");
+    expect(response.body).toContain("--signal-blue: #4d7dff;");
+    expect(response.body).toContain("--signal-orange: #6f6bff;");
+    expect(response.body).toContain("--bg-page-glow-a: radial-gradient(circle at 14% 16%, rgba(87, 144, 255, 0.24), transparent 28%);");
+    expect(response.body).not.toContain("--signal-blue: #37352f;");
+    expect(response.body).not.toContain("--signal-orange: #6f6e69;");
     expect(response.body).toContain(".legacy-page {");
     expect(response.body).toContain(".legacy-shell {");
     expect(response.body).toContain(".legacy-header {");
+    expect(response.body).toContain(".legacy-brand-lock {");
     expect(response.body).toContain(".legacy-card {");
     expect(response.body).toContain(".legacy-meta-list {");
     expect(response.body).toContain(".legacy-actions {");
     expect(response.body).toContain(".legacy-callout {");
     expect(response.body).toContain(".legacy-card button {");
+    expect(response.body).toContain(".login-stage {");
     expect(response.body).toContain(".login-shell {");
     expect(response.body).toContain(".login-page {");
-    expect(response.body).toContain("place-items: center;");
     expect(response.body).toContain(".mobile-top-nav {");
     expect(response.body).toContain(".shell-sidebar .nav-group {");
     expect(response.body).toContain(".shell-main {");
@@ -70,6 +69,7 @@ describe("report pages", () => {
     expect(response.body).toContain('class="legacy-shell legacy-shell--control"');
     expect(response.body).toContain('class="legacy-header legacy-header--control"');
     expect(response.body).toContain('class="legacy-card legacy-card--control"');
+    expect(response.body).toContain('class="legacy-brand-lock"');
   });
 
   it("renders history entries with mail and degraded status", async () => {
@@ -94,6 +94,7 @@ describe("report pages", () => {
     expect(response.body).toContain('class="legacy-shell legacy-shell--history"');
     expect(response.body).toContain('class="legacy-header legacy-header--history"');
     expect(response.body).toContain('class="legacy-card legacy-card--history"');
+    expect(response.body).toContain('class="legacy-brand-lock"');
   });
 
   it("renders the report fallback notice page with shared theme resources", async () => {
@@ -115,6 +116,7 @@ describe("report pages", () => {
     expect(response.body).toContain('class="legacy-shell legacy-shell--notice"');
     expect(response.body).toContain('class="legacy-header legacy-header--notice"');
     expect(response.body).toContain('class="legacy-card legacy-card--notice"');
+    expect(response.body).toContain('class="legacy-brand-lock"');
   });
 
   it("renders the latest stored report on the home page", async () => {

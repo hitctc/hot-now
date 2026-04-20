@@ -4,6 +4,7 @@ import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 
 import {
   editorialContentCardClass,
+  editorialContentIntroSectionClass,
   editorialContentPageClass
 } from "../../components/content/contentCardShared";
 import { HttpError } from "../../services/http";
@@ -574,12 +575,6 @@ onUnmounted(() => {
         @close="pageNotice = null"
       />
 
-      <div class="flex justify-start">
-        <a-button type="primary" data-action="add-source" @click="openCreateSourceModal">
-          新增来源
-        </a-button>
-      </div>
-
       <a-skeleton v-if="isLoading" active :paragraph="{ rows: 8 }" />
 
       <a-result
@@ -594,24 +589,52 @@ onUnmounted(() => {
       </a-result>
 
       <template v-else-if="sourcesModel">
+        <section :class="editorialContentIntroSectionClass" data-settings-intro="sources">
+          <div
+            class="pointer-events-none absolute right-[-56px] top-[-72px] h-48 w-48 rounded-full bg-[radial-gradient(circle,_rgba(81,220,255,0.22),_transparent_72%)] blur-3xl"
+            aria-hidden="true"
+          />
+          <div class="relative z-[1] flex flex-col gap-4">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="rounded-editorial-pill border border-editorial-border bg-editorial-panel/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-editorial-text-muted">
+                Source Inventory
+              </span>
+              <span class="text-xs leading-6 text-editorial-text-muted">来源接入、手动采集和库存巡检都在这一页完成。</span>
+            </div>
+            <div class="flex flex-col gap-2">
+              <h2 class="m-0 text-[28px] font-semibold tracking-[-0.04em] text-editorial-text-main">
+                数据来源工作台
+              </h2>
+              <p class="m-0 max-w-3xl text-sm leading-7 text-editorial-text-body">
+                这里负责管理 RSS 与公众号桥接来源、查看调度节奏、执行手动采集和人工发信，同时保持库存表和统计表在同一屏里可比对。
+              </p>
+            </div>
+            <div class="flex justify-start">
+              <a-button type="primary" data-action="add-source" @click="openCreateSourceModal">
+                新增来源
+              </a-button>
+            </div>
+          </div>
+        </section>
+
         <section class="grid gap-3 md:grid-cols-2 xl:grid-cols-5" data-sources-section="overview">
-          <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+          <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/84 px-4 py-4 shadow-editorial-card backdrop-blur-xl">
             <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">接入来源</p>
             <p class="mt-2 mb-0 text-xl font-medium text-editorial-text-main">{{ totalSourceCount }}</p>
           </article>
-          <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+          <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/84 px-4 py-4 shadow-editorial-card backdrop-blur-xl">
             <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">已启用来源</p>
             <p class="mt-2 mb-0 text-xl font-medium text-editorial-text-main">{{ enabledSourceCount }}</p>
           </article>
-          <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+          <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/84 px-4 py-4 shadow-editorial-card backdrop-blur-xl">
             <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">最近采集</p>
             <p class="mt-2 mb-0 text-sm text-editorial-text-main">{{ formatDateTime(sourcesModel.operations.lastCollectionRunAt) }}</p>
           </article>
-          <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+          <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/84 px-4 py-4 shadow-editorial-card backdrop-blur-xl">
             <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">最近发信</p>
             <p class="mt-2 mb-0 text-sm text-editorial-text-main">{{ formatDateTime(sourcesModel.operations.lastSendLatestEmailAt) }}</p>
           </article>
-          <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-4 py-4">
+          <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/84 px-4 py-4 shadow-editorial-card backdrop-blur-xl">
             <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">下一次采集</p>
             <p class="mt-2 mb-0 text-sm text-editorial-text-main">
               {{ formatNextCollectionText(sourcesModel.operations.nextCollectionRunAt) }}

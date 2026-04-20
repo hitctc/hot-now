@@ -141,6 +141,10 @@ function renderLegacyDocument(config: LegacyDocumentConfig) {
   <body class="legacy-page legacy-page--${config.pageKind}">
     <main class="legacy-shell legacy-shell--${config.pageKind}">
       <header class="legacy-header legacy-header--${config.pageKind}">
+        <div class="legacy-brand-lock">
+          <img src="/brand/hotnow-logo-sd.png" alt="HotNow logo" class="legacy-brand-lock__logo" />
+          <span class="legacy-brand-lock__text">HotNow</span>
+        </div>
         <p class="legacy-eyebrow">${escapeHtml(config.eyebrow)}</p>
         <h1>${escapeHtml(config.title)}</h1>
         <p class="legacy-subtitle">${escapeHtml(config.subtitle)}</p>

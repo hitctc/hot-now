@@ -10,6 +10,7 @@ import {
   editorialContentBadgeClass,
   editorialContentCardClass,
   editorialContentFeedbackSummaryClass,
+  editorialContentInsetPanelClass,
   editorialContentMetaClass,
   editorialContentScoreBadgeClass,
   formatFeedbackSummary,
@@ -94,12 +95,16 @@ const {
 
 <template>
   <article
-    :class="[editorialContentCardClass, 'px-4 py-4 transition hover:bg-editorial-link-active']"
+    :class="[
+      editorialContentCardClass,
+      'group overflow-hidden rounded-editorial-lg border border-editorial-border px-5 py-5 transition hover:-translate-y-0.5 hover:border-editorial-border-strong hover:bg-editorial-link-active/60 hover:shadow-editorial-floating'
+    ]"
     :data-content-id="cardState.id"
     data-content-row
     data-content-variant="standard"
   >
-    <div class="flex flex-col gap-4">
+    <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_220px]" data-content-row-shell>
+      <div class="flex flex-col gap-4">
       <div :class="editorialContentMetaClass">
         <span>{{ cardState.sourceName }}</span>
         <span>{{ publishedText }}</span>
@@ -158,26 +163,30 @@ const {
         </span>
       </div>
 
-      <ContentActionBar
-        :is-busy="isBusy"
-        :feedback-open="feedbackOpen"
-        :status-text="statusText"
-        @toggle-feedback="feedbackOpen = !feedbackOpen"
-      />
-
-      <div v-if="feedbackSummary" :class="editorialContentFeedbackSummaryClass">
-        <span class="text-xs font-semibold uppercase tracking-[0.18em] text-editorial-text-muted">反馈词</span>
-        <p class="m-0 text-sm leading-6 text-editorial-text-body">
-          {{ feedbackSummary }}
-        </p>
       </div>
 
-      <ContentFeedbackPanel
-        v-if="feedbackOpen"
-        :model-value="cardState.feedbackEntry"
-        :submitting="isBusy"
-        @submit="handleFeedbackSubmit"
-      />
+      <div :class="[editorialContentInsetPanelClass, 'flex h-full flex-col justify-between gap-4 px-4 py-4']" data-content-row-sidecar>
+        <ContentActionBar
+          :is-busy="isBusy"
+          :feedback-open="feedbackOpen"
+          :status-text="statusText"
+          @toggle-feedback="feedbackOpen = !feedbackOpen"
+        />
+
+        <div v-if="feedbackSummary" :class="editorialContentFeedbackSummaryClass">
+          <span class="text-xs font-semibold uppercase tracking-[0.18em] text-editorial-text-muted">反馈词</span>
+          <p class="m-0 text-sm leading-6 text-editorial-text-body">
+            {{ feedbackSummary }}
+          </p>
+        </div>
+
+        <ContentFeedbackPanel
+          v-if="feedbackOpen"
+          :model-value="cardState.feedbackEntry"
+          :submitting="isBusy"
+          @submit="handleFeedbackSubmit"
+        />
+      </div>
     </div>
   </article>
 </template>

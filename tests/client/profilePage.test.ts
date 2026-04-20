@@ -47,7 +47,7 @@ describe("ProfilePage", () => {
 
     await flushPromises();
 
-    expect(wrapper.find("[data-settings-intro='profile']").exists()).toBe(false);
+    expect(wrapper.find("[data-settings-intro='profile']").exists()).toBe(true);
     expect(wrapper.get("[data-profile-section='overview']").findAll("article")).toHaveLength(3);
     expect(wrapper.get("[data-profile-section='summary']").text()).toContain("系统管理员");
     expect(wrapper.get("[data-profile-field='display-name']").text()).toBe("系统管理员");
@@ -68,6 +68,6 @@ describe("ProfilePage", () => {
     expect(emptyState.text()).toContain("当前没有可读取的用户信息");
     expect(emptyState.text()).toContain("可以稍后刷新页面，或重新登录后再试。");
     expect(emptyState.classes()).toContain("rounded-editorial-lg");
-    expect(emptyState.classes()).toContain("bg-editorial-panel");
+    expect(emptyState.classes()).toContain("editorial-glass-panel");
   });
 });

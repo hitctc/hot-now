@@ -1,5 +1,6 @@
 import path from "node:path";
 import { existsSync } from "node:fs";
+import { loadRootEnvFile } from "./core/config/loadRootEnvFile.js";
 import { loadRuntimeConfig } from "./core/config/loadRuntimeConfig.js";
 import { verifyPassword } from "./core/auth/passwords.js";
 import { buildContentPageModel } from "./core/content/buildContentPageModel.js";
@@ -67,6 +68,8 @@ type UserProfileRow = {
   email: string | null;
 };
 
+// 本地直接跑 tsx watch src/main.ts 时也要和 npm run dev 一样吃到根目录 .env。
+loadRootEnvFile();
 const config = await loadRuntimeConfig();
 const recoveryDir = path.join(path.dirname(config.database.file), "recovery-backups");
 const db = createRuntimeDatabase({

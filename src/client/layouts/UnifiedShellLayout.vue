@@ -238,7 +238,7 @@ onBeforeUnmount(() => {
             <img
               :src="shellLogoSrc"
               alt="HotNow logo"
-              class="h-11 w-11 shrink-0 rounded-[16px] border border-editorial-border bg-editorial-panel/90 object-cover shadow-editorial-floating"
+              class="h-11 w-11 shrink-0 rounded-[16px] object-cover"
               data-workspace-brand-logo
             />
             <div class="min-w-0">

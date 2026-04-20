@@ -102,6 +102,9 @@ describe("client app shell", () => {
     expect(wrapper.get("[data-workspace-brand]").text()).toContain("热讯");
     expect(wrapper.get("[data-workspace-brand-logo]").attributes("src")).toBe("/brand/hotnow-logo-mark.png");
     expect(wrapper.get("[data-workspace-brand-logo]").attributes("alt")).toBe("HotNow logo");
+    expect(wrapper.get("[data-workspace-brand-logo]").classes()).not.toEqual(
+      expect.arrayContaining(["border", "border-editorial-border", "bg-editorial-panel/90", "shadow-editorial-floating"])
+    );
     expect(wrapper.get("[data-shell-brand-stage]").text()).toContain("HotNow");
     expect(wrapper.get("[data-shell-brand-stage]").text()).toContain("AI 热点与新讯");
     expect(wrapper.find("[data-page-header-title]").text()).toBe("当前用户");

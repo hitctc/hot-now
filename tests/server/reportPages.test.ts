@@ -26,6 +26,8 @@ describe("report pages", () => {
     expect(response.body).toContain(".legacy-callout {");
     expect(response.body).toContain(".legacy-card button {");
     expect(response.body).toContain(".login-shell {");
+    expect(response.body).toContain(".login-page {");
+    expect(response.body).toContain("place-items: center;");
     expect(response.body).toContain(".mobile-top-nav {");
     expect(response.body).toContain(".shell-sidebar .nav-group {");
     expect(response.body).toContain(".shell-main {");

@@ -1612,11 +1612,10 @@ code {
 }
 
 .login-page {
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 72px 24px 48px;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
 }
 
 .login-shell {

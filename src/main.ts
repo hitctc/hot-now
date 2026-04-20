@@ -77,6 +77,7 @@ runMigrations(db);
 seedInitialData(db, {
   username: config.auth.username,
   password: config.auth.password,
+  email: config.smtp.user,
   juyaRssUrl: config.source.rssUrl
 });
 const lock = createRunLock();

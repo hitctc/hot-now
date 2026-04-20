@@ -5,6 +5,7 @@ import { ensureDefaultViewRules } from "../viewRules/viewRuleRepository.js";
 type AuthBootstrap = {
   username: string;
   password: string;
+  email?: string;
   juyaRssUrl?: string;
 };
 
@@ -192,15 +193,17 @@ export function seedInitialData(db: SqliteDatabase, authBootstrap?: AuthBootstra
         password_hash,
         role,
         display_name,
+        email,
         preferences_json,
         updated_at
       )
-      VALUES (1, @username, @passwordHash, 'admin', @displayName, '{}', CURRENT_TIMESTAMP)
+      VALUES (1, @username, @passwordHash, 'admin', @displayName, @email, '{}', CURRENT_TIMESTAMP)
       ON CONFLICT(id) DO UPDATE SET
         username = excluded.username,
         password_hash = excluded.password_hash,
         role = excluded.role,
         display_name = excluded.display_name,
+        email = excluded.email,
         updated_at = CURRENT_TIMESTAMP
     `
   );
@@ -223,7 +226,8 @@ export function seedInitialData(db: SqliteDatabase, authBootstrap?: AuthBootstra
       upsertAdmin.run({
         username: authBootstrap.username,
         passwordHash: hashPassword(authBootstrap.password),
-        displayName: authBootstrap.username
+        displayName: authBootstrap.username,
+        email: authBootstrap.email?.trim() || null
       });
     }
   });

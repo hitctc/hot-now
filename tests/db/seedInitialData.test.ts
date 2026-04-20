@@ -306,4 +306,50 @@ describe("seedInitialData", () => {
       }
     ]);
   });
+
+  it("syncs the bootstrap contact email into the admin profile row", async () => {
+    const db = await createTestDatabase();
+
+    seedInitialData(db, {
+      username: "admin",
+      password: "bootstrap-password",
+      email: "admin@example.com"
+    });
+
+    let row = db
+      .prepare(
+        `
+          SELECT username, email
+          FROM user_profile
+          WHERE id = 1
+        `
+      )
+      .get() as { username: string; email: string | null } | undefined;
+
+    expect(row).toEqual({
+      username: "admin",
+      email: "admin@example.com"
+    });
+
+    seedInitialData(db, {
+      username: "admin",
+      password: "bootstrap-password",
+      email: "owner@example.com"
+    });
+
+    row = db
+      .prepare(
+        `
+          SELECT username, email
+          FROM user_profile
+          WHERE id = 1
+        `
+      )
+      .get() as { username: string; email: string | null } | undefined;
+
+    expect(row).toEqual({
+      username: "admin",
+      email: "owner@example.com"
+    });
+  });
 });

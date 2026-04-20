@@ -24,6 +24,7 @@ function handleSubmit(payload: SaveFeedbackPoolEntryPayload): void {
     :open="open"
     :footer="null"
     :destroy-on-close="true"
+    class="editorial-feedback-modal"
     centered
     title="补充反馈"
     width="640px"

@@ -52,17 +52,10 @@ resolver_port="$(
 )"
 server_port="${PORT:-3030}"
 
-has_listening_port() {
-  local port="$1"
-  local listen_pids
-
-  listen_pids="$(lsof -tiTCP:${port} -sTCP:LISTEN 2>/dev/null || true)"
-  [ -n "${listen_pids}" ]
-}
-
 reclaim_listen_port() {
   local port="$1"
   local listen_pids
+  local remaining_pids
 
   listen_pids="$(lsof -tiTCP:${port} -sTCP:LISTEN 2>/dev/null || true)"
 
@@ -70,34 +63,48 @@ reclaim_listen_port() {
     return 0
   fi
 
-  echo "Port ${port} is already in use. Asking existing listener(s) to exit cleanly: ${listen_pids}"
+  echo "Port ${port} is already in use. Stopping existing listener(s): ${listen_pids}"
   kill ${=listen_pids} 2>/dev/null || true
 
-  for _ in {1..20}; do
-    local remaining_pids
+  # 先给开发进程一个短暂的清理窗口；如果还占着端口，再强制停止，避免 npm run dev 卡在旧监听上。
+  for _ in {1..10}; do
     remaining_pids="$(lsof -tiTCP:${port} -sTCP:LISTEN 2>/dev/null || true)"
 
     if [ -z "${remaining_pids}" ]; then
       return 0
     fi
 
-    sleep 0.5
+    sleep 0.2
   done
 
-  local remaining_pids
   remaining_pids="$(lsof -tiTCP:${port} -sTCP:LISTEN 2>/dev/null || true)"
 
   if [ -n "${remaining_pids}" ]; then
     echo "Port ${port} is still busy. Force stopping listener(s): ${remaining_pids}"
     kill -9 ${=remaining_pids}
-    sleep 1
+  fi
+
+  for _ in {1..10}; do
+    remaining_pids="$(lsof -tiTCP:${port} -sTCP:LISTEN 2>/dev/null || true)"
+
+    if [ -z "${remaining_pids}" ]; then
+      return 0
+    fi
+
+    sleep 0.2
+  done
+
+  remaining_pids="$(lsof -tiTCP:${port} -sTCP:LISTEN 2>/dev/null || true)"
+
+  if [ -n "${remaining_pids}" ]; then
+    echo "Port ${port} is still busy after cleanup: ${remaining_pids}" >&2
+    exit 1
   fi
 }
 
 client_pid=""
 server_pid=""
 resolver_pid=""
-reused_client_dev_server="false"
 
 cleanup() {
   if [ -n "${server_pid}" ] && kill -0 "${server_pid}" 2>/dev/null; then
@@ -116,20 +123,10 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 reclaim_listen_port "${server_port}"
+reclaim_listen_port "${client_dev_port}"
 
 if [ "${resolver_autostart}" = "true" ]; then
   reclaim_listen_port "${resolver_port}"
-fi
-
-if [ "${mode}" != "local" ] && has_listening_port "${client_dev_port}"; then
-  if curl -fsS "${HOT_NOW_CLIENT_DEV_ORIGIN}/client/@vite/client" >/dev/null 2>&1; then
-    echo "Reusing existing Vite dev server at ${HOT_NOW_CLIENT_DEV_ORIGIN}."
-    reused_client_dev_server="true"
-  else
-    echo "Port ${client_dev_port} is already in use, but it is not the expected HotNow Vite dev server." >&2
-    echo "Please free that port or change HOT_NOW_CLIENT_DEV_ORIGIN before running npm run dev." >&2
-    exit 1
-  fi
 fi
 
 if [ "${resolver_autostart}" = "true" ]; then
@@ -158,12 +155,9 @@ if [ -n "${resolver_pid}" ]; then
   fi
 fi
 
-if [ "${reused_client_dev_server}" != "true" ]; then
-  reclaim_listen_port "${client_dev_port}"
-  echo "Starting Vite dev server on ${HOT_NOW_CLIENT_DEV_ORIGIN}..."
-  npm run dev:client -- --host "${client_dev_host}" --port "${client_dev_port}" --strictPort &
-  client_pid=$!
-fi
+echo "Starting Vite dev server on ${HOT_NOW_CLIENT_DEV_ORIGIN}..."
+npm run dev:client -- --host "${client_dev_host}" --port "${client_dev_port}" --strictPort &
+client_pid=$!
 
 for _ in {1..60}; do
   if curl -fsS "${HOT_NOW_CLIENT_DEV_ORIGIN}/client/" >/dev/null 2>&1; then

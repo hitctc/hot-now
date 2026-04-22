@@ -25,7 +25,7 @@ const emit = defineEmits<{
 
 const rootClass = computed(() =>
   props.compact
-    ? "flex flex-col gap-2 rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-3 py-2 shadow-none sm:rounded-editorial-lg sm:px-4 sm:py-3 sm:shadow-editorial-card"
+    ? "flex flex-col gap-2 rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-3 py-2 shadow-none sm:rounded-editorial-lg sm:px-4 sm:py-3 sm:shadow-editorial-card lg:px-3 lg:py-2 lg:shadow-none"
     : `${editorialContentFloatingPanelClass} flex flex-col gap-3 px-4 py-4`
 );
 const contentClass = computed(() =>

@@ -80,7 +80,7 @@ function handleClear(): void {
   <section
     :class="[
       editorialContentCardClass,
-      'editorial-spotlight-card relative flex flex-col gap-2 overflow-hidden rounded-editorial-lg border border-editorial-border-strong px-3 py-2 sm:gap-5 sm:rounded-editorial-xl sm:px-5 sm:py-5'
+      'editorial-spotlight-card relative flex flex-col gap-2 overflow-hidden rounded-editorial-lg border border-editorial-border-strong px-3 py-2 sm:gap-4 sm:rounded-editorial-xl sm:px-5 sm:py-4 lg:px-4 lg:py-3'
     ]"
     data-content-toolbar-card
   >
@@ -89,32 +89,32 @@ function handleClear(): void {
       aria-hidden="true"
     />
     <div
-      class="flex flex-col gap-2 sm:gap-3 lg:flex-row lg:items-start lg:justify-between"
+      class="flex flex-col gap-2 sm:gap-3 lg:flex-row lg:items-center lg:justify-between"
       data-content-toolbar-main-row
     >
-      <div class="flex min-w-0 flex-1 flex-col gap-2">
+      <div class="flex min-w-0 flex-1 flex-col gap-2 lg:flex-row lg:items-center lg:gap-3">
         <div class="hidden flex-wrap items-center gap-2 sm:flex" data-content-toolbar-stage>
           <span class="rounded-editorial-pill border border-editorial-border bg-editorial-panel/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-editorial-text-muted">
             Content Command
           </span>
-          <span class="text-xs leading-6 text-editorial-text-muted">来源、排序与标题搜索共用同一组浏览上下文。</span>
+          <span class="text-xs leading-6 text-editorial-text-muted lg:hidden 2xl:inline">来源、排序与标题搜索共用同一组浏览上下文。</span>
         </div>
-        <div class="flex min-w-0 items-center gap-2 sm:flex-wrap sm:items-start">
+        <div class="flex min-w-0 items-center gap-2 sm:flex-wrap sm:items-start lg:flex-1 lg:flex-nowrap lg:items-center">
           <button
             type="button"
-            class="flex min-w-0 flex-1 items-center gap-2 rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-3 py-2 text-left shadow-none sm:flex-col sm:items-start sm:gap-1 sm:rounded-editorial-lg sm:px-4 sm:py-3 sm:shadow-editorial-card"
+            class="flex min-w-0 flex-1 items-center gap-2 rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-3 py-2 text-left shadow-none sm:flex-col sm:items-start sm:gap-1 sm:rounded-editorial-lg sm:px-4 sm:py-3 sm:shadow-editorial-card lg:flex-row lg:items-center lg:px-3 lg:py-2 lg:shadow-none"
             :aria-expanded="isSourceExpanded"
             :aria-controls="sourcePanelId"
             data-content-toolbar-summary
             @click="toggleSourcePanel"
           >
-            <span class="hidden text-[11px] font-semibold uppercase tracking-[0.14em] text-editorial-text-muted sm:inline">
+            <span class="hidden text-[11px] font-semibold uppercase tracking-[0.14em] text-editorial-text-muted sm:inline lg:hidden">
               Source Scope
             </span>
             <span class="min-w-0 truncate text-sm font-semibold leading-6 text-editorial-text-main">
               {{ sourceSummaryText }}
             </span>
-            <span class="hidden whitespace-nowrap text-[11px] leading-5 text-editorial-text-muted sm:inline">
+            <span class="hidden whitespace-nowrap text-[11px] leading-5 text-editorial-text-muted sm:inline lg:hidden xl:inline">
               {{ sourceCountText }}
             </span>
           </button>

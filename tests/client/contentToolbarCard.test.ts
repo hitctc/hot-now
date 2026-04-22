@@ -24,15 +24,31 @@ describe("ContentToolbarCard", () => {
     });
 
     expect(wrapper.get("[data-content-toolbar-card]").classes()).toEqual(
-      expect.arrayContaining(["editorial-spotlight-card", "rounded-editorial-xl", "border", "border-editorial-border-strong"])
+      expect.arrayContaining([
+        "editorial-spotlight-card",
+        "rounded-editorial-lg",
+        "sm:rounded-editorial-xl",
+        "px-3",
+        "py-2",
+        "sm:px-5",
+        "sm:py-5",
+        "border",
+        "border-editorial-border-strong"
+      ])
     );
     expect(wrapper.findAll("[data-content-toolbar-main-row]").length).toBe(1);
     const mainRow = wrapper.get("[data-content-toolbar-main-row]");
     expect(wrapper.find("[data-content-toolbar-stage]").exists()).toBe(true);
+    expect(wrapper.get("[data-content-toolbar-stage]").classes()).toEqual(expect.arrayContaining(["hidden", "sm:flex"]));
     expect(mainRow.find("[data-content-toolbar-summary]").exists()).toBe(true);
     expect(mainRow.find("[data-content-sort-control]").exists()).toBe(true);
     expect(mainRow.find("[data-content-search-control]").exists()).toBe(true);
-    expect(wrapper.get("[data-content-toolbar-summary]").classes()).toContain("flex-col");
+    expect(wrapper.get("[data-content-toolbar-summary]").classes()).toEqual(
+      expect.arrayContaining(["items-center", "py-2", "sm:flex-col", "sm:py-3"])
+    );
+    expect(wrapper.get("[data-content-toolbar-mobile-controls]").classes()).toEqual(
+      expect.arrayContaining(["grid", "sm:hidden"])
+    );
     expect(wrapper.get("[data-content-toolbar-summary]").text()).toContain("来源：未选择");
     expect(wrapper.get("[data-content-toolbar-summary]").attributes("aria-expanded")).toBe("false");
     expect(wrapper.get("[data-content-toolbar-source-toggle]").text()).toContain("展开来源");

@@ -80,7 +80,7 @@ function handleClear(): void {
   <section
     :class="[
       editorialContentCardClass,
-      'editorial-spotlight-card relative flex flex-col gap-2 overflow-hidden rounded-editorial-lg border border-editorial-border-strong px-3 py-2 sm:gap-4 sm:rounded-editorial-xl sm:px-5 sm:py-4 lg:px-4 lg:py-3'
+      'editorial-spotlight-card relative flex flex-col gap-2 overflow-hidden rounded-editorial-lg border border-editorial-border-strong px-3 py-2 lg:gap-4 lg:rounded-editorial-xl lg:px-4 lg:py-3'
     ]"
     data-content-toolbar-card
   >
@@ -89,26 +89,23 @@ function handleClear(): void {
       aria-hidden="true"
     />
     <div
-      class="flex flex-col gap-2 sm:gap-3 lg:flex-row lg:items-center lg:justify-between"
+      class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between"
       data-content-toolbar-main-row
     >
       <div class="flex min-w-0 flex-1 flex-col gap-2 lg:flex-row lg:items-center">
-        <div class="flex min-w-0 items-center gap-2 sm:flex-wrap sm:items-start lg:flex-1 lg:flex-nowrap lg:items-center">
+        <div class="flex min-w-0 items-center gap-2 lg:flex-1 lg:flex-nowrap">
           <button
             type="button"
-            class="flex min-w-0 flex-1 items-center gap-2 rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-3 py-2 text-left shadow-none sm:flex-col sm:items-start sm:gap-1 sm:rounded-editorial-lg sm:px-4 sm:py-3 sm:shadow-editorial-card lg:flex-row lg:items-center lg:px-3 lg:py-2 lg:shadow-none"
+            class="flex min-w-0 flex-1 items-center gap-2 rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-3 py-2 text-left shadow-none lg:px-3 lg:py-2"
             :aria-expanded="isSourceExpanded"
             :aria-controls="sourcePanelId"
             data-content-toolbar-summary
             @click="toggleSourcePanel"
           >
-            <span class="hidden text-[11px] font-semibold uppercase tracking-[0.14em] text-editorial-text-muted sm:inline lg:hidden">
-              Source Scope
-            </span>
             <span class="min-w-0 truncate text-sm font-semibold leading-6 text-editorial-text-main">
               {{ sourceSummaryText }}
             </span>
-            <span class="hidden whitespace-nowrap text-[11px] leading-5 text-editorial-text-muted sm:inline lg:hidden xl:inline">
+            <span class="hidden whitespace-nowrap text-[11px] leading-5 text-editorial-text-muted xl:inline">
               {{ sourceCountText }}
             </span>
           </button>
@@ -126,8 +123,8 @@ function handleClear(): void {
         </div>
       </div>
 
-      <div class="hidden min-w-0 flex-1 flex-col gap-3 sm:flex sm:flex-row sm:items-center sm:justify-end">
-        <div class="sm:flex-none">
+      <div class="hidden min-w-0 flex-1 flex-col gap-3 lg:flex lg:flex-row lg:items-center lg:justify-end">
+        <div class="lg:flex-none">
           <ContentSortControl
             :sort-mode="sortMode"
             compact
@@ -135,7 +132,7 @@ function handleClear(): void {
           />
         </div>
 
-        <div class="sm:min-w-0 sm:flex-1">
+        <div class="lg:min-w-0 lg:flex-1">
           <ContentSearchControl
             :keyword="keyword"
             :is-loading="isLoading"
@@ -150,11 +147,11 @@ function handleClear(): void {
     <div
       :id="sourcePanelId"
       v-show="isSourceExpanded"
-      class="flex flex-col gap-2 pt-1 sm:gap-3"
+      class="flex flex-col gap-2 pt-1 lg:gap-3"
       data-content-toolbar-source-panel
     >
       <div
-        class="grid gap-2 sm:hidden"
+        class="grid gap-2 lg:hidden"
         data-content-toolbar-mobile-controls
       >
         <ContentSortControl

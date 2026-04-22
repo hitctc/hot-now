@@ -27,11 +27,9 @@ describe("ContentToolbarCard", () => {
       expect.arrayContaining([
         "editorial-spotlight-card",
         "rounded-editorial-lg",
-        "sm:rounded-editorial-xl",
+        "lg:rounded-editorial-xl",
         "px-3",
         "py-2",
-        "sm:px-5",
-        "sm:py-4",
         "lg:px-4",
         "lg:py-3",
         "border",
@@ -45,10 +43,10 @@ describe("ContentToolbarCard", () => {
     expect(mainRow.find("[data-content-sort-control]").exists()).toBe(true);
     expect(mainRow.find("[data-content-search-control]").exists()).toBe(true);
     expect(wrapper.get("[data-content-toolbar-summary]").classes()).toEqual(
-      expect.arrayContaining(["items-center", "py-2", "sm:flex-col", "sm:py-3", "lg:flex-row", "lg:py-2"])
+      expect.arrayContaining(["items-center", "py-2"])
     );
     expect(wrapper.get("[data-content-toolbar-mobile-controls]").classes()).toEqual(
-      expect.arrayContaining(["grid", "sm:hidden"])
+      expect.arrayContaining(["grid", "lg:hidden"])
     );
     expect(wrapper.get("[data-content-toolbar-summary]").text()).toContain("来源：未选择");
     expect(wrapper.get("[data-content-toolbar-summary]").attributes("aria-expanded")).toBe("false");

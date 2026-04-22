@@ -30,7 +30,7 @@ watch(
 const hasDraftKeyword = computed(() => draftKeyword.value.trim().length > 0);
 const rootClass = computed(() =>
   props.compact
-    ? "flex w-full items-center gap-2 rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-2 py-2 shadow-none sm:rounded-editorial-lg sm:px-3 sm:py-3 sm:shadow-editorial-card lg:py-2 lg:shadow-none"
+    ? "flex w-full items-center gap-2 rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-2 py-2 shadow-none lg:rounded-editorial-lg lg:px-3"
     : "flex items-center gap-2"
 );
 const inputClass = computed(() => (props.compact ? "min-w-0 flex-1" : undefined));

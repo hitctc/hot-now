@@ -27,6 +27,11 @@ describe("report pages", () => {
     expect(response.body).toContain(".login-stage {");
     expect(response.body).toContain(".login-shell {");
     expect(response.body).toContain(".login-page {");
+    expect(response.body).toContain("/* 移动端登录先展示表单，品牌说明退到下方，避免用户为了找输入框先滑完整个 hero。 */");
+    expect(response.body).toContain("  .login-card {\n    order: 1;");
+    expect(response.body).toContain("  .login-stage {\n    order: 2;");
+    expect(response.body).toContain("  .login-stage__highlights {\n    display: none;");
+    expect(response.body).toContain("  .login-page {\n    padding: 10px;");
     expect(response.body).toContain(".mobile-top-nav {");
     expect(response.body).toContain(".shell-sidebar .nav-group {");
     expect(response.body).toContain(".shell-main {");

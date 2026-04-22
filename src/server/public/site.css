@@ -1918,6 +1918,87 @@ code {
 }
 
 @media (max-width: 900px) {
+  .login-page {
+    align-items: flex-start;
+    padding: 14px;
+  }
+
+  .login-shell {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    align-content: start;
+  }
+
+  /* 移动端登录先展示表单，品牌说明退到下方，避免用户为了找输入框先滑完整个 hero。 */
+  .login-card {
+    order: 1;
+    justify-content: flex-start;
+    border-radius: 24px;
+    padding: 22px;
+  }
+
+  .login-stage {
+    order: 2;
+    min-height: auto;
+    justify-content: flex-start;
+    border-radius: 24px;
+    padding: 18px;
+  }
+
+  .login-stage__halo {
+    inset: -64px -44px auto auto;
+    width: 180px;
+    height: 180px;
+    opacity: 0.64;
+  }
+
+  .login-stage__brandlock {
+    gap: 12px;
+  }
+
+  .login-stage__logo {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+  }
+
+  .login-stage__title {
+    font-size: 22px;
+  }
+
+  .login-stage h1 {
+    max-width: none;
+    margin-top: 16px;
+    font-size: clamp(30px, 11vw, 40px);
+    line-height: 1;
+  }
+
+  .login-stage .login-subtitle {
+    margin-top: 12px;
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  .login-stage__highlights {
+    display: none;
+  }
+
+  .login-card h2 {
+    font-size: 30px;
+  }
+
+  .login-card__summary {
+    margin-bottom: 18px;
+  }
+
+  .field-input {
+    min-height: 48px;
+  }
+
+  .primary-button {
+    min-height: 44px;
+  }
+
   .mobile-top-nav {
     position: sticky;
     top: 0;
@@ -2276,6 +2357,24 @@ code {
   .placeholder-card,
   .login-card {
     padding: 13px;
+  }
+
+  .login-page {
+    padding: 10px;
+  }
+
+  .login-card {
+    padding: 18px;
+    border-radius: 22px;
+  }
+
+  .login-stage {
+    padding: 14px;
+    border-radius: 22px;
+  }
+
+  .login-card h2 {
+    font-size: 28px;
   }
 
   .system-section {

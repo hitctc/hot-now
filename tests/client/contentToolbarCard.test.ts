@@ -40,8 +40,7 @@ describe("ContentToolbarCard", () => {
     );
     expect(wrapper.findAll("[data-content-toolbar-main-row]").length).toBe(1);
     const mainRow = wrapper.get("[data-content-toolbar-main-row]");
-    expect(wrapper.find("[data-content-toolbar-stage]").exists()).toBe(true);
-    expect(wrapper.get("[data-content-toolbar-stage]").classes()).toEqual(expect.arrayContaining(["hidden", "sm:flex"]));
+    expect(wrapper.find("[data-content-toolbar-stage]").exists()).toBe(false);
     expect(mainRow.find("[data-content-toolbar-summary]").exists()).toBe(true);
     expect(mainRow.find("[data-content-sort-control]").exists()).toBe(true);
     expect(mainRow.find("[data-content-search-control]").exists()).toBe(true);

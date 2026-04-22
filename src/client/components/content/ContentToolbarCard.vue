@@ -92,13 +92,7 @@ function handleClear(): void {
       class="flex flex-col gap-2 sm:gap-3 lg:flex-row lg:items-center lg:justify-between"
       data-content-toolbar-main-row
     >
-      <div class="flex min-w-0 flex-1 flex-col gap-2 lg:flex-row lg:items-center lg:gap-3">
-        <div class="hidden flex-wrap items-center gap-2 sm:flex" data-content-toolbar-stage>
-          <span class="rounded-editorial-pill border border-editorial-border bg-editorial-panel/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-editorial-text-muted">
-            Content Command
-          </span>
-          <span class="text-xs leading-6 text-editorial-text-muted lg:hidden 2xl:inline">来源、排序与标题搜索共用同一组浏览上下文。</span>
-        </div>
+      <div class="flex min-w-0 flex-1 flex-col gap-2 lg:flex-row lg:items-center">
         <div class="flex min-w-0 items-center gap-2 sm:flex-wrap sm:items-start lg:flex-1 lg:flex-nowrap lg:items-center">
           <button
             type="button"

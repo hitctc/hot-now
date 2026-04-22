@@ -84,6 +84,47 @@ describe("vite client config", () => {
     expect(createClientViteConfig({ command: "build" }).base).toBe(CLIENT_ASSET_BASE);
   });
 
+  it("proxies backend shell routes and shared static assets during local client development", () => {
+    const serveConfig = createClientViteConfig({ command: "serve" });
+    const proxy = serveConfig.server?.proxy as Record<string, { target?: string; changeOrigin?: boolean }> | undefined;
+
+    // 登录页这类后端 HTML 会引用 /assets 下的共享样式，本地只开 Vite 端口时也必须一起代理。
+    expect(proxy).toMatchObject({
+      "/api": {
+        target: "http://127.0.0.1:3030",
+        changeOrigin: true
+      },
+      "/actions": {
+        target: "http://127.0.0.1:3030",
+        changeOrigin: true
+      },
+      "/assets": {
+        target: "http://127.0.0.1:3030",
+        changeOrigin: true
+      },
+      "/brand": {
+        target: "http://127.0.0.1:3030",
+        changeOrigin: true
+      },
+      "/favicon.ico": {
+        target: "http://127.0.0.1:3030",
+        changeOrigin: true
+      },
+      "/health": {
+        target: "http://127.0.0.1:3030",
+        changeOrigin: true
+      },
+      "/login": {
+        target: "http://127.0.0.1:3030",
+        changeOrigin: true
+      },
+      "/logout": {
+        target: "http://127.0.0.1:3030",
+        changeOrigin: true
+      }
+    });
+  });
+
   it("splits core vendors into dedicated chunks instead of leaving everything in the entry bundle", () => {
     const viteConfig = createClientViteConfig({ command: "build" });
     const manualChunks = viteConfig.build?.rollupOptions?.output

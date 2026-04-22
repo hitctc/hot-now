@@ -82,6 +82,10 @@ export function createClientViteConfig(options: { command: "serve" | "build" }):
           target: "http://127.0.0.1:3030",
           changeOrigin: true
         },
+        "/assets": {
+          target: "http://127.0.0.1:3030",
+          changeOrigin: true
+        },
         "/health": {
           target: "http://127.0.0.1:3030",
           changeOrigin: true

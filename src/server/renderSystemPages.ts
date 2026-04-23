@@ -80,6 +80,7 @@ export type SourcesSettingsOperationsView = {
   canTriggerManualTwitterCollect: boolean;
   canTriggerManualTwitterKeywordCollect: boolean;
   canTriggerManualHackerNewsCollect?: boolean;
+  canTriggerManualBilibiliCollect?: boolean;
   canTriggerManualSendLatestEmail: boolean;
   isRunning: boolean;
   lastCollectionRunAt: string | null;
@@ -96,6 +97,8 @@ export type SourcesCapabilityView = {
   twitterKeywordSearchMessage?: string;
   hackerNewsSearchEnabled?: boolean;
   hackerNewsSearchMessage?: string;
+  bilibiliSearchEnabled?: boolean;
+  bilibiliSearchMessage?: string;
 };
 
 export type TwitterAccountSettingsView = {
@@ -143,11 +146,25 @@ export type HackerNewsQuerySettingsView = {
   updatedAt: string;
 };
 
+export type BilibiliQuerySettingsView = {
+  id: number;
+  query: string;
+  priority: number;
+  isEnabled: boolean;
+  notes: string | null;
+  lastFetchedAt: string | null;
+  lastSuccessAt: string | null;
+  lastResult: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type SourcesSettingsView = {
   sources: SourceItem[];
   twitterAccounts?: TwitterAccountSettingsView[];
   twitterSearchKeywords?: TwitterSearchKeywordSettingsView[];
   hackerNewsQueries?: HackerNewsQuerySettingsView[];
+  bilibiliQueries?: BilibiliQuerySettingsView[];
   operations: SourcesSettingsOperationsView;
   capability: SourcesCapabilityView;
 };

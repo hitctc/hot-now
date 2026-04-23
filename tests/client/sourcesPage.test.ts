@@ -23,20 +23,25 @@ vi.mock("../../src/client/services/settingsApi", async () => {
     deleteSource: vi.fn(),
     toggleSource: vi.fn(),
     updateSourceDisplayMode: vi.fn(),
+    createBilibiliQuery: vi.fn(),
     createHackerNewsQuery: vi.fn(),
     createTwitterAccount: vi.fn(),
     createTwitterSearchKeyword: vi.fn(),
     updateHackerNewsQuery: vi.fn(),
+    updateBilibiliQuery: vi.fn(),
     updateTwitterAccount: vi.fn(),
     updateTwitterSearchKeyword: vi.fn(),
     deleteHackerNewsQuery: vi.fn(),
+    deleteBilibiliQuery: vi.fn(),
     deleteTwitterAccount: vi.fn(),
     deleteTwitterSearchKeyword: vi.fn(),
     toggleHackerNewsQuery: vi.fn(),
+    toggleBilibiliQuery: vi.fn(),
     toggleTwitterAccount: vi.fn(),
     toggleTwitterSearchKeywordCollect: vi.fn(),
     toggleTwitterSearchKeywordVisible: vi.fn(),
     triggerManualCollect: vi.fn(),
+    triggerManualBilibiliCollect: vi.fn(),
     triggerManualHackerNewsCollect: vi.fn(),
     triggerManualTwitterCollect: vi.fn(),
     triggerManualTwitterKeywordCollect: vi.fn(),
@@ -50,7 +55,9 @@ function mountSourcesPage() {
   const wrapper = mountWithApp(SourcesPage, {
     global: {
       stubs: {
-        teleport: false
+        teleport: false,
+        transition: true,
+        "transition-group": true
       }
     }
   });
@@ -152,6 +159,20 @@ function createSourcesModel() {
         updatedAt: "2026-04-23T08:21:00.000Z"
       }
     ],
+    bilibiliQueries: [
+      {
+        id: 31,
+        query: "openai",
+        priority: 75,
+        isEnabled: true,
+        notes: "video query",
+        lastFetchedAt: "2026-04-23T08:30:00.000Z",
+        lastSuccessAt: "2026-04-23T08:31:00.000Z",
+        lastResult: "本次搜索成功，获得 2 条候选视频。",
+        createdAt: "2026-04-23T07:00:00.000Z",
+        updatedAt: "2026-04-23T08:31:00.000Z"
+      }
+    ],
     operations: {
       lastCollectionRunAt: "2026-03-31T08:10:00.000Z",
       lastSendLatestEmailAt: "2026-03-31T08:30:00.000Z",
@@ -160,6 +181,7 @@ function createSourcesModel() {
       canTriggerManualTwitterCollect: true,
       canTriggerManualTwitterKeywordCollect: true,
       canTriggerManualHackerNewsCollect: true,
+      canTriggerManualBilibiliCollect: true,
       canTriggerManualSendLatestEmail: true,
       isRunning: false
     },
@@ -171,7 +193,9 @@ function createSourcesModel() {
       twitterKeywordSearchEnabled: true,
       twitterKeywordSearchMessage: "Twitter 关键词搜索已配置 API key，仅支持手动采集。",
       hackerNewsSearchEnabled: true,
-      hackerNewsSearchMessage: "Hacker News 搜索已就绪，可维护 query 并手动采集。"
+      hackerNewsSearchMessage: "Hacker News 搜索已就绪，可维护 query 并手动采集。",
+      bilibiliSearchEnabled: true,
+      bilibiliSearchMessage: "B 站搜索已就绪，可维护 query 并手动采集。"
     }
   } satisfies settingsApi.SettingsSourcesResponse;
 }
@@ -256,6 +280,10 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-sources-section='hackernews']").text()).toContain("openai");
     expect(wrapper.get("[data-sources-section='hackernews']").text()).toContain("Hacker News 搜索已就绪");
     expect(wrapper.get("[data-sources-section='hackernews']").text()).toContain("手动采集 Hacker News");
+    expect(wrapper.get("[data-sources-section='bilibili']").text()).toContain("B 站搜索");
+    expect(wrapper.get("[data-sources-section='bilibili']").text()).toContain("openai");
+    expect(wrapper.get("[data-sources-section='bilibili']").text()).toContain("B 站搜索已就绪");
+    expect(wrapper.get("[data-sources-section='bilibili']").text()).toContain("手动采集 B 站搜索");
     expect(wrapper.get("[data-sources-section='inventory']").classes()).toContain("editorial-glass-panel");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("已完成");
     expect(wrapper.get("[data-sources-section='inventory']").text()).not.toContain("选中时全量");
@@ -406,6 +434,31 @@ describe("SourcesPage", () => {
     expect(wrapper.text()).toContain("Hacker News 搜索已完成：处理 1 个 query，新入库 1 条，复用 1 条，失败 0 个。");
   });
 
+  it("starts bilibili collection and shows the persisted count summary", async () => {
+    vi.mocked(settingsApi.readSettingsSources)
+      .mockResolvedValueOnce(createSourcesModel())
+      .mockResolvedValueOnce(createSourcesModel());
+    vi.mocked(settingsApi.triggerManualBilibiliCollect).mockResolvedValue({
+      accepted: true,
+      action: "collect-bilibili",
+      enabledQueryCount: 1,
+      processedQueryCount: 1,
+      fetchedVideoCount: 2,
+      persistedContentItemCount: 1,
+      reusedContentItemCount: 1,
+      failureCount: 0
+    });
+
+    const wrapper = mountSourcesPage();
+
+    await flushPromises();
+    await wrapper.get("[data-action='manual-bilibili-collect']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.triggerManualBilibiliCollect).toHaveBeenCalledTimes(1);
+    expect(wrapper.text()).toContain("B 站搜索已完成：处理 1 个 query，新入库 1 条，复用 1 条，失败 0 个。");
+  });
+
   it("updates source display mode and reloads the latest sources model", async () => {
     vi.mocked(settingsApi.readSettingsSources)
       .mockResolvedValueOnce(createSourcesModel())
@@ -478,6 +531,30 @@ describe("SourcesPage", () => {
     expect(wrapper.text()).toContain("已停用 Hacker News query");
   });
 
+  it("toggles a bilibili query and reloads the latest sources model", async () => {
+    vi.mocked(settingsApi.readSettingsSources)
+      .mockResolvedValueOnce(createSourcesModel())
+      .mockResolvedValueOnce({
+        ...createSourcesModel(),
+        bilibiliQueries: [{ ...createSourcesModel().bilibiliQueries![0], isEnabled: false }]
+      });
+    vi.mocked(settingsApi.toggleBilibiliQuery).mockResolvedValue({
+      ok: true,
+      id: 31,
+      enable: false
+    });
+
+    const wrapper = mountSourcesPage();
+
+    await flushPromises();
+    await wrapper.get("[data-bilibili-query-toggle='31']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.toggleBilibiliQuery).toHaveBeenCalledWith(31, false);
+    expect(settingsApi.readSettingsSources).toHaveBeenCalledTimes(2);
+    expect(wrapper.text()).toContain("已停用 B 站 query");
+  });
+
   it("submits a twitter account from the create modal", async () => {
     vi.mocked(settingsApi.readSettingsSources).mockResolvedValue(createSourcesModel());
     vi.mocked(settingsApi.createTwitterAccount).mockResolvedValue({
@@ -492,6 +569,7 @@ describe("SourcesPage", () => {
     await flushPromises();
 
     expect(document.body.querySelector(".ant-modal-root")).not.toBeNull();
+    expect(getModalNode("[data-twitter-account-capability]").text()).toContain("Twitter 账号采集已配置 API key");
 
     await getModalNode("[data-twitter-account-form='username']").setValue("@OpenAI");
     await getModalNode("[data-twitter-account-form='display-name']").setValue("OpenAI");
@@ -501,7 +579,6 @@ describe("SourcesPage", () => {
     await getModalNode("[data-twitter-account-form='submit']").trigger("click");
     await flushPromises();
 
-    expect(getModalNode("[data-twitter-account-capability]").text()).toContain("Twitter 账号采集已配置 API key");
     expect(settingsApi.createTwitterAccount).toHaveBeenCalledWith(
       expect.objectContaining({
         username: "@OpenAI",
@@ -561,6 +638,7 @@ describe("SourcesPage", () => {
 
     await wrapper.get("[data-action='add-hackernews-query']").trigger("click");
     await flushPromises();
+    expect(getModalNode("[data-hackernews-query-capability]").text()).toContain("Hacker News 搜索已就绪");
 
     await getModalNode("[data-hackernews-query-form='query']").setValue("anthropic");
     await getModalNode("[data-hackernews-query-form='priority']").setValue("75");
@@ -568,7 +646,6 @@ describe("SourcesPage", () => {
     await getModalNode("[data-hackernews-query-form='submit']").trigger("click");
     await flushPromises();
 
-    expect(getModalNode("[data-hackernews-query-capability]").text()).toContain("Hacker News 搜索已就绪");
     expect(settingsApi.createHackerNewsQuery).toHaveBeenCalledWith(
       expect.objectContaining({
         query: "anthropic",
@@ -611,6 +688,68 @@ describe("SourcesPage", () => {
     );
   });
 
+  it("submits a bilibili query from the create modal", async () => {
+    vi.mocked(settingsApi.readSettingsSources).mockResolvedValue(createSourcesModel());
+    vi.mocked(settingsApi.createBilibiliQuery).mockResolvedValue({
+      ok: true,
+      query: createSourcesModel().bilibiliQueries![0]
+    });
+
+    const wrapper = mountSourcesPage();
+    await flushPromises();
+
+    await wrapper.get("[data-action='add-bilibili-query']").trigger("click");
+    await flushPromises();
+    expect(getModalNode("[data-bilibili-query-capability]").text()).toContain("B 站搜索已就绪");
+
+    await getModalNode("[data-bilibili-query-form='query']").setValue("anthropic");
+    await getModalNode("[data-bilibili-query-form='priority']").setValue("75");
+    await getModalNode("[data-bilibili-query-form='notes']").setValue("video query");
+    await getModalNode("[data-bilibili-query-form='submit']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.createBilibiliQuery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: "anthropic",
+        priority: 75,
+        isEnabled: true,
+        notes: "video query"
+      })
+    );
+  });
+
+  it("updates a bilibili query from the edit modal", async () => {
+    vi.mocked(settingsApi.readSettingsSources).mockResolvedValue(createSourcesModel());
+    vi.mocked(settingsApi.updateBilibiliQuery).mockResolvedValue({
+      ok: true,
+      query: {
+        ...createSourcesModel().bilibiliQueries![0],
+        query: "openai api"
+      }
+    });
+
+    const wrapper = mountSourcesPage();
+    await flushPromises();
+
+    await wrapper.get("[data-bilibili-query-edit='31']").trigger("click");
+    await flushPromises();
+
+    await getModalNode("[data-bilibili-query-form='query']").setValue("openai api");
+    await getModalNode("[data-bilibili-query-form='is-enabled']").setValue(false);
+    await getModalNode("[data-bilibili-query-form='submit']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.updateBilibiliQuery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 31,
+        query: "openai api",
+        priority: 75,
+        isEnabled: false,
+        notes: "video query"
+      })
+    );
+  });
+
   it("submits a wechat source from the simplified modal", async () => {
     vi.mocked(settingsApi.readSettingsSources).mockResolvedValue(createSourcesModel());
     vi.mocked(settingsApi.createSource).mockResolvedValue({ ok: true, kind: "wechat_demo" });
@@ -647,13 +786,13 @@ describe("SourcesPage", () => {
 
     await wrapper.get("[data-action='add-source']").trigger("click");
     await flushPromises();
+    expect(getModalNode("[data-source-modal-intro]").text()).toContain("这里只收用户输入");
 
     await getModalNode("[data-source-type='rss']").trigger("click");
     await getModalNode("[data-source-form='rss-url']").setValue("https://example.com/feed.xml");
     await getModalNode("[data-source-form='submit']").trigger("click");
     await flushPromises();
 
-    expect(getModalNode("[data-source-modal-intro]").text()).toContain("这里只收用户输入");
     expect(settingsApi.createSource).toHaveBeenCalledWith(
       expect.objectContaining({
         sourceType: "rss",

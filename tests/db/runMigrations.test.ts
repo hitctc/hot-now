@@ -16,6 +16,7 @@ const expectedTables = [
   "content_sources",
   "digest_reports",
   "feedback_pool",
+  "bilibili_queries",
   "hackernews_queries",
   "llm_provider_settings",
   "nl_evaluation_runs",
@@ -69,7 +70,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(10);
+    expect(schemaVersion).toBe(11);
 
     const appliedMigrations = db
       .prepare(
@@ -91,7 +92,8 @@ describe("runMigrations", () => {
       { version: 7, name: "007_source_bridge_metadata" },
       { version: 8, name: "008_twitter_accounts" },
       { version: 9, name: "009_twitter_search_keywords" },
-      { version: 10, name: "010_hackernews_queries" }
+      { version: 10, name: "010_hackernews_queries" },
+      { version: 11, name: "011_bilibili_queries" }
     ]);
 
     const digestReportColumns = db
@@ -220,6 +222,29 @@ describe("runMigrations", () => {
       ])
     );
 
+    const bilibiliQueryColumns = db
+      .prepare(
+        `
+          PRAGMA table_info(bilibili_queries)
+        `
+      )
+      .all() as Array<{ name: string }>;
+
+    expect(bilibiliQueryColumns.map((column) => column.name)).toEqual(
+      expect.arrayContaining([
+        "id",
+        "query",
+        "priority",
+        "is_enabled",
+        "notes",
+        "last_fetched_at",
+        "last_success_at",
+        "last_result",
+        "created_at",
+        "updated_at"
+      ])
+    );
+
     const providerSettingsColumns = db
       .prepare(
         `
@@ -281,6 +306,14 @@ describe("runMigrations", () => {
           is_enabled: 0,
           show_all_when_selected: 0,
           source_type: "hackernews_aggregate",
+          bridge_kind: null,
+          bridge_config_json: null
+        },
+        {
+          kind: "bilibili_search",
+          is_enabled: 0,
+          show_all_when_selected: 0,
+          source_type: "bilibili_search_aggregate",
           bridge_kind: null,
           bridge_config_json: null
         }

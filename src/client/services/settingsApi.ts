@@ -118,6 +118,7 @@ export type SettingsSourcesOperations = {
   canTriggerManualTwitterCollect: boolean;
   canTriggerManualTwitterKeywordCollect: boolean;
   canTriggerManualHackerNewsCollect?: boolean;
+  canTriggerManualBilibiliCollect?: boolean;
   canTriggerManualSendLatestEmail: boolean;
   isRunning: boolean;
 };
@@ -131,6 +132,8 @@ export type SettingsSourcesCapability = {
   twitterKeywordSearchMessage?: string;
   hackerNewsSearchEnabled?: boolean;
   hackerNewsSearchMessage?: string;
+  bilibiliSearchEnabled?: boolean;
+  bilibiliSearchMessage?: string;
 };
 
 export type SettingsTwitterAccount = {
@@ -178,11 +181,25 @@ export type SettingsHackerNewsQuery = {
   updatedAt: string;
 };
 
+export type SettingsBilibiliQuery = {
+  id: number;
+  query: string;
+  priority: number;
+  isEnabled: boolean;
+  notes: string | null;
+  lastFetchedAt: string | null;
+  lastSuccessAt: string | null;
+  lastResult: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type SettingsSourcesResponse = {
   sources: SettingsSourceItem[];
   twitterAccounts?: SettingsTwitterAccount[];
   twitterSearchKeywords?: SettingsTwitterSearchKeyword[];
   hackerNewsQueries?: SettingsHackerNewsQuery[];
+  bilibiliQueries?: SettingsBilibiliQuery[];
   operations: SettingsSourcesOperations;
   capability: SettingsSourcesCapability;
 };
@@ -307,6 +324,19 @@ export type SaveHackerNewsQueryResponse = {
   query: SettingsHackerNewsQuery;
 };
 
+export type SaveBilibiliQueryPayload = {
+  id?: number;
+  query: string;
+  priority?: number | null;
+  isEnabled?: boolean | null;
+  notes?: string | null;
+};
+
+export type SaveBilibiliQueryResponse = {
+  ok: true;
+  query: SettingsBilibiliQuery;
+};
+
 export type DeleteTwitterSearchKeywordResponse = {
   ok: true;
   id: number;
@@ -324,6 +354,17 @@ export type DeleteHackerNewsQueryResponse = {
 };
 
 export type ToggleHackerNewsQueryResponse = {
+  ok: true;
+  id: number;
+  enable: boolean;
+};
+
+export type DeleteBilibiliQueryResponse = {
+  ok: true;
+  id: number;
+};
+
+export type ToggleBilibiliQueryResponse = {
   ok: true;
   id: number;
   enable: boolean;
@@ -390,6 +431,22 @@ export type ManualHackerNewsCollectResponse =
   | {
       accepted: false;
       reason?: "no-enabled-hackernews-queries" | "already-running";
+    };
+
+export type ManualBilibiliCollectResponse =
+  | {
+      accepted: true;
+      action: "collect-bilibili";
+      enabledQueryCount: number;
+      processedQueryCount: number;
+      fetchedVideoCount: number;
+      persistedContentItemCount: number;
+      reusedContentItemCount: number;
+      failureCount: number;
+    }
+  | {
+      accepted: false;
+      reason?: "no-enabled-bilibili-queries" | "already-running";
     };
 
 export type ManualSendLatestEmailResponse = {
@@ -572,6 +629,22 @@ export function toggleHackerNewsQuery(id: number, enable: boolean): Promise<Togg
   return postSettingsAction<ToggleHackerNewsQueryResponse>("/actions/hackernews/toggle", { id, enable });
 }
 
+export function createBilibiliQuery(payload: SaveBilibiliQueryPayload): Promise<SaveBilibiliQueryResponse> {
+  return postSettingsAction<SaveBilibiliQueryResponse>("/actions/bilibili/create", payload);
+}
+
+export function updateBilibiliQuery(payload: SaveBilibiliQueryPayload): Promise<SaveBilibiliQueryResponse> {
+  return postSettingsAction<SaveBilibiliQueryResponse>("/actions/bilibili/update", payload);
+}
+
+export function deleteBilibiliQuery(id: number): Promise<DeleteBilibiliQueryResponse> {
+  return postSettingsAction<DeleteBilibiliQueryResponse>("/actions/bilibili/delete", { id });
+}
+
+export function toggleBilibiliQuery(id: number, enable: boolean): Promise<ToggleBilibiliQueryResponse> {
+  return postSettingsAction<ToggleBilibiliQueryResponse>("/actions/bilibili/toggle", { id, enable });
+}
+
 // 手动采集走独立动作接口，保持和旧系统页一致的任务语义。
 export function triggerManualCollect(): Promise<ManualCollectResponse> {
   return postSettingsAction<ManualCollectResponse>("/actions/collect", {});
@@ -590,6 +663,11 @@ export function triggerManualTwitterKeywordCollect(): Promise<ManualTwitterKeywo
 // Hacker News 搜索保持独立手动入口，避免默认采集链路无意扩大范围。
 export function triggerManualHackerNewsCollect(): Promise<ManualHackerNewsCollectResponse> {
   return postSettingsAction<ManualHackerNewsCollectResponse>("/actions/hackernews/collect", {});
+}
+
+// B 站搜索和 HN 一样保持独立手动入口，避免默认采集链路无意扩大到视频搜索。
+export function triggerManualBilibiliCollect(): Promise<ManualBilibiliCollectResponse> {
+  return postSettingsAction<ManualBilibiliCollectResponse>("/actions/bilibili/collect", {});
 }
 
 // 手动发送最新报告沿用现有后端接口，错误原因由调用方再翻译成用户提示。

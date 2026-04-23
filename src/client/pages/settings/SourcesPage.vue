@@ -9,37 +9,45 @@ import {
 } from "../../components/content/contentCardShared";
 import { HttpError } from "../../services/http";
 import {
+  createBilibiliQuery,
   createHackerNewsQuery,
   createTwitterAccount,
   createTwitterSearchKeyword,
   createSource,
+  deleteBilibiliQuery,
   deleteHackerNewsQuery,
   deleteTwitterAccount,
   deleteTwitterSearchKeyword,
   deleteSource,
   readSettingsSources,
+  toggleBilibiliQuery,
   toggleHackerNewsQuery,
   toggleTwitterAccount,
   toggleTwitterSearchKeywordCollect,
   toggleTwitterSearchKeywordVisible,
   toggleSource,
+  triggerManualBilibiliCollect,
   triggerManualHackerNewsCollect,
   triggerManualTwitterCollect,
   triggerManualTwitterKeywordCollect,
   updateTwitterAccount,
   updateTwitterSearchKeyword,
+  updateBilibiliQuery,
   updateHackerNewsQuery,
   updateSource,
   updateSourceDisplayMode,
   triggerManualCollect,
   triggerManualSendLatestEmail,
+  type ManualBilibiliCollectResponse,
   type ManualHackerNewsCollectResponse,
   type ManualCollectResponse,
   type ManualTwitterCollectResponse,
   type ManualTwitterKeywordCollectResponse,
   type ManualSendLatestEmailResponse,
+  type SaveBilibiliQueryPayload,
   type SaveHackerNewsQueryPayload,
   type SaveSourcePayload,
+  type SettingsBilibiliQuery,
   type SettingsHackerNewsQuery,
   type SettingsSourceItem,
   type SettingsSourcesResponse,
@@ -55,6 +63,7 @@ type SourceModalMode = "create" | "update";
 type TwitterAccountModalMode = "create" | "update";
 type TwitterKeywordModalMode = "create" | "update";
 type HackerNewsQueryModalMode = "create" | "update";
+type BilibiliQueryModalMode = "create" | "update";
 type SourceFormState = {
   kind: string;
   sourceType: "rss" | "wechat_bridge";
@@ -81,6 +90,13 @@ type TwitterKeywordFormState = {
   notes: string;
 };
 type HackerNewsQueryFormState = {
+  id: number | null;
+  query: string;
+  priority: number;
+  isEnabled: boolean;
+  notes: string;
+};
+type BilibiliQueryFormState = {
   id: number | null;
   query: string;
   priority: number;
@@ -134,6 +150,14 @@ const hackerNewsQueryColumns = [
   { title: "最近结果", key: "lastResult", align: "center" as const },
   { title: "操作", key: "actions", align: "center" as const }
 ];
+const bilibiliQueryColumns = [
+  { title: "查询词", key: "query", align: "center" as const },
+  { title: "优先级", key: "priority", align: "center" as const },
+  { title: "采集启用", key: "enabled", align: "center" as const },
+  { title: "最近成功", key: "lastSuccessAt", align: "center" as const },
+  { title: "最近结果", key: "lastResult", align: "center" as const },
+  { title: "操作", key: "actions", align: "center" as const }
+];
 const twitterAccountCategoryOptions = [
   { label: "官方厂商", value: "official_vendor" },
   { label: "产品账号", value: "product" },
@@ -160,18 +184,22 @@ const isSourceModalOpen = ref(false);
 const isTwitterAccountModalOpen = ref(false);
 const isTwitterKeywordModalOpen = ref(false);
 const isHackerNewsQueryModalOpen = ref(false);
+const isBilibiliQueryModalOpen = ref(false);
 const sourceModalMode = ref<SourceModalMode>("create");
 const twitterAccountModalMode = ref<TwitterAccountModalMode>("create");
 const twitterKeywordModalMode = ref<TwitterKeywordModalMode>("create");
 const hackerNewsQueryModalMode = ref<HackerNewsQueryModalMode>("create");
+const bilibiliQueryModalMode = ref<BilibiliQueryModalMode>("create");
 const sourceFormError = ref<string | null>(null);
 const twitterAccountFormError = ref<string | null>(null);
 const twitterKeywordFormError = ref<string | null>(null);
 const hackerNewsQueryFormError = ref<string | null>(null);
+const bilibiliQueryFormError = ref<string | null>(null);
 const sourceForm = reactive<SourceFormState>(createEmptySourceForm());
 const twitterAccountForm = reactive<TwitterAccountFormState>(createEmptyTwitterAccountForm());
 const twitterKeywordForm = reactive<TwitterKeywordFormState>(createEmptyTwitterKeywordForm());
 const hackerNewsQueryForm = reactive<HackerNewsQueryFormState>(createEmptyHackerNewsQueryForm());
+const bilibiliQueryForm = reactive<BilibiliQueryFormState>(createEmptyBilibiliQueryForm());
 const relativeNow = ref(Date.now());
 let nextCollectionTimer: number | null = null;
 
@@ -193,6 +221,10 @@ const enabledTwitterKeywordVisibleCount = computed(
 const totalHackerNewsQueryCount = computed(() => sourcesModel.value?.hackerNewsQueries?.length ?? 0);
 const enabledHackerNewsQueryCount = computed(
   () => sourcesModel.value?.hackerNewsQueries?.filter((query) => query.isEnabled).length ?? 0
+);
+const totalBilibiliQueryCount = computed(() => sourcesModel.value?.bilibiliQueries?.length ?? 0);
+const enabledBilibiliQueryCount = computed(
+  () => sourcesModel.value?.bilibiliQueries?.filter((query) => query.isEnabled).length ?? 0
 );
 const wechatArticleUrlAvailable = computed(
   () => sourcesModel.value?.capability.wechatArticleUrlEnabled ?? false
@@ -216,6 +248,11 @@ const hackerNewsCollectionMessage = computed(
   () =>
     sourcesModel.value?.capability.hackerNewsSearchMessage ??
     "Hacker News 搜索已就绪，可维护 query 并手动采集。"
+);
+const bilibiliCollectionMessage = computed(
+  () =>
+    sourcesModel.value?.capability.bilibiliSearchMessage ??
+    "B 站搜索已就绪，可维护 query 并手动采集。"
 );
 
 // 页面提示统一通过一层 notice 管理，操作后同时保留页内 Alert 和全局 toast。
@@ -316,6 +353,21 @@ function resetHackerNewsQueryForm(): void {
   hackerNewsQueryFormError.value = null;
 }
 
+function createEmptyBilibiliQueryForm(): BilibiliQueryFormState {
+  return {
+    id: null,
+    query: "",
+    priority: 60,
+    isEnabled: true,
+    notes: ""
+  };
+}
+
+function resetBilibiliQueryForm(): void {
+  Object.assign(bilibiliQueryForm, createEmptyBilibiliQueryForm());
+  bilibiliQueryFormError.value = null;
+}
+
 // 新增模式只需要清空表单并打开弹窗，不再引入额外的临时草稿状态。
 function openCreateSourceModal(): void {
   sourceModalMode.value = "create";
@@ -339,6 +391,12 @@ function openCreateHackerNewsQueryModal(): void {
   hackerNewsQueryModalMode.value = "create";
   resetHackerNewsQueryForm();
   isHackerNewsQueryModalOpen.value = true;
+}
+
+function openCreateBilibiliQueryModal(): void {
+  bilibiliQueryModalMode.value = "create";
+  resetBilibiliQueryForm();
+  isBilibiliQueryModalOpen.value = true;
 }
 
 // 编辑模式只回填当前来源已有配置，kind 继续锁定，避免把“编辑”做成“重命名来源主键”。
@@ -395,6 +453,17 @@ function openEditHackerNewsQueryModal(query: SettingsHackerNewsQuery): void {
   isHackerNewsQueryModalOpen.value = true;
 }
 
+function openEditBilibiliQueryModal(query: SettingsBilibiliQuery): void {
+  bilibiliQueryModalMode.value = "update";
+  resetBilibiliQueryForm();
+  bilibiliQueryForm.id = query.id;
+  bilibiliQueryForm.query = query.query;
+  bilibiliQueryForm.priority = query.priority;
+  bilibiliQueryForm.isEnabled = query.isEnabled;
+  bilibiliQueryForm.notes = query.notes ?? "";
+  isBilibiliQueryModalOpen.value = true;
+}
+
 // 关闭弹窗时顺手清掉局部错误，避免旧的公众号解析失败提示粘在下一次操作里。
 function closeSourceModal(): void {
   isSourceModalOpen.value = false;
@@ -414,6 +483,11 @@ function closeTwitterKeywordModal(): void {
 function closeHackerNewsQueryModal(): void {
   isHackerNewsQueryModalOpen.value = false;
   hackerNewsQueryFormError.value = null;
+}
+
+function closeBilibiliQueryModal(): void {
+  isBilibiliQueryModalOpen.value = false;
+  bilibiliQueryFormError.value = null;
 }
 
 // 类型切换只负责收口当前可见字段，真正的 payload 仍由提交时统一构建。
@@ -698,6 +772,29 @@ function buildHackerNewsQuerySavePayload(): { ok: true; payload: SaveHackerNewsQ
   };
 }
 
+function buildBilibiliQuerySavePayload(): { ok: true; payload: SaveBilibiliQueryPayload } | { ok: false; message: string } {
+  const query = bilibiliQueryForm.query.trim();
+
+  if (!query) {
+    return { ok: false, message: "请填写 B 站查询词。" };
+  }
+
+  if (!Number.isInteger(bilibiliQueryForm.priority) || bilibiliQueryForm.priority < 0 || bilibiliQueryForm.priority > 100) {
+    return { ok: false, message: "优先级需要是 0 到 100 之间的整数。" };
+  }
+
+  return {
+    ok: true,
+    payload: {
+      ...(bilibiliQueryModalMode.value === "update" && bilibiliQueryForm.id ? { id: bilibiliQueryForm.id } : {}),
+      query,
+      priority: bilibiliQueryForm.priority,
+      isEnabled: bilibiliQueryForm.isEnabled,
+      notes: bilibiliQueryForm.notes.trim() || null
+    }
+  };
+}
+
 // 数据加载区分首屏和静默刷新，切换 source 时不需要把整页退回骨架屏。
 async function loadSources(options: { silent?: boolean } = {}): Promise<boolean> {
   if (options.silent) {
@@ -857,6 +954,22 @@ async function handleManualHackerNewsCollect(): Promise<void> {
     reasonMessages: {
       "already-running": "当前已有任务执行中，请稍后再试。",
       "no-enabled-hackernews-queries": "当前没有启用中的 Hacker News query，请先启用至少一个 query。",
+      unauthorized: "请先登录后再操作。"
+    }
+  });
+}
+
+// B 站第一版也只保留手动采集，并把 query 数、入库数和复用数直接展示出来。
+async function handleManualBilibiliCollect(): Promise<void> {
+  await runSourcesAction("manual:bilibili-collect", () => triggerManualBilibiliCollect(), {
+    fallbackMessage: "B 站搜索启动失败，请稍后再试。",
+    successMessage: (result: ManualBilibiliCollectResponse) =>
+      result.accepted
+        ? `B 站搜索已完成：处理 ${result.processedQueryCount} 个 query，新入库 ${result.persistedContentItemCount} 条，复用 ${result.reusedContentItemCount} 条，失败 ${result.failureCount} 个。`
+        : "B 站搜索未成功启动。",
+    reasonMessages: {
+      "already-running": "当前已有任务执行中，请稍后再试。",
+      "no-enabled-bilibili-queries": "当前没有启用中的 B 站 query，请先启用至少一个 query。",
       unauthorized: "请先登录后再操作。"
     }
   });
@@ -1098,6 +1211,61 @@ async function handleSubmitHackerNewsQuery(): Promise<void> {
   }
 }
 
+async function handleSubmitBilibiliQuery(): Promise<void> {
+  if (isActionPending("bilibili-query:submit")) {
+    return;
+  }
+
+  const payload = buildBilibiliQuerySavePayload();
+
+  if (!payload.ok) {
+    bilibiliQueryFormError.value = payload.message;
+    return;
+  }
+
+  bilibiliQueryFormError.value = null;
+  setPendingAction("bilibili-query:submit", true);
+
+  try {
+    if (bilibiliQueryModalMode.value === "create") {
+      await createBilibiliQuery(payload.payload);
+    } else {
+      await updateBilibiliQuery(payload.payload);
+    }
+
+    const refreshed = await loadSources({ silent: true });
+    closeBilibiliQueryModal();
+    showNotice(
+      "success",
+      refreshed
+        ? bilibiliQueryModalMode.value === "create"
+          ? "已新增 B 站 query。"
+          : "已更新 B 站 query。"
+        : bilibiliQueryModalMode.value === "create"
+          ? "已新增 B 站 query，但最新数据刷新失败，请稍后手动刷新。"
+          : "已更新 B 站 query，但最新数据刷新失败，请稍后手动刷新。"
+    );
+  } catch (error) {
+    const message = readActionErrorMessage(
+      error,
+      bilibiliQueryModalMode.value === "create" ? "B 站 query 保存失败，请稍后再试。" : "B 站 query 更新失败，请稍后再试。",
+      {
+        "invalid-bilibili-query": "B 站查询词不合法，请检查后重试。",
+        "invalid-priority": "B 站 query 优先级不合法。",
+        "duplicate-query": "这个 B 站 query 已存在。",
+        "invalid-bilibili-query-payload": "B 站 query 配置不完整，请检查后重试。",
+        "bilibili-disabled": "当前环境未启用 B 站搜索。",
+        "not-found": "对应 B 站 query 不存在，可能已被移除。"
+      }
+    );
+
+    bilibiliQueryFormError.value = message;
+    showNotice("error", message);
+  } finally {
+    setPendingAction("bilibili-query:submit", false);
+  }
+}
+
 async function handleToggleTwitterAccount(account: SettingsTwitterAccount): Promise<void> {
   const nextEnable = !account.isEnabled;
 
@@ -1201,6 +1369,37 @@ async function handleDeleteHackerNewsQuery(query: SettingsHackerNewsQuery): Prom
       "invalid-hackernews-query-id": "Hacker News query ID 不合法。",
       "hackernews-disabled": "当前环境未启用 Hacker News 搜索。",
       "not-found": "对应 Hacker News query 不存在，可能已被移除。"
+    }
+  });
+}
+
+async function handleToggleBilibiliQuery(query: SettingsBilibiliQuery): Promise<void> {
+  const nextEnable = !query.isEnabled;
+
+  await runSourcesAction(
+    `bilibili-toggle:${query.id}`,
+    () => toggleBilibiliQuery(query.id, nextEnable),
+    {
+      fallbackMessage: "B 站 query 开关更新失败，请稍后再试。",
+      successMessage: nextEnable ? "已启用 B 站 query。" : "已停用 B 站 query。",
+      reasonMessages: {
+        "invalid-bilibili-query-id": "B 站 query ID 不合法。",
+        "invalid-bilibili-query-enable": "B 站 query 开关参数不合法。",
+        "bilibili-disabled": "当前环境未启用 B 站搜索。",
+        "not-found": "对应 B 站 query 不存在，可能已被移除。"
+      }
+    }
+  );
+}
+
+async function handleDeleteBilibiliQuery(query: SettingsBilibiliQuery): Promise<void> {
+  await runSourcesAction(`bilibili-delete:${query.id}`, () => deleteBilibiliQuery(query.id), {
+    fallbackMessage: "删除 B 站 query 失败，请稍后再试。",
+    successMessage: "已删除 B 站 query。",
+    reasonMessages: {
+      "invalid-bilibili-query-id": "B 站 query ID 不合法。",
+      "bilibili-disabled": "当前环境未启用 B 站搜索。",
+      "not-found": "对应 B 站 query 不存在，可能已被移除。"
     }
   });
 }
@@ -1734,6 +1933,127 @@ onUnmounted(() => {
 
         <a-card
           :class="editorialContentCardClass"
+          title="B 站搜索"
+          size="small"
+          data-sources-section="bilibili"
+        >
+          <div class="mb-4 grid gap-3 md:grid-cols-4">
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-4 py-3">
+              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">Query 总数</p>
+              <p class="mt-2 mb-0 text-lg font-medium text-editorial-text-main">{{ totalBilibiliQueryCount }}</p>
+            </article>
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-4 py-3">
+              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">采集启用</p>
+              <p class="mt-2 mb-0 text-lg font-medium text-editorial-text-main">{{ enabledBilibiliQueryCount }}</p>
+            </article>
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-4 py-3">
+              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">搜索范围</p>
+              <p class="mt-2 mb-0 text-xs leading-5 text-editorial-text-body">固定只搜视频，结果进入 AI 新讯和 AI 热点</p>
+            </article>
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-4 py-3">
+              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">API 状态</p>
+              <p class="mt-2 mb-0 text-xs leading-5 text-editorial-text-body">{{ bilibiliCollectionMessage }}</p>
+            </article>
+          </div>
+
+          <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <a-typography-paragraph class="!mb-0" type="secondary">
+              第一版只做手动搜索，固定按最近发布排序、每轮最多 5 个 query、每词最多 10 条视频结果。
+            </a-typography-paragraph>
+            <div class="flex flex-wrap gap-2">
+              <a-button data-action="add-bilibili-query" @click="openCreateBilibiliQueryModal">
+                新增 B 站 query
+              </a-button>
+              <a-button
+                type="primary"
+                data-action="manual-bilibili-collect"
+                :disabled="!sourcesModel.operations.canTriggerManualBilibiliCollect || sourcesModel.operations.isRunning"
+                :loading="isActionPending('manual:bilibili-collect')"
+                @click="handleManualBilibiliCollect"
+              >
+                {{ sourcesModel.operations.isRunning ? "任务执行中..." : "手动采集 B 站搜索" }}
+              </a-button>
+            </div>
+          </div>
+
+          <a-table
+            :data-source="sourcesModel.bilibiliQueries ?? []"
+            :columns="bilibiliQueryColumns"
+            row-key="id"
+            :pagination="false"
+            size="small"
+          >
+            <template #emptyText>
+              暂无 B 站 query
+            </template>
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'query'">
+                <a-space direction="vertical" size="small">
+                  <a-typography-text strong>{{ record.query }}</a-typography-text>
+                  <a-typography-text type="secondary" :data-bilibili-query-note="record.id">
+                    {{ record.notes || "暂无备注" }}
+                  </a-typography-text>
+                </a-space>
+              </template>
+              <template v-else-if="column.key === 'priority'">
+                {{ record.priority }}
+              </template>
+              <template v-else-if="column.key === 'enabled'">
+                <a-switch
+                  :checked="record.isEnabled"
+                  :loading="isActionPending(`bilibili-toggle:${record.id}`)"
+                  :checked-children="'启用'"
+                  :un-checked-children="'停用'"
+                  :data-bilibili-query-toggle="record.id"
+                  @change="handleToggleBilibiliQuery(record)"
+                />
+              </template>
+              <template v-else-if="column.key === 'lastSuccessAt'">
+                {{ formatDateTime(record.lastSuccessAt) }}
+              </template>
+              <template v-else-if="column.key === 'lastResult'">
+                <span
+                  class="inline-block max-w-[240px] truncate align-middle"
+                  :title="record.lastResult ?? '暂无结果'"
+                  :data-bilibili-query-result="record.id"
+                >
+                  {{ record.lastResult ?? "暂无结果" }}
+                </span>
+              </template>
+              <template v-else-if="column.key === 'actions'">
+                <div class="flex flex-wrap justify-center gap-2" :data-bilibili-query-actions="record.id">
+                  <a-button
+                    type="link"
+                    size="small"
+                    :data-bilibili-query-edit="record.id"
+                    @click="openEditBilibiliQueryModal(record)"
+                  >
+                    编辑
+                  </a-button>
+                  <a-popconfirm
+                    title="确认删除这个 B 站 query 吗？"
+                    ok-text="确认删除"
+                    cancel-text="取消"
+                    @confirm="handleDeleteBilibiliQuery(record)"
+                  >
+                    <a-button
+                      type="link"
+                      size="small"
+                      danger
+                      :loading="isActionPending(`bilibili-delete:${record.id}`)"
+                      :data-bilibili-query-delete="record.id"
+                    >
+                      删除
+                    </a-button>
+                  </a-popconfirm>
+                </div>
+              </template>
+            </template>
+          </a-table>
+        </a-card>
+
+        <a-card
+          :class="editorialContentCardClass"
           title="来源统计概览"
           size="small"
           data-sources-section="analytics"
@@ -2195,6 +2515,89 @@ onUnmounted(() => {
               @click="handleSubmitHackerNewsQuery"
             >
               {{ hackerNewsQueryModalMode === "create" ? "新增 query" : "保存更新" }}
+            </a-button>
+          </div>
+        </div>
+      </a-modal>
+
+      <a-modal
+        :open="isBilibiliQueryModalOpen"
+        :title="bilibiliQueryModalMode === 'create' ? '新增 B 站 query' : '编辑 B 站 query'"
+        :footer="null"
+        centered
+        :width="680"
+        destroy-on-close
+        @cancel="closeBilibiliQueryModal"
+      >
+        <div class="flex flex-col gap-4" data-bilibili-query-modal="bilibili-query">
+          <a-alert
+            v-if="bilibiliQueryFormError"
+            class="editorial-inline-alert editorial-inline-alert--error"
+            type="error"
+            show-icon
+            :message="bilibiliQueryFormError"
+          />
+
+          <a-alert
+            class="editorial-inline-alert editorial-inline-alert--info"
+            type="info"
+            show-icon
+            :message="bilibiliCollectionMessage"
+            data-bilibili-query-capability
+          />
+
+          <label class="flex flex-col gap-2">
+            <span class="text-sm font-medium text-editorial-text-main">查询词</span>
+            <input
+              v-model="bilibiliQueryForm.query"
+              data-bilibili-query-form="query"
+              class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
+              placeholder="例如 openai、anthropic、cursor、ai agent"
+            />
+          </label>
+
+          <label class="flex flex-col gap-2">
+            <span class="text-sm font-medium text-editorial-text-main">优先级</span>
+            <input
+              v-model.number="bilibiliQueryForm.priority"
+              data-bilibili-query-form="priority"
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
+            />
+          </label>
+
+          <label class="flex items-center gap-2 text-sm text-editorial-text-main">
+            <input
+              v-model="bilibiliQueryForm.isEnabled"
+              data-bilibili-query-form="is-enabled"
+              type="checkbox"
+              class="h-4 w-4"
+            />
+            默认启用采集
+          </label>
+
+          <label class="flex flex-col gap-2">
+            <span class="text-sm font-medium text-editorial-text-main">备注</span>
+            <textarea
+              v-model="bilibiliQueryForm.notes"
+              data-bilibili-query-form="notes"
+              rows="3"
+              class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
+            />
+          </label>
+
+          <div class="flex justify-end gap-2">
+            <a-button @click="closeBilibiliQueryModal">取消</a-button>
+            <a-button
+              type="primary"
+              data-bilibili-query-form="submit"
+              :loading="isActionPending('bilibili-query:submit')"
+              @click="handleSubmitBilibiliQuery"
+            >
+              {{ bilibiliQueryModalMode === "create" ? "新增 query" : "保存更新" }}
             </a-button>
           </div>
         </div>

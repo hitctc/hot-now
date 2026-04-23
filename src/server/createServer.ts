@@ -42,6 +42,13 @@ import type {
   SaveHackerNewsQueryResult,
   ToggleHackerNewsQueryResult
 } from "../core/hackernews/hackerNewsQueryRepository.js";
+import type {
+  BilibiliQueryRecord,
+  DeleteBilibiliQueryResult,
+  SaveBilibiliQueryInput,
+  SaveBilibiliQueryResult,
+  ToggleBilibiliQueryResult
+} from "../core/bilibili/bilibiliQueryRepository.js";
 import type { RuntimeConfig } from "../core/types/appConfig.js";
 import { readNextCollectionRunAt } from "../core/scheduler/readNextCollectionRunAt.js";
 import {
@@ -62,6 +69,7 @@ import {
   renderProfilePage,
   renderSourcesPage,
   renderViewRulesPage,
+  type BilibiliQuerySettingsView,
   type ProfileView,
   type SourcesSettingsView,
   type HackerNewsQuerySettingsView,
@@ -156,6 +164,21 @@ type ManualHackerNewsCollectResult =
   | {
       accepted: false;
       reason: "no-enabled-hackernews-queries";
+    };
+type ManualBilibiliCollectResult =
+  | {
+      accepted: true;
+      action: "collect-bilibili";
+      enabledQueryCount: number;
+      processedQueryCount: number;
+      fetchedVideoCount: number;
+      persistedContentItemCount: number;
+      reusedContentItemCount: number;
+      failureCount: number;
+    }
+  | {
+      accepted: false;
+      reason: "no-enabled-bilibili-queries";
     };
 type ManualSendLatestEmailResult =
   | { accepted: true; action: "send-latest-email" }
@@ -254,6 +277,7 @@ type ServerDeps = {
   listTwitterAccounts?: () => Promise<TwitterAccountRecord[]> | TwitterAccountRecord[];
   listTwitterSearchKeywords?: () => Promise<TwitterSearchKeywordRecord[]> | TwitterSearchKeywordRecord[];
   listHackerNewsQueries?: () => Promise<HackerNewsQueryRecord[]> | HackerNewsQueryRecord[];
+  listBilibiliQueries?: () => Promise<BilibiliQueryRecord[]> | BilibiliQueryRecord[];
   createTwitterAccount?: (
     input: SaveTwitterAccountInput
   ) => Promise<SaveTwitterAccountResult> | SaveTwitterAccountResult;
@@ -293,8 +317,20 @@ type ServerDeps = {
     id: number,
     enable: boolean
   ) => Promise<ToggleHackerNewsQueryResult> | ToggleHackerNewsQueryResult;
+  createBilibiliQuery?: (
+    input: SaveBilibiliQueryInput
+  ) => Promise<SaveBilibiliQueryResult> | SaveBilibiliQueryResult;
+  updateBilibiliQuery?: (
+    input: SaveBilibiliQueryInput
+  ) => Promise<SaveBilibiliQueryResult> | SaveBilibiliQueryResult;
+  deleteBilibiliQuery?: (id: number) => Promise<DeleteBilibiliQueryResult> | DeleteBilibiliQueryResult;
+  toggleBilibiliQuery?: (
+    id: number,
+    enable: boolean
+  ) => Promise<ToggleBilibiliQueryResult> | ToggleBilibiliQueryResult;
   hasTwitterApiKey?: boolean;
   triggerManualHackerNewsCollect?: () => Promise<ManualHackerNewsCollectResult>;
+  triggerManualBilibiliCollect?: () => Promise<ManualBilibiliCollectResult>;
   getCurrentUserProfile?: () => Promise<CurrentUserProfile | null> | CurrentUserProfile | null;
   getContentPageModel?: (
     pageKey: ContentPageKey,
@@ -730,6 +766,17 @@ export function createServer(deps: ServerDeps = {}) {
       authConfig?.sessionSecret ?? "",
       deps.isRunning?.() ?? false,
       deps.triggerManualHackerNewsCollect
+    );
+  });
+
+  app.post("/actions/bilibili/collect", async (request, reply) => {
+    return await handleManualBilibiliCollectAction(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? "",
+      deps.isRunning?.() ?? false,
+      deps.triggerManualBilibiliCollect
     );
   });
 
@@ -1355,6 +1402,96 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.send({ ok: true, id: result.query.id, enable: result.query.isEnabled });
   });
 
+  app.post("/actions/bilibili/create", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.createBilibiliQuery) {
+      return reply.code(503).send({ ok: false, reason: "bilibili-disabled" });
+    }
+
+    const payload = parseBilibiliQuerySavePayload(request.body, "create");
+
+    if (!payload) {
+      return reply.code(400).send({ ok: false, reason: "invalid-bilibili-query-payload" });
+    }
+
+    return sendBilibiliQuerySaveResult(reply, await deps.createBilibiliQuery(payload));
+  });
+
+  app.post("/actions/bilibili/update", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.updateBilibiliQuery) {
+      return reply.code(503).send({ ok: false, reason: "bilibili-disabled" });
+    }
+
+    const payload = parseBilibiliQuerySavePayload(request.body, "update");
+
+    if (!payload) {
+      return reply.code(400).send({ ok: false, reason: "invalid-bilibili-query-payload" });
+    }
+
+    return sendBilibiliQuerySaveResult(reply, await deps.updateBilibiliQuery(payload));
+  });
+
+  app.post("/actions/bilibili/delete", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.deleteBilibiliQuery) {
+      return reply.code(503).send({ ok: false, reason: "bilibili-disabled" });
+    }
+
+    const id = parsePositiveInteger((request.body as { id?: unknown } | undefined)?.id);
+
+    if (id === null) {
+      return reply.code(400).send({ ok: false, reason: "invalid-bilibili-query-id" });
+    }
+
+    const result = await deps.deleteBilibiliQuery(id);
+
+    if (!result.ok) {
+      return reply.code(result.reason === "not-found" ? 404 : 400).send({ ok: false, reason: result.reason });
+    }
+
+    return reply.send({ ok: true, id: result.id });
+  });
+
+  app.post("/actions/bilibili/toggle", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.toggleBilibiliQuery) {
+      return reply.code(503).send({ ok: false, reason: "bilibili-disabled" });
+    }
+
+    const body = request.body as { id?: unknown; enable?: unknown } | undefined;
+    const id = parsePositiveInteger(body?.id);
+    const enable = typeof body?.enable === "boolean" ? body.enable : null;
+
+    if (id === null) {
+      return reply.code(400).send({ ok: false, reason: "invalid-bilibili-query-id" });
+    }
+
+    if (enable === null) {
+      return reply.code(400).send({ ok: false, reason: "invalid-bilibili-query-enable" });
+    }
+
+    const result = await deps.toggleBilibiliQuery(id, enable);
+
+    if (!result.ok) {
+      return reply.code(result.reason === "not-found" ? 404 : 400).send({ ok: false, reason: result.reason });
+    }
+
+    return reply.send({ ok: true, id: result.query.id, enable: result.query.isEnabled });
+  });
+
   return app;
 }
 
@@ -1459,6 +1596,36 @@ function parseHackerNewsQuerySavePayload(
   };
 }
 
+function parseBilibiliQuerySavePayload(
+  body: unknown,
+  mode: "create" | "update"
+): SaveBilibiliQueryInput | null {
+  if (!body || typeof body !== "object") {
+    return null;
+  }
+
+  const payload = body as Record<string, unknown>;
+  const query = typeof payload.query === "string" ? payload.query.trim() : "";
+
+  if (!query) {
+    return null;
+  }
+
+  const id = mode === "update" ? parsePositiveInteger(payload.id) : null;
+
+  if (mode === "update" && id === null) {
+    return null;
+  }
+
+  return {
+    ...(id !== null ? { id } : {}),
+    query,
+    priority: typeof payload.priority === "number" ? payload.priority : null,
+    isEnabled: typeof payload.isEnabled === "boolean" ? payload.isEnabled : null,
+    notes: typeof payload.notes === "string" ? payload.notes : null
+  };
+}
+
 function sendTwitterAccountSaveResult(reply: FastifyReply, result: SaveTwitterAccountResult) {
   if (result.ok) {
     return reply.send({ ok: true, account: result.account });
@@ -1492,6 +1659,22 @@ function sendTwitterKeywordSaveResult(reply: FastifyReply, result: SaveTwitterSe
 }
 
 function sendHackerNewsQuerySaveResult(reply: FastifyReply, result: SaveHackerNewsQueryResult) {
+  if (result.ok) {
+    return reply.send({ ok: true, query: result.query });
+  }
+
+  if (result.reason === "not-found") {
+    return reply.code(404).send({ ok: false, reason: result.reason });
+  }
+
+  if (result.reason === "duplicate-query") {
+    return reply.code(409).send({ ok: false, reason: result.reason });
+  }
+
+  return reply.code(400).send({ ok: false, reason: result.reason });
+}
+
+function sendBilibiliQuerySaveResult(reply: FastifyReply, result: SaveBilibiliQueryResult) {
   if (result.ok) {
     return reply.send({ ok: true, query: result.query });
   }
@@ -1701,6 +1884,7 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
   const twitterAccounts = ((await deps.listTwitterAccounts?.()) ?? []) as TwitterAccountSettingsView[];
   const twitterSearchKeywords = ((await deps.listTwitterSearchKeywords?.()) ?? []) as TwitterSearchKeywordSettingsView[];
   const hackerNewsQueries = ((await deps.listHackerNewsQueries?.()) ?? []) as HackerNewsQuerySettingsView[];
+  const bilibiliQueries = ((await deps.listBilibiliQueries?.()) ?? []) as BilibiliQuerySettingsView[];
   const operationSummary = deps.getSourcesOperationSummary
     ? await deps.getSourcesOperationSummary()
     : { lastCollectionRunAt: null, lastSendLatestEmailAt: null };
@@ -1714,6 +1898,7 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
     twitterAccounts,
     twitterSearchKeywords,
     hackerNewsQueries,
+    bilibiliQueries,
     operations: {
       lastCollectionRunAt: operationSummary.lastCollectionRunAt,
       lastSendLatestEmailAt: operationSummary.lastSendLatestEmailAt,
@@ -1722,6 +1907,7 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
       canTriggerManualTwitterCollect: typeof deps.triggerManualTwitterCollect === "function",
       canTriggerManualTwitterKeywordCollect: typeof deps.triggerManualTwitterKeywordCollect === "function",
       canTriggerManualHackerNewsCollect: typeof deps.triggerManualHackerNewsCollect === "function",
+      canTriggerManualBilibiliCollect: typeof deps.triggerManualBilibiliCollect === "function",
       canTriggerManualSendLatestEmail: typeof deps.triggerManualSendLatestEmail === "function",
       isRunning: deps.isRunning?.() ?? false
     },
@@ -1741,7 +1927,9 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
           ? "Twitter 关键词搜索已配置 API key，仅支持手动采集。"
           : "当前环境未配置 TWITTER_API_KEY；Twitter 关键词可先维护，采集时会跳过。",
       hackerNewsSearchEnabled: true,
-      hackerNewsSearchMessage: "Hacker News 搜索已就绪，可维护 query 并手动采集。"
+      hackerNewsSearchMessage: "Hacker News 搜索已就绪，可维护 query 并手动采集。",
+      bilibiliSearchEnabled: true,
+      bilibiliSearchMessage: "B 站搜索已就绪，可维护 query 并手动采集。"
     }
   };
 }
@@ -2646,6 +2834,31 @@ async function handleManualHackerNewsCollectAction(
   }
 
   const result = await triggerManualHackerNewsCollect();
+  return reply.code(202).send(result);
+}
+
+async function handleManualBilibiliCollectAction(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  authEnabled: boolean,
+  sessionSecret: string,
+  isRunning: boolean,
+  triggerManualBilibiliCollect: ServerDeps["triggerManualBilibiliCollect"]
+) {
+  // B 站搜索和 HN 一样只做手动触发，但返回的是视频搜索侧的单独统计。
+  if (!ensureManualActionAuthorized(request, reply, authEnabled, sessionSecret)) {
+    return;
+  }
+
+  if (isRunning) {
+    return reply.code(409).send({ accepted: false, reason: "already-running" });
+  }
+
+  if (!triggerManualBilibiliCollect) {
+    return reply.code(503).send({ accepted: false });
+  }
+
+  const result = await triggerManualBilibiliCollect();
   return reply.code(202).send(result);
 }
 

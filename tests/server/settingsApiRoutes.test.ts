@@ -135,9 +135,24 @@ function createAuthenticatedServer() {
         updatedAt: "2026-04-23T08:00:00.000Z"
       }
     ]),
+    listBilibiliQueries: vi.fn().mockResolvedValue([
+      {
+        id: 12,
+        query: "OpenAI",
+        priority: 88,
+        isEnabled: true,
+        notes: "视频重点词",
+        lastFetchedAt: null,
+        lastSuccessAt: null,
+        lastResult: null,
+        createdAt: "2026-04-23T08:00:00.000Z",
+        updatedAt: "2026-04-23T08:00:00.000Z"
+      }
+    ]),
     hasTwitterApiKey: true,
     triggerManualRun: vi.fn().mockResolvedValue({ accepted: true }),
     triggerManualHackerNewsCollect: vi.fn().mockResolvedValue({ accepted: true }),
+    triggerManualBilibiliCollect: vi.fn().mockResolvedValue({ accepted: true }),
     getSourcesOperationSummary: vi.fn().mockResolvedValue({
       lastCollectionRunAt: "2026-03-31T03:00:00.000Z",
       lastSendLatestEmailAt: "2026-03-31T03:10:00.000Z"
@@ -249,6 +264,14 @@ describe("settings api routes", () => {
           isEnabled: true
         }
       ],
+      bilibiliQueries: [
+        {
+          id: 12,
+          query: "OpenAI",
+          priority: 88,
+          isEnabled: true
+        }
+      ],
       operations: {
         lastCollectionRunAt: "2026-03-31T03:00:00.000Z",
         lastSendLatestEmailAt: "2026-03-31T03:10:00.000Z",
@@ -256,13 +279,15 @@ describe("settings api routes", () => {
         canTriggerManualCollect: true,
         canTriggerManualTwitterCollect: false,
         canTriggerManualHackerNewsCollect: true,
+        canTriggerManualBilibiliCollect: true,
         canTriggerManualSendLatestEmail: false,
         isRunning: false
       },
       capability: {
         wechatArticleUrlEnabled: false,
         twitterAccountCollectionEnabled: true,
-        hackerNewsSearchEnabled: true
+        hackerNewsSearchEnabled: true,
+        bilibiliSearchEnabled: true
       }
     });
   });

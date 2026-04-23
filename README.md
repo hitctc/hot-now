@@ -105,6 +105,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - `/settings/sources` 现在还包含独立的 Twitter 账号分区，可新增 / 编辑 / 删除 / 启停账号，并单独执行 Twitter 手动采集；字段包含 username、展示名称、分类、优先级、是否采集回复和备注；账号配置保存在独立 `twitter_accounts` 表，不混入普通 source 库存表
 - `/settings/sources` 现在也包含独立的 Twitter 关键词搜索分区，可新增 / 编辑 / 删除关键词，分别控制 `采集启用` 和 `展示启用`，并手动执行关键词搜索；字段包含关键词、分类、优先级、备注，分类会统一映射成中文展示；关键词配置保存在独立 `twitter_search_keywords` 表，不混入普通 source 库存表
 - `/settings/sources` 现在还包含独立的 Hacker News 搜索分区，可新增 / 编辑 / 删除 query，控制 `采集启用`，并手动执行 HN 搜索；字段包含 query、优先级、备注；第一版固定按最近 7 天、每轮最多 5 个 query、每个 query 最多 10 条结果执行，不做 HN newest 流，也不混入普通 source 库存表
+- `/settings/sources` 现在还包含独立的 B 站搜索分区，可新增 / 编辑 / 删除 query，控制 `采集启用`，并手动执行 B 站搜索；字段包含 query、优先级、备注；第一版只搜视频，固定每轮最多 5 个 query、每个 query 最多 10 条结果执行，结果进入 `AI 新讯` 与 `AI 热点`，也不混入普通 source 库存表
 - `/settings/sources` 现在支持逐 source 配置“选中该来源时全量展示”；开启后，该来源不会在内容页首次默认勾选，只有用户显式勾选后才会按全量模式展示
 - `/settings/profile` 现在会展示会话状态、用户名、角色和联系邮箱，不再停留在占位页
 - 当前支持的 LLM 厂商是 `DeepSeek`、`MiniMax`、`Kimi`；用户在页面里录入 API key，本地只保存加密后的密文；未显式配置 `LLM_SETTINGS_MASTER_KEY` 时，系统会回退使用 `SESSION_SECRET` 作为本地加密 key；当前版本先只保留这些配置入口，不再驱动内容筛选或采集后的自动评估
@@ -114,6 +115,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - Twitter 账号手动采集：`POST /actions/twitter-accounts/collect`
 - Twitter 关键词手动采集：`POST /actions/twitter-keywords/collect`
 - Hacker News 手动采集：`POST /actions/hackernews/collect`
+- B 站手动采集：`POST /actions/bilibili/collect`
 - 手动发送最新报告：`POST /actions/send-latest-email`
 - 兼容别名：`POST /actions/run`（等价于手动采集）
 - 内容反馈写入：`POST /actions/content/:id/feedback-pool`
@@ -123,9 +125,10 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - Twitter 账号动作：`POST /actions/twitter-accounts/create`、`POST /actions/twitter-accounts/update`、`POST /actions/twitter-accounts/delete`、`POST /actions/twitter-accounts/toggle`、`POST /actions/twitter-accounts/collect`
 - Twitter 关键词动作：`POST /actions/twitter-keywords/create`、`POST /actions/twitter-keywords/update`、`POST /actions/twitter-keywords/delete`、`POST /actions/twitter-keywords/toggle-collect`、`POST /actions/twitter-keywords/toggle-visible`、`POST /actions/twitter-keywords/collect`
 - Hacker News query 动作：`POST /actions/hackernews/create`、`POST /actions/hackernews/update`、`POST /actions/hackernews/delete`、`POST /actions/hackernews/toggle`、`POST /actions/hackernews/collect`
+- B 站 query 动作：`POST /actions/bilibili/create`、`POST /actions/bilibili/update`、`POST /actions/bilibili/delete`、`POST /actions/bilibili/toggle`、`POST /actions/bilibili/collect`
 - 内容导航已收口为 AI-first：`/` 与 `/ai-new` 等同 `AI 新讯`，`/ai-hot` 承接 `AI 热点`，`/articles` 已移除
 
-统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。auth 开启后，内容菜单保持公开可读，但系统菜单和所有写操作仍然要求登录；`content_sources.is_enabled` 决定哪些 RSS / 微信公众号 source 参与定时 / 手动采集，`content_sources.show_all_when_selected` 决定该 source 在内容页被显式勾选时是否全量展示；Twitter 账号由独立 `twitter_accounts.is_enabled` 控制是否参与 Twitter 手动采集，Twitter 关键词由独立 `twitter_search_keywords.is_collect_enabled` 控制是否参与关键词搜索、由 `twitter_search_keywords.is_visible` 控制该关键词命中的内容是否继续进入内容页，真实拉取都依赖环境变量 `TWITTER_API_KEY`；Hacker News query 由独立 `hackernews_queries.is_enabled` 控制是否参与 HN 手动搜索，当前不额外区分“展示启用”；为满足 `content_items.source_id` 外键，系统会维护隐藏聚合 source `twitter_accounts`、`twitter_keyword_search` 和 `hackernews_search`，它们都不承载配置，也不会出现在普通 source 库存表中；内容页来源筛选会继续把前两个 Twitter 聚合 source 暴露出来并展开二级多选，HN 第一版暂不提供内容页二级 query 筛选；`/settings/sources` 现在可以直接启用/停用 source、切换“选中时全量展示”、新增 / 编辑 / 删除自定义 RSS 或微信公众号桥接来源，也可以单独维护 Twitter 账号列表、Twitter 关键词列表、Hacker News query 列表并执行各自的独立手动采集；来源保存成功后，系统会自动补拉该来源的首批内容，不需要再手动先跑一次采集；内容页顶部的来源筛选和排序只影响当前浏览结果，不会改 source 启用状态；legacy `/control` 继续提供 RSS / 微信公众号采集与发信动作。
+统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。auth 开启后，内容菜单保持公开可读，但系统菜单和所有写操作仍然要求登录；`content_sources.is_enabled` 决定哪些 RSS / 微信公众号 source 参与定时 / 手动采集，`content_sources.show_all_when_selected` 决定该 source 在内容页被显式勾选时是否全量展示；Twitter 账号由独立 `twitter_accounts.is_enabled` 控制是否参与 Twitter 手动采集，Twitter 关键词由独立 `twitter_search_keywords.is_collect_enabled` 控制是否参与关键词搜索、由 `twitter_search_keywords.is_visible` 控制该关键词命中的内容是否继续进入内容页，真实拉取都依赖环境变量 `TWITTER_API_KEY`；Hacker News query 由独立 `hackernews_queries.is_enabled` 控制是否参与 HN 手动搜索，当前不额外区分“展示启用”；B 站 query 由独立 `bilibili_queries.is_enabled` 控制是否参与 B 站手动搜索，第一版只搜视频且不额外区分“展示启用”；为满足 `content_items.source_id` 外键，系统会维护隐藏聚合 source `twitter_accounts`、`twitter_keyword_search`、`hackernews_search` 和 `bilibili_search`，它们都不承载配置，也不会出现在普通 source 库存表中；内容页来源筛选会继续把前两个 Twitter 聚合 source 暴露出来并展开二级多选，HN 和 B 站第一版暂不提供内容页二级 query 筛选；`/settings/sources` 现在可以直接启用/停用 source、切换“选中时全量展示”、新增 / 编辑 / 删除自定义 RSS 或微信公众号桥接来源，也可以单独维护 Twitter 账号列表、Twitter 关键词列表、Hacker News query 列表、B 站 query 列表并执行各自的独立手动采集；来源保存成功后，系统会自动补拉该来源的首批内容，不需要再手动先跑一次采集；内容页顶部的来源筛选和排序只影响当前浏览结果，不会改 source 启用状态；legacy `/control` 继续提供 RSS / 微信公众号采集与发信动作。
 
 当前内置 RSS 源包括：
 
@@ -164,6 +167,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - `/settings/sources` 会直接按当前采集调度显示下一次自动采集时间；调度关闭时回显 `未启用定时采集`
 - 未配置 `TWITTER_API_KEY` 时，Twitter 账号手动采集和 Twitter 关键词手动采集都会被标记为不可用，但不会阻断 RSS / 微信公众号采集和报告生成
 - Hacker News 搜索不依赖额外密钥；只要后台已有启用中的 query，就可以手动执行
+- B 站搜索不依赖额外密钥；只要后台已有启用中的 query，就可以手动执行
 
 默认报告目录是 `data/reports/<YYYY-MM-DD>/`，其中会保存：
 
@@ -328,3 +332,4 @@ sudo visudo -cf /etc/sudoers.d/hot-now-systemctl
 - 如果要手动验证 Twitter 账号采集，先在 `.env` 配置 `TWITTER_API_KEY`，再到 `/settings/sources` 新增并启用账号，点击“手动采集 Twitter 账号”后确认账号“最近成功 / 最近结果”被回写；如果内容页仍无结果，优先检查“最近结果”里是否出现“本次抓取成功，但没有可入库的新推文。”这类提示；不配置 key 时应只显示不可用提示，RSS / 微信公众号采集仍可继续
 - 如果要手动验证 Twitter 关键词搜索，先在 `/settings/sources` 新增并启用关键词，确认 `采集启用` 与 `展示启用` 都打开，再点击“手动采集 Twitter 关键词”；当前第一版会限制为“最多处理 5 个已启用关键词、每个关键词最多取前 10 条结果”，成功后优先检查关键词“最近成功 / 最近结果”是否回写，再到 `/ai-new`、`/ai-hot` 确认结果是否可见；如果只想停采但保留历史展示，关闭 `采集启用`；如果只想让该关键词命中的内容从内容页消失，关闭 `展示启用`
 - 如果要手动验证 Hacker News 搜索，先在 `/settings/sources` 新增并启用至少一个 query，再点击“手动采集 Hacker News”；当前第一版固定按最近 7 天、最多处理 5 个已启用 query、每个 query 最多取前 10 条结果，成功后优先检查 query 的“最近成功 / 最近结果”是否回写，再到 `/ai-new`、`/ai-hot` 确认内容是否已入库并可见
+- 如果要手动验证 B 站搜索，先在 `/settings/sources` 新增并启用至少一个 query，再点击“手动采集 B 站搜索”；当前第一版固定为“最多处理 5 个已启用 query、每个 query 最多取前 10 条视频结果”，成功后优先检查 query 的“最近成功 / 最近结果”是否回写，再到 `/ai-new`、`/ai-hot` 确认视频内容是否已入库并可见

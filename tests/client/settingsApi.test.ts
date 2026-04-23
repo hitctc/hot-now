@@ -27,6 +27,7 @@ describe("settingsApi", () => {
         canTriggerManualTwitterCollect: true,
         canTriggerManualTwitterKeywordCollect: true,
         canTriggerManualHackerNewsCollect: true,
+        canTriggerManualBilibiliCollect: true,
         canTriggerManualSendLatestEmail: true,
         isRunning: false
       },
@@ -34,7 +35,9 @@ describe("settingsApi", () => {
         wechatArticleUrlEnabled: false,
         wechatArticleUrlMessage: "当前环境未启用公众号来源解析。",
         hackerNewsSearchEnabled: true,
-        hackerNewsSearchMessage: "Hacker News 搜索已就绪，可维护 query 并手动采集。"
+        hackerNewsSearchMessage: "Hacker News 搜索已就绪，可维护 query 并手动采集。",
+        bilibiliSearchEnabled: true,
+        bilibiliSearchMessage: "B 站搜索已就绪，可维护 query 并手动采集。"
       }
     });
 
@@ -423,6 +426,68 @@ describe("settingsApi", () => {
     await triggerManualHackerNewsCollect();
 
     expect(requestJson).toHaveBeenCalledWith("/actions/hackernews/collect", {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+  });
+
+  it("posts bilibili query create update delete and toggle payloads to their actions", async () => {
+    const {
+      createBilibiliQuery,
+      updateBilibiliQuery,
+      deleteBilibiliQuery,
+      toggleBilibiliQuery
+    } = await import("../../src/client/services/settingsApi");
+
+    requestJson.mockResolvedValue({ ok: true, query: { id: 1 } });
+
+    await createBilibiliQuery({
+      query: "OpenAI",
+      priority: 90,
+      isEnabled: true,
+      notes: "video query"
+    });
+    await updateBilibiliQuery({
+      id: 1,
+      query: "OpenAI agents"
+    });
+    await deleteBilibiliQuery(1);
+    await toggleBilibiliQuery(1, false);
+
+    expect(requestJson).toHaveBeenNthCalledWith(1, "/actions/bilibili/create", {
+      method: "POST",
+      body: JSON.stringify({
+        query: "OpenAI",
+        priority: 90,
+        isEnabled: true,
+        notes: "video query"
+      })
+    });
+    expect(requestJson).toHaveBeenNthCalledWith(2, "/actions/bilibili/update", {
+      method: "POST",
+      body: JSON.stringify({
+        id: 1,
+        query: "OpenAI agents"
+      })
+    });
+    expect(requestJson).toHaveBeenNthCalledWith(3, "/actions/bilibili/delete", {
+      method: "POST",
+      body: JSON.stringify({ id: 1 })
+    });
+    expect(requestJson).toHaveBeenNthCalledWith(4, "/actions/bilibili/toggle", {
+      method: "POST",
+      body: JSON.stringify({ id: 1, enable: false })
+    });
+  });
+
+  it("posts manual bilibili collection to the dedicated action", async () => {
+    const { triggerManualBilibiliCollect } = await import("../../src/client/services/settingsApi");
+
+    requestJson.mockResolvedValue({ accepted: true, action: "collect-bilibili" });
+
+    await triggerManualBilibiliCollect();
+
+    expect(requestJson).toHaveBeenCalledWith("/actions/bilibili/collect", {
       method: "POST",
       body: JSON.stringify({})
     });

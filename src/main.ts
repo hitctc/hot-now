@@ -38,6 +38,7 @@ import { hydrateSourceContent } from "./core/source/hydrateSourceContent.js";
 import { runTwitterAccountCollection } from "./core/twitter/runTwitterAccountCollection.js";
 import { runTwitterKeywordCollection } from "./core/twitter/runTwitterKeywordCollection.js";
 import { runHackerNewsCollection } from "./core/hackernews/runHackerNewsCollection.js";
+import { runBilibiliCollection } from "./core/bilibili/runBilibiliCollection.js";
 import {
   deleteSource as removeSource,
   saveSource as persistSource,
@@ -66,6 +67,13 @@ import {
   toggleHackerNewsQuery as persistHackerNewsQueryToggle,
   updateHackerNewsQuery as persistHackerNewsQueryUpdate
 } from "./core/hackernews/hackerNewsQueryRepository.js";
+import {
+  createBilibiliQuery as persistBilibiliQuery,
+  deleteBilibiliQuery as removeBilibiliQuery,
+  listBilibiliQueries,
+  toggleBilibiliQuery as persistBilibiliQueryToggle,
+  updateBilibiliQuery as persistBilibiliQueryUpdate
+} from "./core/bilibili/bilibiliQueryRepository.js";
 import { listReportDates, readTextFile } from "./core/storage/reportStore.js";
 import {
   getViewRuleConfig,
@@ -151,6 +159,11 @@ async function runTwitterKeywordCollectionTask() {
 // Hacker News 搜索第一版只支持手动触发，避免在默认采集节奏里顺手扩大来源范围。
 async function runHackerNewsCollectionTask() {
   return await runHackerNewsCollection(db);
+}
+
+// B 站搜索第一版也只支持手动触发，先把视频搜索链路验证稳定再考虑调度扩展。
+async function runBilibiliCollectionTask() {
+  return await runBilibiliCollection(db);
 }
 
 // Latest-email runs reuse the most recent report artifact and keep SMTP concerns out of the collection cadence.
@@ -481,6 +494,13 @@ const triggerManualHackerNewsCollect = config.manualActions.collectEnabled
     }
   : undefined;
 
+// B 站搜索与 HN 一样先走独立手动入口，避免默认采集节奏无意扩大到视频搜索。
+const triggerManualBilibiliCollect = config.manualActions.collectEnabled
+  ? async () => {
+      return await lock.runExclusive(async () => await runBilibiliCollectionTask());
+    }
+  : undefined;
+
 // 新增来源后先只补这一条 source 的内容入库，避免为了拿到首批数据就把整轮全站采集串进保存接口。
 async function saveAndHydrateSource(input: Parameters<typeof persistSource>[1]) {
   const result = await persistSource(db, input, {
@@ -558,6 +578,7 @@ const app = createServer({
   listTwitterAccounts: async () => listTwitterAccounts(db),
   listTwitterSearchKeywords: async () => listTwitterSearchKeywords(db),
   listHackerNewsQueries: async () => listHackerNewsQueries(db),
+  listBilibiliQueries: async () => listBilibiliQueries(db),
   createTwitterAccount: async (input) => persistTwitterAccount(db, input),
   updateTwitterAccount: async (input) => persistTwitterAccountUpdate(db, input),
   deleteTwitterAccount: async (id) => removeTwitterAccount(db, id),
@@ -573,10 +594,15 @@ const app = createServer({
   updateHackerNewsQuery: async (input) => persistHackerNewsQueryUpdate(db, input),
   deleteHackerNewsQuery: async (id) => removeHackerNewsQuery(db, id),
   toggleHackerNewsQuery: async (id, enable) => persistHackerNewsQueryToggle(db, id, enable),
+  createBilibiliQuery: async (input) => persistBilibiliQuery(db, input),
+  updateBilibiliQuery: async (input) => persistBilibiliQueryUpdate(db, input),
+  deleteBilibiliQuery: async (id) => removeBilibiliQuery(db, id),
+  toggleBilibiliQuery: async (id, enable) => persistBilibiliQueryToggle(db, id, enable),
   hasTwitterApiKey: Boolean(process.env.TWITTER_API_KEY?.trim()),
   triggerManualTwitterCollect,
   triggerManualTwitterKeywordCollect,
   triggerManualHackerNewsCollect,
+  triggerManualBilibiliCollect,
   getCurrentUserProfile: async () => getCurrentUserProfile(),
   listReportSummaries: listStoredReportSummaries,
   latestReportDate: async () => (await listReportDates(config.report.dataDir))[0] ?? null,

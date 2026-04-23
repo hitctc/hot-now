@@ -562,6 +562,82 @@ describe("system routes", () => {
     expect(triggerManualTwitterKeywordCollect).toHaveBeenCalledTimes(1);
   });
 
+  it("calls createHackerNewsQuery and toggles hacker news query actions", async () => {
+    const createHackerNewsQuery = vi.fn().mockResolvedValue({
+      ok: true,
+      query: {
+        id: 1,
+        query: "OpenAI",
+        priority: 90,
+        isEnabled: true,
+        notes: null,
+        lastFetchedAt: null,
+        lastSuccessAt: null,
+        lastResult: null,
+        createdAt: "2026-04-23T08:00:00.000Z",
+        updatedAt: "2026-04-23T08:00:00.000Z"
+      }
+    });
+    const toggleHackerNewsQuery = vi.fn().mockResolvedValue({
+      ok: true,
+      query: { id: 1, isEnabled: false }
+    });
+    const app = createSystemTestServer({
+      createHackerNewsQuery,
+      toggleHackerNewsQuery
+    } as never);
+
+    const createResponse = await app.inject({
+      method: "POST",
+      url: "/actions/hackernews/create",
+      payload: {
+        query: "OpenAI",
+        priority: 90,
+        isEnabled: true
+      }
+    });
+    const toggleResponse = await app.inject({
+      method: "POST",
+      url: "/actions/hackernews/toggle",
+      payload: { id: 1, enable: false }
+    });
+
+    expect(createResponse.statusCode).toBe(200);
+    expect(createHackerNewsQuery).toHaveBeenCalledWith({
+      query: "OpenAI",
+      priority: 90,
+      isEnabled: true,
+      notes: null
+    });
+    expect(toggleResponse.statusCode).toBe(200);
+    expect(toggleHackerNewsQuery).toHaveBeenCalledWith(1, false);
+    expect(toggleResponse.json()).toEqual({ ok: true, id: 1, enable: false });
+  });
+
+  it("starts hacker news collection with the dedicated action", async () => {
+    const triggerManualHackerNewsCollect = vi.fn().mockResolvedValue({
+      accepted: true,
+      action: "collect-hackernews",
+      enabledQueryCount: 2,
+      processedQueryCount: 2,
+      fetchedHitCount: 3,
+      persistedContentItemCount: 1,
+      reusedContentItemCount: 1,
+      failureCount: 0
+    });
+    const app = createSystemTestServer({
+      triggerManualHackerNewsCollect
+    } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/hackernews/collect"
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(triggerManualHackerNewsCollect).toHaveBeenCalledTimes(1);
+  });
+
   it("calls saveProviderSettings for llm provider configuration", async () => {
     const saveProviderSettings = vi.fn().mockResolvedValue({ ok: true });
     const app = createSystemTestServer({

@@ -26,12 +26,15 @@ describe("settingsApi", () => {
         canTriggerManualCollect: true,
         canTriggerManualTwitterCollect: true,
         canTriggerManualTwitterKeywordCollect: true,
+        canTriggerManualHackerNewsCollect: true,
         canTriggerManualSendLatestEmail: true,
         isRunning: false
       },
       capability: {
         wechatArticleUrlEnabled: false,
-        wechatArticleUrlMessage: "当前环境未启用公众号来源解析。"
+        wechatArticleUrlMessage: "当前环境未启用公众号来源解析。",
+        hackerNewsSearchEnabled: true,
+        hackerNewsSearchMessage: "Hacker News 搜索已就绪，可维护 query 并手动采集。"
       }
     });
 
@@ -337,6 +340,55 @@ describe("settingsApi", () => {
     });
   });
 
+  it("posts hacker news query create update delete and toggle payloads to their actions", async () => {
+    const {
+      createHackerNewsQuery,
+      updateHackerNewsQuery,
+      deleteHackerNewsQuery,
+      toggleHackerNewsQuery
+    } = await import("../../src/client/services/settingsApi");
+
+    requestJson.mockResolvedValue({ ok: true, query: { id: 1 } });
+
+    await createHackerNewsQuery({
+      query: "OpenAI",
+      priority: 90,
+      isEnabled: true,
+      notes: "core query"
+    });
+    await updateHackerNewsQuery({
+      id: 1,
+      query: "OpenAI agents"
+    });
+    await deleteHackerNewsQuery(1);
+    await toggleHackerNewsQuery(1, false);
+
+    expect(requestJson).toHaveBeenNthCalledWith(1, "/actions/hackernews/create", {
+      method: "POST",
+      body: JSON.stringify({
+        query: "OpenAI",
+        priority: 90,
+        isEnabled: true,
+        notes: "core query"
+      })
+    });
+    expect(requestJson).toHaveBeenNthCalledWith(2, "/actions/hackernews/update", {
+      method: "POST",
+      body: JSON.stringify({
+        id: 1,
+        query: "OpenAI agents"
+      })
+    });
+    expect(requestJson).toHaveBeenNthCalledWith(3, "/actions/hackernews/delete", {
+      method: "POST",
+      body: JSON.stringify({ id: 1 })
+    });
+    expect(requestJson).toHaveBeenNthCalledWith(4, "/actions/hackernews/toggle", {
+      method: "POST",
+      body: JSON.stringify({ id: 1, enable: false })
+    });
+  });
+
   it("posts manual twitter collection to the dedicated twitter action", async () => {
     const { triggerManualTwitterCollect } = await import("../../src/client/services/settingsApi");
 
@@ -358,6 +410,19 @@ describe("settingsApi", () => {
     await triggerManualTwitterKeywordCollect();
 
     expect(requestJson).toHaveBeenCalledWith("/actions/twitter-keywords/collect", {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+  });
+
+  it("posts manual hacker news collection to the dedicated action", async () => {
+    const { triggerManualHackerNewsCollect } = await import("../../src/client/services/settingsApi");
+
+    requestJson.mockResolvedValue({ accepted: true, action: "collect-hackernews" });
+
+    await triggerManualHackerNewsCollect();
+
+    expect(requestJson).toHaveBeenCalledWith("/actions/hackernews/collect", {
       method: "POST",
       body: JSON.stringify({})
     });

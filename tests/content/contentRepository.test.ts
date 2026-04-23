@@ -7,6 +7,7 @@ import {
   finishCollectionRun,
   linkTwitterSearchKeywordMatches,
   listVisibleTwitterKeywordMatchContentItemIds,
+  mergeContentMatchedQueries,
   resolveSourceByKind,
   upsertContentItems
 } from "../../src/core/content/contentRepository.js";
@@ -251,6 +252,37 @@ describe("contentRepository", () => {
       visibleOnlyItemId,
       sharedItemId
     ]);
+  });
+
+  it("merges matchedQueries into metadata_json without dropping existing metadata fields", async () => {
+    const db = await createTestDatabase();
+    const contentItemId = insertContentItem(db, "https://example.com/hn-1");
+
+    db.prepare("UPDATE content_items SET metadata_json = ? WHERE id = ?").run(
+      JSON.stringify({
+        collector: { kind: "hackernews_search", query: "OpenAI" },
+        matchedQueries: ["OpenAI"],
+        author: "pg"
+      }),
+      contentItemId
+    );
+
+    mergeContentMatchedQueries(db, [
+      {
+        contentItemId,
+        matchedQueries: ["Agents", "OpenAI"]
+      }
+    ]);
+
+    const row = db.prepare("SELECT metadata_json FROM content_items WHERE id = ?").get(contentItemId) as {
+      metadata_json: string | null;
+    };
+
+    expect(JSON.parse(row.metadata_json ?? "{}")).toEqual({
+      collector: { kind: "hackernews_search", query: "OpenAI" },
+      matchedQueries: ["OpenAI", "Agents"],
+      author: "pg"
+    });
   });
 
   async function createTestDatabase() {

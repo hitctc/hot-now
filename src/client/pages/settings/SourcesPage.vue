@@ -9,30 +9,38 @@ import {
 } from "../../components/content/contentCardShared";
 import { HttpError } from "../../services/http";
 import {
+  createHackerNewsQuery,
   createTwitterAccount,
   createTwitterSearchKeyword,
   createSource,
+  deleteHackerNewsQuery,
   deleteTwitterAccount,
   deleteTwitterSearchKeyword,
   deleteSource,
   readSettingsSources,
+  toggleHackerNewsQuery,
   toggleTwitterAccount,
   toggleTwitterSearchKeywordCollect,
   toggleTwitterSearchKeywordVisible,
   toggleSource,
+  triggerManualHackerNewsCollect,
   triggerManualTwitterCollect,
   triggerManualTwitterKeywordCollect,
   updateTwitterAccount,
   updateTwitterSearchKeyword,
+  updateHackerNewsQuery,
   updateSource,
   updateSourceDisplayMode,
   triggerManualCollect,
   triggerManualSendLatestEmail,
+  type ManualHackerNewsCollectResponse,
   type ManualCollectResponse,
   type ManualTwitterCollectResponse,
   type ManualTwitterKeywordCollectResponse,
   type ManualSendLatestEmailResponse,
+  type SaveHackerNewsQueryPayload,
   type SaveSourcePayload,
+  type SettingsHackerNewsQuery,
   type SettingsSourceItem,
   type SettingsSourcesResponse,
   type SettingsTwitterAccount,
@@ -46,6 +54,7 @@ type PageNotice = { tone: AlertTone; message: string };
 type SourceModalMode = "create" | "update";
 type TwitterAccountModalMode = "create" | "update";
 type TwitterKeywordModalMode = "create" | "update";
+type HackerNewsQueryModalMode = "create" | "update";
 type SourceFormState = {
   kind: string;
   sourceType: "rss" | "wechat_bridge";
@@ -69,6 +78,13 @@ type TwitterKeywordFormState = {
   priority: number;
   isCollectEnabled: boolean;
   isVisible: boolean;
+  notes: string;
+};
+type HackerNewsQueryFormState = {
+  id: number | null;
+  query: string;
+  priority: number;
+  isEnabled: boolean;
   notes: string;
 };
 
@@ -110,6 +126,14 @@ const twitterKeywordColumns = [
   { title: "最近结果", key: "lastResult", align: "center" as const },
   { title: "操作", key: "actions", align: "center" as const }
 ];
+const hackerNewsQueryColumns = [
+  { title: "查询词", key: "query", align: "center" as const },
+  { title: "优先级", key: "priority", align: "center" as const },
+  { title: "采集启用", key: "enabled", align: "center" as const },
+  { title: "最近成功", key: "lastSuccessAt", align: "center" as const },
+  { title: "最近结果", key: "lastResult", align: "center" as const },
+  { title: "操作", key: "actions", align: "center" as const }
+];
 const twitterAccountCategoryOptions = [
   { label: "官方厂商", value: "official_vendor" },
   { label: "产品账号", value: "product" },
@@ -135,15 +159,19 @@ const pendingActions = reactive<Record<string, boolean>>({});
 const isSourceModalOpen = ref(false);
 const isTwitterAccountModalOpen = ref(false);
 const isTwitterKeywordModalOpen = ref(false);
+const isHackerNewsQueryModalOpen = ref(false);
 const sourceModalMode = ref<SourceModalMode>("create");
 const twitterAccountModalMode = ref<TwitterAccountModalMode>("create");
 const twitterKeywordModalMode = ref<TwitterKeywordModalMode>("create");
+const hackerNewsQueryModalMode = ref<HackerNewsQueryModalMode>("create");
 const sourceFormError = ref<string | null>(null);
 const twitterAccountFormError = ref<string | null>(null);
 const twitterKeywordFormError = ref<string | null>(null);
+const hackerNewsQueryFormError = ref<string | null>(null);
 const sourceForm = reactive<SourceFormState>(createEmptySourceForm());
 const twitterAccountForm = reactive<TwitterAccountFormState>(createEmptyTwitterAccountForm());
 const twitterKeywordForm = reactive<TwitterKeywordFormState>(createEmptyTwitterKeywordForm());
+const hackerNewsQueryForm = reactive<HackerNewsQueryFormState>(createEmptyHackerNewsQueryForm());
 const relativeNow = ref(Date.now());
 let nextCollectionTimer: number | null = null;
 
@@ -162,6 +190,10 @@ const enabledTwitterKeywordCollectCount = computed(
 const enabledTwitterKeywordVisibleCount = computed(
   () => sourcesModel.value?.twitterSearchKeywords?.filter((keyword) => keyword.isVisible).length ?? 0
 );
+const totalHackerNewsQueryCount = computed(() => sourcesModel.value?.hackerNewsQueries?.length ?? 0);
+const enabledHackerNewsQueryCount = computed(
+  () => sourcesModel.value?.hackerNewsQueries?.filter((query) => query.isEnabled).length ?? 0
+);
 const wechatArticleUrlAvailable = computed(
   () => sourcesModel.value?.capability.wechatArticleUrlEnabled ?? false
 );
@@ -179,6 +211,11 @@ const twitterKeywordCollectionMessage = computed(
   () =>
     sourcesModel.value?.capability.twitterKeywordSearchMessage ??
     "当前环境未配置 TWITTER_API_KEY；Twitter 关键词可先维护，采集时会跳过。"
+);
+const hackerNewsCollectionMessage = computed(
+  () =>
+    sourcesModel.value?.capability.hackerNewsSearchMessage ??
+    "Hacker News 搜索已就绪，可维护 query 并手动采集。"
 );
 
 // 页面提示统一通过一层 notice 管理，操作后同时保留页内 Alert 和全局 toast。
@@ -264,6 +301,21 @@ function resetTwitterKeywordForm(): void {
   twitterKeywordFormError.value = null;
 }
 
+function createEmptyHackerNewsQueryForm(): HackerNewsQueryFormState {
+  return {
+    id: null,
+    query: "",
+    priority: 60,
+    isEnabled: true,
+    notes: ""
+  };
+}
+
+function resetHackerNewsQueryForm(): void {
+  Object.assign(hackerNewsQueryForm, createEmptyHackerNewsQueryForm());
+  hackerNewsQueryFormError.value = null;
+}
+
 // 新增模式只需要清空表单并打开弹窗，不再引入额外的临时草稿状态。
 function openCreateSourceModal(): void {
   sourceModalMode.value = "create";
@@ -281,6 +333,12 @@ function openCreateTwitterKeywordModal(): void {
   twitterKeywordModalMode.value = "create";
   resetTwitterKeywordForm();
   isTwitterKeywordModalOpen.value = true;
+}
+
+function openCreateHackerNewsQueryModal(): void {
+  hackerNewsQueryModalMode.value = "create";
+  resetHackerNewsQueryForm();
+  isHackerNewsQueryModalOpen.value = true;
 }
 
 // 编辑模式只回填当前来源已有配置，kind 继续锁定，避免把“编辑”做成“重命名来源主键”。
@@ -326,6 +384,17 @@ function openEditTwitterKeywordModal(keyword: SettingsTwitterSearchKeyword): voi
   isTwitterKeywordModalOpen.value = true;
 }
 
+function openEditHackerNewsQueryModal(query: SettingsHackerNewsQuery): void {
+  hackerNewsQueryModalMode.value = "update";
+  resetHackerNewsQueryForm();
+  hackerNewsQueryForm.id = query.id;
+  hackerNewsQueryForm.query = query.query;
+  hackerNewsQueryForm.priority = query.priority;
+  hackerNewsQueryForm.isEnabled = query.isEnabled;
+  hackerNewsQueryForm.notes = query.notes ?? "";
+  isHackerNewsQueryModalOpen.value = true;
+}
+
 // 关闭弹窗时顺手清掉局部错误，避免旧的公众号解析失败提示粘在下一次操作里。
 function closeSourceModal(): void {
   isSourceModalOpen.value = false;
@@ -340,6 +409,11 @@ function closeTwitterAccountModal(): void {
 function closeTwitterKeywordModal(): void {
   isTwitterKeywordModalOpen.value = false;
   twitterKeywordFormError.value = null;
+}
+
+function closeHackerNewsQueryModal(): void {
+  isHackerNewsQueryModalOpen.value = false;
+  hackerNewsQueryFormError.value = null;
 }
 
 // 类型切换只负责收口当前可见字段，真正的 payload 仍由提交时统一构建。
@@ -601,6 +675,29 @@ function buildTwitterKeywordSavePayload(): { ok: true; payload: SaveTwitterSearc
   };
 }
 
+function buildHackerNewsQuerySavePayload(): { ok: true; payload: SaveHackerNewsQueryPayload } | { ok: false; message: string } {
+  const query = hackerNewsQueryForm.query.trim();
+
+  if (!query) {
+    return { ok: false, message: "请填写 Hacker News 查询词。" };
+  }
+
+  if (!Number.isInteger(hackerNewsQueryForm.priority) || hackerNewsQueryForm.priority < 0 || hackerNewsQueryForm.priority > 100) {
+    return { ok: false, message: "优先级需要是 0 到 100 之间的整数。" };
+  }
+
+  return {
+    ok: true,
+    payload: {
+      ...(hackerNewsQueryModalMode.value === "update" && hackerNewsQueryForm.id ? { id: hackerNewsQueryForm.id } : {}),
+      query,
+      priority: hackerNewsQueryForm.priority,
+      isEnabled: hackerNewsQueryForm.isEnabled,
+      notes: hackerNewsQueryForm.notes.trim() || null
+    }
+  };
+}
+
 // 数据加载区分首屏和静默刷新，切换 source 时不需要把整页退回骨架屏。
 async function loadSources(options: { silent?: boolean } = {}): Promise<boolean> {
   if (options.silent) {
@@ -744,6 +841,22 @@ async function handleManualTwitterKeywordCollect(): Promise<void> {
       "already-running": "当前已有任务执行中，请稍后再试。",
       "twitter-api-key-missing": "当前环境未配置 TWITTER_API_KEY，暂时无法采集 Twitter 关键词。",
       "no-enabled-twitter-keywords": "当前没有启用中的 Twitter 关键词，请先启用至少一个关键词。",
+      unauthorized: "请先登录后再操作。"
+    }
+  });
+}
+
+// HN 搜索第一版只走手动执行，成功提示直接回显处理 query 数、入库条数和复用条数。
+async function handleManualHackerNewsCollect(): Promise<void> {
+  await runSourcesAction("manual:hackernews-collect", () => triggerManualHackerNewsCollect(), {
+    fallbackMessage: "Hacker News 搜索启动失败，请稍后再试。",
+    successMessage: (result: ManualHackerNewsCollectResponse) =>
+      result.accepted
+        ? `Hacker News 搜索已完成：处理 ${result.processedQueryCount} 个 query，新入库 ${result.persistedContentItemCount} 条，复用 ${result.reusedContentItemCount} 条，失败 ${result.failureCount} 个。`
+        : "Hacker News 搜索未成功启动。",
+    reasonMessages: {
+      "already-running": "当前已有任务执行中，请稍后再试。",
+      "no-enabled-hackernews-queries": "当前没有启用中的 Hacker News query，请先启用至少一个 query。",
       unauthorized: "请先登录后再操作。"
     }
   });
@@ -930,6 +1043,61 @@ async function handleSubmitTwitterKeyword(): Promise<void> {
   }
 }
 
+async function handleSubmitHackerNewsQuery(): Promise<void> {
+  if (isActionPending("hackernews-query:submit")) {
+    return;
+  }
+
+  const payload = buildHackerNewsQuerySavePayload();
+
+  if (!payload.ok) {
+    hackerNewsQueryFormError.value = payload.message;
+    return;
+  }
+
+  hackerNewsQueryFormError.value = null;
+  setPendingAction("hackernews-query:submit", true);
+
+  try {
+    if (hackerNewsQueryModalMode.value === "create") {
+      await createHackerNewsQuery(payload.payload);
+    } else {
+      await updateHackerNewsQuery(payload.payload);
+    }
+
+    const refreshed = await loadSources({ silent: true });
+    closeHackerNewsQueryModal();
+    showNotice(
+      "success",
+      refreshed
+        ? hackerNewsQueryModalMode.value === "create"
+          ? "已新增 Hacker News query。"
+          : "已更新 Hacker News query。"
+        : hackerNewsQueryModalMode.value === "create"
+          ? "已新增 Hacker News query，但最新数据刷新失败，请稍后手动刷新。"
+          : "已更新 Hacker News query，但最新数据刷新失败，请稍后手动刷新。"
+    );
+  } catch (error) {
+    const message = readActionErrorMessage(
+      error,
+      hackerNewsQueryModalMode.value === "create" ? "Hacker News query 保存失败，请稍后再试。" : "Hacker News query 更新失败，请稍后再试。",
+      {
+        "invalid-hackernews-query": "Hacker News 查询词不合法，请检查后重试。",
+        "invalid-priority": "Hacker News query 优先级不合法。",
+        "duplicate-query": "这个 Hacker News query 已存在。",
+        "invalid-hackernews-query-payload": "Hacker News query 配置不完整，请检查后重试。",
+        "hackernews-disabled": "当前环境未启用 Hacker News 搜索。",
+        "not-found": "对应 Hacker News query 不存在，可能已被移除。"
+      }
+    );
+
+    hackerNewsQueryFormError.value = message;
+    showNotice("error", message);
+  } finally {
+    setPendingAction("hackernews-query:submit", false);
+  }
+}
+
 async function handleToggleTwitterAccount(account: SettingsTwitterAccount): Promise<void> {
   const nextEnable = !account.isEnabled;
 
@@ -1002,6 +1170,37 @@ async function handleDeleteTwitterKeyword(keyword: SettingsTwitterSearchKeyword)
     reasonMessages: {
       "invalid-twitter-keyword-id": "Twitter 关键词 ID 不合法。",
       "not-found": "对应 Twitter 关键词不存在，可能已被移除。"
+    }
+  });
+}
+
+async function handleToggleHackerNewsQuery(query: SettingsHackerNewsQuery): Promise<void> {
+  const nextEnable = !query.isEnabled;
+
+  await runSourcesAction(
+    `hackernews-toggle:${query.id}`,
+    () => toggleHackerNewsQuery(query.id, nextEnable),
+    {
+      fallbackMessage: "Hacker News query 开关更新失败，请稍后再试。",
+      successMessage: nextEnable ? "已启用 Hacker News query。" : "已停用 Hacker News query。",
+      reasonMessages: {
+        "invalid-hackernews-query-id": "Hacker News query ID 不合法。",
+        "invalid-hackernews-query-enable": "Hacker News query 开关参数不合法。",
+        "hackernews-disabled": "当前环境未启用 Hacker News 搜索。",
+        "not-found": "对应 Hacker News query 不存在，可能已被移除。"
+      }
+    }
+  );
+}
+
+async function handleDeleteHackerNewsQuery(query: SettingsHackerNewsQuery): Promise<void> {
+  await runSourcesAction(`hackernews-delete:${query.id}`, () => deleteHackerNewsQuery(query.id), {
+    fallbackMessage: "删除 Hacker News query 失败，请稍后再试。",
+    successMessage: "已删除 Hacker News query。",
+    reasonMessages: {
+      "invalid-hackernews-query-id": "Hacker News query ID 不合法。",
+      "hackernews-disabled": "当前环境未启用 Hacker News 搜索。",
+      "not-found": "对应 Hacker News query 不存在，可能已被移除。"
     }
   });
 }
@@ -1093,6 +1292,9 @@ onUnmounted(() => {
                 </a-button>
                 <a-button data-action="add-twitter-keyword" @click="openCreateTwitterKeywordModal">
                   新增 Twitter 关键词
+                </a-button>
+                <a-button data-action="add-hackernews-query" @click="openCreateHackerNewsQueryModal">
+                  新增 Hacker News query
                 </a-button>
               </a-space>
             </div>
@@ -1404,6 +1606,122 @@ onUnmounted(() => {
                       danger
                       :loading="isActionPending(`twitter-keyword-delete:${record.id}`)"
                       :data-twitter-keyword-delete="record.id"
+                    >
+                      删除
+                    </a-button>
+                  </a-popconfirm>
+                </div>
+              </template>
+            </template>
+          </a-table>
+        </a-card>
+
+        <a-card
+          :class="editorialContentCardClass"
+          title="Hacker News 搜索"
+          size="small"
+          data-sources-section="hackernews"
+        >
+          <div class="mb-4 grid gap-3 md:grid-cols-4">
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-4 py-3">
+              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">Query 总数</p>
+              <p class="mt-2 mb-0 text-lg font-medium text-editorial-text-main">{{ totalHackerNewsQueryCount }}</p>
+            </article>
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-4 py-3">
+              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">采集启用</p>
+              <p class="mt-2 mb-0 text-lg font-medium text-editorial-text-main">{{ enabledHackerNewsQueryCount }}</p>
+            </article>
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-4 py-3">
+              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">时间窗口</p>
+              <p class="mt-2 mb-0 text-xs leading-5 text-editorial-text-body">固定最近 7 天</p>
+            </article>
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-4 py-3">
+              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">API 状态</p>
+              <p class="mt-2 mb-0 text-xs leading-5 text-editorial-text-body">{{ hackerNewsCollectionMessage }}</p>
+            </article>
+          </div>
+
+          <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <a-typography-paragraph class="!mb-0" type="secondary">
+              第一版只做手动搜索，固定按最近 7 天、每轮最多 5 个 query、每词最多 10 条结果控住范围。
+            </a-typography-paragraph>
+            <a-button
+              type="primary"
+              data-action="manual-hackernews-collect"
+              :disabled="!sourcesModel.operations.canTriggerManualHackerNewsCollect || sourcesModel.operations.isRunning"
+              :loading="isActionPending('manual:hackernews-collect')"
+              @click="handleManualHackerNewsCollect"
+            >
+              {{ sourcesModel.operations.isRunning ? "任务执行中..." : "手动采集 Hacker News" }}
+            </a-button>
+          </div>
+
+          <a-table
+            :data-source="sourcesModel.hackerNewsQueries ?? []"
+            :columns="hackerNewsQueryColumns"
+            row-key="id"
+            :pagination="false"
+            size="small"
+          >
+            <template #emptyText>
+              暂无 Hacker News query
+            </template>
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'query'">
+                <a-space direction="vertical" size="small">
+                  <a-typography-text strong>{{ record.query }}</a-typography-text>
+                  <a-typography-text type="secondary" :data-hackernews-query-note="record.id">
+                    {{ record.notes || "暂无备注" }}
+                  </a-typography-text>
+                </a-space>
+              </template>
+              <template v-else-if="column.key === 'priority'">
+                {{ record.priority }}
+              </template>
+              <template v-else-if="column.key === 'enabled'">
+                <a-switch
+                  :checked="record.isEnabled"
+                  :loading="isActionPending(`hackernews-toggle:${record.id}`)"
+                  :checked-children="'启用'"
+                  :un-checked-children="'停用'"
+                  :data-hackernews-query-toggle="record.id"
+                  @change="handleToggleHackerNewsQuery(record)"
+                />
+              </template>
+              <template v-else-if="column.key === 'lastSuccessAt'">
+                {{ formatDateTime(record.lastSuccessAt) }}
+              </template>
+              <template v-else-if="column.key === 'lastResult'">
+                <span
+                  class="inline-block max-w-[240px] truncate align-middle"
+                  :title="record.lastResult ?? '暂无结果'"
+                  :data-hackernews-query-result="record.id"
+                >
+                  {{ record.lastResult ?? "暂无结果" }}
+                </span>
+              </template>
+              <template v-else-if="column.key === 'actions'">
+                <div class="flex flex-wrap justify-center gap-2" :data-hackernews-query-actions="record.id">
+                  <a-button
+                    type="link"
+                    size="small"
+                    :data-hackernews-query-edit="record.id"
+                    @click="openEditHackerNewsQueryModal(record)"
+                  >
+                    编辑
+                  </a-button>
+                  <a-popconfirm
+                    title="确认删除这个 Hacker News query 吗？"
+                    ok-text="确认删除"
+                    cancel-text="取消"
+                    @confirm="handleDeleteHackerNewsQuery(record)"
+                  >
+                    <a-button
+                      type="link"
+                      size="small"
+                      danger
+                      :loading="isActionPending(`hackernews-delete:${record.id}`)"
+                      :data-hackernews-query-delete="record.id"
                     >
                       删除
                     </a-button>
@@ -1794,6 +2112,89 @@ onUnmounted(() => {
               @click="handleSubmitTwitterAccount"
             >
               {{ twitterAccountModalMode === "create" ? "新增账号" : "保存更新" }}
+            </a-button>
+          </div>
+        </div>
+      </a-modal>
+
+      <a-modal
+        :open="isHackerNewsQueryModalOpen"
+        :title="hackerNewsQueryModalMode === 'create' ? '新增 Hacker News query' : '编辑 Hacker News query'"
+        :footer="null"
+        centered
+        :width="680"
+        destroy-on-close
+        @cancel="closeHackerNewsQueryModal"
+      >
+        <div class="flex flex-col gap-4" data-hackernews-query-modal="hackernews-query">
+          <a-alert
+            v-if="hackerNewsQueryFormError"
+            class="editorial-inline-alert editorial-inline-alert--error"
+            type="error"
+            show-icon
+            :message="hackerNewsQueryFormError"
+          />
+
+          <a-alert
+            class="editorial-inline-alert editorial-inline-alert--info"
+            type="info"
+            show-icon
+            :message="hackerNewsCollectionMessage"
+            data-hackernews-query-capability
+          />
+
+          <label class="flex flex-col gap-2">
+            <span class="text-sm font-medium text-editorial-text-main">查询词</span>
+            <input
+              v-model="hackerNewsQueryForm.query"
+              data-hackernews-query-form="query"
+              class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
+              placeholder="例如 openai、anthropic、cursor、ai agents"
+            />
+          </label>
+
+          <label class="flex flex-col gap-2">
+            <span class="text-sm font-medium text-editorial-text-main">优先级</span>
+            <input
+              v-model.number="hackerNewsQueryForm.priority"
+              data-hackernews-query-form="priority"
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
+            />
+          </label>
+
+          <label class="flex items-center gap-2 text-sm text-editorial-text-main">
+            <input
+              v-model="hackerNewsQueryForm.isEnabled"
+              data-hackernews-query-form="is-enabled"
+              type="checkbox"
+              class="h-4 w-4"
+            />
+            默认启用采集
+          </label>
+
+          <label class="flex flex-col gap-2">
+            <span class="text-sm font-medium text-editorial-text-main">备注</span>
+            <textarea
+              v-model="hackerNewsQueryForm.notes"
+              data-hackernews-query-form="notes"
+              rows="3"
+              class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
+            />
+          </label>
+
+          <div class="flex justify-end gap-2">
+            <a-button @click="closeHackerNewsQueryModal">取消</a-button>
+            <a-button
+              type="primary"
+              data-hackernews-query-form="submit"
+              :loading="isActionPending('hackernews-query:submit')"
+              @click="handleSubmitHackerNewsQuery"
+            >
+              {{ hackerNewsQueryModalMode === "create" ? "新增 query" : "保存更新" }}
             </a-button>
           </div>
         </div>

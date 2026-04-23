@@ -79,6 +79,7 @@ export type SourcesSettingsOperationsView = {
   canTriggerManualCollect: boolean;
   canTriggerManualTwitterCollect: boolean;
   canTriggerManualTwitterKeywordCollect: boolean;
+  canTriggerManualHackerNewsCollect?: boolean;
   canTriggerManualSendLatestEmail: boolean;
   isRunning: boolean;
   lastCollectionRunAt: string | null;
@@ -93,6 +94,8 @@ export type SourcesCapabilityView = {
   twitterAccountCollectionMessage?: string;
   twitterKeywordSearchEnabled?: boolean;
   twitterKeywordSearchMessage?: string;
+  hackerNewsSearchEnabled?: boolean;
+  hackerNewsSearchMessage?: string;
 };
 
 export type TwitterAccountSettingsView = {
@@ -127,10 +130,24 @@ export type TwitterSearchKeywordSettingsView = {
   updatedAt: string;
 };
 
+export type HackerNewsQuerySettingsView = {
+  id: number;
+  query: string;
+  priority: number;
+  isEnabled: boolean;
+  notes: string | null;
+  lastFetchedAt: string | null;
+  lastSuccessAt: string | null;
+  lastResult: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type SourcesSettingsView = {
   sources: SourceItem[];
   twitterAccounts?: TwitterAccountSettingsView[];
   twitterSearchKeywords?: TwitterSearchKeywordSettingsView[];
+  hackerNewsQueries?: HackerNewsQuerySettingsView[];
   operations: SourcesSettingsOperationsView;
   capability: SourcesCapabilityView;
 };

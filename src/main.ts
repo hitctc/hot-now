@@ -37,6 +37,7 @@ import { loadEnabledSourceIssues } from "./core/source/loadEnabledSourceIssues.j
 import { hydrateSourceContent } from "./core/source/hydrateSourceContent.js";
 import { runTwitterAccountCollection } from "./core/twitter/runTwitterAccountCollection.js";
 import { runTwitterKeywordCollection } from "./core/twitter/runTwitterKeywordCollection.js";
+import { runHackerNewsCollection } from "./core/hackernews/runHackerNewsCollection.js";
 import {
   deleteSource as removeSource,
   saveSource as persistSource,
@@ -58,6 +59,13 @@ import {
   toggleTwitterSearchKeywordVisible as persistTwitterSearchKeywordVisibleToggle,
   updateTwitterSearchKeyword as persistTwitterSearchKeywordUpdate
 } from "./core/twitter/twitterSearchKeywordRepository.js";
+import {
+  createHackerNewsQuery as persistHackerNewsQuery,
+  deleteHackerNewsQuery as removeHackerNewsQuery,
+  listHackerNewsQueries,
+  toggleHackerNewsQuery as persistHackerNewsQueryToggle,
+  updateHackerNewsQuery as persistHackerNewsQueryUpdate
+} from "./core/hackernews/hackerNewsQueryRepository.js";
 import { listReportDates, readTextFile } from "./core/storage/reportStore.js";
 import {
   getViewRuleConfig,
@@ -138,6 +146,11 @@ async function runTwitterKeywordCollectionTask() {
     apiKey: process.env.TWITTER_API_KEY?.trim() || null,
     fetchArticle: fetchAndExtractArticle
   });
+}
+
+// Hacker News 搜索第一版只支持手动触发，避免在默认采集节奏里顺手扩大来源范围。
+async function runHackerNewsCollectionTask() {
+  return await runHackerNewsCollection(db);
 }
 
 // Latest-email runs reuse the most recent report artifact and keep SMTP concerns out of the collection cadence.
@@ -461,6 +474,13 @@ const triggerManualTwitterKeywordCollect = config.manualActions.collectEnabled
     }
   : undefined;
 
+// Hacker News 搜索和其他手动采集共用同一把运行锁，但继续保持独立入口和独立结果摘要。
+const triggerManualHackerNewsCollect = config.manualActions.collectEnabled
+  ? async () => {
+      return await lock.runExclusive(async () => await runHackerNewsCollectionTask());
+    }
+  : undefined;
+
 // 新增来源后先只补这一条 source 的内容入库，避免为了拿到首批数据就把整轮全站采集串进保存接口。
 async function saveAndHydrateSource(input: Parameters<typeof persistSource>[1]) {
   const result = await persistSource(db, input, {
@@ -537,6 +557,7 @@ const app = createServer({
     persistSourceDisplayMode(db, kind, showAllWhenSelected),
   listTwitterAccounts: async () => listTwitterAccounts(db),
   listTwitterSearchKeywords: async () => listTwitterSearchKeywords(db),
+  listHackerNewsQueries: async () => listHackerNewsQueries(db),
   createTwitterAccount: async (input) => persistTwitterAccount(db, input),
   updateTwitterAccount: async (input) => persistTwitterAccountUpdate(db, input),
   deleteTwitterAccount: async (id) => removeTwitterAccount(db, id),
@@ -548,9 +569,14 @@ const app = createServer({
     persistTwitterSearchKeywordCollectToggle(db, id, enable),
   toggleTwitterSearchKeywordVisible: async (id, enable) =>
     persistTwitterSearchKeywordVisibleToggle(db, id, enable),
+  createHackerNewsQuery: async (input) => persistHackerNewsQuery(db, input),
+  updateHackerNewsQuery: async (input) => persistHackerNewsQueryUpdate(db, input),
+  deleteHackerNewsQuery: async (id) => removeHackerNewsQuery(db, id),
+  toggleHackerNewsQuery: async (id, enable) => persistHackerNewsQueryToggle(db, id, enable),
   hasTwitterApiKey: Boolean(process.env.TWITTER_API_KEY?.trim()),
   triggerManualTwitterCollect,
   triggerManualTwitterKeywordCollect,
+  triggerManualHackerNewsCollect,
   getCurrentUserProfile: async () => getCurrentUserProfile(),
   listReportSummaries: listStoredReportSummaries,
   latestReportDate: async () => (await listReportDates(config.report.dataDir))[0] ?? null,

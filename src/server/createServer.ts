@@ -35,6 +35,13 @@ import type {
   ToggleTwitterSearchKeywordResult,
   TwitterSearchKeywordRecord
 } from "../core/twitter/twitterSearchKeywordRepository.js";
+import type {
+  DeleteHackerNewsQueryResult,
+  HackerNewsQueryRecord,
+  SaveHackerNewsQueryInput,
+  SaveHackerNewsQueryResult,
+  ToggleHackerNewsQueryResult
+} from "../core/hackernews/hackerNewsQueryRepository.js";
 import type { RuntimeConfig } from "../core/types/appConfig.js";
 import { readNextCollectionRunAt } from "../core/scheduler/readNextCollectionRunAt.js";
 import {
@@ -57,6 +64,7 @@ import {
   renderViewRulesPage,
   type ProfileView,
   type SourcesSettingsView,
+  type HackerNewsQuerySettingsView,
   type TwitterAccountSettingsView,
   type TwitterSearchKeywordSettingsView,
   type ViewRulesWorkbenchView
@@ -133,6 +141,21 @@ type ManualTwitterKeywordCollectResult =
   | {
       accepted: false;
       reason: "twitter-api-key-missing" | "no-enabled-twitter-keywords";
+    };
+type ManualHackerNewsCollectResult =
+  | {
+      accepted: true;
+      action: "collect-hackernews";
+      enabledQueryCount: number;
+      processedQueryCount: number;
+      fetchedHitCount: number;
+      persistedContentItemCount: number;
+      reusedContentItemCount: number;
+      failureCount: number;
+    }
+  | {
+      accepted: false;
+      reason: "no-enabled-hackernews-queries";
     };
 type ManualSendLatestEmailResult =
   | { accepted: true; action: "send-latest-email" }
@@ -230,6 +253,7 @@ type ServerDeps = {
   ) => Promise<UpdateSourceDisplayModeResult> | UpdateSourceDisplayModeResult;
   listTwitterAccounts?: () => Promise<TwitterAccountRecord[]> | TwitterAccountRecord[];
   listTwitterSearchKeywords?: () => Promise<TwitterSearchKeywordRecord[]> | TwitterSearchKeywordRecord[];
+  listHackerNewsQueries?: () => Promise<HackerNewsQueryRecord[]> | HackerNewsQueryRecord[];
   createTwitterAccount?: (
     input: SaveTwitterAccountInput
   ) => Promise<SaveTwitterAccountResult> | SaveTwitterAccountResult;
@@ -258,7 +282,19 @@ type ServerDeps = {
     id: number,
     enable: boolean
   ) => Promise<ToggleTwitterSearchKeywordResult> | ToggleTwitterSearchKeywordResult;
+  createHackerNewsQuery?: (
+    input: SaveHackerNewsQueryInput
+  ) => Promise<SaveHackerNewsQueryResult> | SaveHackerNewsQueryResult;
+  updateHackerNewsQuery?: (
+    input: SaveHackerNewsQueryInput
+  ) => Promise<SaveHackerNewsQueryResult> | SaveHackerNewsQueryResult;
+  deleteHackerNewsQuery?: (id: number) => Promise<DeleteHackerNewsQueryResult> | DeleteHackerNewsQueryResult;
+  toggleHackerNewsQuery?: (
+    id: number,
+    enable: boolean
+  ) => Promise<ToggleHackerNewsQueryResult> | ToggleHackerNewsQueryResult;
   hasTwitterApiKey?: boolean;
+  triggerManualHackerNewsCollect?: () => Promise<ManualHackerNewsCollectResult>;
   getCurrentUserProfile?: () => Promise<CurrentUserProfile | null> | CurrentUserProfile | null;
   getContentPageModel?: (
     pageKey: ContentPageKey,
@@ -683,6 +719,17 @@ export function createServer(deps: ServerDeps = {}) {
       authConfig?.sessionSecret ?? "",
       deps.isRunning?.() ?? false,
       deps.triggerManualTwitterKeywordCollect
+    );
+  });
+
+  app.post("/actions/hackernews/collect", async (request, reply) => {
+    return await handleManualHackerNewsCollectAction(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? "",
+      deps.isRunning?.() ?? false,
+      deps.triggerManualHackerNewsCollect
     );
   });
 
@@ -1218,6 +1265,96 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.send({ ok: true, id: result.keyword.id, enable: result.keyword.isVisible });
   });
 
+  app.post("/actions/hackernews/create", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.createHackerNewsQuery) {
+      return reply.code(503).send({ ok: false, reason: "hackernews-disabled" });
+    }
+
+    const payload = parseHackerNewsQuerySavePayload(request.body, "create");
+
+    if (!payload) {
+      return reply.code(400).send({ ok: false, reason: "invalid-hackernews-query-payload" });
+    }
+
+    return sendHackerNewsQuerySaveResult(reply, await deps.createHackerNewsQuery(payload));
+  });
+
+  app.post("/actions/hackernews/update", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.updateHackerNewsQuery) {
+      return reply.code(503).send({ ok: false, reason: "hackernews-disabled" });
+    }
+
+    const payload = parseHackerNewsQuerySavePayload(request.body, "update");
+
+    if (!payload) {
+      return reply.code(400).send({ ok: false, reason: "invalid-hackernews-query-payload" });
+    }
+
+    return sendHackerNewsQuerySaveResult(reply, await deps.updateHackerNewsQuery(payload));
+  });
+
+  app.post("/actions/hackernews/delete", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.deleteHackerNewsQuery) {
+      return reply.code(503).send({ ok: false, reason: "hackernews-disabled" });
+    }
+
+    const id = parsePositiveInteger((request.body as { id?: unknown } | undefined)?.id);
+
+    if (id === null) {
+      return reply.code(400).send({ ok: false, reason: "invalid-hackernews-query-id" });
+    }
+
+    const result = await deps.deleteHackerNewsQuery(id);
+
+    if (!result.ok) {
+      return reply.code(result.reason === "not-found" ? 404 : 400).send({ ok: false, reason: result.reason });
+    }
+
+    return reply.send({ ok: true, id: result.id });
+  });
+
+  app.post("/actions/hackernews/toggle", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.toggleHackerNewsQuery) {
+      return reply.code(503).send({ ok: false, reason: "hackernews-disabled" });
+    }
+
+    const body = request.body as { id?: unknown; enable?: unknown } | undefined;
+    const id = parsePositiveInteger(body?.id);
+    const enable = typeof body?.enable === "boolean" ? body.enable : null;
+
+    if (id === null) {
+      return reply.code(400).send({ ok: false, reason: "invalid-hackernews-query-id" });
+    }
+
+    if (enable === null) {
+      return reply.code(400).send({ ok: false, reason: "invalid-hackernews-query-enable" });
+    }
+
+    const result = await deps.toggleHackerNewsQuery(id, enable);
+
+    if (!result.ok) {
+      return reply.code(result.reason === "not-found" ? 404 : 400).send({ ok: false, reason: result.reason });
+    }
+
+    return reply.send({ ok: true, id: result.query.id, enable: result.query.isEnabled });
+  });
+
   return app;
 }
 
@@ -1292,6 +1429,36 @@ function parseTwitterKeywordSavePayload(
   };
 }
 
+function parseHackerNewsQuerySavePayload(
+  body: unknown,
+  mode: "create" | "update"
+): SaveHackerNewsQueryInput | null {
+  if (!body || typeof body !== "object") {
+    return null;
+  }
+
+  const payload = body as Record<string, unknown>;
+  const query = typeof payload.query === "string" ? payload.query.trim() : "";
+
+  if (!query) {
+    return null;
+  }
+
+  const id = mode === "update" ? parsePositiveInteger(payload.id) : null;
+
+  if (mode === "update" && id === null) {
+    return null;
+  }
+
+  return {
+    ...(id !== null ? { id } : {}),
+    query,
+    priority: typeof payload.priority === "number" ? payload.priority : null,
+    isEnabled: typeof payload.isEnabled === "boolean" ? payload.isEnabled : null,
+    notes: typeof payload.notes === "string" ? payload.notes : null
+  };
+}
+
 function sendTwitterAccountSaveResult(reply: FastifyReply, result: SaveTwitterAccountResult) {
   if (result.ok) {
     return reply.send({ ok: true, account: result.account });
@@ -1318,6 +1485,22 @@ function sendTwitterKeywordSaveResult(reply: FastifyReply, result: SaveTwitterSe
   }
 
   if (result.reason === "duplicate-keyword") {
+    return reply.code(409).send({ ok: false, reason: result.reason });
+  }
+
+  return reply.code(400).send({ ok: false, reason: result.reason });
+}
+
+function sendHackerNewsQuerySaveResult(reply: FastifyReply, result: SaveHackerNewsQueryResult) {
+  if (result.ok) {
+    return reply.send({ ok: true, query: result.query });
+  }
+
+  if (result.reason === "not-found") {
+    return reply.code(404).send({ ok: false, reason: result.reason });
+  }
+
+  if (result.reason === "duplicate-query") {
     return reply.code(409).send({ ok: false, reason: result.reason });
   }
 
@@ -1517,6 +1700,7 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
   const sources = ((await deps.listSources?.()) ?? []) as SourceCard[];
   const twitterAccounts = ((await deps.listTwitterAccounts?.()) ?? []) as TwitterAccountSettingsView[];
   const twitterSearchKeywords = ((await deps.listTwitterSearchKeywords?.()) ?? []) as TwitterSearchKeywordSettingsView[];
+  const hackerNewsQueries = ((await deps.listHackerNewsQueries?.()) ?? []) as HackerNewsQuerySettingsView[];
   const operationSummary = deps.getSourcesOperationSummary
     ? await deps.getSourcesOperationSummary()
     : { lastCollectionRunAt: null, lastSendLatestEmailAt: null };
@@ -1529,6 +1713,7 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
     sources,
     twitterAccounts,
     twitterSearchKeywords,
+    hackerNewsQueries,
     operations: {
       lastCollectionRunAt: operationSummary.lastCollectionRunAt,
       lastSendLatestEmailAt: operationSummary.lastSendLatestEmailAt,
@@ -1536,6 +1721,7 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
       canTriggerManualCollect: typeof (deps.triggerManualCollect ?? deps.triggerManualRun) === "function",
       canTriggerManualTwitterCollect: typeof deps.triggerManualTwitterCollect === "function",
       canTriggerManualTwitterKeywordCollect: typeof deps.triggerManualTwitterKeywordCollect === "function",
+      canTriggerManualHackerNewsCollect: typeof deps.triggerManualHackerNewsCollect === "function",
       canTriggerManualSendLatestEmail: typeof deps.triggerManualSendLatestEmail === "function",
       isRunning: deps.isRunning?.() ?? false
     },
@@ -1553,7 +1739,9 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
       twitterKeywordSearchMessage:
         deps.hasTwitterApiKey === true
           ? "Twitter 关键词搜索已配置 API key，仅支持手动采集。"
-          : "当前环境未配置 TWITTER_API_KEY；Twitter 关键词可先维护，采集时会跳过。"
+          : "当前环境未配置 TWITTER_API_KEY；Twitter 关键词可先维护，采集时会跳过。",
+      hackerNewsSearchEnabled: true,
+      hackerNewsSearchMessage: "Hacker News 搜索已就绪，可维护 query 并手动采集。"
     }
   };
 }
@@ -2433,6 +2621,31 @@ async function handleManualTwitterKeywordCollectAction(
   }
 
   const result = await triggerManualTwitterKeywordCollect();
+  return reply.code(202).send(result);
+}
+
+async function handleManualHackerNewsCollectAction(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  authEnabled: boolean,
+  sessionSecret: string,
+  isRunning: boolean,
+  triggerManualHackerNewsCollect: ServerDeps["triggerManualHackerNewsCollect"]
+) {
+  // Hacker News 搜索沿用同一套手动动作权限和运行锁门禁，但单独返回 HN 侧结果摘要。
+  if (!ensureManualActionAuthorized(request, reply, authEnabled, sessionSecret)) {
+    return;
+  }
+
+  if (isRunning) {
+    return reply.code(409).send({ accepted: false, reason: "already-running" });
+  }
+
+  if (!triggerManualHackerNewsCollect) {
+    return reply.code(503).send({ accepted: false });
+  }
+
+  const result = await triggerManualHackerNewsCollect();
   return reply.code(202).send(result);
 }
 

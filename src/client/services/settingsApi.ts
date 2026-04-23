@@ -117,6 +117,7 @@ export type SettingsSourcesOperations = {
   canTriggerManualCollect: boolean;
   canTriggerManualTwitterCollect: boolean;
   canTriggerManualTwitterKeywordCollect: boolean;
+  canTriggerManualHackerNewsCollect?: boolean;
   canTriggerManualSendLatestEmail: boolean;
   isRunning: boolean;
 };
@@ -128,6 +129,8 @@ export type SettingsSourcesCapability = {
   twitterAccountCollectionMessage?: string;
   twitterKeywordSearchEnabled?: boolean;
   twitterKeywordSearchMessage?: string;
+  hackerNewsSearchEnabled?: boolean;
+  hackerNewsSearchMessage?: string;
 };
 
 export type SettingsTwitterAccount = {
@@ -162,10 +165,24 @@ export type SettingsTwitterSearchKeyword = {
   updatedAt: string;
 };
 
+export type SettingsHackerNewsQuery = {
+  id: number;
+  query: string;
+  priority: number;
+  isEnabled: boolean;
+  notes: string | null;
+  lastFetchedAt: string | null;
+  lastSuccessAt: string | null;
+  lastResult: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type SettingsSourcesResponse = {
   sources: SettingsSourceItem[];
   twitterAccounts?: SettingsTwitterAccount[];
   twitterSearchKeywords?: SettingsTwitterSearchKeyword[];
+  hackerNewsQueries?: SettingsHackerNewsQuery[];
   operations: SettingsSourcesOperations;
   capability: SettingsSourcesCapability;
 };
@@ -277,12 +294,36 @@ export type SaveTwitterSearchKeywordResponse = {
   keyword: SettingsTwitterSearchKeyword;
 };
 
+export type SaveHackerNewsQueryPayload = {
+  id?: number;
+  query: string;
+  priority?: number | null;
+  isEnabled?: boolean | null;
+  notes?: string | null;
+};
+
+export type SaveHackerNewsQueryResponse = {
+  ok: true;
+  query: SettingsHackerNewsQuery;
+};
+
 export type DeleteTwitterSearchKeywordResponse = {
   ok: true;
   id: number;
 };
 
 export type ToggleTwitterSearchKeywordResponse = {
+  ok: true;
+  id: number;
+  enable: boolean;
+};
+
+export type DeleteHackerNewsQueryResponse = {
+  ok: true;
+  id: number;
+};
+
+export type ToggleHackerNewsQueryResponse = {
   ok: true;
   id: number;
   enable: boolean;
@@ -333,6 +374,22 @@ export type ManualTwitterKeywordCollectResponse =
   | {
       accepted: false;
       reason?: "twitter-api-key-missing" | "no-enabled-twitter-keywords" | "already-running";
+    };
+
+export type ManualHackerNewsCollectResponse =
+  | {
+      accepted: true;
+      action: "collect-hackernews";
+      enabledQueryCount: number;
+      processedQueryCount: number;
+      fetchedHitCount: number;
+      persistedContentItemCount: number;
+      reusedContentItemCount: number;
+      failureCount: number;
+    }
+  | {
+      accepted: false;
+      reason?: "no-enabled-hackernews-queries" | "already-running";
     };
 
 export type ManualSendLatestEmailResponse = {
@@ -499,6 +556,22 @@ export function toggleTwitterSearchKeywordVisible(
   });
 }
 
+export function createHackerNewsQuery(payload: SaveHackerNewsQueryPayload): Promise<SaveHackerNewsQueryResponse> {
+  return postSettingsAction<SaveHackerNewsQueryResponse>("/actions/hackernews/create", payload);
+}
+
+export function updateHackerNewsQuery(payload: SaveHackerNewsQueryPayload): Promise<SaveHackerNewsQueryResponse> {
+  return postSettingsAction<SaveHackerNewsQueryResponse>("/actions/hackernews/update", payload);
+}
+
+export function deleteHackerNewsQuery(id: number): Promise<DeleteHackerNewsQueryResponse> {
+  return postSettingsAction<DeleteHackerNewsQueryResponse>("/actions/hackernews/delete", { id });
+}
+
+export function toggleHackerNewsQuery(id: number, enable: boolean): Promise<ToggleHackerNewsQueryResponse> {
+  return postSettingsAction<ToggleHackerNewsQueryResponse>("/actions/hackernews/toggle", { id, enable });
+}
+
 // 手动采集走独立动作接口，保持和旧系统页一致的任务语义。
 export function triggerManualCollect(): Promise<ManualCollectResponse> {
   return postSettingsAction<ManualCollectResponse>("/actions/collect", {});
@@ -512,6 +585,11 @@ export function triggerManualTwitterCollect(): Promise<ManualTwitterCollectRespo
 // Twitter 关键词搜索只支持手动采集，避免把 credits 消耗绑定进默认定时任务。
 export function triggerManualTwitterKeywordCollect(): Promise<ManualTwitterKeywordCollectResponse> {
   return postSettingsAction<ManualTwitterKeywordCollectResponse>("/actions/twitter-keywords/collect", {});
+}
+
+// Hacker News 搜索保持独立手动入口，避免默认采集链路无意扩大范围。
+export function triggerManualHackerNewsCollect(): Promise<ManualHackerNewsCollectResponse> {
+  return postSettingsAction<ManualHackerNewsCollectResponse>("/actions/hackernews/collect", {});
 }
 
 // 手动发送最新报告沿用现有后端接口，错误原因由调用方再翻译成用户提示。

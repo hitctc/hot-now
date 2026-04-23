@@ -46,6 +46,11 @@ export type ContentItemIdByExternalId = {
   contentItemId: number;
 };
 
+export type MergeContentMatchedQueriesInput = {
+  contentItemId: number;
+  matchedQueries: string[];
+};
+
 // This resolves the persisted source row so callers can attach collected items to the same
 // source catalog that migrations and seed data already manage.
 export function resolveSourceByKind(db: SqliteDatabase, kind: SourceKind): ContentSourceRecord | undefined {
@@ -282,6 +287,53 @@ export function listContentItemIdsByExternalIds(
   return rows.filter((row) => typeof row.externalId === "string" && row.externalId.length > 0);
 }
 
+// Hacker News search keeps first-phase query hits in metadata_json, so repeated matches can merge
+// there without introducing another relation table before query-level filtering is needed.
+export function mergeContentMatchedQueries(
+  db: SqliteDatabase,
+  updates: MergeContentMatchedQueriesInput[]
+): void {
+  const normalizedUpdates = updates
+    .map((update) => ({
+      contentItemId: update.contentItemId,
+      matchedQueries: uniqueNonEmptyStrings(update.matchedQueries)
+    }))
+    .filter((update) => Number.isInteger(update.contentItemId) && update.contentItemId > 0 && update.matchedQueries.length > 0);
+
+  if (normalizedUpdates.length === 0) {
+    return;
+  }
+
+  const readStatement = db.prepare("SELECT metadata_json AS metadataJson FROM content_items WHERE id = ? LIMIT 1");
+  const writeStatement = db.prepare(
+    `
+      UPDATE content_items
+      SET metadata_json = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `
+  );
+
+  const merge = db.transaction((items: Array<{ contentItemId: number; matchedQueries: string[] }>) => {
+    for (const item of items) {
+      const row = readStatement.get(item.contentItemId) as { metadataJson: string | null } | undefined;
+
+      if (!row) {
+        continue;
+      }
+
+      const metadata = parseMetadataJson(row.metadataJson);
+      const existingMatchedQueries = Array.isArray(metadata.matchedQueries)
+        ? uniqueNonEmptyStrings(metadata.matchedQueries.filter((value): value is string => typeof value === "string"))
+        : [];
+      metadata.matchedQueries = uniqueNonEmptyStrings([...existingMatchedQueries, ...item.matchedQueries]);
+      writeStatement.run(JSON.stringify(metadata), item.contentItemId);
+    }
+  });
+
+  merge(normalizedUpdates);
+}
+
 // A collection run row is created as soon as a digest has enough source context to be tracked,
 // so later steps can either complete it or mark the run as failed.
 export function createCollectionRun(db: SqliteDatabase, input: CreateCollectionRunInput): number {
@@ -328,6 +380,19 @@ function uniqueNonEmptyStrings(values: string[]): string[] {
         .filter((value) => value.length > 0)
     )
   ];
+}
+
+function parseMetadataJson(value: string | null): Record<string, unknown> {
+  if (!value) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
 }
 
 function readTwitterAccountIdFromMetadataJson(metadataJson: string | null): number | null {

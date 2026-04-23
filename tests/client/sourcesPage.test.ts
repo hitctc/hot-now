@@ -23,16 +23,21 @@ vi.mock("../../src/client/services/settingsApi", async () => {
     deleteSource: vi.fn(),
     toggleSource: vi.fn(),
     updateSourceDisplayMode: vi.fn(),
+    createHackerNewsQuery: vi.fn(),
     createTwitterAccount: vi.fn(),
     createTwitterSearchKeyword: vi.fn(),
+    updateHackerNewsQuery: vi.fn(),
     updateTwitterAccount: vi.fn(),
     updateTwitterSearchKeyword: vi.fn(),
+    deleteHackerNewsQuery: vi.fn(),
     deleteTwitterAccount: vi.fn(),
     deleteTwitterSearchKeyword: vi.fn(),
+    toggleHackerNewsQuery: vi.fn(),
     toggleTwitterAccount: vi.fn(),
     toggleTwitterSearchKeywordCollect: vi.fn(),
     toggleTwitterSearchKeywordVisible: vi.fn(),
     triggerManualCollect: vi.fn(),
+    triggerManualHackerNewsCollect: vi.fn(),
     triggerManualTwitterCollect: vi.fn(),
     triggerManualTwitterKeywordCollect: vi.fn(),
     triggerManualSendLatestEmail: vi.fn()
@@ -133,6 +138,20 @@ function createSourcesModel() {
         updatedAt: "2026-04-23T08:11:00.000Z"
       }
     ],
+    hackerNewsQueries: [
+      {
+        id: 21,
+        query: "openai",
+        priority: 70,
+        isEnabled: true,
+        notes: "core query",
+        lastFetchedAt: "2026-04-23T08:20:00.000Z",
+        lastSuccessAt: "2026-04-23T08:21:00.000Z",
+        lastResult: "本次搜索成功，获得 2 条候选内容。",
+        createdAt: "2026-04-23T07:00:00.000Z",
+        updatedAt: "2026-04-23T08:21:00.000Z"
+      }
+    ],
     operations: {
       lastCollectionRunAt: "2026-03-31T08:10:00.000Z",
       lastSendLatestEmailAt: "2026-03-31T08:30:00.000Z",
@@ -140,6 +159,7 @@ function createSourcesModel() {
       canTriggerManualCollect: true,
       canTriggerManualTwitterCollect: true,
       canTriggerManualTwitterKeywordCollect: true,
+      canTriggerManualHackerNewsCollect: true,
       canTriggerManualSendLatestEmail: true,
       isRunning: false
     },
@@ -149,7 +169,9 @@ function createSourcesModel() {
       twitterAccountCollectionEnabled: true,
       twitterAccountCollectionMessage: "Twitter 账号采集已配置 API key，可采集已启用账号。",
       twitterKeywordSearchEnabled: true,
-      twitterKeywordSearchMessage: "Twitter 关键词搜索已配置 API key，仅支持手动采集。"
+      twitterKeywordSearchMessage: "Twitter 关键词搜索已配置 API key，仅支持手动采集。",
+      hackerNewsSearchEnabled: true,
+      hackerNewsSearchMessage: "Hacker News 搜索已就绪，可维护 query 并手动采集。"
     }
   } satisfies settingsApi.SettingsSourcesResponse;
 }
@@ -230,6 +252,10 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-sources-section='twitter-keywords']").text()).toContain("官方厂商");
     expect(wrapper.get("[data-sources-section='twitter-keywords']").text()).toContain("Twitter 关键词搜索已配置 API key");
     expect(wrapper.get("[data-sources-section='twitter-keywords']").text()).toContain("手动采集 Twitter 关键词");
+    expect(wrapper.get("[data-sources-section='hackernews']").text()).toContain("Hacker News 搜索");
+    expect(wrapper.get("[data-sources-section='hackernews']").text()).toContain("openai");
+    expect(wrapper.get("[data-sources-section='hackernews']").text()).toContain("Hacker News 搜索已就绪");
+    expect(wrapper.get("[data-sources-section='hackernews']").text()).toContain("手动采集 Hacker News");
     expect(wrapper.get("[data-sources-section='inventory']").classes()).toContain("editorial-glass-panel");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("已完成");
     expect(wrapper.get("[data-sources-section='inventory']").text()).not.toContain("选中时全量");
@@ -355,6 +381,31 @@ describe("SourcesPage", () => {
     expect(wrapper.text()).toContain("Twitter 关键词采集已完成：处理 1 个关键词，新入库 1 条，复用 1 条，失败 0 个。");
   });
 
+  it("starts hacker news collection and shows the persisted count summary", async () => {
+    vi.mocked(settingsApi.readSettingsSources)
+      .mockResolvedValueOnce(createSourcesModel())
+      .mockResolvedValueOnce(createSourcesModel());
+    vi.mocked(settingsApi.triggerManualHackerNewsCollect).mockResolvedValue({
+      accepted: true,
+      action: "collect-hackernews",
+      enabledQueryCount: 1,
+      processedQueryCount: 1,
+      fetchedHitCount: 2,
+      persistedContentItemCount: 1,
+      reusedContentItemCount: 1,
+      failureCount: 0
+    });
+
+    const wrapper = mountSourcesPage();
+
+    await flushPromises();
+    await wrapper.get("[data-action='manual-hackernews-collect']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.triggerManualHackerNewsCollect).toHaveBeenCalledTimes(1);
+    expect(wrapper.text()).toContain("Hacker News 搜索已完成：处理 1 个 query，新入库 1 条，复用 1 条，失败 0 个。");
+  });
+
   it("updates source display mode and reloads the latest sources model", async () => {
     vi.mocked(settingsApi.readSettingsSources)
       .mockResolvedValueOnce(createSourcesModel())
@@ -401,6 +452,30 @@ describe("SourcesPage", () => {
     expect(settingsApi.toggleTwitterAccount).toHaveBeenCalledWith(1, false);
     expect(settingsApi.readSettingsSources).toHaveBeenCalledTimes(2);
     expect(wrapper.text()).toContain("已停用 Twitter 账号");
+  });
+
+  it("toggles a hacker news query and reloads the latest sources model", async () => {
+    vi.mocked(settingsApi.readSettingsSources)
+      .mockResolvedValueOnce(createSourcesModel())
+      .mockResolvedValueOnce({
+        ...createSourcesModel(),
+        hackerNewsQueries: [{ ...createSourcesModel().hackerNewsQueries![0], isEnabled: false }]
+      });
+    vi.mocked(settingsApi.toggleHackerNewsQuery).mockResolvedValue({
+      ok: true,
+      id: 21,
+      enable: false
+    });
+
+    const wrapper = mountSourcesPage();
+
+    await flushPromises();
+    await wrapper.get("[data-hackernews-query-toggle='21']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.toggleHackerNewsQuery).toHaveBeenCalledWith(21, false);
+    expect(settingsApi.readSettingsSources).toHaveBeenCalledTimes(2);
+    expect(wrapper.text()).toContain("已停用 Hacker News query");
   });
 
   it("submits a twitter account from the create modal", async () => {
@@ -470,6 +545,68 @@ describe("SourcesPage", () => {
         priority: 90,
         includeReplies: true,
         notes: "official account"
+      })
+    );
+  });
+
+  it("submits a hacker news query from the create modal", async () => {
+    vi.mocked(settingsApi.readSettingsSources).mockResolvedValue(createSourcesModel());
+    vi.mocked(settingsApi.createHackerNewsQuery).mockResolvedValue({
+      ok: true,
+      query: createSourcesModel().hackerNewsQueries![0]
+    });
+
+    const wrapper = mountSourcesPage();
+    await flushPromises();
+
+    await wrapper.get("[data-action='add-hackernews-query']").trigger("click");
+    await flushPromises();
+
+    await getModalNode("[data-hackernews-query-form='query']").setValue("anthropic");
+    await getModalNode("[data-hackernews-query-form='priority']").setValue("75");
+    await getModalNode("[data-hackernews-query-form='notes']").setValue("model vendor");
+    await getModalNode("[data-hackernews-query-form='submit']").trigger("click");
+    await flushPromises();
+
+    expect(getModalNode("[data-hackernews-query-capability]").text()).toContain("Hacker News 搜索已就绪");
+    expect(settingsApi.createHackerNewsQuery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: "anthropic",
+        priority: 75,
+        isEnabled: true,
+        notes: "model vendor"
+      })
+    );
+  });
+
+  it("updates a hacker news query from the edit modal", async () => {
+    vi.mocked(settingsApi.readSettingsSources).mockResolvedValue(createSourcesModel());
+    vi.mocked(settingsApi.updateHackerNewsQuery).mockResolvedValue({
+      ok: true,
+      query: {
+        ...createSourcesModel().hackerNewsQueries![0],
+        query: "openai api"
+      }
+    });
+
+    const wrapper = mountSourcesPage();
+    await flushPromises();
+
+    await wrapper.get("[data-hackernews-query-edit='21']").trigger("click");
+    await flushPromises();
+
+    await getModalNode("[data-hackernews-query-form='query']").setValue("openai api");
+    await getModalNode("[data-hackernews-query-form='is-enabled']").setValue(false);
+    await getModalNode("[data-hackernews-query-form='submit']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.updateHackerNewsQuery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 21,
+        query: "openai api",
+        priority: 70,
+        isEnabled: false,
+        notes: "core query"
       })
     );
   });

@@ -121,8 +121,23 @@ function createAuthenticatedServer() {
         updatedAt: "2026-04-23T08:00:00.000Z"
       }
     ]),
+    listHackerNewsQueries: vi.fn().mockResolvedValue([
+      {
+        id: 11,
+        query: "OpenAI",
+        priority: 90,
+        isEnabled: true,
+        notes: "重点 query",
+        lastFetchedAt: null,
+        lastSuccessAt: null,
+        lastResult: null,
+        createdAt: "2026-04-23T08:00:00.000Z",
+        updatedAt: "2026-04-23T08:00:00.000Z"
+      }
+    ]),
     hasTwitterApiKey: true,
     triggerManualRun: vi.fn().mockResolvedValue({ accepted: true }),
+    triggerManualHackerNewsCollect: vi.fn().mockResolvedValue({ accepted: true }),
     getSourcesOperationSummary: vi.fn().mockResolvedValue({
       lastCollectionRunAt: "2026-03-31T03:00:00.000Z",
       lastSendLatestEmailAt: "2026-03-31T03:10:00.000Z"
@@ -226,18 +241,28 @@ describe("settings api routes", () => {
           isEnabled: true
         }
       ],
+      hackerNewsQueries: [
+        {
+          id: 11,
+          query: "OpenAI",
+          priority: 90,
+          isEnabled: true
+        }
+      ],
       operations: {
         lastCollectionRunAt: "2026-03-31T03:00:00.000Z",
         lastSendLatestEmailAt: "2026-03-31T03:10:00.000Z",
         nextCollectionRunAt: expect.any(String),
         canTriggerManualCollect: true,
         canTriggerManualTwitterCollect: false,
+        canTriggerManualHackerNewsCollect: true,
         canTriggerManualSendLatestEmail: false,
         isRunning: false
       },
       capability: {
         wechatArticleUrlEnabled: false,
-        twitterAccountCollectionEnabled: true
+        twitterAccountCollectionEnabled: true,
+        hackerNewsSearchEnabled: true
       }
     });
   });

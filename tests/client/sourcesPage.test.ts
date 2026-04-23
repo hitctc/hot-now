@@ -148,6 +148,10 @@ describe("SourcesPage", () => {
       value: vi.fn().mockReturnValue({
         width: "0px",
         height: "0px",
+        transitionDelay: "0s",
+        transitionDuration: "0s",
+        animationDelay: "0s",
+        animationDuration: "0s",
         getPropertyValue: vi.fn().mockReturnValue("0px")
       })
     });

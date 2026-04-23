@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { getInternalViewRuleConfig, normalizeViewRuleConfig } from "../../src/core/viewRules/viewRuleConfig.js";
 
+const enabledRankingToggles = {
+  enableSourceViewBonus: true,
+  enableAiKeywordWeight: true,
+  enableHeatKeywordWeight: true,
+  enableFreshnessWeight: true,
+  enableScoreRanking: true
+} as const;
+
 describe("viewRuleConfig", () => {
   it("returns fixed internal defaults for the legacy content views still used by the ranking engine", () => {
     expect(getInternalViewRuleConfig("hot")).toEqual({
@@ -10,7 +18,9 @@ describe("viewRuleConfig", () => {
       sourceWeight: 0.1,
       completenessWeight: 0.1,
       aiWeight: 0.05,
-      heatWeight: 0.4
+      heatWeight: 0.4,
+      enableTimeWindow: false,
+      ...enabledRankingToggles
     });
 
     expect(getInternalViewRuleConfig("articles")).toEqual({
@@ -20,7 +30,9 @@ describe("viewRuleConfig", () => {
       sourceWeight: 0.3,
       completenessWeight: 0.35,
       aiWeight: 0.05,
-      heatWeight: 0.15
+      heatWeight: 0.15,
+      enableTimeWindow: false,
+      ...enabledRankingToggles
     });
 
     expect(getInternalViewRuleConfig("ai")).toEqual({
@@ -30,7 +42,9 @@ describe("viewRuleConfig", () => {
       sourceWeight: 0.1,
       completenessWeight: 0.15,
       aiWeight: 0.5,
-      heatWeight: 0.15
+      heatWeight: 0.15,
+      enableTimeWindow: true,
+      ...enabledRankingToggles
     });
   });
 
@@ -49,7 +63,9 @@ describe("viewRuleConfig", () => {
       sourceWeight: 0.3,
       completenessWeight: 0.9,
       aiWeight: 0.02,
-      heatWeight: 0.15
+      heatWeight: 0.15,
+      enableTimeWindow: false,
+      ...enabledRankingToggles
     });
   });
 });

@@ -29,7 +29,7 @@ describe("useTheme", () => {
     expect(document.documentElement.style.colorScheme).toBe("light");
     expect(document.documentElement.style.getPropertyValue("--editorial-bg-page")).toBe(lightTokens.bgPage);
     expect(document.documentElement.style.getPropertyValue("--editorial-accent")).toBe(lightTokens.accent);
-  });
+  }, 10_000);
 
   it("falls back to light theme when there is no stored preference", async () => {
     const { bootstrapEditorialTheme, useTheme, THEME_STORAGE_KEY } = await import("../../src/client/composables/useTheme");

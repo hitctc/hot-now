@@ -22,6 +22,8 @@ const expectedTables = [
   "rating_dimensions",
   "strategy_drafts",
   "twitter_accounts",
+  "twitter_search_keyword_matches",
+  "twitter_search_keywords",
   "user_profile",
   "view_rule_configs"
 ];
@@ -66,7 +68,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(8);
+    expect(schemaVersion).toBe(9);
 
     const appliedMigrations = db
       .prepare(
@@ -86,7 +88,8 @@ describe("runMigrations", () => {
       { version: 5, name: "005_nl_rule_enabled_flag" },
       { version: 6, name: "006_provider_settings_multi_save" },
       { version: 7, name: "007_source_bridge_metadata" },
-      { version: 8, name: "008_twitter_accounts" }
+      { version: 8, name: "008_twitter_accounts" },
+      { version: 9, name: "009_twitter_search_keywords" }
     ]);
 
     const digestReportColumns = db
@@ -148,6 +151,50 @@ describe("runMigrations", () => {
       ])
     );
 
+    const twitterSearchKeywordColumns = db
+      .prepare(
+        `
+          PRAGMA table_info(twitter_search_keywords)
+        `
+      )
+      .all() as Array<{ name: string }>;
+
+    expect(twitterSearchKeywordColumns.map((column) => column.name)).toEqual(
+      expect.arrayContaining([
+        "id",
+        "keyword",
+        "category",
+        "priority",
+        "is_collect_enabled",
+        "is_visible",
+        "notes",
+        "last_fetched_at",
+        "last_success_at",
+        "last_result",
+        "created_at",
+        "updated_at"
+      ])
+    );
+
+    const twitterSearchKeywordMatchColumns = db
+      .prepare(
+        `
+          PRAGMA table_info(twitter_search_keyword_matches)
+        `
+      )
+      .all() as Array<{ name: string }>;
+
+    expect(twitterSearchKeywordMatchColumns.map((column) => column.name)).toEqual(
+      expect.arrayContaining([
+        "id",
+        "keyword_id",
+        "tweet_external_id",
+        "content_item_id",
+        "created_at",
+        "updated_at"
+      ])
+    );
+
     const providerSettingsColumns = db
       .prepare(
         `
@@ -195,10 +242,18 @@ describe("runMigrations", () => {
           source_type: "rss",
           bridge_kind: null,
           bridge_config_json: null
+        },
+        {
+          kind: "twitter_keyword_search",
+          is_enabled: 0,
+          show_all_when_selected: 0,
+          source_type: "twitter_keyword_aggregate",
+          bridge_kind: null,
+          bridge_config_json: null
         }
       ])
     );
-    expect(sourceRows.every((source) => source.source_type === "rss" && source.bridge_kind === null)).toBe(true);
+    expect(sourceRows.filter((source) => source.source_type === "rss").every((source) => source.bridge_kind === null)).toBe(true);
 
     const adminRow = db
       .prepare(

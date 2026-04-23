@@ -44,6 +44,7 @@ describe("seedInitialData", () => {
         `
           SELECT kind, is_enabled, show_all_when_selected, source_type, bridge_kind, bridge_config_json
           FROM content_sources
+          WHERE source_type = 'rss'
           ORDER BY kind
         `
       )
@@ -92,6 +93,24 @@ describe("seedInitialData", () => {
       .all() as Array<{ kind: string }>;
 
     expect(activeRows).toEqual([{ kind: "juya" }]);
+
+    const hiddenRow = db
+      .prepare(
+        `
+          SELECT kind, is_enabled, show_all_when_selected, source_type
+          FROM content_sources
+          WHERE kind = 'twitter_keyword_search'
+          LIMIT 1
+        `
+      )
+      .get() as { kind: string; is_enabled: number; show_all_when_selected: number; source_type: string } | undefined;
+
+    expect(hiddenRow).toEqual({
+      kind: "twitter_keyword_search",
+      is_enabled: 0,
+      show_all_when_selected: 0,
+      source_type: "twitter_keyword_aggregate"
+    });
   });
 
   it("keeps manually switched active source on reseed", async () => {

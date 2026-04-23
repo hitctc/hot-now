@@ -35,6 +35,12 @@ export type FinishCollectionRunInput = {
   notes?: string;
 };
 
+export type LinkTwitterSearchKeywordMatchInput = {
+  keywordId: number;
+  tweetExternalId: string;
+  contentItemId: number;
+};
+
 // This resolves the persisted source row so callers can attach collected items to the same
 // source catalog that migrations and seed data already manage.
 export function resolveSourceByKind(db: SqliteDatabase, kind: SourceKind): ContentSourceRecord | undefined {
@@ -117,6 +123,70 @@ export function upsertContentItems(
   upsert(params.items);
 }
 
+// Keyword matches are stored separately so one tweet can belong to multiple search terms without
+// duplicating the content_items row or losing per-keyword visibility controls later on.
+export function linkTwitterSearchKeywordMatches(
+  db: SqliteDatabase,
+  matches: LinkTwitterSearchKeywordMatchInput[]
+): void {
+  const statement = db.prepare(
+    `
+      INSERT INTO twitter_search_keyword_matches (
+        keyword_id,
+        tweet_external_id,
+        content_item_id,
+        updated_at
+      )
+      VALUES (
+        @keywordId,
+        @tweetExternalId,
+        @contentItemId,
+        CURRENT_TIMESTAMP
+      )
+      ON CONFLICT(keyword_id, tweet_external_id) DO UPDATE SET
+        content_item_id = excluded.content_item_id,
+        updated_at = CURRENT_TIMESTAMP
+    `
+  );
+
+  const link = db.transaction((items: LinkTwitterSearchKeywordMatchInput[]) => {
+    for (const match of items) {
+      statement.run(match);
+    }
+  });
+
+  link(matches);
+}
+
+// Content reads only need the subset of ids that still has at least one visible keyword match,
+// so the caller can keep other source logic unchanged and apply a small extra filter.
+export function listVisibleTwitterKeywordMatchContentItemIds(
+  db: SqliteDatabase,
+  contentItemIds: number[]
+): number[] {
+  const normalizedIds = uniquePositiveIntegers(contentItemIds);
+
+  if (normalizedIds.length === 0) {
+    return [];
+  }
+
+  const placeholders = normalizedIds.map(() => "?").join(", ");
+  const rows = db
+    .prepare(
+      `
+        SELECT DISTINCT match.content_item_id AS contentItemId
+        FROM twitter_search_keyword_matches match
+        JOIN twitter_search_keywords keyword ON keyword.id = match.keyword_id
+        WHERE keyword.is_visible = 1
+          AND match.content_item_id IN (${placeholders})
+        ORDER BY match.content_item_id ASC
+      `
+    )
+    .all(...normalizedIds) as Array<{ contentItemId: number }>;
+
+  return rows.map((row) => row.contentItemId);
+}
+
 // A collection run row is created as soon as a digest has enough source context to be tracked,
 // so later steps can either complete it or mark the run as failed.
 export function createCollectionRun(db: SqliteDatabase, input: CreateCollectionRunInput): number {
@@ -149,4 +219,8 @@ export function finishCollectionRun(db: SqliteDatabase, input: FinishCollectionR
       WHERE id = ?
     `
   ).run(input.status, input.finishedAt, input.notes ?? null, input.id);
+}
+
+function uniquePositiveIntegers(values: number[]): number[] {
+  return [...new Set(values.filter((value) => Number.isInteger(value) && value > 0))];
 }

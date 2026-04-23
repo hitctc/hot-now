@@ -2,10 +2,18 @@ import { mkdtemp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createCollectionRun, finishCollectionRun, resolveSourceByKind, upsertContentItems } from "../../src/core/content/contentRepository.js";
+import {
+  createCollectionRun,
+  finishCollectionRun,
+  linkTwitterSearchKeywordMatches,
+  listVisibleTwitterKeywordMatchContentItemIds,
+  resolveSourceByKind,
+  upsertContentItems
+} from "../../src/core/content/contentRepository.js";
 import { openDatabase } from "../../src/core/db/openDatabase.js";
 import { runMigrations } from "../../src/core/db/runMigrations.js";
 import { seedInitialData } from "../../src/core/db/seedInitialData.js";
+import { createTwitterSearchKeyword } from "../../src/core/twitter/twitterSearchKeywordRepository.js";
 
 describe("contentRepository", () => {
   const databasesToClose: ReturnType<typeof openDatabase>[] = [];
@@ -192,6 +200,59 @@ describe("contentRepository", () => {
     });
   });
 
+  it("returns only content items that still have at least one visible twitter keyword match", async () => {
+    const db = await createTestDatabase();
+    const visibleKeyword = createTwitterSearchKeyword(db, {
+      keyword: "OpenAI",
+      category: "official_vendor"
+    });
+    const hiddenKeyword = createTwitterSearchKeyword(db, {
+      keyword: "内部噪音词",
+      category: "topic",
+      isVisible: false
+    });
+
+    expect(visibleKeyword.ok).toBe(true);
+    expect(hiddenKeyword.ok).toBe(true);
+
+    const visibleOnlyItemId = insertContentItem(db, "https://example.com/twitter-1");
+    const hiddenOnlyItemId = insertContentItem(db, "https://example.com/twitter-2");
+    const sharedItemId = insertContentItem(db, "https://example.com/twitter-3");
+
+    linkTwitterSearchKeywordMatches(db, [
+      {
+        keywordId: visibleKeyword.ok ? visibleKeyword.keyword.id : 0,
+        tweetExternalId: "twitter:1",
+        contentItemId: visibleOnlyItemId
+      },
+      {
+        keywordId: hiddenKeyword.ok ? hiddenKeyword.keyword.id : 0,
+        tweetExternalId: "twitter:2",
+        contentItemId: hiddenOnlyItemId
+      },
+      {
+        keywordId: hiddenKeyword.ok ? hiddenKeyword.keyword.id : 0,
+        tweetExternalId: "twitter:3",
+        contentItemId: sharedItemId
+      },
+      {
+        keywordId: visibleKeyword.ok ? visibleKeyword.keyword.id : 0,
+        tweetExternalId: "twitter:3",
+        contentItemId: sharedItemId
+      },
+      {
+        keywordId: visibleKeyword.ok ? visibleKeyword.keyword.id : 0,
+        tweetExternalId: "twitter:1",
+        contentItemId: visibleOnlyItemId
+      }
+    ]);
+
+    expect(listVisibleTwitterKeywordMatchContentItemIds(db, [visibleOnlyItemId, hiddenOnlyItemId, sharedItemId])).toEqual([
+      visibleOnlyItemId,
+      sharedItemId
+    ]);
+  });
+
   async function createTestDatabase() {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-content-"));
     const db = openDatabase(path.join(tempDir, "hot-now.sqlite"));
@@ -202,5 +263,36 @@ describe("contentRepository", () => {
       password: "bootstrap-password"
     });
     return db;
+  }
+
+  function insertContentItem(db: ReturnType<typeof openDatabase>, canonicalUrl: string): number {
+    const source = resolveSourceByKind(db, "twitter_keyword_search");
+
+    expect(source).toBeDefined();
+
+    upsertContentItems(db, {
+      sourceId: source!.id,
+      items: [
+        {
+          externalId: canonicalUrl.replace("https://example.com/", "twitter:"),
+          title: "A tweet title",
+          canonicalUrl,
+          summary: "tweet summary",
+          bodyMarkdown: "tweet body",
+          publishedAt: "2026-03-28T08:00:00.000Z",
+          fetchedAt: "2026-03-28T08:01:00.000Z"
+        }
+      ]
+    });
+
+    const row = db.prepare("SELECT id FROM content_items WHERE canonical_url = ? LIMIT 1").get(canonicalUrl) as
+      | { id: number }
+      | undefined;
+
+    if (!row) {
+      throw new Error("content item insert failed");
+    }
+
+    return row.id;
   }
 });

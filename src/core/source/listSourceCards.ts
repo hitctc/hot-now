@@ -51,7 +51,7 @@ export function listSourceCards(db: SqliteDatabase): SourceCard[] {
         SELECT kind, name, site_url, rss_url, is_enabled, is_builtin, show_all_when_selected
                , source_type, bridge_kind, bridge_config_json
         FROM content_sources
-        WHERE COALESCE(source_type, 'rss') <> 'twitter_account_aggregate'
+        WHERE COALESCE(source_type, 'rss') NOT IN ('twitter_account_aggregate', 'twitter_keyword_aggregate')
         ORDER BY id ASC
       `
     )

@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 8;
+const schemaVersion = 9;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -9,6 +9,7 @@ const nlRuleEnabledFlagMigrationName = "005_nl_rule_enabled_flag";
 const providerSettingsMultiSaveMigrationName = "006_provider_settings_multi_save";
 const sourceBridgeMetadataMigrationName = "007_source_bridge_metadata";
 const twitterAccountsMigrationName = "008_twitter_accounts";
+const twitterSearchKeywordsMigrationName = "009_twitter_search_keywords";
 
 const migrationStatements = [
   `
@@ -391,6 +392,90 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(8, twitterAccountsMigrationName);
+
+    // Twitter keyword search uses its own config and match tables, while collected tweets still
+    // need one hidden aggregate source row to satisfy the existing content_items foreign key.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS twitter_search_keywords (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        keyword TEXT NOT NULL COLLATE NOCASE UNIQUE,
+        category TEXT NOT NULL,
+        priority INTEGER NOT NULL DEFAULT 60,
+        is_collect_enabled INTEGER NOT NULL DEFAULT 1,
+        is_visible INTEGER NOT NULL DEFAULT 1,
+        notes TEXT,
+        last_fetched_at TEXT,
+        last_success_at TEXT,
+        last_result TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_twitter_search_keywords_collect_enabled
+      ON twitter_search_keywords(is_collect_enabled)
+    `);
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_twitter_search_keywords_visible
+      ON twitter_search_keywords(is_visible)
+    `);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS twitter_search_keyword_matches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        keyword_id INTEGER NOT NULL,
+        tweet_external_id TEXT NOT NULL,
+        content_item_id INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(keyword_id, tweet_external_id),
+        FOREIGN KEY (keyword_id) REFERENCES twitter_search_keywords(id) ON DELETE CASCADE,
+        FOREIGN KEY (content_item_id) REFERENCES content_items(id) ON DELETE CASCADE
+      )
+    `);
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_twitter_search_keyword_matches_content_item
+      ON twitter_search_keyword_matches(content_item_id)
+    `);
+
+    db.prepare(
+      `
+        INSERT INTO content_sources (
+          kind,
+          name,
+          site_url,
+          rss_url,
+          is_enabled,
+          is_builtin,
+          source_type,
+          show_all_when_selected,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, 0, 0, ?, 0, CURRENT_TIMESTAMP)
+        ON CONFLICT(kind) DO UPDATE SET
+          name = excluded.name,
+          site_url = excluded.site_url,
+          source_type = excluded.source_type,
+          show_all_when_selected = 0,
+          updated_at = CURRENT_TIMESTAMP
+      `
+    ).run(
+      "twitter_keyword_search",
+      "Twitter 关键词搜索",
+      "https://x.com",
+      null,
+      "twitter_keyword_aggregate"
+    );
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(9, twitterSearchKeywordsMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

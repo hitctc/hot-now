@@ -223,7 +223,7 @@ onBeforeUnmount(() => {
     >
       <div class="flex min-h-0 flex-1 flex-col gap-5">
         <section
-          class="editorial-spotlight-card overflow-hidden px-4 py-4"
+          class="editorial-spotlight-card shrink-0 overflow-hidden px-4 py-4"
           data-workspace-brand
           data-shell-brand-stage
         >
@@ -251,7 +251,7 @@ onBeforeUnmount(() => {
           </p>
         </section>
 
-        <section class="flex flex-col gap-1">
+        <section class="flex shrink-0 flex-col gap-1" data-shell-content-menu-section>
           <p class="px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
             内容菜单
           </p>
@@ -271,7 +271,7 @@ onBeforeUnmount(() => {
           </nav>
         </section>
 
-        <section v-if="shouldShowSystemMenu" class="flex flex-col gap-1">
+        <section v-if="shouldShowSystemMenu" class="flex shrink-0 flex-col gap-1" data-shell-system-menu-section>
           <p class="px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
             系统菜单
           </p>
@@ -291,7 +291,7 @@ onBeforeUnmount(() => {
           </nav>
         </section>
 
-        <div class="mt-auto flex flex-col gap-3 pt-2">
+        <div class="mt-auto flex shrink-0 flex-col gap-3 pt-2" data-shell-sidebar-footer>
           <section
             class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-3"
             data-shell-theme-toggle

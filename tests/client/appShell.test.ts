@@ -99,6 +99,10 @@ describe("client app shell", () => {
     );
     expect(wrapper.find("[data-shell-page-summary]").exists()).toBe(false);
     expect(wrapper.find("[data-workspace-sidebar]").exists()).toBe(true);
+    expect(wrapper.get("[data-workspace-brand]").classes()).toEqual(expect.arrayContaining(["shrink-0"]));
+    expect(wrapper.get("[data-shell-content-menu-section]").classes()).toEqual(expect.arrayContaining(["shrink-0"]));
+    expect(wrapper.get("[data-shell-system-menu-section]").classes()).toEqual(expect.arrayContaining(["shrink-0"]));
+    expect(wrapper.get("[data-shell-sidebar-footer]").classes()).toEqual(expect.arrayContaining(["shrink-0"]));
     expect(wrapper.get("[data-workspace-brand]").text()).toContain("热讯");
     expect(wrapper.get("[data-workspace-brand-logo]").attributes("src")).toBe("/brand/hotnow-logo-mark.png");
     expect(wrapper.get("[data-workspace-brand-logo]").attributes("alt")).toBe("HotNow logo");

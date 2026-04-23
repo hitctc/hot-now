@@ -87,10 +87,30 @@ export type SourcesSettingsOperationsView = {
 export type SourcesCapabilityView = {
   wechatArticleUrlEnabled: boolean;
   wechatArticleUrlMessage: string;
+  twitterAccountCollectionEnabled?: boolean;
+  twitterAccountCollectionMessage?: string;
+};
+
+export type TwitterAccountSettingsView = {
+  id: number;
+  username: string;
+  userId: string | null;
+  displayName: string;
+  category: string;
+  priority: number;
+  includeReplies: boolean;
+  isEnabled: boolean;
+  notes: string | null;
+  lastFetchedAt: string | null;
+  lastSuccessAt: string | null;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type SourcesSettingsView = {
   sources: SourceItem[];
+  twitterAccounts?: TwitterAccountSettingsView[];
   operations: SourcesSettingsOperationsView;
   capability: SourcesCapabilityView;
 };

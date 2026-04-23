@@ -21,6 +21,13 @@ import type {
   ToggleSourceResult,
   UpdateSourceDisplayModeResult
 } from "../core/source/sourceMutationRepository.js";
+import type {
+  DeleteTwitterAccountResult,
+  SaveTwitterAccountInput,
+  SaveTwitterAccountResult,
+  ToggleTwitterAccountResult,
+  TwitterAccountRecord
+} from "../core/twitter/twitterAccountRepository.js";
 import type { RuntimeConfig } from "../core/types/appConfig.js";
 import { readNextCollectionRunAt } from "../core/scheduler/readNextCollectionRunAt.js";
 import {
@@ -43,6 +50,7 @@ import {
   renderViewRulesPage,
   type ProfileView,
   type SourcesSettingsView,
+  type TwitterAccountSettingsView,
   type ViewRulesWorkbenchView
 } from "./renderSystemPages.js";
 
@@ -171,6 +179,19 @@ type ServerDeps = {
     kind: string,
     showAllWhenSelected: boolean
   ) => Promise<UpdateSourceDisplayModeResult> | UpdateSourceDisplayModeResult;
+  listTwitterAccounts?: () => Promise<TwitterAccountRecord[]> | TwitterAccountRecord[];
+  createTwitterAccount?: (
+    input: SaveTwitterAccountInput
+  ) => Promise<SaveTwitterAccountResult> | SaveTwitterAccountResult;
+  updateTwitterAccount?: (
+    input: SaveTwitterAccountInput
+  ) => Promise<SaveTwitterAccountResult> | SaveTwitterAccountResult;
+  deleteTwitterAccount?: (id: number) => Promise<DeleteTwitterAccountResult> | DeleteTwitterAccountResult;
+  toggleTwitterAccount?: (
+    id: number,
+    enable: boolean
+  ) => Promise<ToggleTwitterAccountResult> | ToggleTwitterAccountResult;
+  hasTwitterApiKey?: boolean;
   getCurrentUserProfile?: () => Promise<CurrentUserProfile | null> | CurrentUserProfile | null;
   getContentPageModel?: (
     pageKey: ContentPageKey,
@@ -895,7 +916,152 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.send({ ok: true, kind, showAllWhenSelected });
   });
 
+  app.post("/actions/twitter-accounts/create", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.createTwitterAccount) {
+      return reply.code(503).send({ ok: false, reason: "twitter-accounts-disabled" });
+    }
+
+    const payload = parseTwitterAccountSavePayload(request.body, "create");
+
+    if (!payload) {
+      return reply.code(400).send({ ok: false, reason: "invalid-twitter-account-payload" });
+    }
+
+    return sendTwitterAccountSaveResult(reply, await deps.createTwitterAccount(payload));
+  });
+
+  app.post("/actions/twitter-accounts/update", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.updateTwitterAccount) {
+      return reply.code(503).send({ ok: false, reason: "twitter-accounts-disabled" });
+    }
+
+    const payload = parseTwitterAccountSavePayload(request.body, "update");
+
+    if (!payload) {
+      return reply.code(400).send({ ok: false, reason: "invalid-twitter-account-payload" });
+    }
+
+    return sendTwitterAccountSaveResult(reply, await deps.updateTwitterAccount(payload));
+  });
+
+  app.post("/actions/twitter-accounts/delete", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.deleteTwitterAccount) {
+      return reply.code(503).send({ ok: false, reason: "twitter-accounts-disabled" });
+    }
+
+    const id = parsePositiveInteger((request.body as { id?: unknown } | undefined)?.id);
+
+    if (id === null) {
+      return reply.code(400).send({ ok: false, reason: "invalid-twitter-account-id" });
+    }
+
+    const result = await deps.deleteTwitterAccount(id);
+
+    if (!result.ok) {
+      return reply.code(result.reason === "not-found" ? 404 : 400).send({ ok: false, reason: result.reason });
+    }
+
+    return reply.send({ ok: true, id: result.id });
+  });
+
+  app.post("/actions/twitter-accounts/toggle", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.toggleTwitterAccount) {
+      return reply.code(503).send({ ok: false, reason: "twitter-accounts-disabled" });
+    }
+
+    const body = request.body as { id?: unknown; enable?: unknown } | undefined;
+    const id = parsePositiveInteger(body?.id);
+    const enable = typeof body?.enable === "boolean" ? body.enable : null;
+
+    if (id === null) {
+      return reply.code(400).send({ ok: false, reason: "invalid-twitter-account-id" });
+    }
+
+    if (enable === null) {
+      return reply.code(400).send({ ok: false, reason: "invalid-twitter-account-enable" });
+    }
+
+    const result = await deps.toggleTwitterAccount(id, enable);
+
+    if (!result.ok) {
+      return reply.code(result.reason === "not-found" ? 404 : 400).send({ ok: false, reason: result.reason });
+    }
+
+    return reply.send({ ok: true, id: result.account.id, enable: result.account.isEnabled });
+  });
+
   return app;
+}
+
+function parsePositiveInteger(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+    return null;
+  }
+
+  return value;
+}
+
+function parseTwitterAccountSavePayload(body: unknown, mode: "create" | "update"): SaveTwitterAccountInput | null {
+  if (!body || typeof body !== "object") {
+    return null;
+  }
+
+  const payload = body as Record<string, unknown>;
+  const username = typeof payload.username === "string" ? payload.username.trim() : "";
+
+  if (!username) {
+    return null;
+  }
+
+  const id = mode === "update" ? parsePositiveInteger(payload.id) : null;
+
+  if (mode === "update" && id === null) {
+    return null;
+  }
+
+  return {
+    ...(id !== null ? { id } : {}),
+    username,
+    userId: typeof payload.userId === "string" ? payload.userId : null,
+    displayName: typeof payload.displayName === "string" ? payload.displayName : null,
+    category: typeof payload.category === "string" ? payload.category : null,
+    priority: typeof payload.priority === "number" ? payload.priority : null,
+    includeReplies: typeof payload.includeReplies === "boolean" ? payload.includeReplies : null,
+    isEnabled: typeof payload.isEnabled === "boolean" ? payload.isEnabled : null,
+    notes: typeof payload.notes === "string" ? payload.notes : null
+  };
+}
+
+function sendTwitterAccountSaveResult(reply: FastifyReply, result: SaveTwitterAccountResult) {
+  if (result.ok) {
+    return reply.send({ ok: true, account: result.account });
+  }
+
+  if (result.reason === "not-found") {
+    return reply.code(404).send({ ok: false, reason: result.reason });
+  }
+
+  if (result.reason === "duplicate-username") {
+    return reply.code(409).send({ ok: false, reason: result.reason });
+  }
+
+  return reply.code(400).send({ ok: false, reason: result.reason });
 }
 
 function parseSourceSavePayload(
@@ -1089,6 +1255,7 @@ async function readSettingsViewRulesApiData(deps: ServerDeps): Promise<ViewRules
 async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSettingsView> {
   // Sources workbench uses独立来源统计，不再依赖内容页当前筛选上下文。
   const sources = ((await deps.listSources?.()) ?? []) as SourceCard[];
+  const twitterAccounts = ((await deps.listTwitterAccounts?.()) ?? []) as TwitterAccountSettingsView[];
   const operationSummary = deps.getSourcesOperationSummary
     ? await deps.getSourcesOperationSummary()
     : { lastCollectionRunAt: null, lastSendLatestEmailAt: null };
@@ -1099,6 +1266,7 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
 
   return {
     sources,
+    twitterAccounts,
     operations: {
       lastCollectionRunAt: operationSummary.lastCollectionRunAt,
       lastSendLatestEmailAt: operationSummary.lastSendLatestEmailAt,
@@ -1111,7 +1279,12 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
       wechatArticleUrlEnabled: wechatResolverConfigured,
       wechatArticleUrlMessage: wechatResolverConfigured
         ? "公众号来源已开启，可直接填写公众号名称，或补一篇文章链接帮助系统更快定位来源。"
-        : "当前环境未启用公众号来源解析；RSS 仍可直接新增。"
+        : "当前环境未启用公众号来源解析；RSS 仍可直接新增。",
+      twitterAccountCollectionEnabled: deps.hasTwitterApiKey === true,
+      twitterAccountCollectionMessage:
+        deps.hasTwitterApiKey === true
+          ? "Twitter 账号采集已配置 API key，可采集已启用账号。"
+          : "当前环境未配置 TWITTER_API_KEY；Twitter 账号可先维护，采集时会跳过。"
     }
   };
 }

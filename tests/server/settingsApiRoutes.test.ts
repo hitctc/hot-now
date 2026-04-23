@@ -103,6 +103,25 @@ function createAuthenticatedServer() {
         lastCollectionStatus: "completed"
       }
     ]),
+    listTwitterAccounts: vi.fn().mockResolvedValue([
+      {
+        id: 1,
+        username: "openai",
+        userId: "123",
+        displayName: "OpenAI",
+        category: "official_vendor",
+        priority: 90,
+        includeReplies: false,
+        isEnabled: true,
+        notes: null,
+        lastFetchedAt: null,
+        lastSuccessAt: null,
+        lastError: null,
+        createdAt: "2026-04-23T08:00:00.000Z",
+        updatedAt: "2026-04-23T08:00:00.000Z"
+      }
+    ]),
+    hasTwitterApiKey: true,
     triggerManualRun: vi.fn().mockResolvedValue({ accepted: true }),
     getSourcesOperationSummary: vi.fn().mockResolvedValue({
       lastCollectionRunAt: "2026-03-31T03:00:00.000Z",
@@ -197,6 +216,16 @@ describe("settings api routes", () => {
           showAllWhenSelected: true
         }
       ],
+      twitterAccounts: [
+        {
+          id: 1,
+          username: "openai",
+          displayName: "OpenAI",
+          category: "official_vendor",
+          priority: 90,
+          isEnabled: true
+        }
+      ],
       operations: {
         lastCollectionRunAt: "2026-03-31T03:00:00.000Z",
         lastSendLatestEmailAt: "2026-03-31T03:10:00.000Z",
@@ -206,7 +235,8 @@ describe("settings api routes", () => {
         isRunning: false
       },
       capability: {
-        wechatArticleUrlEnabled: false
+        wechatArticleUrlEnabled: false,
+        twitterAccountCollectionEnabled: true
       }
     });
   });

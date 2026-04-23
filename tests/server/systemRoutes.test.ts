@@ -318,6 +318,149 @@ describe("system routes", () => {
     expect(deleteSource).toHaveBeenCalledWith("wechat_demo");
   });
 
+  it("calls createTwitterAccount for the twitter account create action", async () => {
+    const createTwitterAccount = vi.fn().mockResolvedValue({
+      ok: true,
+      account: {
+        id: 1,
+        username: "openai",
+        displayName: "OpenAI",
+        category: "official_vendor",
+        priority: 90,
+        includeReplies: false,
+        isEnabled: true,
+        userId: null,
+        notes: null,
+        lastFetchedAt: null,
+        lastSuccessAt: null,
+        lastError: null,
+        createdAt: "2026-04-23T08:00:00.000Z",
+        updatedAt: "2026-04-23T08:00:00.000Z"
+      }
+    });
+    const app = createSystemTestServer({ createTwitterAccount } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/twitter-accounts/create",
+      payload: {
+        username: "@OpenAI",
+        displayName: "OpenAI",
+        category: "official_vendor",
+        priority: 90,
+        includeReplies: false,
+        notes: "official account"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(createTwitterAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: "@OpenAI",
+        displayName: "OpenAI",
+        category: "official_vendor",
+        priority: 90,
+        includeReplies: false,
+        notes: "official account"
+      })
+    );
+  });
+
+  it("calls updateTwitterAccount for the twitter account update action", async () => {
+    const updateTwitterAccount = vi.fn().mockResolvedValue({
+      ok: true,
+      account: {
+        id: 1,
+        username: "openai",
+        displayName: "OpenAI News",
+        category: "product",
+        priority: 80,
+        includeReplies: true,
+        isEnabled: true,
+        userId: null,
+        notes: null,
+        lastFetchedAt: null,
+        lastSuccessAt: null,
+        lastError: null,
+        createdAt: "2026-04-23T08:00:00.000Z",
+        updatedAt: "2026-04-23T08:00:00.000Z"
+      }
+    });
+    const app = createSystemTestServer({ updateTwitterAccount } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/twitter-accounts/update",
+      payload: {
+        id: 1,
+        username: "openai",
+        displayName: "OpenAI News",
+        category: "product",
+        priority: 80,
+        includeReplies: true
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(updateTwitterAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 1,
+        username: "openai",
+        displayName: "OpenAI News",
+        category: "product",
+        priority: 80,
+        includeReplies: true
+      })
+    );
+  });
+
+  it("calls deleteTwitterAccount for the twitter account delete action", async () => {
+    const deleteTwitterAccount = vi.fn().mockResolvedValue({ ok: true, id: 1 });
+    const app = createSystemTestServer({ deleteTwitterAccount } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/twitter-accounts/delete",
+      payload: { id: 1 }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(deleteTwitterAccount).toHaveBeenCalledWith(1);
+  });
+
+  it("calls toggleTwitterAccount for the twitter account toggle action", async () => {
+    const toggleTwitterAccount = vi.fn().mockResolvedValue({
+      ok: true,
+      account: { id: 1, isEnabled: false }
+    });
+    const app = createSystemTestServer({ toggleTwitterAccount } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/twitter-accounts/toggle",
+      payload: { id: 1, enable: false }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(toggleTwitterAccount).toHaveBeenCalledWith(1, false);
+    expect(response.json()).toEqual({ ok: true, id: 1, enable: false });
+  });
+
+  it("returns 400 for invalid twitter account action payloads", async () => {
+    const createTwitterAccount = vi.fn();
+    const app = createSystemTestServer({ createTwitterAccount } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/twitter-accounts/create",
+      payload: { displayName: "OpenAI" }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ ok: false, reason: "invalid-twitter-account-payload" });
+    expect(createTwitterAccount).not.toHaveBeenCalled();
+  });
+
   it("calls saveProviderSettings for llm provider configuration", async () => {
     const saveProviderSettings = vi.fn().mockResolvedValue({ ok: true });
     const app = createSystemTestServer({

@@ -198,4 +198,70 @@ describe("settingsApi", () => {
       body: JSON.stringify({ kind: "wechat_demo" })
     });
   });
+
+  it("posts twitter account create payloads to the twitter account create action", async () => {
+    const { createTwitterAccount } = await import("../../src/client/services/settingsApi");
+
+    requestJson.mockResolvedValue({ ok: true, account: { id: 1 } });
+
+    await createTwitterAccount({
+      username: "@OpenAI",
+      displayName: "OpenAI",
+      category: "official_vendor",
+      priority: 90,
+      includeReplies: false,
+      notes: "official account"
+    });
+
+    expect(requestJson).toHaveBeenCalledWith("/actions/twitter-accounts/create", {
+      method: "POST",
+      body: JSON.stringify({
+        username: "@OpenAI",
+        displayName: "OpenAI",
+        category: "official_vendor",
+        priority: 90,
+        includeReplies: false,
+        notes: "official account"
+      })
+    });
+  });
+
+  it("posts twitter account update payloads to the twitter account update action", async () => {
+    const { updateTwitterAccount } = await import("../../src/client/services/settingsApi");
+
+    requestJson.mockResolvedValue({ ok: true, account: { id: 1 } });
+
+    await updateTwitterAccount({
+      id: 1,
+      username: "openai",
+      displayName: "OpenAI News"
+    });
+
+    expect(requestJson).toHaveBeenCalledWith("/actions/twitter-accounts/update", {
+      method: "POST",
+      body: JSON.stringify({
+        id: 1,
+        username: "openai",
+        displayName: "OpenAI News"
+      })
+    });
+  });
+
+  it("posts twitter account delete and toggle payloads to their actions", async () => {
+    const { deleteTwitterAccount, toggleTwitterAccount } = await import("../../src/client/services/settingsApi");
+
+    requestJson.mockResolvedValue({ ok: true });
+
+    await deleteTwitterAccount(1);
+    await toggleTwitterAccount(1, false);
+
+    expect(requestJson).toHaveBeenNthCalledWith(1, "/actions/twitter-accounts/delete", {
+      method: "POST",
+      body: JSON.stringify({ id: 1 })
+    });
+    expect(requestJson).toHaveBeenNthCalledWith(2, "/actions/twitter-accounts/toggle", {
+      method: "POST",
+      body: JSON.stringify({ id: 1, enable: false })
+    });
+  });
 });

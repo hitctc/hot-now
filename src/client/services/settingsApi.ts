@@ -122,10 +122,30 @@ export type SettingsSourcesOperations = {
 export type SettingsSourcesCapability = {
   wechatArticleUrlEnabled: boolean;
   wechatArticleUrlMessage: string;
+  twitterAccountCollectionEnabled?: boolean;
+  twitterAccountCollectionMessage?: string;
+};
+
+export type SettingsTwitterAccount = {
+  id: number;
+  username: string;
+  userId: string | null;
+  displayName: string;
+  category: string;
+  priority: number;
+  includeReplies: boolean;
+  isEnabled: boolean;
+  notes: string | null;
+  lastFetchedAt: string | null;
+  lastSuccessAt: string | null;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type SettingsSourcesResponse = {
   sources: SettingsSourceItem[];
+  twitterAccounts?: SettingsTwitterAccount[];
   operations: SettingsSourcesOperations;
   capability: SettingsSourcesCapability;
 };
@@ -203,6 +223,34 @@ export type SaveSourceResponse = {
 export type DeleteSourceResponse = {
   ok: true;
   kind: string;
+};
+
+export type SaveTwitterAccountPayload = {
+  id?: number;
+  username: string;
+  userId?: string | null;
+  displayName?: string | null;
+  category?: string | null;
+  priority?: number | null;
+  includeReplies?: boolean | null;
+  isEnabled?: boolean | null;
+  notes?: string | null;
+};
+
+export type SaveTwitterAccountResponse = {
+  ok: true;
+  account: SettingsTwitterAccount;
+};
+
+export type DeleteTwitterAccountResponse = {
+  ok: true;
+  id: number;
+};
+
+export type ToggleTwitterAccountResponse = {
+  ok: true;
+  id: number;
+  enable: boolean;
 };
 
 export type ManualCollectResponse = {
@@ -321,6 +369,22 @@ export function updateSource(payload: SaveSourcePayload): Promise<SaveSourceResp
 // 删除只需要 source kind，是否允许删除由后端按 built-in / in-use 规则判断。
 export function deleteSource(kind: string): Promise<DeleteSourceResponse> {
   return postSettingsAction<DeleteSourceResponse>("/actions/sources/delete", { kind });
+}
+
+export function createTwitterAccount(payload: SaveTwitterAccountPayload): Promise<SaveTwitterAccountResponse> {
+  return postSettingsAction<SaveTwitterAccountResponse>("/actions/twitter-accounts/create", payload);
+}
+
+export function updateTwitterAccount(payload: SaveTwitterAccountPayload): Promise<SaveTwitterAccountResponse> {
+  return postSettingsAction<SaveTwitterAccountResponse>("/actions/twitter-accounts/update", payload);
+}
+
+export function deleteTwitterAccount(id: number): Promise<DeleteTwitterAccountResponse> {
+  return postSettingsAction<DeleteTwitterAccountResponse>("/actions/twitter-accounts/delete", { id });
+}
+
+export function toggleTwitterAccount(id: number, enable: boolean): Promise<ToggleTwitterAccountResponse> {
+  return postSettingsAction<ToggleTwitterAccountResponse>("/actions/twitter-accounts/toggle", { id, enable });
 }
 
 // 手动采集走独立动作接口，保持和旧系统页一致的任务语义。

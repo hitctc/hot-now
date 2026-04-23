@@ -41,6 +41,13 @@ import {
   toggleSource as persistSourceToggle,
   updateSourceDisplayMode as persistSourceDisplayMode
 } from "./core/source/sourceMutationRepository.js";
+import {
+  createTwitterAccount as persistTwitterAccount,
+  deleteTwitterAccount as removeTwitterAccount,
+  listTwitterAccounts,
+  toggleTwitterAccount as persistTwitterAccountToggle,
+  updateTwitterAccount as persistTwitterAccountUpdate
+} from "./core/twitter/twitterAccountRepository.js";
 import { listReportDates, readTextFile } from "./core/storage/reportStore.js";
 import {
   getViewRuleConfig,
@@ -488,6 +495,12 @@ const app = createServer({
   toggleSource: async (kind, enable) => persistSourceToggle(db, kind, enable),
   updateSourceDisplayMode: async (kind, showAllWhenSelected) =>
     persistSourceDisplayMode(db, kind, showAllWhenSelected),
+  listTwitterAccounts: async () => listTwitterAccounts(db),
+  createTwitterAccount: async (input) => persistTwitterAccount(db, input),
+  updateTwitterAccount: async (input) => persistTwitterAccountUpdate(db, input),
+  deleteTwitterAccount: async (id) => removeTwitterAccount(db, id),
+  toggleTwitterAccount: async (id, enable) => persistTwitterAccountToggle(db, id, enable),
+  hasTwitterApiKey: Boolean(process.env.TWITTER_API_KEY?.trim()),
   getCurrentUserProfile: async () => getCurrentUserProfile(),
   listReportSummaries: listStoredReportSummaries,
   latestReportDate: async () => (await listReportDates(config.report.dataDir))[0] ?? null,

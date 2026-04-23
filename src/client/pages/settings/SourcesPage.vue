@@ -9,10 +9,14 @@ import {
 } from "../../components/content/contentCardShared";
 import { HttpError } from "../../services/http";
 import {
+  createTwitterAccount,
   createSource,
+  deleteTwitterAccount,
   deleteSource,
   readSettingsSources,
+  toggleTwitterAccount,
   toggleSource,
+  updateTwitterAccount,
   updateSource,
   updateSourceDisplayMode,
   triggerManualCollect,
@@ -21,18 +25,30 @@ import {
   type ManualSendLatestEmailResponse,
   type SaveSourcePayload,
   type SettingsSourceItem,
-  type SettingsSourcesResponse
+  type SettingsSourcesResponse,
+  type SettingsTwitterAccount,
+  type SaveTwitterAccountPayload
 } from "../../services/settingsApi";
 
 type AlertTone = "success" | "info" | "warning" | "error";
 type PageNotice = { tone: AlertTone; message: string };
 type SourceModalMode = "create" | "update";
+type TwitterAccountModalMode = "create" | "update";
 type SourceFormState = {
   kind: string;
   sourceType: "rss" | "wechat_bridge";
   rssUrl: string;
   wechatName: string;
   articleUrl: string;
+};
+type TwitterAccountFormState = {
+  id: number | null;
+  username: string;
+  displayName: string;
+  category: string;
+  priority: number;
+  includeReplies: boolean;
+  notes: string;
 };
 
 const analyticsColumns = [
@@ -54,6 +70,22 @@ const inventoryColumns = [
   { title: "RSS", key: "rssUrl", align: "center" as const },
   { title: "操作", key: "actions", align: "center" as const }
 ];
+const twitterAccountColumns = [
+  { title: "账号", key: "account", align: "center" as const },
+  { title: "分类", key: "category", align: "center" as const },
+  { title: "优先级", key: "priority", align: "center" as const },
+  { title: "启用", key: "enabled", align: "center" as const },
+  { title: "最近成功", key: "lastSuccessAt", align: "center" as const },
+  { title: "最近错误", key: "lastError", align: "center" as const },
+  { title: "操作", key: "actions", align: "center" as const }
+];
+const twitterAccountCategoryOptions = [
+  { label: "官方厂商", value: "official_vendor" },
+  { label: "产品账号", value: "product" },
+  { label: "关键人物", value: "person" },
+  { label: "媒体", value: "media" },
+  { label: "其他", value: "other" }
+];
 
 const isLoading = ref(true);
 const isRefreshing = ref(false);
@@ -62,9 +94,13 @@ const pageNotice = ref<PageNotice | null>(null);
 const sourcesModel = ref<SettingsSourcesResponse | null>(null);
 const pendingActions = reactive<Record<string, boolean>>({});
 const isSourceModalOpen = ref(false);
+const isTwitterAccountModalOpen = ref(false);
 const sourceModalMode = ref<SourceModalMode>("create");
+const twitterAccountModalMode = ref<TwitterAccountModalMode>("create");
 const sourceFormError = ref<string | null>(null);
+const twitterAccountFormError = ref<string | null>(null);
 const sourceForm = reactive<SourceFormState>(createEmptySourceForm());
+const twitterAccountForm = reactive<TwitterAccountFormState>(createEmptyTwitterAccountForm());
 const relativeNow = ref(Date.now());
 let nextCollectionTimer: number | null = null;
 
@@ -72,6 +108,10 @@ const enabledSourceCount = computed(
   () => sourcesModel.value?.sources.filter((source) => source.isEnabled).length ?? 0
 );
 const totalSourceCount = computed(() => sourcesModel.value?.sources.length ?? 0);
+const totalTwitterAccountCount = computed(() => sourcesModel.value?.twitterAccounts?.length ?? 0);
+const enabledTwitterAccountCount = computed(
+  () => sourcesModel.value?.twitterAccounts?.filter((account) => account.isEnabled).length ?? 0
+);
 const wechatArticleUrlAvailable = computed(
   () => sourcesModel.value?.capability.wechatArticleUrlEnabled ?? false
 );
@@ -79,6 +119,11 @@ const wechatArticleUrlMessage = computed(
   () =>
     sourcesModel.value?.capability.wechatArticleUrlMessage ??
     "当前环境未启用公众号来源解析；RSS 仍可直接新增。"
+);
+const twitterAccountCollectionMessage = computed(
+  () =>
+    sourcesModel.value?.capability.twitterAccountCollectionMessage ??
+    "当前环境未配置 TWITTER_API_KEY；Twitter 账号可先维护，采集时会跳过。"
 );
 
 // 页面提示统一通过一层 notice 管理，操作后同时保留页内 Alert 和全局 toast。
@@ -130,11 +175,34 @@ function resetSourceForm(): void {
   sourceFormError.value = null;
 }
 
+function createEmptyTwitterAccountForm(): TwitterAccountFormState {
+  return {
+    id: null,
+    username: "",
+    displayName: "",
+    category: "official_vendor",
+    priority: 90,
+    includeReplies: false,
+    notes: ""
+  };
+}
+
+function resetTwitterAccountForm(): void {
+  Object.assign(twitterAccountForm, createEmptyTwitterAccountForm());
+  twitterAccountFormError.value = null;
+}
+
 // 新增模式只需要清空表单并打开弹窗，不再引入额外的临时草稿状态。
 function openCreateSourceModal(): void {
   sourceModalMode.value = "create";
   resetSourceForm();
   isSourceModalOpen.value = true;
+}
+
+function openCreateTwitterAccountModal(): void {
+  twitterAccountModalMode.value = "create";
+  resetTwitterAccountForm();
+  isTwitterAccountModalOpen.value = true;
 }
 
 // 编辑模式只回填当前来源已有配置，kind 继续锁定，避免把“编辑”做成“重命名来源主键”。
@@ -154,10 +222,28 @@ function openEditSourceModal(source: SettingsSourceItem): void {
   isSourceModalOpen.value = true;
 }
 
+function openEditTwitterAccountModal(account: SettingsTwitterAccount): void {
+  twitterAccountModalMode.value = "update";
+  resetTwitterAccountForm();
+  twitterAccountForm.id = account.id;
+  twitterAccountForm.username = account.username;
+  twitterAccountForm.displayName = account.displayName;
+  twitterAccountForm.category = account.category;
+  twitterAccountForm.priority = account.priority;
+  twitterAccountForm.includeReplies = account.includeReplies;
+  twitterAccountForm.notes = account.notes ?? "";
+  isTwitterAccountModalOpen.value = true;
+}
+
 // 关闭弹窗时顺手清掉局部错误，避免旧的公众号解析失败提示粘在下一次操作里。
 function closeSourceModal(): void {
   isSourceModalOpen.value = false;
   sourceFormError.value = null;
+}
+
+function closeTwitterAccountModal(): void {
+  isTwitterAccountModalOpen.value = false;
+  twitterAccountFormError.value = null;
 }
 
 // 类型切换只负责收口当前可见字段，真正的 payload 仍由提交时统一构建。
@@ -342,6 +428,31 @@ function buildSourceSavePayload(): { ok: true; payload: SaveSourcePayload } | { 
             wechatName,
             ...(articleUrl ? { articleUrl } : {})
           }
+  };
+}
+
+function buildTwitterAccountSavePayload(): { ok: true; payload: SaveTwitterAccountPayload } | { ok: false; message: string } {
+  const username = twitterAccountForm.username.trim();
+
+  if (!username) {
+    return { ok: false, message: "请填写 Twitter username。" };
+  }
+
+  if (!Number.isInteger(twitterAccountForm.priority) || twitterAccountForm.priority < 0 || twitterAccountForm.priority > 100) {
+    return { ok: false, message: "优先级需要是 0 到 100 之间的整数。" };
+  }
+
+  return {
+    ok: true,
+    payload: {
+      ...(twitterAccountModalMode.value === "update" && twitterAccountForm.id ? { id: twitterAccountForm.id } : {}),
+      username,
+      displayName: twitterAccountForm.displayName.trim() || null,
+      category: twitterAccountForm.category,
+      priority: twitterAccountForm.priority,
+      includeReplies: twitterAccountForm.includeReplies,
+      notes: twitterAccountForm.notes.trim() || null
+    }
   };
 }
 
@@ -532,6 +643,89 @@ async function handleSubmitSource(): Promise<void> {
   }
 }
 
+async function handleSubmitTwitterAccount(): Promise<void> {
+  if (isActionPending("twitter-account:submit")) {
+    return;
+  }
+
+  const payload = buildTwitterAccountSavePayload();
+
+  if (!payload.ok) {
+    twitterAccountFormError.value = payload.message;
+    return;
+  }
+
+  twitterAccountFormError.value = null;
+  setPendingAction("twitter-account:submit", true);
+
+  try {
+    if (twitterAccountModalMode.value === "create") {
+      await createTwitterAccount(payload.payload);
+    } else {
+      await updateTwitterAccount(payload.payload);
+    }
+
+    const refreshed = await loadSources({ silent: true });
+    closeTwitterAccountModal();
+    showNotice(
+      "success",
+      refreshed
+        ? twitterAccountModalMode.value === "create"
+          ? "已新增 Twitter 账号。"
+          : "已更新 Twitter 账号。"
+        : twitterAccountModalMode.value === "create"
+          ? "已新增 Twitter 账号，但最新数据刷新失败，请稍后手动刷新。"
+          : "已更新 Twitter 账号，但最新数据刷新失败，请稍后手动刷新。"
+    );
+  } catch (error) {
+    const message = readActionErrorMessage(
+      error,
+      twitterAccountModalMode.value === "create" ? "Twitter 账号保存失败，请稍后再试。" : "Twitter 账号更新失败，请稍后再试。",
+      {
+        "invalid-username": "Twitter username 不合法，请检查后重试。",
+        "invalid-category": "Twitter 账号分类不合法。",
+        "invalid-priority": "Twitter 账号优先级不合法。",
+        "duplicate-username": "这个 Twitter username 已存在。",
+        "not-found": "对应 Twitter 账号不存在，可能已被移除。"
+      }
+    );
+
+    twitterAccountFormError.value = message;
+    showNotice("error", message);
+  } finally {
+    setPendingAction("twitter-account:submit", false);
+  }
+}
+
+async function handleToggleTwitterAccount(account: SettingsTwitterAccount): Promise<void> {
+  const nextEnable = !account.isEnabled;
+
+  await runSourcesAction(
+    `twitter-toggle:${account.id}`,
+    () => toggleTwitterAccount(account.id, nextEnable),
+    {
+      fallbackMessage: "Twitter 账号状态切换失败，请稍后再试。",
+      successMessage: nextEnable ? "已启用 Twitter 账号。" : "已停用 Twitter 账号。",
+      reasonMessages: {
+        "invalid-twitter-account-id": "Twitter 账号 ID 不合法。",
+        "invalid-twitter-account-enable": "Twitter 账号启用状态参数不合法。",
+        "not-found": "对应 Twitter 账号不存在，可能已被移除。"
+      }
+    }
+  );
+}
+
+async function handleDeleteTwitterAccount(account: SettingsTwitterAccount): Promise<void> {
+  await runSourcesAction(`twitter-delete:${account.id}`, () => deleteTwitterAccount(account.id), {
+    fallbackMessage: "删除 Twitter 账号失败，请稍后再试。",
+    successMessage: "已删除 Twitter 账号。",
+    reasonMessages: {
+      "invalid-twitter-account-id": "Twitter 账号 ID 不合法。",
+      "not-found": "对应 Twitter 账号不存在，可能已被移除。"
+    }
+  });
+}
+
 // 删除动作只开放给自定义来源，是否允许真正删除仍由后端按 built-in / in-use 决定。
 async function handleDeleteSource(source: SettingsSourceItem): Promise<void> {
   await runSourcesAction(`delete:${source.kind}`, () => deleteSource(source.kind), {
@@ -610,9 +804,14 @@ onUnmounted(() => {
               </p>
             </div>
             <div class="flex justify-start">
-              <a-button type="primary" data-action="add-source" @click="openCreateSourceModal">
-                新增来源
-              </a-button>
+              <a-space wrap>
+                <a-button type="primary" data-action="add-source" @click="openCreateSourceModal">
+                  新增来源
+                </a-button>
+                <a-button data-action="add-twitter-account" @click="openCreateTwitterAccountModal">
+                  新增 Twitter 账号
+                </a-button>
+              </a-space>
             </div>
           </div>
         </section>
@@ -689,6 +888,104 @@ onUnmounted(() => {
               </div>
           </a-card>
         </section>
+
+        <a-card
+          :class="editorialContentCardClass"
+          title="Twitter 账号"
+          size="small"
+          data-sources-section="twitter-accounts"
+        >
+          <div class="mb-4 grid gap-3 md:grid-cols-3">
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-4 py-3">
+              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">账号总数</p>
+              <p class="mt-2 mb-0 text-lg font-medium text-editorial-text-main">{{ totalTwitterAccountCount }}</p>
+            </article>
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-4 py-3">
+              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">已启用</p>
+              <p class="mt-2 mb-0 text-lg font-medium text-editorial-text-main">{{ enabledTwitterAccountCount }}</p>
+            </article>
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-4 py-3">
+              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">API 状态</p>
+              <p class="mt-2 mb-0 text-xs leading-5 text-editorial-text-body">{{ twitterAccountCollectionMessage }}</p>
+            </article>
+          </div>
+
+          <a-table
+            :data-source="sourcesModel.twitterAccounts ?? []"
+            :columns="twitterAccountColumns"
+            row-key="id"
+            :pagination="false"
+            size="small"
+          >
+            <template #emptyText>
+              暂无 Twitter 账号
+            </template>
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'account'">
+                <a-space direction="vertical" size="small">
+                  <a-typography-text strong>{{ record.displayName }}</a-typography-text>
+                  <a-typography-text type="secondary" :data-twitter-account-username="record.id">@{{ record.username }}</a-typography-text>
+                </a-space>
+              </template>
+              <template v-else-if="column.key === 'category'">
+                <a-tag>{{ record.category }}</a-tag>
+              </template>
+              <template v-else-if="column.key === 'priority'">
+                {{ record.priority }}
+              </template>
+              <template v-else-if="column.key === 'enabled'">
+                <a-switch
+                  :checked="record.isEnabled"
+                  :loading="isActionPending(`twitter-toggle:${record.id}`)"
+                  :checked-children="'启用'"
+                  :un-checked-children="'停用'"
+                  :data-twitter-account-toggle="record.id"
+                  @change="handleToggleTwitterAccount(record)"
+                />
+              </template>
+              <template v-else-if="column.key === 'lastSuccessAt'">
+                {{ formatDateTime(record.lastSuccessAt) }}
+              </template>
+              <template v-else-if="column.key === 'lastError'">
+                <span
+                  class="inline-block max-w-[220px] truncate align-middle"
+                  :title="record.lastError ?? '暂无错误'"
+                  :data-twitter-account-error="record.id"
+                >
+                  {{ record.lastError ?? "暂无错误" }}
+                </span>
+              </template>
+              <template v-else-if="column.key === 'actions'">
+                <div class="flex flex-wrap justify-center gap-2" :data-twitter-account-actions="record.id">
+                  <a-button
+                    type="link"
+                    size="small"
+                    :data-twitter-account-edit="record.id"
+                    @click="openEditTwitterAccountModal(record)"
+                  >
+                    编辑
+                  </a-button>
+                  <a-popconfirm
+                    title="确认删除这个 Twitter 账号吗？"
+                    ok-text="确认删除"
+                    cancel-text="取消"
+                    @confirm="handleDeleteTwitterAccount(record)"
+                  >
+                    <a-button
+                      type="link"
+                      size="small"
+                      danger
+                      :loading="isActionPending(`twitter-delete:${record.id}`)"
+                      :data-twitter-account-delete="record.id"
+                    >
+                      删除
+                    </a-button>
+                  </a-popconfirm>
+                </div>
+              </template>
+            </template>
+          </a-table>
+        </a-card>
 
         <a-card
           :class="editorialContentCardClass"
@@ -961,6 +1258,115 @@ onUnmounted(() => {
               @click="handleSubmitSource"
             >
               {{ sourceModalMode === "create" ? "新增来源" : "保存更新" }}
+            </a-button>
+          </div>
+        </div>
+      </a-modal>
+
+      <a-modal
+        :open="isTwitterAccountModalOpen"
+        :title="twitterAccountModalMode === 'create' ? '新增 Twitter 账号' : '编辑 Twitter 账号'"
+        :footer="null"
+        centered
+        :width="680"
+        destroy-on-close
+        @cancel="closeTwitterAccountModal"
+      >
+        <div class="flex flex-col gap-4" data-twitter-account-modal="twitter-account">
+          <a-alert
+            v-if="twitterAccountFormError"
+            class="editorial-inline-alert editorial-inline-alert--error"
+            type="error"
+            show-icon
+            :message="twitterAccountFormError"
+          />
+
+          <a-alert
+            class="editorial-inline-alert editorial-inline-alert--info"
+            type="info"
+            show-icon
+            :message="twitterAccountCollectionMessage"
+            data-twitter-account-capability
+          />
+
+          <label class="flex flex-col gap-2">
+            <span class="text-sm font-medium text-editorial-text-main">Username</span>
+            <input
+              v-model="twitterAccountForm.username"
+              data-twitter-account-form="username"
+              class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
+              placeholder="例如 openai，不需要填写 @"
+            />
+          </label>
+
+          <label class="flex flex-col gap-2">
+            <span class="text-sm font-medium text-editorial-text-main">展示名称</span>
+            <input
+              v-model="twitterAccountForm.displayName"
+              data-twitter-account-form="display-name"
+              class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
+            />
+          </label>
+
+          <label class="flex flex-col gap-2">
+            <span class="text-sm font-medium text-editorial-text-main">分类</span>
+            <select
+              v-model="twitterAccountForm.category"
+              data-twitter-account-form="category"
+              class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
+            >
+              <option
+                v-for="option in twitterAccountCategoryOptions"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+
+          <label class="flex flex-col gap-2">
+            <span class="text-sm font-medium text-editorial-text-main">优先级</span>
+            <input
+              v-model.number="twitterAccountForm.priority"
+              data-twitter-account-form="priority"
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
+            />
+          </label>
+
+          <label class="flex items-center gap-2 text-sm text-editorial-text-main">
+            <input
+              v-model="twitterAccountForm.includeReplies"
+              data-twitter-account-form="include-replies"
+              type="checkbox"
+              class="h-4 w-4"
+            />
+            采集回复
+          </label>
+
+          <label class="flex flex-col gap-2">
+            <span class="text-sm font-medium text-editorial-text-main">备注</span>
+            <textarea
+              v-model="twitterAccountForm.notes"
+              data-twitter-account-form="notes"
+              rows="3"
+              class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
+            />
+          </label>
+
+          <div class="flex justify-end gap-2">
+            <a-button @click="closeTwitterAccountModal">取消</a-button>
+            <a-button
+              type="primary"
+              data-twitter-account-form="submit"
+              :loading="isActionPending('twitter-account:submit')"
+              @click="handleSubmitTwitterAccount"
+            >
+              {{ twitterAccountModalMode === "create" ? "新增账号" : "保存更新" }}
             </a-button>
           </div>
         </div>

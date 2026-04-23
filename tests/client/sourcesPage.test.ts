@@ -23,6 +23,10 @@ vi.mock("../../src/client/services/settingsApi", async () => {
     deleteSource: vi.fn(),
     toggleSource: vi.fn(),
     updateSourceDisplayMode: vi.fn(),
+    createTwitterAccount: vi.fn(),
+    updateTwitterAccount: vi.fn(),
+    deleteTwitterAccount: vi.fn(),
+    toggleTwitterAccount: vi.fn(),
     triggerManualCollect: vi.fn(),
     triggerManualSendLatestEmail: vi.fn()
   };
@@ -88,6 +92,24 @@ function createSourcesModel() {
         }
       }
     ],
+    twitterAccounts: [
+      {
+        id: 1,
+        username: "openai",
+        userId: "123",
+        displayName: "OpenAI",
+        category: "official_vendor",
+        priority: 90,
+        includeReplies: false,
+        isEnabled: true,
+        notes: "official account",
+        lastFetchedAt: "2026-04-23T08:00:00.000Z",
+        lastSuccessAt: "2026-04-23T08:01:00.000Z",
+        lastError: null,
+        createdAt: "2026-04-23T07:00:00.000Z",
+        updatedAt: "2026-04-23T08:01:00.000Z"
+      }
+    ],
     operations: {
       lastCollectionRunAt: "2026-03-31T08:10:00.000Z",
       lastSendLatestEmailAt: "2026-03-31T08:30:00.000Z",
@@ -98,7 +120,9 @@ function createSourcesModel() {
     },
     capability: {
       wechatArticleUrlEnabled: true,
-      wechatArticleUrlMessage: "公众号来源已开启，可直接填写公众号名称，或补一篇文章链接帮助系统更快定位来源。"
+      wechatArticleUrlMessage: "公众号来源已开启，可直接填写公众号名称，或补一篇文章链接帮助系统更快定位来源。",
+      twitterAccountCollectionEnabled: true,
+      twitterAccountCollectionMessage: "Twitter 账号采集已配置 API key，可采集已启用账号。"
     }
   } satisfies settingsApi.SettingsSourcesResponse;
 }
@@ -164,6 +188,11 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-sources-section='analytics']").text()).not.toContain("AI 热点今日候选 / 今日展示");
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("OpenAI");
     expect(wrapper.get("[data-sources-section='manual-send-latest-email']").text()).toContain("发送最新报告");
+    expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("Twitter 账号");
+    expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("OpenAI");
+    expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("@openai");
+    expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("official_vendor");
+    expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("Twitter 账号采集已配置 API key");
     expect(wrapper.get("[data-sources-section='inventory']").classes()).toContain("editorial-glass-panel");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("已完成");
     expect(wrapper.get("[data-sources-section='inventory']").text()).not.toContain("选中时全量");
@@ -263,6 +292,101 @@ describe("SourcesPage", () => {
     expect(settingsApi.updateSourceDisplayMode).toHaveBeenCalledWith("openai", false);
     expect(settingsApi.readSettingsSources).toHaveBeenCalledTimes(2);
     expect(wrapper.text()).toContain("已关闭选中时全量展示");
+  });
+
+  it("toggles a twitter account and reloads the latest sources model", async () => {
+    vi.mocked(settingsApi.readSettingsSources)
+      .mockResolvedValueOnce(createSourcesModel())
+      .mockResolvedValueOnce({
+        ...createSourcesModel(),
+        twitterAccounts: [{ ...createSourcesModel().twitterAccounts[0], isEnabled: false }]
+      });
+    vi.mocked(settingsApi.toggleTwitterAccount).mockResolvedValue({
+      ok: true,
+      id: 1,
+      enable: false
+    });
+
+    const wrapper = mountSourcesPage();
+
+    await flushPromises();
+    await wrapper.get("[data-twitter-account-toggle='1']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.toggleTwitterAccount).toHaveBeenCalledWith(1, false);
+    expect(settingsApi.readSettingsSources).toHaveBeenCalledTimes(2);
+    expect(wrapper.text()).toContain("已停用 Twitter 账号");
+  });
+
+  it("submits a twitter account from the create modal", async () => {
+    vi.mocked(settingsApi.readSettingsSources).mockResolvedValue(createSourcesModel());
+    vi.mocked(settingsApi.createTwitterAccount).mockResolvedValue({
+      ok: true,
+      account: createSourcesModel().twitterAccounts[0]
+    });
+
+    const wrapper = mountSourcesPage();
+    await flushPromises();
+
+    await wrapper.get("[data-action='add-twitter-account']").trigger("click");
+    await flushPromises();
+
+    expect(document.body.querySelector(".ant-modal-root")).not.toBeNull();
+
+    await getModalNode("[data-twitter-account-form='username']").setValue("@OpenAI");
+    await getModalNode("[data-twitter-account-form='display-name']").setValue("OpenAI");
+    await getModalNode("[data-twitter-account-form='category']").setValue("official_vendor");
+    await getModalNode("[data-twitter-account-form='priority']").setValue("90");
+    await getModalNode("[data-twitter-account-form='notes']").setValue("official account");
+    await getModalNode("[data-twitter-account-form='submit']").trigger("click");
+    await flushPromises();
+
+    expect(getModalNode("[data-twitter-account-capability]").text()).toContain("Twitter 账号采集已配置 API key");
+    expect(settingsApi.createTwitterAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: "@OpenAI",
+        displayName: "OpenAI",
+        category: "official_vendor",
+        priority: 90,
+        includeReplies: false,
+        notes: "official account"
+      })
+    );
+  });
+
+  it("updates a twitter account from the edit modal", async () => {
+    vi.mocked(settingsApi.readSettingsSources).mockResolvedValue(createSourcesModel());
+    vi.mocked(settingsApi.updateTwitterAccount).mockResolvedValue({
+      ok: true,
+      account: {
+        ...createSourcesModel().twitterAccounts[0],
+        displayName: "OpenAI News",
+        includeReplies: true
+      }
+    });
+
+    const wrapper = mountSourcesPage();
+    await flushPromises();
+
+    await wrapper.get("[data-twitter-account-edit='1']").trigger("click");
+    await flushPromises();
+
+    await getModalNode("[data-twitter-account-form='display-name']").setValue("OpenAI News");
+    await getModalNode("[data-twitter-account-form='include-replies']").setValue(true);
+    await getModalNode("[data-twitter-account-form='submit']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.updateTwitterAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 1,
+        username: "openai",
+        displayName: "OpenAI News",
+        category: "official_vendor",
+        priority: 90,
+        includeReplies: true,
+        notes: "official account"
+      })
+    );
   });
 
   it("submits a wechat source from the simplified modal", async () => {
@@ -465,6 +589,34 @@ describe("SourcesPage", () => {
     await flushPromises();
 
     expect(settingsApi.deleteSource).toHaveBeenCalledWith("wechat_demo");
+    expect(settingsApi.readSettingsSources).toHaveBeenCalledTimes(2);
+  });
+
+  it("requires popconfirm before deleting a twitter account", async () => {
+    vi.mocked(settingsApi.readSettingsSources)
+      .mockResolvedValueOnce(createSourcesModel())
+      .mockResolvedValueOnce({
+        ...createSourcesModel(),
+        twitterAccounts: []
+      });
+    vi.mocked(settingsApi.deleteTwitterAccount).mockResolvedValue({ ok: true, id: 1 });
+
+    const wrapper = mountSourcesPage();
+    await flushPromises();
+
+    await wrapper.get("[data-twitter-account-delete='1']").trigger("click");
+    expect(settingsApi.deleteTwitterAccount).not.toHaveBeenCalled();
+
+    const accountDeleteConfirm = wrapper
+      .findAllComponents({ name: "APopconfirm" })
+      .find((component) => component.find('[data-twitter-account-delete="1"]').exists());
+
+    expect(accountDeleteConfirm).toBeTruthy();
+
+    accountDeleteConfirm!.vm.$emit("confirm");
+    await flushPromises();
+
+    expect(settingsApi.deleteTwitterAccount).toHaveBeenCalledWith(1);
     expect(settingsApi.readSettingsSources).toHaveBeenCalledTimes(2);
   });
 });

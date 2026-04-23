@@ -70,7 +70,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(11);
+    expect(schemaVersion).toBe(12);
 
     const appliedMigrations = db
       .prepare(
@@ -93,7 +93,26 @@ describe("runMigrations", () => {
       { version: 8, name: "008_twitter_accounts" },
       { version: 9, name: "009_twitter_search_keywords" },
       { version: 10, name: "010_hackernews_queries" },
-      { version: 11, name: "011_bilibili_queries" }
+      { version: 11, name: "011_bilibili_queries" },
+      { version: 12, name: "012_weibo_trending" }
+    ]);
+
+    const hiddenAggregates = db
+      .prepare(
+        `
+          SELECT kind, source_type
+          FROM content_sources
+          WHERE kind IN ('twitter_keyword_search', 'hackernews_search', 'bilibili_search', 'weibo_trending')
+          ORDER BY kind ASC
+        `
+      )
+      .all() as Array<{ kind: string; source_type: string }>;
+
+    expect(hiddenAggregates).toEqual([
+      { kind: "bilibili_search", source_type: "bilibili_search_aggregate" },
+      { kind: "hackernews_search", source_type: "hackernews_aggregate" },
+      { kind: "twitter_keyword_search", source_type: "twitter_keyword_aggregate" },
+      { kind: "weibo_trending", source_type: "weibo_trending_aggregate" }
     ]);
 
     const digestReportColumns = db

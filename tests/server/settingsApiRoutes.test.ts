@@ -149,10 +149,17 @@ function createAuthenticatedServer() {
         updatedAt: "2026-04-23T08:00:00.000Z"
       }
     ]),
+    getWeiboTrendingState: vi.fn().mockResolvedValue({
+      fixedKeywords: ["OpenAI", "AI"],
+      lastFetchedAt: "2026-04-23T08:40:00.000Z",
+      lastSuccessAt: "2026-04-23T08:41:00.000Z",
+      lastResult: "本次匹配成功，命中 1 个微博热搜话题。"
+    }),
     hasTwitterApiKey: true,
     triggerManualRun: vi.fn().mockResolvedValue({ accepted: true }),
     triggerManualHackerNewsCollect: vi.fn().mockResolvedValue({ accepted: true }),
     triggerManualBilibiliCollect: vi.fn().mockResolvedValue({ accepted: true }),
+    triggerManualWeiboTrendingCollect: vi.fn().mockResolvedValue({ accepted: true }),
     getSourcesOperationSummary: vi.fn().mockResolvedValue({
       lastCollectionRunAt: "2026-03-31T03:00:00.000Z",
       lastSendLatestEmailAt: "2026-03-31T03:10:00.000Z"
@@ -272,6 +279,10 @@ describe("settings api routes", () => {
           isEnabled: true
         }
       ],
+      weiboTrending: {
+        fixedKeywords: ["OpenAI", "AI"],
+        lastResult: "本次匹配成功，命中 1 个微博热搜话题。"
+      },
       operations: {
         lastCollectionRunAt: "2026-03-31T03:00:00.000Z",
         lastSendLatestEmailAt: "2026-03-31T03:10:00.000Z",
@@ -280,6 +291,7 @@ describe("settings api routes", () => {
         canTriggerManualTwitterCollect: false,
         canTriggerManualHackerNewsCollect: true,
         canTriggerManualBilibiliCollect: true,
+        canTriggerManualWeiboTrendingCollect: true,
         canTriggerManualSendLatestEmail: false,
         isRunning: false
       },
@@ -287,7 +299,8 @@ describe("settings api routes", () => {
         wechatArticleUrlEnabled: false,
         twitterAccountCollectionEnabled: true,
         hackerNewsSearchEnabled: true,
-        bilibiliSearchEnabled: true
+        bilibiliSearchEnabled: true,
+        weiboTrendingEnabled: true
       }
     });
   });

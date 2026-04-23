@@ -83,6 +83,7 @@ type ContentCardRow = {
 const matchingSourceViewBonus = 120;
 const twitterAccountsSourceKind = "twitter_accounts";
 const twitterKeywordSearchSourceKind = "twitter_keyword_search";
+const hotOnlySourceKinds = new Set(["weibo_trending"]);
 
 const contentSelectSql = `
   SELECT
@@ -543,6 +544,7 @@ function buildRankedCardCandidate(
     ),
     rankingTimestamp: row.rankingTimestamp,
     isBlocked:
+      shouldBlockByViewSourceScope(context.viewKey, row.sourceKind) ||
       shouldBlockByTimeWindow(context.viewKey, row, context.referenceTime, context.viewRuleConfig) ||
       (context.includeNlEvaluations &&
         (normalizeNlDecision(row.baseDecision) === "block" || normalizeNlDecision(row.viewDecision) === "block"))
@@ -567,6 +569,11 @@ function shouldBlockByTimeWindow(
 
   const timestamp = row.publishedAt ?? row.rankingTimestamp;
   return !isWithinLastHours(timestamp, referenceTime, 24);
+}
+
+function shouldBlockByViewSourceScope(viewKey: ContentViewKey, sourceKind: string): boolean {
+  // 微博热搜只作为热点信号补充源，不进入 AI 新讯或旧文章流。
+  return hotOnlySourceKinds.has(sourceKind) && viewKey !== "hot";
 }
 
 function isWithinLastHours(value: string | null, referenceTime: Date, hours: number): boolean {

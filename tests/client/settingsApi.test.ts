@@ -28,6 +28,7 @@ describe("settingsApi", () => {
         canTriggerManualTwitterKeywordCollect: true,
         canTriggerManualHackerNewsCollect: true,
         canTriggerManualBilibiliCollect: true,
+        canTriggerManualWeiboTrendingCollect: true,
         canTriggerManualSendLatestEmail: true,
         isRunning: false
       },
@@ -37,7 +38,9 @@ describe("settingsApi", () => {
         hackerNewsSearchEnabled: true,
         hackerNewsSearchMessage: "Hacker News 搜索已就绪，可维护 query 并手动采集。",
         bilibiliSearchEnabled: true,
-        bilibiliSearchMessage: "B 站搜索已就绪，可维护 query 并手动采集。"
+        bilibiliSearchMessage: "B 站搜索已就绪，可维护 query 并手动采集。",
+        weiboTrendingEnabled: true,
+        weiboTrendingMessage: "微博热搜榜匹配已就绪，固定 AI 关键词只进入 AI 热点。"
       }
     });
 
@@ -488,6 +491,19 @@ describe("settingsApi", () => {
     await triggerManualBilibiliCollect();
 
     expect(requestJson).toHaveBeenCalledWith("/actions/bilibili/collect", {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+  });
+
+  it("posts manual weibo trending collection to the dedicated action", async () => {
+    const { triggerManualWeiboTrendingCollect } = await import("../../src/client/services/settingsApi");
+
+    requestJson.mockResolvedValue({ accepted: true, action: "collect-weibo-trending" });
+
+    await triggerManualWeiboTrendingCollect();
+
+    expect(requestJson).toHaveBeenCalledWith("/actions/weibo/collect", {
       method: "POST",
       body: JSON.stringify({})
     });

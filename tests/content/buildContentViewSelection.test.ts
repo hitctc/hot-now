@@ -225,6 +225,38 @@ describe("buildContentViewSelection", () => {
     expect(hotSelection.visibleCards.map((card) => card.title)).toContain("Too old for ai-new");
   });
 
+  it("keeps weibo trending content out of ai and articles while still allowing it in hot", async () => {
+    const db = await createTestDatabase(databasesToClose);
+    const weiboTrending = resolveSourceByKind(db, "weibo_trending");
+
+    upsertContentItems(db, {
+      sourceId: weiboTrending!.id,
+      items: [
+        {
+          title: "OpenAI 登上微博热搜",
+          canonicalUrl: "https://s.weibo.com/weibo?q=%23OpenAI%23",
+          summary: "summary",
+          bodyMarkdown: "body",
+          publishedAt: "2026-03-31T03:00:00.000Z",
+          fetchedAt: "2026-03-31T03:00:05.000Z"
+        }
+      ]
+    });
+
+    const hotSelection = buildContentViewSelection(db, "hot");
+    const aiSelection = buildContentViewSelection(db, "ai", {
+      ruleConfig: {
+        ...getInternalViewRuleConfig("ai"),
+        enableTimeWindow: false
+      }
+    });
+    const articlesSelection = buildContentViewSelection(db, "articles");
+
+    expect(hotSelection.visibleCards.map((card) => card.title)).toContain("OpenAI 登上微博热搜");
+    expect(aiSelection.visibleCards.map((card) => card.title)).not.toContain("OpenAI 登上微博热搜");
+    expect(articlesSelection.visibleCards.map((card) => card.title)).not.toContain("OpenAI 登上微博热搜");
+  });
+
   it("stops blocking old ai content when enableTimeWindow is false", async () => {
     const db = await createTestDatabase(databasesToClose);
     const openai = resolveSourceByKind(db, "openai");

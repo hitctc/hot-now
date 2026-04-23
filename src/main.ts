@@ -39,6 +39,7 @@ import { runTwitterAccountCollection } from "./core/twitter/runTwitterAccountCol
 import { runTwitterKeywordCollection } from "./core/twitter/runTwitterKeywordCollection.js";
 import { runHackerNewsCollection } from "./core/hackernews/runHackerNewsCollection.js";
 import { runBilibiliCollection } from "./core/bilibili/runBilibiliCollection.js";
+import { readWeiboTrendingRunState, runWeiboTrendingCollection } from "./core/weibo/runWeiboTrendingCollection.js";
 import {
   deleteSource as removeSource,
   saveSource as persistSource,
@@ -164,6 +165,11 @@ async function runHackerNewsCollectionTask() {
 // B 站搜索第一版也只支持手动触发，先把视频搜索链路验证稳定再考虑调度扩展。
 async function runBilibiliCollectionTask() {
   return await runBilibiliCollection(db);
+}
+
+// 微博热搜榜匹配只做热点补充信号，不进默认采集调度。
+async function runWeiboTrendingCollectionTask() {
+  return await runWeiboTrendingCollection(db);
 }
 
 // Latest-email runs reuse the most recent report artifact and keep SMTP concerns out of the collection cadence.
@@ -501,6 +507,13 @@ const triggerManualBilibiliCollect = config.manualActions.collectEnabled
     }
   : undefined;
 
+// 微博热搜榜匹配和其他搜索来源共用运行锁，但继续保持单独入口和单独结果摘要。
+const triggerManualWeiboTrendingCollect = config.manualActions.collectEnabled
+  ? async () => {
+      return await lock.runExclusive(async () => await runWeiboTrendingCollectionTask());
+    }
+  : undefined;
+
 // 新增来源后先只补这一条 source 的内容入库，避免为了拿到首批数据就把整轮全站采集串进保存接口。
 async function saveAndHydrateSource(input: Parameters<typeof persistSource>[1]) {
   const result = await persistSource(db, input, {
@@ -579,6 +592,7 @@ const app = createServer({
   listTwitterSearchKeywords: async () => listTwitterSearchKeywords(db),
   listHackerNewsQueries: async () => listHackerNewsQueries(db),
   listBilibiliQueries: async () => listBilibiliQueries(db),
+  getWeiboTrendingState: async () => readWeiboTrendingRunState(db),
   createTwitterAccount: async (input) => persistTwitterAccount(db, input),
   updateTwitterAccount: async (input) => persistTwitterAccountUpdate(db, input),
   deleteTwitterAccount: async (id) => removeTwitterAccount(db, id),
@@ -603,6 +617,7 @@ const app = createServer({
   triggerManualTwitterKeywordCollect,
   triggerManualHackerNewsCollect,
   triggerManualBilibiliCollect,
+  triggerManualWeiboTrendingCollect,
   getCurrentUserProfile: async () => getCurrentUserProfile(),
   listReportSummaries: listStoredReportSummaries,
   latestReportDate: async () => (await listReportDates(config.report.dataDir))[0] ?? null,

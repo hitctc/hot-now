@@ -119,6 +119,7 @@ export type SettingsSourcesOperations = {
   canTriggerManualTwitterKeywordCollect: boolean;
   canTriggerManualHackerNewsCollect?: boolean;
   canTriggerManualBilibiliCollect?: boolean;
+  canTriggerManualWeiboTrendingCollect?: boolean;
   canTriggerManualSendLatestEmail: boolean;
   isRunning: boolean;
 };
@@ -134,6 +135,8 @@ export type SettingsSourcesCapability = {
   hackerNewsSearchMessage?: string;
   bilibiliSearchEnabled?: boolean;
   bilibiliSearchMessage?: string;
+  weiboTrendingEnabled?: boolean;
+  weiboTrendingMessage?: string;
 };
 
 export type SettingsTwitterAccount = {
@@ -194,12 +197,20 @@ export type SettingsBilibiliQuery = {
   updatedAt: string;
 };
 
+export type SettingsWeiboTrending = {
+  fixedKeywords: string[];
+  lastFetchedAt: string | null;
+  lastSuccessAt: string | null;
+  lastResult: string | null;
+};
+
 export type SettingsSourcesResponse = {
   sources: SettingsSourceItem[];
   twitterAccounts?: SettingsTwitterAccount[];
   twitterSearchKeywords?: SettingsTwitterSearchKeyword[];
   hackerNewsQueries?: SettingsHackerNewsQuery[];
   bilibiliQueries?: SettingsBilibiliQuery[];
+  weiboTrending?: SettingsWeiboTrending;
   operations: SettingsSourcesOperations;
   capability: SettingsSourcesCapability;
 };
@@ -449,6 +460,21 @@ export type ManualBilibiliCollectResponse =
       reason?: "no-enabled-bilibili-queries" | "already-running";
     };
 
+export type ManualWeiboTrendingCollectResponse =
+  | {
+      accepted: true;
+      action: "collect-weibo-trending";
+      fetchedTopicCount: number;
+      matchedTopicCount: number;
+      persistedContentItemCount: number;
+      reusedContentItemCount: number;
+      failureCount: number;
+    }
+  | {
+      accepted: false;
+      reason?: "already-running";
+    };
+
 export type ManualSendLatestEmailResponse = {
   accepted: boolean;
   action?: "send-latest-email";
@@ -668,6 +694,11 @@ export function triggerManualHackerNewsCollect(): Promise<ManualHackerNewsCollec
 // B 站搜索和 HN 一样保持独立手动入口，避免默认采集链路无意扩大到视频搜索。
 export function triggerManualBilibiliCollect(): Promise<ManualBilibiliCollectResponse> {
   return postSettingsAction<ManualBilibiliCollectResponse>("/actions/bilibili/collect", {});
+}
+
+// 微博热搜榜匹配只走独立手动入口，不进入默认采集链路。
+export function triggerManualWeiboTrendingCollect(): Promise<ManualWeiboTrendingCollectResponse> {
+  return postSettingsAction<ManualWeiboTrendingCollectResponse>("/actions/weibo/collect", {});
 }
 
 // 手动发送最新报告沿用现有后端接口，错误原因由调用方再翻译成用户提示。

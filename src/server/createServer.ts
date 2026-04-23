@@ -49,6 +49,7 @@ import type {
   SaveBilibiliQueryResult,
   ToggleBilibiliQueryResult
 } from "../core/bilibili/bilibiliQueryRepository.js";
+import type { WeiboTrendingRunState } from "../core/weibo/runWeiboTrendingCollection.js";
 import type { RuntimeConfig } from "../core/types/appConfig.js";
 import { readNextCollectionRunAt } from "../core/scheduler/readNextCollectionRunAt.js";
 import {
@@ -75,6 +76,7 @@ import {
   type HackerNewsQuerySettingsView,
   type TwitterAccountSettingsView,
   type TwitterSearchKeywordSettingsView,
+  type WeiboTrendingSettingsView,
   type ViewRulesWorkbenchView
 } from "./renderSystemPages.js";
 
@@ -180,6 +182,15 @@ type ManualBilibiliCollectResult =
       accepted: false;
       reason: "no-enabled-bilibili-queries";
     };
+type ManualWeiboTrendingCollectResult = {
+  accepted: true;
+  action: "collect-weibo-trending";
+  fetchedTopicCount: number;
+  matchedTopicCount: number;
+  persistedContentItemCount: number;
+  reusedContentItemCount: number;
+  failureCount: number;
+};
 type ManualSendLatestEmailResult =
   | { accepted: true; action: "send-latest-email" }
   | { accepted: false; reason: LatestReportEmailErrorReason };
@@ -278,6 +289,7 @@ type ServerDeps = {
   listTwitterSearchKeywords?: () => Promise<TwitterSearchKeywordRecord[]> | TwitterSearchKeywordRecord[];
   listHackerNewsQueries?: () => Promise<HackerNewsQueryRecord[]> | HackerNewsQueryRecord[];
   listBilibiliQueries?: () => Promise<BilibiliQueryRecord[]> | BilibiliQueryRecord[];
+  getWeiboTrendingState?: () => Promise<WeiboTrendingRunState> | WeiboTrendingRunState;
   createTwitterAccount?: (
     input: SaveTwitterAccountInput
   ) => Promise<SaveTwitterAccountResult> | SaveTwitterAccountResult;
@@ -331,6 +343,7 @@ type ServerDeps = {
   hasTwitterApiKey?: boolean;
   triggerManualHackerNewsCollect?: () => Promise<ManualHackerNewsCollectResult>;
   triggerManualBilibiliCollect?: () => Promise<ManualBilibiliCollectResult>;
+  triggerManualWeiboTrendingCollect?: () => Promise<ManualWeiboTrendingCollectResult>;
   getCurrentUserProfile?: () => Promise<CurrentUserProfile | null> | CurrentUserProfile | null;
   getContentPageModel?: (
     pageKey: ContentPageKey,
@@ -777,6 +790,17 @@ export function createServer(deps: ServerDeps = {}) {
       authConfig?.sessionSecret ?? "",
       deps.isRunning?.() ?? false,
       deps.triggerManualBilibiliCollect
+    );
+  });
+
+  app.post("/actions/weibo/collect", async (request, reply) => {
+    return await handleManualWeiboTrendingCollectAction(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? "",
+      deps.isRunning?.() ?? false,
+      deps.triggerManualWeiboTrendingCollect
     );
   });
 
@@ -1885,6 +1909,7 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
   const twitterSearchKeywords = ((await deps.listTwitterSearchKeywords?.()) ?? []) as TwitterSearchKeywordSettingsView[];
   const hackerNewsQueries = ((await deps.listHackerNewsQueries?.()) ?? []) as HackerNewsQuerySettingsView[];
   const bilibiliQueries = ((await deps.listBilibiliQueries?.()) ?? []) as BilibiliQuerySettingsView[];
+  const weiboTrending = (await deps.getWeiboTrendingState?.()) as WeiboTrendingSettingsView | undefined;
   const operationSummary = deps.getSourcesOperationSummary
     ? await deps.getSourcesOperationSummary()
     : { lastCollectionRunAt: null, lastSendLatestEmailAt: null };
@@ -1899,6 +1924,7 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
     twitterSearchKeywords,
     hackerNewsQueries,
     bilibiliQueries,
+    weiboTrending,
     operations: {
       lastCollectionRunAt: operationSummary.lastCollectionRunAt,
       lastSendLatestEmailAt: operationSummary.lastSendLatestEmailAt,
@@ -1908,6 +1934,7 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
       canTriggerManualTwitterKeywordCollect: typeof deps.triggerManualTwitterKeywordCollect === "function",
       canTriggerManualHackerNewsCollect: typeof deps.triggerManualHackerNewsCollect === "function",
       canTriggerManualBilibiliCollect: typeof deps.triggerManualBilibiliCollect === "function",
+      canTriggerManualWeiboTrendingCollect: typeof deps.triggerManualWeiboTrendingCollect === "function",
       canTriggerManualSendLatestEmail: typeof deps.triggerManualSendLatestEmail === "function",
       isRunning: deps.isRunning?.() ?? false
     },
@@ -1929,7 +1956,9 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
       hackerNewsSearchEnabled: true,
       hackerNewsSearchMessage: "Hacker News 搜索已就绪，可维护 query 并手动采集。",
       bilibiliSearchEnabled: true,
-      bilibiliSearchMessage: "B 站搜索已就绪，可维护 query 并手动采集。"
+      bilibiliSearchMessage: "B 站搜索已就绪，可维护 query 并手动采集。",
+      weiboTrendingEnabled: true,
+      weiboTrendingMessage: "微博热搜榜匹配已就绪，固定 AI 关键词只进入 AI 热点。"
     }
   };
 }
@@ -2859,6 +2888,31 @@ async function handleManualBilibiliCollectAction(
   }
 
   const result = await triggerManualBilibiliCollect();
+  return reply.code(202).send(result);
+}
+
+async function handleManualWeiboTrendingCollectAction(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  authEnabled: boolean,
+  sessionSecret: string,
+  isRunning: boolean,
+  triggerManualWeiboTrendingCollect: ServerDeps["triggerManualWeiboTrendingCollect"]
+) {
+  // 微博热搜榜匹配和其他手动采集保持同一套权限与运行锁，但只返回热点匹配侧摘要。
+  if (!ensureManualActionAuthorized(request, reply, authEnabled, sessionSecret)) {
+    return;
+  }
+
+  if (isRunning) {
+    return reply.code(409).send({ accepted: false, reason: "already-running" });
+  }
+
+  if (!triggerManualWeiboTrendingCollect) {
+    return reply.code(503).send({ accepted: false });
+  }
+
+  const result = await triggerManualWeiboTrendingCollect();
   return reply.code(202).send(result);
 }
 

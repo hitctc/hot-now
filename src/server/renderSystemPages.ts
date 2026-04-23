@@ -81,6 +81,7 @@ export type SourcesSettingsOperationsView = {
   canTriggerManualTwitterKeywordCollect: boolean;
   canTriggerManualHackerNewsCollect?: boolean;
   canTriggerManualBilibiliCollect?: boolean;
+  canTriggerManualWeiboTrendingCollect?: boolean;
   canTriggerManualSendLatestEmail: boolean;
   isRunning: boolean;
   lastCollectionRunAt: string | null;
@@ -99,6 +100,8 @@ export type SourcesCapabilityView = {
   hackerNewsSearchMessage?: string;
   bilibiliSearchEnabled?: boolean;
   bilibiliSearchMessage?: string;
+  weiboTrendingEnabled?: boolean;
+  weiboTrendingMessage?: string;
 };
 
 export type TwitterAccountSettingsView = {
@@ -159,12 +162,20 @@ export type BilibiliQuerySettingsView = {
   updatedAt: string;
 };
 
+export type WeiboTrendingSettingsView = {
+  fixedKeywords: string[];
+  lastFetchedAt: string | null;
+  lastSuccessAt: string | null;
+  lastResult: string | null;
+};
+
 export type SourcesSettingsView = {
   sources: SourceItem[];
   twitterAccounts?: TwitterAccountSettingsView[];
   twitterSearchKeywords?: TwitterSearchKeywordSettingsView[];
   hackerNewsQueries?: HackerNewsQuerySettingsView[];
   bilibiliQueries?: BilibiliQuerySettingsView[];
+  weiboTrending?: WeiboTrendingSettingsView;
   operations: SourcesSettingsOperationsView;
   capability: SourcesCapabilityView;
 };

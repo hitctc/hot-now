@@ -96,6 +96,9 @@ describe("listSourceCards", () => {
       lastCollectedAt: null,
       lastCollectionStatus: null
     });
+    expect(cards.some((card) => card.kind === "hackernews_search")).toBe(false);
+    expect(cards.some((card) => card.kind === "bilibili_search")).toBe(false);
+    expect(cards.some((card) => card.kind === "weibo_trending")).toBe(false);
   });
 
   it("ignores collection run rows whose notes do not contain a valid sourceKind", async () => {

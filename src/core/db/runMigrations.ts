@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 11;
+const schemaVersion = 12;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -12,6 +12,7 @@ const twitterAccountsMigrationName = "008_twitter_accounts";
 const twitterSearchKeywordsMigrationName = "009_twitter_search_keywords";
 const hackerNewsQueriesMigrationName = "010_hackernews_queries";
 const bilibiliQueriesMigrationName = "011_bilibili_queries";
+const weiboTrendingMigrationName = "012_weibo_trending";
 
 const migrationStatements = [
   `
@@ -601,6 +602,47 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(11, bilibiliQueriesMigrationName);
+
+    // 微博热搜第一版只有固定关键词匹配，没有单独配置表，但仍需要一个隐藏聚合 source
+    // 来承接 content_items 外键。
+    db.prepare(
+      `
+        INSERT INTO content_sources (
+          kind,
+          name,
+          site_url,
+          rss_url,
+          is_enabled,
+          is_builtin,
+          source_type,
+          show_all_when_selected,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, 0, 0, ?, 0, CURRENT_TIMESTAMP)
+        ON CONFLICT(kind) DO UPDATE SET
+          name = excluded.name,
+          site_url = excluded.site_url,
+          source_type = excluded.source_type,
+          is_enabled = 0,
+          is_builtin = 0,
+          show_all_when_selected = 0,
+          updated_at = CURRENT_TIMESTAMP
+      `
+    ).run(
+      "weibo_trending",
+      "微博热搜榜匹配",
+      "https://s.weibo.com/top/summary",
+      null,
+      "weibo_trending_aggregate"
+    );
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(12, weiboTrendingMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

@@ -43,6 +43,7 @@ vi.mock("../../src/client/services/settingsApi", async () => {
     triggerManualCollect: vi.fn(),
     triggerManualBilibiliCollect: vi.fn(),
     triggerManualHackerNewsCollect: vi.fn(),
+    triggerManualWeiboTrendingCollect: vi.fn(),
     triggerManualTwitterCollect: vi.fn(),
     triggerManualTwitterKeywordCollect: vi.fn(),
     triggerManualSendLatestEmail: vi.fn()
@@ -173,6 +174,12 @@ function createSourcesModel() {
         updatedAt: "2026-04-23T08:31:00.000Z"
       }
     ],
+    weiboTrending: {
+      fixedKeywords: ["OpenAI", "AI", "大模型"],
+      lastFetchedAt: "2026-04-23T08:40:00.000Z",
+      lastSuccessAt: "2026-04-23T08:41:00.000Z",
+      lastResult: "本次匹配成功，命中 1 个微博热搜话题。"
+    },
     operations: {
       lastCollectionRunAt: "2026-03-31T08:10:00.000Z",
       lastSendLatestEmailAt: "2026-03-31T08:30:00.000Z",
@@ -182,6 +189,7 @@ function createSourcesModel() {
       canTriggerManualTwitterKeywordCollect: true,
       canTriggerManualHackerNewsCollect: true,
       canTriggerManualBilibiliCollect: true,
+      canTriggerManualWeiboTrendingCollect: true,
       canTriggerManualSendLatestEmail: true,
       isRunning: false
     },
@@ -195,7 +203,9 @@ function createSourcesModel() {
       hackerNewsSearchEnabled: true,
       hackerNewsSearchMessage: "Hacker News 搜索已就绪，可维护 query 并手动采集。",
       bilibiliSearchEnabled: true,
-      bilibiliSearchMessage: "B 站搜索已就绪，可维护 query 并手动采集。"
+      bilibiliSearchMessage: "B 站搜索已就绪，可维护 query 并手动采集。",
+      weiboTrendingEnabled: true,
+      weiboTrendingMessage: "微博热搜榜匹配已就绪，固定 AI 关键词只进入 AI 热点。"
     }
   } satisfies settingsApi.SettingsSourcesResponse;
 }
@@ -284,6 +294,10 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-sources-section='bilibili']").text()).toContain("openai");
     expect(wrapper.get("[data-sources-section='bilibili']").text()).toContain("B 站搜索已就绪");
     expect(wrapper.get("[data-sources-section='bilibili']").text()).toContain("手动采集 B 站搜索");
+    expect(wrapper.get("[data-sources-section='weibo-trending']").text()).toContain("微博热搜榜匹配");
+    expect(wrapper.get("[data-sources-section='weibo-trending']").text()).toContain("固定只进入 AI 热点");
+    expect(wrapper.get("[data-sources-section='weibo-trending']").text()).toContain("微博热搜榜匹配已就绪");
+    expect(wrapper.findAll("[data-weibo-keyword]")).toHaveLength(3);
     expect(wrapper.get("[data-sources-section='inventory']").classes()).toContain("editorial-glass-panel");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("已完成");
     expect(wrapper.get("[data-sources-section='inventory']").text()).not.toContain("选中时全量");
@@ -457,6 +471,30 @@ describe("SourcesPage", () => {
 
     expect(settingsApi.triggerManualBilibiliCollect).toHaveBeenCalledTimes(1);
     expect(wrapper.text()).toContain("B 站搜索已完成：处理 1 个 query，新入库 1 条，复用 1 条，失败 0 个。");
+  });
+
+  it("runs the manual weibo trending collect action and shows the summarized toast", async () => {
+    vi.mocked(settingsApi.readSettingsSources)
+      .mockResolvedValueOnce(createSourcesModel())
+      .mockResolvedValueOnce(createSourcesModel());
+    vi.mocked(settingsApi.triggerManualWeiboTrendingCollect).mockResolvedValue({
+      accepted: true,
+      action: "collect-weibo-trending",
+      fetchedTopicCount: 5,
+      matchedTopicCount: 2,
+      persistedContentItemCount: 1,
+      reusedContentItemCount: 1,
+      failureCount: 0
+    });
+
+    const wrapper = mountSourcesPage();
+
+    await flushPromises();
+    await wrapper.get("[data-action='manual-weibo-trending-collect']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.triggerManualWeiboTrendingCollect).toHaveBeenCalledTimes(1);
+    expect(wrapper.text()).toContain("微博热搜榜匹配已完成：命中 2 个话题，新入库 1 条，复用 1 条，失败 0 次。");
   });
 
   it("updates source display mode and reloads the latest sources model", async () => {

@@ -231,6 +231,7 @@ describe("settings api routes", () => {
         lastSendLatestEmailAt: "2026-03-31T03:10:00.000Z",
         nextCollectionRunAt: expect.any(String),
         canTriggerManualCollect: true,
+        canTriggerManualTwitterCollect: false,
         canTriggerManualSendLatestEmail: false,
         isRunning: false
       },

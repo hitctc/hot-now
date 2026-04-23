@@ -6,7 +6,6 @@ import { openDatabase } from "../../src/core/db/openDatabase.js";
 import { runMigrations } from "../../src/core/db/runMigrations.js";
 import { runCollectionCycle, type RunCollectionCycleDeps } from "../../src/core/pipeline/runCollectionCycle.js";
 import { seedInitialData } from "../../src/core/db/seedInitialData.js";
-import { collectTwitterAccountIssues } from "../../src/core/twitter/twitterAccountCollector.js";
 import { createTwitterAccount } from "../../src/core/twitter/twitterAccountRepository.js";
 import type { RuntimeConfig } from "../../src/core/types/appConfig.js";
 
@@ -330,7 +329,7 @@ describe("runCollectionCycle", () => {
     db.close();
   });
 
-  it("merges twitter account collection into the sqlite mirror with metadata", async () => {
+  it("leaves twitter accounts out of the default collection cycle", async () => {
     const rootDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-collection-twitter-"));
     const config = makeConfig(rootDir);
     const db = createTestDatabase(path.join(rootDir, "hot-now.sqlite"));
@@ -338,28 +337,6 @@ describe("runCollectionCycle", () => {
       username: "openai",
       displayName: "OpenAI"
     });
-    const twitterFetch = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          status: "success",
-          tweets: [
-            {
-              id: "tweet-1",
-              text: "OpenAI ships a new model",
-              url: "https://x.com/openai/status/tweet-1",
-              createdAt: "2026-04-23T08:00:00.000Z",
-              likeCount: 120,
-              author: {
-                id: "user-1",
-                userName: "openai",
-                name: "OpenAI"
-              }
-            }
-          ]
-        }),
-        { status: 200, headers: { "content-type": "application/json" } }
-      )
-    );
 
     await runCollectionCycle(config, "manual", {
       db,
@@ -373,12 +350,6 @@ describe("runCollectionCycle", () => {
           items: []
         }
       ]),
-      collectTwitterAccountIssues: async () =>
-        await collectTwitterAccountIssues(db, {
-          apiKey: "test-key",
-          fetch: twitterFetch,
-          now: new Date("2026-04-23T08:30:00.000Z")
-        }),
       fetchArticle: vi.fn(async (url: string) => ({
         ok: false,
         url,
@@ -391,34 +362,19 @@ describe("runCollectionCycle", () => {
     const row = db
       .prepare(
         `
-          SELECT cs.kind AS source_kind, ci.external_id, ci.canonical_url, ci.summary, ci.metadata_json
+          SELECT cs.kind AS source_kind, ci.external_id
           FROM content_items ci
           JOIN content_sources cs ON cs.id = ci.source_id
-          WHERE ci.external_id = 'twitter:tweet-1'
+          WHERE cs.kind = 'twitter_accounts'
           LIMIT 1
         `
       )
       .get() as {
       source_kind: string;
       external_id: string;
-      canonical_url: string;
-      summary: string;
-      metadata_json: string;
-    };
+    } | undefined;
 
-    expect(row.source_kind).toBe("twitter_accounts");
-    expect(row.external_id).toBe("twitter:tweet-1");
-    expect(row.canonical_url).toBe("https://x.com/openai/status/tweet-1");
-    expect(row.summary).toBe("OpenAI ships a new model");
-    expect(JSON.parse(row.metadata_json)).toMatchObject({
-      collector: {
-        kind: "twitter_account",
-        username: "openai"
-      },
-      metrics: {
-        likeCount: 120
-      }
-    });
+    expect(row).toBeUndefined();
 
     db.close();
   });

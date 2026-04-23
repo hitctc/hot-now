@@ -52,6 +52,7 @@ export type MarkTwitterAccountFetchResultInput =
       fetchedAt: string;
       success: true;
       userId?: string | null;
+      message?: string | null;
     }
   | {
       id: number;
@@ -257,12 +258,18 @@ export function markTwitterAccountFetchResult(
               SET user_id = COALESCE(?, user_id),
                   last_fetched_at = ?,
                   last_success_at = ?,
-                  last_error = NULL,
+                  last_error = ?,
                   updated_at = CURRENT_TIMESTAMP
               WHERE id = ?
             `
           )
-          .run(normalizeNullableText(input.userId), input.fetchedAt, input.fetchedAt, input.id)
+          .run(
+            normalizeNullableText(input.userId),
+            input.fetchedAt,
+            input.fetchedAt,
+            normalizeErrorMessage(input.message),
+            input.id
+          )
       : db
           .prepare(
             `
@@ -383,9 +390,14 @@ function normalizeNullableText(value: string | null | undefined): string | null 
   return normalized ? normalized : null;
 }
 
-function normalizeErrorMessage(value: string): string {
-  const normalized = value.trim();
-  return normalized.length > 500 ? normalized.slice(0, 500) : normalized || "unknown error";
+function normalizeErrorMessage(value: string | null | undefined): string | null {
+  const normalized = value?.trim();
+
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized.length > 500 ? normalized.slice(0, 500) : normalized;
 }
 
 function isSqliteUniqueError(error: unknown): boolean {

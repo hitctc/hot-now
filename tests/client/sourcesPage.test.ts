@@ -28,6 +28,7 @@ vi.mock("../../src/client/services/settingsApi", async () => {
     deleteTwitterAccount: vi.fn(),
     toggleTwitterAccount: vi.fn(),
     triggerManualCollect: vi.fn(),
+    triggerManualTwitterCollect: vi.fn(),
     triggerManualSendLatestEmail: vi.fn()
   };
 });
@@ -115,6 +116,7 @@ function createSourcesModel() {
       lastSendLatestEmailAt: "2026-03-31T08:30:00.000Z",
       nextCollectionRunAt: "2026-03-31T10:40:00.000Z",
       canTriggerManualCollect: true,
+      canTriggerManualTwitterCollect: true,
       canTriggerManualSendLatestEmail: true,
       isRunning: false
     },
@@ -197,6 +199,7 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("@openai");
     expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("official_vendor");
     expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("Twitter 账号采集已配置 API key");
+    expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("手动采集 Twitter 账号");
     expect(wrapper.get("[data-sources-section='inventory']").classes()).toContain("editorial-glass-panel");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("已完成");
     expect(wrapper.get("[data-sources-section='inventory']").text()).not.toContain("选中时全量");
@@ -272,6 +275,29 @@ describe("SourcesPage", () => {
 
     expect(settingsApi.triggerManualCollect).toHaveBeenCalledTimes(1);
     expect(wrapper.text()).toContain("已开始执行采集");
+  });
+
+  it("starts twitter account collection and shows the persisted count summary", async () => {
+    vi.mocked(settingsApi.readSettingsSources)
+      .mockResolvedValueOnce(createSourcesModel())
+      .mockResolvedValueOnce(createSourcesModel());
+    vi.mocked(settingsApi.triggerManualTwitterCollect).mockResolvedValue({
+      accepted: true,
+      action: "collect-twitter-accounts",
+      enabledAccountCount: 1,
+      fetchedTweetCount: 1,
+      persistedContentItemCount: 1,
+      failureCount: 0
+    });
+
+    const wrapper = mountSourcesPage();
+
+    await flushPromises();
+    await wrapper.get("[data-action='manual-twitter-collect']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.triggerManualTwitterCollect).toHaveBeenCalledTimes(1);
+    expect(wrapper.text()).toContain("Twitter 账号采集已完成：启用 1 个账号，入库 1 条内容，失败 0 个。");
   });
 
   it("updates source display mode and reloads the latest sources model", async () => {

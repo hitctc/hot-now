@@ -16,12 +16,14 @@ import {
   readSettingsSources,
   toggleTwitterAccount,
   toggleSource,
+  triggerManualTwitterCollect,
   updateTwitterAccount,
   updateSource,
   updateSourceDisplayMode,
   triggerManualCollect,
   triggerManualSendLatestEmail,
   type ManualCollectResponse,
+  type ManualTwitterCollectResponse,
   type ManualSendLatestEmailResponse,
   type SaveSourcePayload,
   type SettingsSourceItem,
@@ -76,7 +78,7 @@ const twitterAccountColumns = [
   { title: "优先级", key: "priority", align: "center" as const },
   { title: "启用", key: "enabled", align: "center" as const },
   { title: "最近成功", key: "lastSuccessAt", align: "center" as const },
-  { title: "最近错误", key: "lastError", align: "center" as const },
+  { title: "最近结果", key: "lastError", align: "center" as const },
   { title: "操作", key: "actions", align: "center" as const }
 ];
 const twitterAccountCategoryOptions = [
@@ -570,6 +572,23 @@ async function handleManualCollect(): Promise<void> {
   });
 }
 
+// Twitter 账号采集单独执行，并把启用账号数、入库条数和失败数直接回显给操作人。
+async function handleManualTwitterCollect(): Promise<void> {
+  await runSourcesAction("manual:twitter-collect", () => triggerManualTwitterCollect(), {
+    fallbackMessage: "Twitter 账号采集启动失败，请稍后再试。",
+    successMessage: (result: ManualTwitterCollectResponse) =>
+      result.accepted
+        ? `Twitter 账号采集已完成：启用 ${result.enabledAccountCount} 个账号，入库 ${result.persistedContentItemCount} 条内容，失败 ${result.failureCount} 个。`
+        : "Twitter 账号采集未成功启动。",
+    reasonMessages: {
+      "already-running": "当前已有任务执行中，请稍后再试。",
+      "twitter-api-key-missing": "当前环境未配置 TWITTER_API_KEY，暂时无法采集 Twitter 账号。",
+      "no-enabled-twitter-accounts": "当前没有启用中的 Twitter 账号，请先启用至少一个账号。",
+      unauthorized: "请先登录后再操作。"
+    }
+  });
+}
+
 // 手动发送最新报告邮件沿用后端错误原因映射，用户能直接看懂当前阻塞点。
 async function handleManualSendLatestEmail(): Promise<void> {
   await runSourcesAction("manual:send-latest-email", () => triggerManualSendLatestEmail(), {
@@ -910,6 +929,21 @@ onUnmounted(() => {
             </article>
           </div>
 
+          <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <a-typography-paragraph class="!mb-0" type="secondary">
+              Twitter 账号采集已从默认定时采集里拆出，只会在这里手动执行。
+            </a-typography-paragraph>
+            <a-button
+              type="primary"
+              data-action="manual-twitter-collect"
+              :disabled="!sourcesModel.operations.canTriggerManualTwitterCollect || sourcesModel.operations.isRunning"
+              :loading="isActionPending('manual:twitter-collect')"
+              @click="handleManualTwitterCollect"
+            >
+              {{ sourcesModel.operations.isRunning ? "任务执行中..." : "手动采集 Twitter 账号" }}
+            </a-button>
+          </div>
+
           <a-table
             :data-source="sourcesModel.twitterAccounts ?? []"
             :columns="twitterAccountColumns"
@@ -949,10 +983,10 @@ onUnmounted(() => {
               <template v-else-if="column.key === 'lastError'">
                 <span
                   class="inline-block max-w-[220px] truncate align-middle"
-                  :title="record.lastError ?? '暂无错误'"
+                  :title="record.lastError ?? '暂无结果'"
                   :data-twitter-account-error="record.id"
                 >
-                  {{ record.lastError ?? "暂无错误" }}
+                  {{ record.lastError ?? "暂无结果" }}
                 </span>
               </template>
               <template v-else-if="column.key === 'actions'">

@@ -139,14 +139,15 @@ describe("twitterAccountRepository", () => {
       id: accountId,
       success: true,
       fetchedAt: "2026-04-23T09:00:00.000Z",
-      userId: "12345"
+      userId: "12345",
+      message: "本次抓取成功，获得 2 条可入库推文。"
     });
 
     expect(success.ok ? success.account : null).toMatchObject({
       userId: "12345",
       lastFetchedAt: "2026-04-23T09:00:00.000Z",
       lastSuccessAt: "2026-04-23T09:00:00.000Z",
-      lastError: null
+      lastError: "本次抓取成功，获得 2 条可入库推文。"
     });
 
     const failed = markTwitterAccountFetchResult(handle.db, {

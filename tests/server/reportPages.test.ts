@@ -174,6 +174,32 @@ describe("report pages", () => {
     expect(response.json()).toEqual({ accepted: true, action: "collect" });
   });
 
+  it("accepts a manual twitter account collect request", async () => {
+    const app = createServer({
+      config: { report: { topN: 10 }, schedule: { dailyTime: "08:00" }, smtp: { to: "receiver@example.com" } },
+      triggerManualTwitterCollect: vi.fn().mockResolvedValue({
+        accepted: true,
+        action: "collect-twitter-accounts",
+        enabledAccountCount: 1,
+        fetchedTweetCount: 1,
+        persistedContentItemCount: 1,
+        failureCount: 0
+      })
+    } as never);
+
+    const response = await app.inject({ method: "POST", url: "/actions/twitter-accounts/collect" });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toEqual({
+      accepted: true,
+      action: "collect-twitter-accounts",
+      enabledAccountCount: 1,
+      fetchedTweetCount: 1,
+      persistedContentItemCount: 1,
+      failureCount: 0
+    });
+  });
+
   it("accepts sending the latest report email", async () => {
     const app = createServer({
       config: { report: { topN: 10 }, schedule: { dailyTime: "08:00" }, smtp: { to: "receiver@example.com" } },

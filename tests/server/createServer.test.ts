@@ -334,6 +334,29 @@ describe("createServer", () => {
     expect(response.json()).toEqual({ accepted: false, reason: "unauthorized" });
   });
 
+  it("rejects anonymous twitter collect actions when unified shell auth is enabled", async () => {
+    const app = createServer({
+      auth: {
+        requireLogin: true,
+        sessionSecret: "test-secret",
+        verifyLogin: vi.fn().mockResolvedValue(null)
+      },
+      triggerManualTwitterCollect: vi.fn().mockResolvedValue({
+        accepted: true,
+        action: "collect-twitter-accounts",
+        enabledAccountCount: 1,
+        fetchedTweetCount: 1,
+        persistedContentItemCount: 1,
+        failureCount: 0
+      })
+    });
+
+    const response = await app.inject({ method: "POST", url: "/actions/twitter-accounts/collect" });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({ accepted: false, reason: "unauthorized" });
+  });
+
   it("rejects anonymous send-latest-email actions when unified shell auth is enabled", async () => {
     const app = createServer({
       auth: {

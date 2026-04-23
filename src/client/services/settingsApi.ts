@@ -115,6 +115,7 @@ export type SettingsSourcesOperations = {
   lastSendLatestEmailAt: string | null;
   nextCollectionRunAt: string | null;
   canTriggerManualCollect: boolean;
+  canTriggerManualTwitterCollect: boolean;
   canTriggerManualSendLatestEmail: boolean;
   isRunning: boolean;
 };
@@ -259,6 +260,20 @@ export type ManualCollectResponse = {
   reason?: string;
 };
 
+export type ManualTwitterCollectResponse =
+  | {
+      accepted: true;
+      action: "collect-twitter-accounts";
+      enabledAccountCount: number;
+      fetchedTweetCount: number;
+      persistedContentItemCount: number;
+      failureCount: number;
+    }
+  | {
+      accepted: false;
+      reason?: "twitter-api-key-missing" | "no-enabled-twitter-accounts" | "already-running";
+    };
+
 export type ManualSendLatestEmailResponse = {
   accepted: boolean;
   action?: "send-latest-email";
@@ -390,6 +405,11 @@ export function toggleTwitterAccount(id: number, enable: boolean): Promise<Toggl
 // 手动采集走独立动作接口，保持和旧系统页一致的任务语义。
 export function triggerManualCollect(): Promise<ManualCollectResponse> {
   return postSettingsAction<ManualCollectResponse>("/actions/collect", {});
+}
+
+// Twitter 账号采集单独触发，避免和默认 RSS / 公众号采集共用同一条高频入口。
+export function triggerManualTwitterCollect(): Promise<ManualTwitterCollectResponse> {
+  return postSettingsAction<ManualTwitterCollectResponse>("/actions/twitter-accounts/collect", {});
 }
 
 // 手动发送最新报告沿用现有后端接口，错误原因由调用方再翻译成用户提示。

@@ -1,6 +1,6 @@
 # hot-now
 
-本地单机运行的科技资讯编辑台。它会按固定周期拉取多个已启用的 RSS / 微信公众号来源，并可额外采集已启用的 Twitter 账号；采集结果会经过规则聚类、系统百分制评分和排序，生成多源汇总的 HTML/JSON 报告。邮件发送与采集解耦，可按每日固定时间或手动触发，对最新一份报告单独发信。统一站点继续由 Fastify 托管路由和登录态，但 `/settings/*` 系统页现在已经切到 `Vue 3 + Vite + Ant Design Vue + Tailwind CSS`。
+本地单机运行的科技资讯编辑台。它会按固定周期拉取多个已启用的 RSS / 微信公众号来源；Twitter 账号采集已拆成 `/settings/sources` 里的独立手动动作，不再并入默认定时采集。采集结果会经过规则聚类、系统百分制评分和排序，生成多源汇总的 HTML/JSON 报告。邮件发送与采集解耦，可按每日固定时间或手动触发，对最新一份报告单独发信。统一站点继续由 Fastify 托管路由和登录态，但 `/settings/*` 系统页现在已经切到 `Vue 3 + Vite + Ant Design Vue + Tailwind CSS`。
 
 ## 本地启动
 
@@ -27,7 +27,7 @@ export HOT_NOW_CLIENT_DEV_ORIGIN="http://127.0.0.1:35173"
 ```
 
 `LLM_SETTINGS_MASTER_KEY` 现在是可选覆盖项；如果你不单独配置，系统会回退使用 `SESSION_SECRET` 继续加密保存厂商 API key。
-`TWITTER_API_KEY` 是 TwitterAPI.io 的敏感密钥，只在需要执行 Twitter 账号采集时配置；不配置时仍可在后台维护账号列表，但采集链路会跳过 Twitter 账号来源，RSS / 微信公众号照常运行。
+`TWITTER_API_KEY` 是 TwitterAPI.io 的敏感密钥，只在需要执行 Twitter 账号采集时配置；不配置时仍可在后台维护账号列表，但 Twitter 手动采集会不可用，RSS / 微信公众号照常运行。
 `HOT_NOW_DATABASE_FILE`、`HOT_NOW_REPORT_DATA_DIR` 是可选生产覆盖项，用来把 SQLite 和报告目录从代码树移到 `/srv/hot-now/shared/data`；本地开发不填时，系统继续按 `config/hot-now.config.json` 里的相对路径运行。
 `HOT_NOW_CLIENT_DEV_ORIGIN` 也是可选开发辅助项；`npm run dev` 默认会把 Vite dev server 拉到 `http://127.0.0.1:35173`，并按这个地址接入，让 `3030` 页面直接拿到 HMR 和 Vue DevTools。只有你想改成别的开发端口时，才需要显式覆盖它。
 本地开发不再要求手工配置 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`；`npm run dev` 会自动拉起仓库内置的本地公众号解析 sidecar。只有你想覆盖到远端 relay 时，才需要显式配置这两个环境变量。
@@ -101,23 +101,24 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - `/settings/view-rules` 现在是内容筛选工作台：页面会解释并控制 `AI 新讯 / AI 热点` 的真实筛选开关，同时保留 `反馈池` 与标记为 `暂未使用` 的 `LLM 设置`
 - `/settings/sources` 现在会展示即时操作卡、来源统计概览表和 source 库存表，包含总条数、今天发布、今天抓取，以及 `AI 新讯 / AI 热点` 的入池与展示统计；概览区还会显示系统真实下一次自动采集时间，格式为 `18:40（还有 6 分钟）`
 - `/settings/sources` 现在支持可视化新增 / 编辑 / 删除自定义来源：RSS 来源只需要填写 `RSS URL`；公众号来源只需要填写 `公众号名称`，文章链接可选但建议一起填写，其余 `kind / 来源名称 / 来源主页 / bridge 细节` 由系统在保存时自动生成；本地开发默认使用仓库内置公众号解析 sidecar，保存成功后会立即自动补拉这条新来源的首批内容
-- `/settings/sources` 现在还包含独立的 Twitter 账号分区，可新增 / 编辑 / 删除 / 启停账号，字段包含 username、展示名称、分类、优先级、是否采集回复和备注；账号配置保存在独立 `twitter_accounts` 表，不混入普通 source 库存表
+- `/settings/sources` 现在还包含独立的 Twitter 账号分区，可新增 / 编辑 / 删除 / 启停账号，并单独执行 Twitter 手动采集；字段包含 username、展示名称、分类、优先级、是否采集回复和备注；账号配置保存在独立 `twitter_accounts` 表，不混入普通 source 库存表
 - `/settings/sources` 现在支持逐 source 配置“选中该来源时全量展示”；开启后，该来源不会在内容页首次默认勾选，只有用户显式勾选后才会按全量模式展示
 - `/settings/profile` 现在会展示会话状态、用户名、角色和联系邮箱，不再停留在占位页
 - 当前支持的 LLM 厂商是 `DeepSeek`、`MiniMax`、`Kimi`；用户在页面里录入 API key，本地只保存加密后的密文；未显式配置 `LLM_SETTINGS_MASTER_KEY` 时，系统会回退使用 `SESSION_SECRET` 作为本地加密 key；当前版本先只保留这些配置入口，不再驱动内容筛选或采集后的自动评估
 - Legacy 报告页（当前仍保留）：`/history`、`/reports/:date`、`/control`
 - legacy `/history`、`/control` 与 `/reports/:date` 的 fallback notice 轻量跟随共享主题资源
 - 手动采集：`POST /actions/collect`
+- Twitter 账号手动采集：`POST /actions/twitter-accounts/collect`
 - 手动发送最新报告：`POST /actions/send-latest-email`
 - 兼容别名：`POST /actions/run`（等价于手动采集）
 - 内容反馈写入：`POST /actions/content/:id/feedback-pool`
 - LLM 设置动作：`POST /actions/view-rules/provider-settings`、`POST /actions/view-rules/provider-settings/activation`、`POST /actions/view-rules/provider-settings/delete`
 - 内容筛选动作：`POST /actions/view-rules/content-filters`
 - 反馈池动作：`POST /actions/feedback-pool/:id/delete`、`POST /actions/feedback-pool/clear`
-- Twitter 账号动作：`POST /actions/twitter-accounts/create`、`POST /actions/twitter-accounts/update`、`POST /actions/twitter-accounts/delete`、`POST /actions/twitter-accounts/toggle`
+- Twitter 账号动作：`POST /actions/twitter-accounts/create`、`POST /actions/twitter-accounts/update`、`POST /actions/twitter-accounts/delete`、`POST /actions/twitter-accounts/toggle`、`POST /actions/twitter-accounts/collect`
 - 内容导航已收口为 AI-first：`/` 与 `/ai-new` 等同 `AI 新讯`，`/ai-hot` 承接 `AI 热点`，`/articles` 已移除
 
-统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。auth 开启后，内容菜单保持公开可读，但系统菜单和所有写操作仍然要求登录；`content_sources.is_enabled` 决定哪些 RSS / 微信公众号 source 参与采集，`content_sources.show_all_when_selected` 决定该 source 在内容页被显式勾选时是否全量展示；Twitter 账号由独立 `twitter_accounts.is_enabled` 控制是否参与采集，真实拉取依赖环境变量 `TWITTER_API_KEY`；`/settings/sources` 现在可以直接启用/停用 source、切换“选中时全量展示”、新增 / 编辑 / 删除自定义 RSS 或微信公众号桥接来源，也可以单独维护 Twitter 账号列表；来源保存成功后，系统会自动补拉该来源的首批内容，不需要再手动先跑一次采集；内容页顶部的来源筛选和排序只影响当前浏览结果，不会改 source 启用状态；legacy `/control` 也同步提供采集与发信动作。
+统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。auth 开启后，内容菜单保持公开可读，但系统菜单和所有写操作仍然要求登录；`content_sources.is_enabled` 决定哪些 RSS / 微信公众号 source 参与定时 / 手动采集，`content_sources.show_all_when_selected` 决定该 source 在内容页被显式勾选时是否全量展示；Twitter 账号由独立 `twitter_accounts.is_enabled` 控制是否参与 Twitter 手动采集，真实拉取依赖环境变量 `TWITTER_API_KEY`；`/settings/sources` 现在可以直接启用/停用 source、切换“选中时全量展示”、新增 / 编辑 / 删除自定义 RSS 或微信公众号桥接来源，也可以单独维护 Twitter 账号列表并执行独立手动采集；来源保存成功后，系统会自动补拉该来源的首批内容，不需要再手动先跑一次采集；内容页顶部的来源筛选和排序只影响当前浏览结果，不会改 source 启用状态；legacy `/control` 继续提供 RSS / 微信公众号采集与发信动作。
 
 当前内置 RSS 源包括：
 
@@ -154,7 +155,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 发信任务每天 `10:00`（`Asia/Shanghai`）执行一次
 - 两个任务都可以在页面中手动触发
 - `/settings/sources` 会直接按当前采集调度显示下一次自动采集时间；调度关闭时回显 `未启用定时采集`
-- 未配置 `TWITTER_API_KEY` 时，Twitter 账号采集会被标记为不可用，但不会阻断 RSS / 微信公众号采集和报告生成
+- 未配置 `TWITTER_API_KEY` 时，Twitter 账号手动采集会被标记为不可用，但不会阻断 RSS / 微信公众号采集和报告生成
 
 默认报告目录是 `data/reports/<YYYY-MM-DD>/`，其中会保存：
 
@@ -316,4 +317,4 @@ sudo visudo -cf /etc/sudoers.d/hot-now-systemctl
 - 系统页客户端构建：已通过
 - Playwright MCP 本地验收通过：`/login` 登录成功；`/`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常；浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持；内容页来源筛选写入 `localStorage['hot-now-content-sources']`、排序偏好写入 `localStorage['hot-now-content-sort']`、标题搜索词写入 `localStorage['hot-now-content-search']` 后刷新仍保留
 - 如果要手动验证 `/settings/view-rules`，先检查 `AI 新讯 / AI 热点` 筛选总览与开关保存，再检查反馈池的复制 / 删除 / 清空，以及 LLM 设置的保存 / 启用 / 删除是否正常；如需把厂商配置和会话密钥分开管理，再额外配置 `LLM_SETTINGS_MASTER_KEY`
-- 如果要手动验证 Twitter 账号采集，先在 `.env` 配置 `TWITTER_API_KEY`，再到 `/settings/sources` 新增并启用账号，手动采集后确认账号最近成功时间被回写；不配置 key 时应只显示不可用提示，RSS / 微信公众号采集仍可继续
+- 如果要手动验证 Twitter 账号采集，先在 `.env` 配置 `TWITTER_API_KEY`，再到 `/settings/sources` 新增并启用账号，点击“手动采集 Twitter 账号”后确认账号“最近成功 / 最近结果”被回写；如果内容页仍无结果，优先检查“最近结果”里是否出现“本次抓取成功，但没有可入库的新推文。”这类提示；不配置 key 时应只显示不可用提示，RSS / 微信公众号采集仍可继续

@@ -22,7 +22,9 @@ describe("settingsApi", () => {
       operations: {
         lastCollectionRunAt: null,
         lastSendLatestEmailAt: null,
+        nextCollectionRunAt: null,
         canTriggerManualCollect: true,
+        canTriggerManualTwitterCollect: true,
         canTriggerManualSendLatestEmail: true,
         isRunning: false
       },
@@ -262,6 +264,19 @@ describe("settingsApi", () => {
     expect(requestJson).toHaveBeenNthCalledWith(2, "/actions/twitter-accounts/toggle", {
       method: "POST",
       body: JSON.stringify({ id: 1, enable: false })
+    });
+  });
+
+  it("posts manual twitter collection to the dedicated twitter action", async () => {
+    const { triggerManualTwitterCollect } = await import("../../src/client/services/settingsApi");
+
+    requestJson.mockResolvedValue({ accepted: true, action: "collect-twitter-accounts" });
+
+    await triggerManualTwitterCollect();
+
+    expect(requestJson).toHaveBeenCalledWith("/actions/twitter-accounts/collect", {
+      method: "POST",
+      body: JSON.stringify({})
     });
   });
 });

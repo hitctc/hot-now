@@ -77,6 +77,7 @@ type SourceItem = {
 
 export type SourcesSettingsOperationsView = {
   canTriggerManualCollect: boolean;
+  canTriggerManualTwitterCollect: boolean;
   canTriggerManualSendLatestEmail: boolean;
   isRunning: boolean;
   lastCollectionRunAt: string | null;

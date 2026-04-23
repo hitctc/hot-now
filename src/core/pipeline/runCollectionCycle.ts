@@ -6,7 +6,6 @@ import { buildDailyReport, type DailyReport, type DailyReportIssue, type DailyRe
 import { renderReportHtml } from "../report/renderReportHtml.js";
 import { loadEnabledSourceIssues } from "../source/loadEnabledSourceIssues.js";
 import type { LoadedSourceIssues } from "../source/loadEnabledSourceIssues.js";
-import { collectTwitterAccountIssues } from "../twitter/twitterAccountCollector.js";
 import { reportDayDir, upsertDigestReport, writeJsonFile, writeTextFile } from "../storage/reportStore.js";
 import { clusterTopics } from "../topics/clusterTopics.js";
 import type { ArticleResult } from "../fetch/extractArticle.js";
@@ -26,7 +25,6 @@ type EnrichedIssue = LoadedIssue & {
 export type RunCollectionCycleDeps = {
   db?: SqliteDatabase;
   loadEnabledSourceIssues?: () => Promise<LoadedSourceIssues>;
-  collectTwitterAccountIssues?: () => Promise<LoadedSourceIssues>;
   fetchArticle?: (url: string) => Promise<ArticleResult>;
   runNlEvaluationCycle?: (input: {
     mode: "incremental-after-collect";
@@ -56,18 +54,9 @@ export async function runCollectionCycle(
   }
 
   const loadEnabledSourceIssuesFn = deps.loadEnabledSourceIssues ?? (() => loadEnabledSourceIssues(runtimeDeps.db!));
-  const collectTwitterAccountIssuesFn =
-    deps.collectTwitterAccountIssues ??
-    (runtimeDeps.db
-      ? (() =>
-          collectTwitterAccountIssues(runtimeDeps.db!, {
-            apiKey: process.env.TWITTER_API_KEY?.trim() || null
-          }))
-      : undefined);
   const rssIssues = await loadEnabledSourceIssuesFn();
-  const twitterIssues = collectTwitterAccountIssuesFn ? await collectTwitterAccountIssuesFn() : Object.assign([], { failures: [] });
-  const issues = Object.assign([...rssIssues, ...twitterIssues], {
-    failures: [...(rssIssues.failures ?? []), ...(twitterIssues.failures ?? [])]
+  const issues = Object.assign([...rssIssues], {
+    failures: [...(rssIssues.failures ?? [])]
   });
   const sourceFailures = issues.failures ?? [];
   const hasSourceFailures = sourceFailures.length > 0;

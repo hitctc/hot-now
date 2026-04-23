@@ -42,13 +42,14 @@ export function ensureTwitterAccountsContentSource(db: SqliteDatabase): number {
         show_all_when_selected,
         updated_at
       )
-      VALUES (?, ?, ?, NULL, ?, 1, 1, 1, CURRENT_TIMESTAMP)
+      VALUES (?, ?, ?, NULL, ?, 1, 1, 0, CURRENT_TIMESTAMP)
       ON CONFLICT(kind) DO UPDATE SET
         name = excluded.name,
         site_url = excluded.site_url,
         source_type = excluded.source_type,
         is_enabled = 1,
         is_builtin = 1,
+        show_all_when_selected = 0,
         updated_at = CURRENT_TIMESTAMP
     `
   ).run(twitterAccountsSourceKind, "Twitter 账号", "https://x.com/", twitterAccountsSourceType);
@@ -111,14 +112,19 @@ export async function collectTwitterAccountIssues(
       continue;
     }
 
+    const candidateTweets = result.tweets.flatMap((tweet, index) => mapTweetToCandidate(account, tweet, now, index));
     const firstAuthorId = result.tweets.find((tweet) => tweet.author.id)?.author.id ?? null;
     markTwitterAccountFetchResult(db, {
       id: account.id,
       success: true,
       fetchedAt,
-      userId: firstAuthorId
+      userId: firstAuthorId,
+      message:
+        candidateTweets.length > 0
+          ? `本次抓取成功，获得 ${candidateTweets.length} 条可入库推文。`
+          : "本次抓取成功，但没有可入库的新推文。"
     });
-    items.push(...result.tweets.flatMap((tweet, index) => mapTweetToCandidate(account, tweet, now, index)));
+    items.push(...candidateTweets);
   }
 
   if (items.length === 0) {

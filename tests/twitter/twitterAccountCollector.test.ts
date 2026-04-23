@@ -105,8 +105,13 @@ describe("twitterAccountCollector", () => {
       user_id: "user-1",
       last_fetched_at: "2026-04-23T08:30:00.000Z",
       last_success_at: "2026-04-23T08:30:00.000Z",
-      last_error: null
+      last_error: "本次抓取成功，获得 1 条可入库推文。"
     });
+    expect(
+      handle.db
+        .prepare("SELECT show_all_when_selected FROM content_sources WHERE kind = 'twitter_accounts' LIMIT 1")
+        .get()
+    ).toEqual({ show_all_when_selected: 0 });
     expect(listSourceCards(handle.db).map((source) => source.kind)).not.toContain("twitter_accounts");
   });
 });

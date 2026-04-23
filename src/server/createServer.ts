@@ -98,6 +98,19 @@ type CurrentUserProfile = {
   email: string | null;
 };
 type ManualCollectResult = { accepted: true; action: "collect" };
+type ManualTwitterCollectResult =
+  | {
+      accepted: true;
+      action: "collect-twitter-accounts";
+      enabledAccountCount: number;
+      fetchedTweetCount: number;
+      persistedContentItemCount: number;
+      failureCount: number;
+    }
+  | {
+      accepted: false;
+      reason: "twitter-api-key-missing" | "no-enabled-twitter-accounts";
+    };
 type ManualSendLatestEmailResult =
   | { accepted: true; action: "send-latest-email" }
   | { accepted: false; reason: LatestReportEmailErrorReason };
@@ -145,6 +158,7 @@ type ServerDeps = {
   readReportHtml?: (date: string) => Promise<string>;
   triggerManualRun?: () => Promise<{ accepted: boolean }>;
   triggerManualCollect?: () => Promise<ManualCollectResult>;
+  triggerManualTwitterCollect?: () => Promise<ManualTwitterCollectResult>;
   triggerManualSendLatestEmail?: () => Promise<ManualSendLatestEmailResult>;
   isRunning?: () => boolean;
   listContentView?: (
@@ -591,6 +605,17 @@ export function createServer(deps: ServerDeps = {}) {
       authConfig?.sessionSecret ?? "",
       deps.isRunning?.() ?? false,
       deps.triggerManualSendLatestEmail
+    );
+  });
+
+  app.post("/actions/twitter-accounts/collect", async (request, reply) => {
+    return await handleManualTwitterCollectAction(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? "",
+      deps.isRunning?.() ?? false,
+      deps.triggerManualTwitterCollect
     );
   });
 
@@ -1272,6 +1297,7 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
       lastSendLatestEmailAt: operationSummary.lastSendLatestEmailAt,
       nextCollectionRunAt,
       canTriggerManualCollect: typeof (deps.triggerManualCollect ?? deps.triggerManualRun) === "function",
+      canTriggerManualTwitterCollect: typeof deps.triggerManualTwitterCollect === "function",
       canTriggerManualSendLatestEmail: typeof deps.triggerManualSendLatestEmail === "function",
       isRunning: deps.isRunning?.() ?? false
     },
@@ -1898,6 +1924,7 @@ async function renderSystemPageForPath(deps: ServerDeps, pathname: string, logge
 
     return renderSourcesPage(sources, {
       canTriggerManualCollect: typeof (deps.triggerManualCollect ?? deps.triggerManualRun) === "function",
+      canTriggerManualTwitterCollect: typeof deps.triggerManualTwitterCollect === "function",
       canTriggerManualSendLatestEmail: typeof deps.triggerManualSendLatestEmail === "function",
       isRunning: deps.isRunning?.() ?? false,
       lastCollectionRunAt: operationSummary.lastCollectionRunAt,
@@ -1989,6 +2016,31 @@ async function handleManualCollectAction(
   }
 
   const result = await triggerManualCollect();
+  return reply.code(202).send(result);
+}
+
+async function handleManualTwitterCollectAction(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  authEnabled: boolean,
+  sessionSecret: string,
+  isRunning: boolean,
+  triggerManualTwitterCollect: ServerDeps["triggerManualTwitterCollect"]
+) {
+  // Twitter 账号采集和常规采集共用一套权限与运行锁，但返回更细的账号采集结果摘要。
+  if (!ensureManualActionAuthorized(request, reply, authEnabled, sessionSecret)) {
+    return;
+  }
+
+  if (isRunning) {
+    return reply.code(409).send({ accepted: false, reason: "already-running" });
+  }
+
+  if (!triggerManualTwitterCollect) {
+    return reply.code(503).send({ accepted: false });
+  }
+
+  const result = await triggerManualTwitterCollect();
   return reply.code(202).send(result);
 }
 

@@ -35,7 +35,7 @@ import { listSourceWorkbench } from "./core/source/listSourceWorkbench.js";
 import { readSourcesOperationSummary } from "./core/source/readSourcesOperationSummary.js";
 import { loadEnabledSourceIssues } from "./core/source/loadEnabledSourceIssues.js";
 import { hydrateSourceContent } from "./core/source/hydrateSourceContent.js";
-import { collectTwitterAccountIssues } from "./core/twitter/twitterAccountCollector.js";
+import { runTwitterAccountCollection } from "./core/twitter/runTwitterAccountCollection.js";
 import {
   deleteSource as removeSource,
   saveSource as persistSource,
@@ -111,10 +111,14 @@ async function runCollectionTask(triggerType: DailyReportTrigger) {
   return await runCollectionCycle(config, triggerType, {
     db,
     loadEnabledSourceIssues: async () => await loadEnabledSourceIssues(db),
-    collectTwitterAccountIssues: async () =>
-      await collectTwitterAccountIssues(db, {
-        apiKey: process.env.TWITTER_API_KEY?.trim() || null
-      }),
+    fetchArticle: fetchAndExtractArticle
+  });
+}
+
+// Twitter 账号采集单独手动触发，避免把高成本轮询绑进默认 10 分钟节奏。
+async function runTwitterAccountCollectionTask() {
+  return await runTwitterAccountCollection(db, {
+    apiKey: process.env.TWITTER_API_KEY?.trim() || null,
     fetchArticle: fetchAndExtractArticle
   });
 }
@@ -426,6 +430,13 @@ const triggerManualSendLatestEmail = config.manualActions.sendLatestEmailEnabled
     }
   : undefined;
 
+// Twitter 手动采集复用同一把运行锁，但不会触发 RSS/公众号采集，也不会生成日报产物。
+const triggerManualTwitterCollect = config.manualActions.collectEnabled
+  ? async () => {
+      return await lock.runExclusive(async () => await runTwitterAccountCollectionTask());
+    }
+  : undefined;
+
 // 新增来源后先只补这一条 source 的内容入库，避免为了拿到首批数据就把整轮全站采集串进保存接口。
 async function saveAndHydrateSource(input: Parameters<typeof persistSource>[1]) {
   const result = await persistSource(db, input, {
@@ -506,6 +517,7 @@ const app = createServer({
   deleteTwitterAccount: async (id) => removeTwitterAccount(db, id),
   toggleTwitterAccount: async (id, enable) => persistTwitterAccountToggle(db, id, enable),
   hasTwitterApiKey: Boolean(process.env.TWITTER_API_KEY?.trim()),
+  triggerManualTwitterCollect,
   getCurrentUserProfile: async () => getCurrentUserProfile(),
   listReportSummaries: listStoredReportSummaries,
   latestReportDate: async () => (await listReportDates(config.report.dataDir))[0] ?? null,

@@ -41,6 +41,11 @@ export type LinkTwitterSearchKeywordMatchInput = {
   contentItemId: number;
 };
 
+export type ContentItemIdByExternalId = {
+  externalId: string;
+  contentItemId: number;
+};
+
 // This resolves the persisted source row so callers can attach collected items to the same
 // source catalog that migrations and seed data already manage.
 export function resolveSourceByKind(db: SqliteDatabase, kind: SourceKind): ContentSourceRecord | undefined {
@@ -187,6 +192,32 @@ export function listVisibleTwitterKeywordMatchContentItemIds(
   return rows.map((row) => row.contentItemId);
 }
 
+// Twitter 账号采集和关键词搜索会共享同一个 tweet external_id，所以这里单独暴露批量读取帮助后续复用去重。
+export function listContentItemIdsByExternalIds(
+  db: SqliteDatabase,
+  externalIds: string[]
+): ContentItemIdByExternalId[] {
+  const normalizedExternalIds = uniqueNonEmptyStrings(externalIds);
+
+  if (normalizedExternalIds.length === 0) {
+    return [];
+  }
+
+  const placeholders = normalizedExternalIds.map(() => "?").join(", ");
+  const rows = db
+    .prepare(
+      `
+        SELECT external_id AS externalId, id AS contentItemId
+        FROM content_items
+        WHERE external_id IN (${placeholders})
+        ORDER BY id ASC
+      `
+    )
+    .all(...normalizedExternalIds) as ContentItemIdByExternalId[];
+
+  return rows.filter((row) => typeof row.externalId === "string" && row.externalId.length > 0);
+}
+
 // A collection run row is created as soon as a digest has enough source context to be tracked,
 // so later steps can either complete it or mark the run as failed.
 export function createCollectionRun(db: SqliteDatabase, input: CreateCollectionRunInput): number {
@@ -223,4 +254,14 @@ export function finishCollectionRun(db: SqliteDatabase, input: FinishCollectionR
 
 function uniquePositiveIntegers(values: number[]): number[] {
   return [...new Set(values.filter((value) => Number.isInteger(value) && value > 0))];
+}
+
+function uniqueNonEmptyStrings(values: string[]): string[] {
+  return [
+    ...new Set(
+      values
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0)
+    )
+  ];
 }

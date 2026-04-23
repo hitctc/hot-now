@@ -78,6 +78,7 @@ type SourceItem = {
 export type SourcesSettingsOperationsView = {
   canTriggerManualCollect: boolean;
   canTriggerManualTwitterCollect: boolean;
+  canTriggerManualTwitterKeywordCollect: boolean;
   canTriggerManualSendLatestEmail: boolean;
   isRunning: boolean;
   lastCollectionRunAt: string | null;
@@ -90,6 +91,8 @@ export type SourcesCapabilityView = {
   wechatArticleUrlMessage: string;
   twitterAccountCollectionEnabled?: boolean;
   twitterAccountCollectionMessage?: string;
+  twitterKeywordSearchEnabled?: boolean;
+  twitterKeywordSearchMessage?: string;
 };
 
 export type TwitterAccountSettingsView = {
@@ -109,9 +112,25 @@ export type TwitterAccountSettingsView = {
   updatedAt: string;
 };
 
+export type TwitterSearchKeywordSettingsView = {
+  id: number;
+  keyword: string;
+  category: string;
+  priority: number;
+  isCollectEnabled: boolean;
+  isVisible: boolean;
+  notes: string | null;
+  lastFetchedAt: string | null;
+  lastSuccessAt: string | null;
+  lastResult: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type SourcesSettingsView = {
   sources: SourceItem[];
   twitterAccounts?: TwitterAccountSettingsView[];
+  twitterSearchKeywords?: TwitterSearchKeywordSettingsView[];
   operations: SourcesSettingsOperationsView;
   capability: SourcesCapabilityView;
 };

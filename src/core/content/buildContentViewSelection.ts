@@ -1,5 +1,6 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
 import { scoreContentItem, type ContentScoreBreakdown } from "./contentScoring.js";
+import { listVisibleTwitterKeywordMatchContentItemIds } from "./contentRepository.js";
 import { BUILTIN_SOURCES } from "../source/sourceCatalog.js";
 import {
   getInternalViewRuleConfig,
@@ -74,6 +75,7 @@ type ContentCardRow = {
 };
 
 const matchingSourceViewBonus = 120;
+const twitterKeywordSearchSourceKind = "twitter_keyword_search";
 
 const contentSelectSql = `
   SELECT
@@ -123,7 +125,8 @@ export function buildContentViewSelection(
   const rows = db
     .prepare(contentSelectSql)
     .all({ viewScope: mapViewScope(viewKey) }) as ContentCardRow[];
-  const rankedCandidates = rows
+  const visibleRows = filterVisibleTwitterKeywordRows(db, rows);
+  const rankedCandidates = visibleRows
     .map((row) =>
       buildRankedCardCandidate(row, {
         viewKey,
@@ -217,7 +220,8 @@ export function collectIndependentStatsBySourceForView(
   const rows = db
     .prepare(contentSelectSql)
     .all({ viewScope: mapViewScope(viewKey) }) as ContentCardRow[];
-  const rankedCandidates = rows
+  const visibleRows = filterVisibleTwitterKeywordRows(db, rows);
+  const rankedCandidates = visibleRows
     .map((row) =>
       buildRankedCardCandidate(row, {
         viewKey,
@@ -300,6 +304,30 @@ function countCardsForWindow(
   }
 
   return countCardsWithinShanghaiDay(cards, shanghaiDayStart, shanghaiNextDayStart);
+}
+
+// 关键词来源要额外尊重“展示启用”开关，但其他来源不应该被这层逻辑误伤。
+function filterVisibleTwitterKeywordRows(db: SqliteDatabase, rows: ContentCardRow[]) {
+  const twitterKeywordRows = rows.filter((row) => row.sourceKind === twitterKeywordSearchSourceKind);
+
+  if (twitterKeywordRows.length === 0) {
+    return rows;
+  }
+
+  const visibleContentItemIdSet = new Set(
+    listVisibleTwitterKeywordMatchContentItemIds(
+      db,
+      twitterKeywordRows.map((row) => row.id)
+    )
+  );
+
+  return rows.filter((row) => {
+    if (row.sourceKind !== twitterKeywordSearchSourceKind) {
+      return true;
+    }
+
+    return visibleContentItemIdSet.has(row.id);
+  });
 }
 
 function countStableVisibleCardsBySourceKind(

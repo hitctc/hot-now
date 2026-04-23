@@ -10,32 +10,42 @@ import {
 import { HttpError } from "../../services/http";
 import {
   createTwitterAccount,
+  createTwitterSearchKeyword,
   createSource,
   deleteTwitterAccount,
+  deleteTwitterSearchKeyword,
   deleteSource,
   readSettingsSources,
   toggleTwitterAccount,
+  toggleTwitterSearchKeywordCollect,
+  toggleTwitterSearchKeywordVisible,
   toggleSource,
   triggerManualTwitterCollect,
+  triggerManualTwitterKeywordCollect,
   updateTwitterAccount,
+  updateTwitterSearchKeyword,
   updateSource,
   updateSourceDisplayMode,
   triggerManualCollect,
   triggerManualSendLatestEmail,
   type ManualCollectResponse,
   type ManualTwitterCollectResponse,
+  type ManualTwitterKeywordCollectResponse,
   type ManualSendLatestEmailResponse,
   type SaveSourcePayload,
   type SettingsSourceItem,
   type SettingsSourcesResponse,
   type SettingsTwitterAccount,
-  type SaveTwitterAccountPayload
+  type SettingsTwitterSearchKeyword,
+  type SaveTwitterAccountPayload,
+  type SaveTwitterSearchKeywordPayload
 } from "../../services/settingsApi";
 
 type AlertTone = "success" | "info" | "warning" | "error";
 type PageNotice = { tone: AlertTone; message: string };
 type SourceModalMode = "create" | "update";
 type TwitterAccountModalMode = "create" | "update";
+type TwitterKeywordModalMode = "create" | "update";
 type SourceFormState = {
   kind: string;
   sourceType: "rss" | "wechat_bridge";
@@ -50,6 +60,15 @@ type TwitterAccountFormState = {
   category: string;
   priority: number;
   includeReplies: boolean;
+  notes: string;
+};
+type TwitterKeywordFormState = {
+  id: number | null;
+  keyword: string;
+  category: string;
+  priority: number;
+  isCollectEnabled: boolean;
+  isVisible: boolean;
   notes: string;
 };
 
@@ -81,10 +100,28 @@ const twitterAccountColumns = [
   { title: "最近结果", key: "lastError", align: "center" as const },
   { title: "操作", key: "actions", align: "center" as const }
 ];
+const twitterKeywordColumns = [
+  { title: "关键词", key: "keyword", align: "center" as const },
+  { title: "分类", key: "category", align: "center" as const },
+  { title: "优先级", key: "priority", align: "center" as const },
+  { title: "采集启用", key: "collectEnabled", align: "center" as const },
+  { title: "展示启用", key: "visible", align: "center" as const },
+  { title: "最近成功", key: "lastSuccessAt", align: "center" as const },
+  { title: "最近结果", key: "lastResult", align: "center" as const },
+  { title: "操作", key: "actions", align: "center" as const }
+];
 const twitterAccountCategoryOptions = [
   { label: "官方厂商", value: "official_vendor" },
   { label: "产品账号", value: "product" },
   { label: "关键人物", value: "person" },
+  { label: "媒体", value: "media" },
+  { label: "其他", value: "other" }
+];
+const twitterKeywordCategoryOptions = [
+  { label: "官方厂商", value: "official_vendor" },
+  { label: "产品", value: "product" },
+  { label: "关键人物", value: "person" },
+  { label: "主题", value: "topic" },
   { label: "媒体", value: "media" },
   { label: "其他", value: "other" }
 ];
@@ -97,12 +134,16 @@ const sourcesModel = ref<SettingsSourcesResponse | null>(null);
 const pendingActions = reactive<Record<string, boolean>>({});
 const isSourceModalOpen = ref(false);
 const isTwitterAccountModalOpen = ref(false);
+const isTwitterKeywordModalOpen = ref(false);
 const sourceModalMode = ref<SourceModalMode>("create");
 const twitterAccountModalMode = ref<TwitterAccountModalMode>("create");
+const twitterKeywordModalMode = ref<TwitterKeywordModalMode>("create");
 const sourceFormError = ref<string | null>(null);
 const twitterAccountFormError = ref<string | null>(null);
+const twitterKeywordFormError = ref<string | null>(null);
 const sourceForm = reactive<SourceFormState>(createEmptySourceForm());
 const twitterAccountForm = reactive<TwitterAccountFormState>(createEmptyTwitterAccountForm());
+const twitterKeywordForm = reactive<TwitterKeywordFormState>(createEmptyTwitterKeywordForm());
 const relativeNow = ref(Date.now());
 let nextCollectionTimer: number | null = null;
 
@@ -113,6 +154,13 @@ const totalSourceCount = computed(() => sourcesModel.value?.sources.length ?? 0)
 const totalTwitterAccountCount = computed(() => sourcesModel.value?.twitterAccounts?.length ?? 0);
 const enabledTwitterAccountCount = computed(
   () => sourcesModel.value?.twitterAccounts?.filter((account) => account.isEnabled).length ?? 0
+);
+const totalTwitterKeywordCount = computed(() => sourcesModel.value?.twitterSearchKeywords?.length ?? 0);
+const enabledTwitterKeywordCollectCount = computed(
+  () => sourcesModel.value?.twitterSearchKeywords?.filter((keyword) => keyword.isCollectEnabled).length ?? 0
+);
+const enabledTwitterKeywordVisibleCount = computed(
+  () => sourcesModel.value?.twitterSearchKeywords?.filter((keyword) => keyword.isVisible).length ?? 0
 );
 const wechatArticleUrlAvailable = computed(
   () => sourcesModel.value?.capability.wechatArticleUrlEnabled ?? false
@@ -126,6 +174,11 @@ const twitterAccountCollectionMessage = computed(
   () =>
     sourcesModel.value?.capability.twitterAccountCollectionMessage ??
     "当前环境未配置 TWITTER_API_KEY；Twitter 账号可先维护，采集时会跳过。"
+);
+const twitterKeywordCollectionMessage = computed(
+  () =>
+    sourcesModel.value?.capability.twitterKeywordSearchMessage ??
+    "当前环境未配置 TWITTER_API_KEY；Twitter 关键词可先维护，采集时会跳过。"
 );
 
 // 页面提示统一通过一层 notice 管理，操作后同时保留页内 Alert 和全局 toast。
@@ -194,6 +247,23 @@ function resetTwitterAccountForm(): void {
   twitterAccountFormError.value = null;
 }
 
+function createEmptyTwitterKeywordForm(): TwitterKeywordFormState {
+  return {
+    id: null,
+    keyword: "",
+    category: "topic",
+    priority: 60,
+    isCollectEnabled: true,
+    isVisible: true,
+    notes: ""
+  };
+}
+
+function resetTwitterKeywordForm(): void {
+  Object.assign(twitterKeywordForm, createEmptyTwitterKeywordForm());
+  twitterKeywordFormError.value = null;
+}
+
 // 新增模式只需要清空表单并打开弹窗，不再引入额外的临时草稿状态。
 function openCreateSourceModal(): void {
   sourceModalMode.value = "create";
@@ -205,6 +275,12 @@ function openCreateTwitterAccountModal(): void {
   twitterAccountModalMode.value = "create";
   resetTwitterAccountForm();
   isTwitterAccountModalOpen.value = true;
+}
+
+function openCreateTwitterKeywordModal(): void {
+  twitterKeywordModalMode.value = "create";
+  resetTwitterKeywordForm();
+  isTwitterKeywordModalOpen.value = true;
 }
 
 // 编辑模式只回填当前来源已有配置，kind 继续锁定，避免把“编辑”做成“重命名来源主键”。
@@ -237,6 +313,19 @@ function openEditTwitterAccountModal(account: SettingsTwitterAccount): void {
   isTwitterAccountModalOpen.value = true;
 }
 
+function openEditTwitterKeywordModal(keyword: SettingsTwitterSearchKeyword): void {
+  twitterKeywordModalMode.value = "update";
+  resetTwitterKeywordForm();
+  twitterKeywordForm.id = keyword.id;
+  twitterKeywordForm.keyword = keyword.keyword;
+  twitterKeywordForm.category = keyword.category;
+  twitterKeywordForm.priority = keyword.priority;
+  twitterKeywordForm.isCollectEnabled = keyword.isCollectEnabled;
+  twitterKeywordForm.isVisible = keyword.isVisible;
+  twitterKeywordForm.notes = keyword.notes ?? "";
+  isTwitterKeywordModalOpen.value = true;
+}
+
 // 关闭弹窗时顺手清掉局部错误，避免旧的公众号解析失败提示粘在下一次操作里。
 function closeSourceModal(): void {
   isSourceModalOpen.value = false;
@@ -246,6 +335,11 @@ function closeSourceModal(): void {
 function closeTwitterAccountModal(): void {
   isTwitterAccountModalOpen.value = false;
   twitterAccountFormError.value = null;
+}
+
+function closeTwitterKeywordModal(): void {
+  isTwitterKeywordModalOpen.value = false;
+  twitterKeywordFormError.value = null;
 }
 
 // 类型切换只负责收口当前可见字段，真正的 payload 仍由提交时统一构建。
@@ -358,6 +452,30 @@ function formatCollectionStatus(value: string | null | undefined): string {
   return value ?? "未知";
 }
 
+function formatTwitterCategoryLabel(value: string): string {
+  if (value === "official_vendor") {
+    return "官方厂商";
+  }
+
+  if (value === "product") {
+    return "产品";
+  }
+
+  if (value === "person") {
+    return "关键人物";
+  }
+
+  if (value === "topic") {
+    return "主题";
+  }
+
+  if (value === "media") {
+    return "媒体";
+  }
+
+  return "其他";
+}
+
 // sources 页错误提示沿用后端 reason 映射，避免把接口细节直接暴露给用户。
 function readActionErrorMessage(
   error: unknown,
@@ -454,6 +572,31 @@ function buildTwitterAccountSavePayload(): { ok: true; payload: SaveTwitterAccou
       priority: twitterAccountForm.priority,
       includeReplies: twitterAccountForm.includeReplies,
       notes: twitterAccountForm.notes.trim() || null
+    }
+  };
+}
+
+function buildTwitterKeywordSavePayload(): { ok: true; payload: SaveTwitterSearchKeywordPayload } | { ok: false; message: string } {
+  const keyword = twitterKeywordForm.keyword.trim();
+
+  if (!keyword) {
+    return { ok: false, message: "请填写 Twitter 关键词。" };
+  }
+
+  if (!Number.isInteger(twitterKeywordForm.priority) || twitterKeywordForm.priority < 0 || twitterKeywordForm.priority > 100) {
+    return { ok: false, message: "优先级需要是 0 到 100 之间的整数。" };
+  }
+
+  return {
+    ok: true,
+    payload: {
+      ...(twitterKeywordModalMode.value === "update" && twitterKeywordForm.id ? { id: twitterKeywordForm.id } : {}),
+      keyword,
+      category: twitterKeywordForm.category,
+      priority: twitterKeywordForm.priority,
+      isCollectEnabled: twitterKeywordForm.isCollectEnabled,
+      isVisible: twitterKeywordForm.isVisible,
+      notes: twitterKeywordForm.notes.trim() || null
     }
   };
 }
@@ -589,6 +732,23 @@ async function handleManualTwitterCollect(): Promise<void> {
   });
 }
 
+// 关键词搜索只保留手动执行，成功提示会直接回显本轮处理关键词数与复用条数，便于控制 credits。
+async function handleManualTwitterKeywordCollect(): Promise<void> {
+  await runSourcesAction("manual:twitter-keyword-collect", () => triggerManualTwitterKeywordCollect(), {
+    fallbackMessage: "Twitter 关键词采集启动失败，请稍后再试。",
+    successMessage: (result: ManualTwitterKeywordCollectResponse) =>
+      result.accepted
+        ? `Twitter 关键词采集已完成：处理 ${result.processedKeywordCount} 个关键词，新入库 ${result.persistedContentItemCount} 条，复用 ${result.reusedContentItemCount} 条，失败 ${result.failureCount} 个。`
+        : "Twitter 关键词采集未成功启动。",
+    reasonMessages: {
+      "already-running": "当前已有任务执行中，请稍后再试。",
+      "twitter-api-key-missing": "当前环境未配置 TWITTER_API_KEY，暂时无法采集 Twitter 关键词。",
+      "no-enabled-twitter-keywords": "当前没有启用中的 Twitter 关键词，请先启用至少一个关键词。",
+      unauthorized: "请先登录后再操作。"
+    }
+  });
+}
+
 // 手动发送最新报告邮件沿用后端错误原因映射，用户能直接看懂当前阻塞点。
 async function handleManualSendLatestEmail(): Promise<void> {
   await runSourcesAction("manual:send-latest-email", () => triggerManualSendLatestEmail(), {
@@ -716,6 +876,60 @@ async function handleSubmitTwitterAccount(): Promise<void> {
   }
 }
 
+async function handleSubmitTwitterKeyword(): Promise<void> {
+  if (isActionPending("twitter-keyword:submit")) {
+    return;
+  }
+
+  const payload = buildTwitterKeywordSavePayload();
+
+  if (!payload.ok) {
+    twitterKeywordFormError.value = payload.message;
+    return;
+  }
+
+  twitterKeywordFormError.value = null;
+  setPendingAction("twitter-keyword:submit", true);
+
+  try {
+    if (twitterKeywordModalMode.value === "create") {
+      await createTwitterSearchKeyword(payload.payload);
+    } else {
+      await updateTwitterSearchKeyword(payload.payload);
+    }
+
+    const refreshed = await loadSources({ silent: true });
+    closeTwitterKeywordModal();
+    showNotice(
+      "success",
+      refreshed
+        ? twitterKeywordModalMode.value === "create"
+          ? "已新增 Twitter 关键词。"
+          : "已更新 Twitter 关键词。"
+        : twitterKeywordModalMode.value === "create"
+          ? "已新增 Twitter 关键词，但最新数据刷新失败，请稍后手动刷新。"
+          : "已更新 Twitter 关键词，但最新数据刷新失败，请稍后手动刷新。"
+    );
+  } catch (error) {
+    const message = readActionErrorMessage(
+      error,
+      twitterKeywordModalMode.value === "create" ? "Twitter 关键词保存失败，请稍后再试。" : "Twitter 关键词更新失败，请稍后再试。",
+      {
+        "invalid-keyword": "Twitter 关键词不合法，请检查后重试。",
+        "invalid-category": "Twitter 关键词分类不合法。",
+        "invalid-priority": "Twitter 关键词优先级不合法。",
+        "duplicate-keyword": "这个 Twitter 关键词已存在。",
+        "not-found": "对应 Twitter 关键词不存在，可能已被移除。"
+      }
+    );
+
+    twitterKeywordFormError.value = message;
+    showNotice("error", message);
+  } finally {
+    setPendingAction("twitter-keyword:submit", false);
+  }
+}
+
 async function handleToggleTwitterAccount(account: SettingsTwitterAccount): Promise<void> {
   const nextEnable = !account.isEnabled;
 
@@ -741,6 +955,53 @@ async function handleDeleteTwitterAccount(account: SettingsTwitterAccount): Prom
     reasonMessages: {
       "invalid-twitter-account-id": "Twitter 账号 ID 不合法。",
       "not-found": "对应 Twitter 账号不存在，可能已被移除。"
+    }
+  });
+}
+
+async function handleToggleTwitterKeywordCollect(keyword: SettingsTwitterSearchKeyword): Promise<void> {
+  const nextEnable = !keyword.isCollectEnabled;
+
+  await runSourcesAction(
+    `twitter-keyword-collect-toggle:${keyword.id}`,
+    () => toggleTwitterSearchKeywordCollect(keyword.id, nextEnable),
+    {
+      fallbackMessage: "Twitter 关键词采集开关更新失败，请稍后再试。",
+      successMessage: nextEnable ? "已启用 Twitter 关键词采集。" : "已停用 Twitter 关键词采集。",
+      reasonMessages: {
+        "invalid-twitter-keyword-id": "Twitter 关键词 ID 不合法。",
+        "invalid-twitter-keyword-collect-enable": "Twitter 关键词采集开关参数不合法。",
+        "not-found": "对应 Twitter 关键词不存在，可能已被移除。"
+      }
+    }
+  );
+}
+
+async function handleToggleTwitterKeywordVisible(keyword: SettingsTwitterSearchKeyword): Promise<void> {
+  const nextEnable = !keyword.isVisible;
+
+  await runSourcesAction(
+    `twitter-keyword-visible-toggle:${keyword.id}`,
+    () => toggleTwitterSearchKeywordVisible(keyword.id, nextEnable),
+    {
+      fallbackMessage: "Twitter 关键词展示开关更新失败，请稍后再试。",
+      successMessage: nextEnable ? "已开启 Twitter 关键词展示。" : "已关闭 Twitter 关键词展示。",
+      reasonMessages: {
+        "invalid-twitter-keyword-id": "Twitter 关键词 ID 不合法。",
+        "invalid-twitter-keyword-visible-enable": "Twitter 关键词展示开关参数不合法。",
+        "not-found": "对应 Twitter 关键词不存在，可能已被移除。"
+      }
+    }
+  );
+}
+
+async function handleDeleteTwitterKeyword(keyword: SettingsTwitterSearchKeyword): Promise<void> {
+  await runSourcesAction(`twitter-keyword-delete:${keyword.id}`, () => deleteTwitterSearchKeyword(keyword.id), {
+    fallbackMessage: "删除 Twitter 关键词失败，请稍后再试。",
+    successMessage: "已删除 Twitter 关键词。",
+    reasonMessages: {
+      "invalid-twitter-keyword-id": "Twitter 关键词 ID 不合法。",
+      "not-found": "对应 Twitter 关键词不存在，可能已被移除。"
     }
   });
 }
@@ -829,6 +1090,9 @@ onUnmounted(() => {
                 </a-button>
                 <a-button data-action="add-twitter-account" @click="openCreateTwitterAccountModal">
                   新增 Twitter 账号
+                </a-button>
+                <a-button data-action="add-twitter-keyword" @click="openCreateTwitterKeywordModal">
+                  新增 Twitter 关键词
                 </a-button>
               </a-space>
             </div>
@@ -962,7 +1226,7 @@ onUnmounted(() => {
                 </a-space>
               </template>
               <template v-else-if="column.key === 'category'">
-                <a-tag>{{ record.category }}</a-tag>
+                <a-tag>{{ formatTwitterCategoryLabel(record.category) }}</a-tag>
               </template>
               <template v-else-if="column.key === 'priority'">
                 {{ record.priority }}
@@ -1011,6 +1275,135 @@ onUnmounted(() => {
                       danger
                       :loading="isActionPending(`twitter-delete:${record.id}`)"
                       :data-twitter-account-delete="record.id"
+                    >
+                      删除
+                    </a-button>
+                  </a-popconfirm>
+                </div>
+              </template>
+            </template>
+          </a-table>
+        </a-card>
+
+        <a-card
+          :class="editorialContentCardClass"
+          title="Twitter 关键词搜索"
+          size="small"
+          data-sources-section="twitter-keywords"
+        >
+          <div class="mb-4 grid gap-3 md:grid-cols-4">
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-4 py-3">
+              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">关键词总数</p>
+              <p class="mt-2 mb-0 text-lg font-medium text-editorial-text-main">{{ totalTwitterKeywordCount }}</p>
+            </article>
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-4 py-3">
+              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">采集启用</p>
+              <p class="mt-2 mb-0 text-lg font-medium text-editorial-text-main">{{ enabledTwitterKeywordCollectCount }}</p>
+            </article>
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-4 py-3">
+              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">展示启用</p>
+              <p class="mt-2 mb-0 text-lg font-medium text-editorial-text-main">{{ enabledTwitterKeywordVisibleCount }}</p>
+            </article>
+            <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-4 py-3">
+              <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">API 状态</p>
+              <p class="mt-2 mb-0 text-xs leading-5 text-editorial-text-body">{{ twitterKeywordCollectionMessage }}</p>
+            </article>
+          </div>
+
+          <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <a-typography-paragraph class="!mb-0" type="secondary">
+              关键词搜索仅支持手动执行，默认按 5 个关键词、每词最多 10 条结果控住 credits。
+            </a-typography-paragraph>
+            <a-button
+              type="primary"
+              data-action="manual-twitter-keyword-collect"
+              :disabled="!sourcesModel.operations.canTriggerManualTwitterKeywordCollect || sourcesModel.operations.isRunning"
+              :loading="isActionPending('manual:twitter-keyword-collect')"
+              @click="handleManualTwitterKeywordCollect"
+            >
+              {{ sourcesModel.operations.isRunning ? "任务执行中..." : "手动采集 Twitter 关键词" }}
+            </a-button>
+          </div>
+
+          <a-table
+            :data-source="sourcesModel.twitterSearchKeywords ?? []"
+            :columns="twitterKeywordColumns"
+            row-key="id"
+            :pagination="false"
+            size="small"
+          >
+            <template #emptyText>
+              暂无 Twitter 关键词
+            </template>
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'keyword'">
+                <a-space direction="vertical" size="small">
+                  <a-typography-text strong>{{ record.keyword }}</a-typography-text>
+                  <a-typography-text type="secondary" :data-twitter-keyword-note="record.id">
+                    {{ record.notes || "暂无备注" }}
+                  </a-typography-text>
+                </a-space>
+              </template>
+              <template v-else-if="column.key === 'category'">
+                <a-tag>{{ formatTwitterCategoryLabel(record.category) }}</a-tag>
+              </template>
+              <template v-else-if="column.key === 'priority'">
+                {{ record.priority }}
+              </template>
+              <template v-else-if="column.key === 'collectEnabled'">
+                <a-switch
+                  :checked="record.isCollectEnabled"
+                  :loading="isActionPending(`twitter-keyword-collect-toggle:${record.id}`)"
+                  :checked-children="'启用'"
+                  :un-checked-children="'停用'"
+                  :data-twitter-keyword-collect-toggle="record.id"
+                  @change="handleToggleTwitterKeywordCollect(record)"
+                />
+              </template>
+              <template v-else-if="column.key === 'visible'">
+                <a-switch
+                  :checked="record.isVisible"
+                  :loading="isActionPending(`twitter-keyword-visible-toggle:${record.id}`)"
+                  :checked-children="'展示'"
+                  :un-checked-children="'隐藏'"
+                  :data-twitter-keyword-visible-toggle="record.id"
+                  @change="handleToggleTwitterKeywordVisible(record)"
+                />
+              </template>
+              <template v-else-if="column.key === 'lastSuccessAt'">
+                {{ formatDateTime(record.lastSuccessAt) }}
+              </template>
+              <template v-else-if="column.key === 'lastResult'">
+                <span
+                  class="inline-block max-w-[240px] truncate align-middle"
+                  :title="record.lastResult ?? '暂无结果'"
+                  :data-twitter-keyword-result="record.id"
+                >
+                  {{ record.lastResult ?? "暂无结果" }}
+                </span>
+              </template>
+              <template v-else-if="column.key === 'actions'">
+                <div class="flex flex-wrap justify-center gap-2" :data-twitter-keyword-actions="record.id">
+                  <a-button
+                    type="link"
+                    size="small"
+                    :data-twitter-keyword-edit="record.id"
+                    @click="openEditTwitterKeywordModal(record)"
+                  >
+                    编辑
+                  </a-button>
+                  <a-popconfirm
+                    title="确认删除这个 Twitter 关键词吗？"
+                    ok-text="确认删除"
+                    cancel-text="取消"
+                    @confirm="handleDeleteTwitterKeyword(record)"
+                  >
+                    <a-button
+                      type="link"
+                      size="small"
+                      danger
+                      :loading="isActionPending(`twitter-keyword-delete:${record.id}`)"
+                      :data-twitter-keyword-delete="record.id"
                     >
                       删除
                     </a-button>
@@ -1401,6 +1794,116 @@ onUnmounted(() => {
               @click="handleSubmitTwitterAccount"
             >
               {{ twitterAccountModalMode === "create" ? "新增账号" : "保存更新" }}
+            </a-button>
+          </div>
+        </div>
+      </a-modal>
+
+      <a-modal
+        :open="isTwitterKeywordModalOpen"
+        :title="twitterKeywordModalMode === 'create' ? '新增 Twitter 关键词' : '编辑 Twitter 关键词'"
+        :footer="null"
+        centered
+        :width="680"
+        destroy-on-close
+        @cancel="closeTwitterKeywordModal"
+      >
+        <div class="flex flex-col gap-4" data-twitter-keyword-modal="twitter-keyword">
+          <a-alert
+            v-if="twitterKeywordFormError"
+            class="editorial-inline-alert editorial-inline-alert--error"
+            type="error"
+            show-icon
+            :message="twitterKeywordFormError"
+          />
+
+          <a-alert
+            class="editorial-inline-alert editorial-inline-alert--info"
+            type="info"
+            show-icon
+            :message="twitterKeywordCollectionMessage"
+            data-twitter-keyword-capability
+          />
+
+          <label class="flex flex-col gap-2">
+            <span class="text-sm font-medium text-editorial-text-main">关键词</span>
+            <input
+              v-model="twitterKeywordForm.keyword"
+              data-twitter-keyword-form="keyword"
+              class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
+              placeholder="例如 OpenAI、Anthropic、Agents SDK"
+            />
+          </label>
+
+          <label class="flex flex-col gap-2">
+            <span class="text-sm font-medium text-editorial-text-main">分类</span>
+            <select
+              v-model="twitterKeywordForm.category"
+              data-twitter-keyword-form="category"
+              class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
+            >
+              <option
+                v-for="option in twitterKeywordCategoryOptions"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+
+          <label class="flex flex-col gap-2">
+            <span class="text-sm font-medium text-editorial-text-main">优先级</span>
+            <input
+              v-model.number="twitterKeywordForm.priority"
+              data-twitter-keyword-form="priority"
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
+            />
+          </label>
+
+          <label class="flex items-center gap-2 text-sm text-editorial-text-main">
+            <input
+              v-model="twitterKeywordForm.isCollectEnabled"
+              data-twitter-keyword-form="is-collect-enabled"
+              type="checkbox"
+              class="h-4 w-4"
+            />
+            默认启用采集
+          </label>
+
+          <label class="flex items-center gap-2 text-sm text-editorial-text-main">
+            <input
+              v-model="twitterKeywordForm.isVisible"
+              data-twitter-keyword-form="is-visible"
+              type="checkbox"
+              class="h-4 w-4"
+            />
+            默认启用展示
+          </label>
+
+          <label class="flex flex-col gap-2">
+            <span class="text-sm font-medium text-editorial-text-main">备注</span>
+            <textarea
+              v-model="twitterKeywordForm.notes"
+              data-twitter-keyword-form="notes"
+              rows="3"
+              class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
+            />
+          </label>
+
+          <div class="flex justify-end gap-2">
+            <a-button @click="closeTwitterKeywordModal">取消</a-button>
+            <a-button
+              type="primary"
+              data-twitter-keyword-form="submit"
+              :loading="isActionPending('twitter-keyword:submit')"
+              @click="handleSubmitTwitterKeyword"
+            >
+              {{ twitterKeywordModalMode === "create" ? "新增关键词" : "保存更新" }}
             </a-button>
           </div>
         </div>

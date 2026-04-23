@@ -36,6 +36,7 @@ import { readSourcesOperationSummary } from "./core/source/readSourcesOperationS
 import { loadEnabledSourceIssues } from "./core/source/loadEnabledSourceIssues.js";
 import { hydrateSourceContent } from "./core/source/hydrateSourceContent.js";
 import { runTwitterAccountCollection } from "./core/twitter/runTwitterAccountCollection.js";
+import { runTwitterKeywordCollection } from "./core/twitter/runTwitterKeywordCollection.js";
 import {
   deleteSource as removeSource,
   saveSource as persistSource,
@@ -49,6 +50,14 @@ import {
   toggleTwitterAccount as persistTwitterAccountToggle,
   updateTwitterAccount as persistTwitterAccountUpdate
 } from "./core/twitter/twitterAccountRepository.js";
+import {
+  createTwitterSearchKeyword as persistTwitterSearchKeyword,
+  deleteTwitterSearchKeyword as removeTwitterSearchKeyword,
+  listTwitterSearchKeywords,
+  toggleTwitterSearchKeywordCollect as persistTwitterSearchKeywordCollectToggle,
+  toggleTwitterSearchKeywordVisible as persistTwitterSearchKeywordVisibleToggle,
+  updateTwitterSearchKeyword as persistTwitterSearchKeywordUpdate
+} from "./core/twitter/twitterSearchKeywordRepository.js";
 import { listReportDates, readTextFile } from "./core/storage/reportStore.js";
 import {
   getViewRuleConfig,
@@ -118,6 +127,14 @@ async function runCollectionTask(triggerType: DailyReportTrigger) {
 // Twitter 账号采集单独手动触发，避免把高成本轮询绑进默认 10 分钟节奏。
 async function runTwitterAccountCollectionTask() {
   return await runTwitterAccountCollection(db, {
+    apiKey: process.env.TWITTER_API_KEY?.trim() || null,
+    fetchArticle: fetchAndExtractArticle
+  });
+}
+
+// Twitter 关键词搜索保持独立手动动作，避免和账号采集一起把 credits 固定烧进默认调度。
+async function runTwitterKeywordCollectionTask() {
+  return await runTwitterKeywordCollection(db, {
     apiKey: process.env.TWITTER_API_KEY?.trim() || null,
     fetchArticle: fetchAndExtractArticle
   });
@@ -437,6 +454,13 @@ const triggerManualTwitterCollect = config.manualActions.collectEnabled
     }
   : undefined;
 
+// 关键词搜索和账号采集共用运行锁，但继续保持独立按钮和独立结果摘要。
+const triggerManualTwitterKeywordCollect = config.manualActions.collectEnabled
+  ? async () => {
+      return await lock.runExclusive(async () => await runTwitterKeywordCollectionTask());
+    }
+  : undefined;
+
 // 新增来源后先只补这一条 source 的内容入库，避免为了拿到首批数据就把整轮全站采集串进保存接口。
 async function saveAndHydrateSource(input: Parameters<typeof persistSource>[1]) {
   const result = await persistSource(db, input, {
@@ -512,12 +536,21 @@ const app = createServer({
   updateSourceDisplayMode: async (kind, showAllWhenSelected) =>
     persistSourceDisplayMode(db, kind, showAllWhenSelected),
   listTwitterAccounts: async () => listTwitterAccounts(db),
+  listTwitterSearchKeywords: async () => listTwitterSearchKeywords(db),
   createTwitterAccount: async (input) => persistTwitterAccount(db, input),
   updateTwitterAccount: async (input) => persistTwitterAccountUpdate(db, input),
   deleteTwitterAccount: async (id) => removeTwitterAccount(db, id),
   toggleTwitterAccount: async (id, enable) => persistTwitterAccountToggle(db, id, enable),
+  createTwitterSearchKeyword: async (input) => persistTwitterSearchKeyword(db, input),
+  updateTwitterSearchKeyword: async (input) => persistTwitterSearchKeywordUpdate(db, input),
+  deleteTwitterSearchKeyword: async (id) => removeTwitterSearchKeyword(db, id),
+  toggleTwitterSearchKeywordCollect: async (id, enable) =>
+    persistTwitterSearchKeywordCollectToggle(db, id, enable),
+  toggleTwitterSearchKeywordVisible: async (id, enable) =>
+    persistTwitterSearchKeywordVisibleToggle(db, id, enable),
   hasTwitterApiKey: Boolean(process.env.TWITTER_API_KEY?.trim()),
   triggerManualTwitterCollect,
+  triggerManualTwitterKeywordCollect,
   getCurrentUserProfile: async () => getCurrentUserProfile(),
   listReportSummaries: listStoredReportSummaries,
   latestReportDate: async () => (await listReportDates(config.report.dataDir))[0] ?? null,

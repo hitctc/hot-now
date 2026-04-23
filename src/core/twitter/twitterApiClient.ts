@@ -35,7 +35,27 @@ export type FetchUserLastTweetsInput = {
   fetch?: TwitterApiFetch;
 };
 
+export type TwitterSearchQueryType = "Latest" | "Top";
+
+export type TwitterAdvancedSearchResult =
+  | {
+      ok: true;
+      tweets: TwitterApiTweet[];
+      hasNextPage: boolean;
+      nextCursor: string | null;
+    }
+  | { ok: false; reason: string };
+
+export type FetchAdvancedSearchTweetsInput = {
+  apiKey: string;
+  query: string;
+  queryType?: TwitterSearchQueryType;
+  cursor?: string | null;
+  fetch?: TwitterApiFetch;
+};
+
 const endpoint = "https://api.twitterapi.io/twitter/user/last_tweets";
+const advancedSearchEndpoint = "https://api.twitterapi.io/twitter/tweet/advanced_search";
 
 // The client keeps TwitterAPI.io response quirks out of the collector so tests can pin one shape.
 export async function fetchUserLastTweets(input: FetchUserLastTweetsInput): Promise<TwitterUserLastTweetsResult> {
@@ -65,6 +85,62 @@ export async function fetchUserLastTweets(input: FetchUserLastTweetsInput): Prom
 
   if (input.includeReplies === true) {
     requestUrl.searchParams.set("includeReplies", "true");
+  }
+
+  const fetcher = input.fetch ?? fetch;
+
+  try {
+    const response = await fetcher(requestUrl, {
+      headers: {
+        "X-API-Key": apiKey
+      }
+    });
+
+    if (!response.ok) {
+      return { ok: false, reason: `TwitterAPI.io request failed with ${response.status}` };
+    }
+
+    const payload = await response.json() as Record<string, unknown>;
+    const status = typeof payload.status === "string" ? payload.status.toLowerCase() : "";
+
+    if (status === "error") {
+      return { ok: false, reason: readString(payload.message) ?? "TwitterAPI.io returned error" };
+    }
+
+    const rawTweets = Array.isArray(payload.tweets) ? payload.tweets : [];
+
+    return {
+      ok: true,
+      tweets: rawTweets.flatMap((tweet) => normalizeTweet(tweet)),
+      hasNextPage: payload.has_next_page === true,
+      nextCursor: readString(payload.next_cursor)
+    };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : "TwitterAPI.io request failed" };
+  }
+}
+
+// 关键词搜索和账号时间线共用一套 tweet 归一化，避免 collector 关心第三方字段命名差异。
+export async function fetchAdvancedSearchTweets(
+  input: FetchAdvancedSearchTweetsInput
+): Promise<TwitterAdvancedSearchResult> {
+  const apiKey = input.apiKey.trim();
+  const query = input.query.trim();
+
+  if (!apiKey) {
+    return { ok: false, reason: "TWITTER_API_KEY is not configured" };
+  }
+
+  if (!query) {
+    return { ok: false, reason: "query is required" };
+  }
+
+  const requestUrl = new URL(advancedSearchEndpoint);
+  requestUrl.searchParams.set("query", query);
+  requestUrl.searchParams.set("queryType", input.queryType ?? "Latest");
+
+  if (input.cursor?.trim()) {
+    requestUrl.searchParams.set("cursor", input.cursor.trim());
   }
 
   const fetcher = input.fetch ?? fetch;

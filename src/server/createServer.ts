@@ -28,6 +28,13 @@ import type {
   ToggleTwitterAccountResult,
   TwitterAccountRecord
 } from "../core/twitter/twitterAccountRepository.js";
+import type {
+  DeleteTwitterSearchKeywordResult,
+  SaveTwitterSearchKeywordInput,
+  SaveTwitterSearchKeywordResult,
+  ToggleTwitterSearchKeywordResult,
+  TwitterSearchKeywordRecord
+} from "../core/twitter/twitterSearchKeywordRepository.js";
 import type { RuntimeConfig } from "../core/types/appConfig.js";
 import { readNextCollectionRunAt } from "../core/scheduler/readNextCollectionRunAt.js";
 import {
@@ -51,6 +58,7 @@ import {
   type ProfileView,
   type SourcesSettingsView,
   type TwitterAccountSettingsView,
+  type TwitterSearchKeywordSettingsView,
   type ViewRulesWorkbenchView
 } from "./renderSystemPages.js";
 
@@ -111,6 +119,21 @@ type ManualTwitterCollectResult =
       accepted: false;
       reason: "twitter-api-key-missing" | "no-enabled-twitter-accounts";
     };
+type ManualTwitterKeywordCollectResult =
+  | {
+      accepted: true;
+      action: "collect-twitter-keywords";
+      enabledKeywordCount: number;
+      processedKeywordCount: number;
+      fetchedTweetCount: number;
+      persistedContentItemCount: number;
+      reusedContentItemCount: number;
+      failureCount: number;
+    }
+  | {
+      accepted: false;
+      reason: "twitter-api-key-missing" | "no-enabled-twitter-keywords";
+    };
 type ManualSendLatestEmailResult =
   | { accepted: true; action: "send-latest-email" }
   | { accepted: false; reason: LatestReportEmailErrorReason };
@@ -159,6 +182,7 @@ type ServerDeps = {
   triggerManualRun?: () => Promise<{ accepted: boolean }>;
   triggerManualCollect?: () => Promise<ManualCollectResult>;
   triggerManualTwitterCollect?: () => Promise<ManualTwitterCollectResult>;
+  triggerManualTwitterKeywordCollect?: () => Promise<ManualTwitterKeywordCollectResult>;
   triggerManualSendLatestEmail?: () => Promise<ManualSendLatestEmailResult>;
   isRunning?: () => boolean;
   listContentView?: (
@@ -194,6 +218,7 @@ type ServerDeps = {
     showAllWhenSelected: boolean
   ) => Promise<UpdateSourceDisplayModeResult> | UpdateSourceDisplayModeResult;
   listTwitterAccounts?: () => Promise<TwitterAccountRecord[]> | TwitterAccountRecord[];
+  listTwitterSearchKeywords?: () => Promise<TwitterSearchKeywordRecord[]> | TwitterSearchKeywordRecord[];
   createTwitterAccount?: (
     input: SaveTwitterAccountInput
   ) => Promise<SaveTwitterAccountResult> | SaveTwitterAccountResult;
@@ -205,6 +230,23 @@ type ServerDeps = {
     id: number,
     enable: boolean
   ) => Promise<ToggleTwitterAccountResult> | ToggleTwitterAccountResult;
+  createTwitterSearchKeyword?: (
+    input: SaveTwitterSearchKeywordInput
+  ) => Promise<SaveTwitterSearchKeywordResult> | SaveTwitterSearchKeywordResult;
+  updateTwitterSearchKeyword?: (
+    input: SaveTwitterSearchKeywordInput
+  ) => Promise<SaveTwitterSearchKeywordResult> | SaveTwitterSearchKeywordResult;
+  deleteTwitterSearchKeyword?: (
+    id: number
+  ) => Promise<DeleteTwitterSearchKeywordResult> | DeleteTwitterSearchKeywordResult;
+  toggleTwitterSearchKeywordCollect?: (
+    id: number,
+    enable: boolean
+  ) => Promise<ToggleTwitterSearchKeywordResult> | ToggleTwitterSearchKeywordResult;
+  toggleTwitterSearchKeywordVisible?: (
+    id: number,
+    enable: boolean
+  ) => Promise<ToggleTwitterSearchKeywordResult> | ToggleTwitterSearchKeywordResult;
   hasTwitterApiKey?: boolean;
   getCurrentUserProfile?: () => Promise<CurrentUserProfile | null> | CurrentUserProfile | null;
   getContentPageModel?: (
@@ -616,6 +658,17 @@ export function createServer(deps: ServerDeps = {}) {
       authConfig?.sessionSecret ?? "",
       deps.isRunning?.() ?? false,
       deps.triggerManualTwitterCollect
+    );
+  });
+
+  app.post("/actions/twitter-keywords/collect", async (request, reply) => {
+    return await handleManualTwitterKeywordCollectAction(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? "",
+      deps.isRunning?.() ?? false,
+      deps.triggerManualTwitterKeywordCollect
     );
   });
 
@@ -1031,6 +1084,126 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.send({ ok: true, id: result.account.id, enable: result.account.isEnabled });
   });
 
+  app.post("/actions/twitter-keywords/create", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.createTwitterSearchKeyword) {
+      return reply.code(503).send({ ok: false, reason: "twitter-keywords-disabled" });
+    }
+
+    const payload = parseTwitterKeywordSavePayload(request.body, "create");
+
+    if (!payload) {
+      return reply.code(400).send({ ok: false, reason: "invalid-twitter-keyword-payload" });
+    }
+
+    return sendTwitterKeywordSaveResult(reply, await deps.createTwitterSearchKeyword(payload));
+  });
+
+  app.post("/actions/twitter-keywords/update", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.updateTwitterSearchKeyword) {
+      return reply.code(503).send({ ok: false, reason: "twitter-keywords-disabled" });
+    }
+
+    const payload = parseTwitterKeywordSavePayload(request.body, "update");
+
+    if (!payload) {
+      return reply.code(400).send({ ok: false, reason: "invalid-twitter-keyword-payload" });
+    }
+
+    return sendTwitterKeywordSaveResult(reply, await deps.updateTwitterSearchKeyword(payload));
+  });
+
+  app.post("/actions/twitter-keywords/delete", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.deleteTwitterSearchKeyword) {
+      return reply.code(503).send({ ok: false, reason: "twitter-keywords-disabled" });
+    }
+
+    const id = parsePositiveInteger((request.body as { id?: unknown } | undefined)?.id);
+
+    if (id === null) {
+      return reply.code(400).send({ ok: false, reason: "invalid-twitter-keyword-id" });
+    }
+
+    const result = await deps.deleteTwitterSearchKeyword(id);
+
+    if (!result.ok) {
+      return reply.code(result.reason === "not-found" ? 404 : 400).send({ ok: false, reason: result.reason });
+    }
+
+    return reply.send({ ok: true, id: result.id });
+  });
+
+  app.post("/actions/twitter-keywords/toggle-collect", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.toggleTwitterSearchKeywordCollect) {
+      return reply.code(503).send({ ok: false, reason: "twitter-keywords-disabled" });
+    }
+
+    const body = request.body as { id?: unknown; enable?: unknown } | undefined;
+    const id = parsePositiveInteger(body?.id);
+    const enable = typeof body?.enable === "boolean" ? body.enable : null;
+
+    if (id === null) {
+      return reply.code(400).send({ ok: false, reason: "invalid-twitter-keyword-id" });
+    }
+
+    if (enable === null) {
+      return reply.code(400).send({ ok: false, reason: "invalid-twitter-keyword-collect-enable" });
+    }
+
+    const result = await deps.toggleTwitterSearchKeywordCollect(id, enable);
+
+    if (!result.ok) {
+      return reply.code(result.reason === "not-found" ? 404 : 400).send({ ok: false, reason: result.reason });
+    }
+
+    return reply.send({ ok: true, id: result.keyword.id, enable: result.keyword.isCollectEnabled });
+  });
+
+  app.post("/actions/twitter-keywords/toggle-visible", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.toggleTwitterSearchKeywordVisible) {
+      return reply.code(503).send({ ok: false, reason: "twitter-keywords-disabled" });
+    }
+
+    const body = request.body as { id?: unknown; enable?: unknown } | undefined;
+    const id = parsePositiveInteger(body?.id);
+    const enable = typeof body?.enable === "boolean" ? body.enable : null;
+
+    if (id === null) {
+      return reply.code(400).send({ ok: false, reason: "invalid-twitter-keyword-id" });
+    }
+
+    if (enable === null) {
+      return reply.code(400).send({ ok: false, reason: "invalid-twitter-keyword-visible-enable" });
+    }
+
+    const result = await deps.toggleTwitterSearchKeywordVisible(id, enable);
+
+    if (!result.ok) {
+      return reply.code(result.reason === "not-found" ? 404 : 400).send({ ok: false, reason: result.reason });
+    }
+
+    return reply.send({ ok: true, id: result.keyword.id, enable: result.keyword.isVisible });
+  });
+
   return app;
 }
 
@@ -1073,6 +1246,38 @@ function parseTwitterAccountSavePayload(body: unknown, mode: "create" | "update"
   };
 }
 
+function parseTwitterKeywordSavePayload(
+  body: unknown,
+  mode: "create" | "update"
+): SaveTwitterSearchKeywordInput | null {
+  if (!body || typeof body !== "object") {
+    return null;
+  }
+
+  const payload = body as Record<string, unknown>;
+  const keyword = typeof payload.keyword === "string" ? payload.keyword.trim() : "";
+
+  if (!keyword) {
+    return null;
+  }
+
+  const id = mode === "update" ? parsePositiveInteger(payload.id) : null;
+
+  if (mode === "update" && id === null) {
+    return null;
+  }
+
+  return {
+    ...(id !== null ? { id } : {}),
+    keyword,
+    category: typeof payload.category === "string" ? payload.category : null,
+    priority: typeof payload.priority === "number" ? payload.priority : null,
+    isCollectEnabled: typeof payload.isCollectEnabled === "boolean" ? payload.isCollectEnabled : null,
+    isVisible: typeof payload.isVisible === "boolean" ? payload.isVisible : null,
+    notes: typeof payload.notes === "string" ? payload.notes : null
+  };
+}
+
 function sendTwitterAccountSaveResult(reply: FastifyReply, result: SaveTwitterAccountResult) {
   if (result.ok) {
     return reply.send({ ok: true, account: result.account });
@@ -1083,6 +1288,22 @@ function sendTwitterAccountSaveResult(reply: FastifyReply, result: SaveTwitterAc
   }
 
   if (result.reason === "duplicate-username") {
+    return reply.code(409).send({ ok: false, reason: result.reason });
+  }
+
+  return reply.code(400).send({ ok: false, reason: result.reason });
+}
+
+function sendTwitterKeywordSaveResult(reply: FastifyReply, result: SaveTwitterSearchKeywordResult) {
+  if (result.ok) {
+    return reply.send({ ok: true, keyword: result.keyword });
+  }
+
+  if (result.reason === "not-found") {
+    return reply.code(404).send({ ok: false, reason: result.reason });
+  }
+
+  if (result.reason === "duplicate-keyword") {
     return reply.code(409).send({ ok: false, reason: result.reason });
   }
 
@@ -1281,6 +1502,7 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
   // Sources workbench uses独立来源统计，不再依赖内容页当前筛选上下文。
   const sources = ((await deps.listSources?.()) ?? []) as SourceCard[];
   const twitterAccounts = ((await deps.listTwitterAccounts?.()) ?? []) as TwitterAccountSettingsView[];
+  const twitterSearchKeywords = ((await deps.listTwitterSearchKeywords?.()) ?? []) as TwitterSearchKeywordSettingsView[];
   const operationSummary = deps.getSourcesOperationSummary
     ? await deps.getSourcesOperationSummary()
     : { lastCollectionRunAt: null, lastSendLatestEmailAt: null };
@@ -1292,12 +1514,14 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
   return {
     sources,
     twitterAccounts,
+    twitterSearchKeywords,
     operations: {
       lastCollectionRunAt: operationSummary.lastCollectionRunAt,
       lastSendLatestEmailAt: operationSummary.lastSendLatestEmailAt,
       nextCollectionRunAt,
       canTriggerManualCollect: typeof (deps.triggerManualCollect ?? deps.triggerManualRun) === "function",
       canTriggerManualTwitterCollect: typeof deps.triggerManualTwitterCollect === "function",
+      canTriggerManualTwitterKeywordCollect: typeof deps.triggerManualTwitterKeywordCollect === "function",
       canTriggerManualSendLatestEmail: typeof deps.triggerManualSendLatestEmail === "function",
       isRunning: deps.isRunning?.() ?? false
     },
@@ -1310,7 +1534,12 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
       twitterAccountCollectionMessage:
         deps.hasTwitterApiKey === true
           ? "Twitter 账号采集已配置 API key，可采集已启用账号。"
-          : "当前环境未配置 TWITTER_API_KEY；Twitter 账号可先维护，采集时会跳过。"
+          : "当前环境未配置 TWITTER_API_KEY；Twitter 账号可先维护，采集时会跳过。",
+      twitterKeywordSearchEnabled: deps.hasTwitterApiKey === true,
+      twitterKeywordSearchMessage:
+        deps.hasTwitterApiKey === true
+          ? "Twitter 关键词搜索已配置 API key，仅支持手动采集。"
+          : "当前环境未配置 TWITTER_API_KEY；Twitter 关键词可先维护，采集时会跳过。"
     }
   };
 }
@@ -1925,6 +2154,7 @@ async function renderSystemPageForPath(deps: ServerDeps, pathname: string, logge
     return renderSourcesPage(sources, {
       canTriggerManualCollect: typeof (deps.triggerManualCollect ?? deps.triggerManualRun) === "function",
       canTriggerManualTwitterCollect: typeof deps.triggerManualTwitterCollect === "function",
+      canTriggerManualTwitterKeywordCollect: typeof deps.triggerManualTwitterKeywordCollect === "function",
       canTriggerManualSendLatestEmail: typeof deps.triggerManualSendLatestEmail === "function",
       isRunning: deps.isRunning?.() ?? false,
       lastCollectionRunAt: operationSummary.lastCollectionRunAt,
@@ -2041,6 +2271,31 @@ async function handleManualTwitterCollectAction(
   }
 
   const result = await triggerManualTwitterCollect();
+  return reply.code(202).send(result);
+}
+
+async function handleManualTwitterKeywordCollectAction(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  authEnabled: boolean,
+  sessionSecret: string,
+  isRunning: boolean,
+  triggerManualTwitterKeywordCollect: ServerDeps["triggerManualTwitterKeywordCollect"]
+) {
+  // Twitter 关键词搜索和账号采集共用锁与权限门，但单独返回关键词侧的命中统计。
+  if (!ensureManualActionAuthorized(request, reply, authEnabled, sessionSecret)) {
+    return;
+  }
+
+  if (isRunning) {
+    return reply.code(409).send({ accepted: false, reason: "already-running" });
+  }
+
+  if (!triggerManualTwitterKeywordCollect) {
+    return reply.code(503).send({ accepted: false });
+  }
+
+  const result = await triggerManualTwitterKeywordCollect();
   return reply.code(202).send(result);
 }
 

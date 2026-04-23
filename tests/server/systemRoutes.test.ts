@@ -461,6 +461,107 @@ describe("system routes", () => {
     expect(createTwitterAccount).not.toHaveBeenCalled();
   });
 
+  it("calls createTwitterSearchKeyword for the twitter keyword create action", async () => {
+    const createTwitterSearchKeyword = vi.fn().mockResolvedValue({
+      ok: true,
+      keyword: {
+        id: 1,
+        keyword: "OpenAI",
+        category: "official_vendor",
+        priority: 90,
+        isCollectEnabled: true,
+        isVisible: true,
+        notes: null,
+        lastFetchedAt: null,
+        lastSuccessAt: null,
+        lastResult: null,
+        createdAt: "2026-04-23T08:00:00.000Z",
+        updatedAt: "2026-04-23T08:00:00.000Z"
+      }
+    });
+    const app = createSystemTestServer({ createTwitterSearchKeyword } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/twitter-keywords/create",
+      payload: {
+        keyword: "OpenAI",
+        category: "official_vendor",
+        priority: 90,
+        isCollectEnabled: true,
+        isVisible: true
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(createTwitterSearchKeyword).toHaveBeenCalledWith(
+      expect.objectContaining({
+        keyword: "OpenAI",
+        category: "official_vendor",
+        priority: 90,
+        isCollectEnabled: true,
+        isVisible: true
+      })
+    );
+  });
+
+  it("calls toggleTwitterSearchKeywordCollect and toggleTwitterSearchKeywordVisible for keyword actions", async () => {
+    const toggleTwitterSearchKeywordCollect = vi.fn().mockResolvedValue({
+      ok: true,
+      keyword: { id: 1, isCollectEnabled: false }
+    });
+    const toggleTwitterSearchKeywordVisible = vi.fn().mockResolvedValue({
+      ok: true,
+      keyword: { id: 1, isVisible: true }
+    });
+    const app = createSystemTestServer({
+      toggleTwitterSearchKeywordCollect,
+      toggleTwitterSearchKeywordVisible
+    } as never);
+
+    const collectResponse = await app.inject({
+      method: "POST",
+      url: "/actions/twitter-keywords/toggle-collect",
+      payload: { id: 1, enable: false }
+    });
+    const visibleResponse = await app.inject({
+      method: "POST",
+      url: "/actions/twitter-keywords/toggle-visible",
+      payload: { id: 1, enable: true }
+    });
+
+    expect(collectResponse.statusCode).toBe(200);
+    expect(toggleTwitterSearchKeywordCollect).toHaveBeenCalledWith(1, false);
+    expect(collectResponse.json()).toEqual({ ok: true, id: 1, enable: false });
+    expect(visibleResponse.statusCode).toBe(200);
+    expect(toggleTwitterSearchKeywordVisible).toHaveBeenCalledWith(1, true);
+    expect(visibleResponse.json()).toEqual({ ok: true, id: 1, enable: true });
+  });
+
+  it("starts twitter keyword collection with the dedicated action", async () => {
+    const triggerManualTwitterKeywordCollect = vi.fn().mockResolvedValue({
+      accepted: true,
+      action: "collect-twitter-keywords",
+      enabledKeywordCount: 2,
+      processedKeywordCount: 2,
+      fetchedTweetCount: 3,
+      persistedContentItemCount: 1,
+      reusedContentItemCount: 1,
+      failureCount: 0
+    });
+    const app = createSystemTestServer({
+      triggerManualTwitterKeywordCollect
+    } as never);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/twitter-keywords/collect"
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(triggerManualTwitterKeywordCollect).toHaveBeenCalledTimes(1);
+  });
+
   it("calls saveProviderSettings for llm provider configuration", async () => {
     const saveProviderSettings = vi.fn().mockResolvedValue({ ok: true });
     const app = createSystemTestServer({

@@ -116,6 +116,7 @@ export type SettingsSourcesOperations = {
   nextCollectionRunAt: string | null;
   canTriggerManualCollect: boolean;
   canTriggerManualTwitterCollect: boolean;
+  canTriggerManualTwitterKeywordCollect: boolean;
   canTriggerManualSendLatestEmail: boolean;
   isRunning: boolean;
 };
@@ -125,6 +126,8 @@ export type SettingsSourcesCapability = {
   wechatArticleUrlMessage: string;
   twitterAccountCollectionEnabled?: boolean;
   twitterAccountCollectionMessage?: string;
+  twitterKeywordSearchEnabled?: boolean;
+  twitterKeywordSearchMessage?: string;
 };
 
 export type SettingsTwitterAccount = {
@@ -144,9 +147,25 @@ export type SettingsTwitterAccount = {
   updatedAt: string;
 };
 
+export type SettingsTwitterSearchKeyword = {
+  id: number;
+  keyword: string;
+  category: string;
+  priority: number;
+  isCollectEnabled: boolean;
+  isVisible: boolean;
+  notes: string | null;
+  lastFetchedAt: string | null;
+  lastSuccessAt: string | null;
+  lastResult: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type SettingsSourcesResponse = {
   sources: SettingsSourceItem[];
   twitterAccounts?: SettingsTwitterAccount[];
+  twitterSearchKeywords?: SettingsTwitterSearchKeyword[];
   operations: SettingsSourcesOperations;
   capability: SettingsSourcesCapability;
 };
@@ -243,6 +262,32 @@ export type SaveTwitterAccountResponse = {
   account: SettingsTwitterAccount;
 };
 
+export type SaveTwitterSearchKeywordPayload = {
+  id?: number;
+  keyword: string;
+  category?: string | null;
+  priority?: number | null;
+  isCollectEnabled?: boolean | null;
+  isVisible?: boolean | null;
+  notes?: string | null;
+};
+
+export type SaveTwitterSearchKeywordResponse = {
+  ok: true;
+  keyword: SettingsTwitterSearchKeyword;
+};
+
+export type DeleteTwitterSearchKeywordResponse = {
+  ok: true;
+  id: number;
+};
+
+export type ToggleTwitterSearchKeywordResponse = {
+  ok: true;
+  id: number;
+  enable: boolean;
+};
+
 export type DeleteTwitterAccountResponse = {
   ok: true;
   id: number;
@@ -272,6 +317,22 @@ export type ManualTwitterCollectResponse =
   | {
       accepted: false;
       reason?: "twitter-api-key-missing" | "no-enabled-twitter-accounts" | "already-running";
+    };
+
+export type ManualTwitterKeywordCollectResponse =
+  | {
+      accepted: true;
+      action: "collect-twitter-keywords";
+      enabledKeywordCount: number;
+      processedKeywordCount: number;
+      fetchedTweetCount: number;
+      persistedContentItemCount: number;
+      reusedContentItemCount: number;
+      failureCount: number;
+    }
+  | {
+      accepted: false;
+      reason?: "twitter-api-key-missing" | "no-enabled-twitter-keywords" | "already-running";
     };
 
 export type ManualSendLatestEmailResponse = {
@@ -402,6 +463,42 @@ export function toggleTwitterAccount(id: number, enable: boolean): Promise<Toggl
   return postSettingsAction<ToggleTwitterAccountResponse>("/actions/twitter-accounts/toggle", { id, enable });
 }
 
+export function createTwitterSearchKeyword(
+  payload: SaveTwitterSearchKeywordPayload
+): Promise<SaveTwitterSearchKeywordResponse> {
+  return postSettingsAction<SaveTwitterSearchKeywordResponse>("/actions/twitter-keywords/create", payload);
+}
+
+export function updateTwitterSearchKeyword(
+  payload: SaveTwitterSearchKeywordPayload
+): Promise<SaveTwitterSearchKeywordResponse> {
+  return postSettingsAction<SaveTwitterSearchKeywordResponse>("/actions/twitter-keywords/update", payload);
+}
+
+export function deleteTwitterSearchKeyword(id: number): Promise<DeleteTwitterSearchKeywordResponse> {
+  return postSettingsAction<DeleteTwitterSearchKeywordResponse>("/actions/twitter-keywords/delete", { id });
+}
+
+export function toggleTwitterSearchKeywordCollect(
+  id: number,
+  enable: boolean
+): Promise<ToggleTwitterSearchKeywordResponse> {
+  return postSettingsAction<ToggleTwitterSearchKeywordResponse>("/actions/twitter-keywords/toggle-collect", {
+    id,
+    enable
+  });
+}
+
+export function toggleTwitterSearchKeywordVisible(
+  id: number,
+  enable: boolean
+): Promise<ToggleTwitterSearchKeywordResponse> {
+  return postSettingsAction<ToggleTwitterSearchKeywordResponse>("/actions/twitter-keywords/toggle-visible", {
+    id,
+    enable
+  });
+}
+
 // 手动采集走独立动作接口，保持和旧系统页一致的任务语义。
 export function triggerManualCollect(): Promise<ManualCollectResponse> {
   return postSettingsAction<ManualCollectResponse>("/actions/collect", {});
@@ -410,6 +507,11 @@ export function triggerManualCollect(): Promise<ManualCollectResponse> {
 // Twitter 账号采集单独触发，避免和默认 RSS / 公众号采集共用同一条高频入口。
 export function triggerManualTwitterCollect(): Promise<ManualTwitterCollectResponse> {
   return postSettingsAction<ManualTwitterCollectResponse>("/actions/twitter-accounts/collect", {});
+}
+
+// Twitter 关键词搜索只支持手动采集，避免把 credits 消耗绑定进默认定时任务。
+export function triggerManualTwitterKeywordCollect(): Promise<ManualTwitterKeywordCollectResponse> {
+  return postSettingsAction<ManualTwitterKeywordCollectResponse>("/actions/twitter-keywords/collect", {});
 }
 
 // 手动发送最新报告沿用现有后端接口，错误原因由调用方再翻译成用户提示。

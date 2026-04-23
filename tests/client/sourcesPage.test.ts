@@ -24,11 +24,17 @@ vi.mock("../../src/client/services/settingsApi", async () => {
     toggleSource: vi.fn(),
     updateSourceDisplayMode: vi.fn(),
     createTwitterAccount: vi.fn(),
+    createTwitterSearchKeyword: vi.fn(),
     updateTwitterAccount: vi.fn(),
+    updateTwitterSearchKeyword: vi.fn(),
     deleteTwitterAccount: vi.fn(),
+    deleteTwitterSearchKeyword: vi.fn(),
     toggleTwitterAccount: vi.fn(),
+    toggleTwitterSearchKeywordCollect: vi.fn(),
+    toggleTwitterSearchKeywordVisible: vi.fn(),
     triggerManualCollect: vi.fn(),
     triggerManualTwitterCollect: vi.fn(),
+    triggerManualTwitterKeywordCollect: vi.fn(),
     triggerManualSendLatestEmail: vi.fn()
   };
 });
@@ -111,12 +117,29 @@ function createSourcesModel() {
         updatedAt: "2026-04-23T08:01:00.000Z"
       }
     ],
+    twitterSearchKeywords: [
+      {
+        id: 11,
+        keyword: "OpenAI",
+        category: "official_vendor",
+        priority: 90,
+        isCollectEnabled: true,
+        isVisible: true,
+        notes: "core keyword",
+        lastFetchedAt: "2026-04-23T08:10:00.000Z",
+        lastSuccessAt: "2026-04-23T08:11:00.000Z",
+        lastResult: "本次搜索成功，获得 2 条可入库推文。",
+        createdAt: "2026-04-23T07:00:00.000Z",
+        updatedAt: "2026-04-23T08:11:00.000Z"
+      }
+    ],
     operations: {
       lastCollectionRunAt: "2026-03-31T08:10:00.000Z",
       lastSendLatestEmailAt: "2026-03-31T08:30:00.000Z",
       nextCollectionRunAt: "2026-03-31T10:40:00.000Z",
       canTriggerManualCollect: true,
       canTriggerManualTwitterCollect: true,
+      canTriggerManualTwitterKeywordCollect: true,
       canTriggerManualSendLatestEmail: true,
       isRunning: false
     },
@@ -124,7 +147,9 @@ function createSourcesModel() {
       wechatArticleUrlEnabled: true,
       wechatArticleUrlMessage: "公众号来源已开启，可直接填写公众号名称，或补一篇文章链接帮助系统更快定位来源。",
       twitterAccountCollectionEnabled: true,
-      twitterAccountCollectionMessage: "Twitter 账号采集已配置 API key，可采集已启用账号。"
+      twitterAccountCollectionMessage: "Twitter 账号采集已配置 API key，可采集已启用账号。",
+      twitterKeywordSearchEnabled: true,
+      twitterKeywordSearchMessage: "Twitter 关键词搜索已配置 API key，仅支持手动采集。"
     }
   } satisfies settingsApi.SettingsSourcesResponse;
 }
@@ -197,9 +222,14 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("Twitter 账号");
     expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("OpenAI");
     expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("@openai");
-    expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("official_vendor");
+    expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("官方厂商");
     expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("Twitter 账号采集已配置 API key");
     expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("手动采集 Twitter 账号");
+    expect(wrapper.get("[data-sources-section='twitter-keywords']").text()).toContain("Twitter 关键词搜索");
+    expect(wrapper.get("[data-sources-section='twitter-keywords']").text()).toContain("OpenAI");
+    expect(wrapper.get("[data-sources-section='twitter-keywords']").text()).toContain("官方厂商");
+    expect(wrapper.get("[data-sources-section='twitter-keywords']").text()).toContain("Twitter 关键词搜索已配置 API key");
+    expect(wrapper.get("[data-sources-section='twitter-keywords']").text()).toContain("手动采集 Twitter 关键词");
     expect(wrapper.get("[data-sources-section='inventory']").classes()).toContain("editorial-glass-panel");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("已完成");
     expect(wrapper.get("[data-sources-section='inventory']").text()).not.toContain("选中时全量");
@@ -298,6 +328,31 @@ describe("SourcesPage", () => {
 
     expect(settingsApi.triggerManualTwitterCollect).toHaveBeenCalledTimes(1);
     expect(wrapper.text()).toContain("Twitter 账号采集已完成：启用 1 个账号，入库 1 条内容，失败 0 个。");
+  });
+
+  it("starts twitter keyword collection and shows the persisted count summary", async () => {
+    vi.mocked(settingsApi.readSettingsSources)
+      .mockResolvedValueOnce(createSourcesModel())
+      .mockResolvedValueOnce(createSourcesModel());
+    vi.mocked(settingsApi.triggerManualTwitterKeywordCollect).mockResolvedValue({
+      accepted: true,
+      action: "collect-twitter-keywords",
+      enabledKeywordCount: 1,
+      processedKeywordCount: 1,
+      fetchedTweetCount: 2,
+      persistedContentItemCount: 1,
+      reusedContentItemCount: 1,
+      failureCount: 0
+    });
+
+    const wrapper = mountSourcesPage();
+
+    await flushPromises();
+    await wrapper.get("[data-action='manual-twitter-keyword-collect']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.triggerManualTwitterKeywordCollect).toHaveBeenCalledTimes(1);
+    expect(wrapper.text()).toContain("Twitter 关键词采集已完成：处理 1 个关键词，新入库 1 条，复用 1 条，失败 0 个。");
   });
 
   it("updates source display mode and reloads the latest sources model", async () => {

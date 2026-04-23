@@ -25,6 +25,7 @@ describe("settingsApi", () => {
         nextCollectionRunAt: null,
         canTriggerManualCollect: true,
         canTriggerManualTwitterCollect: true,
+        canTriggerManualTwitterKeywordCollect: true,
         canTriggerManualSendLatestEmail: true,
         isRunning: false
       },
@@ -267,6 +268,75 @@ describe("settingsApi", () => {
     });
   });
 
+  it("posts twitter keyword create and update payloads to their actions", async () => {
+    const { createTwitterSearchKeyword, updateTwitterSearchKeyword } = await import(
+      "../../src/client/services/settingsApi"
+    );
+
+    requestJson.mockResolvedValue({ ok: true, keyword: { id: 1 } });
+
+    await createTwitterSearchKeyword({
+      keyword: "OpenAI",
+      category: "official_vendor",
+      priority: 90,
+      isCollectEnabled: true,
+      isVisible: true,
+      notes: "core keyword"
+    });
+    await updateTwitterSearchKeyword({
+      id: 1,
+      keyword: "OpenAI Agents",
+      category: "topic"
+    });
+
+    expect(requestJson).toHaveBeenNthCalledWith(1, "/actions/twitter-keywords/create", {
+      method: "POST",
+      body: JSON.stringify({
+        keyword: "OpenAI",
+        category: "official_vendor",
+        priority: 90,
+        isCollectEnabled: true,
+        isVisible: true,
+        notes: "core keyword"
+      })
+    });
+    expect(requestJson).toHaveBeenNthCalledWith(2, "/actions/twitter-keywords/update", {
+      method: "POST",
+      body: JSON.stringify({
+        id: 1,
+        keyword: "OpenAI Agents",
+        category: "topic"
+      })
+    });
+  });
+
+  it("posts twitter keyword delete and toggle payloads to their actions", async () => {
+    const {
+      deleteTwitterSearchKeyword,
+      toggleTwitterSearchKeywordCollect,
+      toggleTwitterSearchKeywordVisible
+    } = await import("../../src/client/services/settingsApi");
+
+    requestJson.mockResolvedValue({ ok: true });
+
+    await deleteTwitterSearchKeyword(1);
+    await toggleTwitterSearchKeywordCollect(1, false);
+    await toggleTwitterSearchKeywordVisible(1, true);
+
+    expect(requestJson).toHaveBeenNthCalledWith(1, "/actions/twitter-keywords/delete", {
+      method: "POST",
+      body: JSON.stringify({ id: 1 })
+    });
+    expect(requestJson).toHaveBeenNthCalledWith(2, "/actions/twitter-keywords/toggle-collect", {
+      method: "POST",
+      body: JSON.stringify({ id: 1, enable: false })
+    });
+    expect(requestJson).toHaveBeenNthCalledWith(3, "/actions/twitter-keywords/toggle-visible", {
+      method: "POST",
+      body: JSON.stringify({ id: 1, enable: true })
+    });
+  });
+
   it("posts manual twitter collection to the dedicated twitter action", async () => {
     const { triggerManualTwitterCollect } = await import("../../src/client/services/settingsApi");
 
@@ -275,6 +345,19 @@ describe("settingsApi", () => {
     await triggerManualTwitterCollect();
 
     expect(requestJson).toHaveBeenCalledWith("/actions/twitter-accounts/collect", {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+  });
+
+  it("posts manual twitter keyword collection to the dedicated twitter action", async () => {
+    const { triggerManualTwitterKeywordCollect } = await import("../../src/client/services/settingsApi");
+
+    requestJson.mockResolvedValue({ accepted: true, action: "collect-twitter-keywords" });
+
+    await triggerManualTwitterKeywordCollect();
+
+    expect(requestJson).toHaveBeenCalledWith("/actions/twitter-keywords/collect", {
       method: "POST",
       body: JSON.stringify({})
     });

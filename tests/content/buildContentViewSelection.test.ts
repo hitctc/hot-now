@@ -2,13 +2,18 @@ import { mkdtemp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resolveSourceByKind, upsertContentItems } from "../../src/core/content/contentRepository.js";
+import {
+  linkTwitterSearchKeywordMatches,
+  resolveSourceByKind,
+  upsertContentItems
+} from "../../src/core/content/contentRepository.js";
 import { buildContentViewSelection } from "../../src/core/content/buildContentViewSelection.js";
 import { listContentView } from "../../src/core/content/listContentView.js";
 import { openDatabase } from "../../src/core/db/openDatabase.js";
 import { runMigrations } from "../../src/core/db/runMigrations.js";
 import { seedInitialData } from "../../src/core/db/seedInitialData.js";
 import { saveNlEvaluations } from "../../src/core/strategy/nlEvaluationRepository.js";
+import { createTwitterSearchKeyword } from "../../src/core/twitter/twitterSearchKeywordRepository.js";
 import { getInternalViewRuleConfig } from "../../src/core/viewRules/viewRuleConfig.js";
 
 describe("buildContentViewSelection", () => {
@@ -497,6 +502,58 @@ describe("buildContentViewSelection", () => {
       todayVisibleShare: 1
     });
   });
+
+  it("filters twitter keyword content when no visible keyword match remains", async () => {
+    const db = await createTestDatabase(databasesToClose);
+    const twitterKeywordSource = resolveSourceByKind(db, "twitter_keyword_search");
+
+    expect(twitterKeywordSource).toBeDefined();
+
+    const visibleKeyword = createTwitterSearchKeyword(db, {
+      keyword: "OpenAI",
+      isVisible: true
+    });
+    const hiddenKeyword = createTwitterSearchKeyword(db, {
+      keyword: "噪音词",
+      isVisible: false
+    });
+
+    expect(visibleKeyword.ok).toBe(true);
+    expect(hiddenKeyword.ok).toBe(true);
+
+    upsertContentItems(db, {
+      sourceId: twitterKeywordSource!.id,
+      items: [
+        buildItem("Visible Twitter keyword item", "2026-03-31T03:00:00.000Z", "https://example.com/twitter-keyword-1", "twitter:kw-1"),
+        buildItem("Hidden Twitter keyword item", "2026-03-31T02:00:00.000Z", "https://example.com/twitter-keyword-2", "twitter:kw-2")
+      ]
+    });
+
+    const visibleItemId = db
+      .prepare("SELECT id FROM content_items WHERE external_id = 'twitter:kw-1' LIMIT 1")
+      .get() as { id: number };
+    const hiddenItemId = db
+      .prepare("SELECT id FROM content_items WHERE external_id = 'twitter:kw-2' LIMIT 1")
+      .get() as { id: number };
+
+    linkTwitterSearchKeywordMatches(db, [
+      {
+        keywordId: visibleKeyword.ok ? visibleKeyword.keyword.id : 0,
+        tweetExternalId: "twitter:kw-1",
+        contentItemId: visibleItemId.id
+      },
+      {
+        keywordId: hiddenKeyword.ok ? hiddenKeyword.keyword.id : 0,
+        tweetExternalId: "twitter:kw-2",
+        contentItemId: hiddenItemId.id
+      }
+    ]);
+
+    const selection = buildContentViewSelection(db, "articles");
+
+    expect(selection.candidateCards.map((card) => card.title)).toContain("Visible Twitter keyword item");
+    expect(selection.candidateCards.map((card) => card.title)).not.toContain("Hidden Twitter keyword item");
+  });
 });
 
 async function createTestDatabase(databasesToClose: ReturnType<typeof openDatabase>[]) {
@@ -508,12 +565,18 @@ async function createTestDatabase(databasesToClose: ReturnType<typeof openDataba
   return db;
 }
 
-function buildItem(title: string, publishedAt: string) {
+function buildItem(
+  title: string,
+  publishedAt: string,
+  canonicalUrl = `https://example.com/${encodeURIComponent(title)}`,
+  externalId?: string
+) {
   return {
     title,
-    canonicalUrl: `https://example.com/${encodeURIComponent(title)}`,
+    canonicalUrl,
     summary: `${title} summary`,
     bodyMarkdown: `${title} body markdown`,
+    externalId,
     publishedAt,
     fetchedAt: publishedAt
   };

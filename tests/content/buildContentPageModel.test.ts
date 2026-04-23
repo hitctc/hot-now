@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildContentPageModel } from "../../src/core/content/buildContentPageModel.js";
+import { linkTwitterSearchKeywordMatches, resolveSourceByKind, upsertContentItems } from "../../src/core/content/contentRepository.js";
+import { ensureTwitterAccountsContentSource } from "../../src/core/twitter/twitterAccountCollector.js";
+import { createTwitterAccount } from "../../src/core/twitter/twitterAccountRepository.js";
+import { createTwitterSearchKeyword } from "../../src/core/twitter/twitterSearchKeywordRepository.js";
 import { createTestDatabase } from "../helpers/testDatabase.js";
 
 describe("buildContentPageModel", () => {
@@ -116,6 +120,81 @@ describe("buildContentPageModel", () => {
       description: "可以换个关键词，或清空搜索后查看全部结果。",
       tone: "filtered"
     });
+  });
+
+  it("adds twitter source groups and defaults second-level filters to all options", async () => {
+    const handle = await createTestDatabase("hot-now-content-page-twitter-filters-");
+    handles.push(handle);
+    const twitterAccountSourceId = ensureTwitterAccountsContentSource(handle.db);
+    const twitterKeywordSource = resolveSourceByKind(handle.db, "twitter_keyword_search");
+    const account = createTwitterAccount(handle.db, {
+      username: "openai",
+      displayName: "OpenAI",
+      isEnabled: true
+    });
+    const keyword = createTwitterSearchKeyword(handle.db, {
+      keyword: "Image2",
+      isCollectEnabled: true,
+      isVisible: true
+    });
+
+    upsertContentItems(handle.db, {
+      sourceId: twitterAccountSourceId,
+      items: [
+        {
+          title: "Twitter account result",
+          canonicalUrl: "https://example.com/twitter-account-result",
+          summary: "Twitter account result summary",
+          bodyMarkdown: "Twitter account result body",
+          externalId: "twitter:account-result",
+          metadataJson: JSON.stringify({
+            collector: {
+              kind: "twitter_accounts",
+              accountId: account.ok ? account.account.id : 0
+            }
+          }),
+          publishedAt: "2026-03-31T03:00:00.000Z",
+          fetchedAt: "2026-03-31T03:00:05.000Z"
+        }
+      ]
+    });
+    upsertContentItems(handle.db, {
+      sourceId: twitterKeywordSource?.id ?? 0,
+      items: [
+        {
+          title: "Twitter keyword result",
+          canonicalUrl: "https://example.com/twitter-keyword-result",
+          summary: "Twitter keyword result summary",
+          bodyMarkdown: "Twitter keyword result body",
+          externalId: "twitter:keyword-result",
+          publishedAt: "2026-03-31T02:00:00.000Z",
+          fetchedAt: "2026-03-31T02:00:05.000Z"
+        }
+      ]
+    });
+
+    const keywordContentItem = handle.db
+      .prepare("SELECT id FROM content_items WHERE external_id = 'twitter:keyword-result' LIMIT 1")
+      .get() as { id: number } | undefined;
+
+    linkTwitterSearchKeywordMatches(handle.db, [
+      {
+        keywordId: keyword.ok ? keyword.keyword.id : 0,
+        tweetExternalId: "twitter:keyword-result",
+        contentItemId: keywordContentItem?.id ?? 0
+      }
+    ]);
+
+    const model = buildContentPageModel(handle.db, "ai-new");
+
+    expect(model.sourceFilter?.options.map((option) => option.kind)).toEqual(
+      expect.arrayContaining(["twitter_accounts", "twitter_keyword_search"])
+    );
+    expect(model.sourceFilter?.selectedSourceKinds).toEqual(
+      expect.arrayContaining(["twitter_accounts", "twitter_keyword_search"])
+    );
+    expect(model.twitterAccountFilter?.selectedAccountIds).toEqual(account.ok ? [account.account.id] : []);
+    expect(model.twitterKeywordFilter?.selectedKeywordIds).toEqual(keyword.ok ? [keyword.keyword.id] : []);
   });
 });
 

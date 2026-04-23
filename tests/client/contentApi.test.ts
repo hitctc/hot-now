@@ -19,6 +19,14 @@ describe("contentApi", () => {
         options: [{ kind: "openai", name: "OpenAI", showAllWhenSelected: false, currentPageVisibleCount: 3 }],
         selectedSourceKinds: ["openai"]
       },
+      twitterAccountFilter: {
+        options: [{ id: 1, label: "OpenAI", username: "openai" }],
+        selectedAccountIds: [1]
+      },
+      twitterKeywordFilter: {
+        options: [{ id: 11, label: "Image2" }],
+        selectedKeywordIds: [11]
+      },
       featuredCard: null,
       cards: [],
       pagination: {
@@ -34,6 +42,8 @@ describe("contentApi", () => {
 
     await readAiNewPage({
       selectedSourceKinds: [" openai ", "openai", "ithome"],
+      selectedTwitterAccountIds: [1, 1, 2],
+      selectedTwitterKeywordIds: [11, 11, 12],
       sortMode: "content_score",
       page: 2
     });
@@ -50,6 +60,8 @@ describe("contentApi", () => {
       expect.objectContaining({
         headers: {
           "x-hot-now-source-filter": "openai,ithome",
+          "x-hot-now-twitter-account-filter": "1,2",
+          "x-hot-now-twitter-keyword-filter": "11,12",
           "x-hot-now-content-sort": "content_score"
         }
       })
@@ -72,6 +84,38 @@ describe("contentApi", () => {
 
     expect(window.localStorage.getItem(CONTENT_SOURCE_STORAGE_KEY)).toBe('["openai","ithome"]');
     expect(readStoredContentSourceKinds()).toEqual(["openai", "ithome"]);
+  });
+
+  it("persists and restores twitter account and keyword filters", async () => {
+    const {
+      CONTENT_TWITTER_ACCOUNT_STORAGE_KEY,
+      CONTENT_TWITTER_KEYWORD_STORAGE_KEY,
+      readStoredTwitterAccountIds,
+      readStoredTwitterKeywordIds,
+      writeStoredTwitterAccountIds,
+      writeStoredTwitterKeywordIds,
+      deriveInitialSelectedEntityIds
+    } = await import("../../src/client/services/contentApi");
+
+    writeStoredTwitterAccountIds([1, 1, 2]);
+    writeStoredTwitterKeywordIds([11, 11, 12]);
+
+    expect(window.localStorage.getItem(CONTENT_TWITTER_ACCOUNT_STORAGE_KEY)).toBe("[1,2]");
+    expect(window.localStorage.getItem(CONTENT_TWITTER_KEYWORD_STORAGE_KEY)).toBe("[11,12]");
+    expect(readStoredTwitterAccountIds()).toEqual([1, 2]);
+    expect(readStoredTwitterKeywordIds()).toEqual([11, 12]);
+    expect(
+      deriveInitialSelectedEntityIds(
+        [{ id: 1 }, { id: 2 }, { id: 3 }],
+        null
+      )
+    ).toEqual([1, 2, 3]);
+    expect(
+      deriveInitialSelectedEntityIds(
+        [{ id: 1 }, { id: 2 }, { id: 3 }],
+        [2, 9]
+      )
+    ).toEqual([2]);
   });
 
   it("persists sort mode and derives first-visit source defaults", async () => {
@@ -130,6 +174,8 @@ describe("contentApi", () => {
 
     await readAiNewPage({
       selectedSourceKinds: ["openai"],
+      selectedTwitterAccountIds: [1],
+      selectedTwitterKeywordIds: [11],
       sortMode: "published_at",
       searchKeyword: "agent"
     });
@@ -137,6 +183,8 @@ describe("contentApi", () => {
     expect(requestJson).toHaveBeenCalledWith("/api/content/ai-new", {
       headers: {
         "x-hot-now-source-filter": "openai",
+        "x-hot-now-twitter-account-filter": "1",
+        "x-hot-now-twitter-keyword-filter": "11",
         "x-hot-now-content-sort": "published_at",
         "x-hot-now-content-search": "agent"
       }

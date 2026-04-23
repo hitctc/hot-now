@@ -82,7 +82,8 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 统一站点内容菜单（未登录也可访问）：`/`、`/ai-new`、`/ai-hot`
 - 统一站点系统菜单（登录后访问）：`/settings/view-rules`、`/settings/sources`、`/settings/profile`
 - 内容页统一展示系统自动分数（`0-100`）和解释标签，不再提供手工评分表单
-- `/`、`/ai-new`、`/ai-hot` 顶部新增共享来源筛选条，支持 `全选 / 全不选`，浏览偏好保存在浏览器本地 `localStorage`
+- `/`、`/ai-new`、`/ai-hot` 顶部新增共享来源筛选条，支持 `全选 / 全不选`，浏览偏好保存在浏览器本地 `localStorage['hot-now-content-sources']`
+- 当来源筛选勾选 `Twitter 账号` 时，工具栏下方会展开二级“账号筛选”；当来源筛选勾选 `Twitter 关键词搜索` 时，会展开二级“关键词筛选”；两组都支持多选、默认全选，并分别保存在 `localStorage['hot-now-twitter-account-filter']`、`localStorage['hot-now-twitter-keyword-filter']`
 - `/`、`/ai-new`、`/ai-hot` 现在同时提供共享排序切换：`按发布时间`、`按评分`；排序偏好保存在浏览器本地 `localStorage['hot-now-content-sort']`
 - `/`、`/ai-new`、`/ai-hot` 顶部现在还提供共享标题搜索框；搜索只匹配标题，按回车或点击按钮才生效，关键词保存在浏览器本地 `localStorage['hot-now-content-search']`
 - `/api/content/ai-new?page=<n>` 与 `/api/content/ai-hot?page=<n>` 现在支持分页，固定 `50` 条 / 页
@@ -121,7 +122,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - Twitter 关键词动作：`POST /actions/twitter-keywords/create`、`POST /actions/twitter-keywords/update`、`POST /actions/twitter-keywords/delete`、`POST /actions/twitter-keywords/toggle-collect`、`POST /actions/twitter-keywords/toggle-visible`、`POST /actions/twitter-keywords/collect`
 - 内容导航已收口为 AI-first：`/` 与 `/ai-new` 等同 `AI 新讯`，`/ai-hot` 承接 `AI 热点`，`/articles` 已移除
 
-统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。auth 开启后，内容菜单保持公开可读，但系统菜单和所有写操作仍然要求登录；`content_sources.is_enabled` 决定哪些 RSS / 微信公众号 source 参与定时 / 手动采集，`content_sources.show_all_when_selected` 决定该 source 在内容页被显式勾选时是否全量展示；Twitter 账号由独立 `twitter_accounts.is_enabled` 控制是否参与 Twitter 手动采集，Twitter 关键词由独立 `twitter_search_keywords.is_collect_enabled` 控制是否参与关键词搜索、由 `twitter_search_keywords.is_visible` 控制该关键词命中的内容是否继续进入内容页，真实拉取都依赖环境变量 `TWITTER_API_KEY`；为满足 `content_items.source_id` 外键，系统会维护隐藏聚合 source `twitter_accounts` 和 `twitter_keyword_search`，它们不承载配置，也不会出现在普通 source 库存表中；`/settings/sources` 现在可以直接启用/停用 source、切换“选中时全量展示”、新增 / 编辑 / 删除自定义 RSS 或微信公众号桥接来源，也可以单独维护 Twitter 账号列表、Twitter 关键词列表并执行各自的独立手动采集；来源保存成功后，系统会自动补拉该来源的首批内容，不需要再手动先跑一次采集；内容页顶部的来源筛选和排序只影响当前浏览结果，不会改 source 启用状态；legacy `/control` 继续提供 RSS / 微信公众号采集与发信动作。
+统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。auth 开启后，内容菜单保持公开可读，但系统菜单和所有写操作仍然要求登录；`content_sources.is_enabled` 决定哪些 RSS / 微信公众号 source 参与定时 / 手动采集，`content_sources.show_all_when_selected` 决定该 source 在内容页被显式勾选时是否全量展示；Twitter 账号由独立 `twitter_accounts.is_enabled` 控制是否参与 Twitter 手动采集，Twitter 关键词由独立 `twitter_search_keywords.is_collect_enabled` 控制是否参与关键词搜索、由 `twitter_search_keywords.is_visible` 控制该关键词命中的内容是否继续进入内容页，真实拉取都依赖环境变量 `TWITTER_API_KEY`；为满足 `content_items.source_id` 外键，系统会维护隐藏聚合 source `twitter_accounts` 和 `twitter_keyword_search`，它们不承载配置，也不会出现在普通 source 库存表中；内容页来源筛选会把这两个聚合 source 作为固定项暴露出来，选中后再展开账号 / 关键词二级多选，方便只看特定账号或特定关键词的结果；`/settings/sources` 现在可以直接启用/停用 source、切换“选中时全量展示”、新增 / 编辑 / 删除自定义 RSS 或微信公众号桥接来源，也可以单独维护 Twitter 账号列表、Twitter 关键词列表并执行各自的独立手动采集；来源保存成功后，系统会自动补拉该来源的首批内容，不需要再手动先跑一次采集；内容页顶部的来源筛选和排序只影响当前浏览结果，不会改 source 启用状态；legacy `/control` 继续提供 RSS / 微信公众号采集与发信动作。
 
 当前内置 RSS 源包括：
 
@@ -318,7 +319,7 @@ sudo visudo -cf /etc/sudoers.d/hot-now-systemctl
 - 相关测试：已通过
 - 类型构建：已通过
 - 系统页客户端构建：已通过
-- Playwright MCP 本地验收通过：`/login` 登录成功；`/`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常；浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持；内容页来源筛选写入 `localStorage['hot-now-content-sources']`、排序偏好写入 `localStorage['hot-now-content-sort']`、标题搜索词写入 `localStorage['hot-now-content-search']` 后刷新仍保留
+- Playwright MCP 本地验收通过：`/login` 登录成功；`/`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常；浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持；内容页来源筛选写入 `localStorage['hot-now-content-sources']`、Twitter 二级筛选写入 `localStorage['hot-now-twitter-account-filter']` / `localStorage['hot-now-twitter-keyword-filter']`、排序偏好写入 `localStorage['hot-now-content-sort']`、标题搜索词写入 `localStorage['hot-now-content-search']` 后刷新仍保留
 - 如果要手动验证 `/settings/view-rules`，先检查 `AI 新讯 / AI 热点` 筛选总览与开关保存，再检查反馈池的复制 / 删除 / 清空，以及 LLM 设置的保存 / 启用 / 删除是否正常；如需把厂商配置和会话密钥分开管理，再额外配置 `LLM_SETTINGS_MASTER_KEY`
 - 如果要手动验证 Twitter 账号采集，先在 `.env` 配置 `TWITTER_API_KEY`，再到 `/settings/sources` 新增并启用账号，点击“手动采集 Twitter 账号”后确认账号“最近成功 / 最近结果”被回写；如果内容页仍无结果，优先检查“最近结果”里是否出现“本次抓取成功，但没有可入库的新推文。”这类提示；不配置 key 时应只显示不可用提示，RSS / 微信公众号采集仍可继续
 - 如果要手动验证 Twitter 关键词搜索，先在 `/settings/sources` 新增并启用关键词，确认 `采集启用` 与 `展示启用` 都打开，再点击“手动采集 Twitter 关键词”；当前第一版会限制为“最多处理 5 个已启用关键词、每个关键词最多取前 10 条结果”，成功后优先检查关键词“最近成功 / 最近结果”是否回写，再到 `/ai-new`、`/ai-hot` 确认结果是否可见；如果只想停采但保留历史展示，关闭 `采集启用`；如果只想让该关键词命中的内容从内容页消失，关闭 `展示启用`

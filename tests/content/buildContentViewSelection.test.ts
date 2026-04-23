@@ -13,6 +13,8 @@ import { openDatabase } from "../../src/core/db/openDatabase.js";
 import { runMigrations } from "../../src/core/db/runMigrations.js";
 import { seedInitialData } from "../../src/core/db/seedInitialData.js";
 import { saveNlEvaluations } from "../../src/core/strategy/nlEvaluationRepository.js";
+import { createTwitterAccount } from "../../src/core/twitter/twitterAccountRepository.js";
+import { ensureTwitterAccountsContentSource } from "../../src/core/twitter/twitterAccountCollector.js";
 import { createTwitterSearchKeyword } from "../../src/core/twitter/twitterSearchKeywordRepository.js";
 import { getInternalViewRuleConfig } from "../../src/core/viewRules/viewRuleConfig.js";
 
@@ -554,6 +556,104 @@ describe("buildContentViewSelection", () => {
     expect(selection.candidateCards.map((card) => card.title)).toContain("Visible Twitter keyword item");
     expect(selection.candidateCards.map((card) => card.title)).not.toContain("Hidden Twitter keyword item");
   });
+
+  it("filters twitter account and twitter keyword rows by the selected second-level ids", async () => {
+    const db = await createTestDatabase(databasesToClose);
+    const twitterAccountSourceId = ensureTwitterAccountsContentSource(db);
+    const twitterKeywordSource = resolveSourceByKind(db, "twitter_keyword_search");
+    const accountA = createTwitterAccount(db, {
+      username: "openai",
+      displayName: "OpenAI",
+      isEnabled: true
+    });
+    const accountB = createTwitterAccount(db, {
+      username: "sama",
+      displayName: "Sam Altman",
+      isEnabled: true
+    });
+    const keywordA = createTwitterSearchKeyword(db, {
+      keyword: "Image2",
+      isCollectEnabled: true,
+      isVisible: true
+    });
+    const keywordB = createTwitterSearchKeyword(db, {
+      keyword: "Noise",
+      isCollectEnabled: true,
+      isVisible: true
+    });
+
+    upsertContentItems(db, {
+      sourceId: twitterAccountSourceId,
+      items: [
+        buildItem(
+          "OpenAI account item",
+          "2026-03-31T03:00:00.000Z",
+          "https://example.com/twitter-account-openai",
+          "twitter:account-openai",
+          JSON.stringify({ collector: { kind: "twitter_accounts", accountId: accountA.ok ? accountA.account.id : 0 } })
+        ),
+        buildItem(
+          "Sam account item",
+          "2026-03-31T02:30:00.000Z",
+          "https://example.com/twitter-account-sam",
+          "twitter:account-sam",
+          JSON.stringify({ collector: { kind: "twitter_accounts", accountId: accountB.ok ? accountB.account.id : 0 } })
+        )
+      ]
+    });
+    upsertContentItems(db, {
+      sourceId: twitterKeywordSource?.id ?? 0,
+      items: [
+        buildItem(
+          "Image keyword item",
+          "2026-03-31T02:00:00.000Z",
+          "https://example.com/twitter-keyword-image",
+          "twitter:keyword-image"
+        ),
+        buildItem(
+          "Noise keyword item",
+          "2026-03-31T01:30:00.000Z",
+          "https://example.com/twitter-keyword-noise",
+          "twitter:keyword-noise"
+        )
+      ]
+    });
+
+    const persistedTwitterItems = db
+      .prepare(
+        `
+          SELECT id, title
+          FROM content_items
+          WHERE external_id IN ('twitter:account-openai', 'twitter:account-sam', 'twitter:keyword-image', 'twitter:keyword-noise')
+        `
+      )
+      .all() as Array<{ id: number; title: string }>;
+    const contentIdByTitle = Object.fromEntries(persistedTwitterItems.map((row) => [row.title, row.id]));
+
+    linkTwitterSearchKeywordMatches(db, [
+      {
+        keywordId: keywordA.ok ? keywordA.keyword.id : 0,
+        tweetExternalId: "twitter:keyword-image",
+        contentItemId: contentIdByTitle["Image keyword item"]
+      },
+      {
+        keywordId: keywordB.ok ? keywordB.keyword.id : 0,
+        tweetExternalId: "twitter:keyword-noise",
+        contentItemId: contentIdByTitle["Noise keyword item"]
+      }
+    ]);
+
+    const selection = buildContentViewSelection(db, "ai", {
+      selectedSourceKinds: ["twitter_accounts", "twitter_keyword_search"],
+      selectedTwitterAccountIds: accountA.ok ? [accountA.account.id] : [],
+      selectedTwitterKeywordIds: keywordA.ok ? [keywordA.keyword.id] : []
+    });
+
+    expect(selection.visibleCards.map((card) => card.title)).toContain("OpenAI account item");
+    expect(selection.visibleCards.map((card) => card.title)).toContain("Image keyword item");
+    expect(selection.visibleCards.map((card) => card.title)).not.toContain("Sam account item");
+    expect(selection.visibleCards.map((card) => card.title)).not.toContain("Noise keyword item");
+  });
 });
 
 async function createTestDatabase(databasesToClose: ReturnType<typeof openDatabase>[]) {
@@ -569,7 +669,8 @@ function buildItem(
   title: string,
   publishedAt: string,
   canonicalUrl = `https://example.com/${encodeURIComponent(title)}`,
-  externalId?: string
+  externalId?: string,
+  metadataJson?: string
 ) {
   return {
     title,
@@ -577,6 +678,7 @@ function buildItem(
     summary: `${title} summary`,
     bodyMarkdown: `${title} body markdown`,
     externalId,
+    metadataJson,
     publishedAt,
     fetchedAt: publishedAt
   };

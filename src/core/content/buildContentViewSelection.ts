@@ -1,6 +1,10 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
 import { scoreContentItem, type ContentScoreBreakdown } from "./contentScoring.js";
-import { listVisibleTwitterKeywordMatchContentItemIds } from "./contentRepository.js";
+import {
+  listTwitterAccountContentItemIds,
+  listVisibleTwitterKeywordMatchContentItemIds,
+  listVisibleTwitterKeywordMatchContentItemIdsByKeywordIds
+} from "./contentRepository.js";
 import { BUILTIN_SOURCES } from "../source/sourceCatalog.js";
 import {
   getInternalViewRuleConfig,
@@ -13,6 +17,8 @@ import type { StrategyGateScope } from "../strategy/strategyGateScopes.js";
 export type ContentViewSelectionOptions = {
   includeNlEvaluations?: boolean;
   selectedSourceKinds?: string[];
+  selectedTwitterAccountIds?: number[];
+  selectedTwitterKeywordIds?: number[];
   referenceTime?: Date;
   limitOverride?: number;
   sortMode?: ContentSortMode;
@@ -75,6 +81,7 @@ type ContentCardRow = {
 };
 
 const matchingSourceViewBonus = 120;
+const twitterAccountsSourceKind = "twitter_accounts";
 const twitterKeywordSearchSourceKind = "twitter_keyword_search";
 
 const contentSelectSql = `
@@ -125,7 +132,10 @@ export function buildContentViewSelection(
   const rows = db
     .prepare(contentSelectSql)
     .all({ viewScope: mapViewScope(viewKey) }) as ContentCardRow[];
-  const visibleRows = filterVisibleTwitterKeywordRows(db, rows);
+  const visibleRows = filterTwitterScopedRows(db, rows, {
+    selectedTwitterAccountIds: options.selectedTwitterAccountIds,
+    selectedTwitterKeywordIds: options.selectedTwitterKeywordIds
+  });
   const rankedCandidates = visibleRows
     .map((row) =>
       buildRankedCardCandidate(row, {
@@ -203,7 +213,10 @@ export function collectIndependentStatsBySourceForView(
   db: SqliteDatabase,
   viewKey: ContentViewKey,
   sourceKinds: string[],
-  options: Pick<ContentViewSelectionOptions, "includeNlEvaluations" | "referenceTime"> & {
+  options: Pick<
+    ContentViewSelectionOptions,
+    "includeNlEvaluations" | "referenceTime" | "selectedTwitterAccountIds" | "selectedTwitterKeywordIds"
+  > & {
     countWindow?: "today" | "all" | "last_24_hours";
     ruleConfig?: ViewRuleConfigValues;
   } = {}
@@ -220,7 +233,10 @@ export function collectIndependentStatsBySourceForView(
   const rows = db
     .prepare(contentSelectSql)
     .all({ viewScope: mapViewScope(viewKey) }) as ContentCardRow[];
-  const visibleRows = filterVisibleTwitterKeywordRows(db, rows);
+  const visibleRows = filterTwitterScopedRows(db, rows, {
+    selectedTwitterAccountIds: options.selectedTwitterAccountIds,
+    selectedTwitterKeywordIds: options.selectedTwitterKeywordIds
+  });
   const rankedCandidates = visibleRows
     .map((row) =>
       buildRankedCardCandidate(row, {
@@ -306,27 +322,61 @@ function countCardsForWindow(
   return countCardsWithinShanghaiDay(cards, shanghaiDayStart, shanghaiNextDayStart);
 }
 
-// 关键词来源要额外尊重“展示启用”开关，但其他来源不应该被这层逻辑误伤。
-function filterVisibleTwitterKeywordRows(db: SqliteDatabase, rows: ContentCardRow[]) {
+// Twitter 的账号聚合和关键词聚合都走隐藏来源，这里统一把可见性和二级筛选条件收口到一处。
+function filterTwitterScopedRows(
+  db: SqliteDatabase,
+  rows: ContentCardRow[],
+  options: {
+    selectedTwitterAccountIds?: number[];
+    selectedTwitterKeywordIds?: number[];
+  }
+) {
+  const twitterAccountRows = rows.filter((row) => row.sourceKind === twitterAccountsSourceKind);
   const twitterKeywordRows = rows.filter((row) => row.sourceKind === twitterKeywordSearchSourceKind);
 
-  if (twitterKeywordRows.length === 0) {
+  if (twitterAccountRows.length === 0 && twitterKeywordRows.length === 0) {
     return rows;
   }
 
-  const visibleContentItemIdSet = new Set(
+  const visibleTwitterKeywordContentItemIdSet = new Set(
     listVisibleTwitterKeywordMatchContentItemIds(
       db,
       twitterKeywordRows.map((row) => row.id)
     )
   );
+  const selectedTwitterAccountContentItemIdSet = options.selectedTwitterAccountIds === undefined
+    ? null
+    : new Set(
+        listTwitterAccountContentItemIds(
+          db,
+          twitterAccountRows.map((row) => row.id),
+          options.selectedTwitterAccountIds
+        )
+      );
+  const selectedTwitterKeywordContentItemIdSet = options.selectedTwitterKeywordIds === undefined
+    ? null
+    : new Set(
+        listVisibleTwitterKeywordMatchContentItemIdsByKeywordIds(
+          db,
+          twitterKeywordRows.map((row) => row.id),
+          options.selectedTwitterKeywordIds
+        )
+      );
 
   return rows.filter((row) => {
-    if (row.sourceKind !== twitterKeywordSearchSourceKind) {
-      return true;
+    if (row.sourceKind === twitterAccountsSourceKind) {
+      return selectedTwitterAccountContentItemIdSet === null || selectedTwitterAccountContentItemIdSet.has(row.id);
     }
 
-    return visibleContentItemIdSet.has(row.id);
+    if (row.sourceKind === twitterKeywordSearchSourceKind) {
+      if (!visibleTwitterKeywordContentItemIdSet.has(row.id)) {
+        return false;
+      }
+
+      return selectedTwitterKeywordContentItemIdSet === null || selectedTwitterKeywordContentItemIdSet.has(row.id);
+    }
+
+    return true;
   });
 }
 

@@ -31,9 +31,21 @@ export type ContentSourceFilter = {
   selectedSourceKinds: string[];
 };
 
+export type ContentTwitterAccountFilter = {
+  options: { id: number; label: string; username: string }[];
+  selectedAccountIds: number[];
+};
+
+export type ContentTwitterKeywordFilter = {
+  options: { id: number; label: string }[];
+  selectedKeywordIds: number[];
+};
+
 export type ContentPageModel = {
   pageKey: ContentPageKey;
   sourceFilter?: ContentSourceFilter;
+  twitterAccountFilter?: ContentTwitterAccountFilter;
+  twitterKeywordFilter?: ContentTwitterKeywordFilter;
   featuredCard: ContentCard | null;
   cards: ContentCard[];
   strategySummary: {
@@ -70,9 +82,13 @@ export type SaveFeedbackPoolEntryPayload = {
 export const CONTENT_SOURCE_STORAGE_KEY = "hot-now-content-sources";
 export const CONTENT_SORT_STORAGE_KEY = "hot-now-content-sort";
 export const CONTENT_SEARCH_STORAGE_KEY = "hot-now-content-search";
+export const CONTENT_TWITTER_ACCOUNT_STORAGE_KEY = "hot-now-twitter-account-filter";
+export const CONTENT_TWITTER_KEYWORD_STORAGE_KEY = "hot-now-twitter-keyword-filter";
 
 export type ReadContentPageOptions = {
   selectedSourceKinds?: string[];
+  selectedTwitterAccountIds?: number[];
+  selectedTwitterKeywordIds?: number[];
   sortMode?: ContentSortMode;
   page?: number;
   searchKeyword?: string;
@@ -115,6 +131,42 @@ function writePersistedStringArray(key: string, values: string[]): void {
   }
 }
 
+function readPersistedNumberArray(key: string): number[] | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(key);
+
+    if (rawValue === null) {
+      return null;
+    }
+
+    const parsed = JSON.parse(rawValue) as unknown;
+
+    if (!Array.isArray(parsed)) {
+      return null;
+    }
+
+    return normalizeSelectedEntityIds(parsed.filter((value): value is number => typeof value === "number"));
+  } catch {
+    return null;
+  }
+}
+
+function writePersistedNumberArray(key: string, values: number[]): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(key, JSON.stringify(values));
+  } catch {
+    // localStorage 不可写时只做静默降级，页面仍然继续使用当前会话内状态。
+  }
+}
+
 function readPersistedStringValue(key: string): string | null {
   if (typeof window === "undefined") {
     return null;
@@ -146,6 +198,10 @@ function normalizeSelectedSourceKinds(selectedSourceKinds: string[]): string[] {
     .filter((kind, index, array) => kind.length > 0 && array.indexOf(kind) === index);
 }
 
+function normalizeSelectedEntityIds(selectedIds: number[]): number[] {
+  return selectedIds.filter((id, index, array) => Number.isInteger(id) && id > 0 && array.indexOf(id) === index);
+}
+
 // 搜索词会通过自定义 header 传给内容 API，这里先转成 ASCII 安全格式，避免中文等字符触发 ByteString 异常。
 function encodeSearchKeywordHeaderValue(searchKeyword: string): string {
   return encodeURIComponent(searchKeyword);
@@ -153,6 +209,8 @@ function encodeSearchKeywordHeaderValue(searchKeyword: string): string {
 
 function createContentPageRequestHeaders(
   selectedSourceKinds: string[] | undefined,
+  selectedTwitterAccountIds: number[] | undefined,
+  selectedTwitterKeywordIds: number[] | undefined,
   sortMode: ContentSortMode | undefined,
   searchKeyword: string | undefined
 ): HeadersInit | undefined {
@@ -164,6 +222,14 @@ function createContentPageRequestHeaders(
 
   if (sortMode !== undefined) {
     headers["x-hot-now-content-sort"] = sortMode;
+  }
+
+  if (selectedTwitterAccountIds !== undefined) {
+    headers["x-hot-now-twitter-account-filter"] = normalizeSelectedEntityIds(selectedTwitterAccountIds).join(",");
+  }
+
+  if (selectedTwitterKeywordIds !== undefined) {
+    headers["x-hot-now-twitter-keyword-filter"] = normalizeSelectedEntityIds(selectedTwitterKeywordIds).join(",");
   }
 
   const normalizedSearchKeyword = typeof searchKeyword === "string" ? searchKeyword.trim() : "";
@@ -188,7 +254,13 @@ async function readContentPage(
   options: ReadContentPageOptions = {}
 ): Promise<ContentPageModel> {
   return requestJson<ContentPageModel>(path, {
-    headers: createContentPageRequestHeaders(options.selectedSourceKinds, options.sortMode, options.searchKeyword)
+    headers: createContentPageRequestHeaders(
+      options.selectedSourceKinds,
+      options.selectedTwitterAccountIds,
+      options.selectedTwitterKeywordIds,
+      options.sortMode,
+      options.searchKeyword
+    )
   });
 }
 
@@ -205,6 +277,22 @@ export function readStoredContentSourceKinds(): string[] | null {
 
 export function writeStoredContentSourceKinds(selectedSourceKinds: string[]): void {
   writePersistedStringArray(CONTENT_SOURCE_STORAGE_KEY, normalizeSelectedSourceKinds(selectedSourceKinds));
+}
+
+export function readStoredTwitterAccountIds(): number[] | null {
+  return readPersistedNumberArray(CONTENT_TWITTER_ACCOUNT_STORAGE_KEY);
+}
+
+export function writeStoredTwitterAccountIds(selectedAccountIds: number[]): void {
+  writePersistedNumberArray(CONTENT_TWITTER_ACCOUNT_STORAGE_KEY, normalizeSelectedEntityIds(selectedAccountIds));
+}
+
+export function readStoredTwitterKeywordIds(): number[] | null {
+  return readPersistedNumberArray(CONTENT_TWITTER_KEYWORD_STORAGE_KEY);
+}
+
+export function writeStoredTwitterKeywordIds(selectedKeywordIds: number[]): void {
+  writePersistedNumberArray(CONTENT_TWITTER_KEYWORD_STORAGE_KEY, normalizeSelectedEntityIds(selectedKeywordIds));
 }
 
 export function readStoredContentSortMode(): ContentSortMode | null {
@@ -237,11 +325,24 @@ export function deriveInitialSelectedSourceKinds(
   return options.filter((option) => !option.showAllWhenSelected).map((option) => option.kind);
 }
 
+export function deriveInitialSelectedEntityIds(
+  options: Array<{ id: number }>,
+  storedIds: number[] | null
+): number[] {
+  if (storedIds !== null) {
+    return normalizeSelectedEntityIds(storedIds).filter((id) => options.some((option) => option.id === id));
+  }
+
+  return options.map((option) => option.id);
+}
+
 export function readAiNewPage(
   options: ReadContentPageOptions = {}
 ): Promise<ContentPageModel> {
   return readContentPage(buildContentPagePath("/api/content/ai-new", options.page), {
     selectedSourceKinds: options.selectedSourceKinds,
+    selectedTwitterAccountIds: options.selectedTwitterAccountIds,
+    selectedTwitterKeywordIds: options.selectedTwitterKeywordIds,
     sortMode: options.sortMode ?? "published_at",
     searchKeyword: options.searchKeyword
   });
@@ -252,6 +353,8 @@ export function readAiHotPage(
 ): Promise<ContentPageModel> {
   return readContentPage(buildContentPagePath("/api/content/ai-hot", options.page), {
     selectedSourceKinds: options.selectedSourceKinds,
+    selectedTwitterAccountIds: options.selectedTwitterAccountIds,
+    selectedTwitterKeywordIds: options.selectedTwitterKeywordIds,
     sortMode: options.sortMode ?? "published_at",
     searchKeyword: options.searchKeyword
   });

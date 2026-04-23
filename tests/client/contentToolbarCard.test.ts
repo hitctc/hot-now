@@ -10,10 +10,26 @@ describe("ContentToolbarCard", () => {
       props: {
         options: [
           { kind: "openai", name: "OpenAI", currentPageVisibleCount: 3 },
+          { kind: "twitter_accounts", name: "Twitter 账号", currentPageVisibleCount: 2 },
+          { kind: "twitter_keyword_search", name: "Twitter 关键词搜索", currentPageVisibleCount: 1 },
           { kind: "ithome", name: "IT之家", currentPageVisibleCount: 1 },
           { kind: "36kr", name: "36氪", currentPageVisibleCount: 2 }
         ],
         selectedSourceKinds: [],
+        twitterAccountFilter: {
+          options: [
+            { id: 1, label: "OpenAI", username: "openai" },
+            { id: 2, label: "Sam Altman", username: "sama" }
+          ],
+          selectedAccountIds: [1, 2]
+        },
+        twitterKeywordFilter: {
+          options: [
+            { id: 11, label: "Image2" },
+            { id: 12, label: "GPT-4o" }
+          ],
+          selectedKeywordIds: [11, 12]
+        },
         visibleResultCount: 7,
         sortMode: "published_at",
         keyword: ""
@@ -109,5 +125,21 @@ describe("ContentToolbarCard", () => {
     expect(wrapper.get("[data-content-toolbar-summary]").text()).toContain("来源：OpenAI、IT之家 +1");
     expect((wrapper.get("[data-content-toolbar-source-panel]").element as HTMLElement).style.display).toBe("");
     expect(wrapper.get("[data-content-toolbar-source-toggle]").text()).toContain("收起来源");
+
+    await wrapper.setProps({
+      selectedSourceKinds: ["twitter_accounts", "twitter_keyword_search"]
+    });
+    await flushPromises();
+
+    expect(wrapper.find("[data-content-entity-filter='twitter-accounts']").exists()).toBe(true);
+    expect(wrapper.find("[data-content-entity-filter='twitter-keywords']").exists()).toBe(true);
+
+    await wrapper.get("[data-entity-id='twitter-accounts:2']").setValue(false);
+    await flushPromises();
+    expect(wrapper.emitted("changeTwitterAccounts")?.at(-1)).toEqual([[1]]);
+
+    await wrapper.get("[data-content-filter-action='twitter-keywords-toggle-all']").trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("changeTwitterKeywords")?.at(-1)).toEqual([[]]);
   });
 });

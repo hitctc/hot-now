@@ -146,6 +146,14 @@ type ContentPageModel = {
     options: { kind: string; name: string; showAllWhenSelected: boolean; currentPageVisibleCount: number }[];
     selectedSourceKinds: string[];
   };
+  twitterAccountFilter?: {
+    options: { id: number; label: string; username: string }[];
+    selectedAccountIds: number[];
+  };
+  twitterKeywordFilter?: {
+    options: { id: number; label: string }[];
+    selectedKeywordIds: number[];
+  };
   featuredCard: ContentCardView | null;
   cards: ContentCardView[];
   strategySummary: {
@@ -187,7 +195,10 @@ type ServerDeps = {
   isRunning?: () => boolean;
   listContentView?: (
     viewKey: ContentViewKey,
-    options?: Pick<ContentViewSelectionOptions, "selectedSourceKinds" | "sortMode">
+    options?: Pick<
+      ContentViewSelectionOptions,
+      "selectedSourceKinds" | "selectedTwitterAccountIds" | "selectedTwitterKeywordIds" | "sortMode"
+    >
   ) => Promise<ContentCardView[]> | ContentCardView[];
   listContentSources?: () => Promise<ContentSourceOption[]> | ContentSourceOption[];
   saveContentFeedback?: (
@@ -251,7 +262,10 @@ type ServerDeps = {
   getCurrentUserProfile?: () => Promise<CurrentUserProfile | null> | CurrentUserProfile | null;
   getContentPageModel?: (
     pageKey: ContentPageKey,
-    options?: Pick<BuildContentPageModelOptions, "selectedSourceKinds" | "sortMode" | "page" | "searchKeyword">
+    options?: Pick<
+      BuildContentPageModelOptions,
+      "selectedSourceKinds" | "selectedTwitterAccountIds" | "selectedTwitterKeywordIds" | "sortMode" | "page" | "searchKeyword"
+    >
   ) => Promise<ContentPageModel> | ContentPageModel;
   auth?: {
     requireLogin: boolean;
@@ -1791,15 +1805,24 @@ async function readContentPageModelApiData(
 ): Promise<ContentPageModel> {
   if (deps.getContentPageModel) {
     const selectedSourceKinds = readSelectedSourceKindsHeader(request.headers["x-hot-now-source-filter"]);
+    const selectedTwitterAccountIds = readSelectedEntityIdsHeader(request.headers["x-hot-now-twitter-account-filter"]);
+    const selectedTwitterKeywordIds = readSelectedEntityIdsHeader(request.headers["x-hot-now-twitter-keyword-filter"]);
     const sortMode = readContentSortModeHeader(request.headers["x-hot-now-content-sort"]);
     const searchKeyword = readContentSearchHeader(request.headers["x-hot-now-content-search"]);
     const page = readContentPageQueryPage(request);
     return deps.getContentPageModel(
       pageKey,
-      selectedSourceKinds === undefined && sortMode === undefined && searchKeyword === undefined && page === 1
+      selectedSourceKinds === undefined &&
+        selectedTwitterAccountIds === undefined &&
+        selectedTwitterKeywordIds === undefined &&
+        sortMode === undefined &&
+        searchKeyword === undefined &&
+        page === 1
         ? undefined
         : {
             selectedSourceKinds,
+            selectedTwitterAccountIds,
+            selectedTwitterKeywordIds,
             sortMode,
             page,
             searchKeyword
@@ -1836,14 +1859,32 @@ async function buildContentPageModelFromDependencies(
   }
 
   try {
-    const sourceOptions = ((await deps.listContentSources?.()) ?? []).filter((source) => source.isEnabled);
+    const twitterAccounts = (await deps.listTwitterAccounts?.()) ?? [];
+    const twitterKeywords = (await deps.listTwitterSearchKeywords?.()) ?? [];
+    const sourceOptions = buildContentPageSourceOptions(
+      ((await deps.listContentSources?.()) ?? []).filter((source) => source.isEnabled),
+      twitterAccounts.length > 0,
+      twitterKeywords.length > 0
+    );
     const selectedSourceKinds = readContentPageSelectedSourceKinds(request.headers["x-hot-now-source-filter"], sourceOptions);
     const effectiveSelectedSourceKinds = selectedSourceKinds ?? deriveDefaultSelectedSourceKinds(sourceOptions);
+    const twitterAccountFilter = buildTwitterAccountFilterModel(
+      twitterAccounts,
+      readSelectedEntityIdsHeader(request.headers["x-hot-now-twitter-account-filter"])
+    );
+    const twitterKeywordFilter = buildTwitterKeywordFilterModel(
+      twitterKeywords,
+      readSelectedEntityIdsHeader(request.headers["x-hot-now-twitter-keyword-filter"])
+    );
     const sortMode = readContentSortModeHeader(request.headers["x-hot-now-content-sort"]) ?? "published_at";
     const searchKeyword = readContentSearchHeader(request.headers["x-hot-now-content-search"]);
     const requestedPage = readContentPageQueryPage(request);
     const allCards = await deps.listContentView(viewKey, {
       selectedSourceKinds: effectiveSelectedSourceKinds,
+      selectedTwitterAccountIds:
+        effectiveSelectedSourceKinds.includes("twitter_accounts") ? twitterAccountFilter?.selectedAccountIds : undefined,
+      selectedTwitterKeywordIds:
+        effectiveSelectedSourceKinds.includes("twitter_keyword_search") ? twitterKeywordFilter?.selectedKeywordIds : undefined,
       sortMode
     });
     const filteredCards = filterCardsByTitleKeyword(allCards, searchKeyword);
@@ -1863,6 +1904,8 @@ async function buildContentPageModelFromDependencies(
             selectedSourceKinds: effectiveSelectedSourceKinds
           }
         : undefined,
+      twitterAccountFilter,
+      twitterKeywordFilter,
       // AI 新讯和 AI 热点都统一成标准卡流，保留 featuredCard 仅作兼容空字段。
       featuredCard: null,
       cards: pagination.cards,
@@ -2046,6 +2089,23 @@ function readContentPageSelectedSourceKinds(
   return normalizeSelectedSourceKindsForOptions(selectedSourceKinds, sourceOptions);
 }
 
+function readSelectedEntityIdsHeader(headerValue: string | string[] | undefined) {
+  if (typeof headerValue === "undefined") {
+    return undefined;
+  }
+
+  const rawValue = Array.isArray(headerValue) ? headerValue.join(",") : headerValue ?? "";
+
+  if (rawValue === "") {
+    return [];
+  }
+
+  return rawValue
+    .split(",")
+    .map((value) => Number(value.trim()))
+    .filter((value, index, array) => Number.isInteger(value) && value > 0 && array.indexOf(value) === index);
+}
+
 function readSelectedSourceKindsHeader(headerValue: string | string[] | undefined) {
   if (typeof headerValue === "undefined") {
     return undefined;
@@ -2082,6 +2142,83 @@ function deriveDefaultSelectedSourceKinds(sourceOptions: ContentSourceOption[]):
   // First-visit defaults intentionally leave full-display sources unchecked so users do not land on
   // an unexpectedly long feed before opting into that behavior.
   return sourceOptions.filter((source) => !source.showAllWhenSelected).map((source) => source.kind);
+}
+
+function buildContentPageSourceOptions(
+  sourceOptions: ContentSourceOption[],
+  hasTwitterAccounts: boolean,
+  hasTwitterKeywords: boolean
+): ContentSourceOption[] {
+  const nextOptions = [...sourceOptions];
+
+  if (hasTwitterAccounts) {
+    nextOptions.push({
+      kind: "twitter_accounts",
+      name: "Twitter 账号",
+      isEnabled: true,
+      showAllWhenSelected: false
+    });
+  }
+
+  if (hasTwitterKeywords) {
+    nextOptions.push({
+      kind: "twitter_keyword_search",
+      name: "Twitter 关键词搜索",
+      isEnabled: true,
+      showAllWhenSelected: false
+    });
+  }
+
+  return nextOptions;
+}
+
+function buildTwitterAccountFilterModel(
+  accounts: TwitterAccountRecord[],
+  selectedAccountIds: number[] | undefined
+) {
+  if (accounts.length === 0) {
+    return undefined;
+  }
+
+  const availableIds = accounts.map((account) => account.id);
+
+  return {
+    options: accounts.map((account) => ({
+      id: account.id,
+      label: account.displayName,
+      username: account.username
+    })),
+    selectedAccountIds: normalizeSelectedEntityIds(selectedAccountIds, availableIds)
+  };
+}
+
+function buildTwitterKeywordFilterModel(
+  keywords: TwitterSearchKeywordRecord[],
+  selectedKeywordIds: number[] | undefined
+) {
+  if (keywords.length === 0) {
+    return undefined;
+  }
+
+  const availableIds = keywords.map((keyword) => keyword.id);
+
+  return {
+    options: keywords.map((keyword) => ({
+      id: keyword.id,
+      label: keyword.keyword
+    })),
+    selectedKeywordIds: normalizeSelectedEntityIds(selectedKeywordIds, availableIds)
+  };
+}
+
+function normalizeSelectedEntityIds(selectedIds: number[] | undefined, availableIds: number[]) {
+  const availableIdSet = new Set(availableIds);
+
+  if (!selectedIds) {
+    return availableIds;
+  }
+
+  return selectedIds.filter((id, index, array) => availableIdSet.has(id) && array.indexOf(id) === index);
 }
 
 // 搜索 header 先按客户端编码规则解码，再统一规整空白；旧客户端发纯 ASCII 时也能保持兼容。

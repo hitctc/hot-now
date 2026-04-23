@@ -87,6 +87,8 @@ describe("content routes", () => {
       url: "/api/content/ai-new",
       headers: {
         "x-hot-now-source-filter": "openai,missing",
+        "x-hot-now-twitter-account-filter": "1,2",
+        "x-hot-now-twitter-keyword-filter": "11",
         "x-hot-now-content-sort": "content_score",
         "x-hot-now-content-search": "AI%20Weekly"
       }
@@ -131,10 +133,14 @@ describe("content routes", () => {
     expect(aiHotPayload.emptyState).toBeNull();
     expect(listContentView).toHaveBeenCalledWith("ai", {
       selectedSourceKinds: ["openai"],
+      selectedTwitterAccountIds: undefined,
+      selectedTwitterKeywordIds: undefined,
       sortMode: "content_score"
     });
     expect(listContentView).toHaveBeenCalledWith("hot", {
       selectedSourceKinds: ["openai"],
+      selectedTwitterAccountIds: undefined,
+      selectedTwitterKeywordIds: undefined,
       sortMode: "published_at"
     });
   });
@@ -177,6 +183,8 @@ describe("content routes", () => {
       url: "/api/content/ai-new?page=2",
       headers: {
         "x-hot-now-source-filter": "openai",
+        "x-hot-now-twitter-account-filter": "1,2",
+        "x-hot-now-twitter-keyword-filter": "11",
         "x-hot-now-content-sort": "published_at",
         "x-hot-now-content-search": "agent"
       }
@@ -201,6 +209,8 @@ describe("content routes", () => {
     });
     expect(getContentPageModel).toHaveBeenCalledWith("ai-new", {
       selectedSourceKinds: ["openai"],
+      selectedTwitterAccountIds: [1, 2],
+      selectedTwitterKeywordIds: [11],
       sortMode: "published_at",
       page: 2,
       searchKeyword: "agent"
@@ -231,6 +241,8 @@ describe("content routes", () => {
     expect(response.statusCode).toBe(200);
     expect(getContentPageModel).toHaveBeenCalledWith("ai-new", {
       selectedSourceKinds: undefined,
+      selectedTwitterAccountIds: undefined,
+      selectedTwitterKeywordIds: undefined,
       sortMode: undefined,
       page: 1,
       searchKeyword: "特斯拉 AI"

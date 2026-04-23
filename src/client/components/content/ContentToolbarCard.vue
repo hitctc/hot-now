@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 
 import type { ContentSortMode } from "../../services/contentApi";
+import ContentEntityFilterBar from "./ContentEntityFilterBar.vue";
 import ContentSearchControl from "./ContentSearchControl.vue";
 import ContentSourceFilterBar from "./ContentSourceFilterBar.vue";
 import ContentSortControl from "./ContentSortControl.vue";
@@ -14,6 +15,8 @@ import {
 const props = defineProps<{
   options: { kind: string; name: string; currentPageVisibleCount: number }[];
   selectedSourceKinds: string[];
+  twitterAccountFilter?: { options: { id: number; label: string; username: string }[]; selectedAccountIds: number[] };
+  twitterKeywordFilter?: { options: { id: number; label: string }[]; selectedKeywordIds: number[] };
   visibleResultCount: number;
   sortMode: ContentSortMode;
   keyword: string;
@@ -22,12 +25,16 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   changeSource: [selectedSourceKinds: string[]];
+  changeTwitterAccounts: [selectedAccountIds: number[]];
+  changeTwitterKeywords: [selectedKeywordIds: number[]];
   changeSort: [sortMode: ContentSortMode];
   search: [keyword: string];
   clear: [];
 }>();
 
 const isSourceExpanded = ref(false);
+const hasTwitterAccountsSelected = computed(() => props.selectedSourceKinds.includes("twitter_accounts"));
+const hasTwitterKeywordsSelected = computed(() => props.selectedSourceKinds.includes("twitter_keyword_search"));
 
 const selectedSourceNames = computed(() => {
   const selectedKinds = new Set(props.selectedSourceKinds);
@@ -61,6 +68,14 @@ function toggleSourcePanel(): void {
 
 function handleSourceChange(nextKinds: string[]): void {
   emit("changeSource", nextKinds);
+}
+
+function handleTwitterAccountsChange(nextIds: number[]): void {
+  emit("changeTwitterAccounts", nextIds);
+}
+
+function handleTwitterKeywordsChange(nextIds: number[]): void {
+  emit("changeTwitterKeywords", nextIds);
 }
 
 function handleSortChange(nextSortMode: ContentSortMode): void {
@@ -173,6 +188,24 @@ function handleClear(): void {
         :visible-result-count="visibleResultCount"
         compact
         @change="handleSourceChange"
+      />
+      <ContentEntityFilterBar
+        v-if="hasTwitterAccountsSelected && twitterAccountFilter"
+        filter-key="twitter-accounts"
+        title="账号筛选"
+        :options="twitterAccountFilter.options.map((option) => ({ id: option.id, label: option.label, hint: `@${option.username}` }))"
+        :selected-ids="twitterAccountFilter.selectedAccountIds"
+        compact
+        @change="handleTwitterAccountsChange"
+      />
+      <ContentEntityFilterBar
+        v-if="hasTwitterKeywordsSelected && twitterKeywordFilter"
+        filter-key="twitter-keywords"
+        title="关键词筛选"
+        :options="twitterKeywordFilter.options"
+        :selected-ids="twitterKeywordFilter.selectedKeywordIds"
+        compact
+        @change="handleTwitterKeywordsChange"
       />
     </div>
   </section>

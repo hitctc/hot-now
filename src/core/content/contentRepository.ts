@@ -192,6 +192,70 @@ export function listVisibleTwitterKeywordMatchContentItemIds(
   return rows.map((row) => row.contentItemId);
 }
 
+// 账号筛选只需要拿到当前候选内容里命中指定账号的 content_item_id，不需要改动普通来源查询。
+export function listTwitterAccountContentItemIds(
+  db: SqliteDatabase,
+  contentItemIds: number[],
+  accountIds: number[]
+): number[] {
+  const normalizedContentItemIds = uniquePositiveIntegers(contentItemIds);
+  const normalizedAccountIds = uniquePositiveIntegers(accountIds);
+
+  if (normalizedContentItemIds.length === 0 || normalizedAccountIds.length === 0) {
+    return [];
+  }
+
+  const placeholders = normalizedContentItemIds.map(() => "?").join(", ");
+  const rows = db
+    .prepare(
+      `
+        SELECT id AS contentItemId, metadata_json AS metadataJson
+        FROM content_items
+        WHERE id IN (${placeholders})
+        ORDER BY id ASC
+      `
+    )
+    .all(...normalizedContentItemIds) as Array<{ contentItemId: number; metadataJson: string | null }>;
+  const selectedAccountIds = new Set(normalizedAccountIds);
+
+  return rows.flatMap((row) => {
+    const accountId = readTwitterAccountIdFromMetadataJson(row.metadataJson);
+    return accountId !== null && selectedAccountIds.has(accountId) ? [row.contentItemId] : [];
+  });
+}
+
+// 关键词筛选只保留仍处于展示启用状态且命中了指定关键词的内容，避免把已隐藏关键词重新带回内容页。
+export function listVisibleTwitterKeywordMatchContentItemIdsByKeywordIds(
+  db: SqliteDatabase,
+  contentItemIds: number[],
+  keywordIds: number[]
+): number[] {
+  const normalizedContentItemIds = uniquePositiveIntegers(contentItemIds);
+  const normalizedKeywordIds = uniquePositiveIntegers(keywordIds);
+
+  if (normalizedContentItemIds.length === 0 || normalizedKeywordIds.length === 0) {
+    return [];
+  }
+
+  const contentItemPlaceholders = normalizedContentItemIds.map(() => "?").join(", ");
+  const keywordPlaceholders = normalizedKeywordIds.map(() => "?").join(", ");
+  const rows = db
+    .prepare(
+      `
+        SELECT DISTINCT match.content_item_id AS contentItemId
+        FROM twitter_search_keyword_matches match
+        JOIN twitter_search_keywords keyword ON keyword.id = match.keyword_id
+        WHERE keyword.is_visible = 1
+          AND match.content_item_id IN (${contentItemPlaceholders})
+          AND match.keyword_id IN (${keywordPlaceholders})
+        ORDER BY match.content_item_id ASC
+      `
+    )
+    .all(...normalizedContentItemIds, ...normalizedKeywordIds) as Array<{ contentItemId: number }>;
+
+  return rows.map((row) => row.contentItemId);
+}
+
 // Twitter 账号采集和关键词搜索会共享同一个 tweet external_id，所以这里单独暴露批量读取帮助后续复用去重。
 export function listContentItemIdsByExternalIds(
   db: SqliteDatabase,
@@ -264,4 +328,20 @@ function uniqueNonEmptyStrings(values: string[]): string[] {
         .filter((value) => value.length > 0)
     )
   ];
+}
+
+function readTwitterAccountIdFromMetadataJson(metadataJson: string | null): number | null {
+  if (!metadataJson) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(metadataJson) as {
+      collector?: { accountId?: unknown };
+    };
+    const accountId = parsed.collector?.accountId;
+    return Number.isInteger(accountId) && Number(accountId) > 0 ? Number(accountId) : null;
+  } catch {
+    return null;
+  }
 }

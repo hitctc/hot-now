@@ -1,6 +1,8 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
 import { getViewRuleConfig, type ViewRuleConfig } from "../viewRules/viewRuleRepository.js";
 import { listContentSources, type ContentSourceOption } from "../source/listContentSources.js";
+import { listTwitterAccounts, type TwitterAccountRecord } from "../twitter/twitterAccountRepository.js";
+import { listTwitterSearchKeywords, type TwitterSearchKeywordRecord } from "../twitter/twitterSearchKeywordRepository.js";
 import {
   buildContentViewSelection,
   type ContentSortMode
@@ -22,6 +24,14 @@ export type ContentPageModel = {
     options: { kind: string; name: string; showAllWhenSelected: boolean; currentPageVisibleCount: number }[];
     selectedSourceKinds: string[];
   };
+  twitterAccountFilter?: {
+    options: { id: number; label: string; username: string }[];
+    selectedAccountIds: number[];
+  };
+  twitterKeywordFilter?: {
+    options: { id: number; label: string }[];
+    selectedKeywordIds: number[];
+  };
   featuredCard: ContentCardView | null;
   cards: ContentCardView[];
   strategySummary: {
@@ -39,12 +49,16 @@ export type ContentPageModel = {
 export type BuildContentPageModelOptions = {
   includeNlEvaluations?: boolean;
   selectedSourceKinds?: string[];
+  selectedTwitterAccountIds?: number[];
+  selectedTwitterKeywordIds?: number[];
   sortMode?: ContentSortMode;
   page?: number;
   searchKeyword?: string;
 };
 
 const contentPageSize = 50;
+const twitterAccountsSourceKind = "twitter_accounts";
+const twitterKeywordSearchSourceKind = "twitter_keyword_search";
 
 // 内容页模型在这里统一拼装，避免 server route 再复制一套精选卡、来源筛选和空态判断。
 export function buildContentPageModel(
@@ -52,9 +66,23 @@ export function buildContentPageModel(
   pageKey: ContentPageKey,
   options: BuildContentPageModelOptions = {}
 ): ContentPageModel {
-  const sourceOptions = listContentSources(db).filter((source) => source.isEnabled);
+  const twitterAccounts = listTwitterAccounts(db);
+  const twitterKeywords = listTwitterSearchKeywords(db);
+  const sourceOptions = buildContentPageSourceOptions(
+    listContentSources(db).filter((source) => source.isEnabled),
+    twitterAccounts,
+    twitterKeywords
+  );
   const selectedSourceKinds = normalizeSelectedSourceKinds(options.selectedSourceKinds, sourceOptions);
   const effectiveSelectedSourceKinds = selectedSourceKinds ?? deriveDefaultSelectedSourceKinds(sourceOptions);
+  const twitterAccountFilter = buildTwitterAccountFilterModel(
+    twitterAccounts,
+    options.selectedTwitterAccountIds
+  );
+  const twitterKeywordFilter = buildTwitterKeywordFilterModel(
+    twitterKeywords,
+    options.selectedTwitterKeywordIds
+  );
 
   const viewRuleKey = pageKey === "ai-hot" ? "hot" : "ai";
   const viewRuleConfig = getViewRuleConfig(db, viewRuleKey);
@@ -63,6 +91,14 @@ export function buildContentPageModel(
     const selection = buildContentViewSelection(db, viewRuleKey, {
       includeNlEvaluations: options.includeNlEvaluations,
       selectedSourceKinds: effectiveSelectedSourceKinds,
+      selectedTwitterAccountIds:
+        effectiveSelectedSourceKinds.includes(twitterAccountsSourceKind)
+          ? twitterAccountFilter?.selectedAccountIds
+          : undefined,
+      selectedTwitterKeywordIds:
+        effectiveSelectedSourceKinds.includes(twitterKeywordSearchSourceKind)
+          ? twitterKeywordFilter?.selectedKeywordIds
+          : undefined,
       sortMode: options.sortMode ?? "published_at",
       ruleConfig: viewRuleConfig
     });
@@ -85,6 +121,8 @@ export function buildContentPageModel(
               selectedSourceKinds: effectiveSelectedSourceKinds
             }
           : undefined,
+      twitterAccountFilter,
+      twitterKeywordFilter,
       // 客户端内容页已经不再拆首条精选卡，这里保留空字段只为了兼容现有接口模型。
       featuredCard: null,
       cards: pagination.cards,
@@ -120,6 +158,20 @@ export function buildContentPageModel(
 
     return {
       pageKey,
+      sourceFilter:
+        sourceOptions.length > 0
+          ? {
+              options: sourceOptions.map((source) => ({
+                kind: source.kind,
+                name: source.name,
+                showAllWhenSelected: source.showAllWhenSelected,
+                currentPageVisibleCount: 0
+              })),
+              selectedSourceKinds: effectiveSelectedSourceKinds
+            }
+          : undefined,
+      twitterAccountFilter,
+      twitterKeywordFilter,
       featuredCard: null,
       cards: [],
       strategySummary: buildStrategySummary(pageKey, viewRuleConfig),
@@ -232,6 +284,79 @@ function normalizeSelectedSourceKinds(selectedSourceKinds: string[] | undefined,
 
 function deriveDefaultSelectedSourceKinds(sourceOptions: ContentSourceOption[]): string[] {
   return sourceOptions.filter((source) => !source.showAllWhenSelected).map((source) => source.kind);
+}
+
+function buildContentPageSourceOptions(
+  sourceOptions: ContentSourceOption[],
+  twitterAccounts: TwitterAccountRecord[],
+  twitterKeywords: TwitterSearchKeywordRecord[]
+): ContentSourceOption[] {
+  const nextOptions = [...sourceOptions];
+
+  if (twitterAccounts.length > 0) {
+    nextOptions.push({
+      kind: twitterAccountsSourceKind,
+      name: "Twitter 账号",
+      isEnabled: true,
+      showAllWhenSelected: false
+    });
+  }
+
+  if (twitterKeywords.length > 0) {
+    nextOptions.push({
+      kind: twitterKeywordSearchSourceKind,
+      name: "Twitter 关键词搜索",
+      isEnabled: true,
+      showAllWhenSelected: false
+    });
+  }
+
+  return nextOptions;
+}
+
+function buildTwitterAccountFilterModel(
+  accounts: TwitterAccountRecord[],
+  selectedAccountIds: number[] | undefined
+) {
+  if (accounts.length === 0) {
+    return undefined;
+  }
+
+  return {
+    options: accounts.map((account) => ({
+      id: account.id,
+      label: account.displayName,
+      username: account.username
+    })),
+    selectedAccountIds: normalizeSelectedEntityIds(selectedAccountIds, accounts.map((account) => account.id))
+  };
+}
+
+function buildTwitterKeywordFilterModel(
+  keywords: TwitterSearchKeywordRecord[],
+  selectedKeywordIds: number[] | undefined
+) {
+  if (keywords.length === 0) {
+    return undefined;
+  }
+
+  return {
+    options: keywords.map((keyword) => ({
+      id: keyword.id,
+      label: keyword.keyword
+    })),
+    selectedKeywordIds: normalizeSelectedEntityIds(selectedKeywordIds, keywords.map((keyword) => keyword.id))
+  };
+}
+
+function normalizeSelectedEntityIds(selectedIds: number[] | undefined, availableIds: number[]) {
+  const availableIdSet = new Set(availableIds);
+
+  if (!selectedIds) {
+    return availableIds;
+  }
+
+  return selectedIds.filter((id, index, array) => availableIdSet.has(id) && array.indexOf(id) === index);
 }
 
 function countCurrentPageVisibleCardsBySourceKind(cards: ContentCardView[]) {

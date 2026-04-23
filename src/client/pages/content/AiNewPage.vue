@@ -16,14 +16,19 @@ import {
 } from "../../components/content/contentCardShared";
 import { HttpError } from "../../services/http";
 import {
+  deriveInitialSelectedEntityIds,
   deriveInitialSelectedSourceKinds,
   readAiNewPage,
   readStoredContentSearchKeyword,
   readStoredContentSortMode,
   readStoredContentSourceKinds,
+  readStoredTwitterAccountIds,
+  readStoredTwitterKeywordIds,
   writeStoredContentSearchKeyword,
   writeStoredContentSortMode,
   writeStoredContentSourceKinds,
+  writeStoredTwitterAccountIds,
+  writeStoredTwitterKeywordIds,
   type ContentSortMode,
   type ContentPageModel
 } from "../../services/contentApi";
@@ -33,6 +38,8 @@ const isRefreshing = ref(false);
 const loadError = ref<string | null>(null);
 const pageModel = ref<ContentPageModel | null>(null);
 const selectedSourceKinds = ref<string[] | null>(readStoredContentSourceKinds());
+const selectedTwitterAccountIds = ref<number[] | null>(readStoredTwitterAccountIds());
+const selectedTwitterKeywordIds = ref<number[] | null>(readStoredTwitterKeywordIds());
 const sortMode = ref<ContentSortMode>(readStoredContentSortMode() ?? "published_at");
 const appliedSearchKeyword = ref(readStoredContentSearchKeyword() ?? "");
 const route = useRoute();
@@ -41,6 +48,14 @@ const { showBackToTopButton, scrollPageToTop, handleBackToTopClick } = useConten
 
 function readPageSourceKinds(): string[] | undefined {
   return selectedSourceKinds.value === null ? undefined : selectedSourceKinds.value;
+}
+
+function readPageTwitterAccountIds(): number[] | undefined {
+  return selectedTwitterAccountIds.value === null ? undefined : selectedTwitterAccountIds.value;
+}
+
+function readPageTwitterKeywordIds(): number[] | undefined {
+  return selectedTwitterKeywordIds.value === null ? undefined : selectedTwitterKeywordIds.value;
 }
 
 function readCurrentPage(): number {
@@ -98,6 +113,8 @@ async function loadPage(options: { selectedKinds?: string[]; silent?: boolean; s
     const requestedPage = readCurrentPage();
     const nextModel = await readAiNewPage({
       selectedSourceKinds: options.selectedKinds ?? readPageSourceKinds(),
+      selectedTwitterAccountIds: readPageTwitterAccountIds(),
+      selectedTwitterKeywordIds: readPageTwitterKeywordIds(),
       sortMode: sortMode.value,
       page: requestedPage,
       searchKeyword: options.searchKeyword ?? appliedSearchKeyword.value
@@ -115,6 +132,24 @@ async function loadPage(options: { selectedKinds?: string[]; silent?: boolean; s
       selectedSourceKinds.value = nextKinds;
       writeStoredContentSourceKinds(nextKinds);
     }
+
+    if (selectedTwitterAccountIds.value === null && nextModel.twitterAccountFilter) {
+      const nextIds = deriveInitialSelectedEntityIds(
+        nextModel.twitterAccountFilter.options,
+        selectedTwitterAccountIds.value
+      );
+      selectedTwitterAccountIds.value = nextIds;
+      writeStoredTwitterAccountIds(nextIds);
+    }
+
+    if (selectedTwitterKeywordIds.value === null && nextModel.twitterKeywordFilter) {
+      const nextIds = deriveInitialSelectedEntityIds(
+        nextModel.twitterKeywordFilter.options,
+        selectedTwitterKeywordIds.value
+      );
+      selectedTwitterKeywordIds.value = nextIds;
+      writeStoredTwitterKeywordIds(nextIds);
+    }
   } catch (error) {
     if (error instanceof HttpError && error.status === 401) {
       loadError.value = "请先登录后再查看 AI 新讯。";
@@ -131,11 +166,43 @@ async function loadPage(options: { selectedKinds?: string[]; silent?: boolean; s
 }
 
 async function handleSourceKindsChange(nextKinds: string[]): Promise<void> {
+  const nextSourceKindSet = new Set(nextKinds);
+
+  if (nextSourceKindSet.has("twitter_accounts") && selectedTwitterAccountIds.value === null && pageModel.value?.twitterAccountFilter) {
+    const nextIds = deriveInitialSelectedEntityIds(pageModel.value.twitterAccountFilter.options, selectedTwitterAccountIds.value);
+    selectedTwitterAccountIds.value = nextIds;
+    writeStoredTwitterAccountIds(nextIds);
+  }
+
+  if (nextSourceKindSet.has("twitter_keyword_search") &&
+    selectedTwitterKeywordIds.value === null &&
+    pageModel.value?.twitterKeywordFilter) {
+    const nextIds = deriveInitialSelectedEntityIds(pageModel.value.twitterKeywordFilter.options, selectedTwitterKeywordIds.value);
+    selectedTwitterKeywordIds.value = nextIds;
+    writeStoredTwitterKeywordIds(nextIds);
+  }
+
   selectedSourceKinds.value = nextKinds;
   writeStoredContentSourceKinds(nextKinds);
   await replacePageQuery(1);
   scrollPageToTop("auto");
   await loadPage({ selectedKinds: nextKinds, silent: true });
+}
+
+async function handleTwitterAccountsChange(nextIds: number[]): Promise<void> {
+  selectedTwitterAccountIds.value = nextIds;
+  writeStoredTwitterAccountIds(nextIds);
+  await replacePageQuery(1);
+  scrollPageToTop("auto");
+  await loadPage({ selectedKinds: readPageSourceKinds(), silent: true });
+}
+
+async function handleTwitterKeywordsChange(nextIds: number[]): Promise<void> {
+  selectedTwitterKeywordIds.value = nextIds;
+  writeStoredTwitterKeywordIds(nextIds);
+  await replacePageQuery(1);
+  scrollPageToTop("auto");
+  await loadPage({ selectedKinds: readPageSourceKinds(), silent: true });
 }
 
 async function handleSortModeChange(nextSortMode: ContentSortMode): Promise<void> {
@@ -239,11 +306,25 @@ onMounted(() => {
       <ContentToolbarCard
         :options="sourceFilter.options"
         :selected-source-kinds="selectedSourceKinds ?? sourceFilter.selectedSourceKinds"
+        :twitter-account-filter="pageModel?.twitterAccountFilter
+          ? {
+              ...pageModel.twitterAccountFilter,
+              selectedAccountIds: selectedTwitterAccountIds ?? pageModel.twitterAccountFilter.selectedAccountIds
+            }
+          : undefined"
+        :twitter-keyword-filter="pageModel?.twitterKeywordFilter
+          ? {
+              ...pageModel.twitterKeywordFilter,
+              selectedKeywordIds: selectedTwitterKeywordIds ?? pageModel.twitterKeywordFilter.selectedKeywordIds
+            }
+          : undefined"
         :visible-result-count="visibleResultCount"
         :sort-mode="sortMode"
         :keyword="appliedSearchKeyword"
         :is-loading="isRefreshing"
         @change-source="handleSourceKindsChange"
+        @change-twitter-accounts="handleTwitterAccountsChange"
+        @change-twitter-keywords="handleTwitterKeywordsChange"
         @change-sort="handleSortModeChange"
         @search="handleSearchSubmit"
         @clear="handleSearchClear"

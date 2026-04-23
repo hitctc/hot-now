@@ -21,10 +21,15 @@ const contentApiMocks = vi.hoisted(() => ({
   readAiHotPage: vi.fn(),
   readStoredContentSourceKinds: vi.fn(),
   writeStoredContentSourceKinds: vi.fn(),
+  readStoredTwitterAccountIds: vi.fn(),
+  writeStoredTwitterAccountIds: vi.fn(),
+  readStoredTwitterKeywordIds: vi.fn(),
+  writeStoredTwitterKeywordIds: vi.fn(),
   readStoredContentSortMode: vi.fn(),
   writeStoredContentSortMode: vi.fn(),
   readStoredContentSearchKeyword: vi.fn(),
-  writeStoredContentSearchKeyword: vi.fn()
+  writeStoredContentSearchKeyword: vi.fn(),
+  deriveInitialSelectedEntityIds: vi.fn()
 }));
 
 vi.mock("../../src/client/services/contentApi", async () => {
@@ -37,10 +42,15 @@ vi.mock("../../src/client/services/contentApi", async () => {
     readAiHotPage: contentApiMocks.readAiHotPage,
     readStoredContentSourceKinds: contentApiMocks.readStoredContentSourceKinds,
     writeStoredContentSourceKinds: contentApiMocks.writeStoredContentSourceKinds,
+    readStoredTwitterAccountIds: contentApiMocks.readStoredTwitterAccountIds,
+    writeStoredTwitterAccountIds: contentApiMocks.writeStoredTwitterAccountIds,
+    readStoredTwitterKeywordIds: contentApiMocks.readStoredTwitterKeywordIds,
+    writeStoredTwitterKeywordIds: contentApiMocks.writeStoredTwitterKeywordIds,
     readStoredContentSortMode: contentApiMocks.readStoredContentSortMode,
     writeStoredContentSortMode: contentApiMocks.writeStoredContentSortMode,
     readStoredContentSearchKeyword: contentApiMocks.readStoredContentSearchKeyword,
-    writeStoredContentSearchKeyword: contentApiMocks.writeStoredContentSearchKeyword
+    writeStoredContentSearchKeyword: contentApiMocks.writeStoredContentSearchKeyword,
+    deriveInitialSelectedEntityIds: contentApiMocks.deriveInitialSelectedEntityIds
   };
 });
 
@@ -53,6 +63,8 @@ const baseModel = {
     ],
     selectedSourceKinds: ["openai"]
   },
+  twitterAccountFilter: undefined,
+  twitterKeywordFilter: undefined,
   featuredCard: null,
   strategySummary: {
     pageKey: "ai-hot" as const,
@@ -107,8 +119,13 @@ describe("AiHotPage", () => {
       routeState.query = location.query ?? {};
     });
     contentApiMocks.readStoredContentSourceKinds.mockReturnValue(["openai"]);
+    contentApiMocks.readStoredTwitterAccountIds.mockReturnValue(null);
+    contentApiMocks.readStoredTwitterKeywordIds.mockReturnValue(null);
     contentApiMocks.readStoredContentSortMode.mockReturnValue("content_score");
     contentApiMocks.readStoredContentSearchKeyword.mockReturnValue(null);
+    contentApiMocks.deriveInitialSelectedEntityIds.mockImplementation((options: Array<{ id: number }>, storedIds: number[] | null) =>
+      storedIds === null ? options.map((option) => option.id) : storedIds
+    );
     Object.defineProperty(window, "scrollTo", {
       writable: true,
       value: vi.fn()
@@ -145,6 +162,8 @@ describe("AiHotPage", () => {
 
     expect(contentApiMocks.readAiHotPage).toHaveBeenCalledWith({
       selectedSourceKinds: ["openai"],
+      selectedTwitterAccountIds: undefined,
+      selectedTwitterKeywordIds: undefined,
       sortMode: "content_score",
       page: 1,
       searchKeyword: ""
@@ -251,6 +270,8 @@ describe("AiHotPage", () => {
     });
     expect(contentApiMocks.readAiHotPage).toHaveBeenLastCalledWith(
       expect.objectContaining({
+        selectedTwitterAccountIds: undefined,
+        selectedTwitterKeywordIds: undefined,
         page: 1,
         searchKeyword: ""
       })
@@ -280,6 +301,8 @@ describe("AiHotPage", () => {
     });
     expect(contentApiMocks.readAiHotPage).toHaveBeenNthCalledWith(2, {
       selectedSourceKinds: ["openai"],
+      selectedTwitterAccountIds: undefined,
+      selectedTwitterKeywordIds: undefined,
       sortMode: "published_at",
       page: 1,
       searchKeyword: ""
@@ -313,6 +336,8 @@ describe("AiHotPage", () => {
     });
     expect(contentApiMocks.readAiHotPage).toHaveBeenNthCalledWith(2, {
       selectedSourceKinds: ["openai", "ithome"],
+      selectedTwitterAccountIds: undefined,
+      selectedTwitterKeywordIds: undefined,
       sortMode: "content_score",
       page: 1,
       searchKeyword: ""
@@ -368,6 +393,8 @@ describe("AiHotPage", () => {
     });
     expect(contentApiMocks.readAiHotPage).toHaveBeenNthCalledWith(2, {
       selectedSourceKinds: ["openai"],
+      selectedTwitterAccountIds: undefined,
+      selectedTwitterKeywordIds: undefined,
       sortMode: "content_score",
       page: 2,
       searchKeyword: ""

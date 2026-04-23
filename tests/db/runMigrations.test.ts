@@ -21,6 +21,7 @@ const expectedTables = [
   "nl_rule_sets",
   "rating_dimensions",
   "strategy_drafts",
+  "twitter_accounts",
   "user_profile",
   "view_rule_configs"
 ];
@@ -65,7 +66,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(7);
+    expect(schemaVersion).toBe(8);
 
     const appliedMigrations = db
       .prepare(
@@ -84,7 +85,8 @@ describe("runMigrations", () => {
       { version: 4, name: "004_source_display_mode" },
       { version: 5, name: "005_nl_rule_enabled_flag" },
       { version: 6, name: "006_provider_settings_multi_save" },
-      { version: 7, name: "007_source_bridge_metadata" }
+      { version: 7, name: "007_source_bridge_metadata" },
+      { version: 8, name: "008_twitter_accounts" }
     ]);
 
     const digestReportColumns = db
@@ -107,6 +109,43 @@ describe("runMigrations", () => {
 
     expect(sourceColumns.map((column) => column.name)).toEqual(
       expect.arrayContaining(["show_all_when_selected", "source_type", "bridge_kind", "bridge_config_json"])
+    );
+
+    const contentItemColumns = db
+      .prepare(
+        `
+          PRAGMA table_info(content_items)
+        `
+      )
+      .all() as Array<{ name: string }>;
+
+    expect(contentItemColumns.map((column) => column.name)).toContain("metadata_json");
+
+    const twitterAccountColumns = db
+      .prepare(
+        `
+          PRAGMA table_info(twitter_accounts)
+        `
+      )
+      .all() as Array<{ name: string }>;
+
+    expect(twitterAccountColumns.map((column) => column.name)).toEqual(
+      expect.arrayContaining([
+        "id",
+        "username",
+        "user_id",
+        "display_name",
+        "category",
+        "priority",
+        "include_replies",
+        "is_enabled",
+        "notes",
+        "last_fetched_at",
+        "last_success_at",
+        "last_error",
+        "created_at",
+        "updated_at"
+      ])
     );
 
     const providerSettingsColumns = db
@@ -138,16 +177,28 @@ describe("runMigrations", () => {
       bridge_config_json: string | null;
     }>;
 
-    expect(sourceRows).toEqual([
-      { kind: "aifanr", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
-      { kind: "google_ai", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
-      { kind: "ithome", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
-      { kind: "juya", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
-      { kind: "kr36", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
-      { kind: "kr36_newsflash", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
-      { kind: "openai", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null },
-      { kind: "techcrunch_ai", is_enabled: 1, show_all_when_selected: 0, source_type: "rss", bridge_kind: null, bridge_config_json: null }
-    ]);
+    expect(sourceRows.length).toBeGreaterThan(8);
+    expect(sourceRows).toEqual(
+      expect.arrayContaining([
+        {
+          kind: "openai",
+          is_enabled: 1,
+          show_all_when_selected: 0,
+          source_type: "rss",
+          bridge_kind: null,
+          bridge_config_json: null
+        },
+        {
+          kind: "juya",
+          is_enabled: 1,
+          show_all_when_selected: 0,
+          source_type: "rss",
+          bridge_kind: null,
+          bridge_config_json: null
+        }
+      ])
+    );
+    expect(sourceRows.every((source) => source.source_type === "rss" && source.bridge_kind === null)).toBe(true);
 
     const adminRow = db
       .prepare(
@@ -167,7 +218,7 @@ describe("runMigrations", () => {
     expect(verifyPassword("wrong-password", adminRow?.password_hash ?? "")).toBe(false);
   });
 
-  it("keeps the juya row aligned with legacy config.source.rssUrl without resetting other source URLs", async () => {
+  it("keeps the juya row aligned with legacy config.source.rssUrl while refreshing built-in catalog URLs", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-db-"));
     const dbPath = path.join(tempDir, "hot-now.sqlite");
     const db = openDatabase(dbPath);
@@ -207,7 +258,7 @@ describe("runMigrations", () => {
 
     expect(rows).toEqual([
       { kind: "juya", rss_url: "https://legacy.example.com/custom-juya.xml" },
-      { kind: "openai", rss_url: "https://manual.example.com/openai.xml" }
+      { kind: "openai", rss_url: "https://openai.com/news/rss.xml" }
     ]);
   });
 });

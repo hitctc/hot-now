@@ -532,8 +532,8 @@ type SearchCollectedItem = {
 最小实现边界：
 
 1. 新增 Twitter 账号来源类型，例如 `twitter_account`。
-2. `content_sources` 或新表保存账号名、展示名、优先级、分类、是否启用。
-3. `/settings/sources` 支持新增 / 编辑 / 启停 Twitter 账号来源。
+2. 使用独立 `twitter_accounts` 表保存账号名、展示名、优先级、分类、是否启用。
+3. `/settings/sources` 支持新增 / 编辑 / 启停 Twitter 账号独立分区。
 4. collector 通过 `TWITTER_API_KEY` 调用 TwitterAPI.io 用户推文接口。
 5. 推文转换成统一候选内容后进入去重、新鲜度、优先级、AI 过滤、入库。
 6. key 缺失时返回明确 failure，不影响 RSS 采集。

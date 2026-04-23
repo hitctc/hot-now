@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 7;
+const schemaVersion = 8;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -8,6 +8,7 @@ const sourceDisplayModeMigrationName = "004_source_display_mode";
 const nlRuleEnabledFlagMigrationName = "005_nl_rule_enabled_flag";
 const providerSettingsMultiSaveMigrationName = "006_provider_settings_multi_save";
 const sourceBridgeMetadataMigrationName = "007_source_bridge_metadata";
+const twitterAccountsMigrationName = "008_twitter_accounts";
 
 const migrationStatements = [
   `
@@ -352,6 +353,44 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(7, sourceBridgeMetadataMigrationName);
+
+    // Twitter account collection has its own configuration table because account sources need
+    // platform-specific fields and should not be mixed into the RSS source inventory.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS twitter_accounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL UNIQUE,
+        user_id TEXT,
+        display_name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        priority INTEGER NOT NULL DEFAULT 50,
+        include_replies INTEGER NOT NULL DEFAULT 0,
+        is_enabled INTEGER NOT NULL DEFAULT 1,
+        notes TEXT,
+        last_fetched_at TEXT,
+        last_success_at TEXT,
+        last_error TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_twitter_accounts_enabled
+      ON twitter_accounts(is_enabled)
+    `);
+
+    if (!hasColumn(db, "content_items", "metadata_json")) {
+      db.exec("ALTER TABLE content_items ADD COLUMN metadata_json TEXT");
+    }
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(8, twitterAccountsMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

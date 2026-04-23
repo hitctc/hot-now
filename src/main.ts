@@ -35,6 +35,7 @@ import { listSourceWorkbench } from "./core/source/listSourceWorkbench.js";
 import { readSourcesOperationSummary } from "./core/source/readSourcesOperationSummary.js";
 import { loadEnabledSourceIssues } from "./core/source/loadEnabledSourceIssues.js";
 import { hydrateSourceContent } from "./core/source/hydrateSourceContent.js";
+import { collectTwitterAccountIssues } from "./core/twitter/twitterAccountCollector.js";
 import {
   deleteSource as removeSource,
   saveSource as persistSource,
@@ -110,6 +111,10 @@ async function runCollectionTask(triggerType: DailyReportTrigger) {
   return await runCollectionCycle(config, triggerType, {
     db,
     loadEnabledSourceIssues: async () => await loadEnabledSourceIssues(db),
+    collectTwitterAccountIssues: async () =>
+      await collectTwitterAccountIssues(db, {
+        apiKey: process.env.TWITTER_API_KEY?.trim() || null
+      }),
     fetchArticle: fetchAndExtractArticle
   });
 }

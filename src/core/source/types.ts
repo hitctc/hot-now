@@ -43,6 +43,7 @@ export type CandidateItem = {
   externalId: string;
   publishedAt?: string;
   summary?: string;
+  metadataJson?: string;
 };
 
 export type LoadedIssue = {

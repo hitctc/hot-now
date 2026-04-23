@@ -31,6 +31,7 @@ describe("contentRepository", () => {
           canonicalUrl: "https://example.com/article-1",
           summary: "first summary",
           bodyMarkdown: "first body",
+          metadataJson: '{"source":"initial"}',
           publishedAt: "2026-03-28T08:00:00.000Z",
           fetchedAt: "2026-03-28T08:05:00.000Z"
         }
@@ -46,6 +47,7 @@ describe("contentRepository", () => {
           canonicalUrl: "https://example.com/article-1",
           summary: "updated summary",
           bodyMarkdown: "updated body",
+          metadataJson: '{"source":"updated"}',
           publishedAt: "2026-03-28T08:00:00.000Z",
           fetchedAt: "2026-03-28T09:00:00.000Z"
         }
@@ -55,7 +57,7 @@ describe("contentRepository", () => {
     const rows = db
       .prepare(
         `
-          SELECT external_id, title, canonical_url, summary, body_markdown, fetched_at
+          SELECT external_id, title, canonical_url, summary, body_markdown, metadata_json, fetched_at
           FROM content_items
           WHERE source_id = ?
         `
@@ -66,6 +68,7 @@ describe("contentRepository", () => {
       canonical_url: string;
       summary: string;
       body_markdown: string;
+      metadata_json: string;
       fetched_at: string;
     }>;
 
@@ -76,6 +79,7 @@ describe("contentRepository", () => {
         canonical_url: "https://example.com/article-1",
         summary: "updated summary",
         body_markdown: "updated body",
+        metadata_json: '{"source":"updated"}',
         fetched_at: "2026-03-28T09:00:00.000Z"
       }
     ]);

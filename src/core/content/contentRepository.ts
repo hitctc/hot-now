@@ -17,6 +17,7 @@ export type UpsertContentItemInput = {
   bodyMarkdown?: string;
   publishedAt?: string;
   fetchedAt?: string;
+  metadataJson?: string;
 };
 
 export type CreateCollectionRunInput = {
@@ -64,6 +65,7 @@ export function upsertContentItems(
         canonical_url,
         summary,
         body_markdown,
+        metadata_json,
         published_at,
         fetched_at,
         updated_at
@@ -75,6 +77,7 @@ export function upsertContentItems(
         @canonicalUrl,
         @summary,
         @bodyMarkdown,
+        @metadataJson,
         @publishedAt,
         @fetchedAt,
         CURRENT_TIMESTAMP
@@ -88,6 +91,7 @@ export function upsertContentItems(
             THEN excluded.body_markdown
           ELSE content_items.body_markdown
         END,
+        metadata_json = excluded.metadata_json,
         published_at = excluded.published_at,
         fetched_at = excluded.fetched_at,
         updated_at = CURRENT_TIMESTAMP
@@ -103,6 +107,7 @@ export function upsertContentItems(
         canonicalUrl: item.canonicalUrl,
         summary: item.summary ?? null,
         bodyMarkdown: item.bodyMarkdown ?? null,
+        metadataJson: item.metadataJson ?? null,
         publishedAt: item.publishedAt ?? null,
         fetchedAt: item.fetchedAt ?? null
       });

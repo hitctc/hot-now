@@ -39,6 +39,7 @@ import { runTwitterAccountCollection } from "./core/twitter/runTwitterAccountCol
 import { runTwitterKeywordCollection } from "./core/twitter/runTwitterKeywordCollection.js";
 import { runHackerNewsCollection } from "./core/hackernews/runHackerNewsCollection.js";
 import { runBilibiliCollection } from "./core/bilibili/runBilibiliCollection.js";
+import { runWechatRssCollection } from "./core/wechatRss/runWechatRssCollection.js";
 import { readWeiboTrendingRunState, runWeiboTrendingCollection } from "./core/weibo/runWeiboTrendingCollection.js";
 import {
   deleteSource as removeSource,
@@ -75,6 +76,11 @@ import {
   toggleBilibiliQuery as persistBilibiliQueryToggle,
   updateBilibiliQuery as persistBilibiliQueryUpdate
 } from "./core/bilibili/bilibiliQueryRepository.js";
+import {
+  createWechatRssSources as persistWechatRssSources,
+  deleteWechatRssSource as removeWechatRssSource,
+  listWechatRssSources
+} from "./core/wechatRss/wechatRssSourceRepository.js";
 import { listReportDates, readTextFile } from "./core/storage/reportStore.js";
 import {
   getViewRuleConfig,
@@ -165,6 +171,13 @@ async function runHackerNewsCollectionTask() {
 // B 站搜索第一版也只支持手动触发，先把视频搜索链路验证稳定再考虑调度扩展。
 async function runBilibiliCollectionTask() {
   return await runBilibiliCollection(db);
+}
+
+// 微信公众号 RSS 由后台单独维护，第一版只手动采集，避免混进普通 RSS 定时轮询。
+async function runWechatRssCollectionTask() {
+  return await runWechatRssCollection(db, {
+    fetchArticle: fetchAndExtractArticle
+  });
 }
 
 // 微博热搜榜匹配只做热点补充信号，不进默认采集调度。
@@ -507,6 +520,13 @@ const triggerManualBilibiliCollect = config.manualActions.collectEnabled
     }
   : undefined;
 
+// 公众号 RSS 和其他扩展来源一样只走手动入口，避免新增链接后立刻进入默认调度。
+const triggerManualWechatRssCollect = config.manualActions.collectEnabled
+  ? async () => {
+      return await lock.runExclusive(async () => await runWechatRssCollectionTask());
+    }
+  : undefined;
+
 // 微博热搜榜匹配和其他搜索来源共用运行锁，但继续保持单独入口和单独结果摘要。
 const triggerManualWeiboTrendingCollect = config.manualActions.collectEnabled
   ? async () => {
@@ -592,6 +612,7 @@ const app = createServer({
   listTwitterSearchKeywords: async () => listTwitterSearchKeywords(db),
   listHackerNewsQueries: async () => listHackerNewsQueries(db),
   listBilibiliQueries: async () => listBilibiliQueries(db),
+  listWechatRssSources: async () => listWechatRssSources(db),
   getWeiboTrendingState: async () => readWeiboTrendingRunState(db),
   createTwitterAccount: async (input) => persistTwitterAccount(db, input),
   updateTwitterAccount: async (input) => persistTwitterAccountUpdate(db, input),
@@ -612,11 +633,14 @@ const app = createServer({
   updateBilibiliQuery: async (input) => persistBilibiliQueryUpdate(db, input),
   deleteBilibiliQuery: async (id) => removeBilibiliQuery(db, id),
   toggleBilibiliQuery: async (id, enable) => persistBilibiliQueryToggle(db, id, enable),
+  createWechatRssSources: async (input) => persistWechatRssSources(db, input),
+  deleteWechatRssSource: async (id) => removeWechatRssSource(db, id),
   hasTwitterApiKey: Boolean(process.env.TWITTER_API_KEY?.trim()),
   triggerManualTwitterCollect,
   triggerManualTwitterKeywordCollect,
   triggerManualHackerNewsCollect,
   triggerManualBilibiliCollect,
+  triggerManualWechatRssCollect,
   triggerManualWeiboTrendingCollect,
   getCurrentUserProfile: async () => getCurrentUserProfile(),
   listReportSummaries: listStoredReportSummaries,

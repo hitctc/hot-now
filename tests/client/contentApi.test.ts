@@ -27,6 +27,10 @@ describe("contentApi", () => {
         options: [{ id: 11, label: "Image2" }],
         selectedKeywordIds: [11]
       },
+      wechatRssFilter: {
+        options: [{ id: 21, label: "AI 公众号 RSS", rssUrl: "https://rss.example.com/wechat.xml" }],
+        selectedSourceIds: [21]
+      },
       featuredCard: null,
       cards: [],
       pagination: {
@@ -44,6 +48,7 @@ describe("contentApi", () => {
       selectedSourceKinds: [" openai ", "openai", "ithome"],
       selectedTwitterAccountIds: [1, 1, 2],
       selectedTwitterKeywordIds: [11, 11, 12],
+      selectedWechatRssSourceIds: [21, 21, 22],
       sortMode: "content_score",
       page: 2
     });
@@ -62,6 +67,7 @@ describe("contentApi", () => {
           "x-hot-now-source-filter": "openai,ithome",
           "x-hot-now-twitter-account-filter": "1,2",
           "x-hot-now-twitter-keyword-filter": "11,12",
+          "x-hot-now-wechat-rss-filter": "21,22",
           "x-hot-now-content-sort": "content_score"
         }
       })
@@ -93,24 +99,30 @@ describe("contentApi", () => {
     expect(readStoredContentSourceKinds()).toEqual(["openai", "ithome"]);
   });
 
-  it("persists and restores twitter account and keyword filters", async () => {
+  it("persists and restores twitter account, keyword, and WeChat RSS filters", async () => {
     const {
       CONTENT_TWITTER_ACCOUNT_STORAGE_KEY,
       CONTENT_TWITTER_KEYWORD_STORAGE_KEY,
+      CONTENT_WECHAT_RSS_STORAGE_KEY,
       readStoredTwitterAccountIds,
       readStoredTwitterKeywordIds,
+      readStoredWechatRssSourceIds,
       writeStoredTwitterAccountIds,
       writeStoredTwitterKeywordIds,
+      writeStoredWechatRssSourceIds,
       deriveInitialSelectedEntityIds
     } = await import("../../src/client/services/contentApi");
 
     writeStoredTwitterAccountIds([1, 1, 2]);
     writeStoredTwitterKeywordIds([11, 11, 12]);
+    writeStoredWechatRssSourceIds([21, 21, 22]);
 
     expect(window.localStorage.getItem(CONTENT_TWITTER_ACCOUNT_STORAGE_KEY)).toBe("[1,2]");
     expect(window.localStorage.getItem(CONTENT_TWITTER_KEYWORD_STORAGE_KEY)).toBe("[11,12]");
+    expect(window.localStorage.getItem(CONTENT_WECHAT_RSS_STORAGE_KEY)).toBe("[21,22]");
     expect(readStoredTwitterAccountIds()).toEqual([1, 2]);
     expect(readStoredTwitterKeywordIds()).toEqual([11, 12]);
+    expect(readStoredWechatRssSourceIds()).toEqual([21, 22]);
     expect(
       deriveInitialSelectedEntityIds(
         [{ id: 1 }, { id: 2 }, { id: 3 }],
@@ -183,6 +195,7 @@ describe("contentApi", () => {
       selectedSourceKinds: ["openai"],
       selectedTwitterAccountIds: [1],
       selectedTwitterKeywordIds: [11],
+      selectedWechatRssSourceIds: [21],
       sortMode: "published_at",
       searchKeyword: "agent"
     });
@@ -192,6 +205,7 @@ describe("contentApi", () => {
         "x-hot-now-source-filter": "openai",
         "x-hot-now-twitter-account-filter": "1",
         "x-hot-now-twitter-keyword-filter": "11",
+        "x-hot-now-wechat-rss-filter": "21",
         "x-hot-now-content-sort": "published_at",
         "x-hot-now-content-search": "agent"
       }

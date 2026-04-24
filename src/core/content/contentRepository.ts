@@ -246,6 +246,38 @@ export function listTwitterAccountContentItemIds(
   });
 }
 
+// 微信公众号 RSS 子筛选通过 metadata_json 里的 sourceId 关联具体 feed，不再拆成多个 source kind。
+export function listWechatRssContentItemIds(
+  db: SqliteDatabase,
+  contentItemIds: number[],
+  sourceIds: number[]
+): number[] {
+  const normalizedContentItemIds = uniquePositiveIntegers(contentItemIds);
+  const normalizedSourceIds = uniquePositiveIntegers(sourceIds);
+
+  if (normalizedContentItemIds.length === 0 || normalizedSourceIds.length === 0) {
+    return [];
+  }
+
+  const placeholders = normalizedContentItemIds.map(() => "?").join(", ");
+  const rows = db
+    .prepare(
+      `
+        SELECT id AS contentItemId, metadata_json AS metadataJson
+        FROM content_items
+        WHERE id IN (${placeholders})
+        ORDER BY id ASC
+      `
+    )
+    .all(...normalizedContentItemIds) as Array<{ contentItemId: number; metadataJson: string | null }>;
+  const selectedSourceIds = new Set(normalizedSourceIds);
+
+  return rows.flatMap((row) => {
+    const sourceId = readWechatRssSourceIdFromMetadataJson(row.metadataJson);
+    return sourceId !== null && selectedSourceIds.has(sourceId) ? [row.contentItemId] : [];
+  });
+}
+
 // 关键词筛选只保留仍处于展示启用状态且命中了指定关键词的内容，避免把已隐藏关键词重新带回内容页。
 export function listVisibleTwitterKeywordMatchContentItemIdsByKeywordIds(
   db: SqliteDatabase,
@@ -423,6 +455,27 @@ function readTwitterAccountIdFromMetadataJson(metadataJson: string | null): numb
     };
     const accountId = parsed.collector?.accountId;
     return Number.isInteger(accountId) && Number(accountId) > 0 ? Number(accountId) : null;
+  } catch {
+    return null;
+  }
+}
+
+function readWechatRssSourceIdFromMetadataJson(metadataJson: string | null): number | null {
+  if (!metadataJson) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(metadataJson) as {
+      collector?: { sourceId?: unknown; kind?: unknown };
+    };
+
+    if (parsed.collector?.kind !== "wechat_rss") {
+      return null;
+    }
+
+    const sourceId = parsed.collector.sourceId;
+    return Number.isInteger(sourceId) && Number(sourceId) > 0 ? Number(sourceId) : null;
   } catch {
     return null;
   }

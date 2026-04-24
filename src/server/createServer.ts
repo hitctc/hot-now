@@ -49,6 +49,12 @@ import type {
   SaveBilibiliQueryResult,
   ToggleBilibiliQueryResult
 } from "../core/bilibili/bilibiliQueryRepository.js";
+import type {
+  CreateWechatRssSourcesInput,
+  CreateWechatRssSourcesResult,
+  DeleteWechatRssSourceResult,
+  WechatRssSourceRecord
+} from "../core/wechatRss/wechatRssSourceRepository.js";
 import type { WeiboTrendingRunState } from "../core/weibo/runWeiboTrendingCollection.js";
 import type { RuntimeConfig } from "../core/types/appConfig.js";
 import { readNextCollectionRunAt } from "../core/scheduler/readNextCollectionRunAt.js";
@@ -182,6 +188,19 @@ type ManualBilibiliCollectResult =
       accepted: false;
       reason: "no-enabled-bilibili-queries";
     };
+type ManualWechatRssCollectResult =
+  | {
+      accepted: true;
+      action: "collect-wechat-rss";
+      enabledSourceCount: number;
+      fetchedItemCount: number;
+      persistedContentItemCount: number;
+      failureCount: number;
+    }
+  | {
+      accepted: false;
+      reason: "no-enabled-wechat-rss-sources";
+    };
 type ManualWeiboTrendingCollectResult = {
   accepted: true;
   action: "collect-weibo-trending";
@@ -210,6 +229,10 @@ type ContentPageModel = {
   twitterKeywordFilter?: {
     options: { id: number; label: string }[];
     selectedKeywordIds: number[];
+  };
+  wechatRssFilter?: {
+    options: { id: number; label: string; rssUrl: string }[];
+    selectedSourceIds: number[];
   };
   featuredCard: ContentCardView | null;
   cards: ContentCardView[];
@@ -254,7 +277,7 @@ type ServerDeps = {
     viewKey: ContentViewKey,
     options?: Pick<
       ContentViewSelectionOptions,
-      "selectedSourceKinds" | "selectedTwitterAccountIds" | "selectedTwitterKeywordIds" | "sortMode"
+      "selectedSourceKinds" | "selectedTwitterAccountIds" | "selectedTwitterKeywordIds" | "selectedWechatRssSourceIds" | "sortMode"
     >
   ) => Promise<ContentCardView[]> | ContentCardView[];
   listContentSources?: () => Promise<ContentSourceOption[]> | ContentSourceOption[];
@@ -289,6 +312,7 @@ type ServerDeps = {
   listTwitterSearchKeywords?: () => Promise<TwitterSearchKeywordRecord[]> | TwitterSearchKeywordRecord[];
   listHackerNewsQueries?: () => Promise<HackerNewsQueryRecord[]> | HackerNewsQueryRecord[];
   listBilibiliQueries?: () => Promise<BilibiliQueryRecord[]> | BilibiliQueryRecord[];
+  listWechatRssSources?: () => Promise<WechatRssSourceRecord[]> | WechatRssSourceRecord[];
   getWeiboTrendingState?: () => Promise<WeiboTrendingRunState> | WeiboTrendingRunState;
   createTwitterAccount?: (
     input: SaveTwitterAccountInput
@@ -340,16 +364,27 @@ type ServerDeps = {
     id: number,
     enable: boolean
   ) => Promise<ToggleBilibiliQueryResult> | ToggleBilibiliQueryResult;
+  createWechatRssSources?: (
+    input: CreateWechatRssSourcesInput
+  ) => Promise<CreateWechatRssSourcesResult> | CreateWechatRssSourcesResult;
+  deleteWechatRssSource?: (id: number) => Promise<DeleteWechatRssSourceResult> | DeleteWechatRssSourceResult;
   hasTwitterApiKey?: boolean;
   triggerManualHackerNewsCollect?: () => Promise<ManualHackerNewsCollectResult>;
   triggerManualBilibiliCollect?: () => Promise<ManualBilibiliCollectResult>;
+  triggerManualWechatRssCollect?: () => Promise<ManualWechatRssCollectResult>;
   triggerManualWeiboTrendingCollect?: () => Promise<ManualWeiboTrendingCollectResult>;
   getCurrentUserProfile?: () => Promise<CurrentUserProfile | null> | CurrentUserProfile | null;
   getContentPageModel?: (
     pageKey: ContentPageKey,
     options?: Pick<
       BuildContentPageModelOptions,
-      "selectedSourceKinds" | "selectedTwitterAccountIds" | "selectedTwitterKeywordIds" | "sortMode" | "page" | "searchKeyword"
+      | "selectedSourceKinds"
+      | "selectedTwitterAccountIds"
+      | "selectedTwitterKeywordIds"
+      | "selectedWechatRssSourceIds"
+      | "sortMode"
+      | "page"
+      | "searchKeyword"
     >
   ) => Promise<ContentPageModel> | ContentPageModel;
   auth?: {
@@ -790,6 +825,17 @@ export function createServer(deps: ServerDeps = {}) {
       authConfig?.sessionSecret ?? "",
       deps.isRunning?.() ?? false,
       deps.triggerManualBilibiliCollect
+    );
+  });
+
+  app.post("/actions/wechat-rss/collect", async (request, reply) => {
+    return await handleManualWechatRssCollectAction(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? "",
+      deps.isRunning?.() ?? false,
+      deps.triggerManualWechatRssCollect
     );
   });
 
@@ -1516,6 +1562,48 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.send({ ok: true, id: result.query.id, enable: result.query.isEnabled });
   });
 
+  app.post("/actions/wechat-rss/create", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.createWechatRssSources) {
+      return reply.code(503).send({ ok: false, reason: "wechat-rss-disabled" });
+    }
+
+    const payload = parseWechatRssCreatePayload(request.body);
+
+    if (!payload) {
+      return reply.code(400).send({ ok: false, reason: "invalid-wechat-rss-payload" });
+    }
+
+    return sendWechatRssCreateResult(reply, await deps.createWechatRssSources(payload));
+  });
+
+  app.post("/actions/wechat-rss/delete", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.deleteWechatRssSource) {
+      return reply.code(503).send({ ok: false, reason: "wechat-rss-disabled" });
+    }
+
+    const id = parsePositiveInteger((request.body as { id?: unknown } | undefined)?.id);
+
+    if (id === null) {
+      return reply.code(400).send({ ok: false, reason: "invalid-wechat-rss-source-id" });
+    }
+
+    const result = await deps.deleteWechatRssSource(id);
+
+    if (!result.ok) {
+      return reply.code(result.reason === "not-found" ? 404 : 400).send({ ok: false, reason: result.reason });
+    }
+
+    return reply.send({ ok: true, id: result.id });
+  });
+
   return app;
 }
 
@@ -1650,6 +1738,25 @@ function parseBilibiliQuerySavePayload(
   };
 }
 
+function parseWechatRssCreatePayload(body: unknown): CreateWechatRssSourcesInput | null {
+  if (!body || typeof body !== "object") {
+    return null;
+  }
+
+  const payload = body as Record<string, unknown>;
+  const rssUrls = payload.rssUrls;
+
+  if (typeof rssUrls === "string") {
+    return { rssUrls };
+  }
+
+  if (Array.isArray(rssUrls) && rssUrls.every((value) => typeof value === "string")) {
+    return { rssUrls };
+  }
+
+  return null;
+}
+
 function sendTwitterAccountSaveResult(reply: FastifyReply, result: SaveTwitterAccountResult) {
   if (result.ok) {
     return reply.send({ ok: true, account: result.account });
@@ -1709,6 +1816,18 @@ function sendBilibiliQuerySaveResult(reply: FastifyReply, result: SaveBilibiliQu
 
   if (result.reason === "duplicate-query") {
     return reply.code(409).send({ ok: false, reason: result.reason });
+  }
+
+  return reply.code(400).send({ ok: false, reason: result.reason });
+}
+
+function sendWechatRssCreateResult(reply: FastifyReply, result: CreateWechatRssSourcesResult) {
+  if (result.ok) {
+    return reply.send({
+      ok: true,
+      created: result.created,
+      skippedDuplicateUrls: result.skippedDuplicateUrls
+    });
   }
 
   return reply.code(400).send({ ok: false, reason: result.reason });
@@ -1909,6 +2028,7 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
   const twitterSearchKeywords = ((await deps.listTwitterSearchKeywords?.()) ?? []) as TwitterSearchKeywordSettingsView[];
   const hackerNewsQueries = ((await deps.listHackerNewsQueries?.()) ?? []) as HackerNewsQuerySettingsView[];
   const bilibiliQueries = ((await deps.listBilibiliQueries?.()) ?? []) as BilibiliQuerySettingsView[];
+  const wechatRssSources = ((await deps.listWechatRssSources?.()) ?? []) as WechatRssSourceRecord[];
   const weiboTrending = (await deps.getWeiboTrendingState?.()) as WeiboTrendingSettingsView | undefined;
   const operationSummary = deps.getSourcesOperationSummary
     ? await deps.getSourcesOperationSummary()
@@ -1924,6 +2044,7 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
     twitterSearchKeywords,
     hackerNewsQueries,
     bilibiliQueries,
+    wechatRssSources,
     weiboTrending,
     operations: {
       lastCollectionRunAt: operationSummary.lastCollectionRunAt,
@@ -1934,6 +2055,7 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
       canTriggerManualTwitterKeywordCollect: typeof deps.triggerManualTwitterKeywordCollect === "function",
       canTriggerManualHackerNewsCollect: typeof deps.triggerManualHackerNewsCollect === "function",
       canTriggerManualBilibiliCollect: typeof deps.triggerManualBilibiliCollect === "function",
+      canTriggerManualWechatRssCollect: typeof deps.triggerManualWechatRssCollect === "function",
       canTriggerManualWeiboTrendingCollect: typeof deps.triggerManualWeiboTrendingCollect === "function",
       canTriggerManualSendLatestEmail: typeof deps.triggerManualSendLatestEmail === "function",
       isRunning: deps.isRunning?.() ?? false
@@ -1957,6 +2079,8 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
       hackerNewsSearchMessage: "Hacker News 搜索已就绪，可维护 query 并手动采集。",
       bilibiliSearchEnabled: true,
       bilibiliSearchMessage: "B 站搜索已就绪，可维护 query 并手动采集。",
+      wechatRssEnabled: true,
+      wechatRssMessage: "微信公众号 RSS 已就绪，可批量维护 RSS 链接并手动采集。",
       weiboTrendingEnabled: true,
       weiboTrendingMessage: "微博热搜榜匹配已就绪，固定 AI 关键词只进入 AI 热点。"
     }
@@ -2212,6 +2336,7 @@ async function readContentPageModelApiData(
     const selectedSourceKinds = readSelectedSourceKindsHeader(request.headers["x-hot-now-source-filter"]);
     const selectedTwitterAccountIds = readSelectedEntityIdsHeader(request.headers["x-hot-now-twitter-account-filter"]);
     const selectedTwitterKeywordIds = readSelectedEntityIdsHeader(request.headers["x-hot-now-twitter-keyword-filter"]);
+    const selectedWechatRssSourceIds = readSelectedEntityIdsHeader(request.headers["x-hot-now-wechat-rss-filter"]);
     const sortMode = readContentSortModeHeader(request.headers["x-hot-now-content-sort"]);
     const searchKeyword = readContentSearchHeader(request.headers["x-hot-now-content-search"]);
     const page = readContentPageQueryPage(request);
@@ -2220,6 +2345,7 @@ async function readContentPageModelApiData(
       selectedSourceKinds === undefined &&
         selectedTwitterAccountIds === undefined &&
         selectedTwitterKeywordIds === undefined &&
+        selectedWechatRssSourceIds === undefined &&
         sortMode === undefined &&
         searchKeyword === undefined &&
         page === 1
@@ -2228,6 +2354,7 @@ async function readContentPageModelApiData(
             selectedSourceKinds,
             selectedTwitterAccountIds,
             selectedTwitterKeywordIds,
+            selectedWechatRssSourceIds,
             sortMode,
             page,
             searchKeyword
@@ -2268,13 +2395,15 @@ async function buildContentPageModelFromDependencies(
     const twitterKeywords = (await deps.listTwitterSearchKeywords?.()) ?? [];
     const hackerNewsQueries = (await deps.listHackerNewsQueries?.()) ?? [];
     const bilibiliQueries = (await deps.listBilibiliQueries?.()) ?? [];
+    const wechatRssSources = (await deps.listWechatRssSources?.()) ?? [];
     const sourceOptions = buildContentPageSourceOptions(
       ((await deps.listContentSources?.()) ?? []).filter((source) => source.isEnabled),
       twitterAccounts.length > 0,
       twitterKeywords.length > 0,
       hackerNewsQueries.length > 0,
       bilibiliQueries.length > 0,
-      false
+      false,
+      wechatRssSources.length > 0
     );
     const selectedSourceKinds = readContentPageSelectedSourceKinds(request.headers["x-hot-now-source-filter"], sourceOptions);
     const effectiveSelectedSourceKinds = selectedSourceKinds ?? deriveDefaultSelectedSourceKinds(sourceOptions);
@@ -2286,6 +2415,10 @@ async function buildContentPageModelFromDependencies(
       twitterKeywords,
       readSelectedEntityIdsHeader(request.headers["x-hot-now-twitter-keyword-filter"])
     );
+    const wechatRssFilter = buildWechatRssFilterModel(
+      wechatRssSources,
+      readSelectedEntityIdsHeader(request.headers["x-hot-now-wechat-rss-filter"])
+    );
     const sortMode = readContentSortModeHeader(request.headers["x-hot-now-content-sort"]) ?? "published_at";
     const searchKeyword = readContentSearchHeader(request.headers["x-hot-now-content-search"]);
     const requestedPage = readContentPageQueryPage(request);
@@ -2295,6 +2428,8 @@ async function buildContentPageModelFromDependencies(
         effectiveSelectedSourceKinds.includes("twitter_accounts") ? twitterAccountFilter?.selectedAccountIds : undefined,
       selectedTwitterKeywordIds:
         effectiveSelectedSourceKinds.includes("twitter_keyword_search") ? twitterKeywordFilter?.selectedKeywordIds : undefined,
+      selectedWechatRssSourceIds:
+        effectiveSelectedSourceKinds.includes("wechat_rss") ? wechatRssFilter?.selectedSourceIds : undefined,
       sortMode
     });
     const filteredCards = filterCardsByTitleKeyword(allCards, searchKeyword);
@@ -2316,6 +2451,7 @@ async function buildContentPageModelFromDependencies(
         : undefined,
       twitterAccountFilter,
       twitterKeywordFilter,
+      wechatRssFilter,
       // AI 新讯和 AI 热点都统一成标准卡流，保留 featuredCard 仅作兼容空字段。
       featuredCard: null,
       cards: pagination.cards,
@@ -2560,7 +2696,8 @@ function buildContentPageSourceOptions(
   hasTwitterKeywords: boolean,
   hasHackerNewsQueries: boolean,
   hasBilibiliQueries: boolean,
-  hasWeiboTrending: boolean
+  hasWeiboTrending: boolean,
+  hasWechatRss: boolean
 ): ContentSourceOption[] {
   const nextOptions = [...sourceOptions];
 
@@ -2609,6 +2746,15 @@ function buildContentPageSourceOptions(
     });
   }
 
+  if (hasWechatRss) {
+    nextOptions.push({
+      kind: "wechat_rss",
+      name: "微信公众号 RSS",
+      isEnabled: true,
+      showAllWhenSelected: false
+    });
+  }
+
   return nextOptions;
 }
 
@@ -2648,6 +2794,26 @@ function buildTwitterKeywordFilterModel(
       label: keyword.keyword
     })),
     selectedKeywordIds: normalizeSelectedEntityIds(selectedKeywordIds, availableIds)
+  };
+}
+
+function buildWechatRssFilterModel(
+  sources: WechatRssSourceRecord[],
+  selectedSourceIds: number[] | undefined
+) {
+  if (sources.length === 0) {
+    return undefined;
+  }
+
+  const availableIds = sources.map((source) => source.id);
+
+  return {
+    options: sources.map((source) => ({
+      id: source.id,
+      label: source.displayName?.trim() || `微信公众号 RSS #${source.id}`,
+      rssUrl: source.rssUrl
+    })),
+    selectedSourceIds: normalizeSelectedEntityIds(selectedSourceIds, availableIds)
   };
 }
 
@@ -2923,6 +3089,31 @@ async function handleManualBilibiliCollectAction(
   }
 
   const result = await triggerManualBilibiliCollect();
+  return reply.code(202).send(result);
+}
+
+async function handleManualWechatRssCollectAction(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  authEnabled: boolean,
+  sessionSecret: string,
+  isRunning: boolean,
+  triggerManualWechatRssCollect: ServerDeps["triggerManualWechatRssCollect"]
+) {
+  // 公众号 RSS 是独立来源表，手动入口只处理这组配置，不影响普通 RSS 的默认采集。
+  if (!ensureManualActionAuthorized(request, reply, authEnabled, sessionSecret)) {
+    return;
+  }
+
+  if (isRunning) {
+    return reply.code(409).send({ accepted: false, reason: "already-running" });
+  }
+
+  if (!triggerManualWechatRssCollect) {
+    return reply.code(503).send({ accepted: false });
+  }
+
+  const result = await triggerManualWechatRssCollect();
   return reply.code(202).send(result);
 }
 

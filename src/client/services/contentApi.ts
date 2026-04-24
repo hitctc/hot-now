@@ -41,11 +41,17 @@ export type ContentTwitterKeywordFilter = {
   selectedKeywordIds: number[];
 };
 
+export type ContentWechatRssFilter = {
+  options: { id: number; label: string; rssUrl: string }[];
+  selectedSourceIds: number[];
+};
+
 export type ContentPageModel = {
   pageKey: ContentPageKey;
   sourceFilter?: ContentSourceFilter;
   twitterAccountFilter?: ContentTwitterAccountFilter;
   twitterKeywordFilter?: ContentTwitterKeywordFilter;
+  wechatRssFilter?: ContentWechatRssFilter;
   featuredCard: ContentCard | null;
   cards: ContentCard[];
   strategySummary: {
@@ -85,12 +91,14 @@ export const CONTENT_SORT_STORAGE_KEY = "hot-now-content-sort";
 export const CONTENT_SEARCH_STORAGE_KEY = "hot-now-content-search";
 export const CONTENT_TWITTER_ACCOUNT_STORAGE_KEY = "hot-now-twitter-account-filter";
 export const CONTENT_TWITTER_KEYWORD_STORAGE_KEY = "hot-now-twitter-keyword-filter";
+export const CONTENT_WECHAT_RSS_STORAGE_KEY = "hot-now-wechat-rss-filter";
 const contentSourceStorageVersion = "2";
 
 export type ReadContentPageOptions = {
   selectedSourceKinds?: string[];
   selectedTwitterAccountIds?: number[];
   selectedTwitterKeywordIds?: number[];
+  selectedWechatRssSourceIds?: number[];
   sortMode?: ContentSortMode;
   page?: number;
   searchKeyword?: string;
@@ -213,6 +221,7 @@ function createContentPageRequestHeaders(
   selectedSourceKinds: string[] | undefined,
   selectedTwitterAccountIds: number[] | undefined,
   selectedTwitterKeywordIds: number[] | undefined,
+  selectedWechatRssSourceIds: number[] | undefined,
   sortMode: ContentSortMode | undefined,
   searchKeyword: string | undefined
 ): HeadersInit | undefined {
@@ -232,6 +241,10 @@ function createContentPageRequestHeaders(
 
   if (selectedTwitterKeywordIds !== undefined) {
     headers["x-hot-now-twitter-keyword-filter"] = normalizeSelectedEntityIds(selectedTwitterKeywordIds).join(",");
+  }
+
+  if (selectedWechatRssSourceIds !== undefined) {
+    headers["x-hot-now-wechat-rss-filter"] = normalizeSelectedEntityIds(selectedWechatRssSourceIds).join(",");
   }
 
   const normalizedSearchKeyword = typeof searchKeyword === "string" ? searchKeyword.trim() : "";
@@ -260,6 +273,7 @@ async function readContentPage(
       options.selectedSourceKinds,
       options.selectedTwitterAccountIds,
       options.selectedTwitterKeywordIds,
+      options.selectedWechatRssSourceIds,
       options.sortMode,
       options.searchKeyword
     )
@@ -307,6 +321,14 @@ export function readStoredTwitterKeywordIds(): number[] | null {
 
 export function writeStoredTwitterKeywordIds(selectedKeywordIds: number[]): void {
   writePersistedNumberArray(CONTENT_TWITTER_KEYWORD_STORAGE_KEY, normalizeSelectedEntityIds(selectedKeywordIds));
+}
+
+export function readStoredWechatRssSourceIds(): number[] | null {
+  return readPersistedNumberArray(CONTENT_WECHAT_RSS_STORAGE_KEY);
+}
+
+export function writeStoredWechatRssSourceIds(selectedSourceIds: number[]): void {
+  writePersistedNumberArray(CONTENT_WECHAT_RSS_STORAGE_KEY, normalizeSelectedEntityIds(selectedSourceIds));
 }
 
 export function readStoredContentSortMode(): ContentSortMode | null {
@@ -357,6 +379,7 @@ export function readAiNewPage(
     selectedSourceKinds: options.selectedSourceKinds,
     selectedTwitterAccountIds: options.selectedTwitterAccountIds,
     selectedTwitterKeywordIds: options.selectedTwitterKeywordIds,
+    selectedWechatRssSourceIds: options.selectedWechatRssSourceIds,
     sortMode: options.sortMode ?? "published_at",
     searchKeyword: options.searchKeyword
   });
@@ -369,6 +392,7 @@ export function readAiHotPage(
     selectedSourceKinds: options.selectedSourceKinds,
     selectedTwitterAccountIds: options.selectedTwitterAccountIds,
     selectedTwitterKeywordIds: options.selectedTwitterKeywordIds,
+    selectedWechatRssSourceIds: options.selectedWechatRssSourceIds,
     sortMode: options.sortMode ?? "published_at",
     searchKeyword: options.searchKeyword
   });

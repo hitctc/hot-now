@@ -27,7 +27,8 @@ const expectedTables = [
   "twitter_search_keyword_matches",
   "twitter_search_keywords",
   "user_profile",
-  "view_rule_configs"
+  "view_rule_configs",
+  "wechat_rss_sources"
 ];
 
 describe("runMigrations", () => {
@@ -70,7 +71,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(12);
+    expect(schemaVersion).toBe(13);
 
     const appliedMigrations = db
       .prepare(
@@ -94,7 +95,8 @@ describe("runMigrations", () => {
       { version: 9, name: "009_twitter_search_keywords" },
       { version: 10, name: "010_hackernews_queries" },
       { version: 11, name: "011_bilibili_queries" },
-      { version: 12, name: "012_weibo_trending" }
+      { version: 12, name: "012_weibo_trending" },
+      { version: 13, name: "013_wechat_rss_sources" }
     ]);
 
     const hiddenAggregates = db
@@ -102,7 +104,7 @@ describe("runMigrations", () => {
         `
           SELECT kind, source_type
           FROM content_sources
-          WHERE kind IN ('twitter_keyword_search', 'hackernews_search', 'bilibili_search', 'weibo_trending')
+          WHERE kind IN ('twitter_keyword_search', 'hackernews_search', 'bilibili_search', 'weibo_trending', 'wechat_rss')
           ORDER BY kind ASC
         `
       )
@@ -112,6 +114,7 @@ describe("runMigrations", () => {
       { kind: "bilibili_search", source_type: "bilibili_search_aggregate" },
       { kind: "hackernews_search", source_type: "hackernews_aggregate" },
       { kind: "twitter_keyword_search", source_type: "twitter_keyword_aggregate" },
+      { kind: "wechat_rss", source_type: "wechat_rss_aggregate" },
       { kind: "weibo_trending", source_type: "weibo_trending_aggregate" }
     ]);
 
@@ -264,6 +267,28 @@ describe("runMigrations", () => {
       ])
     );
 
+    const wechatRssSourceColumns = db
+      .prepare(
+        `
+          PRAGMA table_info(wechat_rss_sources)
+        `
+      )
+      .all() as Array<{ name: string }>;
+
+    expect(wechatRssSourceColumns.map((column) => column.name)).toEqual(
+      expect.arrayContaining([
+        "id",
+        "rss_url",
+        "display_name",
+        "is_enabled",
+        "last_fetched_at",
+        "last_success_at",
+        "last_result",
+        "created_at",
+        "updated_at"
+      ])
+    );
+
     const providerSettingsColumns = db
       .prepare(
         `
@@ -333,6 +358,14 @@ describe("runMigrations", () => {
           is_enabled: 0,
           show_all_when_selected: 0,
           source_type: "bilibili_search_aggregate",
+          bridge_kind: null,
+          bridge_config_json: null
+        },
+        {
+          kind: "wechat_rss",
+          is_enabled: 0,
+          show_all_when_selected: 0,
+          source_type: "wechat_rss_aggregate",
           bridge_kind: null,
           bridge_config_json: null
         }

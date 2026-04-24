@@ -27,6 +27,7 @@ vi.mock("../../src/client/services/settingsApi", async () => {
     createHackerNewsQuery: vi.fn(),
     createTwitterAccount: vi.fn(),
     createTwitterSearchKeyword: vi.fn(),
+    createWechatRssSources: vi.fn(),
     updateHackerNewsQuery: vi.fn(),
     updateBilibiliQuery: vi.fn(),
     updateTwitterAccount: vi.fn(),
@@ -35,6 +36,7 @@ vi.mock("../../src/client/services/settingsApi", async () => {
     deleteBilibiliQuery: vi.fn(),
     deleteTwitterAccount: vi.fn(),
     deleteTwitterSearchKeyword: vi.fn(),
+    deleteWechatRssSource: vi.fn(),
     toggleHackerNewsQuery: vi.fn(),
     toggleBilibiliQuery: vi.fn(),
     toggleTwitterAccount: vi.fn(),
@@ -44,6 +46,7 @@ vi.mock("../../src/client/services/settingsApi", async () => {
     triggerManualBilibiliCollect: vi.fn(),
     triggerManualHackerNewsCollect: vi.fn(),
     triggerManualWeiboTrendingCollect: vi.fn(),
+    triggerManualWechatRssCollect: vi.fn(),
     triggerManualTwitterCollect: vi.fn(),
     triggerManualTwitterKeywordCollect: vi.fn(),
     triggerManualSendLatestEmail: vi.fn()
@@ -174,6 +177,19 @@ function createSourcesModel() {
         updatedAt: "2026-04-23T08:31:00.000Z"
       }
     ],
+    wechatRssSources: [
+      {
+        id: 41,
+        rssUrl: "https://rss.example.com/wechat.xml",
+        displayName: "AI 公众号 RSS",
+        isEnabled: true,
+        lastFetchedAt: "2026-04-23T08:50:00.000Z",
+        lastSuccessAt: "2026-04-23T08:51:00.000Z",
+        lastResult: "本次抓取成功，获得 2 条候选内容。",
+        createdAt: "2026-04-23T07:00:00.000Z",
+        updatedAt: "2026-04-23T08:51:00.000Z"
+      }
+    ],
     weiboTrending: {
       fixedKeywords: ["OpenAI", "AI", "大模型"],
       lastFetchedAt: "2026-04-23T08:40:00.000Z",
@@ -190,6 +206,7 @@ function createSourcesModel() {
       canTriggerManualHackerNewsCollect: true,
       canTriggerManualBilibiliCollect: true,
       canTriggerManualWeiboTrendingCollect: true,
+      canTriggerManualWechatRssCollect: true,
       canTriggerManualSendLatestEmail: true,
       isRunning: false
     },
@@ -204,6 +221,8 @@ function createSourcesModel() {
       hackerNewsSearchMessage: "Hacker News 搜索已就绪，可维护 query 并手动采集。",
       bilibiliSearchEnabled: true,
       bilibiliSearchMessage: "B 站搜索已就绪，可维护 query 并手动采集。",
+      wechatRssEnabled: true,
+      wechatRssMessage: "微信公众号 RSS 已就绪，可批量维护 RSS 链接并手动采集。",
       weiboTrendingEnabled: true,
       weiboTrendingMessage: "微博热搜榜匹配已就绪，固定 AI 关键词只进入 AI 热点。"
     }
@@ -289,6 +308,12 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-sources-section='bilibili']").text()).toContain("openai");
     expect(wrapper.get("[data-sources-section='bilibili']").text()).toContain("B 站搜索已就绪");
     expect(wrapper.get("[data-sources-section='bilibili']").text()).toContain("手动采集 B 站搜索");
+    expect(wrapper.get("[data-sources-section='wechat-rss']").text()).toContain("微信公众号 RSS");
+    expect(wrapper.get("[data-sources-section='wechat-rss']").text()).toContain("批量新增公众号 RSS");
+    expect(wrapper.get("[data-sources-section='wechat-rss']").text()).toContain("AI 公众号 RSS");
+    expect(wrapper.get("[data-sources-section='wechat-rss']").text()).toContain("https://rss.example.com/wechat.xml");
+    expect(wrapper.get("[data-sources-section='wechat-rss']").text()).toContain("微信公众号 RSS 已就绪");
+    expect(wrapper.get("[data-sources-section='wechat-rss']").text()).toContain("手动采集公众号 RSS");
     expect(wrapper.get("[data-sources-section='weibo-trending']").text()).toContain("微博热搜榜匹配");
     expect(wrapper.get("[data-sources-section='weibo-trending']").text()).toContain("固定只进入 AI 热点");
     expect(wrapper.get("[data-sources-section='weibo-trending']").text()).toContain("微博热搜榜匹配已就绪");
@@ -505,6 +530,29 @@ describe("SourcesPage", () => {
 
     expect(settingsApi.triggerManualWeiboTrendingCollect).toHaveBeenCalledTimes(1);
     expect(wrapper.text()).toContain("微博热搜榜匹配已完成：命中 2 个话题，新入库 1 条，复用 1 条，失败 0 次。");
+  });
+
+  it("starts WeChat RSS collection and shows the persisted count summary", async () => {
+    vi.mocked(settingsApi.readSettingsSources)
+      .mockResolvedValueOnce(createSourcesModel())
+      .mockResolvedValueOnce(createSourcesModel());
+    vi.mocked(settingsApi.triggerManualWechatRssCollect).mockResolvedValue({
+      accepted: true,
+      action: "collect-wechat-rss",
+      enabledSourceCount: 1,
+      fetchedItemCount: 2,
+      persistedContentItemCount: 1,
+      failureCount: 0
+    });
+
+    const wrapper = mountSourcesPage();
+
+    await flushPromises();
+    await wrapper.get("[data-action='manual-wechat-rss-collect']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.triggerManualWechatRssCollect).toHaveBeenCalledTimes(1);
+    expect(wrapper.text()).toContain("微信公众号 RSS 采集已完成：启用 1 个 RSS，抓取 2 条，写入/更新 1 条，失败 0 个。");
   });
 
   it("updates source display mode and reloads the latest sources model", async () => {
@@ -859,6 +907,32 @@ describe("SourcesPage", () => {
     );
   });
 
+  it("submits WeChat RSS links from the batch create modal", async () => {
+    vi.mocked(settingsApi.readSettingsSources).mockResolvedValue(createSourcesModel());
+    vi.mocked(settingsApi.createWechatRssSources).mockResolvedValue({
+      ok: true,
+      created: [createSourcesModel().wechatRssSources![0]],
+      skippedDuplicateUrls: []
+    });
+
+    const wrapper = mountSourcesPage();
+    await flushPromises();
+
+    await wrapper.get("[data-action='add-wechat-rss-source']").trigger("click");
+    await flushPromises();
+    expect(getModalNode("[data-wechat-rss-capability]").text()).toContain("微信公众号 RSS 已就绪");
+
+    await getModalNode("[data-wechat-rss-form='rss-urls']").setValue(
+      "https://rss.example.com/a.xml\nhttps://rss.example.com/b.xml"
+    );
+    await getModalNode("[data-wechat-rss-form='submit']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.createWechatRssSources).toHaveBeenCalledWith({
+      rssUrls: "https://rss.example.com/a.xml\nhttps://rss.example.com/b.xml"
+    });
+  });
+
   it("updates a custom rss source with the existing modal", async () => {
     vi.mocked(settingsApi.readSettingsSources).mockResolvedValue({
       ...createSourcesModel(),
@@ -1016,6 +1090,34 @@ describe("SourcesPage", () => {
     await flushPromises();
 
     expect(settingsApi.deleteTwitterAccount).toHaveBeenCalledWith(1);
+    expect(settingsApi.readSettingsSources).toHaveBeenCalledTimes(2);
+  });
+
+  it("requires popconfirm before deleting a WeChat RSS source", async () => {
+    vi.mocked(settingsApi.readSettingsSources)
+      .mockResolvedValueOnce(createSourcesModel())
+      .mockResolvedValueOnce({
+        ...createSourcesModel(),
+        wechatRssSources: []
+      });
+    vi.mocked(settingsApi.deleteWechatRssSource).mockResolvedValue({ ok: true, id: 41 });
+
+    const wrapper = mountSourcesPage();
+    await flushPromises();
+
+    await wrapper.get("[data-wechat-rss-delete='41']").trigger("click");
+    expect(settingsApi.deleteWechatRssSource).not.toHaveBeenCalled();
+
+    const wechatRssDeleteConfirm = wrapper
+      .findAllComponents({ name: "APopconfirm" })
+      .find((component) => component.find('[data-wechat-rss-delete="41"]').exists());
+
+    expect(wechatRssDeleteConfirm).toBeTruthy();
+
+    wechatRssDeleteConfirm!.vm.$emit("confirm");
+    await flushPromises();
+
+    expect(settingsApi.deleteWechatRssSource).toHaveBeenCalledWith(41);
     expect(settingsApi.readSettingsSources).toHaveBeenCalledTimes(2);
   });
 });

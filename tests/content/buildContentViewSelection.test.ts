@@ -17,6 +17,7 @@ import { createTwitterAccount } from "../../src/core/twitter/twitterAccountRepos
 import { ensureTwitterAccountsContentSource } from "../../src/core/twitter/twitterAccountCollector.js";
 import { createTwitterSearchKeyword } from "../../src/core/twitter/twitterSearchKeywordRepository.js";
 import { getInternalViewRuleConfig } from "../../src/core/viewRules/viewRuleConfig.js";
+import { createWechatRssSources } from "../../src/core/wechatRss/wechatRssSourceRepository.js";
 
 describe("buildContentViewSelection", () => {
   const databasesToClose: ReturnType<typeof openDatabase>[] = [];
@@ -685,6 +686,46 @@ describe("buildContentViewSelection", () => {
     expect(selection.visibleCards.map((card) => card.title)).toContain("Image keyword item");
     expect(selection.visibleCards.map((card) => card.title)).not.toContain("Sam account item");
     expect(selection.visibleCards.map((card) => card.title)).not.toContain("Noise keyword item");
+  });
+
+  it("filters WeChat RSS aggregate rows by the selected second-level RSS source ids", async () => {
+    const db = await createTestDatabase(databasesToClose);
+    const wechatRssSource = resolveSourceByKind(db, "wechat_rss");
+    const created = createWechatRssSources(db, {
+      rssUrls: ["https://rss.example.com/vendor.xml", "https://rss.example.com/media.xml"]
+    });
+    const sourceIds = created.ok ? created.created.map((source) => source.id) : [];
+
+    expect(wechatRssSource).toBeDefined();
+    expect(sourceIds).toHaveLength(2);
+
+    upsertContentItems(db, {
+      sourceId: wechatRssSource!.id,
+      items: [
+        buildItem(
+          "Vendor 公众号文章",
+          "2026-03-31T03:00:00.000Z",
+          "https://mp.weixin.qq.com/s/vendor",
+          "wechat-rss:vendor",
+          JSON.stringify({ collector: { kind: "wechat_rss", sourceId: sourceIds[0] } })
+        ),
+        buildItem(
+          "Media 公众号文章",
+          "2026-03-31T02:30:00.000Z",
+          "https://mp.weixin.qq.com/s/media",
+          "wechat-rss:media",
+          JSON.stringify({ collector: { kind: "wechat_rss", sourceId: sourceIds[1] } })
+        )
+      ]
+    });
+
+    const selection = buildContentViewSelection(db, "ai", {
+      selectedSourceKinds: ["wechat_rss"],
+      selectedWechatRssSourceIds: [sourceIds[0]]
+    });
+
+    expect(selection.visibleCards.map((card) => card.title)).toContain("Vendor 公众号文章");
+    expect(selection.visibleCards.map((card) => card.title)).not.toContain("Media 公众号文章");
   });
 });
 

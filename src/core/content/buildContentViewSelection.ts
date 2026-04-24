@@ -3,7 +3,8 @@ import { scoreContentItem, type ContentScoreBreakdown } from "./contentScoring.j
 import {
   listTwitterAccountContentItemIds,
   listVisibleTwitterKeywordMatchContentItemIds,
-  listVisibleTwitterKeywordMatchContentItemIdsByKeywordIds
+  listVisibleTwitterKeywordMatchContentItemIdsByKeywordIds,
+  listWechatRssContentItemIds
 } from "./contentRepository.js";
 import { BUILTIN_SOURCES } from "../source/sourceCatalog.js";
 import {
@@ -19,6 +20,7 @@ export type ContentViewSelectionOptions = {
   selectedSourceKinds?: string[];
   selectedTwitterAccountIds?: number[];
   selectedTwitterKeywordIds?: number[];
+  selectedWechatRssSourceIds?: number[];
   referenceTime?: Date;
   limitOverride?: number;
   sortMode?: ContentSortMode;
@@ -83,6 +85,7 @@ type ContentCardRow = {
 const matchingSourceViewBonus = 120;
 const twitterAccountsSourceKind = "twitter_accounts";
 const twitterKeywordSearchSourceKind = "twitter_keyword_search";
+const wechatRssSourceKind = "wechat_rss";
 const hotOnlySourceKinds = new Set(["weibo_trending"]);
 
 const contentSelectSql = `
@@ -135,7 +138,8 @@ export function buildContentViewSelection(
     .all({ viewScope: mapViewScope(viewKey) }) as ContentCardRow[];
   const visibleRows = filterTwitterScopedRows(db, rows, {
     selectedTwitterAccountIds: options.selectedTwitterAccountIds,
-    selectedTwitterKeywordIds: options.selectedTwitterKeywordIds
+    selectedTwitterKeywordIds: options.selectedTwitterKeywordIds,
+    selectedWechatRssSourceIds: options.selectedWechatRssSourceIds
   });
   const rankedCandidates = visibleRows
     .map((row) =>
@@ -216,7 +220,11 @@ export function collectIndependentStatsBySourceForView(
   sourceKinds: string[],
   options: Pick<
     ContentViewSelectionOptions,
-    "includeNlEvaluations" | "referenceTime" | "selectedTwitterAccountIds" | "selectedTwitterKeywordIds"
+    | "includeNlEvaluations"
+    | "referenceTime"
+    | "selectedTwitterAccountIds"
+    | "selectedTwitterKeywordIds"
+    | "selectedWechatRssSourceIds"
   > & {
     countWindow?: "today" | "all" | "last_24_hours";
     ruleConfig?: ViewRuleConfigValues;
@@ -236,7 +244,8 @@ export function collectIndependentStatsBySourceForView(
     .all({ viewScope: mapViewScope(viewKey) }) as ContentCardRow[];
   const visibleRows = filterTwitterScopedRows(db, rows, {
     selectedTwitterAccountIds: options.selectedTwitterAccountIds,
-    selectedTwitterKeywordIds: options.selectedTwitterKeywordIds
+    selectedTwitterKeywordIds: options.selectedTwitterKeywordIds,
+    selectedWechatRssSourceIds: options.selectedWechatRssSourceIds
   });
   const rankedCandidates = visibleRows
     .map((row) =>
@@ -323,19 +332,21 @@ function countCardsForWindow(
   return countCardsWithinShanghaiDay(cards, shanghaiDayStart, shanghaiNextDayStart);
 }
 
-// Twitter 的账号聚合和关键词聚合都走隐藏来源，这里统一把可见性和二级筛选条件收口到一处。
+// 隐藏聚合来源的二级筛选都在这里统一处理，避免内容页和统计页各自解析 metadata。
 function filterTwitterScopedRows(
   db: SqliteDatabase,
   rows: ContentCardRow[],
   options: {
     selectedTwitterAccountIds?: number[];
     selectedTwitterKeywordIds?: number[];
+    selectedWechatRssSourceIds?: number[];
   }
 ) {
   const twitterAccountRows = rows.filter((row) => row.sourceKind === twitterAccountsSourceKind);
   const twitterKeywordRows = rows.filter((row) => row.sourceKind === twitterKeywordSearchSourceKind);
+  const wechatRssRows = rows.filter((row) => row.sourceKind === wechatRssSourceKind);
 
-  if (twitterAccountRows.length === 0 && twitterKeywordRows.length === 0) {
+  if (twitterAccountRows.length === 0 && twitterKeywordRows.length === 0 && wechatRssRows.length === 0) {
     return rows;
   }
 
@@ -363,6 +374,15 @@ function filterTwitterScopedRows(
           options.selectedTwitterKeywordIds
         )
       );
+  const selectedWechatRssContentItemIdSet = options.selectedWechatRssSourceIds === undefined
+    ? null
+    : new Set(
+        listWechatRssContentItemIds(
+          db,
+          wechatRssRows.map((row) => row.id),
+          options.selectedWechatRssSourceIds
+        )
+      );
 
   return rows.filter((row) => {
     if (row.sourceKind === twitterAccountsSourceKind) {
@@ -375,6 +395,10 @@ function filterTwitterScopedRows(
       }
 
       return selectedTwitterKeywordContentItemIdSet === null || selectedTwitterKeywordContentItemIdSet.has(row.id);
+    }
+
+    if (row.sourceKind === wechatRssSourceKind) {
+      return selectedWechatRssContentItemIdSet === null || selectedWechatRssContentItemIdSet.has(row.id);
     }
 
     return true;

@@ -56,7 +56,8 @@ export function listSourceCards(db: SqliteDatabase): SourceCard[] {
           'twitter_keyword_aggregate',
           'hackernews_aggregate',
           'bilibili_search_aggregate',
-          'weibo_trending_aggregate'
+          'weibo_trending_aggregate',
+          'wechat_rss_aggregate'
         )
         ORDER BY id ASC
       `

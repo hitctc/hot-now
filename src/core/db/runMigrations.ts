@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 12;
+const schemaVersion = 13;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -13,6 +13,7 @@ const twitterSearchKeywordsMigrationName = "009_twitter_search_keywords";
 const hackerNewsQueriesMigrationName = "010_hackernews_queries";
 const bilibiliQueriesMigrationName = "011_bilibili_queries";
 const weiboTrendingMigrationName = "012_weibo_trending";
+const wechatRssSourcesMigrationName = "013_wechat_rss_sources";
 
 const migrationStatements = [
   `
@@ -643,6 +644,65 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(12, weiboTrendingMigrationName);
+
+    // 微信公众号 RSS 进入独立配置表，避免把每个公众号 feed 混进普通 RSS 库存。
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS wechat_rss_sources (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        rss_url TEXT NOT NULL UNIQUE,
+        display_name TEXT,
+        is_enabled INTEGER NOT NULL DEFAULT 1,
+        last_fetched_at TEXT,
+        last_success_at TEXT,
+        last_result TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_wechat_rss_sources_enabled
+      ON wechat_rss_sources(is_enabled)
+    `);
+
+    db.prepare(
+      `
+        INSERT INTO content_sources (
+          kind,
+          name,
+          site_url,
+          rss_url,
+          is_enabled,
+          is_builtin,
+          source_type,
+          show_all_when_selected,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, 0, 0, ?, 0, CURRENT_TIMESTAMP)
+        ON CONFLICT(kind) DO UPDATE SET
+          name = excluded.name,
+          site_url = excluded.site_url,
+          source_type = excluded.source_type,
+          is_enabled = 0,
+          is_builtin = 0,
+          show_all_when_selected = 0,
+          updated_at = CURRENT_TIMESTAMP
+      `
+    ).run(
+      "wechat_rss",
+      "微信公众号 RSS",
+      "https://mp.weixin.qq.com/",
+      null,
+      "wechat_rss_aggregate"
+    );
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(13, wechatRssSourcesMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

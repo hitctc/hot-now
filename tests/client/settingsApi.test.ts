@@ -496,6 +496,31 @@ describe("settingsApi", () => {
     });
   });
 
+  it("posts WeChat RSS batch create delete and manual collection to dedicated actions", async () => {
+    const { createWechatRssSources, deleteWechatRssSource, triggerManualWechatRssCollect } = await import(
+      "../../src/client/services/settingsApi"
+    );
+
+    requestJson.mockResolvedValue({ ok: true });
+
+    await createWechatRssSources({ rssUrls: "https://rss.example.com/a.xml\nhttps://rss.example.com/b.xml" });
+    await deleteWechatRssSource(31);
+    await triggerManualWechatRssCollect();
+
+    expect(requestJson).toHaveBeenNthCalledWith(1, "/actions/wechat-rss/create", {
+      method: "POST",
+      body: JSON.stringify({ rssUrls: "https://rss.example.com/a.xml\nhttps://rss.example.com/b.xml" })
+    });
+    expect(requestJson).toHaveBeenNthCalledWith(2, "/actions/wechat-rss/delete", {
+      method: "POST",
+      body: JSON.stringify({ id: 31 })
+    });
+    expect(requestJson).toHaveBeenNthCalledWith(3, "/actions/wechat-rss/collect", {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+  });
+
   it("posts manual weibo trending collection to the dedicated action", async () => {
     const { triggerManualWeiboTrendingCollect } = await import("../../src/client/services/settingsApi");
 

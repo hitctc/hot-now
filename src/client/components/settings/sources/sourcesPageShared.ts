@@ -4,7 +4,8 @@ import type {
   SettingsSourceItem,
   SettingsSourcesResponse,
   SettingsTwitterAccount,
-  SettingsTwitterSearchKeyword
+  SettingsTwitterSearchKeyword,
+  SettingsWechatRssSource
 } from "../../../services/settingsApi";
 
 export type SourceModalMode = "create" | "update";
@@ -54,6 +55,10 @@ export type BilibiliQueryFormState = {
   notes: string;
 };
 
+export type WechatRssFormState = {
+  rssUrls: string;
+};
+
 export type SourcesActionPendingGetter = (actionKey: string) => boolean;
 export type SourceViewStats = NonNullable<SettingsSourceItem["viewStats"]>["ai"];
 export type SourcesOperations = SettingsSourcesResponse["operations"];
@@ -65,6 +70,7 @@ export type SourceEventMap = {
   twitterKeyword: SettingsTwitterSearchKeyword;
   hackerNewsQuery: SettingsHackerNewsQuery;
   bilibiliQuery: SettingsBilibiliQuery;
+  wechatRssSource: SettingsWechatRssSource;
 };
 
 export const inventoryColumns = [
@@ -114,6 +120,13 @@ export const bilibiliQueryColumns = [
   { title: "查询词", key: "query", align: "center" as const },
   { title: "优先级", key: "priority", align: "center" as const },
   { title: "采集启用", key: "enabled", align: "center" as const },
+  { title: "最近成功", key: "lastSuccessAt", align: "center" as const },
+  { title: "最近结果", key: "lastResult", align: "center" as const },
+  { title: "操作", key: "actions", align: "center" as const }
+];
+
+export const wechatRssSourceColumns = [
+  { title: "RSS 链接", key: "rssUrl", align: "center" as const },
   { title: "最近成功", key: "lastSuccessAt", align: "center" as const },
   { title: "最近结果", key: "lastResult", align: "center" as const },
   { title: "操作", key: "actions", align: "center" as const }

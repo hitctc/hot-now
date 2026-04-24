@@ -7,11 +7,13 @@ import {
   createHackerNewsQuery,
   createTwitterAccount,
   createTwitterSearchKeyword,
+  createWechatRssSources,
   createSource,
   deleteBilibiliQuery,
   deleteHackerNewsQuery,
   deleteTwitterAccount,
   deleteTwitterSearchKeyword,
+  deleteWechatRssSource,
   deleteSource,
   readSettingsSources,
   toggleBilibiliQuery,
@@ -25,6 +27,7 @@ import {
   triggerManualTwitterCollect,
   triggerManualTwitterKeywordCollect,
   triggerManualWeiboTrendingCollect,
+  triggerManualWechatRssCollect,
   updateTwitterAccount,
   updateTwitterSearchKeyword,
   updateBilibiliQuery,
@@ -39,6 +42,7 @@ import {
   type ManualTwitterCollectResponse,
   type ManualTwitterKeywordCollectResponse,
   type ManualWeiboTrendingCollectResponse,
+  type ManualWechatRssCollectResponse,
   type ManualSendLatestEmailResponse,
   type SaveBilibiliQueryPayload,
   type SaveHackerNewsQueryPayload,
@@ -49,6 +53,7 @@ import {
   type SettingsSourcesResponse,
   type SettingsTwitterAccount,
   type SettingsTwitterSearchKeyword,
+  type SettingsWechatRssSource,
   type SaveTwitterAccountPayload,
   type SaveTwitterSearchKeywordPayload
 } from "../../../services/settingsApi";
@@ -62,7 +67,8 @@ import type {
   TwitterAccountFormState,
   TwitterAccountModalMode,
   TwitterKeywordFormState,
-  TwitterKeywordModalMode
+  TwitterKeywordModalMode,
+  WechatRssFormState
 } from "./sourcesPageShared";
 
 type AlertTone = "success" | "info" | "warning" | "error";
@@ -81,6 +87,7 @@ export function useSourcesPageController() {
   const isTwitterKeywordModalOpen = ref(false);
   const isHackerNewsQueryModalOpen = ref(false);
   const isBilibiliQueryModalOpen = ref(false);
+  const isWechatRssModalOpen = ref(false);
   const sourceModalMode = ref<SourceModalMode>("create");
   const twitterAccountModalMode = ref<TwitterAccountModalMode>("create");
   const twitterKeywordModalMode = ref<TwitterKeywordModalMode>("create");
@@ -91,11 +98,13 @@ export function useSourcesPageController() {
   const twitterKeywordFormError = ref<string | null>(null);
   const hackerNewsQueryFormError = ref<string | null>(null);
   const bilibiliQueryFormError = ref<string | null>(null);
+  const wechatRssFormError = ref<string | null>(null);
   const sourceForm = reactive<SourceFormState>(createEmptySourceForm());
   const twitterAccountForm = reactive<TwitterAccountFormState>(createEmptyTwitterAccountForm());
   const twitterKeywordForm = reactive<TwitterKeywordFormState>(createEmptyTwitterKeywordForm());
   const hackerNewsQueryForm = reactive<HackerNewsQueryFormState>(createEmptyHackerNewsQueryForm());
   const bilibiliQueryForm = reactive<BilibiliQueryFormState>(createEmptyBilibiliQueryForm());
+  const wechatRssForm = reactive<WechatRssFormState>(createEmptyWechatRssForm());
   const relativeNow = ref(Date.now());
   let nextCollectionTimer: number | null = null;
 
@@ -122,6 +131,10 @@ export function useSourcesPageController() {
   const enabledBilibiliQueryCount = computed(
     () => sourcesModel.value?.bilibiliQueries?.filter((query) => query.isEnabled).length ?? 0
   );
+  const totalWechatRssSourceCount = computed(() => sourcesModel.value?.wechatRssSources?.length ?? 0);
+  const enabledWechatRssSourceCount = computed(
+    () => sourcesModel.value?.wechatRssSources?.filter((source) => source.isEnabled).length ?? 0
+  );
   const fixedWeiboKeywordCount = computed(() => sourcesModel.value?.weiboTrending?.fixedKeywords.length ?? 0);
   const twitterAccountCollectionMessage = computed(
     () =>
@@ -142,6 +155,11 @@ export function useSourcesPageController() {
     () =>
       sourcesModel.value?.capability.bilibiliSearchMessage ??
       "B 站搜索已就绪，可维护 query 并手动采集。"
+  );
+  const wechatRssCollectionMessage = computed(
+    () =>
+      sourcesModel.value?.capability.wechatRssMessage ??
+      "微信公众号 RSS 已就绪，可批量维护 RSS 链接并手动采集。"
   );
   const weiboTrendingMessage = computed(
     () =>
@@ -259,6 +277,17 @@ export function useSourcesPageController() {
     bilibiliQueryFormError.value = null;
   }
 
+  function createEmptyWechatRssForm(): WechatRssFormState {
+    return {
+      rssUrls: ""
+    };
+  }
+
+  function resetWechatRssForm(): void {
+    Object.assign(wechatRssForm, createEmptyWechatRssForm());
+    wechatRssFormError.value = null;
+  }
+
   // 新增模式只需要清空表单并打开弹窗，不再引入额外的临时草稿状态。
   function openCreateSourceModal(): void {
     sourceModalMode.value = "create";
@@ -288,6 +317,11 @@ export function useSourcesPageController() {
     bilibiliQueryModalMode.value = "create";
     resetBilibiliQueryForm();
     isBilibiliQueryModalOpen.value = true;
+  }
+
+  function openCreateWechatRssModal(): void {
+    resetWechatRssForm();
+    isWechatRssModalOpen.value = true;
   }
 
   // 编辑模式只回填 RSS 来源已有配置，kind 继续锁定，避免把“编辑”做成“重命名来源主键”。
@@ -376,6 +410,11 @@ export function useSourcesPageController() {
   function closeBilibiliQueryModal(): void {
     isBilibiliQueryModalOpen.value = false;
     bilibiliQueryFormError.value = null;
+  }
+
+  function closeWechatRssModal(): void {
+    isWechatRssModalOpen.value = false;
+    wechatRssFormError.value = null;
   }
 
   // sources 页错误提示沿用后端 reason 映射，避免把接口细节直接暴露给用户。
@@ -519,6 +558,19 @@ export function useSourcesPageController() {
         isEnabled: bilibiliQueryForm.isEnabled,
         notes: bilibiliQueryForm.notes.trim() || null
       }
+    };
+  }
+
+  function buildWechatRssCreatePayload(): { ok: true; payload: { rssUrls: string } } | { ok: false; message: string } {
+    const rssUrls = wechatRssForm.rssUrls.trim();
+
+    if (!rssUrls) {
+      return { ok: false, message: "请至少填写一个微信公众号 RSS 链接。" };
+    }
+
+    return {
+      ok: true,
+      payload: { rssUrls }
     };
   }
 
@@ -697,6 +749,22 @@ export function useSourcesPageController() {
       reasonMessages: {
         "already-running": "当前已有任务执行中，请稍后再试。",
         "no-enabled-bilibili-queries": "当前没有启用中的 B 站 query，请先启用至少一个 query。",
+        unauthorized: "请先登录后再操作。"
+      }
+    });
+  }
+
+  // 公众号 RSS 只在用户明确点击时抓取，成功提示直接回显本轮写入和失败情况。
+  async function handleManualWechatRssCollect(): Promise<void> {
+    await runSourcesAction("manual:wechat-rss-collect", () => triggerManualWechatRssCollect(), {
+      fallbackMessage: "微信公众号 RSS 采集启动失败，请稍后再试。",
+      successMessage: (result: ManualWechatRssCollectResponse) =>
+        result.accepted
+          ? `微信公众号 RSS 采集已完成：启用 ${result.enabledSourceCount} 个 RSS，抓取 ${result.fetchedItemCount} 条，写入/更新 ${result.persistedContentItemCount} 条，失败 ${result.failureCount} 个。`
+          : "微信公众号 RSS 采集未成功启动。",
+      reasonMessages: {
+        "already-running": "当前已有任务执行中，请稍后再试。",
+        "no-enabled-wechat-rss-sources": "当前没有可采集的微信公众号 RSS，请先新增至少一个 RSS 链接。",
         unauthorized: "请先登录后再操作。"
       }
     });
@@ -1005,6 +1073,53 @@ export function useSourcesPageController() {
     }
   }
 
+  async function handleSubmitWechatRssSources(): Promise<void> {
+    if (isActionPending("wechat-rss:submit")) {
+      return;
+    }
+
+    const payload = buildWechatRssCreatePayload();
+
+    if (!payload.ok) {
+      wechatRssFormError.value = payload.message;
+      return;
+    }
+
+    wechatRssFormError.value = null;
+    setPendingAction("wechat-rss:submit", true);
+
+    try {
+      const result = await createWechatRssSources(payload.payload);
+      const refreshed = await loadSources({ silent: true });
+      closeWechatRssModal();
+      const skippedText = result.skippedDuplicateUrls.length > 0
+        ? `，跳过重复 ${result.skippedDuplicateUrls.length} 条`
+        : "";
+      showNotice(
+        "success",
+        refreshed
+          ? `已新增 ${result.created.length} 条微信公众号 RSS${skippedText}。`
+          : `已新增 ${result.created.length} 条微信公众号 RSS${skippedText}，但最新数据刷新失败，请稍后手动刷新。`
+      );
+    } catch (error) {
+      const notice = readActionErrorMessage(
+        error,
+        "微信公众号 RSS 保存失败，请稍后再试。",
+        {
+          "empty-rss-url-list": "请至少填写一个微信公众号 RSS 链接。",
+          "invalid-rss-url": "存在不合法的 RSS 链接，请检查后重试。",
+          "invalid-wechat-rss-payload": "微信公众号 RSS 配置不完整，请检查后重试。",
+          "wechat-rss-disabled": "当前环境未启用微信公众号 RSS。"
+        }
+      );
+
+      wechatRssFormError.value = notice;
+      showNotice("error", notice);
+    } finally {
+      setPendingAction("wechat-rss:submit", false);
+    }
+  }
+
   async function handleToggleTwitterAccount(account: SettingsTwitterAccount): Promise<void> {
     const nextEnable = !account.isEnabled;
 
@@ -1143,6 +1258,18 @@ export function useSourcesPageController() {
     });
   }
 
+  async function handleDeleteWechatRssSource(source: SettingsWechatRssSource): Promise<void> {
+    await runSourcesAction(`wechat-rss-delete:${source.id}`, () => deleteWechatRssSource(source.id), {
+      fallbackMessage: "删除微信公众号 RSS 失败，请稍后再试。",
+      successMessage: "已删除微信公众号 RSS 配置。",
+      reasonMessages: {
+        "invalid-wechat-rss-source-id": "微信公众号 RSS ID 不合法。",
+        "wechat-rss-disabled": "当前环境未启用微信公众号 RSS。",
+        "not-found": "对应微信公众号 RSS 不存在，可能已被移除。"
+      }
+    });
+  }
+
   // 删除动作只开放给自定义来源，是否允许真正删除仍由后端按 built-in / in-use 决定。
   async function handleDeleteSource(source: SettingsSourceItem): Promise<void> {
     await runSourcesAction(`delete:${source.kind}`, () => deleteSource(source.kind), {
@@ -1183,6 +1310,7 @@ export function useSourcesPageController() {
     isTwitterKeywordModalOpen,
     isHackerNewsQueryModalOpen,
     isBilibiliQueryModalOpen,
+    isWechatRssModalOpen,
     sourceModalMode,
     twitterAccountModalMode,
     twitterKeywordModalMode,
@@ -1193,11 +1321,13 @@ export function useSourcesPageController() {
     twitterKeywordFormError,
     hackerNewsQueryFormError,
     bilibiliQueryFormError,
+    wechatRssFormError,
     sourceForm,
     twitterAccountForm,
     twitterKeywordForm,
     hackerNewsQueryForm,
     bilibiliQueryForm,
+    wechatRssForm,
     relativeNow,
     enabledSourceCount,
     totalSourceCount,
@@ -1210,11 +1340,14 @@ export function useSourcesPageController() {
     enabledHackerNewsQueryCount,
     totalBilibiliQueryCount,
     enabledBilibiliQueryCount,
+    totalWechatRssSourceCount,
+    enabledWechatRssSourceCount,
     fixedWeiboKeywordCount,
     twitterAccountCollectionMessage,
     twitterKeywordCollectionMessage,
     hackerNewsCollectionMessage,
     bilibiliCollectionMessage,
+    wechatRssCollectionMessage,
     weiboTrendingMessage,
     isActionPending,
     loadSources,
@@ -1223,6 +1356,7 @@ export function useSourcesPageController() {
     openCreateTwitterKeywordModal,
     openCreateHackerNewsQueryModal,
     openCreateBilibiliQueryModal,
+    openCreateWechatRssModal,
     openEditSourceModal,
     openEditTwitterAccountModal,
     openEditTwitterKeywordModal,
@@ -1233,6 +1367,7 @@ export function useSourcesPageController() {
     closeTwitterKeywordModal,
     closeHackerNewsQueryModal,
     closeBilibiliQueryModal,
+    closeWechatRssModal,
     handleToggleSource,
     handleToggleSourceDisplayMode,
     handleManualCollect,
@@ -1240,6 +1375,7 @@ export function useSourcesPageController() {
     handleManualTwitterKeywordCollect,
     handleManualHackerNewsCollect,
     handleManualBilibiliCollect,
+    handleManualWechatRssCollect,
     handleManualWeiboTrendingCollect,
     handleManualSendLatestEmail,
     handleSubmitSource,
@@ -1247,6 +1383,7 @@ export function useSourcesPageController() {
     handleSubmitTwitterKeyword,
     handleSubmitHackerNewsQuery,
     handleSubmitBilibiliQuery,
+    handleSubmitWechatRssSources,
     handleToggleTwitterAccount,
     handleDeleteTwitterAccount,
     handleToggleTwitterKeywordCollect,
@@ -1256,6 +1393,7 @@ export function useSourcesPageController() {
     handleDeleteHackerNewsQuery,
     handleToggleBilibiliQuery,
     handleDeleteBilibiliQuery,
+    handleDeleteWechatRssSource,
     handleDeleteSource
   };
 }

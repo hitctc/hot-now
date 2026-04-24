@@ -27,10 +27,11 @@ const {
   handlePaginationChange,
   handleSearchClear,
   handleSearchSubmit,
-  handleSortModeChange,
-  handleSourceKindsChange,
-  handleTwitterAccountsChange,
-  handleTwitterKeywordsChange,
+	  handleSortModeChange,
+	  handleSourceKindsChange,
+	  handleTwitterAccountsChange,
+	  handleTwitterKeywordsChange,
+	  handleWechatRssChange,
   hasLoadError,
   isLoading,
   isRefreshing,
@@ -38,9 +39,10 @@ const {
   loadError,
   pageModel,
   pagination,
-  selectedSourceKinds,
-  selectedTwitterAccountIds,
-  selectedTwitterKeywordIds,
+	  selectedSourceKinds,
+	  selectedTwitterAccountIds,
+	  selectedTwitterKeywordIds,
+	  selectedWechatRssSourceIds,
   showBackToTopButton,
   sortMode,
   sourceFilter,
@@ -83,19 +85,26 @@ function readStageAccentClass(): string {
               selectedAccountIds: selectedTwitterAccountIds ?? pageModel.twitterAccountFilter.selectedAccountIds
             }
           : undefined"
-        :twitter-keyword-filter="pageModel?.twitterKeywordFilter
-          ? {
-              ...pageModel.twitterKeywordFilter,
-              selectedKeywordIds: selectedTwitterKeywordIds ?? pageModel.twitterKeywordFilter.selectedKeywordIds
-            }
-          : undefined"
+	        :twitter-keyword-filter="pageModel?.twitterKeywordFilter
+	          ? {
+	              ...pageModel.twitterKeywordFilter,
+	              selectedKeywordIds: selectedTwitterKeywordIds ?? pageModel.twitterKeywordFilter.selectedKeywordIds
+	            }
+	          : undefined"
+	        :wechat-rss-filter="pageModel?.wechatRssFilter
+	          ? {
+	              ...pageModel.wechatRssFilter,
+	              selectedSourceIds: selectedWechatRssSourceIds ?? pageModel.wechatRssFilter.selectedSourceIds
+	            }
+	          : undefined"
         :visible-result-count="visibleResultCount"
         :sort-mode="sortMode"
         :keyword="appliedSearchKeyword"
         :is-loading="isRefreshing"
         @change-source="handleSourceKindsChange"
-        @change-twitter-accounts="handleTwitterAccountsChange"
-        @change-twitter-keywords="handleTwitterKeywordsChange"
+	        @change-twitter-accounts="handleTwitterAccountsChange"
+	        @change-twitter-keywords="handleTwitterKeywordsChange"
+	        @change-wechat-rss="handleWechatRssChange"
         @change-sort="handleSortModeChange"
         @search="handleSearchSubmit"
         @clear="handleSearchClear"

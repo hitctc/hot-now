@@ -7,6 +7,7 @@ import { createHackerNewsQuery } from "../../src/core/hackernews/hackerNewsQuery
 import { ensureTwitterAccountsContentSource } from "../../src/core/twitter/twitterAccountCollector.js";
 import { createTwitterAccount } from "../../src/core/twitter/twitterAccountRepository.js";
 import { createTwitterSearchKeyword } from "../../src/core/twitter/twitterSearchKeywordRepository.js";
+import { createWechatRssSources } from "../../src/core/wechatRss/wechatRssSourceRepository.js";
 import { createTestDatabase } from "../helpers/testDatabase.js";
 
 describe("buildContentPageModel", () => {
@@ -244,6 +245,60 @@ describe("buildContentPageModel", () => {
     );
     expect(aiNewModel.cards.map((card) => card.title)).toContain("OpenAI Codex B 站视频");
     expect(aiHotModel.sourceFilter?.options.map((option) => option.kind)).not.toContain("weibo_trending");
+  });
+
+  it("exposes WeChat RSS as a parent source and defaults child RSS filters to all options", async () => {
+    const handle = await createTestDatabase("hot-now-content-page-wechat-rss-");
+    handles.push(handle);
+    const wechatRssSource = resolveSourceByKind(handle.db, "wechat_rss");
+    const created = createWechatRssSources(handle.db, {
+      rssUrls: ["https://rss.example.com/vendor.xml", "https://rss.example.com/media.xml"]
+    });
+    const sourceIds = created.ok ? created.created.map((source) => source.id) : [];
+
+    expect(wechatRssSource).toBeDefined();
+    expect(sourceIds).toHaveLength(2);
+
+    upsertContentItems(handle.db, {
+      sourceId: wechatRssSource!.id,
+      items: [
+        {
+          title: "Vendor 公众号 RSS 内容",
+          canonicalUrl: "https://mp.weixin.qq.com/s/vendor-content",
+          summary: "Vendor 公众号 RSS 内容摘要",
+          bodyMarkdown: "Vendor 公众号 RSS 内容正文",
+          externalId: "wechat-rss:vendor-content",
+          metadataJson: JSON.stringify({ collector: { kind: "wechat_rss", sourceId: sourceIds[0] } }),
+          publishedAt: "2026-03-31T03:00:00.000Z",
+          fetchedAt: "2026-03-31T03:00:05.000Z"
+        },
+        {
+          title: "Media 公众号 RSS 内容",
+          canonicalUrl: "https://mp.weixin.qq.com/s/media-content",
+          summary: "Media 公众号 RSS 内容摘要",
+          bodyMarkdown: "Media 公众号 RSS 内容正文",
+          externalId: "wechat-rss:media-content",
+          metadataJson: JSON.stringify({ collector: { kind: "wechat_rss", sourceId: sourceIds[1] } }),
+          publishedAt: "2026-03-31T02:30:00.000Z",
+          fetchedAt: "2026-03-31T02:30:05.000Z"
+        }
+      ]
+    });
+
+    const defaultModel = buildContentPageModel(handle.db, "ai-new");
+    const filteredModel = buildContentPageModel(handle.db, "ai-new", {
+      selectedSourceKinds: ["wechat_rss"],
+      selectedWechatRssSourceIds: [sourceIds[0]]
+    });
+
+    expect(defaultModel.sourceFilter?.options.map((option) => option.kind)).toContain("wechat_rss");
+    expect(defaultModel.sourceFilter?.selectedSourceKinds).toContain("wechat_rss");
+    expect(defaultModel.wechatRssFilter?.options.map((option) => option.id)).toEqual(sourceIds);
+    expect(defaultModel.wechatRssFilter?.selectedSourceIds).toEqual(sourceIds);
+    expect(defaultModel.cards.map((card) => card.title)).toContain("Vendor 公众号 RSS 内容");
+    expect(defaultModel.cards.map((card) => card.title)).toContain("Media 公众号 RSS 内容");
+    expect(filteredModel.cards.map((card) => card.title)).toContain("Vendor 公众号 RSS 内容");
+    expect(filteredModel.cards.map((card) => card.title)).not.toContain("Media 公众号 RSS 内容");
   });
 });
 

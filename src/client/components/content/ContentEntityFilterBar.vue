@@ -8,8 +8,8 @@ import {
 } from "./contentCardShared";
 
 const props = withDefaults(
-  defineProps<{
-    filterKey: "twitter-accounts" | "twitter-keywords";
+	  defineProps<{
+	    filterKey: "twitter-accounts" | "twitter-keywords" | "wechat-rss";
     title: string;
     options: { id: number; label: string; hint?: string }[];
     selectedIds: number[];

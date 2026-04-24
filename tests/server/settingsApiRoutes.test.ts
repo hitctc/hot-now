@@ -149,6 +149,19 @@ function createAuthenticatedServer() {
         updatedAt: "2026-04-23T08:00:00.000Z"
       }
     ]),
+    listWechatRssSources: vi.fn().mockResolvedValue([
+      {
+        id: 31,
+        rssUrl: "https://rss.example.com/wechat.xml",
+        displayName: "AI 公众号 RSS",
+        isEnabled: true,
+        lastFetchedAt: "2026-04-23T08:50:00.000Z",
+        lastSuccessAt: "2026-04-23T08:51:00.000Z",
+        lastResult: "本次抓取成功，获得 2 条候选内容。",
+        createdAt: "2026-04-23T08:00:00.000Z",
+        updatedAt: "2026-04-23T08:51:00.000Z"
+      }
+    ]),
     getWeiboTrendingState: vi.fn().mockResolvedValue({
       fixedKeywords: ["OpenAI", "AI"],
       lastFetchedAt: "2026-04-23T08:40:00.000Z",
@@ -160,6 +173,32 @@ function createAuthenticatedServer() {
     triggerManualHackerNewsCollect: vi.fn().mockResolvedValue({ accepted: true }),
     triggerManualBilibiliCollect: vi.fn().mockResolvedValue({ accepted: true }),
     triggerManualWeiboTrendingCollect: vi.fn().mockResolvedValue({ accepted: true }),
+    triggerManualWechatRssCollect: vi.fn().mockResolvedValue({
+      accepted: true,
+      action: "collect-wechat-rss",
+      enabledSourceCount: 1,
+      fetchedItemCount: 2,
+      persistedContentItemCount: 2,
+      failureCount: 0
+    }),
+    createWechatRssSources: vi.fn().mockResolvedValue({
+      ok: true,
+      created: [
+        {
+          id: 32,
+          rssUrl: "https://rss.example.com/new.xml",
+          displayName: "公众号 RSS / rss.example.com",
+          isEnabled: true,
+          lastFetchedAt: null,
+          lastSuccessAt: null,
+          lastResult: null,
+          createdAt: "2026-04-23T09:00:00.000Z",
+          updatedAt: "2026-04-23T09:00:00.000Z"
+        }
+      ],
+      skippedDuplicateUrls: []
+    }),
+    deleteWechatRssSource: vi.fn().mockResolvedValue({ ok: true, id: 31 }),
     getSourcesOperationSummary: vi.fn().mockResolvedValue({
       lastCollectionRunAt: "2026-03-31T03:00:00.000Z",
       lastSendLatestEmailAt: "2026-03-31T03:10:00.000Z"
@@ -279,6 +318,14 @@ describe("settings api routes", () => {
           isEnabled: true
         }
       ],
+      wechatRssSources: [
+        {
+          id: 31,
+          rssUrl: "https://rss.example.com/wechat.xml",
+          displayName: "AI 公众号 RSS",
+          isEnabled: true
+        }
+      ],
       weiboTrending: {
         fixedKeywords: ["OpenAI", "AI"],
         lastResult: "本次匹配成功，命中 1 个微博热搜话题。"
@@ -292,6 +339,7 @@ describe("settings api routes", () => {
         canTriggerManualHackerNewsCollect: true,
         canTriggerManualBilibiliCollect: true,
         canTriggerManualWeiboTrendingCollect: true,
+        canTriggerManualWechatRssCollect: true,
         canTriggerManualSendLatestEmail: false,
         isRunning: false
       },
@@ -300,9 +348,45 @@ describe("settings api routes", () => {
         twitterAccountCollectionEnabled: true,
         hackerNewsSearchEnabled: true,
         bilibiliSearchEnabled: true,
-        weiboTrendingEnabled: true
+        weiboTrendingEnabled: true,
+        wechatRssEnabled: true
       }
     });
+  });
+
+  it("accepts WeChat RSS batch create, manual collect, and delete actions", async () => {
+    const app = createAuthenticatedServer();
+    const cookie = await loginAndGetCookie(app);
+
+    const createResponse = await app.inject({
+      method: "POST",
+      url: "/actions/wechat-rss/create",
+      headers: { cookie: cookie ?? "" },
+      payload: { rssUrls: "https://rss.example.com/new.xml\nhttps://rss.example.com/other.xml" }
+    });
+    const collectResponse = await app.inject({
+      method: "POST",
+      url: "/actions/wechat-rss/collect",
+      headers: { cookie: cookie ?? "" }
+    });
+    const deleteResponse = await app.inject({
+      method: "POST",
+      url: "/actions/wechat-rss/delete",
+      headers: { cookie: cookie ?? "" },
+      payload: { id: 31 }
+    });
+
+    expect(createResponse.statusCode).toBe(200);
+    expect(createResponse.json()).toMatchObject({ ok: true, created: [{ id: 32 }] });
+    expect(collectResponse.statusCode).toBe(202);
+    expect(collectResponse.json()).toMatchObject({
+      accepted: true,
+      action: "collect-wechat-rss",
+      enabledSourceCount: 1,
+      persistedContentItemCount: 2
+    });
+    expect(deleteResponse.statusCode).toBe(200);
+    expect(deleteResponse.json()).toEqual({ ok: true, id: 31 });
   });
 
   it("does not pass content-page source filters through to the sources workbench reader", async () => {

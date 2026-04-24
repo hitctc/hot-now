@@ -5,6 +5,7 @@ import { listBilibiliQueries } from "../bilibili/bilibiliQueryRepository.js";
 import { listHackerNewsQueries } from "../hackernews/hackerNewsQueryRepository.js";
 import { listTwitterAccounts, type TwitterAccountRecord } from "../twitter/twitterAccountRepository.js";
 import { listTwitterSearchKeywords, type TwitterSearchKeywordRecord } from "../twitter/twitterSearchKeywordRepository.js";
+import { listWechatRssSources, type WechatRssSourceRecord } from "../wechatRss/wechatRssSourceRepository.js";
 import {
   buildContentViewSelection,
   type ContentSortMode
@@ -35,6 +36,10 @@ export type ContentPageModel = {
     options: { id: number; label: string }[];
     selectedKeywordIds: number[];
   };
+  wechatRssFilter?: {
+    options: { id: number; label: string; rssUrl: string }[];
+    selectedSourceIds: number[];
+  };
   featuredCard: ContentCardView | null;
   cards: ContentCardView[];
   strategySummary: {
@@ -54,6 +59,7 @@ export type BuildContentPageModelOptions = {
   selectedSourceKinds?: string[];
   selectedTwitterAccountIds?: number[];
   selectedTwitterKeywordIds?: number[];
+  selectedWechatRssSourceIds?: number[];
   sortMode?: ContentSortMode;
   page?: number;
   searchKeyword?: string;
@@ -65,6 +71,7 @@ const twitterKeywordSearchSourceKind = "twitter_keyword_search";
 const hackerNewsSourceKind = "hackernews_search";
 const bilibiliSourceKind = "bilibili_search";
 const weiboTrendingSourceKind = "weibo_trending";
+const wechatRssSourceKind = "wechat_rss";
 
 // 内容页模型在这里统一拼装，避免 server route 再复制一套精选卡、来源筛选和空态判断。
 export function buildContentPageModel(
@@ -76,6 +83,7 @@ export function buildContentPageModel(
   const twitterKeywords = listTwitterSearchKeywords(db);
   const hackerNewsQueries = listHackerNewsQueries(db);
   const bilibiliQueries = listBilibiliQueries(db);
+  const wechatRssSources = listWechatRssSources(db);
   const hasHackerNewsContent = hasContentItemsForSourceKind(db, hackerNewsSourceKind);
   const hasBilibiliContent = hasContentItemsForSourceKind(db, bilibiliSourceKind);
   const hasWeiboTrendingContent = pageKey === "ai-hot" && hasContentItemsForSourceKind(db, weiboTrendingSourceKind);
@@ -85,7 +93,8 @@ export function buildContentPageModel(
     twitterKeywords,
     hackerNewsQueries.length > 0 || hasHackerNewsContent,
     bilibiliQueries.length > 0 || hasBilibiliContent,
-    hasWeiboTrendingContent
+    hasWeiboTrendingContent,
+    wechatRssSources.length > 0
   );
   const selectedSourceKinds = normalizeSelectedSourceKinds(options.selectedSourceKinds, sourceOptions);
   const effectiveSelectedSourceKinds = selectedSourceKinds ?? deriveDefaultSelectedSourceKinds(sourceOptions);
@@ -96,6 +105,10 @@ export function buildContentPageModel(
   const twitterKeywordFilter = buildTwitterKeywordFilterModel(
     twitterKeywords,
     options.selectedTwitterKeywordIds
+  );
+  const wechatRssFilter = buildWechatRssFilterModel(
+    wechatRssSources,
+    options.selectedWechatRssSourceIds
   );
 
   const viewRuleKey = pageKey === "ai-hot" ? "hot" : "ai";
@@ -112,6 +125,10 @@ export function buildContentPageModel(
       selectedTwitterKeywordIds:
         effectiveSelectedSourceKinds.includes(twitterKeywordSearchSourceKind)
           ? twitterKeywordFilter?.selectedKeywordIds
+          : undefined,
+      selectedWechatRssSourceIds:
+        effectiveSelectedSourceKinds.includes(wechatRssSourceKind)
+          ? wechatRssFilter?.selectedSourceIds
           : undefined,
       sortMode: options.sortMode ?? "published_at",
       ruleConfig: viewRuleConfig
@@ -137,6 +154,7 @@ export function buildContentPageModel(
           : undefined,
       twitterAccountFilter,
       twitterKeywordFilter,
+      wechatRssFilter,
       // 客户端内容页已经不再拆首条精选卡，这里保留空字段只为了兼容现有接口模型。
       featuredCard: null,
       cards: pagination.cards,
@@ -186,6 +204,7 @@ export function buildContentPageModel(
           : undefined,
       twitterAccountFilter,
       twitterKeywordFilter,
+      wechatRssFilter,
       featuredCard: null,
       cards: [],
       strategySummary: buildStrategySummary(pageKey, viewRuleConfig),
@@ -306,7 +325,8 @@ function buildContentPageSourceOptions(
   twitterKeywords: TwitterSearchKeywordRecord[],
   hasHackerNews: boolean,
   hasBilibili: boolean,
-  hasWeiboTrending: boolean
+  hasWeiboTrending: boolean,
+  hasWechatRss: boolean
 ): ContentSourceOption[] {
   const nextOptions = [...sourceOptions];
 
@@ -355,6 +375,15 @@ function buildContentPageSourceOptions(
     });
   }
 
+  if (hasWechatRss) {
+    nextOptions.push({
+      kind: wechatRssSourceKind,
+      name: "微信公众号 RSS",
+      isEnabled: true,
+      showAllWhenSelected: false
+    });
+  }
+
   return nextOptions;
 }
 
@@ -390,6 +419,24 @@ function buildTwitterKeywordFilterModel(
       label: keyword.keyword
     })),
     selectedKeywordIds: normalizeSelectedEntityIds(selectedKeywordIds, keywords.map((keyword) => keyword.id))
+  };
+}
+
+function buildWechatRssFilterModel(
+  sources: WechatRssSourceRecord[],
+  selectedSourceIds: number[] | undefined
+) {
+  if (sources.length === 0) {
+    return undefined;
+  }
+
+  return {
+    options: sources.map((source) => ({
+      id: source.id,
+      label: source.displayName?.trim() || `微信公众号 RSS #${source.id}`,
+      rssUrl: source.rssUrl
+    })),
+    selectedSourceIds: normalizeSelectedEntityIds(selectedSourceIds, sources.map((source) => source.id))
   };
 }
 

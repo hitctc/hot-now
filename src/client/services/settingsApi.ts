@@ -119,6 +119,7 @@ export type SettingsSourcesOperations = {
   canTriggerManualTwitterKeywordCollect: boolean;
   canTriggerManualHackerNewsCollect?: boolean;
   canTriggerManualBilibiliCollect?: boolean;
+  canTriggerManualWechatRssCollect?: boolean;
   canTriggerManualWeiboTrendingCollect?: boolean;
   canTriggerManualSendLatestEmail: boolean;
   isRunning: boolean;
@@ -135,6 +136,8 @@ export type SettingsSourcesCapability = {
   hackerNewsSearchMessage?: string;
   bilibiliSearchEnabled?: boolean;
   bilibiliSearchMessage?: string;
+  wechatRssEnabled?: boolean;
+  wechatRssMessage?: string;
   weiboTrendingEnabled?: boolean;
   weiboTrendingMessage?: string;
 };
@@ -197,6 +200,18 @@ export type SettingsBilibiliQuery = {
   updatedAt: string;
 };
 
+export type SettingsWechatRssSource = {
+  id: number;
+  rssUrl: string;
+  displayName: string | null;
+  isEnabled: boolean;
+  lastFetchedAt: string | null;
+  lastSuccessAt: string | null;
+  lastResult: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type SettingsWeiboTrending = {
   fixedKeywords: string[];
   lastFetchedAt: string | null;
@@ -210,6 +225,7 @@ export type SettingsSourcesResponse = {
   twitterSearchKeywords?: SettingsTwitterSearchKeyword[];
   hackerNewsQueries?: SettingsHackerNewsQuery[];
   bilibiliQueries?: SettingsBilibiliQuery[];
+  wechatRssSources?: SettingsWechatRssSource[];
   weiboTrending?: SettingsWeiboTrending;
   operations: SettingsSourcesOperations;
   capability: SettingsSourcesCapability;
@@ -348,6 +364,16 @@ export type SaveBilibiliQueryResponse = {
   query: SettingsBilibiliQuery;
 };
 
+export type CreateWechatRssSourcesPayload = {
+  rssUrls: string | string[];
+};
+
+export type CreateWechatRssSourcesResponse = {
+  ok: true;
+  created: SettingsWechatRssSource[];
+  skippedDuplicateUrls: string[];
+};
+
 export type DeleteTwitterSearchKeywordResponse = {
   ok: true;
   id: number;
@@ -371,6 +397,11 @@ export type ToggleHackerNewsQueryResponse = {
 };
 
 export type DeleteBilibiliQueryResponse = {
+  ok: true;
+  id: number;
+};
+
+export type DeleteWechatRssSourceResponse = {
   ok: true;
   id: number;
 };
@@ -458,6 +489,20 @@ export type ManualBilibiliCollectResponse =
   | {
       accepted: false;
       reason?: "no-enabled-bilibili-queries" | "already-running";
+    };
+
+export type ManualWechatRssCollectResponse =
+  | {
+      accepted: true;
+      action: "collect-wechat-rss";
+      enabledSourceCount: number;
+      fetchedItemCount: number;
+      persistedContentItemCount: number;
+      failureCount: number;
+    }
+  | {
+      accepted: false;
+      reason?: "no-enabled-wechat-rss-sources" | "already-running";
     };
 
 export type ManualWeiboTrendingCollectResponse =
@@ -671,6 +716,18 @@ export function toggleBilibiliQuery(id: number, enable: boolean): Promise<Toggle
   return postSettingsAction<ToggleBilibiliQueryResponse>("/actions/bilibili/toggle", { id, enable });
 }
 
+// 微信公众号 RSS 支持批量新增，后端会统一规范化 URL 并跳过重复链接。
+export function createWechatRssSources(
+  payload: CreateWechatRssSourcesPayload
+): Promise<CreateWechatRssSourcesResponse> {
+  return postSettingsAction<CreateWechatRssSourcesResponse>("/actions/wechat-rss/create", payload);
+}
+
+// 删除只移除配置行，历史内容仍然保留在内容库里，避免误删已采集数据。
+export function deleteWechatRssSource(id: number): Promise<DeleteWechatRssSourceResponse> {
+  return postSettingsAction<DeleteWechatRssSourceResponse>("/actions/wechat-rss/delete", { id });
+}
+
 // 手动采集走独立动作接口，保持和旧系统页一致的任务语义。
 export function triggerManualCollect(): Promise<ManualCollectResponse> {
   return postSettingsAction<ManualCollectResponse>("/actions/collect", {});
@@ -694,6 +751,11 @@ export function triggerManualHackerNewsCollect(): Promise<ManualHackerNewsCollec
 // B 站搜索和 HN 一样保持独立手动入口，避免默认采集链路无意扩大到视频搜索。
 export function triggerManualBilibiliCollect(): Promise<ManualBilibiliCollectResponse> {
   return postSettingsAction<ManualBilibiliCollectResponse>("/actions/bilibili/collect", {});
+}
+
+// 公众号 RSS 只支持手动采集，避免新增 RSS 后被默认调度自动放大请求量。
+export function triggerManualWechatRssCollect(): Promise<ManualWechatRssCollectResponse> {
+  return postSettingsAction<ManualWechatRssCollectResponse>("/actions/wechat-rss/collect", {});
 }
 
 // 微博热搜榜匹配只走独立手动入口，不进入默认采集链路。

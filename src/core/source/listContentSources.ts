@@ -22,7 +22,11 @@ export function listContentSources(db: SqliteDatabase): ContentSourceOption[] {
         `
           SELECT kind, name, is_enabled, show_all_when_selected
           FROM content_sources
-          WHERE COALESCE(source_type, 'rss') NOT IN ('twitter_account_aggregate', 'twitter_keyword_aggregate')
+          WHERE COALESCE(source_type, 'rss') NOT IN (
+            'twitter_account_aggregate',
+            'twitter_keyword_aggregate',
+            'wechat_rss_aggregate'
+          )
           ORDER BY id ASC
         `
       )

@@ -12,6 +12,7 @@ describe("ContentToolbarCard", () => {
           { kind: "openai", name: "OpenAI", currentPageVisibleCount: 3 },
           { kind: "twitter_accounts", name: "Twitter 账号", currentPageVisibleCount: 2 },
           { kind: "twitter_keyword_search", name: "Twitter 关键词搜索", currentPageVisibleCount: 1 },
+          { kind: "wechat_rss", name: "微信公众号 RSS", currentPageVisibleCount: 2 },
           { kind: "ithome", name: "IT之家", currentPageVisibleCount: 1 },
           { kind: "36kr", name: "36氪", currentPageVisibleCount: 2 }
         ],
@@ -29,6 +30,13 @@ describe("ContentToolbarCard", () => {
             { id: 12, label: "GPT-4o" }
           ],
           selectedKeywordIds: [11, 12]
+        },
+        wechatRssFilter: {
+          options: [
+            { id: 21, label: "AI 公众号 RSS", rssUrl: "https://rss.example.com/a.xml" },
+            { id: 22, label: "开发者公众号 RSS", rssUrl: "https://rss.example.com/b.xml" }
+          ],
+          selectedSourceIds: [21, 22]
         },
         visibleResultCount: 7,
         sortMode: "published_at",
@@ -127,12 +135,13 @@ describe("ContentToolbarCard", () => {
     expect(wrapper.get("[data-content-toolbar-source-toggle]").text()).toContain("收起来源");
 
     await wrapper.setProps({
-      selectedSourceKinds: ["twitter_accounts", "twitter_keyword_search"]
+      selectedSourceKinds: ["twitter_accounts", "twitter_keyword_search", "wechat_rss"]
     });
     await flushPromises();
 
     expect(wrapper.find("[data-content-entity-filter='twitter-accounts']").exists()).toBe(true);
     expect(wrapper.find("[data-content-entity-filter='twitter-keywords']").exists()).toBe(true);
+    expect(wrapper.find("[data-content-entity-filter='wechat-rss']").exists()).toBe(true);
 
     await wrapper.get("[data-entity-id='twitter-accounts:2']").setValue(false);
     await flushPromises();
@@ -141,5 +150,9 @@ describe("ContentToolbarCard", () => {
     await wrapper.get("[data-content-filter-action='twitter-keywords-toggle-all']").trigger("click");
     await flushPromises();
     expect(wrapper.emitted("changeTwitterKeywords")?.at(-1)).toEqual([[]]);
+
+    await wrapper.get("[data-entity-id='wechat-rss:22']").setValue(false);
+    await flushPromises();
+    expect(wrapper.emitted("changeWechatRss")?.at(-1)).toEqual([[21]]);
   });
 });

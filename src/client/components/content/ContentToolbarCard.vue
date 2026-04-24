@@ -14,20 +14,22 @@ import {
 
 const props = defineProps<{
   options: { kind: string; name: string; currentPageVisibleCount: number }[];
-  selectedSourceKinds: string[];
-  twitterAccountFilter?: { options: { id: number; label: string; username: string }[]; selectedAccountIds: number[] };
-  twitterKeywordFilter?: { options: { id: number; label: string }[]; selectedKeywordIds: number[] };
-  visibleResultCount: number;
+	  selectedSourceKinds: string[];
+	  twitterAccountFilter?: { options: { id: number; label: string; username: string }[]; selectedAccountIds: number[] };
+	  twitterKeywordFilter?: { options: { id: number; label: string }[]; selectedKeywordIds: number[] };
+	  wechatRssFilter?: { options: { id: number; label: string; rssUrl: string }[]; selectedSourceIds: number[] };
+	  visibleResultCount: number;
   sortMode: ContentSortMode;
   keyword: string;
   isLoading?: boolean;
 }>();
 
 const emit = defineEmits<{
-  changeSource: [selectedSourceKinds: string[]];
-  changeTwitterAccounts: [selectedAccountIds: number[]];
-  changeTwitterKeywords: [selectedKeywordIds: number[]];
-  changeSort: [sortMode: ContentSortMode];
+	  changeSource: [selectedSourceKinds: string[]];
+	  changeTwitterAccounts: [selectedAccountIds: number[]];
+	  changeTwitterKeywords: [selectedKeywordIds: number[]];
+	  changeWechatRss: [selectedSourceIds: number[]];
+	  changeSort: [sortMode: ContentSortMode];
   search: [keyword: string];
   clear: [];
 }>();
@@ -35,6 +37,7 @@ const emit = defineEmits<{
 const isSourceExpanded = ref(false);
 const hasTwitterAccountsSelected = computed(() => props.selectedSourceKinds.includes("twitter_accounts"));
 const hasTwitterKeywordsSelected = computed(() => props.selectedSourceKinds.includes("twitter_keyword_search"));
+const hasWechatRssSelected = computed(() => props.selectedSourceKinds.includes("wechat_rss"));
 
 const selectedSourceNames = computed(() => {
   const selectedKinds = new Set(props.selectedSourceKinds);
@@ -76,6 +79,10 @@ function handleTwitterAccountsChange(nextIds: number[]): void {
 
 function handleTwitterKeywordsChange(nextIds: number[]): void {
   emit("changeTwitterKeywords", nextIds);
+}
+
+function handleWechatRssChange(nextIds: number[]): void {
+  emit("changeWechatRss", nextIds);
 }
 
 function handleSortChange(nextSortMode: ContentSortMode): void {
@@ -198,15 +205,24 @@ function handleClear(): void {
         compact
         @change="handleTwitterAccountsChange"
       />
-      <ContentEntityFilterBar
-        v-if="hasTwitterKeywordsSelected && twitterKeywordFilter"
+	      <ContentEntityFilterBar
+	        v-if="hasTwitterKeywordsSelected && twitterKeywordFilter"
         filter-key="twitter-keywords"
         title="关键词筛选"
         :options="twitterKeywordFilter.options"
         :selected-ids="twitterKeywordFilter.selectedKeywordIds"
         compact
-        @change="handleTwitterKeywordsChange"
-      />
-    </div>
+	        @change="handleTwitterKeywordsChange"
+	      />
+	      <ContentEntityFilterBar
+	        v-if="hasWechatRssSelected && wechatRssFilter"
+	        filter-key="wechat-rss"
+	        title="公众号 RSS 筛选"
+	        :options="wechatRssFilter.options.map((option) => ({ id: option.id, label: option.label, hint: option.rssUrl }))"
+	        :selected-ids="wechatRssFilter.selectedSourceIds"
+	        compact
+	        @change="handleWechatRssChange"
+	      />
+	    </div>
   </section>
 </template>

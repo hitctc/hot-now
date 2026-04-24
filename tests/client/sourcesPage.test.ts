@@ -324,6 +324,15 @@ describe("SourcesPage", () => {
     expect(wrapper.findAll("[data-weibo-keyword]")).toHaveLength(3);
     expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("AI 时间线官方源");
     expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("只采集官方白名单来源");
+    expect(wrapper.findAll("[data-ai-timeline-official-source]")).toHaveLength(2);
+    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("OpenAI");
+    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("OpenAI News");
+    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("https://openai.com/news/rss.xml");
+    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("只接受 openai.com 官方链接");
+    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("Google AI");
+    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("Google AI Blog");
+    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("https://blog.google/technology/ai/rss/");
+    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("只接受 blog.google/technology/ai 官方链接");
     expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("手动采集官方事件");
     expect(wrapper.get("[data-sources-section='inventory']").classes()).toContain("editorial-glass-panel");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("来源库存与统计");

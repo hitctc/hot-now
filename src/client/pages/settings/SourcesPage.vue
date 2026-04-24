@@ -21,6 +21,21 @@ import WechatRssSourcesCard from "../../components/settings/sources/WechatRssSou
 import WeiboTrendingCard from "../../components/settings/sources/WeiboTrendingCard.vue";
 import { useSourcesPageController } from "../../components/settings/sources/useSourcesPageController";
 
+const aiTimelineOfficialSources = [
+  {
+    companyName: "OpenAI",
+    sourceLabel: "OpenAI News",
+    feedUrl: "https://openai.com/news/rss.xml",
+    allowedScope: "只接受 openai.com 官方链接"
+  },
+  {
+    companyName: "Google AI",
+    sourceLabel: "Google AI Blog",
+    feedUrl: "https://blog.google/technology/ai/rss/",
+    allowedScope: "只接受 blog.google/technology/ai 官方链接"
+  }
+] as const;
+
 const {
   isLoading,
   isRefreshing,
@@ -273,14 +288,39 @@ const {
           data-sources-section="ai-timeline"
         >
           <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div class="space-y-2">
+            <div class="min-w-0 flex-1 space-y-3">
               <p class="m-0 text-sm leading-6 text-editorial-text-body">
                 只采集官方白名单来源，结果进入 AI 时间线，不进入 AI 新讯 / AI 热点。
               </p>
+              <div class="grid gap-2 md:grid-cols-2">
+                <div
+                  v-for="source in aiTimelineOfficialSources"
+                  :key="source.feedUrl"
+                  class="rounded-editorial-card border border-editorial-border bg-editorial-panel/45 p-3 text-sm"
+                  data-ai-timeline-official-source
+                >
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="font-semibold text-editorial-text-main">{{ source.companyName }}</span>
+                    <span class="rounded-editorial-pill bg-editorial-link px-2 py-0.5 text-[11px] text-editorial-text-body">
+                      {{ source.sourceLabel }}
+                    </span>
+                  </div>
+                  <a
+                    class="mt-2 block break-all text-xs text-editorial-accent hover:underline"
+                    :href="source.feedUrl"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {{ source.feedUrl }}
+                  </a>
+                  <p class="m-0 mt-1 text-xs leading-5 text-editorial-text-muted">
+                    {{ source.allowedScope }}
+                  </p>
+                </div>
+              </div>
               <div class="flex flex-wrap gap-2 text-xs text-editorial-text-muted">
-                <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">OpenAI News</span>
-                <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">Google AI Blog</span>
                 <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">独立事件表</span>
+                <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">不进入普通内容流</span>
               </div>
             </div>
             <a-button

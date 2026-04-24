@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import ContentBackToTopButton from "../../src/client/components/content/ContentBackToTopButton.vue";
 
 describe("ContentBackToTopButton", () => {
-  it("keeps the fixed button high enough to avoid overlapping the pagination bar", () => {
+  it("keeps the shared fixed button high enough above long-page controls", () => {
     const wrapper = mount(ContentBackToTopButton, {
       props: {
         visible: true

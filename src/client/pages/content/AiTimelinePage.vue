@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 
 import AiTimelineEventCard from "../../components/content/AiTimelineEventCard.vue";
 import AiTimelineFilters from "../../components/content/AiTimelineFilters.vue";
+import ContentBackToTopButton from "../../components/content/ContentBackToTopButton.vue";
 import EditorialEmptyState from "../../components/content/EditorialEmptyState.vue";
 import {
   editorialContentIntroSectionClass,
@@ -10,6 +11,7 @@ import {
   editorialContentPageClass
 } from "../../components/content/contentCardShared";
 import { useInfiniteLoadTrigger } from "../../components/content/useInfiniteLoadTrigger";
+import { useContentPageScroll } from "../../components/content/useContentPageScroll";
 import { readAiTimelinePage, type AiTimelineEventRecord, type AiTimelinePageModel } from "../../services/aiTimelineApi";
 
 type LoadState = "idle" | "loading" | "loaded" | "error";
@@ -23,6 +25,7 @@ const selectedEventType = ref("");
 const selectedCompany = ref("");
 const searchKeyword = ref("");
 const currentPage = ref(1);
+const { showBackToTopButton, handleBackToTopClick } = useContentPageScroll();
 
 const events = computed(() => timelineEvents.value);
 const filters = computed(() => pageModel.value?.filters ?? { eventTypes: [], companies: [] });
@@ -236,5 +239,10 @@ onMounted(() => {
         <span v-else>已加载全部 {{ totalEventCount }} 条</span>
       </div>
     </template>
+
+    <ContentBackToTopButton
+      :visible="showBackToTopButton"
+      @click="handleBackToTopClick"
+    />
   </div>
 </template>

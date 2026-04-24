@@ -107,6 +107,14 @@ describe("AiTimelinePage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     installIntersectionObserverMock();
+    Object.defineProperty(window, "scrollTo", {
+      writable: true,
+      value: vi.fn()
+    });
+    Object.defineProperty(window, "scrollY", {
+      writable: true,
+      value: 0
+    });
   });
 
   it("renders official AI timeline events and filter controls", async () => {
@@ -188,6 +196,37 @@ describe("AiTimelinePage", () => {
     expect(wrapper.findAll("[data-ai-timeline-event-card]")).toHaveLength(3);
     expect(wrapper.findAll("[data-ai-timeline-display-index]").map((node) => node.text())).toEqual(["1", "2", "3"]);
     expect(wrapper.get("[data-ai-timeline-result-summary]").text()).toContain("已加载 3 条");
+  });
+
+  it("shows the shared back-to-top button after scrolling down", async () => {
+    aiTimelineApiMocks.readAiTimelinePage.mockResolvedValueOnce(createTimelineModel());
+
+    const wrapper = mount(AiTimelinePage, {
+      global: {
+        plugins: [Antd]
+      }
+    });
+
+    await flushPromises();
+
+    expect(wrapper.find("[data-content-back-to-top]").exists()).toBe(false);
+
+    Object.defineProperty(window, "scrollY", {
+      writable: true,
+      value: 720
+    });
+    window.dispatchEvent(new Event("scroll"));
+    await flushPromises();
+
+    expect(wrapper.get("[data-content-back-to-top]").text()).toContain("回到顶部");
+
+    await wrapper.get("[data-content-back-to-top]").trigger("click");
+    await flushPromises();
+
+    expect(window.scrollTo).toHaveBeenLastCalledWith({
+      top: 0,
+      behavior: "smooth"
+    });
   });
 
   it("reloads from the first page after changing timeline filters", async () => {

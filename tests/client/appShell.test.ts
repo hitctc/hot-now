@@ -125,6 +125,7 @@ describe("client app shell", () => {
     expect(navLinks.map((node) => node.attributes("href"))).toEqual([
       "/ai-new",
       "/ai-hot",
+      "/ai-timeline",
       "/settings/sources",
       "/settings/view-rules",
       "/settings/profile"
@@ -135,6 +136,7 @@ describe("client app shell", () => {
     ).toEqual([
       "AI 新讯",
       "AI 热点",
+      "AI 时间线",
       "数据收集",
       "筛选策略",
       "当前用户"
@@ -201,12 +203,13 @@ describe("client app shell", () => {
     expect(router.getRoutes().some((route) => route.path === "/")).toBe(true);
     expect(router.getRoutes().some((route) => route.path === "/ai-new")).toBe(true);
     expect(router.getRoutes().some((route) => route.path === "/ai-hot")).toBe(true);
+    expect(router.getRoutes().some((route) => route.path === "/ai-timeline")).toBe(true);
     expect(router.getRoutes().some((route) => route.path === "/articles")).toBe(false);
   });
 
   it("registers shell pages as lazy route components so the client build can split them into separate chunks", async () => {
     const router = createAppRouter();
-    const shellRoutePaths = ["/", "/ai-new", "/ai-hot", "/settings/view-rules", "/settings/sources", "/settings/profile"];
+    const shellRoutePaths = ["/", "/ai-new", "/ai-hot", "/ai-timeline", "/settings/view-rules", "/settings/sources", "/settings/profile"];
 
     for (const path of shellRoutePaths) {
       const route = router.getRoutes().find((item) => item.path === path);
@@ -233,7 +236,7 @@ describe("client app shell", () => {
     expect(wrapper.find("[data-mobile-shell-nav]").exists()).toBe(true);
     expect(
       wrapper.findAll("[data-mobile-content-tab]").map((node) => node.text().trim())
-    ).toEqual(["AI 新讯", "AI 热点"]);
+    ).toEqual(["AI 新讯", "AI 热点", "AI 时间线"]);
     expect(wrapper.get("[data-mobile-system-toggle]").classes()).toEqual(
       expect.arrayContaining(["select-none", "rounded-editorial-sm"])
     );

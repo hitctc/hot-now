@@ -24,6 +24,7 @@ const appShellPages: AppShellPage[] = [
   { path: "/", title: "AI 新讯", section: "content", description: "这里会展示最新 AI 新闻、模型、事件与智能体信号。" },
   { path: "/ai-new", title: "AI 新讯", section: "content", description: "这里会展示最新 AI 新闻、模型、事件与智能体信号。" },
   { path: "/ai-hot", title: "AI 热点", section: "content", description: "这里会承接已经开始形成热度的 AI 热点内容。" },
+  { path: "/ai-timeline", title: "AI 时间线", section: "content", description: "这里会按时间追踪主流 AI 公司官方发布的模型、产品、开发生态和行业动态。" },
   { path: "/settings/sources", title: "数据收集", section: "system", description: "这里会管理 RSS 数据源的启用状态、抓取结果和手动采集。" },
   {
     path: "/settings/view-rules",

@@ -158,6 +158,7 @@ describe("site theme runtime", () => {
     <div class="mobile-top-nav-tabs" aria-label="内容菜单">
       <a class="mobile-top-tab mobile-top-tab--content is-active" data-shell-nav href="/ai-new">AI 新讯</a>
       <a class="mobile-top-tab mobile-top-tab--content" data-shell-nav href="/ai-hot">AI 热点</a>
+      <a class="mobile-top-tab mobile-top-tab--content" data-shell-nav href="/ai-timeline">AI 时间线</a>
     </div>
     <button type="button" data-theme-choice="dark" aria-pressed="true">深色模式</button>
     <button type="button" data-theme-choice="light" aria-pressed="false">浅色模式</button>
@@ -175,7 +176,7 @@ describe("site theme runtime", () => {
 
     const tabs = [...window.document.querySelectorAll(".mobile-top-tab")].map((node) => node.textContent?.trim());
 
-    expect(tabs).toEqual(["AI 新讯", "AI 热点"]);
+    expect(tabs).toEqual(["AI 新讯", "AI 热点", "AI 时间线"]);
     expect(window.document.documentElement.dataset.theme).toBe("light");
   });
 
@@ -191,6 +192,7 @@ describe("site theme runtime", () => {
         <div class="mobile-top-nav-tabs" aria-label="内容菜单">
           <a class="mobile-top-tab mobile-top-tab--content" data-shell-nav href="/ai-new">AI 新讯</a>
           <a class="mobile-top-tab mobile-top-tab--content is-active" data-shell-nav href="/ai-hot">AI 热点</a>
+          <a class="mobile-top-tab mobile-top-tab--content" data-shell-nav href="/ai-timeline">AI 时间线</a>
         </div>
       </div>
     </div>
@@ -204,6 +206,7 @@ describe("site theme runtime", () => {
         <nav class="nav-group nav-group--content">
           <a class="nav-link nav-link--content" data-shell-nav href="/ai-new">AI 新讯</a>
           <a class="nav-link nav-link--content is-active" data-shell-nav href="/ai-hot">AI 热点</a>
+          <a class="nav-link nav-link--content" data-shell-nav href="/ai-timeline">AI 时间线</a>
         </nav>
         <div class="sidebar-footer">
           <button type="button" data-theme-choice="dark" aria-pressed="true">深色模式</button>
@@ -230,6 +233,7 @@ describe("site theme runtime", () => {
         <div class="mobile-top-nav-tabs" aria-label="内容菜单">
           <a class="mobile-top-tab mobile-top-tab--content is-active" data-shell-nav href="/ai-new">AI 新讯</a>
           <a class="mobile-top-tab mobile-top-tab--content" data-shell-nav href="/ai-hot">AI 热点</a>
+          <a class="mobile-top-tab mobile-top-tab--content" data-shell-nav href="/ai-timeline">AI 时间线</a>
         </div>
       </div>
     </div>
@@ -243,6 +247,7 @@ describe("site theme runtime", () => {
         <nav class="nav-group nav-group--content">
           <a class="nav-link nav-link--content is-active" data-shell-nav href="/ai-new">AI 新讯</a>
           <a class="nav-link nav-link--content" data-shell-nav href="/ai-hot">AI 热点</a>
+          <a class="nav-link nav-link--content" data-shell-nav href="/ai-timeline">AI 时间线</a>
         </nav>
         <div class="sidebar-footer">
           <button type="button" data-theme-choice="dark" aria-pressed="true">深色模式</button>

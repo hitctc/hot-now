@@ -2,7 +2,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw, type RouterHistory
 
 import { APP_ROUTE_BASE } from "./appBases";
 
-export type ShellPageKey = "ai-new" | "ai-hot" | "view-rules" | "sources" | "profile";
+export type ShellPageKey = "ai-new" | "ai-hot" | "ai-timeline" | "view-rules" | "sources" | "profile";
 
 export type ShellPageMeta = {
   key: ShellPageKey;
@@ -36,6 +36,15 @@ const aiHotPageMeta = {
   description: "已经形成热度、值得继续追踪的 AI 信号。"
 } as const satisfies ShellPageMeta;
 
+const aiTimelinePageMeta = {
+  key: "ai-timeline",
+  path: "/ai-timeline",
+  section: "content",
+  navLabel: "AI 时间线",
+  title: "AI 时间线",
+  description: "按时间追踪主流 AI 公司官方发布的模型、产品、开发生态和行业动态。"
+} as const satisfies ShellPageMeta;
+
 const viewRulesPageMeta = {
   key: "view-rules",
   path: "/settings/view-rules",
@@ -63,7 +72,7 @@ const profilePageMeta = {
   description: "当前登录账号、会话状态和联系信息。"
 } as const satisfies ShellPageMeta;
 
-export const shellPageMetas = [aiNewPageMeta, aiHotPageMeta, sourcesPageMeta, viewRulesPageMeta, profilePageMeta] as const satisfies readonly ShellPageMeta[];
+export const shellPageMetas = [aiNewPageMeta, aiHotPageMeta, aiTimelinePageMeta, sourcesPageMeta, viewRulesPageMeta, profilePageMeta] as const satisfies readonly ShellPageMeta[];
 export const systemShellPageMetas = [sourcesPageMeta, viewRulesPageMeta, profilePageMeta] as const satisfies readonly ShellPageMeta[];
 
 type ShellRouteComponent = () => Promise<unknown>;
@@ -107,11 +116,13 @@ const sourcesPage = () => import("./pages/settings/SourcesPage.vue");
 const profilePage = () => import("./pages/settings/ProfilePage.vue");
 const aiNewPage = () => import("./pages/content/AiNewPage.vue");
 const aiHotPage = () => import("./pages/content/AiHotPage.vue");
+const aiTimelinePage = () => import("./pages/content/AiTimelinePage.vue");
 
 const routes: RouteRecordRaw[] = [
   createShellRoute(aiNewRootPageMeta, aiNewPage),
   createShellRoute(aiNewPageMeta, aiNewPage),
   createShellRoute(aiHotPageMeta, aiHotPage),
+  createShellRoute(aiTimelinePageMeta, aiTimelinePage),
   createShellRoute(viewRulesPageMeta, viewRulesPage),
   createShellRoute(sourcesPageMeta, sourcesPage),
   createShellRoute(profilePageMeta, profilePage)

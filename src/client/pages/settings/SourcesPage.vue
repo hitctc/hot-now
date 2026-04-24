@@ -7,6 +7,7 @@ import {
   editorialContentIntroSectionClass,
   editorialContentPageClass
 } from "../../components/content/contentCardShared";
+import SettingsFormModal from "../../components/settings/SettingsFormModal.vue";
 import { HttpError } from "../../services/http";
 import {
   createBilibiliQuery,
@@ -2305,13 +2306,10 @@ onUnmounted(() => {
         </a-card>
       </template>
 
-      <a-modal
+      <SettingsFormModal
         :open="isSourceModalOpen"
         :title="sourceModalMode === 'create' ? '新增来源' : '编辑来源'"
-        :footer="null"
-        centered
         :width="760"
-        destroy-on-close
         @cancel="closeSourceModal"
       >
         <div class="flex flex-col gap-4" data-source-modal="source">
@@ -2413,15 +2411,12 @@ onUnmounted(() => {
             </a-button>
           </div>
         </div>
-      </a-modal>
+      </SettingsFormModal>
 
-      <a-modal
+      <SettingsFormModal
         :open="isTwitterAccountModalOpen"
         :title="twitterAccountModalMode === 'create' ? '新增 Twitter 账号' : '编辑 Twitter 账号'"
-        :footer="null"
-        centered
         :width="680"
-        destroy-on-close
         @cancel="closeTwitterAccountModal"
       >
         <div class="flex flex-col gap-4" data-twitter-account-modal="twitter-account">
@@ -2522,15 +2517,12 @@ onUnmounted(() => {
             </a-button>
           </div>
         </div>
-      </a-modal>
+      </SettingsFormModal>
 
-      <a-modal
+      <SettingsFormModal
         :open="isHackerNewsQueryModalOpen"
         :title="hackerNewsQueryModalMode === 'create' ? '新增 Hacker News query' : '编辑 Hacker News query'"
-        :footer="null"
-        centered
         :width="680"
-        destroy-on-close
         @cancel="closeHackerNewsQueryModal"
       >
         <div class="flex flex-col gap-4" data-hackernews-query-modal="hackernews-query">
@@ -2605,15 +2597,12 @@ onUnmounted(() => {
             </a-button>
           </div>
         </div>
-      </a-modal>
+      </SettingsFormModal>
 
-      <a-modal
+      <SettingsFormModal
         :open="isBilibiliQueryModalOpen"
         :title="bilibiliQueryModalMode === 'create' ? '新增 B 站 query' : '编辑 B 站 query'"
-        :footer="null"
-        centered
         :width="680"
-        destroy-on-close
         @cancel="closeBilibiliQueryModal"
       >
         <div class="flex flex-col gap-4" data-bilibili-query-modal="bilibili-query">
@@ -2688,15 +2677,12 @@ onUnmounted(() => {
             </a-button>
           </div>
         </div>
-      </a-modal>
+      </SettingsFormModal>
 
-      <a-modal
+      <SettingsFormModal
         :open="isTwitterKeywordModalOpen"
         :title="twitterKeywordModalMode === 'create' ? '新增 Twitter 关键词' : '编辑 Twitter 关键词'"
-        :footer="null"
-        centered
         :width="680"
-        destroy-on-close
         @cancel="closeTwitterKeywordModal"
       >
         <div class="flex flex-col gap-4" data-twitter-keyword-modal="twitter-keyword">
@@ -2798,7 +2784,7 @@ onUnmounted(() => {
             </a-button>
           </div>
         </div>
-      </a-modal>
+      </SettingsFormModal>
     </div>
   </a-spin>
 </template>

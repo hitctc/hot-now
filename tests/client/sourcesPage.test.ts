@@ -614,6 +614,8 @@ describe("SourcesPage", () => {
     await flushPromises();
 
     expect(document.body.querySelector(".ant-modal-root")).not.toBeNull();
+    expect(document.body.querySelector(".editorial-form-modal")).not.toBeNull();
+    expect(document.body.querySelector(".editorial-form-modal-wrap")).not.toBeNull();
     expect(getModalNode("[data-twitter-account-capability]").text()).toContain("Twitter 账号采集已配置 API key");
 
     await getModalNode("[data-twitter-account-form='username']").setValue("@OpenAI");
@@ -839,6 +841,7 @@ describe("SourcesPage", () => {
     await flushPromises();
 
     expect(document.body.querySelector(".ant-modal-root")).not.toBeNull();
+    expect(document.body.querySelector(".editorial-form-modal")).not.toBeNull();
 
     await getModalNode("[data-source-type='wechat_bridge']").trigger("click");
     await getModalNode("[data-source-form='wechat-name']").setValue("微信 Demo");

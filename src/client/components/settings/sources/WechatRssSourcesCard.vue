@@ -20,6 +20,7 @@ defineProps<{
 const emit = defineEmits<{
   add: [];
   collect: [];
+  edit: [source: SettingsWechatRssSource];
   delete: [source: SettingsWechatRssSource];
 }>();
 </script>
@@ -52,7 +53,7 @@ const emit = defineEmits<{
 
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
       <a-typography-paragraph class="!mb-0" type="secondary">
-        这里单独维护微信公众号 RSS 链接，支持批量新增；采集只在点击按钮时执行。
+        这里单独维护微信公众号 RSS 链接，支持批量新增和单条编辑；采集只在点击按钮时执行。
       </a-typography-paragraph>
       <div class="flex flex-wrap gap-2">
         <a-button data-action="add-wechat-rss-source" @click="emit('add')">
@@ -81,18 +82,21 @@ const emit = defineEmits<{
         暂无微信公众号 RSS
       </template>
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'rssUrl'">
-          <a-space direction="vertical" size="small">
-            <a-typography-text strong>{{ record.displayName || `公众号 RSS #${record.id}` }}</a-typography-text>
+        <template v-if="column.key === 'displayName'">
+          <a-typography-text strong :data-wechat-rss-name="record.id">
+            {{ record.displayName || `公众号 RSS #${record.id}` }}
+          </a-typography-text>
+        </template>
+        <template v-else-if="column.key === 'rssUrl'">
+          <a-tooltip :title="record.rssUrl">
             <a-typography-text
               type="secondary"
-              class="inline-block max-w-[520px] truncate"
-              :title="record.rssUrl"
+              class="inline-block max-w-[420px] truncate align-middle"
               :data-wechat-rss-url="record.id"
             >
               {{ record.rssUrl }}
             </a-typography-text>
-          </a-space>
+          </a-tooltip>
         </template>
         <template v-else-if="column.key === 'lastSuccessAt'">
           {{ formatDateTime(record.lastSuccessAt) }}
@@ -108,6 +112,14 @@ const emit = defineEmits<{
         </template>
         <template v-else-if="column.key === 'actions'">
           <div class="flex flex-wrap justify-center gap-2" :data-wechat-rss-actions="record.id">
+            <a-button
+              type="link"
+              size="small"
+              :data-wechat-rss-edit="record.id"
+              @click="emit('edit', record)"
+            >
+              编辑
+            </a-button>
             <a-popconfirm
               title="确认删除这个公众号 RSS 吗？历史已入库内容不会被删除。"
               ok-text="确认删除"

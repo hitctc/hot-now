@@ -37,6 +37,7 @@ const {
   twitterKeywordModalMode,
   hackerNewsQueryModalMode,
   bilibiliQueryModalMode,
+  wechatRssModalMode,
   sourceFormError,
   twitterAccountFormError,
   twitterKeywordFormError,
@@ -83,6 +84,7 @@ const {
   openEditTwitterKeywordModal,
   openEditHackerNewsQueryModal,
   openEditBilibiliQueryModal,
+  openEditWechatRssSource,
   closeSourceModal,
   closeTwitterAccountModal,
   closeTwitterKeywordModal,
@@ -226,7 +228,7 @@ const {
           @delete="handleDeleteHackerNewsQuery"
         />
 
-	        <BilibiliQueriesCard
+        <BilibiliQueriesCard
           :queries="sourcesModel.bilibiliQueries ?? []"
           :total-count="totalBilibiliQueryCount"
           :enabled-count="enabledBilibiliQueryCount"
@@ -238,21 +240,22 @@ const {
           @toggle="handleToggleBilibiliQuery"
           @edit="openEditBilibiliQueryModal"
           @delete="handleDeleteBilibiliQuery"
-	        />
+        />
 
-	        <WechatRssSourcesCard
-	          :sources="sourcesModel.wechatRssSources ?? []"
-	          :total-count="totalWechatRssSourceCount"
-	          :enabled-count="enabledWechatRssSourceCount"
-	          :collection-message="wechatRssCollectionMessage"
-	          :operations="sourcesModel.operations"
-	          :is-action-pending="isActionPending"
-	          @add="openCreateWechatRssModal"
-	          @collect="handleManualWechatRssCollect"
-	          @delete="handleDeleteWechatRssSource"
-	        />
+        <WechatRssSourcesCard
+          :sources="sourcesModel.wechatRssSources ?? []"
+          :total-count="totalWechatRssSourceCount"
+          :enabled-count="enabledWechatRssSourceCount"
+          :collection-message="wechatRssCollectionMessage"
+          :operations="sourcesModel.operations"
+          :is-action-pending="isActionPending"
+          @add="openCreateWechatRssModal"
+          @collect="handleManualWechatRssCollect"
+          @edit="openEditWechatRssSource"
+          @delete="handleDeleteWechatRssSource"
+        />
 
-	        <WeiboTrendingCard
+        <WeiboTrendingCard
           :weibo-trending="sourcesModel.weiboTrending"
           :fixed-keyword-count="fixedWeiboKeywordCount"
           :collection-message="weiboTrendingMessage"
@@ -307,7 +310,7 @@ const {
         @submit="handleSubmitHackerNewsQuery"
       />
 
-	      <BilibiliQueryModal
+      <BilibiliQueryModal
         :open="isBilibiliQueryModalOpen"
         :mode="bilibiliQueryModalMode"
         :form="bilibiliQueryForm"
@@ -315,20 +318,21 @@ const {
         :capability-message="bilibiliCollectionMessage"
         :submitting="isActionPending('bilibili-query:submit')"
         @cancel="closeBilibiliQueryModal"
-	        @submit="handleSubmitBilibiliQuery"
-	      />
+        @submit="handleSubmitBilibiliQuery"
+      />
 
-	      <WechatRssSourceModal
-	        :open="isWechatRssModalOpen"
-	        :form="wechatRssForm"
-	        :error="wechatRssFormError"
-	        :capability-message="wechatRssCollectionMessage"
-	        :submitting="isActionPending('wechat-rss:submit')"
-	        @cancel="closeWechatRssModal"
-	        @submit="handleSubmitWechatRssSources"
-	      />
+      <WechatRssSourceModal
+        :open="isWechatRssModalOpen"
+        :mode="wechatRssModalMode"
+        :form="wechatRssForm"
+        :error="wechatRssFormError"
+        :capability-message="wechatRssCollectionMessage"
+        :submitting="isActionPending('wechat-rss:submit')"
+        @cancel="closeWechatRssModal"
+        @submit="handleSubmitWechatRssSources"
+      />
 
-	      <TwitterKeywordModal
+      <TwitterKeywordModal
         :open="isTwitterKeywordModalOpen"
         :mode="twitterKeywordModalMode"
         :form="twitterKeywordForm"

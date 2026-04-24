@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import SettingsFormModal from "../SettingsFormModal.vue";
-import type { WechatRssFormState } from "./sourcesPageShared";
+import type { WechatRssFormState, WechatRssModalMode } from "./sourcesPageShared";
 
 defineProps<{
   open: boolean;
+  mode: WechatRssModalMode;
   form: WechatRssFormState;
   error: string | null;
   capabilityMessage: string;
@@ -19,7 +20,7 @@ const emit = defineEmits<{
 <template>
   <SettingsFormModal
     :open="open"
-    title="批量新增微信公众号 RSS"
+    :title="mode === 'create' ? '批量新增微信公众号 RSS' : '编辑微信公众号 RSS'"
     :width="760"
     @cancel="emit('cancel')"
   >
@@ -40,7 +41,7 @@ const emit = defineEmits<{
         data-wechat-rss-capability
       />
 
-      <label class="flex flex-col gap-2">
+      <label v-if="mode === 'create'" class="flex flex-col gap-2">
         <span class="text-sm font-medium text-editorial-text-main">RSS 链接</span>
         <textarea
           v-model="form.rssUrls"
@@ -51,6 +52,26 @@ const emit = defineEmits<{
         />
       </label>
 
+      <template v-else>
+        <label class="flex flex-col gap-2">
+          <span class="text-sm font-medium text-editorial-text-main">来源名称</span>
+          <a-input
+            v-model:value="form.displayName"
+            data-wechat-rss-form="display-name"
+            placeholder="例如 机器之心 - 今天看啥"
+          />
+        </label>
+
+        <label class="flex flex-col gap-2">
+          <span class="text-sm font-medium text-editorial-text-main">RSS 地址</span>
+          <a-input
+            v-model:value="form.rssUrl"
+            data-wechat-rss-form="rss-url"
+            placeholder="https://rss.example.com/feed.xml"
+          />
+        </label>
+      </template>
+
       <div class="flex justify-end gap-2">
         <a-button @click="emit('cancel')">取消</a-button>
         <a-button
@@ -59,7 +80,7 @@ const emit = defineEmits<{
           :loading="submitting"
           @click="emit('submit')"
         >
-          批量新增
+          {{ mode === "create" ? "批量新增" : "保存更新" }}
         </a-button>
       </div>
     </div>

@@ -374,6 +374,17 @@ export type CreateWechatRssSourcesResponse = {
   skippedDuplicateUrls: string[];
 };
 
+export type UpdateWechatRssSourcePayload = {
+  id: number;
+  rssUrl: string;
+  displayName: string | null;
+};
+
+export type UpdateWechatRssSourceResponse = {
+  ok: true;
+  source: SettingsWechatRssSource;
+};
+
 export type DeleteTwitterSearchKeywordResponse = {
   ok: true;
   id: number;
@@ -721,6 +732,13 @@ export function createWechatRssSources(
   payload: CreateWechatRssSourcesPayload
 ): Promise<CreateWechatRssSourcesResponse> {
   return postSettingsAction<CreateWechatRssSourcesResponse>("/actions/wechat-rss/create", payload);
+}
+
+// 单条编辑独立于批量新增，避免用户为了改一个名字或链接重新导入整批 RSS。
+export function updateWechatRssSource(
+  payload: UpdateWechatRssSourcePayload
+): Promise<UpdateWechatRssSourceResponse> {
+  return postSettingsAction<UpdateWechatRssSourceResponse>("/actions/wechat-rss/update", payload);
 }
 
 // 删除只移除配置行，历史内容仍然保留在内容库里，避免误删已采集数据。

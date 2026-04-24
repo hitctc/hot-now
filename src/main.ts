@@ -79,7 +79,8 @@ import {
 import {
   createWechatRssSources as persistWechatRssSources,
   deleteWechatRssSource as removeWechatRssSource,
-  listWechatRssSources
+  listWechatRssSources,
+  updateWechatRssSource as persistWechatRssSourceUpdate
 } from "./core/wechatRss/wechatRssSourceRepository.js";
 import { listReportDates, readTextFile } from "./core/storage/reportStore.js";
 import {
@@ -634,6 +635,7 @@ const app = createServer({
   deleteBilibiliQuery: async (id) => removeBilibiliQuery(db, id),
   toggleBilibiliQuery: async (id, enable) => persistBilibiliQueryToggle(db, id, enable),
   createWechatRssSources: async (input) => persistWechatRssSources(db, input),
+  updateWechatRssSource: async (input) => persistWechatRssSourceUpdate(db, input),
   deleteWechatRssSource: async (id) => removeWechatRssSource(db, id),
   hasTwitterApiKey: Boolean(process.env.TWITTER_API_KEY?.trim()),
   triggerManualTwitterCollect,

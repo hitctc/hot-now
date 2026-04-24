@@ -27,6 +27,16 @@ export type CreateWechatRssSourcesResult =
       reason: "invalid-rss-url" | "empty-rss-url-list";
     };
 
+export type UpdateWechatRssSourceInput = {
+  id: number;
+  rssUrl: string;
+  displayName: string | null;
+};
+
+export type UpdateWechatRssSourceResult =
+  | { ok: true; source: WechatRssSourceRecord }
+  | { ok: false; reason: "invalid-id" | "invalid-rss-url" | "duplicate-rss-url" | "not-found" };
+
 export type DeleteWechatRssSourceResult =
   | { ok: true; id: number }
   | { ok: false; reason: "invalid-id" | "not-found" };
@@ -128,6 +138,45 @@ export function createWechatRssSources(
     created: listWechatRssSources(db).filter((source) => urlsToInsert.includes(source.rssUrl)),
     skippedDuplicateUrls: uniqueStrings([...duplicateInBatchUrls, ...uniqueUrls.filter((url) => existingUrls.has(url))])
   };
+}
+
+// 单条编辑只改配置行，不改历史内容；历史内容仍通过 metadata 里的 sourceId 关联到这条配置。
+export function updateWechatRssSource(
+  db: SqliteDatabase,
+  input: UpdateWechatRssSourceInput
+): UpdateWechatRssSourceResult {
+  if (!Number.isInteger(input.id) || input.id <= 0) {
+    return { ok: false, reason: "invalid-id" };
+  }
+
+  const normalizedUrl = normalizeWechatRssUrl(input.rssUrl.trim());
+
+  if (!normalizedUrl) {
+    return { ok: false, reason: "invalid-rss-url" };
+  }
+
+  if (wechatRssUrlExistsForAnotherSource(db, normalizedUrl, input.id)) {
+    return { ok: false, reason: "duplicate-rss-url" };
+  }
+
+  const displayName = normalizeDisplayName(input.displayName) ?? buildInitialDisplayName(normalizedUrl);
+  const result = db
+    .prepare(
+      `
+        UPDATE wechat_rss_sources
+        SET rss_url = ?,
+            display_name = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `
+    )
+    .run(normalizedUrl, displayName, input.id);
+
+  if (result.changes === 0) {
+    return { ok: false, reason: "not-found" };
+  }
+
+  return readWechatRssSourceById(db, input.id);
 }
 
 // 删除配置不删除历史内容，历史内容仍由内容表保留；是否展示由内容页二级筛选控制。
@@ -243,6 +292,21 @@ function readExistingWechatRssUrls(db: SqliteDatabase, urls: string[]): string[]
   return rows.map((row) => row.rssUrl);
 }
 
+function wechatRssUrlExistsForAnotherSource(db: SqliteDatabase, rssUrl: string, id: number): boolean {
+  const row = db
+    .prepare(
+      `
+        SELECT id
+        FROM wechat_rss_sources
+        WHERE rss_url = ? AND id <> ?
+        LIMIT 1
+      `
+    )
+    .get(rssUrl, id) as { id: number } | undefined;
+
+  return Boolean(row);
+}
+
 function normalizeWechatRssUrlList(value: string[] | string): Array<{ ok: true; url: string } | { ok: false }> {
   const rawValues = Array.isArray(value)
     ? value
@@ -270,6 +334,11 @@ function normalizeWechatRssUrl(value: string): string | null {
   } catch {
     return null;
   }
+}
+
+function normalizeDisplayName(value: string | null | undefined): string | null {
+  const normalized = value?.trim().slice(0, 120) ?? "";
+  return normalized || null;
 }
 
 function buildInitialDisplayName(urlValue: string): string {

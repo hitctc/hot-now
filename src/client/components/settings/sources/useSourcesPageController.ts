@@ -32,6 +32,7 @@ import {
   updateTwitterSearchKeyword,
   updateBilibiliQuery,
   updateHackerNewsQuery,
+  updateWechatRssSource,
   updateSource,
   updateSourceDisplayMode,
   triggerManualCollect,
@@ -55,7 +56,8 @@ import {
   type SettingsTwitterSearchKeyword,
   type SettingsWechatRssSource,
   type SaveTwitterAccountPayload,
-  type SaveTwitterSearchKeywordPayload
+  type SaveTwitterSearchKeywordPayload,
+  type UpdateWechatRssSourcePayload
 } from "../../../services/settingsApi";
 import type {
   BilibiliQueryFormState,
@@ -68,7 +70,8 @@ import type {
   TwitterAccountModalMode,
   TwitterKeywordFormState,
   TwitterKeywordModalMode,
-  WechatRssFormState
+  WechatRssFormState,
+  WechatRssModalMode
 } from "./sourcesPageShared";
 
 type AlertTone = "success" | "info" | "warning" | "error";
@@ -93,6 +96,7 @@ export function useSourcesPageController() {
   const twitterKeywordModalMode = ref<TwitterKeywordModalMode>("create");
   const hackerNewsQueryModalMode = ref<HackerNewsQueryModalMode>("create");
   const bilibiliQueryModalMode = ref<BilibiliQueryModalMode>("create");
+  const wechatRssModalMode = ref<WechatRssModalMode>("create");
   const sourceFormError = ref<string | null>(null);
   const twitterAccountFormError = ref<string | null>(null);
   const twitterKeywordFormError = ref<string | null>(null);
@@ -279,6 +283,9 @@ export function useSourcesPageController() {
 
   function createEmptyWechatRssForm(): WechatRssFormState {
     return {
+      id: null,
+      displayName: "",
+      rssUrl: "",
       rssUrls: ""
     };
   }
@@ -320,6 +327,7 @@ export function useSourcesPageController() {
   }
 
   function openCreateWechatRssModal(): void {
+    wechatRssModalMode.value = "create";
     resetWechatRssForm();
     isWechatRssModalOpen.value = true;
   }
@@ -384,6 +392,16 @@ export function useSourcesPageController() {
     bilibiliQueryForm.isEnabled = query.isEnabled;
     bilibiliQueryForm.notes = query.notes ?? "";
     isBilibiliQueryModalOpen.value = true;
+  }
+
+  // 单条编辑只回填当前 RSS 的名称和地址，批量新增 textarea 不参与这条路径。
+  function openEditWechatRssSource(source: SettingsWechatRssSource): void {
+    wechatRssModalMode.value = "update";
+    resetWechatRssForm();
+    wechatRssForm.id = source.id;
+    wechatRssForm.displayName = source.displayName || `公众号 RSS #${source.id}`;
+    wechatRssForm.rssUrl = source.rssUrl;
+    isWechatRssModalOpen.value = true;
   }
 
   // 关闭弹窗时顺手清掉局部错误，避免旧错误粘在下一次操作里。
@@ -571,6 +589,36 @@ export function useSourcesPageController() {
     return {
       ok: true,
       payload: { rssUrls }
+    };
+  }
+
+  // 编辑 payload 必须带上已有 ID，避免把“改一条 RSS”误提交成批量新增。
+  function buildWechatRssUpdatePayload():
+    | { ok: true; payload: UpdateWechatRssSourcePayload }
+    | { ok: false; message: string } {
+    const id = wechatRssForm.id;
+    const displayName = wechatRssForm.displayName.trim();
+    const rssUrl = wechatRssForm.rssUrl.trim();
+
+    if (!id || id <= 0) {
+      return { ok: false, message: "微信公众号 RSS ID 不合法。" };
+    }
+
+    if (!displayName) {
+      return { ok: false, message: "请填写微信公众号 RSS 来源名称。" };
+    }
+
+    if (!rssUrl) {
+      return { ok: false, message: "请填写微信公众号 RSS 地址。" };
+    }
+
+    return {
+      ok: true,
+      payload: {
+        id,
+        displayName,
+        rssUrl
+      }
     };
   }
 
@@ -1078,7 +1126,10 @@ export function useSourcesPageController() {
       return;
     }
 
-    const payload = buildWechatRssCreatePayload();
+    const payload =
+      wechatRssModalMode.value === "create"
+        ? buildWechatRssCreatePayload()
+        : buildWechatRssUpdatePayload();
 
     if (!payload.ok) {
       wechatRssFormError.value = payload.message;
@@ -1089,25 +1140,44 @@ export function useSourcesPageController() {
     setPendingAction("wechat-rss:submit", true);
 
     try {
-      const result = await createWechatRssSources(payload.payload);
+      const result =
+        wechatRssModalMode.value === "create"
+          ? await createWechatRssSources(payload.payload as { rssUrls: string })
+          : await updateWechatRssSource(payload.payload as UpdateWechatRssSourcePayload);
       const refreshed = await loadSources({ silent: true });
       closeWechatRssModal();
-      const skippedText = result.skippedDuplicateUrls.length > 0
-        ? `，跳过重复 ${result.skippedDuplicateUrls.length} 条`
+
+      if (wechatRssModalMode.value === "update") {
+        showNotice(
+          "success",
+          refreshed ? "已更新微信公众号 RSS。" : "已更新微信公众号 RSS，但最新数据刷新失败，请稍后手动刷新。"
+        );
+        return;
+      }
+
+      const createResult = result as Awaited<ReturnType<typeof createWechatRssSources>>;
+      const skippedText = createResult.skippedDuplicateUrls.length > 0
+        ? `，跳过重复 ${createResult.skippedDuplicateUrls.length} 条`
         : "";
       showNotice(
         "success",
         refreshed
-          ? `已新增 ${result.created.length} 条微信公众号 RSS${skippedText}。`
-          : `已新增 ${result.created.length} 条微信公众号 RSS${skippedText}，但最新数据刷新失败，请稍后手动刷新。`
+          ? `已新增 ${createResult.created.length} 条微信公众号 RSS${skippedText}。`
+          : `已新增 ${createResult.created.length} 条微信公众号 RSS${skippedText}，但最新数据刷新失败，请稍后手动刷新。`
       );
     } catch (error) {
       const notice = readActionErrorMessage(
         error,
-        "微信公众号 RSS 保存失败，请稍后再试。",
+        wechatRssModalMode.value === "create"
+          ? "微信公众号 RSS 保存失败，请稍后再试。"
+          : "微信公众号 RSS 更新失败，请稍后再试。",
         {
           "empty-rss-url-list": "请至少填写一个微信公众号 RSS 链接。",
           "invalid-rss-url": "存在不合法的 RSS 链接，请检查后重试。",
+          "invalid-id": "微信公众号 RSS ID 不合法。",
+          "invalid-wechat-rss-source-id": "微信公众号 RSS ID 不合法。",
+          "duplicate-rss-url": "这个微信公众号 RSS 地址已存在。",
+          "not-found": "对应微信公众号 RSS 不存在，可能已被移除。",
           "invalid-wechat-rss-payload": "微信公众号 RSS 配置不完整，请检查后重试。",
           "wechat-rss-disabled": "当前环境未启用微信公众号 RSS。"
         }
@@ -1316,6 +1386,7 @@ export function useSourcesPageController() {
     twitterKeywordModalMode,
     hackerNewsQueryModalMode,
     bilibiliQueryModalMode,
+    wechatRssModalMode,
     sourceFormError,
     twitterAccountFormError,
     twitterKeywordFormError,
@@ -1362,6 +1433,7 @@ export function useSourcesPageController() {
     openEditTwitterKeywordModal,
     openEditHackerNewsQueryModal,
     openEditBilibiliQueryModal,
+    openEditWechatRssSource,
     closeSourceModal,
     closeTwitterAccountModal,
     closeTwitterKeywordModal,

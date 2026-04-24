@@ -28,6 +28,7 @@ vi.mock("../../src/client/services/settingsApi", async () => {
     createTwitterAccount: vi.fn(),
     createTwitterSearchKeyword: vi.fn(),
     createWechatRssSources: vi.fn(),
+    updateWechatRssSource: vi.fn(),
     updateHackerNewsQuery: vi.fn(),
     updateBilibiliQuery: vi.fn(),
     updateTwitterAccount: vi.fn(),
@@ -312,6 +313,8 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-sources-section='wechat-rss']").text()).toContain("批量新增公众号 RSS");
     expect(wrapper.get("[data-sources-section='wechat-rss']").text()).toContain("AI 公众号 RSS");
     expect(wrapper.get("[data-sources-section='wechat-rss']").text()).toContain("https://rss.example.com/wechat.xml");
+    expect(wrapper.get("[data-wechat-rss-name='41']").text()).toContain("AI 公众号 RSS");
+    expect(wrapper.get("[data-wechat-rss-url='41']").text()).toContain("https://rss.example.com/wechat.xml");
     expect(wrapper.get("[data-sources-section='wechat-rss']").text()).toContain("微信公众号 RSS 已就绪");
     expect(wrapper.get("[data-sources-section='wechat-rss']").text()).toContain("手动采集公众号 RSS");
     expect(wrapper.get("[data-sources-section='weibo-trending']").text()).toContain("微博热搜榜匹配");
@@ -930,6 +933,49 @@ describe("SourcesPage", () => {
 
     expect(settingsApi.createWechatRssSources).toHaveBeenCalledWith({
       rssUrls: "https://rss.example.com/a.xml\nhttps://rss.example.com/b.xml"
+    });
+  });
+
+  it("updates a WeChat RSS source from the edit modal", async () => {
+    vi.mocked(settingsApi.readSettingsSources)
+      .mockResolvedValueOnce(createSourcesModel())
+      .mockResolvedValueOnce({
+        ...createSourcesModel(),
+        wechatRssSources: [
+          {
+            ...createSourcesModel().wechatRssSources![0],
+            displayName: "新公众号 RSS",
+            rssUrl: "https://rss.example.com/new.xml"
+          }
+        ]
+      });
+    vi.mocked(settingsApi.updateWechatRssSource).mockResolvedValue({
+      ok: true,
+      source: {
+        ...createSourcesModel().wechatRssSources![0],
+        displayName: "新公众号 RSS",
+        rssUrl: "https://rss.example.com/new.xml"
+      }
+    });
+
+    const wrapper = mountSourcesPage();
+    await flushPromises();
+
+    await wrapper.get("[data-wechat-rss-edit='41']").trigger("click");
+    await flushPromises();
+
+    expect((getModalNode("[data-wechat-rss-form='display-name']").element as HTMLInputElement).value).toBe("AI 公众号 RSS");
+    expect((getModalNode("[data-wechat-rss-form='rss-url']").element as HTMLInputElement).value).toBe("https://rss.example.com/wechat.xml");
+
+    await getModalNode("[data-wechat-rss-form='display-name']").setValue("新公众号 RSS");
+    await getModalNode("[data-wechat-rss-form='rss-url']").setValue("https://rss.example.com/new.xml");
+    await getModalNode("[data-wechat-rss-form='submit']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.updateWechatRssSource).toHaveBeenCalledWith({
+      id: 41,
+      displayName: "新公众号 RSS",
+      rssUrl: "https://rss.example.com/new.xml"
     });
   });
 

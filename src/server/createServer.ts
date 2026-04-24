@@ -53,6 +53,8 @@ import type {
   CreateWechatRssSourcesInput,
   CreateWechatRssSourcesResult,
   DeleteWechatRssSourceResult,
+  UpdateWechatRssSourceInput,
+  UpdateWechatRssSourceResult,
   WechatRssSourceRecord
 } from "../core/wechatRss/wechatRssSourceRepository.js";
 import type { WeiboTrendingRunState } from "../core/weibo/runWeiboTrendingCollection.js";
@@ -367,6 +369,9 @@ type ServerDeps = {
   createWechatRssSources?: (
     input: CreateWechatRssSourcesInput
   ) => Promise<CreateWechatRssSourcesResult> | CreateWechatRssSourcesResult;
+  updateWechatRssSource?: (
+    input: UpdateWechatRssSourceInput
+  ) => Promise<UpdateWechatRssSourceResult> | UpdateWechatRssSourceResult;
   deleteWechatRssSource?: (id: number) => Promise<DeleteWechatRssSourceResult> | DeleteWechatRssSourceResult;
   hasTwitterApiKey?: boolean;
   triggerManualHackerNewsCollect?: () => Promise<ManualHackerNewsCollectResult>;
@@ -1580,6 +1585,24 @@ export function createServer(deps: ServerDeps = {}) {
     return sendWechatRssCreateResult(reply, await deps.createWechatRssSources(payload));
   });
 
+  app.post("/actions/wechat-rss/update", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.updateWechatRssSource) {
+      return reply.code(503).send({ ok: false, reason: "wechat-rss-disabled" });
+    }
+
+    const payload = parseWechatRssUpdatePayload(request.body);
+
+    if (!payload) {
+      return reply.code(400).send({ ok: false, reason: "invalid-wechat-rss-payload" });
+    }
+
+    return sendWechatRssUpdateResult(reply, await deps.updateWechatRssSource(payload));
+  });
+
   app.post("/actions/wechat-rss/delete", async (request, reply) => {
     if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
       return;
@@ -1757,6 +1780,27 @@ function parseWechatRssCreatePayload(body: unknown): CreateWechatRssSourcesInput
   return null;
 }
 
+function parseWechatRssUpdatePayload(body: unknown): UpdateWechatRssSourceInput | null {
+  if (!body || typeof body !== "object") {
+    return null;
+  }
+
+  const payload = body as Record<string, unknown>;
+  const id = parsePositiveInteger(payload.id);
+  const rssUrl = payload.rssUrl;
+  const displayName = payload.displayName;
+
+  if (id === null || typeof rssUrl !== "string") {
+    return null;
+  }
+
+  return {
+    id,
+    rssUrl,
+    displayName: typeof displayName === "string" ? displayName : null
+  };
+}
+
 function sendTwitterAccountSaveResult(reply: FastifyReply, result: SaveTwitterAccountResult) {
   if (result.ok) {
     return reply.send({ ok: true, account: result.account });
@@ -1828,6 +1872,22 @@ function sendWechatRssCreateResult(reply: FastifyReply, result: CreateWechatRssS
       created: result.created,
       skippedDuplicateUrls: result.skippedDuplicateUrls
     });
+  }
+
+  return reply.code(400).send({ ok: false, reason: result.reason });
+}
+
+function sendWechatRssUpdateResult(reply: FastifyReply, result: UpdateWechatRssSourceResult) {
+  if (result.ok) {
+    return reply.send({ ok: true, source: result.source });
+  }
+
+  if (result.reason === "not-found") {
+    return reply.code(404).send({ ok: false, reason: result.reason });
+  }
+
+  if (result.reason === "duplicate-rss-url") {
+    return reply.code(409).send({ ok: false, reason: result.reason });
   }
 
   return reply.code(400).send({ ok: false, reason: result.reason });

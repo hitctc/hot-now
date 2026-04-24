@@ -496,14 +496,19 @@ describe("settingsApi", () => {
     });
   });
 
-  it("posts WeChat RSS batch create delete and manual collection to dedicated actions", async () => {
-    const { createWechatRssSources, deleteWechatRssSource, triggerManualWechatRssCollect } = await import(
+  it("posts WeChat RSS batch create update delete and manual collection to dedicated actions", async () => {
+    const { createWechatRssSources, updateWechatRssSource, deleteWechatRssSource, triggerManualWechatRssCollect } = await import(
       "../../src/client/services/settingsApi"
     );
 
     requestJson.mockResolvedValue({ ok: true });
 
     await createWechatRssSources({ rssUrls: "https://rss.example.com/a.xml\nhttps://rss.example.com/b.xml" });
+    await updateWechatRssSource({
+      id: 31,
+      displayName: "AI 公众号 RSS",
+      rssUrl: "https://rss.example.com/new.xml"
+    });
     await deleteWechatRssSource(31);
     await triggerManualWechatRssCollect();
 
@@ -511,11 +516,19 @@ describe("settingsApi", () => {
       method: "POST",
       body: JSON.stringify({ rssUrls: "https://rss.example.com/a.xml\nhttps://rss.example.com/b.xml" })
     });
-    expect(requestJson).toHaveBeenNthCalledWith(2, "/actions/wechat-rss/delete", {
+    expect(requestJson).toHaveBeenNthCalledWith(2, "/actions/wechat-rss/update", {
+      method: "POST",
+      body: JSON.stringify({
+        id: 31,
+        displayName: "AI 公众号 RSS",
+        rssUrl: "https://rss.example.com/new.xml"
+      })
+    });
+    expect(requestJson).toHaveBeenNthCalledWith(3, "/actions/wechat-rss/delete", {
       method: "POST",
       body: JSON.stringify({ id: 31 })
     });
-    expect(requestJson).toHaveBeenNthCalledWith(3, "/actions/wechat-rss/collect", {
+    expect(requestJson).toHaveBeenNthCalledWith(4, "/actions/wechat-rss/collect", {
       method: "POST",
       body: JSON.stringify({})
     });

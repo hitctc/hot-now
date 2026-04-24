@@ -4,7 +4,8 @@ import {
   createWechatRssSources,
   deleteWechatRssSource,
   listWechatRssSources,
-  markWechatRssSourceFetchResult
+  markWechatRssSourceFetchResult,
+  updateWechatRssSource
 } from "../../src/core/wechatRss/wechatRssSourceRepository.js";
 
 describe("wechatRssSourceRepository", () => {
@@ -59,6 +60,39 @@ describe("wechatRssSourceRepository", () => {
       ok: false,
       reason: "invalid-rss-url"
     });
+  });
+
+  it("updates a single RSS source and rejects duplicate edit targets", async () => {
+    const handle = await createTestDatabase("hot-now-wechat-rss-update-");
+    handles.push(handle);
+
+    const created = createWechatRssSources(handle.db, {
+      rssUrls: "https://rss.example.com/feed.xml\nhttps://rss.example.com/other.xml"
+    });
+    const firstId = created.ok ? created.created[0].id : 0;
+    const secondUrl = created.ok ? created.created[1].rssUrl : "";
+
+    const updated = updateWechatRssSource(handle.db, {
+      id: firstId,
+      displayName: "新的公众号 RSS 名称",
+      rssUrl: " https://rss.example.com/updated.xml#hash "
+    });
+    const duplicate = updateWechatRssSource(handle.db, {
+      id: firstId,
+      displayName: "重复地址",
+      rssUrl: secondUrl
+    });
+
+    expect(updated.ok ? updated.source : null).toMatchObject({
+      id: firstId,
+      displayName: "新的公众号 RSS 名称",
+      rssUrl: "https://rss.example.com/updated.xml"
+    });
+    expect(duplicate).toEqual({ ok: false, reason: "duplicate-rss-url" });
+    expect(listWechatRssSources(handle.db).map((source) => source.rssUrl)).toEqual([
+      "https://rss.example.com/updated.xml",
+      "https://rss.example.com/other.xml"
+    ]);
   });
 
   it("records fetch status and deletes config without touching history", async () => {

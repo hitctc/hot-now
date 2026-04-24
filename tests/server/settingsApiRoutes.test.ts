@@ -198,6 +198,20 @@ function createAuthenticatedServer() {
       ],
       skippedDuplicateUrls: []
     }),
+    updateWechatRssSource: vi.fn().mockResolvedValue({
+      ok: true,
+      source: {
+        id: 31,
+        rssUrl: "https://rss.example.com/updated.xml",
+        displayName: "更新后的公众号 RSS",
+        isEnabled: true,
+        lastFetchedAt: null,
+        lastSuccessAt: null,
+        lastResult: null,
+        createdAt: "2026-04-23T08:00:00.000Z",
+        updatedAt: "2026-04-23T09:10:00.000Z"
+      }
+    }),
     deleteWechatRssSource: vi.fn().mockResolvedValue({ ok: true, id: 31 }),
     getSourcesOperationSummary: vi.fn().mockResolvedValue({
       lastCollectionRunAt: "2026-03-31T03:00:00.000Z",
@@ -354,7 +368,7 @@ describe("settings api routes", () => {
     });
   });
 
-  it("accepts WeChat RSS batch create, manual collect, and delete actions", async () => {
+  it("accepts WeChat RSS batch create, update, manual collect, and delete actions", async () => {
     const app = createAuthenticatedServer();
     const cookie = await loginAndGetCookie(app);
 
@@ -363,6 +377,16 @@ describe("settings api routes", () => {
       url: "/actions/wechat-rss/create",
       headers: { cookie: cookie ?? "" },
       payload: { rssUrls: "https://rss.example.com/new.xml\nhttps://rss.example.com/other.xml" }
+    });
+    const updateResponse = await app.inject({
+      method: "POST",
+      url: "/actions/wechat-rss/update",
+      headers: { cookie: cookie ?? "" },
+      payload: {
+        id: 31,
+        displayName: "更新后的公众号 RSS",
+        rssUrl: "https://rss.example.com/updated.xml"
+      }
     });
     const collectResponse = await app.inject({
       method: "POST",
@@ -378,6 +402,15 @@ describe("settings api routes", () => {
 
     expect(createResponse.statusCode).toBe(200);
     expect(createResponse.json()).toMatchObject({ ok: true, created: [{ id: 32 }] });
+    expect(updateResponse.statusCode).toBe(200);
+    expect(updateResponse.json()).toMatchObject({
+      ok: true,
+      source: {
+        id: 31,
+        displayName: "更新后的公众号 RSS",
+        rssUrl: "https://rss.example.com/updated.xml"
+      }
+    });
     expect(collectResponse.statusCode).toBe(202);
     expect(collectResponse.json()).toMatchObject({
       accepted: true,

@@ -13,6 +13,7 @@ export type TwitterAccountModalMode = "create" | "update";
 export type TwitterKeywordModalMode = "create" | "update";
 export type HackerNewsQueryModalMode = "create" | "update";
 export type BilibiliQueryModalMode = "create" | "update";
+export type WechatRssModalMode = "create" | "update";
 
 export type SourceFormState = {
   kind: string;
@@ -56,6 +57,9 @@ export type BilibiliQueryFormState = {
 };
 
 export type WechatRssFormState = {
+  id: number | null;
+  displayName: string;
+  rssUrl: string;
   rssUrls: string;
 };
 
@@ -126,7 +130,8 @@ export const bilibiliQueryColumns = [
 ];
 
 export const wechatRssSourceColumns = [
-  { title: "RSS 链接", key: "rssUrl", align: "center" as const },
+  { title: "来源名称", key: "displayName", align: "center" as const },
+  { title: "RSS 地址", key: "rssUrl", align: "center" as const },
   { title: "最近成功", key: "lastSuccessAt", align: "center" as const },
   { title: "最近结果", key: "lastResult", align: "center" as const },
   { title: "操作", key: "actions", align: "center" as const }

@@ -20,21 +20,7 @@ import WechatRssSourceModal from "../../components/settings/sources/WechatRssSou
 import WechatRssSourcesCard from "../../components/settings/sources/WechatRssSourcesCard.vue";
 import WeiboTrendingCard from "../../components/settings/sources/WeiboTrendingCard.vue";
 import { useSourcesPageController } from "../../components/settings/sources/useSourcesPageController";
-
-const aiTimelineOfficialSources = [
-  {
-    companyName: "OpenAI",
-    sourceLabel: "OpenAI News",
-    feedUrl: "https://openai.com/news/rss.xml",
-    allowedScope: "只接受 openai.com 官方链接"
-  },
-  {
-    companyName: "Google AI",
-    sourceLabel: "Google AI Blog",
-    feedUrl: "https://blog.google/technology/ai/rss/",
-    allowedScope: "只接受 blog.google/technology/ai 官方链接"
-  }
-] as const;
+import { publicOfficialAiTimelineSources } from "../../../core/aiTimeline/officialAiTimelineSources";
 
 const {
   isLoading,
@@ -294,8 +280,8 @@ const {
               </p>
               <div class="grid gap-2 md:grid-cols-2">
                 <div
-                  v-for="source in aiTimelineOfficialSources"
-                  :key="source.feedUrl"
+                  v-for="source in publicOfficialAiTimelineSources"
+                  :key="source.id"
                   class="rounded-editorial-card border border-editorial-border bg-editorial-panel/45 p-3 text-sm"
                   data-ai-timeline-official-source
                 >
@@ -304,14 +290,17 @@ const {
                     <span class="rounded-editorial-pill bg-editorial-link px-2 py-0.5 text-[11px] text-editorial-text-body">
                       {{ source.sourceLabel }}
                     </span>
+                    <span class="rounded-editorial-pill bg-editorial-link px-2 py-0.5 text-[11px] text-editorial-text-muted">
+                      {{ source.sourceKindLabel }}
+                    </span>
                   </div>
                   <a
                     class="mt-2 block break-all text-xs text-editorial-accent hover:underline"
-                    :href="source.feedUrl"
+                    :href="source.sourceUrl"
                     target="_blank"
                     rel="noreferrer"
                   >
-                    {{ source.feedUrl }}
+                    {{ source.sourceUrl }}
                   </a>
                   <p class="m-0 mt-1 text-xs leading-5 text-editorial-text-muted">
                     {{ source.allowedScope }}

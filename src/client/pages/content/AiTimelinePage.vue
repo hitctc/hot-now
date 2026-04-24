@@ -208,9 +208,9 @@ onMounted(() => {
     </template>
 
     <template v-else>
-      <section :class="editorialContentListSectionClass" data-ai-timeline-list>
+      <section :class="[editorialContentListSectionClass, 'gap-0']" data-ai-timeline-list>
         <div
-          class="flex flex-wrap items-center justify-between gap-3 border-b border-editorial-border/70 pb-3 text-sm text-editorial-text-body"
+          class="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-editorial-border/70 pb-3 text-sm text-editorial-text-body"
           data-ai-timeline-result-summary
         >
           <span class="font-semibold text-editorial-text-main">共 {{ totalEventCount }} 条</span>

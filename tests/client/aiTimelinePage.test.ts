@@ -131,6 +131,10 @@ describe("AiTimelinePage", () => {
     expect(wrapper.get("[data-ai-timeline-filters]").text()).toContain("事件类型");
     expect(wrapper.findAll("[data-ai-timeline-event-card]")).toHaveLength(2);
     expect(wrapper.findAll("[data-ai-timeline-display-index]").map((node) => node.text())).toEqual(["1", "2"]);
+    expect(wrapper.get("[data-ai-timeline-time]").text()).toContain("/");
+    expect(wrapper.get("[data-ai-timeline-event-card]").classes()).toEqual(
+      expect.arrayContaining(["grid", "grid-cols-[52px_32px_minmax(0,1fr)]"])
+    );
     expect(wrapper.get("[data-ai-timeline-list]").text()).toContain("Introducing GPT-5.5");
     expect(wrapper.get("[data-ai-timeline-list]").text()).toContain("Google AI releases a new developer tool");
     expect(wrapper.get("[data-ai-timeline-official-link]").attributes("href")).toBe(

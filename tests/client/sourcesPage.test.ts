@@ -264,16 +264,7 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-sources-section='overview']").text()).toContain("已启用来源");
     expect(wrapper.get("[data-sources-section='overview']").text()).toContain("下一次采集");
     expect(wrapper.get("[data-sources-section='overview']").text()).toContain("18:40（还有 6 分钟）");
-    expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 新讯24小时候选 / 24小时展示");
-    expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 新讯独立展示占比");
-    expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 热点独立展示占比");
-    expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("选中时全量");
-    expect(wrapper.get("[data-sources-section='analytics']").text().indexOf("AI 新讯24小时候选 / 24小时展示")).toBeLessThan(
-      wrapper.get("[data-sources-section='analytics']").text().indexOf("AI 热点候选 / 展示")
-    );
-    expect(wrapper.get("[data-sources-section='analytics']").text()).not.toContain("AI 新讯今日候选 / 今日展示");
-    expect(wrapper.get("[data-sources-section='analytics']").text()).not.toContain("AI 热点今日候选 / 今日展示");
-    expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("OpenAI");
+    expect(wrapper.find("[data-sources-section='analytics']").exists()).toBe(false);
     expect(wrapper.get("[data-sources-section='manual-send-latest-email']").text()).toContain("发送最新报告");
     expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("Twitter 账号");
     expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("新增 Twitter 账号");
@@ -303,22 +294,34 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-sources-section='weibo-trending']").text()).toContain("微博热搜榜匹配已就绪");
     expect(wrapper.findAll("[data-weibo-keyword]")).toHaveLength(3);
     expect(wrapper.get("[data-sources-section='inventory']").classes()).toContain("editorial-glass-panel");
+    expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("来源库存与统计");
+    expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("选中时全量");
+    expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("总条数");
+    expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("今天发布");
+    expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("今天抓取");
+    expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("20");
+    expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("3");
+    expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("2");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("新增来源");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("手动执行采集");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("下一次自动采集：18:40（还有 6 分钟）");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("已完成");
-    expect(wrapper.get("[data-sources-section='inventory']").text()).not.toContain("选中时全量");
+    expect(wrapper.get("[data-sources-section='inventory']").text()).not.toContain("AI 新讯今日候选 / 今日展示");
+    expect(wrapper.get("[data-sources-section='inventory']").text()).not.toContain("AI 热点今日候选 / 今日展示");
+    await wrapper.get(".ant-table-row-expand-icon").trigger("click");
+    await flushPromises();
+    expect(wrapper.get("[data-source-detail='openai']").text()).toContain("AI 新讯");
+    expect(wrapper.get("[data-source-detail='openai']").text()).toContain("AI 热点");
+    expect(wrapper.get("[data-source-detail='openai']").text()).toContain("6 / 4");
+    expect(wrapper.get("[data-source-detail='openai']").text()).toContain("独立展示占比：50.0%");
     expect(wrapper.get("[data-source-rss-link='openai']").attributes("href")).toBe("https://openai.com/news/rss.xml");
     expect(wrapper.get("[data-source-rss-link='openai']").attributes("title")).toBe("https://openai.com/news/rss.xml");
-    expect(wrapper.get("[data-source-rss-link='openai']").classes()).toEqual(
-      expect.arrayContaining(["inline-block", "truncate", "text-left"])
-    );
+    expect(wrapper.get("[data-source-rss-link='openai']").classes()).toContain("break-all");
 
-    const analyticsHeaderCells = wrapper.get("[data-sources-section='analytics']").findAll("thead th");
     const inventoryHeaderCells = wrapper.get("[data-sources-section='inventory']").findAll("thead th");
+    const labeledInventoryHeaderCells = inventoryHeaderCells.filter((cell) => cell.text().trim().length > 0);
 
-    expect(analyticsHeaderCells.every((cell) => (cell.attributes("style") || "").includes("text-align: center"))).toBe(true);
-    expect(inventoryHeaderCells.every((cell) => (cell.attributes("style") || "").includes("text-align: center"))).toBe(true);
+    expect(labeledInventoryHeaderCells.every((cell) => (cell.attributes("style") || "").includes("text-align: center"))).toBe(true);
   });
 
   it("shows disabled schedule copy when the next collection time is unavailable", async () => {
@@ -959,7 +962,7 @@ describe("SourcesPage", () => {
     const inventoryHeaderCells = wrapper.get("[data-sources-section='inventory']").findAll("thead th");
 
     expect(sourceCell.get("[data-source-meta='wechat_demo']").text()).toContain("微信 Demo");
-    expect(sourceCell.get("[data-source-badges='wechat_demo']").text()).toContain("公众号");
+    expect(wrapper.get("[data-source-badges='wechat_demo']").text()).toContain("公众号");
     expect(sourceCell.text()).not.toContain("编辑");
     expect(sourceCell.text()).not.toContain("删除");
     expect(actionsRow.text()).toContain("编辑");

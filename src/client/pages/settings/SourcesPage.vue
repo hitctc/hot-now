@@ -107,23 +107,16 @@ type BilibiliQueryFormState = {
   notes: string;
 };
 
-const analyticsColumns = [
+const inventoryColumns = [
   { title: "来源", key: "name", align: "center" as const },
+  { title: "类型", key: "sourceType", align: "center" as const },
+  { title: "启用", key: "enabled", align: "center" as const },
   { title: "选中时全量", key: "displayMode", align: "center" as const },
   { title: "总条数", key: "totalCount", align: "center" as const },
   { title: "今天发布", key: "publishedTodayCount", align: "center" as const },
   { title: "今天抓取", key: "collectedTodayCount", align: "center" as const },
-  { title: "AI 新讯24小时候选 / 24小时展示", key: "aiStats", align: "center" as const },
-  { title: "AI 新讯独立展示占比", key: "aiShare", align: "center" as const },
-  { title: "AI 热点候选 / 展示", key: "hotStats", align: "center" as const },
-  { title: "AI 热点独立展示占比", key: "hotShare", align: "center" as const }
-];
-const inventoryColumns = [
-  { title: "来源", key: "name", align: "center" as const },
-  { title: "启用", key: "enabled", align: "center" as const },
   { title: "最近抓取时间", key: "lastCollectedAt", align: "center" as const },
   { title: "最近抓取状态", key: "lastCollectionStatus", align: "center" as const },
-  { title: "RSS", key: "rssUrl", align: "center" as const },
   { title: "操作", key: "actions", align: "center" as const }
 ];
 const twitterAccountColumns = [
@@ -1502,7 +1495,7 @@ onUnmounted(() => {
                 数据来源工作台
               </h2>
               <p class="m-0 max-w-3xl text-sm leading-7 text-editorial-text-body">
-                这里负责管理 RSS 与公众号桥接来源、查看调度节奏、执行手动采集和人工发信，同时保持库存表和统计表在同一屏里可比对。
+                这里负责管理 RSS 与公众号桥接来源、查看调度节奏、执行手动采集和人工发信，同时把库存管理与核心统计合并在一张表里。
               </p>
             </div>
           </div>
@@ -2117,74 +2110,17 @@ onUnmounted(() => {
 
         <a-card
           :class="editorialContentCardClass"
-          title="来源统计概览"
-          size="small"
-          data-sources-section="analytics"
-        >
-          <a-table
-            :data-source="sourcesModel.sources"
-            :columns="analyticsColumns"
-            row-key="kind"
-            :pagination="false"
-            size="small"
-          >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'name'">
-                <a-space direction="vertical" size="small">
-                  <a-typography-text strong>{{ record.name }}</a-typography-text>
-                  <a-tag :color="record.isEnabled ? 'green' : 'default'">
-                    {{ record.isEnabled ? "启用中" : "已停用" }}
-                  </a-tag>
-                </a-space>
-              </template>
-              <template v-else-if="column.key === 'totalCount'">
-                {{ record.totalCount ?? 0 }}
-              </template>
-              <template v-else-if="column.key === 'displayMode'">
-                <a-switch
-                  :checked="record.showAllWhenSelected"
-                  :loading="isActionPending(`display-mode:${record.kind}`)"
-                  :checked-children="'全量'"
-                  :un-checked-children="'截断'"
-                  :data-source-display-mode="record.kind"
-                  @change="handleToggleSourceDisplayMode(record)"
-                />
-              </template>
-              <template v-else-if="column.key === 'publishedTodayCount'">
-                {{ record.publishedTodayCount ?? 0 }}
-              </template>
-              <template v-else-if="column.key === 'collectedTodayCount'">
-                {{ record.collectedTodayCount ?? 0 }}
-              </template>
-              <template v-else-if="column.key === 'aiShare'">
-                {{ formatViewShare(record.viewStats?.ai) }}
-              </template>
-              <template v-else-if="column.key === 'hotStats'">
-                {{ formatViewStats(record.viewStats?.hot) }}
-              </template>
-              <template v-else-if="column.key === 'hotShare'">
-                {{ formatViewShare(record.viewStats?.hot) }}
-              </template>
-              <template v-else-if="column.key === 'aiStats'">
-                {{ formatViewStats(record.viewStats?.ai) }}
-              </template>
-            </template>
-          </a-table>
-        </a-card>
-
-        <a-card
-          :class="editorialContentCardClass"
-          title="来源库存"
+          title="来源库存与统计"
           size="small"
           data-sources-section="inventory"
         >
           <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <a-typography-paragraph class="!mb-1" type="secondary">
-                管理 RSS 与公众号桥接来源，手动采集会处理所有已启用 source。
+                管理 RSS 与公众号桥接来源，并在同一张表里查看核心库存统计。
               </a-typography-paragraph>
               <p class="m-0 text-xs leading-5 text-editorial-text-muted">
-                下一次自动采集：{{ formatNextCollectionText(sourcesModel.operations.nextCollectionRunAt) }}
+                手动采集会处理所有已启用 source；展开来源可查看 AI 新讯 / AI 热点细分统计与链接。下一次自动采集：{{ formatNextCollectionText(sourcesModel.operations.nextCollectionRunAt) }}
               </p>
             </div>
             <div class="flex flex-wrap gap-2">
@@ -2209,12 +2145,13 @@ onUnmounted(() => {
             row-key="kind"
             :pagination="false"
             size="small"
+            :scroll="{ x: 1080 }"
           >
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'name'">
                 <div
                   :data-source-cell="record.kind"
-                  class="flex flex-col items-center gap-2"
+                  class="flex flex-col items-center gap-1"
                 >
                   <a-space
                     direction="vertical"
@@ -2224,17 +2161,15 @@ onUnmounted(() => {
                     <a-typography-text strong>{{ record.name }}</a-typography-text>
                     <a-typography-text type="secondary">{{ record.kind }}</a-typography-text>
                   </a-space>
-                  <a-space
-                    wrap
-                    size="small"
-                    class="justify-center"
-                    :data-source-badges="record.kind"
-                  >
-                    <a-tag :color="record.sourceType === 'wechat_bridge' ? 'blue' : 'default'">
-                      {{ record.sourceType === "wechat_bridge" ? "公众号" : "RSS" }}
-                    </a-tag>
-                  </a-space>
                 </div>
+              </template>
+              <template v-else-if="column.key === 'sourceType'">
+                <a-tag
+                  :color="record.sourceType === 'wechat_bridge' ? 'blue' : 'default'"
+                  :data-source-badges="record.kind"
+                >
+                  {{ record.sourceType === "wechat_bridge" ? "公众号" : "RSS" }}
+                </a-tag>
               </template>
               <template v-else-if="column.key === 'actions'">
                 <div
@@ -2279,6 +2214,25 @@ onUnmounted(() => {
                   @change="handleToggleSource(record)"
                 />
               </template>
+              <template v-else-if="column.key === 'displayMode'">
+                <a-switch
+                  :checked="record.showAllWhenSelected"
+                  :loading="isActionPending(`display-mode:${record.kind}`)"
+                  :checked-children="'全量'"
+                  :un-checked-children="'截断'"
+                  :data-source-display-mode="record.kind"
+                  @change="handleToggleSourceDisplayMode(record)"
+                />
+              </template>
+              <template v-else-if="column.key === 'totalCount'">
+                {{ record.totalCount ?? 0 }}
+              </template>
+              <template v-else-if="column.key === 'publishedTodayCount'">
+                {{ record.publishedTodayCount ?? 0 }}
+              </template>
+              <template v-else-if="column.key === 'collectedTodayCount'">
+                {{ record.collectedTodayCount ?? 0 }}
+              </template>
               <template v-else-if="column.key === 'lastCollectedAt'">
                 {{ formatDateTime(record.lastCollectedAt) }}
               </template>
@@ -2287,20 +2241,69 @@ onUnmounted(() => {
                   {{ formatCollectionStatus(record.lastCollectionStatus) }}
                 </a-tag>
               </template>
-              <template v-else-if="column.key === 'rssUrl'">
-                <a
-                  v-if="record.rssUrl"
-                  :href="record.rssUrl"
-                  :title="record.rssUrl"
-                  target="_blank"
-                  rel="noreferrer"
-                  :data-source-rss-link="record.kind"
-                  class="inline-block max-w-[240px] truncate align-middle text-left"
-                >
-                  {{ record.rssUrl }}
-                </a>
-                <span v-else>未配置</span>
-              </template>
+            </template>
+            <template #expandedRowRender="{ record }">
+              <div
+                class="grid gap-3 px-2 py-1 md:grid-cols-2 xl:grid-cols-4"
+                :data-source-detail="record.kind"
+              >
+                <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-4 py-3">
+                  <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
+                    AI 新讯
+                  </p>
+                  <p class="mt-2 mb-0 text-sm text-editorial-text-main">
+                    {{ formatViewStats(record.viewStats?.ai) }}
+                  </p>
+                  <p class="mt-1 mb-0 text-xs text-editorial-text-muted">
+                    独立展示占比：{{ formatViewShare(record.viewStats?.ai) }}
+                  </p>
+                </article>
+                <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-4 py-3">
+                  <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
+                    AI 热点
+                  </p>
+                  <p class="mt-2 mb-0 text-sm text-editorial-text-main">
+                    {{ formatViewStats(record.viewStats?.hot) }}
+                  </p>
+                  <p class="mt-1 mb-0 text-xs text-editorial-text-muted">
+                    独立展示占比：{{ formatViewShare(record.viewStats?.hot) }}
+                  </p>
+                </article>
+                <article class="rounded-editorial-md border border-editorial-border bg-editorial-panel/70 px-4 py-3 xl:col-span-2">
+                  <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
+                    链接
+                  </p>
+                  <p class="mt-2 mb-0 text-xs leading-5 text-editorial-text-body">
+                    RSS：
+                    <a
+                      v-if="record.rssUrl"
+                      :href="record.rssUrl"
+                      :title="record.rssUrl"
+                      target="_blank"
+                      rel="noreferrer"
+                      :data-source-rss-link="record.kind"
+                      class="break-all"
+                    >
+                      {{ record.rssUrl }}
+                    </a>
+                    <span v-else>未配置</span>
+                  </p>
+                  <p class="mt-1 mb-0 text-xs leading-5 text-editorial-text-body">
+                    主页：
+                    <a
+                      v-if="record.siteUrl"
+                      :href="record.siteUrl"
+                      :title="record.siteUrl"
+                      target="_blank"
+                      rel="noreferrer"
+                      class="break-all"
+                    >
+                      {{ record.siteUrl }}
+                    </a>
+                    <span v-else>未配置</span>
+                  </p>
+                </article>
+              </div>
             </template>
           </a-table>
         </a-card>

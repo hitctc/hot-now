@@ -228,6 +228,70 @@ describe("createServer", () => {
     expect(response.body).not.toContain('class="shell-root"');
   });
 
+  it("returns AI timeline events with query filters", async () => {
+    const listAiTimelineEvents = vi.fn().mockResolvedValue({
+      events: [
+        {
+          id: 1,
+          companyKey: "openai",
+          companyName: "OpenAI",
+          eventType: "模型发布",
+          title: "Introducing GPT-5.5",
+          summary: "Official release notes.",
+          officialUrl: "https://openai.com/news/introducing-gpt-5-5/",
+          sourceLabel: "OpenAI News",
+          sourceKind: "official_blog",
+          publishedAt: "2026-04-24T10:00:00.000Z",
+          discoveredAt: "2026-04-24T12:00:00.000Z",
+          importance: 95,
+          rawSourceJson: {},
+          createdAt: "2026-04-24T12:00:00.000Z",
+          updatedAt: "2026-04-24T12:00:00.000Z"
+        }
+      ],
+      filters: {
+        eventTypes: ["要闻", "模型发布", "开发生态", "产品应用", "行业动态", "官方前瞻"],
+        companies: [{ key: "openai", name: "OpenAI", eventCount: 1 }]
+      },
+      pagination: {
+        page: 2,
+        pageSize: 50,
+        totalResults: 51,
+        totalPages: 2
+      }
+    });
+    const app = createServer({ listAiTimelineEvents });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/ai-timeline?eventType=%E6%A8%A1%E5%9E%8B%E5%8F%91%E5%B8%83&company=openai&q=GPT&page=2"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(listAiTimelineEvents).toHaveBeenCalledWith({
+      eventType: "模型发布",
+      companyKey: "openai",
+      searchKeyword: "GPT",
+      page: 2
+    });
+    expect(response.json()).toMatchObject({
+      page: 2,
+      pageSize: 50,
+      totalResults: 51,
+      totalPages: 2,
+      filters: {
+        companies: [{ key: "openai", name: "OpenAI", eventCount: 1 }]
+      },
+      events: [
+        {
+          companyKey: "openai",
+          eventType: "模型发布",
+          title: "Introducing GPT-5.5"
+        }
+      ]
+    });
+  });
+
   it("returns a readable fallback shell instead of fake asset paths when the client build is missing", async () => {
     const tempWorkspace = mkdtempSync(path.join(tmpdir(), "hot-now-missing-client-build-"));
     const app = createServer({

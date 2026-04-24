@@ -173,6 +173,17 @@ function createAuthenticatedServer() {
     triggerManualHackerNewsCollect: vi.fn().mockResolvedValue({ accepted: true }),
     triggerManualBilibiliCollect: vi.fn().mockResolvedValue({ accepted: true }),
     triggerManualWeiboTrendingCollect: vi.fn().mockResolvedValue({ accepted: true }),
+    triggerManualAiTimelineCollect: vi.fn().mockResolvedValue({
+      accepted: true,
+      action: "collect-ai-timeline",
+      sourceCount: 2,
+      fetchedItemCount: 3,
+      persistedEventCount: 2,
+      insertedEventCount: 1,
+      updatedEventCount: 1,
+      skippedItemCount: 1,
+      failureCount: 0
+    }),
     triggerManualWechatRssCollect: vi.fn().mockResolvedValue({
       accepted: true,
       action: "collect-wechat-rss",
@@ -420,6 +431,39 @@ describe("settings api routes", () => {
     });
     expect(deleteResponse.statusCode).toBe(200);
     expect(deleteResponse.json()).toEqual({ ok: true, id: 31 });
+  });
+
+  it("requires login for manual AI timeline collection", async () => {
+    const app = createAuthenticatedServer();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/ai-timeline/collect"
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({ accepted: false, reason: "unauthorized" });
+  });
+
+  it("accepts manual AI timeline collection for logged-in users", async () => {
+    const app = createAuthenticatedServer();
+    const cookie = await loginAndGetCookie(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/ai-timeline/collect",
+      headers: {
+        cookie: cookie ?? ""
+      }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toMatchObject({
+      accepted: true,
+      action: "collect-ai-timeline",
+      sourceCount: 2,
+      persistedEventCount: 2
+    });
   });
 
   it("does not pass content-page source filters through to the sources workbench reader", async () => {

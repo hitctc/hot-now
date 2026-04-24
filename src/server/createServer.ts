@@ -5,6 +5,7 @@ import { LatestReportEmailError, type LatestReportEmailErrorReason } from "../co
 import type { BuildContentPageModelOptions } from "../core/content/buildContentPageModel.js";
 import type { ContentSortMode, ContentViewSelectionOptions } from "../core/content/buildContentViewSelection.js";
 import type { ContentCardView, ContentViewKey } from "../core/content/listContentView.js";
+import { aiTimelineEventTypes, type AiTimelineListQuery, type AiTimelinePageModel } from "../core/aiTimeline/aiTimelineTypes.js";
 import type { SaveFeedbackPoolEntryInput, SaveFeedbackPoolEntryResult } from "../core/feedback/feedbackPoolRepository.js";
 import type {
   SaveProviderSettingsInput,
@@ -212,6 +213,22 @@ type ManualWeiboTrendingCollectResult = {
   reusedContentItemCount: number;
   failureCount: number;
 };
+type ManualAiTimelineCollectResult =
+  | {
+      accepted: true;
+      action: "collect-ai-timeline";
+      sourceCount: number;
+      fetchedItemCount: number;
+      persistedEventCount: number;
+      insertedEventCount: number;
+      updatedEventCount: number;
+      skippedItemCount: number;
+      failureCount: number;
+    }
+  | {
+      accepted: false;
+      reason: "no-ai-timeline-sources";
+    };
 type ManualSendLatestEmailResult =
   | { accepted: true; action: "send-latest-email" }
   | { accepted: false; reason: LatestReportEmailErrorReason };
@@ -316,6 +333,7 @@ type ServerDeps = {
   listBilibiliQueries?: () => Promise<BilibiliQueryRecord[]> | BilibiliQueryRecord[];
   listWechatRssSources?: () => Promise<WechatRssSourceRecord[]> | WechatRssSourceRecord[];
   getWeiboTrendingState?: () => Promise<WeiboTrendingRunState> | WeiboTrendingRunState;
+  listAiTimelineEvents?: (query: AiTimelineListQuery) => Promise<AiTimelinePageModel> | AiTimelinePageModel;
   createTwitterAccount?: (
     input: SaveTwitterAccountInput
   ) => Promise<SaveTwitterAccountResult> | SaveTwitterAccountResult;
@@ -378,6 +396,7 @@ type ServerDeps = {
   triggerManualBilibiliCollect?: () => Promise<ManualBilibiliCollectResult>;
   triggerManualWechatRssCollect?: () => Promise<ManualWechatRssCollectResult>;
   triggerManualWeiboTrendingCollect?: () => Promise<ManualWeiboTrendingCollectResult>;
+  triggerManualAiTimelineCollect?: () => Promise<ManualAiTimelineCollectResult>;
   getCurrentUserProfile?: () => Promise<CurrentUserProfile | null> | CurrentUserProfile | null;
   getContentPageModel?: (
     pageKey: ContentPageKey,
@@ -544,6 +563,10 @@ export function createServer(deps: ServerDeps = {}) {
 
   app.get("/api/content/ai-hot", async (request, reply) => {
     return reply.send(await readContentPageModelApiData(deps, request, "ai-hot"));
+  });
+
+  app.get("/api/ai-timeline", async (request, reply) => {
+    return reply.send(await readAiTimelineApiData(deps, request));
   });
 
   if (authEnabled) {
@@ -852,6 +875,17 @@ export function createServer(deps: ServerDeps = {}) {
       authConfig?.sessionSecret ?? "",
       deps.isRunning?.() ?? false,
       deps.triggerManualWeiboTrendingCollect
+    );
+  });
+
+  app.post("/actions/ai-timeline/collect", async (request, reply) => {
+    return await handleManualAiTimelineCollectAction(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? "",
+      deps.isRunning?.() ?? false,
+      deps.triggerManualAiTimelineCollect
     );
   });
 
@@ -2425,6 +2459,65 @@ async function readContentPageModelApiData(
   return buildContentPageModelFromDependencies(deps, request, pageKey);
 }
 
+async function readAiTimelineApiData(deps: ServerDeps, request: FastifyRequest) {
+  const query = readAiTimelineQuery(request);
+
+  if (!deps.listAiTimelineEvents) {
+    return {
+      page: query.page ?? 1,
+      pageSize: 50,
+      totalResults: 0,
+      totalPages: 0,
+      filters: {
+        eventTypes: [...aiTimelineEventTypes],
+        companies: []
+      },
+      events: []
+    };
+  }
+
+  const model = await deps.listAiTimelineEvents(query);
+
+  return {
+    page: model.pagination.page,
+    pageSize: model.pagination.pageSize,
+    totalResults: model.pagination.totalResults,
+    totalPages: model.pagination.totalPages,
+    filters: model.filters,
+    events: model.events
+  };
+}
+
+function readAiTimelineQuery(request: FastifyRequest): AiTimelineListQuery {
+  const query = request.query as Record<string, unknown>;
+  const eventType = readQueryString(query.eventType);
+  const companyKey = readQueryString(query.company);
+  const searchKeyword = readQueryString(query.q);
+  const page = readPositiveQueryInteger(query.page);
+
+  return {
+    ...(eventType ? { eventType } : {}),
+    ...(companyKey ? { companyKey } : {}),
+    ...(searchKeyword ? { searchKeyword } : {}),
+    ...(page ? { page } : {})
+  };
+}
+
+function readQueryString(value: unknown): string | undefined {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  return normalized || undefined;
+}
+
+function readPositiveQueryInteger(value: unknown): number | undefined {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return undefined;
+  }
+
+  return Math.floor(parsed);
+}
+
 async function buildContentPageModelFromDependencies(
   deps: ServerDeps,
   request: FastifyRequest,
@@ -3199,6 +3292,31 @@ async function handleManualWeiboTrendingCollectAction(
   }
 
   const result = await triggerManualWeiboTrendingCollect();
+  return reply.code(202).send(result);
+}
+
+async function handleManualAiTimelineCollectAction(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  authEnabled: boolean,
+  sessionSecret: string,
+  isRunning: boolean,
+  triggerManualAiTimelineCollect: ServerDeps["triggerManualAiTimelineCollect"]
+) {
+  // AI 时间线是独立官方事件采集，但仍使用和其他手动动作一致的登录与运行锁门禁。
+  if (!ensureManualActionAuthorized(request, reply, authEnabled, sessionSecret)) {
+    return;
+  }
+
+  if (isRunning) {
+    return reply.code(409).send({ accepted: false, reason: "already-running" });
+  }
+
+  if (!triggerManualAiTimelineCollect) {
+    return reply.code(503).send({ accepted: false });
+  }
+
+  const result = await triggerManualAiTimelineCollect();
   return reply.code(202).send(result);
 }
 

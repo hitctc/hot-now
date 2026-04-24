@@ -110,9 +110,37 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
+let latestIntersectionObserverCallback: IntersectionObserverCallback | null = null;
+
+function installIntersectionObserverMock(): void {
+  latestIntersectionObserverCallback = null;
+  vi.stubGlobal(
+    "IntersectionObserver",
+    vi.fn((callback: IntersectionObserverCallback) => {
+      latestIntersectionObserverCallback = callback;
+
+      return {
+        observe: vi.fn(),
+        disconnect: vi.fn(),
+        unobserve: vi.fn(),
+        takeRecords: vi.fn()
+      };
+    })
+  );
+}
+
+function triggerInfiniteLoad(): void {
+  expect(latestIntersectionObserverCallback).not.toBeNull();
+  latestIntersectionObserverCallback?.(
+    [{ isIntersecting: true } as IntersectionObserverEntry],
+    {} as IntersectionObserver
+  );
+}
+
 describe("AiHotPage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    installIntersectionObserverMock();
     window.localStorage.clear();
     routeState.query = {};
     routerMocks.replace.mockImplementation(async (location: { query?: Record<string, unknown> }) => {
@@ -201,7 +229,8 @@ describe("AiHotPage", () => {
     expect(wrapper.get("[data-content-toolbar-summary]").attributes("aria-expanded")).toBe("true");
     expect(wrapper.get("[data-content-source-filter]").text()).toContain("已选 1 / 2 · 共 80 条");
     expect(wrapper.find("[data-content-sort-control]").exists()).toBe(true);
-    expect(wrapper.get("[data-content-pagination-summary]").text()).toContain("第 1 / 2 页 · 共 80 条");
+    expect(wrapper.get("[data-content-result-summary]").text()).toContain("共 80 条");
+    expect(wrapper.get("[data-content-result-summary]").text()).toContain("已加载 1 条");
     expect(wrapper.get("[data-content-section='list']").attributes("data-list-style")).toBe("database");
     expect(wrapper.get("[data-content-section='list']").text()).toContain("Hot AI Event");
     expect(wrapper.findAll("[data-content-row]").length).toBe(1);
@@ -347,7 +376,7 @@ describe("AiHotPage", () => {
     await flushPromises();
   });
 
-  it("reloads ai-hot when the user flips to the next page", async () => {
+  it("appends the next ai-hot page when the infinite load trigger enters the viewport", async () => {
     routeState.query = { page: "1" };
     contentApiMocks.readAiHotPage
       .mockResolvedValueOnce(createModel())
@@ -383,14 +412,9 @@ describe("AiHotPage", () => {
 
     await flushPromises();
     expect(wrapper.findAll("[data-content-display-index]").map((node) => node.text())).toEqual(["1"]);
-    await wrapper.get("[data-content-pagination-action='next']").trigger("click");
+    triggerInfiniteLoad();
     await flushPromises();
 
-    expect(routerMocks.replace).toHaveBeenCalledWith({
-      query: {
-        page: "2"
-      }
-    });
     expect(contentApiMocks.readAiHotPage).toHaveBeenNthCalledWith(2, {
       selectedSourceKinds: ["openai"],
       selectedTwitterAccountIds: undefined,
@@ -399,10 +423,7 @@ describe("AiHotPage", () => {
       page: 2,
       searchKeyword: ""
     });
-    expect(window.scrollTo).toHaveBeenCalledWith({
-      top: 0,
-      behavior: "auto"
-    });
-    expect(wrapper.findAll("[data-content-display-index]").map((node) => node.text())).toEqual(["51"]);
+    expect(wrapper.get("[data-content-result-summary]").text()).toContain("已加载 2 条");
+    expect(wrapper.findAll("[data-content-display-index]").map((node) => node.text())).toEqual(["1", "2"]);
   });
 });

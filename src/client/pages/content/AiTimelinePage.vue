@@ -3,26 +3,28 @@ import { computed, onMounted, ref } from "vue";
 
 import AiTimelineEventCard from "../../components/content/AiTimelineEventCard.vue";
 import AiTimelineFilters from "../../components/content/AiTimelineFilters.vue";
-import ContentPaginationBar from "../../components/content/ContentPaginationBar.vue";
 import EditorialEmptyState from "../../components/content/EditorialEmptyState.vue";
 import {
   editorialContentIntroSectionClass,
   editorialContentListSectionClass,
   editorialContentPageClass
 } from "../../components/content/contentCardShared";
-import { readAiTimelinePage, type AiTimelinePageModel } from "../../services/aiTimelineApi";
+import { useInfiniteLoadTrigger } from "../../components/content/useInfiniteLoadTrigger";
+import { readAiTimelinePage, type AiTimelineEventRecord, type AiTimelinePageModel } from "../../services/aiTimelineApi";
 
 type LoadState = "idle" | "loading" | "loaded" | "error";
 
 const pageModel = ref<AiTimelinePageModel | null>(null);
+const timelineEvents = ref<AiTimelineEventRecord[]>([]);
 const loadState = ref<LoadState>("idle");
 const loadError = ref<string | null>(null);
+const isLoadingNextPage = ref(false);
 const selectedEventType = ref("");
 const selectedCompany = ref("");
 const searchKeyword = ref("");
 const currentPage = ref(1);
 
-const events = computed(() => pageModel.value?.events ?? []);
+const events = computed(() => timelineEvents.value);
 const filters = computed(() => pageModel.value?.filters ?? { eventTypes: [], companies: [] });
 const pagination = computed(() => ({
   page: pageModel.value?.page ?? 1,
@@ -34,26 +36,61 @@ const isLoading = computed(() => loadState.value === "loading");
 const hasActiveFilter = computed(
   () => Boolean(selectedEventType.value || selectedCompany.value || searchKeyword.value.trim())
 );
+const loadedEventCount = computed(() => events.value.length);
+const totalEventCount = computed(() => pagination.value.totalResults);
+const hasMoreEvents = computed(() => (
+  currentPage.value < pagination.value.totalPages && loadedEventCount.value < pagination.value.totalResults
+));
+
+function appendUniqueEvents(currentEvents: AiTimelineEventRecord[], nextEvents: AiTimelineEventRecord[]): AiTimelineEventRecord[] {
+  const seenIds = new Set(currentEvents.map((event) => event.id));
+  const uniqueNextEvents = nextEvents.filter((event) => {
+    if (seenIds.has(event.id)) {
+      return false;
+    }
+
+    seenIds.add(event.id);
+    return true;
+  });
+
+  return [...currentEvents, ...uniqueNextEvents];
+}
 
 // 页面只读取时间线专用 API，不混用内容流的来源筛选、评分排序或反馈池状态。
-async function loadTimelinePage(): Promise<void> {
-  loadState.value = "loading";
-  loadError.value = null;
+async function loadTimelinePage(options: { page?: number; append?: boolean } = {}): Promise<void> {
+  const isAppendLoad = options.append === true;
+
+  if (isAppendLoad) {
+    isLoadingNextPage.value = true;
+  } else {
+    loadState.value = "loading";
+    loadError.value = null;
+  }
 
   try {
     const nextModel = await readAiTimelinePage({
       eventType: selectedEventType.value || undefined,
       company: selectedCompany.value || undefined,
       searchKeyword: searchKeyword.value,
-      page: currentPage.value
+      page: options.page ?? 1
     });
 
     pageModel.value = nextModel;
     currentPage.value = nextModel.page;
+    timelineEvents.value = isAppendLoad
+      ? appendUniqueEvents(timelineEvents.value, nextModel.events)
+      : nextModel.events;
     loadState.value = "loaded";
   } catch (error) {
-    loadState.value = "error";
     loadError.value = error instanceof Error ? error.message : "AI 时间线加载失败";
+
+    if (!isAppendLoad) {
+      loadState.value = "error";
+    }
+  } finally {
+    if (isAppendLoad) {
+      isLoadingNextPage.value = false;
+    }
   }
 }
 
@@ -84,10 +121,18 @@ function handleClear(): void {
   reloadFromFirstPage();
 }
 
-function handlePageChange(page: number): void {
-  currentPage.value = page;
-  void loadTimelinePage();
+function loadNextTimelinePage(): void {
+  if (isLoading.value || isLoadingNextPage.value || !hasMoreEvents.value) {
+    return;
+  }
+
+  void loadTimelinePage({
+    page: currentPage.value + 1,
+    append: true
+  });
 }
+
+const { setInfiniteLoadTrigger } = useInfiniteLoadTrigger(loadNextTimelinePage);
 
 onMounted(() => {
   void loadTimelinePage();
@@ -140,6 +185,15 @@ onMounted(() => {
       data-ai-timeline-error
     />
 
+    <a-alert
+      v-else-if="loadError && pageModel"
+      class="editorial-inline-alert editorial-inline-alert--warning"
+      type="warning"
+      show-icon
+      :message="loadError"
+      data-ai-timeline-load-more-error
+    />
+
     <template v-else-if="loadState === 'loading' && !pageModel">
       <a-skeleton v-for="item in 4" :key="item" :active="true" :paragraph="{ rows: 3 }" />
     </template>
@@ -155,21 +209,32 @@ onMounted(() => {
 
     <template v-else>
       <section :class="editorialContentListSectionClass" data-ai-timeline-list>
+        <div
+          class="flex flex-wrap items-center justify-between gap-3 border-b border-editorial-border/70 pb-3 text-sm text-editorial-text-body"
+          data-ai-timeline-result-summary
+        >
+          <span class="font-semibold text-editorial-text-main">共 {{ totalEventCount }} 条</span>
+          <span class="text-xs text-editorial-text-muted">已加载 {{ loadedEventCount }} 条</span>
+        </div>
+
         <AiTimelineEventCard
           v-for="(event, index) in events"
           :key="event.id"
           :event="event"
-          :display-index="(pagination.page - 1) * pagination.pageSize + index + 1"
+          :display-index="index + 1"
         />
       </section>
 
-      <ContentPaginationBar
-        :page="pagination.page"
-        :page-size="pagination.pageSize"
-        :total-results="pagination.totalResults"
-        :total-pages="pagination.totalPages"
-        @change="handlePageChange"
-      />
+      <div
+        v-if="pagination.totalResults > 0"
+        :ref="setInfiniteLoadTrigger"
+        class="flex min-h-12 items-center justify-center rounded-editorial-card border border-dashed border-editorial-border bg-editorial-panel/55 px-4 py-3 text-sm text-editorial-text-muted"
+        data-ai-timeline-infinite-load-status
+      >
+        <a-spin v-if="isLoadingNextPage" />
+        <span v-else-if="hasMoreEvents">继续向下滚动加载更多</span>
+        <span v-else>已加载全部 {{ totalEventCount }} 条</span>
+      </div>
     </template>
   </div>
 </template>

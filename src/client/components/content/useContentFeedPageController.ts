@@ -18,9 +18,11 @@ import {
 	  writeStoredTwitterKeywordIds,
 	  writeStoredWechatRssSourceIds,
   type ContentPageModel,
+  type ContentCard,
   type ContentSortMode
 } from "../../services/contentApi";
 import { useContentPageScroll } from "./useContentPageScroll";
+import { useInfiniteLoadTrigger } from "./useInfiniteLoadTrigger";
 import type { ContentFeedPageConfig, ContentFeedPageReader } from "./contentFeedPageShared";
 
 export function useContentFeedPageController(options: {
@@ -29,8 +31,11 @@ export function useContentFeedPageController(options: {
 }) {
   const isLoading = ref(true);
   const isRefreshing = ref(false);
+  const isLoadingNextPage = ref(false);
   const loadError = ref<string | null>(null);
   const pageModel = ref<ContentPageModel | null>(null);
+  const accumulatedCards = ref<ContentCard[]>([]);
+  const currentLoadedPage = ref(0);
 	  const selectedSourceKinds = ref<string[] | null>(readStoredContentSourceKinds());
 	  const selectedTwitterAccountIds = ref<number[] | null>(readStoredTwitterAccountIds());
 	  const selectedTwitterKeywordIds = ref<number[] | null>(readStoredTwitterKeywordIds());
@@ -97,9 +102,33 @@ export function useContentFeedPageController(options: {
     } as const;
   }
 
-  // 页面加载支持静默刷新和指定搜索词，排序、筛选、分页与搜索统一走这条路径。
-  async function loadPage(payload: { selectedKinds?: string[]; silent?: boolean; searchKeyword?: string } = {}): Promise<void> {
-    if (payload.silent) {
+  function appendUniqueCards(currentCards: ContentCard[], nextCards: ContentCard[]): ContentCard[] {
+    const seenIds = new Set(currentCards.map((card) => card.id));
+    const uniqueNextCards = nextCards.filter((card) => {
+      if (seenIds.has(card.id)) {
+        return false;
+      }
+
+      seenIds.add(card.id);
+      return true;
+    });
+
+    return [...currentCards, ...uniqueNextCards];
+  }
+
+  // 页面加载支持静默刷新、触底追加和指定搜索词，排序、筛选与搜索统一走这条路径。
+  async function loadPage(payload: {
+    selectedKinds?: string[];
+    silent?: boolean;
+    searchKeyword?: string;
+    page?: number;
+    append?: boolean;
+  } = {}): Promise<void> {
+    const isAppendLoad = payload.append === true;
+
+    if (isAppendLoad) {
+      isLoadingNextPage.value = true;
+    } else if (payload.silent) {
       isRefreshing.value = true;
     } else {
       isLoading.value = true;
@@ -107,7 +136,7 @@ export function useContentFeedPageController(options: {
     }
 
     try {
-      const requestedPage = readCurrentPage();
+      const requestedPage = payload.page ?? 1;
       const nextModel = await options.readPage({
 	        selectedSourceKinds: payload.selectedKinds ?? readPageSourceKinds(),
 	        selectedTwitterAccountIds: readPageTwitterAccountIds(),
@@ -118,8 +147,12 @@ export function useContentFeedPageController(options: {
         searchKeyword: payload.searchKeyword ?? appliedSearchKeyword.value
       });
       pageModel.value = nextModel;
+      currentLoadedPage.value = nextModel.pagination?.page ?? requestedPage;
+      accumulatedCards.value = isAppendLoad
+        ? appendUniqueCards(accumulatedCards.value, nextModel.cards)
+        : nextModel.cards;
 
-      if (nextModel.pagination && nextModel.pagination.page !== requestedPage) {
+      if (!isAppendLoad && nextModel.pagination && readCurrentPage() !== nextModel.pagination.page) {
         await replacePageQuery(nextModel.pagination.page);
       }
 
@@ -162,7 +195,9 @@ export function useContentFeedPageController(options: {
         ? options.config.authErrorMessage
         : options.config.loadErrorMessage;
     } finally {
-      if (payload.silent) {
+      if (isAppendLoad) {
+        isLoadingNextPage.value = false;
+      } else if (payload.silent) {
         isRefreshing.value = false;
       } else {
         isLoading.value = false;
@@ -268,30 +303,39 @@ export function useContentFeedPageController(options: {
     });
   }
 
-  async function handlePaginationChange(nextPage: number): Promise<void> {
-    await replacePageQuery(nextPage);
-    // 翻页后先把视口拉回顶部，不让下一页继续停在上一页的滚动深度。
-    scrollPageToTop("auto");
-    await loadPage({ selectedKinds: readPageSourceKinds(), silent: true });
+  async function loadNextPage(): Promise<void> {
+    if (isLoading.value || isRefreshing.value || isLoadingNextPage.value || !hasMoreResults.value) {
+      return;
+    }
+
+    await loadPage({
+      selectedKinds: readPageSourceKinds(),
+      searchKeyword: appliedSearchKeyword.value,
+      page: currentLoadedPage.value + 1,
+      append: true
+    });
   }
 
+  const { setInfiniteLoadTrigger } = useInfiniteLoadTrigger(loadNextPage);
+
   const sourceFilter = computed(() => pageModel.value?.sourceFilter ?? null);
-  const listCards = computed(() => pageModel.value?.cards ?? []);
+  const listCards = computed(() => accumulatedCards.value);
   const featuredCard = computed(() => pageModel.value?.featuredCard ?? null);
   const strategySummary = computed(() => pageModel.value?.strategySummary?.items ?? []);
   const visibleResultCount = computed(() => pageModel.value?.pagination?.totalResults ?? listCards.value.length);
   const pagination = computed(() => pageModel.value?.pagination ?? null);
-  const displayIndexOffset = computed(() => {
+  const displayIndexOffset = computed(() => 0);
+  const loadedResultCount = computed(() => listCards.value.length);
+  const totalResultCount = computed(() => pagination.value?.totalResults ?? loadedResultCount.value);
+  const hasMoreResults = computed(() => {
     const currentPagination = pagination.value;
 
     if (!currentPagination) {
-      return 0;
+      return false;
     }
 
-    const safePage = currentPagination.page >= 1 ? currentPagination.page : 1;
-    const safePageSize = currentPagination.pageSize >= 1 ? currentPagination.pageSize : listCards.value.length;
-
-    return (safePage - 1) * safePageSize;
+    return currentLoadedPage.value < currentPagination.totalPages &&
+      loadedResultCount.value < currentPagination.totalResults;
   });
   const displayState = computed(() => {
     if (!pageModel.value && loadError.value) {
@@ -320,7 +364,6 @@ export function useContentFeedPageController(options: {
     displayState,
     featuredCard,
     handleBackToTopClick,
-    handlePaginationChange,
     handleSearchClear,
     handleSearchSubmit,
     handleSortModeChange,
@@ -329,9 +372,12 @@ export function useContentFeedPageController(options: {
 	    handleTwitterKeywordsChange,
 	    handleWechatRssChange,
     hasLoadError,
+    hasMoreResults,
     isLoading,
+    isLoadingNextPage,
     isRefreshing,
     listCards,
+    loadedResultCount,
     loadError,
     pageModel,
     pagination,
@@ -342,7 +388,9 @@ export function useContentFeedPageController(options: {
     showBackToTopButton,
     sortMode,
     sourceFilter,
+    setInfiniteLoadTrigger,
     strategySummary,
+    totalResultCount,
     visibleResultCount
   };
 }

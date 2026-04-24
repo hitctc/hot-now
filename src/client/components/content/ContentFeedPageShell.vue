@@ -2,7 +2,6 @@
 import ContentBackToTopButton from "./ContentBackToTopButton.vue";
 import ContentEmptyState from "./ContentEmptyState.vue";
 import ContentHeroCard from "./ContentHeroCard.vue";
-import ContentPaginationBar from "./ContentPaginationBar.vue";
 import ContentStandardCard from "./ContentStandardCard.vue";
 import ContentToolbarCard from "./ContentToolbarCard.vue";
 import {
@@ -24,18 +23,20 @@ const {
   displayState,
   featuredCard,
   handleBackToTopClick,
-  handlePaginationChange,
   handleSearchClear,
   handleSearchSubmit,
 	  handleSortModeChange,
 	  handleSourceKindsChange,
 	  handleTwitterAccountsChange,
 	  handleTwitterKeywordsChange,
-	  handleWechatRssChange,
+  handleWechatRssChange,
   hasLoadError,
+  hasMoreResults,
   isLoading,
+  isLoadingNextPage,
   isRefreshing,
   listCards,
+  loadedResultCount,
   loadError,
   pageModel,
   pagination,
@@ -46,7 +47,9 @@ const {
   showBackToTopButton,
   sortMode,
   sourceFilter,
+  setInfiniteLoadTrigger,
   strategySummary,
+  totalResultCount,
   visibleResultCount
 } = useContentFeedPageController({
   config: props.config,
@@ -160,6 +163,14 @@ function readStageAccentClass(): string {
         data-content-list
         data-list-style="database"
       >
+        <div
+          class="flex flex-wrap items-center justify-between gap-3 border-b border-editorial-border/70 pb-3 text-sm text-editorial-text-body"
+          data-content-result-summary
+        >
+          <span class="font-semibold text-editorial-text-main">共 {{ totalResultCount }} 条</span>
+          <span class="text-xs text-editorial-text-muted">已加载 {{ loadedResultCount }} 条</span>
+        </div>
+
         <ContentStandardCard
           v-for="(card, index) in listCards"
           :key="card.id"
@@ -168,14 +179,16 @@ function readStageAccentClass(): string {
         />
       </section>
 
-      <ContentPaginationBar
-        v-if="pagination"
-        :page="pagination.page"
-        :page-size="pagination.pageSize"
-        :total-results="pagination.totalResults"
-        :total-pages="pagination.totalPages"
-        @change="handlePaginationChange"
-      />
+      <div
+        v-if="pagination && pagination.totalResults > 0"
+        :ref="setInfiniteLoadTrigger"
+        class="flex min-h-12 items-center justify-center rounded-editorial-card border border-dashed border-editorial-border bg-editorial-panel/55 px-4 py-3 text-sm text-editorial-text-muted"
+        data-content-infinite-load-status
+      >
+        <a-spin v-if="isLoadingNextPage" />
+        <span v-else-if="hasMoreResults">继续向下滚动加载更多</span>
+        <span v-else>已加载全部 {{ totalResultCount }} 条</span>
+      </div>
     </template>
 
     <div

@@ -119,9 +119,9 @@
 - `/`、`/ai-new`、`/ai-hot` 顶部还提供共享标题搜索框；搜索只匹配标题，按回车或点击按钮才生效，关键词写入浏览器本地 `localStorage['hot-now-content-search']`
 - `/`、`/ai-new`、`/ai-hot` 现在通过 Fastify 返回统一客户端入口，再由 `Vue 3 + Vite + Ant Design Vue` 内容页读取 `/api/content/ai-new`、`/api/content/ai-hot` 渲染
 - `/`、`/ai-new`、`/ai-hot` 现在还会在顶部工具栏下方显示当前内容筛选策略摘要，方便对照 `/settings/view-rules` 中已保存的开关结果
-- `/api/content/ai-new?page=<n>` 与 `/api/content/ai-hot?page=<n>` 现在支持分页，固定 `50` 条 / 页；缺失、非法或越界页码会回退到有效页
+- `/api/content/ai-new?page=<n>` 与 `/api/content/ai-hot?page=<n>` 现在支持分页，固定 `50` 条 / 页；前端 `AI 新讯 / AI 热点` 页面不再提供上一页 / 下一页按钮，而是在条目上方显示总条数，并在触底时自动追加下一页
 - `AI 新讯` 固定按最近 `24` 小时窗口和 `ai_new` 门规则构建结果集；`AI 热点` 固定按 `ai_hot` 门规则与热点形成逻辑构建结果集，不会被额外压成 `24` 小时
-- `AI 新讯` 与 `AI 热点` 的标准内容卡片会在标题左侧显示连续排序序号；序号按全量分页结果延续，不会在翻页后重新从 `1` 开始
+- `AI 新讯`、`AI 热点` 与 `AI 时间线` 的条目卡片会在标题左侧显示连续排序序号；触底加载更多时序号按当前已加载列表连续递增
 - 内容卡片现在只保留局部 `补充反馈` 面板；反馈词进入反馈池，不会直接修改正式策略或生成草稿
 - 如果本地 `data/hot-now.sqlite` 内容库损坏，内容页会降级显示提示，不再直接以 `500` 打断 unified shell
 - `/history`：历史报告（legacy，当前仍保留）
@@ -350,7 +350,7 @@ SQLite 可靠性约定：
 - 内容页顶部现在会渲染共享 source 过滤条与共享排序切换；勾选结果通过 `localStorage['hot-now-content-sources'] + x-hot-now-source-filter` header 驱动内容 API 过滤，Twitter 与微信公众号 RSS 的二级筛选分别通过对应 localStorage 和 header 驱动，排序偏好通过 `localStorage['hot-now-content-sort'] + x-hot-now-content-sort` header 驱动内容 API 排序，只影响当前浏览结果，不参与系统页统计口径
 - 当来源筛选命中 `twitter_accounts` 或 `twitter_keyword_search` 时，内容页还会额外通过 `localStorage['hot-now-twitter-account-filter'] + x-hot-now-twitter-account-filter`、`localStorage['hot-now-twitter-keyword-filter'] + x-hot-now-twitter-keyword-filter` 驱动二级账号 / 关键词过滤；如果第一层未选中对应 Twitter 聚合来源，后端会忽略对应二级筛选参数
 - 内容页顶部现在还会渲染共享标题搜索框；生效关键词通过 `localStorage['hot-now-content-search'] + x-hot-now-content-search` header 驱动内容 API 做标题过滤，再进入分页切片
-- 内容页现在同时支持 `page` query 分页；翻页状态写在 URL 中，不写入 `localStorage`，筛选或排序变化后会自动回到第一页
+- 内容页 API 仍支持 `page` query 分页；前端浏览改为触底自动加载下一页，筛选、排序或搜索变化后会自动回到第一页重新累计列表
 - 开启“选中时全量展示”的 source 在内容页首次进入时默认不勾选；只有用户显式勾选后，该 source 才会免受普通 view limit 截断
 - 内容页现在会把当前反馈池条目回填到局部反馈面板，内容交互形成 `补充反馈 -> 反馈池` 的轻量闭环
 - `/settings/view-rules` 不再提供正式自然语言策略、草稿池或重算入口；当前内容页筛选改由 `view_rule_configs` 中的页面级开关控制，`LLM 设置` 当前仍只保留配置，不参与内容页筛选和采集后的自动评估

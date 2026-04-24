@@ -76,9 +76,37 @@ function createTimelineModel(overrides: Partial<typeof baseTimelineModel> = {}) 
   };
 }
 
+let latestIntersectionObserverCallback: IntersectionObserverCallback | null = null;
+
+function installIntersectionObserverMock(): void {
+  latestIntersectionObserverCallback = null;
+  vi.stubGlobal(
+    "IntersectionObserver",
+    vi.fn((callback: IntersectionObserverCallback) => {
+      latestIntersectionObserverCallback = callback;
+
+      return {
+        observe: vi.fn(),
+        disconnect: vi.fn(),
+        unobserve: vi.fn(),
+        takeRecords: vi.fn()
+      };
+    })
+  );
+}
+
+function triggerInfiniteLoad(): void {
+  expect(latestIntersectionObserverCallback).not.toBeNull();
+  latestIntersectionObserverCallback?.(
+    [{ isIntersecting: true } as IntersectionObserverEntry],
+    {} as IntersectionObserver
+  );
+}
+
 describe("AiTimelinePage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    installIntersectionObserverMock();
   });
 
   it("renders official AI timeline events and filter controls", async () => {
@@ -108,7 +136,48 @@ describe("AiTimelinePage", () => {
     expect(wrapper.get("[data-ai-timeline-official-link]").attributes("href")).toBe(
       "https://openai.com/news/introducing-gpt-5-5/"
     );
-    expect(wrapper.get("[data-content-pagination-summary]").text()).toContain("第 1 / 2 页 · 共 51 条");
+    expect(wrapper.get("[data-ai-timeline-result-summary]").text()).toContain("共 51 条");
+    expect(wrapper.get("[data-ai-timeline-result-summary]").text()).toContain("已加载 2 条");
+  });
+
+  it("loads the next timeline page when the infinite load trigger enters the viewport", async () => {
+    aiTimelineApiMocks.readAiTimelinePage
+      .mockResolvedValueOnce(createTimelineModel())
+      .mockResolvedValueOnce(
+        createTimelineModel({
+          page: 2,
+          events: [
+            {
+              ...baseTimelineModel.events[0],
+              id: 3,
+              title: "Anthropic ships a Claude Code update",
+              companyKey: "anthropic",
+              companyName: "Anthropic",
+              eventType: "开发生态"
+            }
+          ]
+        })
+      );
+
+    const wrapper = mount(AiTimelinePage, {
+      global: {
+        plugins: [Antd]
+      }
+    });
+
+    await flushPromises();
+    triggerInfiniteLoad();
+    await flushPromises();
+
+    expect(aiTimelineApiMocks.readAiTimelinePage).toHaveBeenNthCalledWith(2, {
+      eventType: undefined,
+      company: undefined,
+      searchKeyword: "",
+      page: 2
+    });
+    expect(wrapper.findAll("[data-ai-timeline-event-card]")).toHaveLength(3);
+    expect(wrapper.findAll("[data-ai-timeline-display-index]").map((node) => node.text())).toEqual(["1", "2", "3"]);
+    expect(wrapper.get("[data-ai-timeline-result-summary]").text()).toContain("已加载 3 条");
   });
 
   it("reloads from the first page after changing timeline filters", async () => {

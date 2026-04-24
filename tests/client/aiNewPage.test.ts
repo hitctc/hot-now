@@ -121,9 +121,37 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
+let latestIntersectionObserverCallback: IntersectionObserverCallback | null = null;
+
+function installIntersectionObserverMock(): void {
+  latestIntersectionObserverCallback = null;
+  vi.stubGlobal(
+    "IntersectionObserver",
+    vi.fn((callback: IntersectionObserverCallback) => {
+      latestIntersectionObserverCallback = callback;
+
+      return {
+        observe: vi.fn(),
+        disconnect: vi.fn(),
+        unobserve: vi.fn(),
+        takeRecords: vi.fn()
+      };
+    })
+  );
+}
+
+function triggerInfiniteLoad(): void {
+  expect(latestIntersectionObserverCallback).not.toBeNull();
+  latestIntersectionObserverCallback?.(
+    [{ isIntersecting: true } as IntersectionObserverEntry],
+    {} as IntersectionObserver
+  );
+}
+
 describe("AiNewPage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    installIntersectionObserverMock();
     window.localStorage.clear();
     routeState.query = {};
     routerMocks.replace.mockImplementation(async (location: { query?: Record<string, unknown> }) => {
@@ -212,7 +240,8 @@ describe("AiNewPage", () => {
     expect(wrapper.get("[data-content-toolbar-source-toggle]").text()).toContain("收起来源");
     expect(wrapper.find("[data-content-sort-control]").exists()).toBe(true);
     expect(wrapper.get("[data-content-source-filter]").text()).toContain("已选 1 / 2 · 共 120 条");
-    expect(wrapper.get("[data-content-pagination-summary]").text()).toContain("第 1 / 3 页 · 共 120 条");
+    expect(wrapper.get("[data-content-result-summary]").text()).toContain("共 120 条");
+    expect(wrapper.get("[data-content-result-summary]").text()).toContain("已加载 2 条");
     expect(wrapper.get("[data-content-section='list']").attributes("data-list-style")).toBe("database");
     expect(wrapper.find("[data-content-section='featured']").exists()).toBe(false);
     expect(wrapper.get("[data-content-section='list']").text()).toContain("AI Weekly Insight");
@@ -420,9 +449,9 @@ describe("AiNewPage", () => {
     });
   });
 
-  it("syncs pagination through the route query and reloads the requested page", async () => {
-    routeState.query = { page: "2" };
+  it("loads the next page when the infinite load trigger enters the viewport", async () => {
     contentApiMocks.readAiNewPage
+      .mockResolvedValueOnce(createModel())
       .mockResolvedValueOnce(
         createModel({
           pagination: {
@@ -440,7 +469,7 @@ describe("AiNewPage", () => {
               sourceKind: "openai",
               canonicalUrl: "https://example.com/page-2-first",
               publishedAt: "2026-03-31T14:00:00.000Z",
-              contentScore: 88,
+              contentScore: 87,
               scoreBadges: ["精选"]
             },
             {
@@ -451,40 +480,6 @@ describe("AiNewPage", () => {
               sourceKind: "ithome",
               canonicalUrl: "https://example.com/page-2-second",
               publishedAt: "2026-03-31T14:30:00.000Z",
-              contentScore: 83,
-              scoreBadges: ["24h 内"]
-            }
-          ]
-        })
-      )
-      .mockResolvedValueOnce(
-        createModel({
-          pagination: {
-            page: 3,
-            pageSize: 50,
-            totalResults: 120,
-            totalPages: 3
-          },
-          cards: [
-            {
-              id: 301,
-              title: "Page 3 First Card",
-              summary: "The first card on the third page.",
-              sourceName: "OpenAI",
-              sourceKind: "openai",
-              canonicalUrl: "https://example.com/page-3-first",
-              publishedAt: "2026-03-31T15:00:00.000Z",
-              contentScore: 87,
-              scoreBadges: ["精选"]
-            },
-            {
-              id: 302,
-              title: "Page 3 Second Card",
-              summary: "The second card on the third page.",
-              sourceName: "IT之家",
-              sourceKind: "ithome",
-              canonicalUrl: "https://example.com/page-3-second",
-              publishedAt: "2026-03-31T15:30:00.000Z",
               contentScore: 81,
               scoreBadges: ["24h 内"]
             }
@@ -499,8 +494,8 @@ describe("AiNewPage", () => {
     });
 
     await flushPromises();
-    expect(wrapper.findAll("[data-content-display-index]").map((node) => node.text())).toEqual(["51", "52"]);
-    await wrapper.get("[data-content-pagination-action='next']").trigger("click");
+    expect(wrapper.findAll("[data-content-display-index]").map((node) => node.text())).toEqual(["1", "2"]);
+    triggerInfiniteLoad();
     await flushPromises();
 
     expect(contentApiMocks.readAiNewPage).toHaveBeenNthCalledWith(1, {
@@ -508,26 +503,18 @@ describe("AiNewPage", () => {
       selectedTwitterAccountIds: undefined,
       selectedTwitterKeywordIds: undefined,
       sortMode: "published_at",
-      page: 2,
+      page: 1,
       searchKeyword: ""
-    });
-    expect(routerMocks.replace).toHaveBeenCalledWith({
-      query: {
-        page: "3"
-      }
     });
     expect(contentApiMocks.readAiNewPage).toHaveBeenNthCalledWith(2, {
       selectedSourceKinds: ["openai"],
       selectedTwitterAccountIds: undefined,
       selectedTwitterKeywordIds: undefined,
       sortMode: "published_at",
-      page: 3,
+      page: 2,
       searchKeyword: ""
     });
-    expect(window.scrollTo).toHaveBeenCalledWith({
-      top: 0,
-      behavior: "auto"
-    });
-    expect(wrapper.findAll("[data-content-display-index]").map((node) => node.text())).toEqual(["101", "102"]);
+    expect(wrapper.get("[data-content-result-summary]").text()).toContain("已加载 4 条");
+    expect(wrapper.findAll("[data-content-display-index]").map((node) => node.text())).toEqual(["1", "2", "3", "4"]);
   });
 });

@@ -21,7 +21,7 @@ export function useContentPageScroll() {
     showBackToTopButton.value = readWindowScrollTop() >= contentBackToTopThreshold;
   }
 
-  // 内容页翻页和手动回顶都复用同一条滚动入口，避免两个交互的滚动手感慢慢漂开。
+  // 筛选、排序、搜索重置和手动回顶都复用同一条滚动入口，避免滚动手感慢慢漂开。
   function scrollPageToTop(behavior: ScrollBehavior = "auto"): void {
     if (typeof window === "undefined") {
       return;
@@ -31,7 +31,7 @@ export function useContentPageScroll() {
     window.scrollTo({ top: 0, behavior });
   }
 
-  // 回顶按钮保留 smooth；分页切换继续用 auto，避免切页过程出现额外动画拖尾。
+  // 回顶按钮保留 smooth；筛选重置继续用 auto，避免刷新列表时出现额外动画拖尾。
   function handleBackToTopClick(): void {
     scrollPageToTop("smooth");
   }

@@ -130,11 +130,11 @@ export const bilibiliQueryColumns = [
 ];
 
 export const wechatRssSourceColumns = [
-  { title: "来源名称", key: "displayName", align: "center" as const },
-  { title: "RSS 地址", key: "rssUrl", align: "center" as const },
-  { title: "最近成功", key: "lastSuccessAt", align: "center" as const },
+  { title: "来源名称", key: "displayName", align: "center" as const, width: 220 },
+  { title: "RSS 地址", key: "rssUrl", align: "center" as const, width: 360 },
+  { title: "最近成功", key: "lastSuccessAt", align: "center" as const, width: 150 },
   { title: "最近结果", key: "lastResult", align: "center" as const },
-  { title: "操作", key: "actions", align: "center" as const }
+  { title: "操作", key: "actions", align: "center" as const, width: 120 }
 ];
 
 export const twitterAccountCategoryOptions = [

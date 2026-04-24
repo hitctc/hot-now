@@ -77,21 +77,29 @@ const emit = defineEmits<{
       row-key="id"
       :pagination="false"
       size="small"
+      table-layout="fixed"
+      :scroll="{ x: 980 }"
     >
       <template #emptyText>
         暂无微信公众号 RSS
       </template>
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'displayName'">
-          <a-typography-text strong :data-wechat-rss-name="record.id">
-            {{ record.displayName || `公众号 RSS #${record.id}` }}
-          </a-typography-text>
+          <a-tooltip :title="record.displayName || `公众号 RSS #${record.id}`">
+            <a-typography-text
+              strong
+              class="inline-block max-w-[190px] truncate align-middle"
+              :data-wechat-rss-name="record.id"
+            >
+              {{ record.displayName || `公众号 RSS #${record.id}` }}
+            </a-typography-text>
+          </a-tooltip>
         </template>
         <template v-else-if="column.key === 'rssUrl'">
           <a-tooltip :title="record.rssUrl">
             <a-typography-text
               type="secondary"
-              class="inline-block max-w-[420px] truncate align-middle"
+              class="inline-block w-full max-w-[320px] truncate align-middle"
               :data-wechat-rss-url="record.id"
             >
               {{ record.rssUrl }}

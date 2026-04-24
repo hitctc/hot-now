@@ -20,7 +20,10 @@ const emit = defineEmits<{
       size="small"
       data-sources-section="manual-send-latest-email"
     >
-      <template #extra>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <a-typography-paragraph class="!mb-0" type="secondary">
+          直接读取最新一份报告并尝试发信，适合采集完成后的人工重试。
+        </a-typography-paragraph>
         <a-button
           type="primary"
           data-action="manual-send-latest-email"
@@ -30,11 +33,6 @@ const emit = defineEmits<{
         >
           {{ operations.isRunning ? "任务执行中..." : "发送最新报告" }}
         </a-button>
-      </template>
-      <div class="flex w-full flex-col gap-4">
-        <a-typography-paragraph type="secondary">
-          直接读取最新一份报告并尝试发信，适合采集完成后的人工重试。
-        </a-typography-paragraph>
       </div>
     </a-card>
   </section>

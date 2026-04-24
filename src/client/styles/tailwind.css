@@ -291,10 +291,18 @@
     min-width: 0;
   }
 
-  .editorial-form-modal input,
+  .editorial-form-modal input:not([type="checkbox"]):not([type="radio"]),
   .editorial-form-modal select,
   .editorial-form-modal textarea {
     width: 100%;
+  }
+
+  .editorial-form-modal input[type="checkbox"],
+  .editorial-form-modal input[type="radio"] {
+    width: 1rem;
+    min-width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
   }
 
   html[data-theme="dark"] .editorial-form-modal .ant-modal-content {

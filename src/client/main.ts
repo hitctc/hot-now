@@ -19,6 +19,7 @@ import {
   Switch,
   Table,
   Tag,
+  Tooltip,
   Typography
 } from "ant-design-vue";
 import { createApp } from "vue";
@@ -48,6 +49,7 @@ const clientUiComponents = [
   Switch,
   Table,
   Tag,
+  Tooltip,
   Typography
 ];
 

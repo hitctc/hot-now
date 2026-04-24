@@ -78,7 +78,7 @@ const emit = defineEmits<{
       :pagination="false"
       size="small"
       table-layout="fixed"
-      :scroll="{ x: 980 }"
+      :scroll="{ x: 1200 }"
     >
       <template #emptyText>
         暂无微信公众号 RSS
@@ -111,7 +111,7 @@ const emit = defineEmits<{
         </template>
         <template v-else-if="column.key === 'lastResult'">
           <span
-            class="inline-block max-w-[260px] truncate align-middle"
+            class="block w-full min-w-0 truncate px-2 align-middle"
             :title="record.lastResult ?? '暂无结果'"
             :data-wechat-rss-result="record.id"
           >
@@ -119,7 +119,7 @@ const emit = defineEmits<{
           </span>
         </template>
         <template v-else-if="column.key === 'actions'">
-          <div class="flex flex-wrap justify-center gap-2" :data-wechat-rss-actions="record.id">
+          <div class="flex min-w-[112px] flex-nowrap justify-center gap-2" :data-wechat-rss-actions="record.id">
             <a-button
               type="link"
               size="small"

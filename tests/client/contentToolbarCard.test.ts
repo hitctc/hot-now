@@ -142,6 +142,11 @@ describe("ContentToolbarCard", () => {
     expect(wrapper.find("[data-content-entity-filter='twitter-accounts']").exists()).toBe(true);
     expect(wrapper.find("[data-content-entity-filter='twitter-keywords']").exists()).toBe(true);
     expect(wrapper.find("[data-content-entity-filter='wechat-rss']").exists()).toBe(true);
+    const wechatRssFilterText = wrapper.get("[data-content-entity-filter='wechat-rss']").text();
+    expect(wechatRssFilterText).toContain("AI 公众号 RSS");
+    expect(wechatRssFilterText).toContain("开发者公众号 RSS");
+    expect(wechatRssFilterText).not.toContain("https://rss.example.com/a.xml");
+    expect(wechatRssFilterText).not.toContain("https://rss.example.com/b.xml");
 
     await wrapper.get("[data-entity-id='twitter-accounts:2']").setValue(false);
     await flushPromises();

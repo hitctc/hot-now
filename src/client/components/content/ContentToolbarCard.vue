@@ -218,7 +218,7 @@ function handleClear(): void {
 	        v-if="hasWechatRssSelected && wechatRssFilter"
 	        filter-key="wechat-rss"
 	        title="公众号 RSS 筛选"
-	        :options="wechatRssFilter.options.map((option) => ({ id: option.id, label: option.label, hint: option.rssUrl }))"
+	        :options="wechatRssFilter.options.map((option) => ({ id: option.id, label: option.label }))"
 	        :selected-ids="wechatRssFilter.selectedSourceIds"
 	        compact
 	        @change="handleWechatRssChange"

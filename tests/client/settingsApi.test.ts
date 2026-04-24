@@ -156,6 +156,29 @@ describe("settingsApi", () => {
     });
   });
 
+  it("posts AI timeline collection requests to the dedicated manual action", async () => {
+    const { triggerManualAiTimelineCollect } = await import("../../src/client/services/settingsApi");
+
+    requestJson.mockResolvedValue({
+      accepted: true,
+      action: "collect-ai-timeline",
+      sourceCount: 2,
+      fetchedItemCount: 3,
+      persistedEventCount: 2,
+      insertedEventCount: 1,
+      updatedEventCount: 1,
+      skippedItemCount: 0,
+      failureCount: 0
+    });
+
+    await triggerManualAiTimelineCollect();
+
+    expect(requestJson).toHaveBeenCalledWith("/actions/ai-timeline/collect", {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+  });
+
   it("posts create source payloads to the sources create action", async () => {
     const { createSource } = await import("../../src/client/services/settingsApi");
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  editorialContentCardClass,
   editorialContentIntroSectionClass,
   editorialContentPageClass
 } from "../../components/content/contentCardShared";
@@ -100,6 +101,7 @@ const {
   handleManualBilibiliCollect,
   handleManualWechatRssCollect,
   handleManualWeiboTrendingCollect,
+  handleManualAiTimelineCollect,
   handleManualSendLatestEmail,
   handleSubmitSource,
   handleSubmitTwitterAccount,
@@ -263,6 +265,35 @@ const {
           :is-action-pending="isActionPending"
           @collect="handleManualWeiboTrendingCollect"
         />
+
+        <a-card
+          :class="editorialContentCardClass"
+          title="AI 时间线官方源"
+          size="small"
+          data-sources-section="ai-timeline"
+        >
+          <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div class="space-y-2">
+              <p class="m-0 text-sm leading-6 text-editorial-text-body">
+                只采集官方白名单来源，结果进入 AI 时间线，不进入 AI 新讯 / AI 热点。
+              </p>
+              <div class="flex flex-wrap gap-2 text-xs text-editorial-text-muted">
+                <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">OpenAI News</span>
+                <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">Google AI Blog</span>
+                <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">独立事件表</span>
+              </div>
+            </div>
+            <a-button
+              type="primary"
+              data-action="manual-ai-timeline-collect"
+              :disabled="sourcesModel.operations.isRunning"
+              :loading="isActionPending('manual:ai-timeline-collect')"
+              @click="handleManualAiTimelineCollect"
+            >
+              {{ sourcesModel.operations.isRunning ? "任务执行中..." : "手动采集官方事件" }}
+            </a-button>
+          </div>
+        </a-card>
 
         <SourceInventoryCard
           :sources="sourcesModel.sources"

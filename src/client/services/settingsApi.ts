@@ -531,6 +531,23 @@ export type ManualWeiboTrendingCollectResponse =
       reason?: "already-running";
     };
 
+export type ManualAiTimelineCollectResponse =
+  | {
+      accepted: true;
+      action: "collect-ai-timeline";
+      sourceCount: number;
+      fetchedItemCount: number;
+      persistedEventCount: number;
+      insertedEventCount: number;
+      updatedEventCount: number;
+      skippedItemCount: number;
+      failureCount: number;
+    }
+  | {
+      accepted: false;
+      reason?: "no-ai-timeline-sources" | "already-running";
+    };
+
 export type ManualSendLatestEmailResponse = {
   accepted: boolean;
   action?: "send-latest-email";
@@ -779,6 +796,11 @@ export function triggerManualWechatRssCollect(): Promise<ManualWechatRssCollectR
 // 微博热搜榜匹配只走独立手动入口，不进入默认采集链路。
 export function triggerManualWeiboTrendingCollect(): Promise<ManualWeiboTrendingCollectResponse> {
   return postSettingsAction<ManualWeiboTrendingCollectResponse>("/actions/weibo/collect", {});
+}
+
+// AI 时间线只采集官方白名单来源，结果写入独立时间线事件表，不进入普通内容流。
+export function triggerManualAiTimelineCollect(): Promise<ManualAiTimelineCollectResponse> {
+  return postSettingsAction<ManualAiTimelineCollectResponse>("/actions/ai-timeline/collect", {});
 }
 
 // 手动发送最新报告沿用现有后端接口，错误原因由调用方再翻译成用户提示。

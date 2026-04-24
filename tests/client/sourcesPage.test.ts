@@ -47,6 +47,7 @@ vi.mock("../../src/client/services/settingsApi", async () => {
     triggerManualBilibiliCollect: vi.fn(),
     triggerManualHackerNewsCollect: vi.fn(),
     triggerManualWeiboTrendingCollect: vi.fn(),
+    triggerManualAiTimelineCollect: vi.fn(),
     triggerManualWechatRssCollect: vi.fn(),
     triggerManualTwitterCollect: vi.fn(),
     triggerManualTwitterKeywordCollect: vi.fn(),
@@ -321,6 +322,9 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-sources-section='weibo-trending']").text()).toContain("固定只进入 AI 热点");
     expect(wrapper.get("[data-sources-section='weibo-trending']").text()).toContain("微博热搜榜匹配已就绪");
     expect(wrapper.findAll("[data-weibo-keyword]")).toHaveLength(3);
+    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("AI 时间线官方源");
+    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("只采集官方白名单来源");
+    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("手动采集官方事件");
     expect(wrapper.get("[data-sources-section='inventory']").classes()).toContain("editorial-glass-panel");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("来源库存与统计");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("选中时全量");
@@ -533,6 +537,32 @@ describe("SourcesPage", () => {
 
     expect(settingsApi.triggerManualWeiboTrendingCollect).toHaveBeenCalledTimes(1);
     expect(wrapper.text()).toContain("微博热搜榜匹配已完成：命中 2 个话题，新入库 1 条，复用 1 条，失败 0 次。");
+  });
+
+  it("runs the manual AI timeline collection action and shows the official event summary", async () => {
+    vi.mocked(settingsApi.readSettingsSources)
+      .mockResolvedValueOnce(createSourcesModel())
+      .mockResolvedValueOnce(createSourcesModel());
+    vi.mocked(settingsApi.triggerManualAiTimelineCollect).mockResolvedValue({
+      accepted: true,
+      action: "collect-ai-timeline",
+      sourceCount: 2,
+      fetchedItemCount: 3,
+      persistedEventCount: 2,
+      insertedEventCount: 1,
+      updatedEventCount: 1,
+      skippedItemCount: 0,
+      failureCount: 0
+    });
+
+    const wrapper = mountSourcesPage();
+
+    await flushPromises();
+    await wrapper.get("[data-action='manual-ai-timeline-collect']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.triggerManualAiTimelineCollect).toHaveBeenCalledTimes(1);
+    expect(wrapper.text()).toContain("AI 时间线官方源采集已完成：官方源 2 个，新事件 1 条，更新 1 条，跳过 0 条，失败 0 个。");
   });
 
   it("starts WeChat RSS collection and shows the persisted count summary", async () => {

@@ -34,6 +34,7 @@
   负责启动配置加载、运行锁、Fastify 服务和定时任务，并装配 unified shell、内容筛选工作台、反馈池工作台与来源工作台，是应用入口。
 - `src/client/`
   负责 `/settings/*` 系统页的 Vue 3 客户端入口、路由、页面组件、主题和前端 service 封装。
+  `src/client/pages/*` 只保留路由级页面编排；可复用或大块 UI 下沉到 `src/client/components/*`，其中数据来源工作台的分区卡片、表格、弹窗和共享格式化逻辑集中在 `src/client/components/settings/sources/`。
   客户端样式栈固定为 `Vue 3 + Vite + Ant Design Vue + Tailwind CSS`；统一主题源收口到 `src/client/theme/editorialTokens.ts`，`src/client/styles/tailwind.css` 只保留基础样式、主题变量和少量 AntD 深层覆写，不要再长出新的大型 CSS 皮肤文件。
 - `src/core/config/`
   负责读取 `config/hot-now.config.json` 和环境变量，组装运行时配置。
@@ -268,6 +269,10 @@ SQLite 可靠性约定：
 - 保持当前单进程、文件归档、规则聚类的主架构，除非需求明确要求架构升级。
 - 新增逻辑优先复用现有的依赖注入方式，特别是 `runDailyDigest` 和 `createServer` 的测试注入模式。
 - 改动行为时，优先补最相关测试，不要只改实现不补门禁。
+- Vue 客户端按“页面编排、组件呈现、composable 承载可复用状态、service 只做接口”的边界拆分；页面文件只保留路由级数据加载、动作编排和少量页面状态，不把表格、弹窗、分区卡片和重复表单都揉在一个 `.vue` 里。
+- `/settings/*` 这类系统页的业务组件放在 `src/client/components/settings/<domain>/`，内容页组件放在 `src/client/components/content/`；同一页面内多个卡片、表格、弹窗或 500 行以上的模板，应优先拆成具名组件。
+- 复杂页面的共享 UI 常量、表单状态类型、格式化函数和选项列表放到同域 `*Shared.ts` 或 composable 中；组件之间通过明确 props / emits 协作，不让子组件直接调用后端 service。
+- 新增组件必须保留清晰的 `data-*` 测试锚点；从大页面拆组件时，优先保持用户可见行为和测试选择器稳定，避免“组件化”顺手改交互。
 - 删除、清空、覆盖、重置等不可逆或高风险操作，默认必须提供显式二次确认；除非用户明确要求并说明可跳过，否则不要直接把危险动作绑定成一次点击立即生效。
 - Git 提交信息默认使用 `英文类型：中文正文`，包含碎片提交、临时提交和最终交付提交；除非用户明确要求其他语言或其他格式，否则不要改成纯英文、纯中文或其他提交标题格式。
 - `docs/superpowers/specs/` 和 `docs/superpowers/plans/` 下新生成的文档文件名必须使用简体中文标题；允许保留日期前缀和必要技术缩写（如 `API`、`LLM`、`UI`），但不要再使用纯英文 slug，也不要在文件名里额外写项目名 `HotNow`。

@@ -134,6 +134,14 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 
 统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。auth 开启后，内容菜单保持公开可读，但系统菜单和所有写操作仍然要求登录；`content_sources.is_enabled` 决定哪些 RSS / 微信公众号 source 参与定时 / 手动采集，`content_sources.show_all_when_selected` 决定该 source 在内容页被显式勾选时是否全量展示；Twitter 账号由独立 `twitter_accounts.is_enabled` 控制是否参与 Twitter 手动采集，Twitter 关键词由独立 `twitter_search_keywords.is_collect_enabled` 控制是否参与关键词搜索、由 `twitter_search_keywords.is_visible` 控制该关键词命中的内容是否继续进入内容页，真实拉取都依赖环境变量 `TWITTER_API_KEY`；Hacker News query 由独立 `hackernews_queries.is_enabled` 控制是否参与 HN 手动搜索，当前不额外区分“展示启用”；B 站 query 由独立 `bilibili_queries.is_enabled` 控制是否参与 B 站手动搜索，第一版只搜视频且不额外区分“展示启用”；微博热搜榜匹配没有单独配置表，只保留固定 AI 关键词和手动执行入口；为满足 `content_items.source_id` 外键，系统会维护隐藏聚合 source `twitter_accounts`、`twitter_keyword_search`、`hackernews_search`、`bilibili_search` 和 `weibo_trending`，它们都不承载配置，也不会出现在普通 source 库存表中；内容页来源筛选会暴露这些聚合 source，其中两个 Twitter 聚合 source 会展开二级多选，HN 和 B 站第一版暂不提供内容页二级 query 筛选，微博热搜榜匹配则只进入 `AI 热点`、不进入 `AI 新讯`；`/settings/sources` 现在可以直接启用/停用 source、切换“选中时全量展示”、新增 / 编辑 / 删除自定义 RSS 来源，也可以单独维护 Twitter 账号列表、Twitter 关键词列表、Hacker News query 列表、B 站 query 列表，或执行微博热搜榜匹配的独立手动采集；普通“新增来源”弹窗不再提供公众号入口，已有公众号来源暂时只保留库存展示、启停和删除能力，后续由单独公众号 RSS 配置表接管；来源保存成功后，系统会自动补拉该来源的首批内容，不需要再手动先跑一次采集；内容页顶部的来源筛选和排序只影响当前浏览结果，不会改 source 启用状态；legacy `/control` 继续提供 RSS / 微信公众号采集与发信动作。
 
+### Vue 开发规范
+
+- 页面文件负责路由级编排：数据加载、动作协调、弹窗开关和少量状态管理；表格、分区卡片、弹窗和重复表单应拆到 `src/client/components/<domain>/`。
+- `/settings/*` 的业务组件放在 `src/client/components/settings/<domain>/`；例如数据来源页的分区卡片和弹窗集中在 `src/client/components/settings/sources/`。
+- 同一页面出现多个表格 / 弹窗 / 卡片，或模板明显超过 500 行时，优先抽组件；共享 columns、表单类型、格式化函数和选项列表放到同域 `*Shared.ts`。
+- 组件通过 props / emits 协作，后端请求继续收口在页面控制器、composable 或 service 层；不要让展示组件直接调用 API。
+- 拆组件时必须保留稳定的 `data-*` 测试锚点，避免因为结构整理导致现有页面测试和端到端验证失效。
+
 当前内置 RSS 源包括：
 
 - `Juya AI Daily`：`https://imjuya.github.io/juya-ai-daily/rss.xml`

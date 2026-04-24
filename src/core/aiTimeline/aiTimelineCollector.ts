@@ -6,6 +6,7 @@ import {
   getOfficialAiTimelineSourceUrl,
   officialAiTimelineSources,
   type OfficialAiTimelineHtmlDateSectionsSource,
+  type OfficialAiTimelineHtmlEmbeddedJsonPostsSource,
   type OfficialAiTimelineHtmlUpdateCardsSource,
   type OfficialAiTimelineHuggingFaceModelsSource,
   type OfficialAiTimelineRssSource,
@@ -50,6 +51,16 @@ type HuggingFaceModelApiItem = {
   tags?: string[];
   downloads?: number;
   likes?: number;
+};
+
+type EmbeddedJsonPostItem = {
+  slug?: string;
+  date?: string;
+  title?: string;
+  description?: string;
+  category?: {
+    name?: string;
+  };
 };
 
 const classifierRules: readonly AiTimelineClassifierRule[] = [
@@ -106,6 +117,8 @@ async function collectSourceEvents(
       return collectHtmlUpdateCardEvents(source, fetchImpl, discoveredAt);
     case "html_date_sections":
       return collectHtmlDateSectionEvents(source, fetchImpl, discoveredAt);
+    case "html_embedded_json_posts":
+      return collectHtmlEmbeddedJsonPostEvents(source, fetchImpl, discoveredAt);
     case "huggingface_models":
       return collectHuggingFaceModelEvents(source, fetchImpl, discoveredAt);
   }
@@ -158,7 +171,7 @@ async function collectHtmlUpdateCardEvents(
     const dateValue = source.dateAttribute ? dateElement.attr(source.dateAttribute) : dateElement.text();
     const publishedAt = toIsoDate(dateValue);
     const summary = source.summarySelector ? toSummary($(item).find(source.summarySelector).first().html() ?? "") : null;
-    const link = source.linkSelector ? $(item).find(source.linkSelector).first().attr("href") : undefined;
+    const link = source.linkSelector ? $(item).find(source.linkSelector).first().attr("href") : $(item).attr("href");
     const officialUrl = normalizeOfficialUrl(link ?? `${source.pageUrl}#${index + 1}`, source, source.pageUrl);
     const event = title && publishedAt && officialUrl
       ? createTimelineEvent(source, {
@@ -202,8 +215,14 @@ async function collectHtmlDateSectionEvents(
     const dateValue = $(heading).attr("data-text") ?? $(heading).text();
     const publishedAt = toIsoDate(dateValue);
     const headingId = $(heading).attr("id");
-    const sectionItems = readSectionItems($, heading, source.dateHeadingSelector, source.sectionItemSelector)
+    const sectionItems = readSectionItems(
+      $,
+      heading,
+      [source.dateHeadingSelector, source.yearHeadingSelector].filter(Boolean).join(", "),
+      source.sectionItemSelector
+    )
       .slice(0, source.maxItemsPerSection ?? 8);
+    const publishedAtWithYear = publishedAt ?? toIsoDateWithYear(dateValue, readNearestYearHint($, heading, source.yearHeadingSelector));
 
     fetchedItemCount += sectionItems.length;
 
@@ -215,12 +234,12 @@ async function collectHtmlDateSectionEvents(
         source,
         source.pageUrl
       );
-      const event = title && publishedAt && officialUrl
+      const event = title && publishedAtWithYear && officialUrl
         ? createTimelineEvent(source, {
             title,
             summary: text,
             officialUrl,
-            publishedAt,
+            publishedAt: publishedAtWithYear,
             discoveredAt,
             rawItem: { date: dateValue, headingId, index }
           })
@@ -287,12 +306,57 @@ async function collectHuggingFaceModelEvents(
   };
 }
 
+async function collectHtmlEmbeddedJsonPostEvents(
+  source: OfficialAiTimelineHtmlEmbeddedJsonPostsSource,
+  fetchImpl: AiTimelineFetch,
+  discoveredAt: string
+): Promise<Omit<CollectAiTimelineEventsResult, "failures">> {
+  const response = await fetchOk(fetchImpl, source.pageUrl);
+  const posts = readEmbeddedJsonPosts(await response.text(), source.postsArrayKey).slice(0, source.maxItems ?? 20);
+  const events: AiTimelineEventInput[] = [];
+  let skippedItemCount = 0;
+
+  for (const post of posts) {
+    const title = cleanText(post.title);
+    const publishedAt = toIsoDate(post.date);
+    const officialUrl = post.slug
+      ? normalizeOfficialUrl(`${source.itemUrlPrefix}${post.slug}`, source, source.pageUrl)
+      : null;
+    const summary = post.description
+      ? cleanText(`${post.category?.name ? `${post.category.name}: ` : ""}${post.description}`)
+      : null;
+    const event = title && publishedAt && officialUrl
+      ? createTimelineEvent(source, {
+          title,
+          summary,
+          officialUrl,
+          publishedAt,
+          discoveredAt,
+          rawItem: post
+        })
+      : null;
+
+    if (!event) {
+      skippedItemCount += 1;
+      continue;
+    }
+
+    events.push(event);
+  }
+
+  return {
+    events,
+    fetchedItemCount: posts.length,
+    skippedItemCount
+  };
+}
+
 function mapFeedItemToTimelineEvent(
   source: OfficialAiTimelineRssSource,
   item: Parser.Item,
   discoveredAt: string
 ): AiTimelineEventInput | null {
-  const title = item.title?.trim() ?? "";
+  const title = `${source.titlePrefix ?? ""}${item.title?.trim() ?? ""}`.trim();
   const officialUrl = normalizeOfficialUrl(item.link, source, source.feedUrl);
   const publishedAt = toIsoDate(item.isoDate ?? item.pubDate);
 
@@ -308,6 +372,7 @@ function mapFeedItemToTimelineEvent(
     discoveredAt,
     rawItem: {
       guid: item.guid,
+      title: item.title,
       link: item.link,
       pubDate: item.pubDate,
       isoDate: item.isoDate
@@ -432,11 +497,42 @@ function toIsoDate(value?: string): string | null {
 }
 
 function parseDate(value: string): string | null {
-  const englishDateOnly = /^(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}$/i;
+  const monthNames = "Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?";
+  const englishDateOnly = new RegExp(`^(${monthNames})\\s+\\d{1,2},\\s+\\d{4}$`, "i");
+  const englishMonthYearOnly = new RegExp(`^(${monthNames})\\s+\\d{4}$`, "i");
+  const englishMonthDayOnly = new RegExp(`^(${monthNames})\\s+\\d{1,2}$`, "i");
   const isoDateOnly = /^\d{4}-\d{2}-\d{2}$/;
-  const normalizedValue = englishDateOnly.test(value) || isoDateOnly.test(value) ? `${value} UTC` : value;
+  const isoDateTimeWithoutZone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?$/;
+  const chineseDate = value.match(/^(\d{4})年(\d{1,2})月(\d{1,2})日$/);
+
+  if (chineseDate) {
+    const [, year, month, day] = chineseDate;
+    return parseDate(`${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`);
+  }
+
+  const normalizedEnglishValue = value
+    .replace(/\bSept\./i, "September")
+    .replace(/\b(Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\./gi, "$1");
+  if (englishMonthDayOnly.test(normalizedEnglishValue)) {
+    return null;
+  }
+  const normalizedValue = englishDateOnly.test(normalizedEnglishValue) || englishMonthYearOnly.test(normalizedEnglishValue) || isoDateOnly.test(normalizedEnglishValue)
+    ? `${normalizedEnglishValue} UTC`
+    : isoDateTimeWithoutZone.test(normalizedEnglishValue)
+      ? `${normalizedEnglishValue}Z`
+    : normalizedEnglishValue;
   const parsed = new Date(normalizedValue);
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function toIsoDateWithYear(value?: string, yearHint?: number): string | null {
+  if (!value || !yearHint) {
+    return null;
+  }
+
+  const trimmed = cleanText(value);
+  const monthDayOnly = /^(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}$/i;
+  return monthDayOnly.test(trimmed) ? parseDate(`${trimmed}, ${yearHint}`) : null;
 }
 
 function toSummary(value?: string): string | null {
@@ -459,4 +555,95 @@ function cleanText(value?: string): string {
 
 function readDescription(item: Parser.Item): string | undefined {
   return (item as Parser.Item & { description?: string }).description;
+}
+
+function readNearestYearHint($: cheerio.CheerioAPI, heading: AnyNode, yearHeadingSelector?: string): number | undefined {
+  if (!yearHeadingSelector) {
+    return undefined;
+  }
+
+  const yearText = cleanText($(heading).prevAll(yearHeadingSelector).first().text());
+  const fullYear = yearText.match(/\b(20\d{2})\b/);
+  const shortYear = yearText.match(/\b\d{2}\b/);
+
+  if (fullYear) {
+    return Number(fullYear[1]);
+  }
+
+  if (shortYear) {
+    return 2000 + Number(shortYear[0]);
+  }
+
+  return undefined;
+}
+
+function readEmbeddedJsonPosts(html: string, postsArrayKey: string): EmbeddedJsonPostItem[] {
+  const decoded = html
+    .replace(/\\"/g, "\"")
+    .replace(/\\u0026/g, "&")
+    .replace(/\\n/g, "\n");
+  const keyIndex = decoded.indexOf(`"${postsArrayKey}":[`);
+
+  if (keyIndex < 0) {
+    return [];
+  }
+
+  const arrayStart = decoded.indexOf("[", keyIndex);
+  const arrayText = readBalancedJsonArray(decoded, arrayStart);
+
+  if (!arrayText) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(arrayText);
+    return Array.isArray(parsed) ? parsed as EmbeddedJsonPostItem[] : [];
+  } catch {
+    return [];
+  }
+}
+
+function readBalancedJsonArray(value: string, startIndex: number): string | null {
+  if (startIndex < 0 || value[startIndex] !== "[") {
+    return null;
+  }
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = startIndex; index < value.length; index += 1) {
+    const char = value[index];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) {
+      continue;
+    }
+
+    if (char === "[") {
+      depth += 1;
+    } else if (char === "]") {
+      depth -= 1;
+
+      if (depth === 0) {
+        return value.slice(startIndex, index + 1);
+      }
+    }
+  }
+
+  return null;
 }

@@ -3,6 +3,7 @@ import { collectAiTimelineEvents } from "../../src/core/aiTimeline/aiTimelineCol
 import {
   officialAiTimelineSources,
   type OfficialAiTimelineHtmlDateSectionsSource,
+  type OfficialAiTimelineHtmlEmbeddedJsonPostsSource,
   type OfficialAiTimelineHtmlUpdateCardsSource,
   type OfficialAiTimelineHuggingFaceModelsSource
 } from "../../src/core/aiTimeline/officialAiTimelineSources.js";
@@ -163,6 +164,50 @@ describe("collectAiTimelineEvents", () => {
     });
   });
 
+  it("maps official link cards that carry their own href to timeline events", async () => {
+    const source: OfficialAiTimelineHtmlUpdateCardsSource = {
+      id: "test-anthropic-news",
+      companyKey: "anthropic",
+      companyName: "Anthropic",
+      sourceLabel: "Anthropic News",
+      sourceKind: "html_update_cards",
+      pageUrl: "https://www.anthropic.com/news",
+      itemSelector: "a:has(time)",
+      titleSelector: "h2, h3, h4, [class*='title']",
+      dateSelector: "time",
+      summarySelector: "p",
+      allowedUrlPrefixes: ["https://www.anthropic.com/news/"],
+      defaultEventType: "行业动态",
+      publicDescription: "Test source"
+    };
+    const fetchMock = vi.fn(async () => new Response(`
+      <a href="/news/claude-opus-4-7">
+        <time>Apr 16, 2026</time>
+        <h2>Introducing Claude Opus 4.7</h2>
+        <p>Our latest Opus model brings stronger performance.</p>
+      </a>
+    `, { status: 200 }));
+
+    const result = await collectAiTimelineEvents({
+      fetch: fetchMock,
+      now: new Date("2026-04-24T12:00:00.000Z"),
+      sources: [source]
+    });
+
+    expect(result).toMatchObject({
+      fetchedItemCount: 1,
+      skippedItemCount: 0,
+      failures: []
+    });
+    expect(result.events[0]).toMatchObject({
+      companyKey: "anthropic",
+      eventType: "模型发布",
+      title: "Introducing Claude Opus 4.7",
+      officialUrl: "https://www.anthropic.com/news/claude-opus-4-7",
+      publishedAt: "2026-04-16T00:00:00.000Z"
+    });
+  });
+
   it("maps official HTML date sections to release-note events", async () => {
     const source: OfficialAiTimelineHtmlDateSectionsSource = {
       id: "test-gemini-release-notes",
@@ -207,6 +252,87 @@ describe("collectAiTimelineEvents", () => {
       title: "Launched Gemini 3.1 Flash TTS Preview for Gemini API developers.",
       officialUrl: "https://ai.google.dev/gemini-api/docs/changelog#04-22-2026-item-1",
       publishedAt: "2026-04-22T00:00:00.000Z"
+    });
+  });
+
+  it("supports grouped year headings and Chinese date headings", async () => {
+    const source: OfficialAiTimelineHtmlDateSectionsSource = {
+      id: "test-mixed-date-sections",
+      companyKey: "mistral",
+      companyName: "Mistral AI",
+      sourceLabel: "Mistral Docs Changelog",
+      sourceKind: "html_date_sections",
+      pageUrl: "https://docs.mistral.ai/getting-started/changelog",
+      dateHeadingSelector: "main h2",
+      yearHeadingSelector: "main h3",
+      sectionItemSelector: "li",
+      allowedUrlPrefixes: ["https://docs.mistral.ai/getting-started/changelog"],
+      defaultEventType: "开发生态",
+      publicDescription: "Test source"
+    };
+    const fetchMock = vi.fn(async () => new Response(`
+      <main>
+        <h3>Mar 26</h3>
+        <h2>March 23</h2>
+        <ul><li>Released Voxtral TTS API.</li></ul>
+        <h2>2026年4月7日</h2>
+        <ul><li>发布 GLM-5.1 新一代旗舰模型。</li></ul>
+      </main>
+    `, { status: 200 }));
+
+    const result = await collectAiTimelineEvents({
+      fetch: fetchMock,
+      now: new Date("2026-04-24T12:00:00.000Z"),
+      sources: [source]
+    });
+
+    expect(result.events).toHaveLength(2);
+    expect(result.events[0]).toMatchObject({
+      title: "Released Voxtral TTS API.",
+      publishedAt: "2026-03-23T00:00:00.000Z"
+    });
+    expect(result.events[1]).toMatchObject({
+      title: "发布 GLM-5.1 新一代旗舰模型。",
+      publishedAt: "2026-04-07T00:00:00.000Z"
+    });
+  });
+
+  it("maps official embedded JSON posts to timeline events", async () => {
+    const source: OfficialAiTimelineHtmlEmbeddedJsonPostsSource = {
+      id: "test-mistral-news",
+      companyKey: "mistral",
+      companyName: "Mistral AI",
+      sourceLabel: "Mistral News",
+      sourceKind: "html_embedded_json_posts",
+      pageUrl: "https://mistral.ai/news",
+      postsArrayKey: "posts",
+      itemUrlPrefix: "https://mistral.ai/news/",
+      allowedUrlPrefixes: ["https://mistral.ai/news/"],
+      defaultEventType: "行业动态",
+      publicDescription: "Test source"
+    };
+    const fetchMock = vi.fn(async () => new Response(`
+      <script>self.__next_f.push([1,"{\\"posts\\":[{\\"slug\\":\\"voxtral-tts\\",\\"date\\":\\"2026-03-23T16:00:00\\",\\"title\\":\\"Speaking of Voxtral\\",\\"description\\":\\"Voxtral TTS release.\\",\\"category\\":{\\"name\\":\\"Research\\"}}]}"])</script>
+    `, { status: 200 }));
+
+    const result = await collectAiTimelineEvents({
+      fetch: fetchMock,
+      now: new Date("2026-04-24T12:00:00.000Z"),
+      sources: [source]
+    });
+
+    expect(result).toMatchObject({
+      fetchedItemCount: 1,
+      skippedItemCount: 0,
+      failures: []
+    });
+    expect(result.events[0]).toMatchObject({
+      companyKey: "mistral",
+      eventType: "模型发布",
+      title: "Speaking of Voxtral",
+      summary: "Research: Voxtral TTS release.",
+      officialUrl: "https://mistral.ai/news/voxtral-tts",
+      publishedAt: "2026-03-23T16:00:00.000Z"
     });
   });
 

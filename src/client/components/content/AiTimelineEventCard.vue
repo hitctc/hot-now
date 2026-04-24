@@ -50,19 +50,19 @@ function formatTimelineTime(): string {
 function readNodeAccentClass(): string {
   switch (props.event.eventType) {
     case "要闻":
-      return "border-red-300/70 bg-red-500/18 text-red-100 shadow-[0_0_28px_rgba(248,113,113,0.28)]";
+      return "border-red-200/80 bg-red-500 text-white shadow-[0_0_30px_rgba(248,113,113,0.42)]";
     case "模型发布":
-      return "border-sky-300/70 bg-sky-500/18 text-sky-100 shadow-[0_0_28px_rgba(56,189,248,0.28)]";
+      return "border-sky-200/80 bg-sky-500 text-white shadow-[0_0_30px_rgba(56,189,248,0.42)]";
     case "开发生态":
-      return "border-emerald-300/70 bg-emerald-500/18 text-emerald-100 shadow-[0_0_28px_rgba(52,211,153,0.26)]";
+      return "border-emerald-200/80 bg-emerald-500 text-white shadow-[0_0_30px_rgba(52,211,153,0.38)]";
     case "产品应用":
-      return "border-violet-300/70 bg-violet-500/18 text-violet-100 shadow-[0_0_28px_rgba(167,139,250,0.26)]";
+      return "border-violet-200/80 bg-violet-500 text-white shadow-[0_0_30px_rgba(167,139,250,0.38)]";
     case "行业动态":
-      return "border-amber-300/70 bg-amber-500/18 text-amber-100 shadow-[0_0_28px_rgba(251,191,36,0.24)]";
+      return "border-amber-200/80 bg-amber-500 text-white shadow-[0_0_30px_rgba(251,191,36,0.36)]";
     case "官方前瞻":
-      return "border-cyan-300/70 bg-cyan-500/18 text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.24)]";
+      return "border-cyan-200/80 bg-cyan-500 text-white shadow-[0_0_30px_rgba(34,211,238,0.36)]";
     default:
-      return "border-editorial-border-strong bg-editorial-link-active text-editorial-text-main shadow-editorial-accent";
+      return "border-editorial-border-strong bg-editorial-text-main text-editorial-panel shadow-editorial-accent";
   }
 }
 </script>
@@ -80,11 +80,14 @@ function readNodeAccentClass(): string {
       <div class="text-[10px] text-editorial-text-muted sm:text-[11px]">{{ formatTimelineDate() }}</div>
     </div>
 
-    <div class="relative flex min-h-full justify-center" aria-hidden="true">
-      <div class="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-editorial-border-strong/70" />
+    <div class="relative flex min-h-full self-stretch justify-center" aria-hidden="true">
+      <div
+        class="absolute left-1/2 top-[-12px] bottom-[-12px] w-[2px] -translate-x-1/2 rounded-full bg-editorial-border-strong shadow-[0_0_18px_rgba(148,163,184,0.32)]"
+        data-ai-timeline-axis-line
+      />
       <div
         :class="[
-          'relative z-[1] flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold backdrop-blur-xl sm:h-11 sm:w-11 sm:text-sm',
+          'relative z-[1] flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-black backdrop-blur-xl ring-4 ring-editorial-panel sm:h-11 sm:w-11 sm:text-sm',
           readNodeAccentClass()
         ]"
         data-ai-timeline-display-index

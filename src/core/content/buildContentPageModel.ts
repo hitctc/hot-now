@@ -1,12 +1,15 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
 import { getViewRuleConfig, type ViewRuleConfig } from "../viewRules/viewRuleRepository.js";
 import { listContentSources, type ContentSourceOption } from "../source/listContentSources.js";
+import { listBilibiliQueries } from "../bilibili/bilibiliQueryRepository.js";
+import { listHackerNewsQueries } from "../hackernews/hackerNewsQueryRepository.js";
 import { listTwitterAccounts, type TwitterAccountRecord } from "../twitter/twitterAccountRepository.js";
 import { listTwitterSearchKeywords, type TwitterSearchKeywordRecord } from "../twitter/twitterSearchKeywordRepository.js";
 import {
   buildContentViewSelection,
   type ContentSortMode
 } from "./buildContentViewSelection.js";
+import { hasContentItemsForSourceKind } from "./contentRepository.js";
 import type { ContentCardView } from "./listContentView.js";
 
 export type ContentPageKey = "ai-new" | "ai-hot";
@@ -59,6 +62,9 @@ export type BuildContentPageModelOptions = {
 const contentPageSize = 50;
 const twitterAccountsSourceKind = "twitter_accounts";
 const twitterKeywordSearchSourceKind = "twitter_keyword_search";
+const hackerNewsSourceKind = "hackernews_search";
+const bilibiliSourceKind = "bilibili_search";
+const weiboTrendingSourceKind = "weibo_trending";
 
 // 内容页模型在这里统一拼装，避免 server route 再复制一套精选卡、来源筛选和空态判断。
 export function buildContentPageModel(
@@ -68,10 +74,18 @@ export function buildContentPageModel(
 ): ContentPageModel {
   const twitterAccounts = listTwitterAccounts(db);
   const twitterKeywords = listTwitterSearchKeywords(db);
+  const hackerNewsQueries = listHackerNewsQueries(db);
+  const bilibiliQueries = listBilibiliQueries(db);
+  const hasHackerNewsContent = hasContentItemsForSourceKind(db, hackerNewsSourceKind);
+  const hasBilibiliContent = hasContentItemsForSourceKind(db, bilibiliSourceKind);
+  const hasWeiboTrendingContent = pageKey === "ai-hot" && hasContentItemsForSourceKind(db, weiboTrendingSourceKind);
   const sourceOptions = buildContentPageSourceOptions(
     listContentSources(db).filter((source) => source.isEnabled),
     twitterAccounts,
-    twitterKeywords
+    twitterKeywords,
+    hackerNewsQueries.length > 0 || hasHackerNewsContent,
+    bilibiliQueries.length > 0 || hasBilibiliContent,
+    hasWeiboTrendingContent
   );
   const selectedSourceKinds = normalizeSelectedSourceKinds(options.selectedSourceKinds, sourceOptions);
   const effectiveSelectedSourceKinds = selectedSourceKinds ?? deriveDefaultSelectedSourceKinds(sourceOptions);
@@ -289,7 +303,10 @@ function deriveDefaultSelectedSourceKinds(sourceOptions: ContentSourceOption[]):
 function buildContentPageSourceOptions(
   sourceOptions: ContentSourceOption[],
   twitterAccounts: TwitterAccountRecord[],
-  twitterKeywords: TwitterSearchKeywordRecord[]
+  twitterKeywords: TwitterSearchKeywordRecord[],
+  hasHackerNews: boolean,
+  hasBilibili: boolean,
+  hasWeiboTrending: boolean
 ): ContentSourceOption[] {
   const nextOptions = [...sourceOptions];
 
@@ -306,6 +323,33 @@ function buildContentPageSourceOptions(
     nextOptions.push({
       kind: twitterKeywordSearchSourceKind,
       name: "Twitter 关键词搜索",
+      isEnabled: true,
+      showAllWhenSelected: false
+    });
+  }
+
+  if (hasHackerNews) {
+    nextOptions.push({
+      kind: hackerNewsSourceKind,
+      name: "Hacker News",
+      isEnabled: true,
+      showAllWhenSelected: false
+    });
+  }
+
+  if (hasBilibili) {
+    nextOptions.push({
+      kind: bilibiliSourceKind,
+      name: "B 站搜索",
+      isEnabled: true,
+      showAllWhenSelected: false
+    });
+  }
+
+  if (hasWeiboTrending) {
+    nextOptions.push({
+      kind: weiboTrendingSourceKind,
+      name: "微博热搜",
       isEnabled: true,
       showAllWhenSelected: false
     });

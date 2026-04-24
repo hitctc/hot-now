@@ -80,10 +80,12 @@ export type SaveFeedbackPoolEntryPayload = {
 };
 
 export const CONTENT_SOURCE_STORAGE_KEY = "hot-now-content-sources";
+export const CONTENT_SOURCE_STORAGE_VERSION_KEY = "hot-now-content-sources-version";
 export const CONTENT_SORT_STORAGE_KEY = "hot-now-content-sort";
 export const CONTENT_SEARCH_STORAGE_KEY = "hot-now-content-search";
 export const CONTENT_TWITTER_ACCOUNT_STORAGE_KEY = "hot-now-twitter-account-filter";
 export const CONTENT_TWITTER_KEYWORD_STORAGE_KEY = "hot-now-twitter-keyword-filter";
+const contentSourceStorageVersion = "2";
 
 export type ReadContentPageOptions = {
   selectedSourceKinds?: string[];
@@ -272,11 +274,23 @@ function postContentAction<T>(path: string, body: unknown): Promise<T> {
 }
 
 export function readStoredContentSourceKinds(): string[] | null {
+  if (typeof window !== "undefined" && window.localStorage.getItem(CONTENT_SOURCE_STORAGE_VERSION_KEY) !== contentSourceStorageVersion) {
+    return null;
+  }
+
   return readPersistedStringArray(CONTENT_SOURCE_STORAGE_KEY);
 }
 
 export function writeStoredContentSourceKinds(selectedSourceKinds: string[]): void {
   writePersistedStringArray(CONTENT_SOURCE_STORAGE_KEY, normalizeSelectedSourceKinds(selectedSourceKinds));
+
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(CONTENT_SOURCE_STORAGE_VERSION_KEY, contentSourceStorageVersion);
+    } catch {
+      // localStorage 不可写时只影响下次刷新能否记住来源筛选，不影响当前页面渲染。
+    }
+  }
 }
 
 export function readStoredTwitterAccountIds(): number[] | null {

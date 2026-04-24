@@ -145,6 +145,66 @@ describe("content routes", () => {
     });
   });
 
+  it("includes enabled search aggregate source groups in the fallback content API model", async () => {
+    const contentCards = [
+      {
+        id: 201,
+        title: "OpenAI Codex B 站视频",
+        summary: "B 站视频摘要",
+        sourceName: "B 站搜索",
+        sourceKind: "bilibili_search",
+        canonicalUrl: "https://www.bilibili.com/video/BV-fallback",
+        publishedAt: "2026-03-28T10:00:00.000Z",
+        contentScore: 86,
+        scoreBadges: ["24h 内"]
+      },
+      {
+        id: 202,
+        title: "Codex on Hacker News",
+        summary: "HN 摘要",
+        sourceName: "Hacker News",
+        sourceKind: "hackernews_search",
+        canonicalUrl: "https://news.ycombinator.com/item?id=1",
+        publishedAt: "2026-03-28T09:00:00.000Z",
+        contentScore: 84,
+        scoreBadges: ["24h 内"]
+      }
+    ];
+    const listContentView = vi.fn().mockImplementation((_viewKey, options) => {
+      const selectedSourceKinds = options?.selectedSourceKinds ?? [];
+      return contentCards.filter((card) => selectedSourceKinds.includes(card.sourceKind));
+    });
+    const app = createContentTestServer({
+      listContentView,
+      listContentSources: vi.fn().mockResolvedValue([
+        { kind: "openai", name: "OpenAI", isEnabled: true, showAllWhenSelected: false }
+      ]),
+      listHackerNewsQueries: vi.fn().mockResolvedValue([{ id: 1, query: "Codex" }]),
+      listBilibiliQueries: vi.fn().mockResolvedValue([{ id: 2, query: "OpenAI" }])
+    } as never);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/content/ai-new"
+    });
+    const payload = response.json() as {
+      cards: { id: number }[];
+      sourceFilter?: {
+        options: { kind: string }[];
+        selectedSourceKinds: string[];
+      };
+    };
+
+    expect(response.statusCode).toBe(200);
+    expect(payload.sourceFilter?.options.map((option) => option.kind)).toEqual(
+      expect.arrayContaining(["hackernews_search", "bilibili_search"])
+    );
+    expect(payload.sourceFilter?.selectedSourceKinds).toEqual(
+      expect.arrayContaining(["hackernews_search", "bilibili_search"])
+    );
+    expect(payload.cards.map((card) => card.id)).toEqual([201, 202]);
+  });
+
   it("passes page query through to getContentPageModel and returns pagination metadata", async () => {
     const getContentPageModel = vi.fn().mockResolvedValue({
       pageKey: "ai-new",

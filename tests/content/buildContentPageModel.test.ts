@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { createBilibiliQuery } from "../../src/core/bilibili/bilibiliQueryRepository.js";
 import { buildContentPageModel } from "../../src/core/content/buildContentPageModel.js";
 import { linkTwitterSearchKeywordMatches, resolveSourceByKind, upsertContentItems } from "../../src/core/content/contentRepository.js";
+import { createHackerNewsQuery } from "../../src/core/hackernews/hackerNewsQueryRepository.js";
 import { ensureTwitterAccountsContentSource } from "../../src/core/twitter/twitterAccountCollector.js";
 import { createTwitterAccount } from "../../src/core/twitter/twitterAccountRepository.js";
 import { createTwitterSearchKeyword } from "../../src/core/twitter/twitterSearchKeywordRepository.js";
@@ -195,6 +197,53 @@ describe("buildContentPageModel", () => {
     );
     expect(model.twitterAccountFilter?.selectedAccountIds).toEqual(account.ok ? [account.account.id] : []);
     expect(model.twitterKeywordFilter?.selectedKeywordIds).toEqual(keyword.ok ? [keyword.keyword.id] : []);
+  });
+
+  it("exposes hidden search aggregate sources on content pages and defaults them selected", async () => {
+    const handle = await createTestDatabase("hot-now-content-page-search-sources-");
+    handles.push(handle);
+    const bilibiliQuery = createBilibiliQuery(handle.db, {
+      query: "OpenAI",
+      priority: 90,
+      isEnabled: true
+    });
+    const hackerNewsQuery = createHackerNewsQuery(handle.db, {
+      query: "Codex",
+      priority: 90,
+      isEnabled: true
+    });
+    const bilibiliSource = resolveSourceByKind(handle.db, "bilibili_search");
+
+    expect(bilibiliQuery.ok).toBe(true);
+    expect(hackerNewsQuery.ok).toBe(true);
+    expect(bilibiliSource).toBeDefined();
+
+    upsertContentItems(handle.db, {
+      sourceId: bilibiliSource!.id,
+      items: [
+        {
+          title: "OpenAI Codex B 站视频",
+          canonicalUrl: "https://www.bilibili.com/video/BV-content-page",
+          summary: "OpenAI Codex 的 B 站视频内容",
+          bodyMarkdown: "OpenAI Codex 的 B 站视频正文",
+          externalId: "bilibili:BV-content-page",
+          publishedAt: "2026-03-31T03:00:00.000Z",
+          fetchedAt: "2026-03-31T03:00:05.000Z"
+        }
+      ]
+    });
+
+    const aiNewModel = buildContentPageModel(handle.db, "ai-new");
+    const aiHotModel = buildContentPageModel(handle.db, "ai-hot");
+
+    expect(aiNewModel.sourceFilter?.options.map((option) => option.kind)).toEqual(
+      expect.arrayContaining(["hackernews_search", "bilibili_search"])
+    );
+    expect(aiNewModel.sourceFilter?.selectedSourceKinds).toEqual(
+      expect.arrayContaining(["hackernews_search", "bilibili_search"])
+    );
+    expect(aiNewModel.cards.map((card) => card.title)).toContain("OpenAI Codex B 站视频");
+    expect(aiHotModel.sourceFilter?.options.map((option) => option.kind)).not.toContain("weibo_trending");
   });
 });
 

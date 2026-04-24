@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   createCollectionRun,
   finishCollectionRun,
+  hasContentItemsForSourceKind,
   linkTwitterSearchKeywordMatches,
   listVisibleTwitterKeywordMatchContentItemIds,
   mergeContentMatchedQueries,
@@ -199,6 +200,32 @@ describe("contentRepository", () => {
       body_markdown: "preserved body",
       fetched_at: "2026-03-28T09:00:00.000Z"
     });
+  });
+
+  it("detects content attached to hidden aggregate source kinds", async () => {
+    const db = await createTestDatabase();
+    const source = resolveSourceByKind(db, "bilibili_search");
+
+    expect(source).toBeDefined();
+    expect(hasContentItemsForSourceKind(db, "bilibili_search")).toBe(false);
+
+    upsertContentItems(db, {
+      sourceId: source!.id,
+      items: [
+        {
+          externalId: "bilibili:BV-source-check",
+          title: "OpenAI Codex B 站视频",
+          canonicalUrl: "https://www.bilibili.com/video/BV-source-check",
+          summary: "B 站聚合来源内容检测",
+          bodyMarkdown: "B 站聚合来源内容检测正文",
+          publishedAt: "2026-03-28T08:00:00.000Z",
+          fetchedAt: "2026-03-28T08:01:00.000Z"
+        }
+      ]
+    });
+
+    expect(hasContentItemsForSourceKind(db, "bilibili_search")).toBe(true);
+    expect(hasContentItemsForSourceKind(db, "hackernews_search")).toBe(false);
   });
 
   it("returns only content items that still have at least one visible twitter keyword match", async () => {

@@ -66,6 +66,23 @@ export function resolveSourceByKind(db: SqliteDatabase, kind: SourceKind): Conte
     .get(kind) as ContentSourceRecord | undefined;
 }
 
+// 隐藏聚合来源不会出现在普通 source 库存表里，内容页需要单独判断它是否已经有可读内容。
+export function hasContentItemsForSourceKind(db: SqliteDatabase, kind: SourceKind): boolean {
+  const row = db
+    .prepare(
+      `
+        SELECT 1 AS hasContent
+        FROM content_items item
+        JOIN content_sources source ON source.id = item.source_id
+        WHERE source.kind = ?
+        LIMIT 1
+      `
+    )
+    .get(kind) as { hasContent: number } | undefined;
+
+  return Boolean(row);
+}
+
 // Content items are upserted on the existing `(source_id, canonical_url)` key so repeated runs
 // refresh extracted text without creating duplicate rows for the same source article.
 export function upsertContentItems(

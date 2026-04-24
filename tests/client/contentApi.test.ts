@@ -76,13 +76,20 @@ describe("contentApi", () => {
   });
 
   it("persists and restores selected content source kinds", async () => {
-    const { CONTENT_SOURCE_STORAGE_KEY, readStoredContentSourceKinds, writeStoredContentSourceKinds } = await import(
-      "../../src/client/services/contentApi"
-    );
+    const {
+      CONTENT_SOURCE_STORAGE_KEY,
+      CONTENT_SOURCE_STORAGE_VERSION_KEY,
+      readStoredContentSourceKinds,
+      writeStoredContentSourceKinds
+    } = await import("../../src/client/services/contentApi");
+
+    window.localStorage.setItem(CONTENT_SOURCE_STORAGE_KEY, '["openai"]');
+    expect(readStoredContentSourceKinds()).toBeNull();
 
     writeStoredContentSourceKinds([" openai ", "openai", "ithome"]);
 
     expect(window.localStorage.getItem(CONTENT_SOURCE_STORAGE_KEY)).toBe('["openai","ithome"]');
+    expect(window.localStorage.getItem(CONTENT_SOURCE_STORAGE_VERSION_KEY)).toBe("2");
     expect(readStoredContentSourceKinds()).toEqual(["openai", "ithome"]);
   });
 

@@ -2266,10 +2266,15 @@ async function buildContentPageModelFromDependencies(
   try {
     const twitterAccounts = (await deps.listTwitterAccounts?.()) ?? [];
     const twitterKeywords = (await deps.listTwitterSearchKeywords?.()) ?? [];
+    const hackerNewsQueries = (await deps.listHackerNewsQueries?.()) ?? [];
+    const bilibiliQueries = (await deps.listBilibiliQueries?.()) ?? [];
     const sourceOptions = buildContentPageSourceOptions(
       ((await deps.listContentSources?.()) ?? []).filter((source) => source.isEnabled),
       twitterAccounts.length > 0,
-      twitterKeywords.length > 0
+      twitterKeywords.length > 0,
+      hackerNewsQueries.length > 0,
+      bilibiliQueries.length > 0,
+      false
     );
     const selectedSourceKinds = readContentPageSelectedSourceKinds(request.headers["x-hot-now-source-filter"], sourceOptions);
     const effectiveSelectedSourceKinds = selectedSourceKinds ?? deriveDefaultSelectedSourceKinds(sourceOptions);
@@ -2552,7 +2557,10 @@ function deriveDefaultSelectedSourceKinds(sourceOptions: ContentSourceOption[]):
 function buildContentPageSourceOptions(
   sourceOptions: ContentSourceOption[],
   hasTwitterAccounts: boolean,
-  hasTwitterKeywords: boolean
+  hasTwitterKeywords: boolean,
+  hasHackerNewsQueries: boolean,
+  hasBilibiliQueries: boolean,
+  hasWeiboTrending: boolean
 ): ContentSourceOption[] {
   const nextOptions = [...sourceOptions];
 
@@ -2569,6 +2577,33 @@ function buildContentPageSourceOptions(
     nextOptions.push({
       kind: "twitter_keyword_search",
       name: "Twitter 关键词搜索",
+      isEnabled: true,
+      showAllWhenSelected: false
+    });
+  }
+
+  if (hasHackerNewsQueries) {
+    nextOptions.push({
+      kind: "hackernews_search",
+      name: "Hacker News",
+      isEnabled: true,
+      showAllWhenSelected: false
+    });
+  }
+
+  if (hasBilibiliQueries) {
+    nextOptions.push({
+      kind: "bilibili_search",
+      name: "B 站搜索",
+      isEnabled: true,
+      showAllWhenSelected: false
+    });
+  }
+
+  if (hasWeiboTrending) {
+    nextOptions.push({
+      kind: "weibo_trending",
+      name: "微博热搜",
       isEnabled: true,
       showAllWhenSelected: false
     });

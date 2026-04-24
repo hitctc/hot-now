@@ -39,7 +39,7 @@ describe("runTwitterKeywordCollection", () => {
           tweets: [
             {
               id: "tweet-1",
-              text: "OpenAI ships a new model",
+              text: "OpenAI 发布了新的模型能力",
               url: "https://x.com/openai/status/tweet-1",
               createdAt: "2026-04-23T08:00:00.000Z",
               likeCount: 120,
@@ -76,7 +76,7 @@ describe("runTwitterKeywordCollection", () => {
             tweets: [
               {
                 id: "tweet-1",
-                text: "OpenAI ships a new model",
+                text: "OpenAI 发布了新的模型能力",
                 url: "https://x.com/openai/status/tweet-1",
                 createdAt: "2026-04-23T08:00:00.000Z",
                 likeCount: 120,
@@ -88,7 +88,7 @@ describe("runTwitterKeywordCollection", () => {
               },
               {
                 id: "tweet-2",
-                text: "Agents SDK gets a new release",
+                text: "Agents SDK 发布了新的中文更新",
                 url: "https://x.com/openai/status/tweet-2",
                 createdAt: "2026-04-23T09:00:00.000Z",
                 likeCount: 88,
@@ -109,7 +109,7 @@ describe("runTwitterKeywordCollection", () => {
             tweets: [
               {
                 id: "tweet-2",
-                text: "Agents SDK gets a new release",
+                text: "Agents SDK 发布了新的中文更新",
                 url: "https://x.com/openai/status/tweet-2",
                 createdAt: "2026-04-23T09:00:00.000Z",
                 likeCount: 88,

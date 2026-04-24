@@ -48,6 +48,18 @@ describe("twitterKeywordCollector", () => {
                 userName: "openai",
                 name: "OpenAI"
               }
+            },
+            {
+              id: "tweet-ja",
+              text: "【ChatGPT image2のつづき】ためしにキャラを読み込ませてみると...",
+              url: "https://x.com/hika_san3/status/tweet-ja",
+              createdAt: "2026-04-23T08:10:00.000Z",
+              likeCount: 66,
+              author: {
+                id: "user-ja",
+                userName: "hika_san3",
+                name: "ひかさん"
+              }
             }
           ]
         }),
@@ -66,6 +78,10 @@ describe("twitterKeywordCollector", () => {
         href: expect.stringContaining("/twitter/tweet/advanced_search?")
       }),
       expect.anything()
+    );
+    const requestUrl = fetchMock.mock.calls[0]?.[0] as URL;
+    expect(requestUrl.searchParams.get("query")).toBe(
+      "OpenAI lang:zh since_time:1776673800 until_time:1776933000"
     );
     expect(issues).toHaveLength(1);
     expect(issues.failures).toEqual([]);
@@ -86,11 +102,13 @@ describe("twitterKeywordCollector", () => {
       publishedAt: "2026-04-23T08:00:00.000Z",
       summary: "OpenAI 发布了新的 Agents 能力"
     });
+    expect(issues[0].items.map((item) => item.externalId)).not.toContain("twitter:tweet-ja");
     expect(JSON.parse(issues[0].items[0].metadataJson ?? "{}")).toMatchObject({
       collector: {
         kind: "twitter_keyword_search",
         keyword: "OpenAI",
-        priority: 95
+        priority: 95,
+        searchQuery: "OpenAI lang:zh since_time:1776673800 until_time:1776933000"
       },
       metrics: {
         likeCount: 120

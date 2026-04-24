@@ -17,6 +17,10 @@ const twitterKeywordSearchSourceType = "twitter_keyword_aggregate";
 const defaultKeywordFetchLimit = 5;
 const defaultTweetsPerKeywordLimit = 10;
 const keywordSearchLookbackHours = 72;
+const fixedSearchLanguageOperator = "lang:zh";
+const chineseTextPattern = /[\u4e00-\u9fff]/;
+const japaneseKanaPattern = /[\u3040-\u30ff\u31f0-\u31ff]/;
+const koreanTextPattern = /[\u1100-\u11ff\u3130-\u318f\uac00-\ud7af]/;
 
 export type CollectTwitterKeywordIssuesOptions = {
   apiKey?: string | null;
@@ -120,6 +124,7 @@ export async function collectTwitterKeywordIssues(
     }
 
     const candidateTweets = result.tweets
+      .filter(isLikelySimplifiedChineseTweet)
       .slice(0, maxTweetsPerKeyword)
       .flatMap((tweet, index) => mapTweetToCandidate(keyword, tweet, index, searchQuery));
 
@@ -156,7 +161,26 @@ export async function collectTwitterKeywordIssues(
 function buildKeywordSearchQuery(keyword: string, now: Date) {
   const untilSeconds = Math.floor(now.getTime() / 1000);
   const sinceSeconds = untilSeconds - keywordSearchLookbackHours * 60 * 60;
-  return `${keyword.trim()} since_time:${sinceSeconds} until_time:${untilSeconds}`;
+  const searchTerm = normalizeKeywordSearchTerm(keyword);
+  return `${searchTerm} ${fixedSearchLanguageOperator} since_time:${sinceSeconds} until_time:${untilSeconds}`.trim();
+}
+
+// 关键词搜索固定收中文结果；本地再排除日文假名和韩文，避免 API 偶发把非中文结果混进来。
+function isLikelySimplifiedChineseTweet(tweet: TwitterApiTweet): boolean {
+  return (
+    chineseTextPattern.test(tweet.text) &&
+    !japaneseKanaPattern.test(tweet.text) &&
+    !koreanTextPattern.test(tweet.text)
+  );
+}
+
+// 用户填写的关键词里即使带了 lang:xx，也以系统固定中文搜索为准，防止后台配置绕开范围。
+function normalizeKeywordSearchTerm(keyword: string) {
+  return keyword
+    .trim()
+    .replace(/(^|\s)-?lang:\S+/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function mapTweetToCandidate(

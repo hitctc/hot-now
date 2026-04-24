@@ -18,6 +18,10 @@ export type ContentCard = {
   title: string;
   summary: string;
   sourceName: string;
+  sourceDetail?: {
+    label: string;
+    value: string;
+  } | null;
   sourceKind?: string;
   canonicalUrl: string;
   publishedAt: string | null;

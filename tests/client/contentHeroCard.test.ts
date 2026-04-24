@@ -28,6 +28,10 @@ const card: ContentCard = {
   title: "AI Weekly Insight",
   summary: "Roundup of recent AI and product updates.",
   sourceName: "OpenAI",
+  sourceDetail: {
+    label: "作者",
+    value: "OpenAI @openai"
+  },
   sourceKind: "openai",
   canonicalUrl: "https://example.com/ai-weekly",
   publishedAt: "2026-03-31T10:00:00.000Z",
@@ -82,6 +86,7 @@ describe("ContentHeroCard", () => {
 
     expect(wrapper.get("[data-content-hero]").text()).toContain("AI Weekly Insight");
     expect(wrapper.get("[data-content-hero-title]").text()).toContain("AI Weekly Insight");
+    expect(wrapper.get("[data-content-source-detail]").text()).toBe("作者：OpenAI @openai");
     expect(wrapper.get("[data-content-hero-summary]").text()).toContain("Roundup of recent AI and product updates.");
     expect(wrapper.get("[data-content-hero-summary]").attributes("data-content-summary-expanded")).toBe("false");
     expect(wrapper.find("[data-content-summary-toggle]").exists()).toBe(false);

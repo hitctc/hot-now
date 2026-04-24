@@ -113,6 +113,13 @@ const {
         </div>
         <div :class="editorialContentMetaClass">
           <span>{{ cardState.sourceName }}</span>
+          <span
+            v-if="cardState.sourceDetail"
+            class="normal-case tracking-normal text-editorial-text-body"
+            data-content-source-detail
+          >
+            {{ cardState.sourceDetail.label }}：{{ cardState.sourceDetail.value }}
+          </span>
           <span>{{ publishedText }}</span>
           <span :class="editorialContentScoreBadgeClass">系统分 {{ cardState.contentScore }}</span>
         </div>

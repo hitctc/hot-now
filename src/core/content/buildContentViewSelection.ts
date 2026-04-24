@@ -64,6 +64,7 @@ type ContentCardRow = {
   title: string;
   summary: string | null;
   bodyMarkdown: string | null;
+  metadataJson: string | null;
   sourceName: string;
   sourceKind: string;
   showAllWhenSelected: number;
@@ -86,6 +87,8 @@ const matchingSourceViewBonus = 120;
 const twitterAccountsSourceKind = "twitter_accounts";
 const twitterKeywordSearchSourceKind = "twitter_keyword_search";
 const wechatRssSourceKind = "wechat_rss";
+const bilibiliSourceKind = "bilibili_search";
+const hackerNewsSourceKind = "hackernews_search";
 const hotOnlySourceKinds = new Set(["weibo_trending"]);
 
 const contentSelectSql = `
@@ -94,6 +97,7 @@ const contentSelectSql = `
     ci.title AS title,
     ci.summary AS summary,
     ci.body_markdown AS bodyMarkdown,
+    ci.metadata_json AS metadataJson,
     cs.name AS sourceName,
     cs.kind AS sourceKind,
     cs.show_all_when_selected AS showAllWhenSelected,
@@ -542,6 +546,7 @@ function buildRankedCardCandidate(
     title: row.title,
     summary: row.summary?.trim() || "暂无摘要",
     sourceName: row.sourceName,
+    sourceDetail: resolveSourceDetail(row),
     sourceKind: row.sourceKind,
     showAllWhenSelected: row.showAllWhenSelected === 1,
     canonicalUrl: row.canonicalUrl,
@@ -659,6 +664,83 @@ function normalizeSuggestedEffect(value: string | null): "boost" | "penalize" | 
 
 function normalizeStrengthLevel(value: string | null): "low" | "medium" | "high" | null {
   return value === "low" || value === "medium" || value === "high" ? value : null;
+}
+
+// 内容卡片的主来源仍保留聚合 source 名，这里只从采集 metadata 里补一条更具体的来源或作者说明。
+function resolveSourceDetail(
+  row: Pick<ContentCardRow, "metadataJson" | "sourceKind" | "sourceName">
+): ContentCardView["sourceDetail"] {
+  const metadata = parseMetadataRecord(row.metadataJson);
+
+  if (!metadata) {
+    return null;
+  }
+
+  const collector = readRecord(metadata.collector);
+
+  if (row.sourceKind === wechatRssSourceKind) {
+    return buildSourceDetail("来源标题", readString(collector?.displayName), row.sourceName);
+  }
+
+  if (row.sourceKind === twitterAccountsSourceKind || row.sourceKind === twitterKeywordSearchSourceKind) {
+    const author = readRecord(metadata.author);
+    const authorText = formatTwitterAuthor(
+      readString(author?.name),
+      readString(author?.username) ?? readString(collector?.username)
+    );
+    return buildSourceDetail("作者", authorText, row.sourceName);
+  }
+
+  if (row.sourceKind === bilibiliSourceKind) {
+    return buildSourceDetail("UP主", readString(metadata.author), row.sourceName);
+  }
+
+  if (row.sourceKind === hackerNewsSourceKind) {
+    return buildSourceDetail("作者", readString(metadata.author), row.sourceName);
+  }
+
+  return null;
+}
+
+// metadata_json 来自多个采集器，坏数据只能降级为空，不能影响内容页整体渲染。
+function parseMetadataRecord(rawValue: string | null): Record<string, unknown> | null {
+  if (!rawValue) {
+    return null;
+  }
+
+  try {
+    return readRecord(JSON.parse(rawValue));
+  } catch {
+    return null;
+  }
+}
+
+// 只接受普通对象，避免数组或 null 被后续按 record 读取。
+function readRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+// 页面只展示有实际内容的字符串，空白值统一当成缺失。
+function readString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+// 和主来源名完全相同的信息不重复展示，避免 RSS 卡片元信息变啰嗦。
+function buildSourceDetail(label: string, value: string | null, fallbackSourceName: string): ContentCardView["sourceDetail"] {
+  if (!value || value === fallbackSourceName.trim()) {
+    return null;
+  }
+
+  return { label, value };
+}
+
+// Twitter 同时给 name 和 username 时保留两个值，方便区分同名账号。
+function formatTwitterAuthor(name: string | null, username: string | null): string | null {
+  if (name && username) {
+    return `${name} @${username}`;
+  }
+
+  return name ?? (username ? `@${username}` : null);
 }
 
 function calculateViewRankingScore(

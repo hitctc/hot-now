@@ -83,6 +83,29 @@ describe("ContentStandardCard", () => {
     expect(wrapper.find("[data-content-feedback-modal]").exists()).toBe(false);
   });
 
+  it("renders source details from collector metadata", async () => {
+    const wrapper = mount(ContentStandardCard, {
+      props: {
+        card: {
+          ...baseCard,
+          sourceName: "B 站搜索",
+          sourceDetail: {
+            label: "UP主",
+            value: "机器之心"
+          }
+        }
+      },
+      global: {
+        plugins: [Antd]
+      },
+      attachTo: document.body
+    });
+
+    await flushPromises();
+
+    expect(wrapper.get("[data-content-source-detail]").text()).toBe("UP主：机器之心");
+  });
+
   it("shows expand and collapse controls for long standard summaries", async () => {
     const wrapper = mount(ContentStandardCard, {
       props: {

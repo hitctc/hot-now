@@ -9,6 +9,7 @@ import { runMigrations } from "../../src/core/db/runMigrations.js";
 import { seedInitialData } from "../../src/core/db/seedInitialData.js";
 import { saveFeedbackPoolEntry } from "../../src/core/feedback/feedbackPoolRepository.js";
 import { saveNlEvaluations } from "../../src/core/strategy/nlEvaluationRepository.js";
+import { ensureTwitterAccountsContentSource } from "../../src/core/twitter/twitterAccountCollector.js";
 
 describe("listContentView", () => {
   const databasesToClose: ReturnType<typeof openDatabase>[] = [];
@@ -80,6 +81,74 @@ describe("listContentView", () => {
     expect(card).not.toHaveProperty("reaction");
     expect(card).not.toHaveProperty("averageRating");
     expect(card).not.toHaveProperty("rankingScore");
+  });
+
+  it("exposes collector source details for RSS and API search content", async () => {
+    const db = await createTestDatabase();
+    const wechatSource = resolveSourceByKind(db, "wechat_rss");
+    const twitterSourceId = ensureTwitterAccountsContentSource(db);
+    const bilibiliSource = resolveSourceByKind(db, "bilibili_search");
+
+    expect(wechatSource).toBeDefined();
+    expect(bilibiliSource).toBeDefined();
+
+    upsertContentItems(db, {
+      sourceId: wechatSource!.id,
+      items: [
+        {
+          title: "同名公众号文章",
+          canonicalUrl: "https://mp.weixin.qq.com/s/vendor",
+          summary: "同名公众号文章摘要",
+          bodyMarkdown: "同名公众号文章正文",
+          metadataJson: JSON.stringify({ collector: { kind: "wechat_rss", displayName: "机器之心 - 今天看啥" } }),
+          publishedAt: "2026-03-29T11:00:00.000Z",
+          fetchedAt: "2026-03-29T11:05:00.000Z"
+        }
+      ]
+    });
+    upsertContentItems(db, {
+      sourceId: twitterSourceId,
+      items: [
+        {
+          title: "Twitter API result",
+          canonicalUrl: "https://x.com/openai/status/1",
+          summary: "Twitter API result summary",
+          bodyMarkdown: "Twitter API result body",
+          metadataJson: JSON.stringify({ author: { name: "OpenAI", username: "openai" } }),
+          publishedAt: "2026-03-29T10:30:00.000Z",
+          fetchedAt: "2026-03-29T10:35:00.000Z"
+        }
+      ]
+    });
+    upsertContentItems(db, {
+      sourceId: bilibiliSource!.id,
+      items: [
+        {
+          title: "B 站视频",
+          canonicalUrl: "https://www.bilibili.com/video/BV1",
+          summary: "B 站视频摘要",
+          bodyMarkdown: "B 站视频正文",
+          metadataJson: JSON.stringify({ author: "机器之心" }),
+          publishedAt: "2026-03-29T10:00:00.000Z",
+          fetchedAt: "2026-03-29T10:05:00.000Z"
+        }
+      ]
+    });
+
+    const cards = listContentView(db, "hot");
+
+    expect(cards.find((card) => card.title === "同名公众号文章")?.sourceDetail).toEqual({
+      label: "来源标题",
+      value: "机器之心 - 今天看啥"
+    });
+    expect(cards.find((card) => card.title === "Twitter API result")?.sourceDetail).toEqual({
+      label: "作者",
+      value: "OpenAI @openai"
+    });
+    expect(cards.find((card) => card.title === "B 站视频")?.sourceDetail).toEqual({
+      label: "UP主",
+      value: "机器之心"
+    });
   });
 
   it("keeps hot and articles on the same pool while ai-new now has its own 24-hour window", async () => {

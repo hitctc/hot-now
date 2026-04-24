@@ -1504,22 +1504,6 @@ onUnmounted(() => {
                 这里负责管理 RSS 与公众号桥接来源、查看调度节奏、执行手动采集和人工发信，同时保持库存表和统计表在同一屏里可比对。
               </p>
             </div>
-            <div class="flex justify-start">
-              <a-space wrap>
-                <a-button type="primary" data-action="add-source" @click="openCreateSourceModal">
-                  新增来源
-                </a-button>
-                <a-button data-action="add-twitter-account" @click="openCreateTwitterAccountModal">
-                  新增 Twitter 账号
-                </a-button>
-                <a-button data-action="add-twitter-keyword" @click="openCreateTwitterKeywordModal">
-                  新增 Twitter 关键词
-                </a-button>
-                <a-button data-action="add-hackernews-query" @click="openCreateHackerNewsQueryModal">
-                  新增 Hacker News query
-                </a-button>
-              </a-space>
-            </div>
           </div>
         </section>
 
@@ -1549,31 +1533,6 @@ onUnmounted(() => {
         </section>
 
         <section class="grid gap-4 xl:grid-cols-2">
-          <a-card
-            :class="editorialContentCardClass"
-            title="手动执行采集"
-            size="small"
-            data-sources-section="manual-collect"
-          >
-              <div class="flex w-full flex-col gap-4">
-                <a-typography-paragraph type="secondary">
-                  当前会对所有已启用 source 发起一次采集，并刷新最新内容库。
-                </a-typography-paragraph>
-                <p class="m-0 text-xs leading-5 text-editorial-text-muted">
-                  下一次自动采集：{{ formatNextCollectionText(sourcesModel.operations.nextCollectionRunAt) }}
-                </p>
-                <a-button
-                  type="primary"
-                  data-action="manual-collect"
-                  :disabled="!sourcesModel.operations.canTriggerManualCollect || sourcesModel.operations.isRunning"
-                  :loading="isActionPending('manual:collect')"
-                  @click="handleManualCollect"
-                >
-                  {{ sourcesModel.operations.isRunning ? "采集中..." : "手动执行采集" }}
-                </a-button>
-              </div>
-          </a-card>
-
           <a-card
             :class="editorialContentCardClass"
             title="发送最新报告"
@@ -1621,15 +1580,20 @@ onUnmounted(() => {
             <a-typography-paragraph class="!mb-0" type="secondary">
               Twitter 账号采集已从默认定时采集里拆出，只会在这里手动执行。
             </a-typography-paragraph>
-            <a-button
-              type="primary"
-              data-action="manual-twitter-collect"
-              :disabled="!sourcesModel.operations.canTriggerManualTwitterCollect || sourcesModel.operations.isRunning"
-              :loading="isActionPending('manual:twitter-collect')"
-              @click="handleManualTwitterCollect"
-            >
-              {{ sourcesModel.operations.isRunning ? "任务执行中..." : "手动采集 Twitter 账号" }}
-            </a-button>
+            <div class="flex flex-wrap gap-2">
+              <a-button data-action="add-twitter-account" @click="openCreateTwitterAccountModal">
+                新增 Twitter 账号
+              </a-button>
+              <a-button
+                type="primary"
+                data-action="manual-twitter-collect"
+                :disabled="!sourcesModel.operations.canTriggerManualTwitterCollect || sourcesModel.operations.isRunning"
+                :loading="isActionPending('manual:twitter-collect')"
+                @click="handleManualTwitterCollect"
+              >
+                {{ sourcesModel.operations.isRunning ? "任务执行中..." : "手动采集 Twitter 账号" }}
+              </a-button>
+            </div>
           </div>
 
           <a-table
@@ -1738,15 +1702,20 @@ onUnmounted(() => {
             <a-typography-paragraph class="!mb-0" type="secondary">
               关键词搜索仅支持手动执行，默认按 5 个关键词、每词最多 10 条结果控住 credits。
             </a-typography-paragraph>
-            <a-button
-              type="primary"
-              data-action="manual-twitter-keyword-collect"
-              :disabled="!sourcesModel.operations.canTriggerManualTwitterKeywordCollect || sourcesModel.operations.isRunning"
-              :loading="isActionPending('manual:twitter-keyword-collect')"
-              @click="handleManualTwitterKeywordCollect"
-            >
-              {{ sourcesModel.operations.isRunning ? "任务执行中..." : "手动采集 Twitter 关键词" }}
-            </a-button>
+            <div class="flex flex-wrap gap-2">
+              <a-button data-action="add-twitter-keyword" @click="openCreateTwitterKeywordModal">
+                新增 Twitter 关键词
+              </a-button>
+              <a-button
+                type="primary"
+                data-action="manual-twitter-keyword-collect"
+                :disabled="!sourcesModel.operations.canTriggerManualTwitterKeywordCollect || sourcesModel.operations.isRunning"
+                :loading="isActionPending('manual:twitter-keyword-collect')"
+                @click="handleManualTwitterKeywordCollect"
+              >
+                {{ sourcesModel.operations.isRunning ? "任务执行中..." : "手动采集 Twitter 关键词" }}
+              </a-button>
+            </div>
           </div>
 
           <a-table
@@ -1867,15 +1836,20 @@ onUnmounted(() => {
             <a-typography-paragraph class="!mb-0" type="secondary">
               第一版只做手动搜索，固定按最近 7 天、每轮最多 5 个 query、每词最多 10 条结果控住范围。
             </a-typography-paragraph>
-            <a-button
-              type="primary"
-              data-action="manual-hackernews-collect"
-              :disabled="!sourcesModel.operations.canTriggerManualHackerNewsCollect || sourcesModel.operations.isRunning"
-              :loading="isActionPending('manual:hackernews-collect')"
-              @click="handleManualHackerNewsCollect"
-            >
-              {{ sourcesModel.operations.isRunning ? "任务执行中..." : "手动采集 Hacker News" }}
-            </a-button>
+            <div class="flex flex-wrap gap-2">
+              <a-button data-action="add-hackernews-query" @click="openCreateHackerNewsQueryModal">
+                新增 Hacker News query
+              </a-button>
+              <a-button
+                type="primary"
+                data-action="manual-hackernews-collect"
+                :disabled="!sourcesModel.operations.canTriggerManualHackerNewsCollect || sourcesModel.operations.isRunning"
+                :loading="isActionPending('manual:hackernews-collect')"
+                @click="handleManualHackerNewsCollect"
+              >
+                {{ sourcesModel.operations.isRunning ? "任务执行中..." : "手动采集 Hacker News" }}
+              </a-button>
+            </div>
           </div>
 
           <a-table
@@ -2203,6 +2177,31 @@ onUnmounted(() => {
           size="small"
           data-sources-section="inventory"
         >
+          <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <a-typography-paragraph class="!mb-1" type="secondary">
+                管理 RSS 与公众号桥接来源，手动采集会处理所有已启用 source。
+              </a-typography-paragraph>
+              <p class="m-0 text-xs leading-5 text-editorial-text-muted">
+                下一次自动采集：{{ formatNextCollectionText(sourcesModel.operations.nextCollectionRunAt) }}
+              </p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <a-button data-action="add-source" @click="openCreateSourceModal">
+                新增来源
+              </a-button>
+              <a-button
+                type="primary"
+                data-action="manual-collect"
+                :disabled="!sourcesModel.operations.canTriggerManualCollect || sourcesModel.operations.isRunning"
+                :loading="isActionPending('manual:collect')"
+                @click="handleManualCollect"
+              >
+                {{ sourcesModel.operations.isRunning ? "采集中..." : "手动执行采集" }}
+              </a-button>
+            </div>
+          </div>
+
           <a-table
             :data-source="sourcesModel.sources"
             :columns="inventoryColumns"

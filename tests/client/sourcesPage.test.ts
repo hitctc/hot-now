@@ -257,13 +257,13 @@ describe("SourcesPage", () => {
     await flushPromises();
 
     expect(wrapper.find("[data-settings-intro='sources']").exists()).toBe(true);
+    expect(wrapper.get("[data-settings-intro='sources']").find("[data-action='add-source']").exists()).toBe(false);
+    expect(wrapper.get("[data-settings-intro='sources']").find("[data-action='add-twitter-account']").exists()).toBe(false);
     expect(wrapper.get("[data-sources-section='overview']").findAll("article")).toHaveLength(5);
     expect(wrapper.get("[data-sources-section='overview']").text()).toContain("接入来源");
     expect(wrapper.get("[data-sources-section='overview']").text()).toContain("已启用来源");
     expect(wrapper.get("[data-sources-section='overview']").text()).toContain("下一次采集");
     expect(wrapper.get("[data-sources-section='overview']").text()).toContain("18:40（还有 6 分钟）");
-    expect(wrapper.get("[data-sources-section='manual-collect']").text()).toContain("手动执行采集");
-    expect(wrapper.get("[data-sources-section='manual-collect']").text()).toContain("下一次自动采集：18:40（还有 6 分钟）");
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 新讯24小时候选 / 24小时展示");
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 新讯独立展示占比");
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("AI 热点独立展示占比");
@@ -276,21 +276,25 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-sources-section='analytics']").text()).toContain("OpenAI");
     expect(wrapper.get("[data-sources-section='manual-send-latest-email']").text()).toContain("发送最新报告");
     expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("Twitter 账号");
+    expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("新增 Twitter 账号");
     expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("OpenAI");
     expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("@openai");
     expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("官方厂商");
     expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("Twitter 账号采集已配置 API key");
     expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("手动采集 Twitter 账号");
     expect(wrapper.get("[data-sources-section='twitter-keywords']").text()).toContain("Twitter 关键词搜索");
+    expect(wrapper.get("[data-sources-section='twitter-keywords']").text()).toContain("新增 Twitter 关键词");
     expect(wrapper.get("[data-sources-section='twitter-keywords']").text()).toContain("OpenAI");
     expect(wrapper.get("[data-sources-section='twitter-keywords']").text()).toContain("官方厂商");
     expect(wrapper.get("[data-sources-section='twitter-keywords']").text()).toContain("Twitter 关键词搜索已配置 API key");
     expect(wrapper.get("[data-sources-section='twitter-keywords']").text()).toContain("手动采集 Twitter 关键词");
     expect(wrapper.get("[data-sources-section='hackernews']").text()).toContain("Hacker News 搜索");
+    expect(wrapper.get("[data-sources-section='hackernews']").text()).toContain("新增 Hacker News query");
     expect(wrapper.get("[data-sources-section='hackernews']").text()).toContain("openai");
     expect(wrapper.get("[data-sources-section='hackernews']").text()).toContain("Hacker News 搜索已就绪");
     expect(wrapper.get("[data-sources-section='hackernews']").text()).toContain("手动采集 Hacker News");
     expect(wrapper.get("[data-sources-section='bilibili']").text()).toContain("B 站搜索");
+    expect(wrapper.get("[data-sources-section='bilibili']").text()).toContain("新增 B 站 query");
     expect(wrapper.get("[data-sources-section='bilibili']").text()).toContain("openai");
     expect(wrapper.get("[data-sources-section='bilibili']").text()).toContain("B 站搜索已就绪");
     expect(wrapper.get("[data-sources-section='bilibili']").text()).toContain("手动采集 B 站搜索");
@@ -299,6 +303,9 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-sources-section='weibo-trending']").text()).toContain("微博热搜榜匹配已就绪");
     expect(wrapper.findAll("[data-weibo-keyword]")).toHaveLength(3);
     expect(wrapper.get("[data-sources-section='inventory']").classes()).toContain("editorial-glass-panel");
+    expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("新增来源");
+    expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("手动执行采集");
+    expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("下一次自动采集：18:40（还有 6 分钟）");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("已完成");
     expect(wrapper.get("[data-sources-section='inventory']").text()).not.toContain("选中时全量");
     expect(wrapper.get("[data-source-rss-link='openai']").attributes("href")).toBe("https://openai.com/news/rss.xml");
@@ -327,7 +334,7 @@ describe("SourcesPage", () => {
     await flushPromises();
 
     expect(wrapper.get("[data-sources-section='overview']").text()).toContain("未启用定时采集");
-    expect(wrapper.get("[data-sources-section='manual-collect']").text()).toContain("未启用定时采集");
+    expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("未启用定时采集");
   });
 
   it("toggles a source and reloads the latest sources model", async () => {
@@ -625,6 +632,39 @@ describe("SourcesPage", () => {
         priority: 90,
         includeReplies: false,
         notes: "official account"
+      })
+    );
+  });
+
+  it("submits a twitter keyword from the create modal", async () => {
+    vi.mocked(settingsApi.readSettingsSources).mockResolvedValue(createSourcesModel());
+    vi.mocked(settingsApi.createTwitterSearchKeyword).mockResolvedValue({
+      ok: true,
+      keyword: createSourcesModel().twitterSearchKeywords[0]
+    });
+
+    const wrapper = mountSourcesPage();
+    await flushPromises();
+
+    await wrapper.get("[data-action='add-twitter-keyword']").trigger("click");
+    await flushPromises();
+    expect(getModalNode("[data-twitter-keyword-capability]").text()).toContain("Twitter 关键词搜索已配置 API key");
+
+    await getModalNode("[data-twitter-keyword-form='keyword']").setValue("ChatGPT Image2");
+    await getModalNode("[data-twitter-keyword-form='category']").setValue("product");
+    await getModalNode("[data-twitter-keyword-form='priority']").setValue("60");
+    await getModalNode("[data-twitter-keyword-form='notes']").setValue("image keyword");
+    await getModalNode("[data-twitter-keyword-form='submit']").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.createTwitterSearchKeyword).toHaveBeenCalledWith(
+      expect.objectContaining({
+        keyword: "ChatGPT Image2",
+        category: "product",
+        priority: 60,
+        isCollectEnabled: true,
+        isVisible: true,
+        notes: "image keyword"
       })
     );
   });

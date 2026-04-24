@@ -550,7 +550,8 @@ function buildRankedCardCandidate(
     sourceKind: row.sourceKind,
     showAllWhenSelected: row.showAllWhenSelected === 1,
     canonicalUrl: row.canonicalUrl,
-    publishedAt: row.publishedAt,
+    // 展示时间优先使用官方发布时间，缺失时回退到抓取/创建时间，避免卡片显示“未知”。
+    publishedAt: row.publishedAt ?? row.rankingTimestamp,
     contentScore: score.contentScore,
     scoreBadges: score.badges,
     feedbackEntry: row.feedbackEntryId

@@ -89,6 +89,7 @@ describe("ContentHeroCard", () => {
     expect(wrapper.get("[data-content-source-detail]").text()).toBe("作者：OpenAI @openai");
     expect(wrapper.get("[data-content-hero-summary]").text()).toContain("Roundup of recent AI and product updates.");
     expect(wrapper.get("[data-content-hero-summary]").attributes("data-content-summary-expanded")).toBe("false");
+    expect(wrapper.text()).toContain("03/31 18:00");
     expect(wrapper.find("[data-content-summary-toggle]").exists()).toBe(false);
     expect(wrapper.get("[data-content-hero]").classes()).toEqual(
       expect.arrayContaining(["editorial-spotlight-card", "rounded-editorial-xl", "border", "border-editorial-border-strong"])

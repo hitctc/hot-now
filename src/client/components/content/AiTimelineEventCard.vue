@@ -29,6 +29,7 @@ function formatTimelineDate(): string {
   }
 
   return date.toLocaleDateString("zh-CN", {
+    timeZone: "Asia/Shanghai",
     month: "2-digit",
     day: "2-digit"
   });
@@ -42,6 +43,7 @@ function formatTimelineTime(): string {
   }
 
   return date.toLocaleTimeString("zh-CN", {
+    timeZone: "Asia/Shanghai",
     hour: "2-digit",
     minute: "2-digit"
   });

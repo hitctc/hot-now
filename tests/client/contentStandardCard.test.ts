@@ -74,6 +74,7 @@ describe("ContentStandardCard", () => {
     expect(wrapper.get("[data-content-standard-summary]").attributes("data-content-summary-expanded")).toBe("false");
     expect(wrapper.get("[data-content-standard-summary]").attributes("class")).toContain("[-webkit-line-clamp:5]");
     expect(wrapper.get("[data-content-display-index]").text()).toBe("12");
+    expect(wrapper.text()).toContain("04/07 18:00");
     expect(wrapper.find("[data-content-row-shell]").exists()).toBe(true);
     expect(wrapper.find("[data-content-row-sidecar]").exists()).toBe(true);
     expect(wrapper.find("[data-content-summary-toggle]").exists()).toBe(false);

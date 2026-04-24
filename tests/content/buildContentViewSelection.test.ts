@@ -536,6 +536,7 @@ describe("buildContentViewSelection", () => {
       todayVisibleCount: 1,
       todayVisibleShare: 1
     });
+    expect(selection.visibleCards[0]?.publishedAt).toBe("2026-03-31T03:00:00.000Z");
   });
 
   it("filters twitter keyword content when no visible keyword match remains", async () => {

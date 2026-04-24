@@ -16,6 +16,7 @@ const expectedTables = [
   "content_sources",
   "digest_reports",
   "feedback_pool",
+  "ai_timeline_events",
   "bilibili_queries",
   "hackernews_queries",
   "llm_provider_settings",
@@ -71,7 +72,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(13);
+    expect(schemaVersion).toBe(14);
 
     const appliedMigrations = db
       .prepare(
@@ -96,7 +97,8 @@ describe("runMigrations", () => {
       { version: 10, name: "010_hackernews_queries" },
       { version: 11, name: "011_bilibili_queries" },
       { version: 12, name: "012_weibo_trending" },
-      { version: 13, name: "013_wechat_rss_sources" }
+      { version: 13, name: "013_wechat_rss_sources" },
+      { version: 14, name: "014_ai_timeline_events" }
     ]);
 
     const hiddenAggregates = db
@@ -284,6 +286,34 @@ describe("runMigrations", () => {
         "last_fetched_at",
         "last_success_at",
         "last_result",
+        "created_at",
+        "updated_at"
+      ])
+    );
+
+    const aiTimelineEventColumns = db
+      .prepare(
+        `
+          PRAGMA table_info(ai_timeline_events)
+        `
+      )
+      .all() as Array<{ name: string }>;
+
+    expect(aiTimelineEventColumns.map((column) => column.name)).toEqual(
+      expect.arrayContaining([
+        "id",
+        "company_key",
+        "company_name",
+        "event_type",
+        "title",
+        "summary",
+        "official_url",
+        "source_label",
+        "source_kind",
+        "published_at",
+        "discovered_at",
+        "importance",
+        "raw_source_json",
         "created_at",
         "updated_at"
       ])

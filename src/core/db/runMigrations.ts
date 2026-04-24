@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 13;
+const schemaVersion = 14;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -14,6 +14,7 @@ const hackerNewsQueriesMigrationName = "010_hackernews_queries";
 const bilibiliQueriesMigrationName = "011_bilibili_queries";
 const weiboTrendingMigrationName = "012_weibo_trending";
 const wechatRssSourcesMigrationName = "013_wechat_rss_sources";
+const aiTimelineEventsMigrationName = "014_ai_timeline_events";
 
 const migrationStatements = [
   `
@@ -703,6 +704,51 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(13, wechatRssSourcesMigrationName);
+
+    // AI 时间线单独保存官方发布事件，不复用普通内容流，避免官方事件被新闻评分和热点归并污染。
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS ai_timeline_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_key TEXT NOT NULL,
+        company_name TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        summary TEXT,
+        official_url TEXT NOT NULL,
+        source_label TEXT NOT NULL,
+        source_kind TEXT NOT NULL,
+        published_at TEXT NOT NULL,
+        discovered_at TEXT NOT NULL,
+        importance INTEGER NOT NULL DEFAULT 50,
+        raw_source_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(official_url)
+      )
+    `);
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_ai_timeline_events_published_at
+      ON ai_timeline_events(published_at DESC)
+    `);
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_ai_timeline_events_company_key
+      ON ai_timeline_events(company_key)
+    `);
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_ai_timeline_events_event_type
+      ON ai_timeline_events(event_type)
+    `);
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(14, aiTimelineEventsMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

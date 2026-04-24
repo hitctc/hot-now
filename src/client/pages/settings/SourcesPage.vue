@@ -69,10 +69,7 @@ type HackerNewsQueryModalMode = "create" | "update";
 type BilibiliQueryModalMode = "create" | "update";
 type SourceFormState = {
   kind: string;
-  sourceType: "rss" | "wechat_bridge";
   rssUrl: string;
-  wechatName: string;
-  articleUrl: string;
 };
 type TwitterAccountFormState = {
   id: number | null;
@@ -223,14 +220,6 @@ const enabledBilibiliQueryCount = computed(
   () => sourcesModel.value?.bilibiliQueries?.filter((query) => query.isEnabled).length ?? 0
 );
 const fixedWeiboKeywordCount = computed(() => sourcesModel.value?.weiboTrending?.fixedKeywords.length ?? 0);
-const wechatArticleUrlAvailable = computed(
-  () => sourcesModel.value?.capability.wechatArticleUrlEnabled ?? false
-);
-const wechatArticleUrlMessage = computed(
-  () =>
-    sourcesModel.value?.capability.wechatArticleUrlMessage ??
-    "当前环境未启用公众号来源解析；RSS 仍可直接新增。"
-);
 const twitterAccountCollectionMessage = computed(
   () =>
     sourcesModel.value?.capability.twitterAccountCollectionMessage ??
@@ -293,10 +282,7 @@ function isActionPending(actionKey: string): boolean {
 function createEmptySourceForm(): SourceFormState {
   return {
     kind: "",
-    sourceType: "rss",
-    rssUrl: "",
-    wechatName: "",
-    articleUrl: ""
+    rssUrl: ""
   };
 }
 
@@ -401,20 +387,17 @@ function openCreateBilibiliQueryModal(): void {
   isBilibiliQueryModalOpen.value = true;
 }
 
-// 编辑模式只回填当前来源已有配置，kind 继续锁定，避免把“编辑”做成“重命名来源主键”。
+// 编辑模式只回填 RSS 来源已有配置，kind 继续锁定，避免把“编辑”做成“重命名来源主键”。
 function openEditSourceModal(source: SettingsSourceItem): void {
+  if (source.sourceType !== "rss") {
+    showNotice("info", "该来源后续会迁移到单独配置表，这里暂不再编辑。");
+    return;
+  }
+
   sourceModalMode.value = "update";
   resetSourceForm();
   sourceForm.kind = source.kind;
-  sourceForm.sourceType = source.sourceType === "wechat_bridge" ? "wechat_bridge" : "rss";
-
-  if (sourceForm.sourceType === "rss") {
-    sourceForm.rssUrl = source.rssUrl ?? "";
-  } else {
-    sourceForm.wechatName = source.name;
-    sourceForm.articleUrl = source.bridgeInputMode === "article_url" ? source.bridgeInputValue ?? "" : "";
-  }
-
+  sourceForm.rssUrl = source.rssUrl ?? "";
   isSourceModalOpen.value = true;
 }
 
@@ -466,7 +449,7 @@ function openEditBilibiliQueryModal(query: SettingsBilibiliQuery): void {
   isBilibiliQueryModalOpen.value = true;
 }
 
-// 关闭弹窗时顺手清掉局部错误，避免旧的公众号解析失败提示粘在下一次操作里。
+// 关闭弹窗时顺手清掉局部错误，避免旧错误粘在下一次操作里。
 function closeSourceModal(): void {
   isSourceModalOpen.value = false;
   sourceFormError.value = null;
@@ -490,16 +473,6 @@ function closeHackerNewsQueryModal(): void {
 function closeBilibiliQueryModal(): void {
   isBilibiliQueryModalOpen.value = false;
   bilibiliQueryFormError.value = null;
-}
-
-// 类型切换只负责收口当前可见字段，真正的 payload 仍由提交时统一构建。
-function selectSourceType(sourceType: "rss" | "wechat_bridge"): void {
-  if (sourceType === "wechat_bridge" && !wechatArticleUrlAvailable.value) {
-    return;
-  }
-
-  sourceForm.sourceType = sourceType;
-  sourceFormError.value = null;
 }
 
 // 系统页继续统一格式化时间，空值统一回落成“暂无记录”。
@@ -650,38 +623,13 @@ function readActionErrorMessage(
   return fallbackMessage;
 }
 
-// 表单提交前先统一整理 payload，这样 create / update 共用一条来源保存路径。
+// 表单提交前先统一整理 payload；当前普通来源弹窗只负责 RSS。
 function buildSourceSavePayload(): { ok: true; payload: SaveSourcePayload } | { ok: false; message: string } {
-  if (sourceForm.sourceType === "rss") {
-    const rssUrl = sourceForm.rssUrl.trim();
+  const rssUrl = sourceForm.rssUrl.trim();
 
-    if (!rssUrl) {
-      return { ok: false, message: "请填写 RSS 地址。" };
-    }
-
-    return {
-      ok: true,
-      payload:
-        sourceModalMode.value === "update"
-          ? {
-              kind: sourceForm.kind,
-              sourceType: "rss",
-              rssUrl
-            }
-          : {
-              sourceType: "rss",
-              rssUrl
-            }
-    };
+  if (!rssUrl) {
+    return { ok: false, message: "请填写 RSS 地址。" };
   }
-
-  const wechatName = sourceForm.wechatName.trim();
-
-  if (!wechatName) {
-    return { ok: false, message: "请填写公众号名称。" };
-  }
-
-  const articleUrl = sourceForm.articleUrl.trim();
 
   return {
     ok: true,
@@ -689,14 +637,12 @@ function buildSourceSavePayload(): { ok: true; payload: SaveSourcePayload } | { 
       sourceModalMode.value === "update"
         ? {
             kind: sourceForm.kind,
-            sourceType: "wechat_bridge",
-            wechatName,
-            ...(articleUrl ? { articleUrl } : {})
+            sourceType: "rss",
+            rssUrl
           }
         : {
-            sourceType: "wechat_bridge",
-            wechatName,
-            ...(articleUrl ? { articleUrl } : {})
+            sourceType: "rss",
+            rssUrl
           }
   };
 }
@@ -1007,7 +953,7 @@ async function handleManualSendLatestEmail(): Promise<void> {
   });
 }
 
-// 来源保存沿用现有 notice + toast 约定，同时把公众号解析失败原因翻译成工作台可读提示。
+// 来源保存沿用现有 notice + toast 约定；普通来源弹窗只提交 RSS payload。
 async function handleSubmitSource(): Promise<void> {
   if (isActionPending("source:submit")) {
     return;
@@ -1051,10 +997,7 @@ async function handleSubmitSource(): Promise<void> {
         "not-found": "对应来源不存在，可能已被移除。",
         "built-in": "内置来源不允许编辑。",
         "invalid-input": "来源配置不合法，请检查后重试。",
-        "invalid-rss-feed": "这个 RSS 地址暂时无法识别，请检查链接是否正确。",
-        "wechat-resolver-disabled": "当前环境未启用公众号来源解析，暂时无法新增公众号来源。",
-        "wechat-resolver-not-found": "没有找到这个公众号的可用来源，请检查名称或补一篇文章链接。",
-        "resolver-unavailable": "公众号解析服务暂时不可用，请稍后再试。"
+        "invalid-rss-feed": "这个 RSS 地址暂时无法识别，请检查链接是否正确。"
       }
     );
 
@@ -1495,7 +1438,7 @@ onUnmounted(() => {
                 数据来源工作台
               </h2>
               <p class="m-0 max-w-3xl text-sm leading-7 text-editorial-text-body">
-                这里负责管理 RSS 与公众号桥接来源、查看调度节奏、执行手动采集和人工发信，同时把库存管理与核心统计合并在一张表里。
+                这里负责管理 RSS 来源与现有来源状态、查看调度节奏、执行手动采集和人工发信，同时把库存管理与核心统计合并在一张表里。
               </p>
             </div>
           </div>
@@ -2117,7 +2060,7 @@ onUnmounted(() => {
           <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <a-typography-paragraph class="!mb-1" type="secondary">
-                管理 RSS 与公众号桥接来源，并在同一张表里查看核心库存统计。
+                管理 RSS 来源与现有来源状态，并在同一张表里查看核心库存统计。
               </a-typography-paragraph>
               <p class="m-0 text-xs leading-5 text-editorial-text-muted">
                 手动采集会处理所有已启用 source；展开来源可查看 AI 新讯 / AI 热点细分统计与链接。下一次自动采集：{{ formatNextCollectionText(sourcesModel.operations.nextCollectionRunAt) }}
@@ -2177,30 +2120,31 @@ onUnmounted(() => {
                   :data-source-actions="record.kind"
                   class="flex flex-wrap justify-center gap-2"
                 >
+                  <a-button
+                    v-if="record.sourceType === 'rss'"
+                    type="link"
+                    size="small"
+                    :data-source-edit="record.kind"
+                    @click="openEditSourceModal(record)"
+                  >
+                    编辑
+                  </a-button>
+                  <a-popconfirm
+                    title="确认删除这个自定义来源吗？"
+                    ok-text="确认删除"
+                    cancel-text="取消"
+                    @confirm="handleDeleteSource(record)"
+                  >
                     <a-button
                       type="link"
                       size="small"
-                      :data-source-edit="record.kind"
-                      @click="openEditSourceModal(record)"
+                      danger
+                      :loading="isActionPending(`delete:${record.kind}`)"
+                      :data-source-delete="record.kind"
                     >
-                      编辑
+                      删除
                     </a-button>
-                    <a-popconfirm
-                      title="确认删除这个自定义来源吗？"
-                      ok-text="确认删除"
-                      cancel-text="取消"
-                      @confirm="handleDeleteSource(record)"
-                    >
-                      <a-button
-                        type="link"
-                        size="small"
-                        danger
-                        :loading="isActionPending(`delete:${record.kind}`)"
-                        :data-source-delete="record.kind"
-                      >
-                        删除
-                      </a-button>
-                    </a-popconfirm>
+                  </a-popconfirm>
                 </div>
                 <span v-else class="text-editorial-text-muted">-</span>
               </template>
@@ -2328,79 +2272,19 @@ onUnmounted(() => {
             class="editorial-inline-alert editorial-inline-alert--info"
             type="info"
             show-icon
-            message="这里只收用户输入：RSS 只填链接，公众号只填名称，可选再补一篇文章链接。"
+            message="这里只新增 RSS 来源，填写可公开访问的 RSS 链接即可。"
             data-source-modal-intro
           />
 
-          <a-alert
-            v-if="!wechatArticleUrlAvailable"
-            class="editorial-inline-alert editorial-inline-alert--info"
-            type="info"
-            show-icon
-            :message="wechatArticleUrlMessage"
-            data-source-wechat-capability
-          />
-
-          <div class="flex flex-col gap-2">
-            <p class="m-0 text-sm font-medium text-editorial-text-main">来源类型</p>
-            <div class="flex flex-wrap gap-2">
-              <a-button
-                :type="sourceForm.sourceType === 'rss' ? 'primary' : 'default'"
-                data-source-type="rss"
-                @click="selectSourceType('rss')"
-              >
-                RSS
-              </a-button>
-              <a-button
-                :type="sourceForm.sourceType === 'wechat_bridge' ? 'primary' : 'default'"
-                data-source-type="wechat_bridge"
-                :disabled="!wechatArticleUrlAvailable"
-                @click="selectSourceType('wechat_bridge')"
-              >
-                微信公众号
-              </a-button>
-            </div>
-          </div>
-
-          <template v-if="sourceForm.sourceType === 'rss'">
-            <label class="flex flex-col gap-2">
-              <span class="text-sm font-medium text-editorial-text-main">RSS 地址</span>
-              <input
-                v-model="sourceForm.rssUrl"
-                data-source-form="rss-url"
-                class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
-              />
-            </label>
-          </template>
-
-          <template v-else>
-            <a-alert
-              class="editorial-inline-alert editorial-inline-alert--info"
-              type="info"
-              show-icon
-              :message="wechatArticleUrlMessage"
-              data-source-wechat-capability
+          <label class="flex flex-col gap-2">
+            <span class="text-sm font-medium text-editorial-text-main">RSS 地址</span>
+            <input
+              v-model="sourceForm.rssUrl"
+              data-source-form="rss-url"
+              class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
+              placeholder="https://example.com/feed.xml"
             />
-
-            <label class="flex flex-col gap-2">
-              <span class="text-sm font-medium text-editorial-text-main">公众号名称</span>
-              <input
-                v-model="sourceForm.wechatName"
-                data-source-form="wechat-name"
-                class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
-              />
-            </label>
-
-            <label class="flex flex-col gap-2">
-              <span class="text-sm font-medium text-editorial-text-main">公众号文章链接</span>
-              <input
-                v-model="sourceForm.articleUrl"
-                data-source-form="article-url"
-                class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-2 text-sm text-editorial-text-main outline-none"
-                placeholder="可选，建议填写一篇文章链接帮助系统更快定位来源"
-              />
-            </label>
-          </template>
+          </label>
 
           <div class="flex justify-end gap-2">
             <a-button @click="closeSourceModal">取消</a-button>

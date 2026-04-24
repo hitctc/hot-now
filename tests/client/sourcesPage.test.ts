@@ -833,35 +833,7 @@ describe("SourcesPage", () => {
     );
   });
 
-  it("submits a wechat source from the simplified modal", async () => {
-    vi.mocked(settingsApi.readSettingsSources).mockResolvedValue(createSourcesModel());
-    vi.mocked(settingsApi.createSource).mockResolvedValue({ ok: true, kind: "wechat_demo" });
-
-    const wrapper = mountSourcesPage();
-    await flushPromises();
-
-    await wrapper.get("[data-action='add-source']").trigger("click");
-    await flushPromises();
-
-    expect(document.body.querySelector(".ant-modal-root")).not.toBeNull();
-    expect(document.body.querySelector(".editorial-form-modal")).not.toBeNull();
-
-    await getModalNode("[data-source-type='wechat_bridge']").trigger("click");
-    await getModalNode("[data-source-form='wechat-name']").setValue("微信 Demo");
-    await getModalNode("[data-source-form='article-url']").setValue("https://mp.weixin.qq.com/s?__biz=abc");
-    await getModalNode("[data-source-form='submit']").trigger("click");
-    await flushPromises();
-
-    expect(settingsApi.createSource).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sourceType: "wechat_bridge",
-        wechatName: "微信 Demo",
-        articleUrl: "https://mp.weixin.qq.com/s?__biz=abc"
-      })
-    );
-  });
-
-  it("submits an rss source from the same create modal", async () => {
+  it("submits an rss source from the create modal", async () => {
     vi.mocked(settingsApi.readSettingsSources).mockResolvedValue(createSourcesModel());
     vi.mocked(settingsApi.createSource).mockResolvedValue({ ok: true, kind: "rss_demo" });
 
@@ -870,9 +842,11 @@ describe("SourcesPage", () => {
 
     await wrapper.get("[data-action='add-source']").trigger("click");
     await flushPromises();
-    expect(getModalNode("[data-source-modal-intro]").text()).toContain("这里只收用户输入");
+    expect(getModalNode("[data-source-modal-intro]").text()).toContain("这里只新增 RSS 来源");
+    expect(findModalNode("[data-source-type='wechat_bridge']")).toBeNull();
+    expect(findModalNode("[data-source-form='wechat-name']")).toBeNull();
+    expect(findModalNode("[data-source-form='article-url']")).toBeNull();
 
-    await getModalNode("[data-source-type='rss']").trigger("click");
     await getModalNode("[data-source-form='rss-url']").setValue("https://example.com/feed.xml");
     await getModalNode("[data-source-form='submit']").trigger("click");
     await flushPromises();
@@ -885,47 +859,47 @@ describe("SourcesPage", () => {
     );
   });
 
-  it("updates a custom wechat source with the existing modal", async () => {
+  it("updates a custom rss source with the existing modal", async () => {
     vi.mocked(settingsApi.readSettingsSources).mockResolvedValue({
       ...createSourcesModel(),
       sources: [
         ...createSourcesModel().sources,
         {
-          kind: "wechat_demo",
-          name: "微信 Demo",
-          siteUrl: "https://mp.weixin.qq.com/",
-          rssUrl: "https://bridge.example.test/feed/demo.xml",
+          kind: "rss_demo",
+          name: "RSS Demo",
+          siteUrl: "https://example.com/",
+          rssUrl: "https://example.com/old.xml",
           isEnabled: true,
           isBuiltIn: false,
           showAllWhenSelected: false,
-          sourceType: "wechat_bridge",
-          bridgeKind: "resolver",
-          bridgeConfigSummary: "公众号文章链接",
-          bridgeInputMode: "article_url" as const,
-          bridgeInputValue: "https://mp.weixin.qq.com/s?__biz=abc",
+          sourceType: "rss",
+          bridgeKind: null,
+          bridgeConfigSummary: null,
+          bridgeInputMode: null,
+          bridgeInputValue: null,
           lastCollectedAt: null,
           lastCollectionStatus: null
         }
       ]
     });
-    vi.mocked(settingsApi.updateSource).mockResolvedValue({ ok: true, kind: "wechat_demo" });
+    vi.mocked(settingsApi.updateSource).mockResolvedValue({ ok: true, kind: "rss_demo" });
 
     const wrapper = mountSourcesPage();
     await flushPromises();
 
-    await wrapper.get("[data-source-edit='wechat_demo']").trigger("click");
+    await wrapper.get("[data-source-edit='rss_demo']").trigger("click");
     await flushPromises();
 
-    await getModalNode("[data-source-form='wechat-name']").setValue("微信 Demo 新版");
+    expect((getModalNode("[data-source-form='rss-url']").element as HTMLInputElement).value).toBe("https://example.com/old.xml");
+    await getModalNode("[data-source-form='rss-url']").setValue("https://example.com/new.xml");
     await getModalNode("[data-source-form='submit']").trigger("click");
     await flushPromises();
 
     expect(settingsApi.updateSource).toHaveBeenCalledWith(
       expect.objectContaining({
-        kind: "wechat_demo",
-        sourceType: "wechat_bridge",
-        wechatName: "微信 Demo 新版",
-        articleUrl: "https://mp.weixin.qq.com/s?__biz=abc"
+        kind: "rss_demo",
+        sourceType: "rss",
+        rssUrl: "https://example.com/new.xml"
       })
     );
   });
@@ -965,30 +939,10 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-source-badges='wechat_demo']").text()).toContain("公众号");
     expect(sourceCell.text()).not.toContain("编辑");
     expect(sourceCell.text()).not.toContain("删除");
-    expect(actionsRow.text()).toContain("编辑");
+    expect(actionsRow.text()).not.toContain("编辑");
+    expect(wrapper.find("[data-source-edit='wechat_demo']").exists()).toBe(false);
     expect(actionsRow.text()).toContain("删除");
     expect(inventoryHeaderCells.at(-1)?.text()).toContain("操作");
-  });
-
-  it("disables wechat source creation when bridge capability is unavailable", async () => {
-    vi.mocked(settingsApi.readSettingsSources).mockResolvedValue({
-      ...createSourcesModel(),
-      capability: {
-        wechatArticleUrlEnabled: false,
-        wechatArticleUrlMessage: "当前未配置 bridge 服务；RSS 仍可直接新增，但公众号来源暂时不可用。"
-      }
-    });
-
-    const wrapper = mountSourcesPage();
-    await flushPromises();
-
-    await wrapper.get("[data-action='add-source']").trigger("click");
-    await flushPromises();
-
-    expect(getModalNode("[data-source-type='wechat_bridge']").attributes("disabled")).toBeDefined();
-    expect(getModalNode("[data-source-wechat-capability]").text()).toContain("公众号来源暂时不可用");
-    expect(findModalNode("[data-source-form='wechat-name']")).toBeNull();
-    expect(findModalNode("[data-source-form='article-url']")).toBeNull();
   });
 
   it("requires popconfirm before deleting a custom source", async () => {

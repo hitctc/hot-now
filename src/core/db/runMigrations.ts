@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 14;
+const schemaVersion = 15;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -15,6 +15,7 @@ const bilibiliQueriesMigrationName = "011_bilibili_queries";
 const weiboTrendingMigrationName = "012_weibo_trending";
 const wechatRssSourcesMigrationName = "013_wechat_rss_sources";
 const aiTimelineEventsMigrationName = "014_ai_timeline_events";
+const aiTimelineEventImportanceMigrationName = "015_ai_timeline_event_importance";
 
 const migrationStatements = [
   `
@@ -749,6 +750,52 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(14, aiTimelineEventsMigrationName);
+
+    // 重要发布时间线需要保留自动规则和人工修正两层语义，迁移保持 additive，避免触碰已有官方事件。
+    if (!hasColumn(db, "ai_timeline_events", "importance_level")) {
+      db.exec("ALTER TABLE ai_timeline_events ADD COLUMN importance_level TEXT NOT NULL DEFAULT 'B'");
+    }
+
+    if (!hasColumn(db, "ai_timeline_events", "release_status")) {
+      db.exec("ALTER TABLE ai_timeline_events ADD COLUMN release_status TEXT NOT NULL DEFAULT 'released'");
+    }
+
+    if (!hasColumn(db, "ai_timeline_events", "importance_summary_zh")) {
+      db.exec("ALTER TABLE ai_timeline_events ADD COLUMN importance_summary_zh TEXT");
+    }
+
+    if (!hasColumn(db, "ai_timeline_events", "visibility_status")) {
+      db.exec("ALTER TABLE ai_timeline_events ADD COLUMN visibility_status TEXT NOT NULL DEFAULT 'auto_visible'");
+    }
+
+    if (!hasColumn(db, "ai_timeline_events", "manual_title")) {
+      db.exec("ALTER TABLE ai_timeline_events ADD COLUMN manual_title TEXT");
+    }
+
+    if (!hasColumn(db, "ai_timeline_events", "manual_summary_zh")) {
+      db.exec("ALTER TABLE ai_timeline_events ADD COLUMN manual_summary_zh TEXT");
+    }
+
+    if (!hasColumn(db, "ai_timeline_events", "manual_importance_level")) {
+      db.exec("ALTER TABLE ai_timeline_events ADD COLUMN manual_importance_level TEXT");
+    }
+
+    if (!hasColumn(db, "ai_timeline_events", "detected_entities_json")) {
+      db.exec("ALTER TABLE ai_timeline_events ADD COLUMN detected_entities_json TEXT NOT NULL DEFAULT '[]'");
+    }
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_ai_timeline_events_visible_recent
+      ON ai_timeline_events(visibility_status, importance_level, published_at DESC)
+    `);
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(15, aiTimelineEventImportanceMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

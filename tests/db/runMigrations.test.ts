@@ -72,7 +72,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(14);
+    expect(schemaVersion).toBe(15);
 
     const appliedMigrations = db
       .prepare(
@@ -98,7 +98,8 @@ describe("runMigrations", () => {
       { version: 11, name: "011_bilibili_queries" },
       { version: 12, name: "012_weibo_trending" },
       { version: 13, name: "013_wechat_rss_sources" },
-      { version: 14, name: "014_ai_timeline_events" }
+      { version: 14, name: "014_ai_timeline_events" },
+      { version: 15, name: "015_ai_timeline_event_importance" }
     ]);
 
     const hiddenAggregates = db
@@ -313,6 +314,14 @@ describe("runMigrations", () => {
         "published_at",
         "discovered_at",
         "importance",
+        "importance_level",
+        "release_status",
+        "importance_summary_zh",
+        "visibility_status",
+        "manual_title",
+        "manual_summary_zh",
+        "manual_importance_level",
+        "detected_entities_json",
         "raw_source_json",
         "created_at",
         "updated_at"

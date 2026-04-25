@@ -9,6 +9,14 @@ export const aiTimelineEventTypes = [
 
 export type AiTimelineEventType = (typeof aiTimelineEventTypes)[number];
 
+export const aiTimelineImportanceLevels = ["S", "A", "B", "C"] as const;
+export const aiTimelineReleaseStatuses = ["released", "official_preview"] as const;
+export const aiTimelineVisibilityStatuses = ["auto_visible", "hidden", "manual_visible"] as const;
+
+export type AiTimelineImportanceLevel = (typeof aiTimelineImportanceLevels)[number];
+export type AiTimelineReleaseStatus = (typeof aiTimelineReleaseStatuses)[number];
+export type AiTimelineVisibilityStatus = (typeof aiTimelineVisibilityStatuses)[number];
+
 export type AiTimelineEventInput = {
   companyKey: string;
   companyName: string;
@@ -21,6 +29,11 @@ export type AiTimelineEventInput = {
   publishedAt: string;
   discoveredAt: string;
   importance?: number;
+  importanceLevel?: AiTimelineImportanceLevel;
+  releaseStatus?: AiTimelineReleaseStatus;
+  importanceSummaryZh?: string | null;
+  visibilityStatus?: AiTimelineVisibilityStatus;
+  detectedEntities?: string[];
   rawSourceJson?: unknown;
 };
 
@@ -37,6 +50,16 @@ export type AiTimelineEventRecord = {
   publishedAt: string;
   discoveredAt: string;
   importance: number;
+  importanceLevel: AiTimelineImportanceLevel;
+  releaseStatus: AiTimelineReleaseStatus;
+  importanceSummaryZh: string | null;
+  visibilityStatus: AiTimelineVisibilityStatus;
+  manualTitle: string | null;
+  manualSummaryZh: string | null;
+  manualImportanceLevel: AiTimelineImportanceLevel | null;
+  detectedEntities: string[];
+  displayTitle: string;
+  displaySummaryZh: string | null;
   rawSourceJson: unknown;
   createdAt: string;
   updatedAt: string;
@@ -51,6 +74,10 @@ export type AiTimelineListQuery = {
   eventType?: AiTimelineEventType | string | null;
   companyKey?: string | null;
   searchKeyword?: string | null;
+  importanceLevels?: AiTimelineImportanceLevel[];
+  visibilityStatuses?: AiTimelineVisibilityStatus[];
+  recentDays?: number;
+  referenceTime?: Date;
   page?: number;
   pageSize?: number;
 };
@@ -77,4 +104,16 @@ export type AiTimelinePageModel = {
 
 export function isAiTimelineEventType(value: string): value is AiTimelineEventType {
   return aiTimelineEventTypes.includes(value as AiTimelineEventType);
+}
+
+export function isAiTimelineImportanceLevel(value: string): value is AiTimelineImportanceLevel {
+  return aiTimelineImportanceLevels.includes(value as AiTimelineImportanceLevel);
+}
+
+export function isAiTimelineReleaseStatus(value: string): value is AiTimelineReleaseStatus {
+  return aiTimelineReleaseStatuses.includes(value as AiTimelineReleaseStatus);
+}
+
+export function isAiTimelineVisibilityStatus(value: string): value is AiTimelineVisibilityStatus {
+  return aiTimelineVisibilityStatuses.includes(value as AiTimelineVisibilityStatus);
 }

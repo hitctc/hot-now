@@ -12,10 +12,30 @@ export type AiTimelineEventType = (typeof aiTimelineEventTypes)[number];
 export const aiTimelineImportanceLevels = ["S", "A", "B", "C"] as const;
 export const aiTimelineReleaseStatuses = ["released", "official_preview"] as const;
 export const aiTimelineVisibilityStatuses = ["auto_visible", "hidden", "manual_visible"] as const;
+export const aiTimelineReliabilityStatuses = ["single_source", "multi_source", "source_degraded", "manual_verified"] as const;
 
 export type AiTimelineImportanceLevel = (typeof aiTimelineImportanceLevels)[number];
 export type AiTimelineReleaseStatus = (typeof aiTimelineReleaseStatuses)[number];
 export type AiTimelineVisibilityStatus = (typeof aiTimelineVisibilityStatuses)[number];
+export type AiTimelineReliabilityStatus = (typeof aiTimelineReliabilityStatuses)[number];
+export type AiTimelineSourceRunStatus = "success" | "failed" | "empty" | "stale";
+
+export type AiTimelineEventEvidenceRecord = {
+  id: number;
+  eventId: number;
+  sourceId: string;
+  companyKey: string;
+  sourceLabel: string;
+  sourceKind: string;
+  officialUrl: string;
+  title: string;
+  summary: string | null;
+  publishedAt: string;
+  discoveredAt: string;
+  rawSourceJson: unknown;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export type AiTimelineEventInput = {
   companyKey: string;
@@ -58,6 +78,11 @@ export type AiTimelineEventRecord = {
   manualSummaryZh: string | null;
   manualImportanceLevel: AiTimelineImportanceLevel | null;
   detectedEntities: string[];
+  eventKey: string | null;
+  reliabilityStatus: AiTimelineReliabilityStatus;
+  evidenceCount: number;
+  lastVerifiedAt: string | null;
+  evidenceLinks: AiTimelineEventEvidenceRecord[];
   displayTitle: string;
   displaySummaryZh: string | null;
   rawSourceJson: unknown;
@@ -123,4 +148,8 @@ export function isAiTimelineReleaseStatus(value: string): value is AiTimelineRel
 
 export function isAiTimelineVisibilityStatus(value: string): value is AiTimelineVisibilityStatus {
   return aiTimelineVisibilityStatuses.includes(value as AiTimelineVisibilityStatus);
+}
+
+export function isAiTimelineReliabilityStatus(value: string): value is AiTimelineReliabilityStatus {
+  return aiTimelineReliabilityStatuses.includes(value as AiTimelineReliabilityStatus);
 }

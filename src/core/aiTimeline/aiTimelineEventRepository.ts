@@ -5,6 +5,7 @@ import {
   aiTimelineVisibilityStatuses,
   isAiTimelineEventType,
   isAiTimelineImportanceLevel,
+  isAiTimelineReliabilityStatus,
   isAiTimelineReleaseStatus,
   isAiTimelineVisibilityStatus,
   type AiTimelineEventInput,
@@ -37,6 +38,10 @@ type AiTimelineEventRow = {
   manual_summary_zh: string | null;
   manual_importance_level: string | null;
   detected_entities_json: string;
+  event_key: string | null;
+  reliability_status: string;
+  evidence_count: number;
+  last_verified_at: string | null;
   raw_source_json: string;
   created_at: string;
   updated_at: string;
@@ -66,6 +71,10 @@ const aiTimelineEventSelectColumns = `
   manual_summary_zh,
   manual_importance_level,
   detected_entities_json,
+  event_key,
+  reliability_status,
+  evidence_count,
+  last_verified_at,
   raw_source_json,
   created_at,
   updated_at
@@ -415,6 +424,9 @@ function mapAiTimelineEventRow(row: AiTimelineEventRow): AiTimelineEventRecord {
   const importanceLevel = manualImportanceLevel ?? storedImportanceLevel;
   const releaseStatus = isAiTimelineReleaseStatus(row.release_status) ? row.release_status : "released";
   const visibilityStatus = isAiTimelineVisibilityStatus(row.visibility_status) ? row.visibility_status : "auto_visible";
+  const reliabilityStatus = isAiTimelineReliabilityStatus(row.reliability_status)
+    ? row.reliability_status
+    : "single_source";
   const manualTitle = normalizeNullableText(row.manual_title);
   const manualSummaryZh = normalizeNullableText(row.manual_summary_zh);
   const importanceSummaryZh = normalizeNullableText(row.importance_summary_zh);
@@ -440,6 +452,11 @@ function mapAiTimelineEventRow(row: AiTimelineEventRow): AiTimelineEventRecord {
     manualSummaryZh,
     manualImportanceLevel,
     detectedEntities: parseDetectedEntities(row.detected_entities_json),
+    eventKey: normalizeNullableText(row.event_key),
+    reliabilityStatus,
+    evidenceCount: row.evidence_count,
+    lastVerifiedAt: row.last_verified_at,
+    evidenceLinks: [],
     displayTitle: manualTitle ?? row.title,
     displaySummaryZh: manualSummaryZh ?? importanceSummaryZh ?? row.summary,
     rawSourceJson: parseRawSourceJson(row.raw_source_json),

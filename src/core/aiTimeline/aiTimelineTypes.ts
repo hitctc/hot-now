@@ -37,6 +37,61 @@ export type AiTimelineEventEvidenceRecord = {
   updatedAt: string;
 };
 
+export type AiTimelineEventEvidenceInput = {
+  eventId: number;
+  sourceId: string;
+  companyKey: string;
+  sourceLabel: string;
+  sourceKind: string;
+  officialUrl: string;
+  title: string;
+  summary?: string | null;
+  publishedAt: string;
+  discoveredAt: string;
+  rawSourceJson?: unknown;
+};
+
+export type AiTimelineSourceRunInput = {
+  sourceId: string;
+  companyKey: string;
+  companyName: string;
+  sourceLabel: string;
+  sourceKind: string;
+  status: AiTimelineSourceRunStatus;
+  startedAt: string;
+  finishedAt?: string | null;
+  fetchedItemCount?: number;
+  candidateEventCount?: number;
+  importantEventCount?: number;
+  latestOfficialPublishedAt?: string | null;
+  errorMessage?: string | null;
+};
+
+export type AiTimelineSourceHealthRecord = {
+  sourceId: string;
+  companyKey: string;
+  companyName: string;
+  sourceLabel: string;
+  sourceKind: string;
+  sourceUrl: string;
+  latestStatus: AiTimelineSourceRunStatus | null;
+  latestStartedAt: string | null;
+  latestFinishedAt: string | null;
+  fetchedItemCount: number;
+  candidateEventCount: number;
+  importantEventCount: number;
+  latestOfficialPublishedAt: string | null;
+  errorMessage: string | null;
+};
+
+export type AiTimelineHealthOverview = {
+  visibleImportantCount7d: number;
+  latestVisiblePublishedAt: string | null;
+  latestCollectStartedAt: string | null;
+  failedSourceCount: number;
+  staleSourceCount: number;
+};
+
 export type AiTimelineEventInput = {
   companyKey: string;
   companyName: string;

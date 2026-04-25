@@ -82,6 +82,13 @@ export type AiTimelineListQuery = {
   pageSize?: number;
 };
 
+export type AiTimelineManualUpdateInput = {
+  visibilityStatus?: AiTimelineVisibilityStatus;
+  manualTitle?: string | null;
+  manualSummaryZh?: string | null;
+  manualImportanceLevel?: AiTimelineImportanceLevel | null;
+};
+
 export type AiTimelineFilterOptions = {
   eventTypes: AiTimelineEventType[];
   companies: Array<{

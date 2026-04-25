@@ -22,6 +22,7 @@ describe("aiTimelineEvidenceRepository", () => {
 
     upsertAiTimelineEvents(handle.db, [
       {
+        sourceId: "openai-news-rss",
         companyKey: "openai",
         companyName: "OpenAI",
         eventType: "模型发布",

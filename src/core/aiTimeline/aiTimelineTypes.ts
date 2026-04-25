@@ -93,6 +93,7 @@ export type AiTimelineHealthOverview = {
 };
 
 export type AiTimelineEventInput = {
+  sourceId?: string;
   companyKey: string;
   companyName: string;
   eventType: AiTimelineEventType;
@@ -109,6 +110,7 @@ export type AiTimelineEventInput = {
   importanceSummaryZh?: string | null;
   visibilityStatus?: AiTimelineVisibilityStatus;
   detectedEntities?: string[];
+  eventKey?: string | null;
   rawSourceJson?: unknown;
 };
 

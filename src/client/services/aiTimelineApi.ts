@@ -10,6 +10,9 @@ export const aiTimelineEventTypes = [
 ] as const;
 
 export type AiTimelineEventType = (typeof aiTimelineEventTypes)[number];
+export type AiTimelineImportanceLevel = "S" | "A" | "B" | "C";
+export type AiTimelineReleaseStatus = "released" | "official_preview";
+export type AiTimelineVisibilityStatus = "auto_visible" | "hidden" | "manual_visible";
 
 export type AiTimelineEventRecord = {
   id: number;
@@ -24,6 +27,16 @@ export type AiTimelineEventRecord = {
   publishedAt: string;
   discoveredAt: string;
   importance: number;
+  importanceLevel: AiTimelineImportanceLevel;
+  releaseStatus: AiTimelineReleaseStatus;
+  importanceSummaryZh: string | null;
+  visibilityStatus: AiTimelineVisibilityStatus;
+  manualTitle: string | null;
+  manualSummaryZh: string | null;
+  manualImportanceLevel: AiTimelineImportanceLevel | null;
+  detectedEntities: string[];
+  displayTitle: string;
+  displaySummaryZh: string | null;
   rawSourceJson: unknown;
   createdAt: string;
   updatedAt: string;

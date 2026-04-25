@@ -50,6 +50,10 @@ function formatTimelineTime(): string {
 }
 
 function readNodeAccentClass(): string {
+  if (props.event.importanceLevel === "S") {
+    return "border-red-200/80 bg-red-500 text-white shadow-[0_0_34px_rgba(248,113,113,0.46)]";
+  }
+
   switch (props.event.eventType) {
     case "要闻":
       return "border-red-200/80 bg-red-500 text-white shadow-[0_0_30px_rgba(248,113,113,0.42)]";
@@ -66,6 +70,23 @@ function readNodeAccentClass(): string {
     default:
       return "border-editorial-border-strong bg-editorial-text-main text-editorial-panel shadow-editorial-accent";
   }
+}
+
+function readImportanceBadgeClass(): string {
+  switch (props.event.importanceLevel) {
+    case "S":
+      return "border-red-200/80 bg-red-500 text-white";
+    case "A":
+      return "border-sky-200/80 bg-sky-500 text-white";
+    case "B":
+      return "border-amber-200/80 bg-amber-500 text-white";
+    case "C":
+      return "border-slate-200/70 bg-slate-500 text-white";
+  }
+}
+
+function readReleaseStatusLabel(): string {
+  return props.event.releaseStatus === "official_preview" ? "官方前瞻，尚未正式发布" : "已正式发布";
 }
 </script>
 
@@ -107,21 +128,48 @@ function readNodeAccentClass(): string {
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
+            <span
+              :class="[
+                'inline-flex items-center rounded-editorial-pill border px-2.5 py-1 text-[11px] font-black tracking-[0.12em]',
+                readImportanceBadgeClass()
+              ]"
+              data-ai-timeline-importance-level
+            >
+              {{ event.importanceLevel }} 级
+            </span>
             <span :class="editorialContentBadgeClass" data-ai-timeline-event-type>
               {{ event.eventType }}
             </span>
             <span :class="editorialContentBadgeClass">
-              官方来源
+              {{ readReleaseStatusLabel() }}
             </span>
           </div>
 
           <h3 class="m-0 text-lg font-semibold leading-7 text-editorial-text-main" data-ai-timeline-event-title>
-            {{ event.title }}
+            {{ event.displayTitle }}
           </h3>
 
-          <p v-if="event.summary" class="m-0 text-sm leading-6 text-editorial-text-body" data-ai-timeline-event-summary>
-            {{ event.summary }}
+          <p
+            v-if="event.displaySummaryZh"
+            class="m-0 text-sm leading-6 text-editorial-text-body"
+            data-ai-timeline-event-summary
+          >
+            {{ event.displaySummaryZh }}
           </p>
+
+          <div
+            v-if="event.detectedEntities.length > 0"
+            class="flex flex-wrap gap-1.5"
+            data-ai-timeline-detected-entities
+          >
+            <span
+              v-for="entity in event.detectedEntities"
+              :key="entity"
+              class="rounded-editorial-pill border border-editorial-border bg-editorial-link px-2 py-0.5 text-[11px] font-semibold text-editorial-text-body"
+            >
+              {{ entity }}
+            </span>
+          </div>
         </div>
 
         <a

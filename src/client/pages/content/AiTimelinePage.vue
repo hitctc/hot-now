@@ -154,13 +154,14 @@ onMounted(() => {
             AI 官方发布时间线
           </h2>
           <p class="m-0 max-w-3xl text-sm leading-6 text-editorial-text-body">
-            这里只收一手官方来源，按发布时间倒序追踪模型发布、开发生态、产品应用、行业动态和官方前瞻。
-            媒体解读、传闻和没有官方链接的内容不会进入这条时间线。
+            默认只展示最近 7 天内达到 S 级或 A 级的重要官方事件，按发布时间倒序追踪模型发布、开发生态、产品应用、行业动态和官方前瞻。
+            每条摘要都会用中文说明这件事为什么重要，媒体解读、传闻和没有官方链接的内容不会进入主时间线。
           </p>
         </div>
         <div class="flex flex-wrap gap-2 text-xs text-editorial-text-muted">
           <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">官方白名单来源</span>
-          <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">手动采集</span>
+          <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">默认最近 7 天</span>
+          <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">只展示 S / A 级</span>
           <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">每条保留官方链接</span>
         </div>
       </div>
@@ -216,7 +217,7 @@ onMounted(() => {
           class="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-editorial-border/70 pb-3 text-sm text-editorial-text-body"
           data-ai-timeline-result-summary
         >
-          <span class="font-semibold text-editorial-text-main">共 {{ totalEventCount }} 条</span>
+          <span class="font-semibold text-editorial-text-main">主时间线共 {{ totalEventCount }} 条重要事件</span>
           <span class="text-xs text-editorial-text-muted">已加载 {{ loadedEventCount }} 条</span>
         </div>
 

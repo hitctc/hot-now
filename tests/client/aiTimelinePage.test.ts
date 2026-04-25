@@ -45,6 +45,54 @@ const baseTimelineModel = {
       publishedAt: "2026-04-24T10:00:00.000Z",
       discoveredAt: "2026-04-24T12:00:00.000Z",
       importance: 95,
+      importanceLevel: "S",
+      releaseStatus: "released",
+      importanceSummaryZh: "OpenAI 正式发布主力模型，影响 API 和产品能力。",
+      visibilityStatus: "auto_visible",
+      manualTitle: null,
+      manualSummaryZh: null,
+      manualImportanceLevel: null,
+      detectedEntities: ["GPT-5.5"],
+      eventKey: "openai:gpt-5-5:2026-04-24",
+      reliabilityStatus: "multi_source",
+      evidenceCount: 2,
+      lastVerifiedAt: "2026-04-24T12:30:00.000Z",
+      evidenceLinks: [
+        {
+          id: 1,
+          eventId: 1,
+          sourceId: "openai-news",
+          companyKey: "openai",
+          sourceLabel: "OpenAI News",
+          sourceKind: "official_blog",
+          officialUrl: "https://openai.com/news/introducing-gpt-5-5/",
+          title: "Introducing GPT-5.5",
+          summary: null,
+          publishedAt: "2026-04-24T10:00:00.000Z",
+          discoveredAt: "2026-04-24T12:00:00.000Z",
+          rawSourceJson: {},
+          createdAt: "2026-04-24T12:00:00.000Z",
+          updatedAt: "2026-04-24T12:00:00.000Z"
+        },
+        {
+          id: 2,
+          eventId: 1,
+          sourceId: "openai-release-notes",
+          companyKey: "openai",
+          sourceLabel: "OpenAI Release Notes",
+          sourceKind: "docs_changelog",
+          officialUrl: "https://platform.openai.com/docs/changelog",
+          title: "GPT-5.5 available",
+          summary: null,
+          publishedAt: "2026-04-24T10:05:00.000Z",
+          discoveredAt: "2026-04-24T12:01:00.000Z",
+          rawSourceJson: {},
+          createdAt: "2026-04-24T12:01:00.000Z",
+          updatedAt: "2026-04-24T12:01:00.000Z"
+        }
+      ],
+      displayTitle: "Introducing GPT-5.5",
+      displaySummaryZh: "OpenAI 正式发布主力模型，影响 API 和产品能力。",
       rawSourceJson: {},
       createdAt: "2026-04-24T12:00:00.000Z",
       updatedAt: "2026-04-24T12:00:00.000Z"
@@ -62,6 +110,38 @@ const baseTimelineModel = {
       publishedAt: "2026-04-23T09:00:00.000Z",
       discoveredAt: "2026-04-24T12:00:00.000Z",
       importance: 70,
+      importanceLevel: "A",
+      releaseStatus: "released",
+      importanceSummaryZh: "Google 更新开发者工具，影响 Gemini 生态开发体验。",
+      visibilityStatus: "auto_visible",
+      manualTitle: null,
+      manualSummaryZh: null,
+      manualImportanceLevel: null,
+      detectedEntities: ["Gemini"],
+      eventKey: "google_ai:gemini-tool:2026-04-23",
+      reliabilityStatus: "source_degraded",
+      evidenceCount: 1,
+      lastVerifiedAt: "2026-04-24T12:30:00.000Z",
+      evidenceLinks: [
+        {
+          id: 3,
+          eventId: 2,
+          sourceId: "google-ai-blog",
+          companyKey: "google_ai",
+          sourceLabel: "Google AI Blog",
+          sourceKind: "official_blog",
+          officialUrl: "https://blog.google/technology/ai/developer-tool/",
+          title: "Google AI releases a new developer tool",
+          summary: null,
+          publishedAt: "2026-04-23T09:00:00.000Z",
+          discoveredAt: "2026-04-24T12:00:00.000Z",
+          rawSourceJson: {},
+          createdAt: "2026-04-24T12:00:00.000Z",
+          updatedAt: "2026-04-24T12:00:00.000Z"
+        }
+      ],
+      displayTitle: "Google AI releases a new developer tool",
+      displaySummaryZh: "Google 更新开发者工具，影响 Gemini 生态开发体验。",
       rawSourceJson: {},
       createdAt: "2026-04-24T12:00:00.000Z",
       updatedAt: "2026-04-24T12:00:00.000Z"
@@ -152,6 +232,9 @@ describe("AiTimelinePage", () => {
     );
     expect(wrapper.get("[data-ai-timeline-list]").text()).toContain("Introducing GPT-5.5");
     expect(wrapper.get("[data-ai-timeline-list]").text()).toContain("Google AI releases a new developer tool");
+    expect(wrapper.get("[data-ai-timeline-evidence-badge]").text()).toContain("2 条官方证据");
+    expect(wrapper.get("[data-ai-timeline-reliability-badge]").text()).toContain("多官方证据确认");
+    expect(wrapper.findAll("[data-ai-timeline-event-card]")[1].text()).toContain("来源近期异常，已保留官方事件");
     expect(wrapper.get("[data-ai-timeline-official-link]").attributes("href")).toBe(
       "https://openai.com/news/introducing-gpt-5-5/"
     );

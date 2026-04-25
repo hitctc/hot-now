@@ -3,6 +3,7 @@ import { message } from "ant-design-vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import SourcesPage from "../../src/client/pages/settings/SourcesPage.vue";
+import * as aiTimelineAdminApi from "../../src/client/services/aiTimelineAdminApi";
 import * as settingsApi from "../../src/client/services/settingsApi";
 import { mountWithApp } from "./helpers/mountWithApp";
 
@@ -52,6 +53,17 @@ vi.mock("../../src/client/services/settingsApi", async () => {
     triggerManualTwitterCollect: vi.fn(),
     triggerManualTwitterKeywordCollect: vi.fn(),
     triggerManualSendLatestEmail: vi.fn()
+  };
+});
+
+vi.mock("../../src/client/services/aiTimelineAdminApi", async () => {
+  const actual = await vi.importActual<typeof import("../../src/client/services/aiTimelineAdminApi")>(
+    "../../src/client/services/aiTimelineAdminApi"
+  );
+
+  return {
+    ...actual,
+    readAiTimelineAdminWorkbench: vi.fn()
   };
 });
 
@@ -231,9 +243,57 @@ function createSourcesModel() {
   } satisfies settingsApi.SettingsSourcesResponse;
 }
 
+function createAiTimelineAdminWorkbench() {
+  return {
+    overview: {
+      visibleImportantCount7d: 3,
+      latestVisiblePublishedAt: "2026-04-24T10:00:00.000Z",
+      latestCollectStartedAt: "2026-04-25T01:00:00.000Z",
+      failedSourceCount: 1,
+      staleSourceCount: 2
+    },
+    sources: [
+      {
+        sourceId: "openai-news",
+        companyKey: "openai",
+        companyName: "OpenAI",
+        sourceLabel: "OpenAI News",
+        sourceKind: "rss",
+        sourceUrl: "https://openai.com/news/rss.xml",
+        latestStatus: "success",
+        latestStartedAt: "2026-04-25T01:00:00.000Z",
+        latestFinishedAt: "2026-04-25T01:00:02.000Z",
+        fetchedItemCount: 12,
+        candidateEventCount: 4,
+        importantEventCount: 2,
+        latestOfficialPublishedAt: "2026-04-24T10:00:00.000Z",
+        errorMessage: null
+      }
+    ],
+    options: {
+      eventTypes: ["要闻", "模型发布", "开发生态", "产品应用", "行业动态", "官方前瞻"],
+      importanceLevels: ["S", "A", "B", "C"],
+      visibilityStatuses: ["auto_visible", "hidden", "manual_visible"],
+      reliabilityStatuses: ["single_source", "multi_source", "source_degraded", "manual_verified"]
+    },
+    events: {
+      page: 1,
+      pageSize: 50,
+      totalResults: 4,
+      totalPages: 1,
+      filters: {
+        eventTypes: ["模型发布"],
+        companies: [{ key: "openai", name: "OpenAI", eventCount: 4 }]
+      },
+      events: []
+    }
+  } satisfies Awaited<ReturnType<typeof aiTimelineAdminApi.readAiTimelineAdminWorkbench>>;
+}
+
 describe("SourcesPage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(aiTimelineAdminApi.readAiTimelineAdminWorkbench).mockResolvedValue(createAiTimelineAdminWorkbench());
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: vi.fn().mockImplementation((query: string) => ({
@@ -287,6 +347,11 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-sources-section='overview']").text()).toContain("18:40（还有 6 分钟）");
     expect(wrapper.find("[data-sources-section='analytics']").exists()).toBe(false);
     expect(wrapper.get("[data-sources-section='manual-send-latest-email']").text()).toContain("发送最新报告");
+    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("AI 时间线官方源摘要");
+    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("进入 AI 时间线管理");
+    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("失败源 1");
+    expect(wrapper.get("[data-sources-section='ai-timeline']").find("[data-ai-timeline-admin-events]").exists()).toBe(false);
+    expect(wrapper.get("[data-action='open-ai-timeline-admin']").attributes("href")).toBe("/settings/ai-timeline");
     expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("Twitter 账号");
     expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("新增 Twitter 账号");
     expect(wrapper.get("[data-sources-section='twitter-accounts']").text()).toContain("OpenAI");
@@ -322,32 +387,16 @@ describe("SourcesPage", () => {
     expect(wrapper.get("[data-sources-section='weibo-trending']").text()).toContain("固定只进入 AI 热点");
     expect(wrapper.get("[data-sources-section='weibo-trending']").text()).toContain("微博热搜榜匹配已就绪");
     expect(wrapper.findAll("[data-weibo-keyword]")).toHaveLength(3);
-    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("AI 时间线官方源");
-    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("只采集官方白名单来源");
-    expect(wrapper.findAll("[data-ai-timeline-official-source]").length).toBeGreaterThan(20);
+    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("候选事件、证据链和人工修正已经拆到独立管理页");
+    expect(wrapper.findAll("[data-ai-timeline-source-summary]")).toHaveLength(6);
     expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("OpenAI");
     expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("OpenAI News");
-    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("https://openai.com/news/rss.xml");
     expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("Google AI");
     expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("Gemini API Release Notes");
-    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("https://ai.google.dev/gemini-api/docs/changelog");
     expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("Anthropic");
     expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("Claude Code Changelog");
     expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("Claude Platform Release Notes");
     expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("Anthropic News");
-    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("Google DeepMind");
-    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("Mistral Docs Changelog");
-    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("Mistral News");
-    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("Azure OpenAI What's New");
-    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("Kimi 开放平台更新记录");
-    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("MiniMax API Release Notes");
-    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("BigModel 新品发布");
-    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("Qwen");
-    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("Hugging Face Qwen");
-    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("Qwen GitHub Releases");
-    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("DeepSeek");
-    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("Meta AI");
-    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("ByteDance Seed");
     expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("手动采集官方事件");
     expect(wrapper.get("[data-sources-section='inventory']").classes()).toContain("editorial-glass-panel");
     expect(wrapper.get("[data-sources-section='inventory']").text()).toContain("来源库存与统计");

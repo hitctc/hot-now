@@ -14,6 +14,12 @@ const props = defineProps<{
 
 // 官方来源链接只允许 http(s)，避免把异常协议从数据层直接渲染成可点击入口。
 const safeOfficialUrl = readSafeUrl(props.event.officialUrl);
+const safeEvidenceLinks = props.event.evidenceLinks
+  .map((evidence) => ({
+    ...evidence,
+    safeUrl: readSafeUrl(evidence.officialUrl)
+  }))
+  .filter((evidence) => evidence.safeUrl);
 
 function readPublishedDate(): Date | null {
   const date = new Date(props.event.publishedAt);
@@ -88,6 +94,19 @@ function readImportanceBadgeClass(): string {
 function readReleaseStatusLabel(): string {
   return props.event.releaseStatus === "official_preview" ? "官方前瞻，尚未正式发布" : "已正式发布";
 }
+
+function readReliabilityLabel(): string {
+  switch (props.event.reliabilityStatus) {
+    case "multi_source":
+      return "多官方证据确认";
+    case "source_degraded":
+      return "来源近期异常，已保留官方事件";
+    case "manual_verified":
+      return "人工确认可靠";
+    case "single_source":
+      return "单一官方证据";
+  }
+}
 </script>
 
 <template>
@@ -143,6 +162,12 @@ function readReleaseStatusLabel(): string {
             <span :class="editorialContentBadgeClass">
               {{ readReleaseStatusLabel() }}
             </span>
+            <span :class="editorialContentBadgeClass" data-ai-timeline-evidence-badge>
+              {{ event.evidenceCount }} 条官方证据
+            </span>
+            <span :class="editorialContentBadgeClass" data-ai-timeline-reliability-badge>
+              {{ readReliabilityLabel() }}
+            </span>
           </div>
 
           <h3 class="m-0 text-lg font-semibold leading-7 text-editorial-text-main" data-ai-timeline-event-title>
@@ -169,6 +194,27 @@ function readReleaseStatusLabel(): string {
             >
               {{ entity }}
             </span>
+          </div>
+
+          <div
+            v-if="safeEvidenceLinks.length > 0"
+            class="rounded-editorial-card border border-editorial-border bg-editorial-panel/55 p-3"
+            data-ai-timeline-evidence-links
+          >
+            <p class="m-0 text-xs font-semibold text-editorial-text-muted">官方证据</p>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <a
+                v-for="evidence in safeEvidenceLinks"
+                :key="`${evidence.sourceId}:${evidence.officialUrl}`"
+                :href="evidence.safeUrl ?? undefined"
+                target="_blank"
+                rel="noreferrer"
+                class="rounded-editorial-pill border border-editorial-border bg-editorial-link px-2.5 py-1 text-xs font-semibold text-editorial-text-main no-underline hover:bg-editorial-link-active hover:no-underline"
+                data-ai-timeline-evidence-link
+              >
+                {{ evidence.sourceLabel }}
+              </a>
+            </div>
           </div>
         </div>
 

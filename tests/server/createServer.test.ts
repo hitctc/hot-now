@@ -244,6 +244,16 @@ describe("createServer", () => {
           publishedAt: "2026-04-24T10:00:00.000Z",
           discoveredAt: "2026-04-24T12:00:00.000Z",
           importance: 95,
+          importanceLevel: "S",
+          releaseStatus: "released",
+          importanceSummaryZh: "这是 OpenAI 的一次重要模型发布。为什么重要：它会影响模型选型。",
+          visibilityStatus: "auto_visible",
+          manualTitle: null,
+          manualSummaryZh: null,
+          manualImportanceLevel: null,
+          detectedEntities: ["GPT-5.5"],
+          displayTitle: "Introducing GPT-5.5",
+          displaySummaryZh: "这是 OpenAI 的一次重要模型发布。为什么重要：它会影响模型选型。",
           rawSourceJson: {},
           createdAt: "2026-04-24T12:00:00.000Z",
           updatedAt: "2026-04-24T12:00:00.000Z"
@@ -289,6 +299,111 @@ describe("createServer", () => {
           title: "Introducing GPT-5.5"
         }
       ]
+    });
+  });
+
+  it("returns protected AI timeline admin events and updates manual fields", async () => {
+    const listAiTimelineAdminEvents = vi.fn().mockResolvedValue({
+      events: [],
+      filters: {
+        eventTypes: ["要闻", "模型发布", "开发生态", "产品应用", "行业动态", "官方前瞻"],
+        companies: []
+      },
+      pagination: {
+        page: 1,
+        pageSize: 50,
+        totalResults: 0,
+        totalPages: 0
+      }
+    });
+    const updateAiTimelineEventManualFields = vi.fn().mockResolvedValue({
+      id: 12,
+      companyKey: "openai",
+      companyName: "OpenAI",
+      eventType: "模型发布",
+      title: "OpenAI 发布 GPT-5.5",
+      summary: "自动摘要。",
+      officialUrl: "https://openai.com/news/gpt-5-5/",
+      sourceLabel: "OpenAI News",
+      sourceKind: "official_blog",
+      publishedAt: "2026-04-24T10:00:00.000Z",
+      discoveredAt: "2026-04-24T12:00:00.000Z",
+      importance: 95,
+      importanceLevel: "A",
+      releaseStatus: "released",
+      importanceSummaryZh: "自动重要性摘要。",
+      visibilityStatus: "manual_visible",
+      manualTitle: "人工修正标题",
+      manualSummaryZh: "人工修正摘要",
+      manualImportanceLevel: "A",
+      detectedEntities: ["GPT-5.5"],
+      displayTitle: "人工修正标题",
+      displaySummaryZh: "人工修正摘要",
+      rawSourceJson: {},
+      createdAt: "2026-04-24T12:00:00.000Z",
+      updatedAt: "2026-04-24T12:10:00.000Z"
+    });
+    const app = createServer({
+      auth: {
+        requireLogin: true,
+        sessionSecret: "test-secret",
+        verifyLogin: vi.fn().mockResolvedValue({
+          username: "admin",
+          displayName: "管理员",
+          role: "owner"
+        })
+      },
+      listAiTimelineAdminEvents,
+      updateAiTimelineEventManualFields
+    });
+
+    const anonymousResponse = await app.inject({ method: "GET", url: "/api/settings/ai-timeline-events" });
+
+    expect(anonymousResponse.statusCode).toBe(401);
+
+    const loginResponse = await app.inject({
+      method: "POST",
+      url: "/login",
+      payload: { username: "admin", password: "admin" }
+    });
+    const cookie = pickCookieValue(loginResponse.headers["set-cookie"]);
+    const adminResponse = await app.inject({
+      method: "GET",
+      url: "/api/settings/ai-timeline-events?importance=S,A&visibility=auto_visible,hidden&page=1",
+      headers: { cookie: cookie ?? "" }
+    });
+    const updateResponse = await app.inject({
+      method: "POST",
+      url: "/actions/ai-timeline/events/12/update",
+      headers: { cookie: cookie ?? "" },
+      payload: {
+        visibilityStatus: "manual_visible",
+        manualTitle: "人工修正标题",
+        manualSummaryZh: "人工修正摘要",
+        manualImportanceLevel: "A"
+      }
+    });
+
+    expect(adminResponse.statusCode).toBe(200);
+    expect(listAiTimelineAdminEvents).toHaveBeenCalledWith({
+      importanceLevels: ["S", "A"],
+      visibilityStatuses: ["auto_visible", "hidden"],
+      page: 1
+    });
+    expect(updateResponse.statusCode).toBe(200);
+    expect(updateAiTimelineEventManualFields).toHaveBeenCalledWith(12, {
+      visibilityStatus: "manual_visible",
+      manualTitle: "人工修正标题",
+      manualSummaryZh: "人工修正摘要",
+      manualImportanceLevel: "A"
+    });
+    expect(updateResponse.json()).toMatchObject({
+      ok: true,
+      event: {
+        id: 12,
+        displayTitle: "人工修正标题",
+        visibilityStatus: "manual_visible"
+      }
     });
   });
 

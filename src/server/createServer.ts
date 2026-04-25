@@ -5,7 +5,14 @@ import { LatestReportEmailError, type LatestReportEmailErrorReason } from "../co
 import type { BuildContentPageModelOptions } from "../core/content/buildContentPageModel.js";
 import type { ContentSortMode, ContentViewSelectionOptions } from "../core/content/buildContentViewSelection.js";
 import type { ContentCardView, ContentViewKey } from "../core/content/listContentView.js";
-import { aiTimelineEventTypes, type AiTimelineListQuery, type AiTimelinePageModel } from "../core/aiTimeline/aiTimelineTypes.js";
+import {
+  aiTimelineEventTypes,
+  isAiTimelineImportanceLevel,
+  isAiTimelineVisibilityStatus,
+  type AiTimelineListQuery,
+  type AiTimelineManualUpdateInput,
+  type AiTimelinePageModel
+} from "../core/aiTimeline/aiTimelineTypes.js";
 import type { SaveFeedbackPoolEntryInput, SaveFeedbackPoolEntryResult } from "../core/feedback/feedbackPoolRepository.js";
 import type {
   SaveProviderSettingsInput,
@@ -334,6 +341,11 @@ type ServerDeps = {
   listWechatRssSources?: () => Promise<WechatRssSourceRecord[]> | WechatRssSourceRecord[];
   getWeiboTrendingState?: () => Promise<WeiboTrendingRunState> | WeiboTrendingRunState;
   listAiTimelineEvents?: (query: AiTimelineListQuery) => Promise<AiTimelinePageModel> | AiTimelinePageModel;
+  listAiTimelineAdminEvents?: (query: AiTimelineListQuery) => Promise<AiTimelinePageModel> | AiTimelinePageModel;
+  updateAiTimelineEventManualFields?: (
+    eventId: number,
+    input: AiTimelineManualUpdateInput
+  ) => Promise<AiTimelinePageModel["events"][number] | null> | AiTimelinePageModel["events"][number] | null;
   createTwitterAccount?: (
     input: SaveTwitterAccountInput
   ) => Promise<SaveTwitterAccountResult> | SaveTwitterAccountResult;
@@ -567,6 +579,16 @@ export function createServer(deps: ServerDeps = {}) {
 
   app.get("/api/ai-timeline", async (request, reply) => {
     return reply.send(await readAiTimelineApiData(deps, request));
+  });
+
+  app.get("/api/settings/ai-timeline-events", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+
+    if (session === undefined) {
+      return;
+    }
+
+    return reply.send(await readAiTimelineAdminApiData(deps, request));
   });
 
   if (authEnabled) {
@@ -887,6 +909,36 @@ export function createServer(deps: ServerDeps = {}) {
       deps.isRunning?.() ?? false,
       deps.triggerManualAiTimelineCollect
     );
+  });
+
+  app.post("/actions/ai-timeline/events/:id/update", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!deps.updateAiTimelineEventManualFields) {
+      return reply.code(503).send({ ok: false, reason: "ai-timeline-event-update-disabled" });
+    }
+
+    const eventId = parseNumericRouteId(request.params, "id");
+
+    if (!eventId) {
+      return reply.code(400).send({ ok: false, reason: "invalid-ai-timeline-event-id" });
+    }
+
+    const parsedBody = parseAiTimelineManualUpdateBody(request.body);
+
+    if (!parsedBody.ok) {
+      return reply.code(400).send({ ok: false, reason: parsedBody.reason });
+    }
+
+    const event = await deps.updateAiTimelineEventManualFields(eventId, parsedBody.input);
+
+    if (!event) {
+      return reply.code(404).send({ ok: false, reason: "ai-timeline-event-not-found" });
+    }
+
+    return reply.send({ ok: true, event });
   });
 
   app.post("/actions/content/:id/feedback-pool", async (request, reply) => {
@@ -2488,19 +2540,107 @@ async function readAiTimelineApiData(deps: ServerDeps, request: FastifyRequest) 
   };
 }
 
+async function readAiTimelineAdminApiData(deps: ServerDeps, request: FastifyRequest) {
+  const query = readAiTimelineQuery(request);
+
+  if (!deps.listAiTimelineAdminEvents) {
+    return {
+      page: query.page ?? 1,
+      pageSize: 50,
+      totalResults: 0,
+      totalPages: 0,
+      filters: {
+        eventTypes: [...aiTimelineEventTypes],
+        companies: []
+      },
+      events: []
+    };
+  }
+
+  const model = await deps.listAiTimelineAdminEvents(query);
+
+  return {
+    page: model.pagination.page,
+    pageSize: model.pagination.pageSize,
+    totalResults: model.pagination.totalResults,
+    totalPages: model.pagination.totalPages,
+    filters: model.filters,
+    events: model.events
+  };
+}
+
 function readAiTimelineQuery(request: FastifyRequest): AiTimelineListQuery {
   const query = request.query as Record<string, unknown>;
   const eventType = readQueryString(query.eventType);
   const companyKey = readQueryString(query.company);
   const searchKeyword = readQueryString(query.q);
+  const importanceLevels = parseAiTimelineImportanceLevels(readQueryString(query.importance));
+  const visibilityStatuses = parseAiTimelineVisibilityStatuses(readQueryString(query.visibility));
+  const recentDays = readPositiveQueryInteger(query.recentDays);
   const page = readPositiveQueryInteger(query.page);
 
   return {
     ...(eventType ? { eventType } : {}),
     ...(companyKey ? { companyKey } : {}),
     ...(searchKeyword ? { searchKeyword } : {}),
+    ...(importanceLevels ? { importanceLevels } : {}),
+    ...(visibilityStatuses ? { visibilityStatuses } : {}),
+    ...(recentDays ? { recentDays } : {}),
     ...(page ? { page } : {})
   };
+}
+
+function parseAiTimelineManualUpdateBody(body: unknown):
+  | { ok: true; input: AiTimelineManualUpdateInput }
+  | { ok: false; reason: string } {
+  const payload = body && typeof body === "object" ? body as Record<string, unknown> : {};
+  const visibilityStatus = readQueryString(payload.visibilityStatus);
+  const manualImportanceLevel = readQueryString(payload.manualImportanceLevel);
+  const manualTitle = typeof payload.manualTitle === "string" ? payload.manualTitle : null;
+  const manualSummaryZh = typeof payload.manualSummaryZh === "string" ? payload.manualSummaryZh : null;
+
+  if (visibilityStatus && !isAiTimelineVisibilityStatus(visibilityStatus)) {
+    return { ok: false, reason: "invalid-ai-timeline-visibility-status" };
+  }
+
+  if (manualImportanceLevel && !isAiTimelineImportanceLevel(manualImportanceLevel)) {
+    return { ok: false, reason: "invalid-ai-timeline-importance-level" };
+  }
+
+  const normalizedVisibilityStatus = visibilityStatus && isAiTimelineVisibilityStatus(visibilityStatus)
+    ? visibilityStatus
+    : undefined;
+  const normalizedManualImportanceLevel = manualImportanceLevel && isAiTimelineImportanceLevel(manualImportanceLevel)
+    ? manualImportanceLevel
+    : null;
+
+  return {
+    ok: true,
+    input: {
+      ...(normalizedVisibilityStatus ? { visibilityStatus: normalizedVisibilityStatus } : {}),
+      manualTitle,
+      manualSummaryZh,
+      manualImportanceLevel: normalizedManualImportanceLevel
+    }
+  };
+}
+
+function parseAiTimelineImportanceLevels(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  const values = value.split(",").map((item) => item.trim()).filter(isAiTimelineImportanceLevel);
+  return values.length > 0 ? values : undefined;
+}
+
+function parseAiTimelineVisibilityStatuses(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  const values = value.split(",").map((item) => item.trim()).filter(isAiTimelineVisibilityStatus);
+  return values.length > 0 ? values : undefined;
 }
 
 function readQueryString(value: unknown): string | undefined {

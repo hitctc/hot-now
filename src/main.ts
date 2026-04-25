@@ -41,7 +41,11 @@ import { runHackerNewsCollection } from "./core/hackernews/runHackerNewsCollecti
 import { runBilibiliCollection } from "./core/bilibili/runBilibiliCollection.js";
 import { runWechatRssCollection } from "./core/wechatRss/runWechatRssCollection.js";
 import { readWeiboTrendingRunState, runWeiboTrendingCollection } from "./core/weibo/runWeiboTrendingCollection.js";
-import { listAiTimelineEvents } from "./core/aiTimeline/aiTimelineEventRepository.js";
+import {
+  listAiTimelineAdminEvents,
+  listAiTimelineEvents,
+  updateAiTimelineEventManualFields
+} from "./core/aiTimeline/aiTimelineEventRepository.js";
 import { runAiTimelineCollection } from "./core/aiTimeline/runAiTimelineCollection.js";
 import {
   deleteSource as removeSource,
@@ -630,6 +634,9 @@ const app = createServer({
   listWechatRssSources: async () => listWechatRssSources(db),
   getWeiboTrendingState: async () => readWeiboTrendingRunState(db),
   listAiTimelineEvents: async (query) => listAiTimelineEvents(db, query),
+  listAiTimelineAdminEvents: async (query) => listAiTimelineAdminEvents(db, query),
+  updateAiTimelineEventManualFields: async (eventId, input) =>
+    updateAiTimelineEventManualFields(db, eventId, input),
   createTwitterAccount: async (input) => persistTwitterAccount(db, input),
   updateTwitterAccount: async (input) => persistTwitterAccountUpdate(db, input),
   deleteTwitterAccount: async (id) => removeTwitterAccount(db, id),

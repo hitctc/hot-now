@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import {
-  editorialContentCardClass,
   editorialContentIntroSectionClass,
   editorialContentPageClass
 } from "../../components/content/contentCardShared";
+import AiTimelineOfficialSourcesCard from "../../components/settings/sources/AiTimelineOfficialSourcesCard.vue";
 import BilibiliQueriesCard from "../../components/settings/sources/BilibiliQueriesCard.vue";
 import BilibiliQueryModal from "../../components/settings/sources/BilibiliQueryModal.vue";
 import HackerNewsQueriesCard from "../../components/settings/sources/HackerNewsQueriesCard.vue";
@@ -28,6 +28,8 @@ const {
   loadError,
   pageNotice,
   sourcesModel,
+  aiTimelineEventsModel,
+  isAiTimelineEventsLoading,
   isSourceModalOpen,
   isTwitterAccountModalOpen,
   isTwitterKeywordModalOpen,
@@ -75,6 +77,7 @@ const {
   weiboTrendingMessage,
   isActionPending,
   loadSources,
+  loadAiTimelineEvents,
   openCreateSourceModal,
   openCreateTwitterAccountModal,
   openCreateTwitterKeywordModal,
@@ -103,6 +106,8 @@ const {
   handleManualWechatRssCollect,
   handleManualWeiboTrendingCollect,
   handleManualAiTimelineCollect,
+  handleSetAiTimelineEventVisibility,
+  handleSaveAiTimelineEventManualText,
   handleManualSendLatestEmail,
   handleSubmitSource,
   handleSubmitTwitterAccount,
@@ -267,62 +272,17 @@ const {
           @collect="handleManualWeiboTrendingCollect"
         />
 
-        <a-card
-          :class="editorialContentCardClass"
-          title="AI 时间线官方源"
-          size="small"
-          data-sources-section="ai-timeline"
-        >
-          <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div class="min-w-0 flex-1 space-y-3">
-              <p class="m-0 text-sm leading-6 text-editorial-text-body">
-                只采集官方白名单来源，结果进入 AI 时间线，不进入 AI 新讯 / AI 热点。
-              </p>
-              <div class="grid gap-2 md:grid-cols-2">
-                <div
-                  v-for="source in publicOfficialAiTimelineSources"
-                  :key="source.id"
-                  class="rounded-editorial-card border border-editorial-border bg-editorial-panel/45 p-3 text-sm"
-                  data-ai-timeline-official-source
-                >
-                  <div class="flex flex-wrap items-center gap-2">
-                    <span class="font-semibold text-editorial-text-main">{{ source.companyName }}</span>
-                    <span class="rounded-editorial-pill bg-editorial-link px-2 py-0.5 text-[11px] text-editorial-text-body">
-                      {{ source.sourceLabel }}
-                    </span>
-                    <span class="rounded-editorial-pill bg-editorial-link px-2 py-0.5 text-[11px] text-editorial-text-muted">
-                      {{ source.sourceKindLabel }}
-                    </span>
-                  </div>
-                  <a
-                    class="mt-2 block break-all text-xs text-editorial-accent hover:underline"
-                    :href="source.sourceUrl"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {{ source.sourceUrl }}
-                  </a>
-                  <p class="m-0 mt-1 text-xs leading-5 text-editorial-text-muted">
-                    {{ source.allowedScope }}
-                  </p>
-                </div>
-              </div>
-              <div class="flex flex-wrap gap-2 text-xs text-editorial-text-muted">
-                <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">独立事件表</span>
-                <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">不进入普通内容流</span>
-              </div>
-            </div>
-            <a-button
-              type="primary"
-              data-action="manual-ai-timeline-collect"
-              :disabled="sourcesModel.operations.isRunning"
-              :loading="isActionPending('manual:ai-timeline-collect')"
-              @click="handleManualAiTimelineCollect"
-            >
-              {{ sourcesModel.operations.isRunning ? "任务执行中..." : "手动采集官方事件" }}
-            </a-button>
-          </div>
-        </a-card>
+        <AiTimelineOfficialSourcesCard
+          :sources="publicOfficialAiTimelineSources"
+          :events-model="aiTimelineEventsModel"
+          :events-loading="isAiTimelineEventsLoading"
+          :operations="sourcesModel.operations"
+          :is-action-pending="isActionPending"
+          @collect="handleManualAiTimelineCollect"
+          @refresh-events="loadAiTimelineEvents"
+          @set-visibility="handleSetAiTimelineEventVisibility"
+          @save-manual-text="handleSaveAiTimelineEventManualText"
+        />
 
         <SourceInventoryCard
           :sources="sourcesModel.sources"

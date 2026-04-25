@@ -1,4 +1,9 @@
 import { HttpError, requestJson } from "./http";
+import type {
+  AiTimelineEventRecord,
+  AiTimelineImportanceLevel,
+  AiTimelineVisibilityStatus
+} from "./aiTimelineApi";
 
 export type SettingsProfile = {
   username: string;
@@ -229,6 +234,14 @@ export type SettingsSourcesResponse = {
   weiboTrending?: SettingsWeiboTrending;
   operations: SettingsSourcesOperations;
   capability: SettingsSourcesCapability;
+};
+
+export type SettingsAiTimelineEventsResponse = {
+  page: number;
+  pageSize: number;
+  totalResults: number;
+  totalPages: number;
+  events: AiTimelineEventRecord[];
 };
 
 export type SaveProviderSettingsPayload = {
@@ -554,6 +567,18 @@ export type ManualSendLatestEmailResponse = {
   reason?: string;
 };
 
+export type UpdateAiTimelineEventPayload = {
+  visibilityStatus?: AiTimelineVisibilityStatus;
+  manualTitle?: string | null;
+  manualSummaryZh?: string | null;
+  manualImportanceLevel?: AiTimelineImportanceLevel | null;
+};
+
+export type UpdateAiTimelineEventResponse = {
+  ok: true;
+  event: AiTimelineEventRecord;
+};
+
 // 读取当前登录用户摘要，401 代表匿名访问或会话失效，调用方可以把它当作“未登录”。
 export async function readSettingsProfile(): Promise<SettingsProfile | null> {
   try {
@@ -582,6 +607,10 @@ export function saveContentFilterRule(
 // sources 工作台现在使用独立来源统计，不再复用内容页当前筛选上下文。
 export function readSettingsSources(): Promise<SettingsSourcesResponse> {
   return requestJson<SettingsSourcesResponse>("/api/settings/sources");
+}
+
+export function readSettingsAiTimelineEvents(): Promise<SettingsAiTimelineEventsResponse> {
+  return requestJson<SettingsAiTimelineEventsResponse>("/api/settings/ai-timeline-events?page=1");
 }
 
 // 系统页写操作统一走 JSON POST，这样页面组件不需要重复拼 fetch 细节。
@@ -801,6 +830,16 @@ export function triggerManualWeiboTrendingCollect(): Promise<ManualWeiboTrending
 // AI 时间线只采集官方白名单来源，结果写入独立时间线事件表，不进入普通内容流。
 export function triggerManualAiTimelineCollect(): Promise<ManualAiTimelineCollectResponse> {
   return postSettingsAction<ManualAiTimelineCollectResponse>("/actions/ai-timeline/collect", {});
+}
+
+export function updateAiTimelineEventManualFields(
+  eventId: number,
+  payload: UpdateAiTimelineEventPayload
+): Promise<UpdateAiTimelineEventResponse> {
+  return postSettingsAction<UpdateAiTimelineEventResponse>(
+    `/actions/ai-timeline/events/${encodeURIComponent(String(eventId))}/update`,
+    payload
+  );
 }
 
 // 手动发送最新报告沿用现有后端接口，错误原因由调用方再翻译成用户提示。

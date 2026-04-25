@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createTestDatabase, type TestDatabaseHandle } from "../helpers/testDatabase.js";
 import { runAiTimelineCollection } from "../../src/core/aiTimeline/runAiTimelineCollection.js";
 import { officialAiTimelineSources } from "../../src/core/aiTimeline/officialAiTimelineSources.js";
+import { listAiTimelineSourceHealth } from "../../src/core/aiTimeline/aiTimelineSourceHealthRepository.js";
 
 describe("runAiTimelineCollection", () => {
   const handles: TestDatabaseHandle[] = [];
@@ -75,6 +76,46 @@ describe("runAiTimelineCollection", () => {
         official_url: "https://openai.com/news/official-gpt-model-release/"
       }
     ]);
+
+    const sourceHealth = listAiTimelineSourceHealth(handle.db, [officialAiTimelineSources[0]]);
+    expect(sourceHealth[0]).toMatchObject({
+      sourceId: officialAiTimelineSources[0].id,
+      latestStatus: "success",
+      latestStartedAt: "2026-04-24T13:00:00.000Z",
+      latestFinishedAt: "2026-04-24T13:00:00.000Z",
+      fetchedItemCount: 1,
+      candidateEventCount: 1,
+      importantEventCount: 1,
+      latestOfficialPublishedAt: "2026-04-24T10:00:00.000Z"
+    });
+  });
+
+  it("records failed source health when a source cannot be fetched", async () => {
+    const handle = await createTestDatabase("hot-now-ai-timeline-run-failed-source-");
+    handles.push(handle);
+
+    const fetchMock = vi.fn(async () => new Response("forbidden", { status: 403 }));
+    const result = await runAiTimelineCollection(handle.db, {
+      fetch: fetchMock,
+      now: new Date("2026-04-24T12:00:00.000Z"),
+      sources: [officialAiTimelineSources[0]]
+    });
+
+    const sourceHealth = listAiTimelineSourceHealth(handle.db, [officialAiTimelineSources[0]]);
+
+    expect(result).toMatchObject({
+      accepted: true,
+      failureCount: 1,
+      persistedEventCount: 0
+    });
+    expect(sourceHealth[0]).toMatchObject({
+      latestStatus: "failed",
+      latestStartedAt: "2026-04-24T12:00:00.000Z",
+      fetchedItemCount: 0,
+      candidateEventCount: 0,
+      importantEventCount: 0,
+      errorMessage: "HTTP 403"
+    });
   });
 });
 

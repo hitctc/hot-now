@@ -81,6 +81,63 @@ describe("aiTimelineEventRepository", () => {
     });
   });
 
+  it("merges different official URLs into one event when the stable event key matches", async () => {
+    const handle = await createTestDatabase("hot-now-ai-timeline-event-key-merge-");
+    handles.push(handle);
+
+    const first = upsertAiTimelineEvents(handle.db, [
+      {
+        sourceId: "openai-news-rss",
+        companyKey: "openai",
+        companyName: "OpenAI",
+        eventType: "模型发布",
+        title: "OpenAI 发布 GPT-5.5",
+        summary: "OpenAI 官方发布 GPT-5.5。",
+        officialUrl: "https://openai.com/news/gpt-5-5/",
+        sourceLabel: "OpenAI News",
+        sourceKind: "rss_feed",
+        publishedAt: "2026-04-24T08:00:00.000Z",
+        discoveredAt: "2026-04-24T09:00:00.000Z",
+        importanceLevel: "S",
+        detectedEntities: ["GPT-5.5"],
+        eventKey: "openai:gpt-5-5:2026-04-24"
+      }
+    ]);
+    const second = upsertAiTimelineEvents(handle.db, [
+      {
+        sourceId: "openai-api-changelog",
+        companyKey: "openai",
+        companyName: "OpenAI",
+        eventType: "开发生态",
+        title: "GPT-5.5 API release notes",
+        summary: "OpenAI API changelog 同步 GPT-5.5。",
+        officialUrl: "https://platform.openai.com/docs/changelog/gpt-5-5",
+        sourceLabel: "OpenAI API Changelog",
+        sourceKind: "release_notes",
+        publishedAt: "2026-04-24T08:30:00.000Z",
+        discoveredAt: "2026-04-24T10:00:00.000Z",
+        importanceLevel: "S",
+        detectedEntities: ["GPT-5.5"],
+        eventKey: "openai:gpt-5-5:2026-04-24"
+      }
+    ]);
+
+    const page = listAiTimelineAdminEvents(handle.db, { referenceTime: new Date("2026-04-25T00:00:00.000Z") });
+
+    expect(first).toEqual({ insertedCount: 1, updatedCount: 0 });
+    expect(second).toEqual({ insertedCount: 0, updatedCount: 1 });
+    expect(page.events).toHaveLength(1);
+    expect(page.events[0]).toMatchObject({
+      eventKey: "openai:gpt-5-5:2026-04-24",
+      reliabilityStatus: "multi_source",
+      evidenceCount: 2
+    });
+    expect(page.events[0].evidenceLinks.map((evidence) => evidence.sourceId).sort()).toEqual([
+      "openai-api-changelog",
+      "openai-news-rss"
+    ]);
+  });
+
   it("rejects invalid event types before writing data", async () => {
     const handle = await createTestDatabase("hot-now-ai-timeline-invalid-type-");
     handles.push(handle);

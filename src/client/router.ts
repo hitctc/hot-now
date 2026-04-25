@@ -2,7 +2,14 @@ import { createRouter, createWebHistory, type RouteRecordRaw, type RouterHistory
 
 import { APP_ROUTE_BASE } from "./appBases";
 
-export type ShellPageKey = "ai-new" | "ai-hot" | "ai-timeline" | "view-rules" | "sources" | "profile";
+export type ShellPageKey =
+  | "ai-new"
+  | "ai-hot"
+  | "ai-timeline"
+  | "ai-timeline-admin"
+  | "view-rules"
+  | "sources"
+  | "profile";
 
 export type ShellPageMeta = {
   key: ShellPageKey;
@@ -63,6 +70,15 @@ const sourcesPageMeta = {
   description: "查看来源状态、维护自定义来源，并执行采集动作。"
 } as const satisfies ShellPageMeta;
 
+const aiTimelineAdminPageMeta = {
+  key: "ai-timeline-admin",
+  path: "/settings/ai-timeline",
+  section: "system",
+  navLabel: "AI 时间线管理",
+  title: "AI 时间线管理",
+  description: "管理官方源健康、候选事件、证据链和主时间线展示规则。"
+} as const satisfies ShellPageMeta;
+
 const profilePageMeta = {
   key: "profile",
   path: "/settings/profile",
@@ -72,8 +88,21 @@ const profilePageMeta = {
   description: "当前登录账号、会话状态和联系信息。"
 } as const satisfies ShellPageMeta;
 
-export const shellPageMetas = [aiNewPageMeta, aiHotPageMeta, aiTimelinePageMeta, sourcesPageMeta, viewRulesPageMeta, profilePageMeta] as const satisfies readonly ShellPageMeta[];
-export const systemShellPageMetas = [sourcesPageMeta, viewRulesPageMeta, profilePageMeta] as const satisfies readonly ShellPageMeta[];
+export const shellPageMetas = [
+  aiNewPageMeta,
+  aiHotPageMeta,
+  aiTimelinePageMeta,
+  sourcesPageMeta,
+  aiTimelineAdminPageMeta,
+  viewRulesPageMeta,
+  profilePageMeta
+] as const satisfies readonly ShellPageMeta[];
+export const systemShellPageMetas = [
+  sourcesPageMeta,
+  aiTimelineAdminPageMeta,
+  viewRulesPageMeta,
+  profilePageMeta
+] as const satisfies readonly ShellPageMeta[];
 
 type ShellRouteComponent = () => Promise<unknown>;
 
@@ -113,6 +142,7 @@ function createRouteMeta(meta: ShellPageMeta) {
 
 const viewRulesPage = () => import("./pages/settings/ViewRulesPage.vue");
 const sourcesPage = () => import("./pages/settings/SourcesPage.vue");
+const aiTimelineAdminPage = () => import("./pages/settings/AiTimelineAdminPage.vue");
 const profilePage = () => import("./pages/settings/ProfilePage.vue");
 const aiNewPage = () => import("./pages/content/AiNewPage.vue");
 const aiHotPage = () => import("./pages/content/AiHotPage.vue");
@@ -125,6 +155,7 @@ const routes: RouteRecordRaw[] = [
   createShellRoute(aiTimelinePageMeta, aiTimelinePage),
   createShellRoute(viewRulesPageMeta, viewRulesPage),
   createShellRoute(sourcesPageMeta, sourcesPage),
+  createShellRoute(aiTimelineAdminPageMeta, aiTimelineAdminPage),
   createShellRoute(profilePageMeta, profilePage)
 ];
 

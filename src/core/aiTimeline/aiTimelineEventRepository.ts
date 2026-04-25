@@ -1,10 +1,16 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
+import { createAiTimelineEventKey } from "./aiTimelineEventKey.js";
+import {
+  listAiTimelineEventEvidence,
+  upsertAiTimelineEventEvidence
+} from "./aiTimelineEvidenceRepository.js";
 import {
   aiTimelineEventTypes,
   aiTimelineImportanceLevels,
   aiTimelineVisibilityStatuses,
   isAiTimelineEventType,
   isAiTimelineImportanceLevel,
+  isAiTimelineReliabilityStatus,
   isAiTimelineReleaseStatus,
   isAiTimelineVisibilityStatus,
   type AiTimelineEventInput,
@@ -37,6 +43,10 @@ type AiTimelineEventRow = {
   manual_summary_zh: string | null;
   manual_importance_level: string | null;
   detected_entities_json: string;
+  event_key: string | null;
+  reliability_status: string;
+  evidence_count: number;
+  last_verified_at: string | null;
   raw_source_json: string;
   created_at: string;
   updated_at: string;
@@ -66,21 +76,27 @@ const aiTimelineEventSelectColumns = `
   manual_summary_zh,
   manual_importance_level,
   detected_entities_json,
+  event_key,
+  reliability_status,
+  evidence_count,
+  last_verified_at,
   raw_source_json,
   created_at,
   updated_at
 `;
 
-// 官方事件以 official_url 作为主去重键，重复采集时只刷新同一条时间线事件。
+// 官方事件优先按稳定 event_key 合并，多入口证据保留在 evidence 表；没有 key 时退回 official_url 去重。
 export function upsertAiTimelineEvents(
   db: SqliteDatabase,
   events: AiTimelineEventInput[]
 ): AiTimelineUpsertResult {
   const normalizedEvents = events.map(normalizeAiTimelineEventInput);
-  const existingUrl = db.prepare("SELECT id FROM ai_timeline_events WHERE official_url = ? LIMIT 1");
-  const statement = db.prepare(
+  const readExistingByEventKey = db.prepare("SELECT id FROM ai_timeline_events WHERE event_key = ? LIMIT 1");
+  const readExistingByUrl = db.prepare("SELECT id FROM ai_timeline_events WHERE official_url = ? LIMIT 1");
+  const insertStatement = db.prepare(
     `
       INSERT INTO ai_timeline_events (
+        event_key,
         company_key,
         company_name,
         event_type,
@@ -101,6 +117,7 @@ export function upsertAiTimelineEvents(
         updated_at
       )
       VALUES (
+        @eventKey,
         @companyKey,
         @companyName,
         @eventType,
@@ -120,41 +137,69 @@ export function upsertAiTimelineEvents(
         @rawSourceJson,
         CURRENT_TIMESTAMP
       )
-      ON CONFLICT(official_url) DO UPDATE SET
-        company_key = excluded.company_key,
-        company_name = excluded.company_name,
-        event_type = excluded.event_type,
-        title = excluded.title,
-        summary = excluded.summary,
-        source_label = excluded.source_label,
-        source_kind = excluded.source_kind,
-        published_at = excluded.published_at,
-        discovered_at = excluded.discovered_at,
-        importance = excluded.importance,
-        importance_level = excluded.importance_level,
-        release_status = excluded.release_status,
-        importance_summary_zh = excluded.importance_summary_zh,
+    `
+  );
+  const updateStatement = db.prepare(
+    `
+      UPDATE ai_timeline_events
+      SET event_key = COALESCE(@eventKey, event_key),
+          company_key = @companyKey,
+          company_name = @companyName,
+          event_type = @eventType,
+          title = @title,
+          summary = @summary,
+          official_url = @officialUrl,
+          source_label = @sourceLabel,
+          source_kind = @sourceKind,
+          published_at = @publishedAt,
+          discovered_at = @discoveredAt,
+          importance = @importance,
+          importance_level = @importanceLevel,
+          release_status = @releaseStatus,
+          importance_summary_zh = @importanceSummaryZh,
         visibility_status = CASE
-          WHEN ai_timeline_events.visibility_status IN ('hidden', 'manual_visible')
-          THEN ai_timeline_events.visibility_status
-          ELSE excluded.visibility_status
+            WHEN visibility_status IN ('hidden', 'manual_visible')
+            THEN visibility_status
+            ELSE @visibilityStatus
         END,
-        detected_entities_json = excluded.detected_entities_json,
-        raw_source_json = excluded.raw_source_json,
-        updated_at = CURRENT_TIMESTAMP
+          detected_entities_json = @detectedEntitiesJson,
+          raw_source_json = @rawSourceJson,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = @id
     `
   );
   const result = { insertedCount: 0, updatedCount: 0 };
   const write = db.transaction((items: ReturnType<typeof normalizeAiTimelineEventInput>[]) => {
     for (const item of items) {
-      const existed = Boolean(existingUrl.get(item.officialUrl));
-      statement.run(item);
+      const existingByEventKey = item.eventKey
+        ? readExistingByEventKey.get(item.eventKey) as { id: number } | undefined
+        : undefined;
+      const existingByUrl = readExistingByUrl.get(item.officialUrl) as { id: number } | undefined;
+      const existingId = existingByEventKey?.id ?? existingByUrl?.id ?? null;
+      let eventId = existingId ?? 0;
 
-      if (existed) {
+      if (existingId) {
+        updateStatement.run({ ...item, id: existingId });
         result.updatedCount += 1;
       } else {
+        const insertResult = insertStatement.run(item);
+        eventId = Number(insertResult.lastInsertRowid);
         result.insertedCount += 1;
       }
+
+      upsertAiTimelineEventEvidence(db, {
+        eventId,
+        sourceId: item.sourceId,
+        companyKey: item.companyKey,
+        sourceLabel: item.sourceLabel,
+        sourceKind: item.sourceKind,
+        officialUrl: item.officialUrl,
+        title: item.title,
+        summary: item.summary,
+        publishedAt: item.publishedAt,
+        discoveredAt: item.discoveredAt,
+        rawSourceJson: item.rawSourceJsonValue
+      });
     }
   });
 
@@ -198,6 +243,7 @@ export function updateAiTimelineEventManualFields(
       `
         UPDATE ai_timeline_events
         SET visibility_status = @visibilityStatus,
+            reliability_status = COALESCE(@reliabilityStatus, reliability_status),
             manual_title = @manualTitle,
             manual_summary_zh = @manualSummaryZh,
             manual_importance_level = @manualImportanceLevel,
@@ -301,9 +347,14 @@ function listAiTimelineEventsInternal(
       pageSize: normalizedQuery.pageSize,
       offset
     }) as AiTimelineEventRow[];
+  const events = rows.map(mapAiTimelineEventRow);
+  const evidenceByEventId = listAiTimelineEventEvidence(db, events.map((event) => event.id));
 
   return {
-    events: rows.map(mapAiTimelineEventRow),
+    events: events.map((event) => ({
+      ...event,
+      evidenceLinks: evidenceByEventId.get(event.id) ?? []
+    })),
     filters: listAiTimelineFilterOptions(db),
     pagination: {
       page: safePage,
@@ -341,25 +392,40 @@ function normalizeAiTimelineEventInput(input: AiTimelineEventInput) {
   }
 
   const importance = normalizeImportance(input.importance);
+  const companyKey = requireNonEmpty(input.companyKey, "companyKey");
+  const title = requireNonEmpty(input.title, "title");
+  const sourceLabel = requireNonEmpty(input.sourceLabel, "sourceLabel");
+  const sourceKind = requireNonEmpty(input.sourceKind, "sourceKind");
+  const publishedAt = requireNonEmpty(input.publishedAt, "publishedAt");
+  const detectedEntities = normalizeDetectedEntities(input.detectedEntities);
+  const rawSourceJsonValue = input.rawSourceJson ?? {};
 
   return {
-    companyKey: requireNonEmpty(input.companyKey, "companyKey"),
+    sourceId: normalizeNullableText(input.sourceId) ?? createFallbackSourceId(companyKey, sourceLabel, sourceKind),
+    companyKey,
     companyName: requireNonEmpty(input.companyName, "companyName"),
     eventType: input.eventType,
-    title: requireNonEmpty(input.title, "title"),
+    title,
     summary: normalizeNullableText(input.summary),
     officialUrl: requireNonEmpty(input.officialUrl, "officialUrl"),
-    sourceLabel: requireNonEmpty(input.sourceLabel, "sourceLabel"),
-    sourceKind: requireNonEmpty(input.sourceKind, "sourceKind"),
-    publishedAt: requireNonEmpty(input.publishedAt, "publishedAt"),
+    sourceLabel,
+    sourceKind,
+    publishedAt,
     discoveredAt: requireNonEmpty(input.discoveredAt, "discoveredAt"),
     importance,
     importanceLevel: normalizeImportanceLevel(input.importanceLevel, input.eventType, importance),
     releaseStatus: normalizeReleaseStatus(input.releaseStatus),
     importanceSummaryZh: normalizeNullableText(input.importanceSummaryZh),
     visibilityStatus: normalizeVisibilityStatus(input.visibilityStatus),
-    detectedEntitiesJson: JSON.stringify(normalizeDetectedEntities(input.detectedEntities)),
-    rawSourceJson: JSON.stringify(input.rawSourceJson ?? {})
+    detectedEntitiesJson: JSON.stringify(detectedEntities),
+    eventKey: normalizeNullableText(input.eventKey) ?? createAiTimelineEventKey({
+      companyKey,
+      title,
+      publishedAt,
+      detectedEntities
+    }),
+    rawSourceJson: JSON.stringify(rawSourceJsonValue),
+    rawSourceJsonValue
   };
 }
 
@@ -415,6 +481,9 @@ function mapAiTimelineEventRow(row: AiTimelineEventRow): AiTimelineEventRecord {
   const importanceLevel = manualImportanceLevel ?? storedImportanceLevel;
   const releaseStatus = isAiTimelineReleaseStatus(row.release_status) ? row.release_status : "released";
   const visibilityStatus = isAiTimelineVisibilityStatus(row.visibility_status) ? row.visibility_status : "auto_visible";
+  const reliabilityStatus = isAiTimelineReliabilityStatus(row.reliability_status)
+    ? row.reliability_status
+    : "single_source";
   const manualTitle = normalizeNullableText(row.manual_title);
   const manualSummaryZh = normalizeNullableText(row.manual_summary_zh);
   const importanceSummaryZh = normalizeNullableText(row.importance_summary_zh);
@@ -440,6 +509,11 @@ function mapAiTimelineEventRow(row: AiTimelineEventRow): AiTimelineEventRecord {
     manualSummaryZh,
     manualImportanceLevel,
     detectedEntities: parseDetectedEntities(row.detected_entities_json),
+    eventKey: normalizeNullableText(row.event_key),
+    reliabilityStatus,
+    evidenceCount: row.evidence_count,
+    lastVerifiedAt: row.last_verified_at,
+    evidenceLinks: [],
     displayTitle: manualTitle ?? row.title,
     displaySummaryZh: manualSummaryZh ?? importanceSummaryZh ?? row.summary,
     rawSourceJson: parseRawSourceJson(row.raw_source_json),
@@ -471,6 +545,9 @@ function parseDetectedEntities(value: string): string[] {
 function normalizeAiTimelineManualUpdateInput(input: AiTimelineManualUpdateInput) {
   return {
     visibilityStatus: normalizeVisibilityStatus(input.visibilityStatus),
+    reliabilityStatus: input.reliabilityStatus && isAiTimelineReliabilityStatus(input.reliabilityStatus)
+      ? input.reliabilityStatus
+      : null,
     manualTitle: normalizeNullableText(input.manualTitle),
     manualSummaryZh: normalizeNullableText(input.manualSummaryZh),
     manualImportanceLevel: input.manualImportanceLevel && isAiTimelineImportanceLevel(input.manualImportanceLevel)
@@ -492,6 +569,13 @@ function requireNonEmpty(value: string, fieldName: string): string {
 function normalizeNullableText(value: string | null | undefined): string | null {
   const normalized = value?.trim();
   return normalized ? normalized : null;
+}
+
+function createFallbackSourceId(companyKey: string, sourceLabel: string, sourceKind: string): string {
+  return [companyKey, sourceKind, sourceLabel]
+    .map((value) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))
+    .filter(Boolean)
+    .join(":");
 }
 
 function normalizeImportance(value: number | undefined): number {

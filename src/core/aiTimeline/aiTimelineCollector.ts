@@ -1,7 +1,8 @@
 import Parser from "rss-parser";
 import * as cheerio from "cheerio";
 import type { AnyNode } from "domhandler";
-import type { AiTimelineEventInput } from "./aiTimelineTypes.js";
+import type { AiTimelineEventInput, AiTimelineSourceRunInput } from "./aiTimelineTypes.js";
+import { createAiTimelineEventKey } from "./aiTimelineEventKey.js";
 import { classifyImportantAiTimelineEvent } from "./aiTimelineImportance.js";
 import {
   getOfficialAiTimelineSourceUrl,
@@ -36,7 +37,10 @@ export type CollectAiTimelineEventsResult = {
   fetchedItemCount: number;
   skippedItemCount: number;
   failures: AiTimelineCollectionFailure[];
+  sourceRuns: AiTimelineSourceRunInput[];
 };
+
+type CollectedSourceEvents = Omit<CollectAiTimelineEventsResult, "failures" | "sourceRuns">;
 
 type HuggingFaceModelApiItem = {
   id?: string;
@@ -69,7 +73,8 @@ export async function collectAiTimelineEvents(
     events: [],
     fetchedItemCount: 0,
     skippedItemCount: 0,
-    failures: []
+    failures: [],
+    sourceRuns: []
   };
 
   for (const source of sources) {
@@ -78,13 +83,25 @@ export async function collectAiTimelineEvents(
       result.events.push(...sourceResult.events);
       result.fetchedItemCount += sourceResult.fetchedItemCount;
       result.skippedItemCount += sourceResult.skippedItemCount;
+      result.sourceRuns.push(createSourceRun(source, discoveredAt, {
+        status: sourceResult.events.length > 0 ? "success" : "empty",
+        fetchedItemCount: sourceResult.fetchedItemCount,
+        candidateEventCount: sourceResult.events.length,
+        importantEventCount: sourceResult.events.filter((event) => event.importanceLevel === "S" || event.importanceLevel === "A").length,
+        latestOfficialPublishedAt: readLatestPublishedAt(sourceResult.events)
+      }));
     } catch (error) {
+      const reason = error instanceof Error ? error.message : "Unknown AI timeline source error";
       result.failures.push({
         sourceLabel: source.sourceLabel,
         sourceUrl: getOfficialAiTimelineSourceUrl(source),
         feedUrl: source.sourceKind === "rss_feed" ? source.feedUrl : undefined,
-        reason: error instanceof Error ? error.message : "Unknown AI timeline source error"
+        reason
       });
+      result.sourceRuns.push(createSourceRun(source, discoveredAt, {
+        status: "failed",
+        errorMessage: reason
+      }));
     }
   }
 
@@ -95,7 +112,7 @@ async function collectSourceEvents(
   source: OfficialAiTimelineSource,
   fetchImpl: AiTimelineFetch,
   discoveredAt: string
-): Promise<Omit<CollectAiTimelineEventsResult, "failures">> {
+): Promise<CollectedSourceEvents> {
   switch (source.sourceKind) {
     case "rss_feed":
       return collectRssEvents(source, fetchImpl, discoveredAt);
@@ -114,7 +131,7 @@ async function collectRssEvents(
   source: OfficialAiTimelineRssSource,
   fetchImpl: AiTimelineFetch,
   discoveredAt: string
-): Promise<Omit<CollectAiTimelineEventsResult, "failures">> {
+): Promise<CollectedSourceEvents> {
   const response = await fetchOk(fetchImpl, source.feedUrl);
   const feed = await parser.parseString(await response.text());
   const items = feed.items.slice(0, source.maxItems ?? 30);
@@ -143,7 +160,7 @@ async function collectHtmlUpdateCardEvents(
   source: OfficialAiTimelineHtmlUpdateCardsSource,
   fetchImpl: AiTimelineFetch,
   discoveredAt: string
-): Promise<Omit<CollectAiTimelineEventsResult, "failures">> {
+): Promise<CollectedSourceEvents> {
   const response = await fetchOk(fetchImpl, source.pageUrl);
   const $ = cheerio.load(await response.text());
   const items = $(source.itemSelector).slice(0, source.maxItems ?? 20).toArray();
@@ -189,7 +206,7 @@ async function collectHtmlDateSectionEvents(
   source: OfficialAiTimelineHtmlDateSectionsSource,
   fetchImpl: AiTimelineFetch,
   discoveredAt: string
-): Promise<Omit<CollectAiTimelineEventsResult, "failures">> {
+): Promise<CollectedSourceEvents> {
   const response = await fetchOk(fetchImpl, source.pageUrl);
   const $ = cheerio.load(await response.text());
   const headings = $(source.dateHeadingSelector).slice(0, source.maxSections ?? 20).toArray();
@@ -251,7 +268,7 @@ async function collectHuggingFaceModelEvents(
   source: OfficialAiTimelineHuggingFaceModelsSource,
   fetchImpl: AiTimelineFetch,
   discoveredAt: string
-): Promise<Omit<CollectAiTimelineEventsResult, "failures">> {
+): Promise<CollectedSourceEvents> {
   const response = await fetchOk(fetchImpl, source.apiUrl);
   const payload = await response.json();
   const models = Array.isArray(payload) ? payload.slice(0, source.maxItems ?? 20) as HuggingFaceModelApiItem[] : [];
@@ -296,7 +313,7 @@ async function collectHtmlEmbeddedJsonPostEvents(
   source: OfficialAiTimelineHtmlEmbeddedJsonPostsSource,
   fetchImpl: AiTimelineFetch,
   discoveredAt: string
-): Promise<Omit<CollectAiTimelineEventsResult, "failures">> {
+): Promise<CollectedSourceEvents> {
   const response = await fetchOk(fetchImpl, source.pageUrl);
   const posts = readEmbeddedJsonPosts(await response.text(), source.postsArrayKey).slice(0, source.maxItems ?? 20);
   const events: AiTimelineEventInput[] = [];
@@ -388,6 +405,7 @@ function createTimelineEvent(
   });
 
   return {
+    sourceId: source.id,
     companyKey: source.companyKey,
     companyName: source.companyName,
     eventType: classification.eventType,
@@ -404,8 +422,15 @@ function createTimelineEvent(
     importanceSummaryZh: classification.importanceSummaryZh,
     visibilityStatus: classification.visibilityStatus,
     detectedEntities: classification.detectedEntities,
+    eventKey: createAiTimelineEventKey({
+      companyKey: source.companyKey,
+      title: input.title,
+      publishedAt: input.publishedAt,
+      detectedEntities: classification.detectedEntities
+    }),
     rawSourceJson: {
       source: {
+        sourceId: source.id,
         companyKey: source.companyKey,
         sourceLabel: source.sourceLabel,
         sourceUrl: getOfficialAiTimelineSourceUrl(source)
@@ -413,6 +438,40 @@ function createTimelineEvent(
       item: input.rawItem
     }
   };
+}
+
+function createSourceRun(
+  source: OfficialAiTimelineSource,
+  timestamp: string,
+  input: Pick<AiTimelineSourceRunInput, "status"> & Partial<AiTimelineSourceRunInput>
+): AiTimelineSourceRunInput {
+  return {
+    sourceId: source.id,
+    companyKey: source.companyKey,
+    companyName: source.companyName,
+    sourceLabel: source.sourceLabel,
+    sourceKind: source.sourceKind,
+    status: input.status,
+    startedAt: timestamp,
+    finishedAt: timestamp,
+    fetchedItemCount: input.fetchedItemCount ?? 0,
+    candidateEventCount: input.candidateEventCount ?? 0,
+    importantEventCount: input.importantEventCount ?? 0,
+    latestOfficialPublishedAt: input.latestOfficialPublishedAt ?? null,
+    errorMessage: input.errorMessage ?? null
+  };
+}
+
+function readLatestPublishedAt(events: AiTimelineEventInput[]): string | null {
+  const timestamps = events
+    .map((event) => new Date(event.publishedAt).getTime())
+    .filter((timestamp) => Number.isFinite(timestamp));
+
+  if (timestamps.length === 0) {
+    return null;
+  }
+
+  return new Date(Math.max(...timestamps)).toISOString();
 }
 
 async function fetchOk(fetchImpl: AiTimelineFetch, url: string): Promise<Response> {

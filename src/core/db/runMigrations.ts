@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 15;
+const schemaVersion = 16;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -16,6 +16,7 @@ const weiboTrendingMigrationName = "012_weibo_trending";
 const wechatRssSourcesMigrationName = "013_wechat_rss_sources";
 const aiTimelineEventsMigrationName = "014_ai_timeline_events";
 const aiTimelineEventImportanceMigrationName = "015_ai_timeline_event_importance";
+const aiTimelineReliabilityWorkspaceMigrationName = "016_ai_timeline_reliability_workspace";
 
 const migrationStatements = [
   `
@@ -796,6 +797,104 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(15, aiTimelineEventImportanceMigrationName);
+
+    // 时间线可靠性工作台需要记录来源健康和官方证据链，迁移保持 additive，
+    // 让既有候选事件继续保留，同时给后续去重合并和后台运营提供结构化数据。
+    if (!hasColumn(db, "ai_timeline_events", "event_key")) {
+      db.exec("ALTER TABLE ai_timeline_events ADD COLUMN event_key TEXT");
+    }
+
+    if (!hasColumn(db, "ai_timeline_events", "reliability_status")) {
+      db.exec("ALTER TABLE ai_timeline_events ADD COLUMN reliability_status TEXT NOT NULL DEFAULT 'single_source'");
+    }
+
+    if (!hasColumn(db, "ai_timeline_events", "evidence_count")) {
+      db.exec("ALTER TABLE ai_timeline_events ADD COLUMN evidence_count INTEGER NOT NULL DEFAULT 1");
+    }
+
+    if (!hasColumn(db, "ai_timeline_events", "last_verified_at")) {
+      db.exec("ALTER TABLE ai_timeline_events ADD COLUMN last_verified_at TEXT");
+    }
+
+    db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_timeline_events_event_key
+      ON ai_timeline_events(event_key)
+      WHERE event_key IS NOT NULL
+    `);
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_ai_timeline_events_reliability_recent
+      ON ai_timeline_events(reliability_status, published_at DESC)
+    `);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS ai_timeline_event_evidence (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        source_id TEXT NOT NULL,
+        company_key TEXT NOT NULL,
+        source_label TEXT NOT NULL,
+        source_kind TEXT NOT NULL,
+        official_url TEXT NOT NULL,
+        title TEXT NOT NULL,
+        summary TEXT,
+        published_at TEXT NOT NULL,
+        discovered_at TEXT NOT NULL,
+        raw_source_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(event_id, source_id, official_url),
+        FOREIGN KEY (event_id) REFERENCES ai_timeline_events(id) ON DELETE CASCADE
+      )
+    `);
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_ai_timeline_event_evidence_event_id
+      ON ai_timeline_event_evidence(event_id)
+    `);
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_ai_timeline_event_evidence_source_id
+      ON ai_timeline_event_evidence(source_id)
+    `);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS ai_timeline_source_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_id TEXT NOT NULL,
+        company_key TEXT NOT NULL,
+        company_name TEXT NOT NULL,
+        source_label TEXT NOT NULL,
+        source_kind TEXT NOT NULL,
+        status TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        finished_at TEXT,
+        fetched_item_count INTEGER NOT NULL DEFAULT 0,
+        candidate_event_count INTEGER NOT NULL DEFAULT 0,
+        important_event_count INTEGER NOT NULL DEFAULT 0,
+        latest_official_published_at TEXT,
+        error_message TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_ai_timeline_source_runs_source_recent
+      ON ai_timeline_source_runs(source_id, started_at DESC)
+    `);
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_ai_timeline_source_runs_status_recent
+      ON ai_timeline_source_runs(status, started_at DESC)
+    `);
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(16, aiTimelineReliabilityWorkspaceMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

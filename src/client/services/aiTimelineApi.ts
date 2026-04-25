@@ -13,6 +13,24 @@ export type AiTimelineEventType = (typeof aiTimelineEventTypes)[number];
 export type AiTimelineImportanceLevel = "S" | "A" | "B" | "C";
 export type AiTimelineReleaseStatus = "released" | "official_preview";
 export type AiTimelineVisibilityStatus = "auto_visible" | "hidden" | "manual_visible";
+export type AiTimelineReliabilityStatus = "single_source" | "multi_source" | "source_degraded" | "manual_verified";
+
+export type AiTimelineEventEvidenceRecord = {
+  id: number;
+  eventId: number;
+  sourceId: string;
+  companyKey: string;
+  sourceLabel: string;
+  sourceKind: string;
+  officialUrl: string;
+  title: string;
+  summary: string | null;
+  publishedAt: string;
+  discoveredAt: string;
+  rawSourceJson: unknown;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export type AiTimelineEventRecord = {
   id: number;
@@ -35,6 +53,11 @@ export type AiTimelineEventRecord = {
   manualSummaryZh: string | null;
   manualImportanceLevel: AiTimelineImportanceLevel | null;
   detectedEntities: string[];
+  eventKey: string | null;
+  reliabilityStatus: AiTimelineReliabilityStatus;
+  evidenceCount: number;
+  lastVerifiedAt: string | null;
+  evidenceLinks: AiTimelineEventEvidenceRecord[];
   displayTitle: string;
   displaySummaryZh: string | null;
   rawSourceJson: unknown;

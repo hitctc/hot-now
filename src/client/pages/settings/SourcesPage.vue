@@ -28,8 +28,8 @@ const {
   loadError,
   pageNotice,
   sourcesModel,
-  aiTimelineEventsModel,
-  isAiTimelineEventsLoading,
+  aiTimelineAdminModel,
+  isAiTimelineSummaryLoading,
   isSourceModalOpen,
   isTwitterAccountModalOpen,
   isTwitterKeywordModalOpen,
@@ -77,7 +77,6 @@ const {
   weiboTrendingMessage,
   isActionPending,
   loadSources,
-  loadAiTimelineEvents,
   openCreateSourceModal,
   openCreateTwitterAccountModal,
   openCreateTwitterKeywordModal,
@@ -106,8 +105,6 @@ const {
   handleManualWechatRssCollect,
   handleManualWeiboTrendingCollect,
   handleManualAiTimelineCollect,
-  handleSetAiTimelineEventVisibility,
-  handleSaveAiTimelineEventManualText,
   handleManualSendLatestEmail,
   handleSubmitSource,
   handleSubmitTwitterAccount,
@@ -274,14 +271,11 @@ const {
 
         <AiTimelineOfficialSourcesCard
           :sources="publicOfficialAiTimelineSources"
-          :events-model="aiTimelineEventsModel"
-          :events-loading="isAiTimelineEventsLoading"
+          :admin-model="aiTimelineAdminModel"
+          :summary-loading="isAiTimelineSummaryLoading"
           :operations="sourcesModel.operations"
           :is-action-pending="isActionPending"
           @collect="handleManualAiTimelineCollect"
-          @refresh-events="loadAiTimelineEvents"
-          @set-visibility="handleSetAiTimelineEventVisibility"
-          @save-manual-text="handleSaveAiTimelineEventManualText"
         />
 
         <SourceInventoryCard

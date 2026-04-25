@@ -337,6 +337,11 @@ describe("createServer", () => {
       manualSummaryZh: "人工修正摘要",
       manualImportanceLevel: "A",
       detectedEntities: ["GPT-5.5"],
+      eventKey: "openai:gpt-5-5:2026-04-24",
+      reliabilityStatus: "manual_verified",
+      evidenceCount: 2,
+      lastVerifiedAt: "2026-04-24T12:05:00.000Z",
+      evidenceLinks: [],
       displayTitle: "人工修正标题",
       displaySummaryZh: "人工修正摘要",
       rawSourceJson: {},
@@ -378,6 +383,7 @@ describe("createServer", () => {
       headers: { cookie: cookie ?? "" },
       payload: {
         visibilityStatus: "manual_visible",
+        reliabilityStatus: "manual_verified",
         manualTitle: "人工修正标题",
         manualSummaryZh: "人工修正摘要",
         manualImportanceLevel: "A"
@@ -393,6 +399,7 @@ describe("createServer", () => {
     expect(updateResponse.statusCode).toBe(200);
     expect(updateAiTimelineEventManualFields).toHaveBeenCalledWith(12, {
       visibilityStatus: "manual_visible",
+      reliabilityStatus: "manual_verified",
       manualTitle: "人工修正标题",
       manualSummaryZh: "人工修正摘要",
       manualImportanceLevel: "A"
@@ -402,7 +409,153 @@ describe("createServer", () => {
       event: {
         id: 12,
         displayTitle: "人工修正标题",
-        visibilityStatus: "manual_visible"
+        visibilityStatus: "manual_visible",
+        reliabilityStatus: "manual_verified"
+      }
+    });
+  });
+
+  it("returns the protected AI timeline admin workbench model", async () => {
+    const listAiTimelineAdminEvents = vi.fn().mockResolvedValue({
+      events: [
+        {
+          id: 8,
+          companyKey: "openai",
+          companyName: "OpenAI",
+          eventType: "模型发布",
+          title: "OpenAI 发布 GPT-5.5",
+          summary: "官方摘要。",
+          officialUrl: "https://openai.com/news/gpt-5-5/",
+          sourceLabel: "OpenAI News",
+          sourceKind: "rss_feed",
+          publishedAt: "2026-04-24T10:00:00.000Z",
+          discoveredAt: "2026-04-24T12:00:00.000Z",
+          importance: 96,
+          importanceLevel: "S",
+          releaseStatus: "released",
+          importanceSummaryZh: "这是重要模型发布。",
+          visibilityStatus: "auto_visible",
+          manualTitle: null,
+          manualSummaryZh: null,
+          manualImportanceLevel: null,
+          detectedEntities: ["GPT-5.5"],
+          eventKey: "openai:gpt-5-5:2026-04-24",
+          reliabilityStatus: "multi_source",
+          evidenceCount: 2,
+          lastVerifiedAt: "2026-04-24T12:10:00.000Z",
+          evidenceLinks: [],
+          displayTitle: "OpenAI 发布 GPT-5.5",
+          displaySummaryZh: "这是重要模型发布。",
+          rawSourceJson: {},
+          createdAt: "2026-04-24T12:00:00.000Z",
+          updatedAt: "2026-04-24T12:10:00.000Z"
+        }
+      ],
+      filters: {
+        eventTypes: ["要闻", "模型发布", "开发生态", "产品应用", "行业动态", "官方前瞻"],
+        companies: [{ key: "openai", name: "OpenAI", eventCount: 1 }]
+      },
+      pagination: {
+        page: 2,
+        pageSize: 50,
+        totalResults: 51,
+        totalPages: 2
+      }
+    });
+    const listAiTimelineSourceHealth = vi.fn().mockResolvedValue([
+      {
+        sourceId: "openai-news-rss",
+        companyKey: "openai",
+        companyName: "OpenAI",
+        sourceLabel: "OpenAI News",
+        sourceKind: "rss_feed",
+        sourceUrl: "https://openai.com/news/rss.xml",
+        latestStatus: "success",
+        latestStartedAt: "2026-04-24T12:00:00.000Z",
+        latestFinishedAt: "2026-04-24T12:00:01.000Z",
+        fetchedItemCount: 10,
+        candidateEventCount: 2,
+        importantEventCount: 1,
+        latestOfficialPublishedAt: "2026-04-24T10:00:00.000Z",
+        errorMessage: null
+      }
+    ]);
+    const readAiTimelineHealthOverview = vi.fn().mockResolvedValue({
+      visibleImportantCount7d: 12,
+      latestVisiblePublishedAt: "2026-04-24T10:00:00.000Z",
+      latestCollectStartedAt: "2026-04-24T12:00:00.000Z",
+      failedSourceCount: 1,
+      staleSourceCount: 0
+    });
+    const app = createServer({
+      auth: {
+        requireLogin: true,
+        sessionSecret: "test-secret",
+        verifyLogin: vi.fn().mockResolvedValue({
+          username: "admin",
+          displayName: "管理员",
+          role: "owner"
+        })
+      },
+      listAiTimelineAdminEvents,
+      listAiTimelineSourceHealth,
+      readAiTimelineHealthOverview
+    });
+
+    const anonymousResponse = await app.inject({ method: "GET", url: "/api/settings/ai-timeline" });
+    const loginResponse = await app.inject({
+      method: "POST",
+      url: "/login",
+      payload: { username: "admin", password: "admin" }
+    });
+    const cookie = pickCookieValue(loginResponse.headers["set-cookie"]);
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/settings/ai-timeline?importance=S,A&visibility=auto_visible&page=2",
+      headers: { cookie: cookie ?? "" }
+    });
+    const eventsResponse = await app.inject({
+      method: "GET",
+      url: "/api/settings/ai-timeline/events?importance=S&page=2",
+      headers: { cookie: cookie ?? "" }
+    });
+
+    expect(anonymousResponse.statusCode).toBe(401);
+    expect(response.statusCode).toBe(200);
+    expect(eventsResponse.statusCode).toBe(200);
+    expect(listAiTimelineAdminEvents).toHaveBeenCalledWith({
+      importanceLevels: ["S", "A"],
+      visibilityStatuses: ["auto_visible"],
+      page: 2
+    });
+    expect(listAiTimelineAdminEvents).toHaveBeenCalledWith({
+      importanceLevels: ["S"],
+      page: 2
+    });
+    expect(response.json()).toMatchObject({
+      overview: {
+        visibleImportantCount7d: 12,
+        failedSourceCount: 1
+      },
+      sources: [
+        {
+          sourceId: "openai-news-rss",
+          latestStatus: "success",
+          importantEventCount: 1
+        }
+      ],
+      options: {
+        reliabilityStatuses: ["single_source", "multi_source", "source_degraded", "manual_verified"]
+      },
+      events: {
+        totalResults: 51,
+        events: [
+          {
+            id: 8,
+            reliabilityStatus: "multi_source",
+            evidenceCount: 2
+          }
+        ]
       }
     });
   });

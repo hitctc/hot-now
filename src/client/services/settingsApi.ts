@@ -2,6 +2,7 @@ import { HttpError, requestJson } from "./http";
 import type {
   AiTimelineEventRecord,
   AiTimelineImportanceLevel,
+  AiTimelineReliabilityStatus,
   AiTimelineVisibilityStatus
 } from "./aiTimelineApi";
 
@@ -241,7 +242,48 @@ export type SettingsAiTimelineEventsResponse = {
   pageSize: number;
   totalResults: number;
   totalPages: number;
+  filters?: {
+    eventTypes: string[];
+    companies: Array<{ key: string; name: string; eventCount: number }>;
+  };
   events: AiTimelineEventRecord[];
+};
+
+export type SettingsAiTimelineHealthOverview = {
+  visibleImportantCount7d: number;
+  latestVisiblePublishedAt: string | null;
+  latestCollectStartedAt: string | null;
+  failedSourceCount: number;
+  staleSourceCount: number;
+};
+
+export type SettingsAiTimelineSourceHealth = {
+  sourceId: string;
+  companyKey: string;
+  companyName: string;
+  sourceLabel: string;
+  sourceKind: string;
+  sourceUrl: string;
+  latestStatus: "success" | "failed" | "empty" | "stale" | null;
+  latestStartedAt: string | null;
+  latestFinishedAt: string | null;
+  fetchedItemCount: number;
+  candidateEventCount: number;
+  importantEventCount: number;
+  latestOfficialPublishedAt: string | null;
+  errorMessage: string | null;
+};
+
+export type SettingsAiTimelineAdminResponse = {
+  overview: SettingsAiTimelineHealthOverview;
+  sources: SettingsAiTimelineSourceHealth[];
+  options: {
+    eventTypes: readonly string[];
+    importanceLevels: readonly AiTimelineImportanceLevel[];
+    visibilityStatuses: readonly AiTimelineVisibilityStatus[];
+    reliabilityStatuses: readonly AiTimelineReliabilityStatus[];
+  };
+  events: SettingsAiTimelineEventsResponse;
 };
 
 export type SaveProviderSettingsPayload = {
@@ -569,6 +611,7 @@ export type ManualSendLatestEmailResponse = {
 
 export type UpdateAiTimelineEventPayload = {
   visibilityStatus?: AiTimelineVisibilityStatus;
+  reliabilityStatus?: AiTimelineReliabilityStatus | null;
   manualTitle?: string | null;
   manualSummaryZh?: string | null;
   manualImportanceLevel?: AiTimelineImportanceLevel | null;

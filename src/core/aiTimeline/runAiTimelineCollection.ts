@@ -4,6 +4,7 @@ import {
   collectAiTimelineEvents,
   type CollectAiTimelineEventsOptions
 } from "./aiTimelineCollector.js";
+import { recordAiTimelineSourceRun } from "./aiTimelineSourceHealthRepository.js";
 import { officialAiTimelineSources } from "./officialAiTimelineSources.js";
 
 export type RunAiTimelineCollectionResult =
@@ -41,6 +42,13 @@ export async function runAiTimelineCollection(
     sources
   });
   const upsertResult = upsertAiTimelineEvents(db, collectionResult.events);
+  const recordSourceRuns = db.transaction(() => {
+    for (const sourceRun of collectionResult.sourceRuns) {
+      recordAiTimelineSourceRun(db, sourceRun);
+    }
+  });
+
+  recordSourceRuns();
 
   return {
     accepted: true,

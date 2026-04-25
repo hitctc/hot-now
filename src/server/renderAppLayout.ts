@@ -27,6 +27,12 @@ const appShellPages: AppShellPage[] = [
   { path: "/ai-timeline", title: "AI 时间线", section: "content", description: "这里会按时间追踪主流 AI 公司官方发布的模型、产品、开发生态和行业动态。" },
   { path: "/settings/sources", title: "数据收集", section: "system", description: "这里会管理 RSS 数据源的启用状态、抓取结果和手动采集。" },
   {
+    path: "/settings/ai-timeline",
+    title: "AI 时间线管理",
+    section: "system",
+    description: "这里会管理官方源健康、候选事件、证据链和主时间线展示规则。"
+  },
+  {
     path: "/settings/view-rules",
     title: "筛选策略",
     section: "system",

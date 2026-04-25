@@ -2,6 +2,7 @@ import { message } from "ant-design-vue";
 import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 
 import { HttpError } from "../../../services/http";
+import { readAiTimelineAdminWorkbench } from "../../../services/aiTimelineAdminApi";
 import {
   createBilibiliQuery,
   createHackerNewsQuery,
@@ -16,7 +17,6 @@ import {
   deleteWechatRssSource,
   deleteSource,
   readSettingsSources,
-  readSettingsAiTimelineEvents,
   toggleBilibiliQuery,
   toggleHackerNewsQuery,
   toggleTwitterAccount,
@@ -39,7 +39,6 @@ import {
   updateSourceDisplayMode,
   triggerManualCollect,
   triggerManualSendLatestEmail,
-  updateAiTimelineEventManualFields,
   type ManualBilibiliCollectResponse,
   type ManualHackerNewsCollectResponse,
   type ManualAiTimelineCollectResponse,
@@ -53,7 +52,7 @@ import {
   type SaveHackerNewsQueryPayload,
   type SaveSourcePayload,
   type SettingsBilibiliQuery,
-  type SettingsAiTimelineEventsResponse,
+  type SettingsAiTimelineAdminResponse,
   type SettingsHackerNewsQuery,
   type SettingsSourceItem,
   type SettingsSourcesResponse,
@@ -62,10 +61,8 @@ import {
   type SettingsWechatRssSource,
   type SaveTwitterAccountPayload,
   type SaveTwitterSearchKeywordPayload,
-  type UpdateAiTimelineEventPayload,
   type UpdateWechatRssSourcePayload
 } from "../../../services/settingsApi";
-import type { AiTimelineEventRecord, AiTimelineVisibilityStatus } from "../../../services/aiTimelineApi";
 import type {
   BilibiliQueryFormState,
   BilibiliQueryModalMode,
@@ -91,8 +88,8 @@ export function useSourcesPageController() {
   const loadError = ref<string | null>(null);
   const pageNotice = ref<PageNotice | null>(null);
   const sourcesModel = ref<SettingsSourcesResponse | null>(null);
-  const aiTimelineEventsModel = ref<SettingsAiTimelineEventsResponse | null>(null);
-  const isAiTimelineEventsLoading = ref(false);
+  const aiTimelineAdminModel = ref<SettingsAiTimelineAdminResponse | null>(null);
+  const isAiTimelineSummaryLoading = ref(false);
   const pendingActions = reactive<Record<string, boolean>>({});
   const isSourceModalOpen = ref(false);
   const isTwitterAccountModalOpen = ref(false);
@@ -663,21 +660,26 @@ export function useSourcesPageController() {
     }
   }
 
-  // AI 时间线候选事件单独从后台接口读取，避免把主 sources 库存接口继续膨胀。
-  async function loadAiTimelineEvents(options: { silent?: boolean } = {}): Promise<boolean> {
+  // 数据收集页只读取 AI 时间线摘要；完整候选治理已拆到 /settings/ai-timeline。
+  async function loadAiTimelineSummary(options: { silent?: boolean } = {}): Promise<boolean> {
     if (!options.silent) {
-      isAiTimelineEventsLoading.value = true;
+      isAiTimelineSummaryLoading.value = true;
     }
 
     try {
-      aiTimelineEventsModel.value = await readSettingsAiTimelineEvents();
+      aiTimelineAdminModel.value = await readAiTimelineAdminWorkbench({
+        importance: ["S", "A"],
+        visibility: ["auto_visible", "manual_visible"],
+        recentDays: 7,
+        page: 1
+      });
       return true;
     } catch (error) {
-      showNotice("error", readActionErrorMessage(error, "AI 时间线候选事件加载失败，请稍后重试。"));
+      showNotice("error", readActionErrorMessage(error, "AI 时间线摘要加载失败，请稍后重试。"));
       return false;
     } finally {
       if (!options.silent) {
-        isAiTimelineEventsLoading.value = false;
+        isAiTimelineSummaryLoading.value = false;
       }
     }
   }
@@ -875,63 +877,7 @@ export function useSourcesPageController() {
         unauthorized: "请先登录后再操作。"
       }
     });
-    await loadAiTimelineEvents({ silent: true });
-  }
-
-  async function handleUpdateAiTimelineEvent(
-    event: AiTimelineEventRecord,
-    payload: UpdateAiTimelineEventPayload,
-    successMessage: string
-  ): Promise<void> {
-    await runSourcesAction(
-      `ai-timeline-event:${event.id}`,
-      () => updateAiTimelineEventManualFields(event.id, payload),
-      {
-        fallbackMessage: "AI 时间线事件更新失败，请稍后再试。",
-        successMessage,
-        reasonMessages: {
-          "invalid-ai-timeline-event-id": "AI 时间线事件 ID 不合法。",
-          "invalid-ai-timeline-visibility-status": "可见状态不合法。",
-          "invalid-ai-timeline-importance-level": "重要级别不合法。",
-          "ai-timeline-event-not-found": "对应 AI 时间线事件不存在，可能已被移除。",
-          unauthorized: "请先登录后再操作。"
-        }
-      }
-    );
-    await loadAiTimelineEvents({ silent: true });
-  }
-
-  async function handleSetAiTimelineEventVisibility(
-    event: AiTimelineEventRecord,
-    visibilityStatus: AiTimelineVisibilityStatus
-  ): Promise<void> {
-    await handleUpdateAiTimelineEvent(
-      event,
-      {
-        visibilityStatus,
-        manualTitle: event.manualTitle,
-        manualSummaryZh: event.manualSummaryZh,
-        manualImportanceLevel: event.manualImportanceLevel
-      },
-      visibilityStatus === "hidden" ? "已隐藏该时间线事件。" : "已恢复显示该时间线事件。"
-    );
-  }
-
-  async function handleSaveAiTimelineEventManualText(event: AiTimelineEventRecord, values: {
-    manualTitle: string;
-    manualSummaryZh: string;
-    manualImportanceLevel: "S" | "A" | "B" | "C" | null;
-  }): Promise<void> {
-    await handleUpdateAiTimelineEvent(
-      event,
-      {
-        visibilityStatus: event.visibilityStatus,
-        manualTitle: values.manualTitle.trim() || null,
-        manualSummaryZh: values.manualSummaryZh.trim() || null,
-        manualImportanceLevel: values.manualImportanceLevel
-      },
-      "已更新 AI 时间线事件人工修正内容。"
-    );
+    await loadAiTimelineSummary({ silent: true });
   }
 
   // 手动发送最新报告邮件沿用后端错误原因映射，用户能直接看懂当前阻塞点。
@@ -1461,7 +1407,7 @@ export function useSourcesPageController() {
       relativeNow.value = Date.now();
     }, 60_000);
     void loadSources();
-    void loadAiTimelineEvents();
+    void loadAiTimelineSummary();
   });
 
   onUnmounted(() => {
@@ -1477,8 +1423,8 @@ export function useSourcesPageController() {
     loadError,
     pageNotice,
     sourcesModel,
-    aiTimelineEventsModel,
-    isAiTimelineEventsLoading,
+    aiTimelineAdminModel,
+    isAiTimelineSummaryLoading,
     isSourceModalOpen,
     isTwitterAccountModalOpen,
     isTwitterKeywordModalOpen,
@@ -1526,7 +1472,7 @@ export function useSourcesPageController() {
     weiboTrendingMessage,
     isActionPending,
     loadSources,
-    loadAiTimelineEvents,
+    loadAiTimelineSummary,
     openCreateSourceModal,
     openCreateTwitterAccountModal,
     openCreateTwitterKeywordModal,
@@ -1555,8 +1501,6 @@ export function useSourcesPageController() {
     handleManualWechatRssCollect,
     handleManualWeiboTrendingCollect,
     handleManualAiTimelineCollect,
-    handleSetAiTimelineEventVisibility,
-    handleSaveAiTimelineEventManualText,
     handleManualSendLatestEmail,
     handleSubmitSource,
     handleSubmitTwitterAccount,

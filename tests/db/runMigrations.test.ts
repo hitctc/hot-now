@@ -16,7 +16,9 @@ const expectedTables = [
   "content_sources",
   "digest_reports",
   "feedback_pool",
+  "ai_timeline_event_evidence",
   "ai_timeline_events",
+  "ai_timeline_source_runs",
   "bilibili_queries",
   "hackernews_queries",
   "llm_provider_settings",
@@ -72,7 +74,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(15);
+    expect(schemaVersion).toBe(16);
 
     const appliedMigrations = db
       .prepare(
@@ -99,7 +101,8 @@ describe("runMigrations", () => {
       { version: 12, name: "012_weibo_trending" },
       { version: 13, name: "013_wechat_rss_sources" },
       { version: 14, name: "014_ai_timeline_events" },
-      { version: 15, name: "015_ai_timeline_event_importance" }
+      { version: 15, name: "015_ai_timeline_event_importance" },
+      { version: 16, name: "016_ai_timeline_reliability_workspace" }
     ]);
 
     const hiddenAggregates = db
@@ -472,5 +475,30 @@ describe("runMigrations", () => {
       { kind: "juya", rss_url: "https://legacy.example.com/custom-juya.xml" },
       { kind: "openai", rss_url: "https://openai.com/news/rss.xml" }
     ]);
+  });
+
+  it("creates AI timeline reliability tables and columns", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-db-"));
+    const dbPath = path.join(tempDir, "hot-now.sqlite");
+    const db = openDatabase(dbPath);
+    databasesToClose.push(db);
+
+    runMigrations(db);
+
+    const eventColumns = db.prepare("PRAGMA table_info(ai_timeline_events)").all() as Array<{ name: string }>;
+    expect(eventColumns.map((column) => column.name)).toEqual(
+      expect.arrayContaining(["event_key", "reliability_status", "evidence_count", "last_verified_at"])
+    );
+
+    const evidenceTable = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ai_timeline_event_evidence'")
+      .get();
+    const sourceRunsTable = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ai_timeline_source_runs'")
+      .get();
+
+    expect(evidenceTable).toBeTruthy();
+    expect(sourceRunsTable).toBeTruthy();
+    expect(db.pragma("user_version", { simple: true })).toBe(16);
   });
 });

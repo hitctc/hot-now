@@ -46,6 +46,11 @@ import {
   listAiTimelineEvents,
   updateAiTimelineEventManualFields
 } from "./core/aiTimeline/aiTimelineEventRepository.js";
+import {
+  listAiTimelineSourceHealth,
+  readAiTimelineHealthOverview
+} from "./core/aiTimeline/aiTimelineSourceHealthRepository.js";
+import { officialAiTimelineSources } from "./core/aiTimeline/officialAiTimelineSources.js";
 import { runAiTimelineCollection } from "./core/aiTimeline/runAiTimelineCollection.js";
 import {
   deleteSource as removeSource,
@@ -635,6 +640,8 @@ const app = createServer({
   getWeiboTrendingState: async () => readWeiboTrendingRunState(db),
   listAiTimelineEvents: async (query) => listAiTimelineEvents(db, query),
   listAiTimelineAdminEvents: async (query) => listAiTimelineAdminEvents(db, query),
+  listAiTimelineSourceHealth: async () => listAiTimelineSourceHealth(db, officialAiTimelineSources),
+  readAiTimelineHealthOverview: async () => readAiTimelineHealthOverview(db),
   updateAiTimelineEventManualFields: async (eventId, input) =>
     updateAiTimelineEventManualFields(db, eventId, input),
   createTwitterAccount: async (input) => persistTwitterAccount(db, input),

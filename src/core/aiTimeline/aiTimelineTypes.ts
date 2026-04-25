@@ -166,6 +166,7 @@ export type AiTimelineListQuery = {
 
 export type AiTimelineManualUpdateInput = {
   visibilityStatus?: AiTimelineVisibilityStatus;
+  reliabilityStatus?: AiTimelineReliabilityStatus | null;
   manualTitle?: string | null;
   manualSummaryZh?: string | null;
   manualImportanceLevel?: AiTimelineImportanceLevel | null;

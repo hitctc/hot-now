@@ -243,6 +243,7 @@ export function updateAiTimelineEventManualFields(
       `
         UPDATE ai_timeline_events
         SET visibility_status = @visibilityStatus,
+            reliability_status = COALESCE(@reliabilityStatus, reliability_status),
             manual_title = @manualTitle,
             manual_summary_zh = @manualSummaryZh,
             manual_importance_level = @manualImportanceLevel,
@@ -544,6 +545,9 @@ function parseDetectedEntities(value: string): string[] {
 function normalizeAiTimelineManualUpdateInput(input: AiTimelineManualUpdateInput) {
   return {
     visibilityStatus: normalizeVisibilityStatus(input.visibilityStatus),
+    reliabilityStatus: input.reliabilityStatus && isAiTimelineReliabilityStatus(input.reliabilityStatus)
+      ? input.reliabilityStatus
+      : null,
     manualTitle: normalizeNullableText(input.manualTitle),
     manualSummaryZh: normalizeNullableText(input.manualSummaryZh),
     manualImportanceLevel: input.manualImportanceLevel && isAiTimelineImportanceLevel(input.manualImportanceLevel)

@@ -50,6 +50,7 @@ const majorCapabilityKeywords = [
   "native 4k",
   "4k",
   "agent",
+  "tts",
   "coding",
   "multimodal",
   "open-source",
@@ -63,6 +64,7 @@ const majorCapabilityKeywords = [
   "多模态",
   "智能体"
 ];
+const headlineModelKeywords = ["gpt-5", "gpt-5.5", "gemini 3", "claude 4", "deepseek", "qwen3"];
 
 const entityPatterns: Array<{ pattern: RegExp; normalize: (match: string) => string }> = [
   { pattern: /\bGPT-\d+(?:\.\d+)?\b/gi, normalize: (match) => match.toUpperCase() },
@@ -74,6 +76,7 @@ const entityPatterns: Array<{ pattern: RegExp; normalize: (match: string) => str
   { pattern: /\bMiMo[-\s]?V?\d+(?:\.\d+)?(?:[-\s]?(?:Pro|Series))?\b/gi, normalize: normalizeMiMoEntity },
   { pattern: /\bKling\s*\d*(?:\.\d+)?\b/gi, normalize: normalizeOptionalVersionEntity },
   { pattern: /\bVeo\s*\d+(?:\.\d+)?\b/gi, normalize: normalizeSpacedEntity },
+  { pattern: /\bVoxtral\b/gi, normalize: () => "Voxtral" },
   { pattern: /\bSora\b/gi, normalize: () => "Sora" },
   { pattern: /\bLlama\s*\d+(?:\.\d+)?\b/gi, normalize: normalizeSpacedEntity },
   { pattern: /\bMistral(?:\s+\w+)?\b/gi, normalize: normalizeSpacedEntity },
@@ -92,6 +95,7 @@ export function classifyImportantAiTimelineEvent(input: ImportantAiTimelineInput
   const hasDeveloperSignal = includesAny(normalizedText, developerKeywords);
   const hasBusinessSignal = includesAny(normalizedText, businessKeywords);
   const hasMajorCapability = includesAny(normalizedText, majorCapabilityKeywords);
+  const hasHeadlineModelSignal = includesAny(normalizedText, headlineModelKeywords);
   const isMaintenanceOnly =
     includesAny(normalizedText, maintenanceKeywords) && !hasReleaseAction && detectedEntities.length === 0 && !hasMajorCapability;
   const eventType = resolveEventType(input.defaultEventType, {
@@ -99,7 +103,8 @@ export function classifyImportantAiTimelineEvent(input: ImportantAiTimelineInput
     hasModelSignal,
     hasDeveloperSignal,
     hasBusinessSignal,
-    hasMajorCapability
+    hasMajorCapability,
+    hasHeadlineModelSignal
   });
   const importanceLevel = resolveImportanceLevel({
     detectedEntities,
@@ -109,6 +114,7 @@ export function classifyImportantAiTimelineEvent(input: ImportantAiTimelineInput
     hasDeveloperSignal,
     hasBusinessSignal,
     hasMajorCapability,
+    hasHeadlineModelSignal,
     isMaintenanceOnly
   });
 
@@ -140,10 +146,15 @@ function resolveEventType(
     hasDeveloperSignal: boolean;
     hasBusinessSignal: boolean;
     hasMajorCapability: boolean;
+    hasHeadlineModelSignal: boolean;
   }
 ): AiTimelineEventType {
   if (signals.releaseStatus === "official_preview") {
     return "官方前瞻";
+  }
+
+  if (signals.hasHeadlineModelSignal) {
+    return "要闻";
   }
 
   if (signals.hasModelSignal || signals.hasMajorCapability) {
@@ -169,6 +180,7 @@ function resolveImportanceLevel(input: {
   hasDeveloperSignal: boolean;
   hasBusinessSignal: boolean;
   hasMajorCapability: boolean;
+  hasHeadlineModelSignal: boolean;
   isMaintenanceOnly: boolean;
 }): AiTimelineImportanceLevel {
   if (input.isMaintenanceOnly) {
@@ -179,7 +191,11 @@ function resolveImportanceLevel(input: {
     /^(GPT-|Claude|Gemini|DeepSeek|Qwen|Kimi|MiMo|Kling|Veo|Sora|Llama|Mistral|4K)/i.test(entity)
   );
 
-  if ((hasFlagshipEntity && (input.hasReleaseAction || input.releaseStatus === "official_preview")) || input.hasMajorCapability) {
+  if (
+    input.hasHeadlineModelSignal ||
+    (hasFlagshipEntity && (input.hasReleaseAction || input.releaseStatus === "official_preview")) ||
+    input.hasMajorCapability
+  ) {
     return "S";
   }
 

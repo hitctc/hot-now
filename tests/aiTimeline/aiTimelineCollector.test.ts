@@ -56,8 +56,13 @@ describe("collectAiTimelineEvents", () => {
       sourceKind: "rss_feed",
       publishedAt: "2026-04-24T10:00:00.000Z",
       discoveredAt: "2026-04-24T12:00:00.000Z",
-      importance: 95
+      importance: 95,
+      importanceLevel: "S",
+      releaseStatus: "released",
+      visibilityStatus: "auto_visible"
     });
+    expect(result.events[0].importanceSummaryZh).toContain("为什么重要");
+    expect(result.events[0].detectedEntities).toContain("GPT-5.5");
     expect(result.events[0].rawSourceJson).toMatchObject({
       source: {
         companyKey: "openai",
@@ -162,6 +167,7 @@ describe("collectAiTimelineEvents", () => {
       officialUrl: "https://code.claude.com/docs/en/changelog#2-1-105",
       publishedAt: "2026-04-13T00:00:00.000Z"
     });
+    expect(["A", "B", "C"]).toContain(result.events[0]?.importanceLevel);
   });
 
   it("maps official link cards that carry their own href to timeline events", async () => {
@@ -248,10 +254,11 @@ describe("collectAiTimelineEvents", () => {
     expect(result.events).toHaveLength(2);
     expect(result.events[0]).toMatchObject({
       companyKey: "google_ai",
-      eventType: "要闻",
+      eventType: "官方前瞻",
       title: "Launched Gemini 3.1 Flash TTS Preview for Gemini API developers.",
       officialUrl: "https://ai.google.dev/gemini-api/docs/changelog#04-22-2026-item-1",
-      publishedAt: "2026-04-22T00:00:00.000Z"
+      publishedAt: "2026-04-22T00:00:00.000Z",
+      releaseStatus: "official_preview"
     });
   });
 
@@ -384,8 +391,10 @@ describe("collectAiTimelineEvents", () => {
       eventType: "要闻",
       title: "发布模型 Qwen/Qwen3.6-27B",
       officialUrl: "https://huggingface.co/Qwen/Qwen3.6-27B",
-      publishedAt: "2026-04-21T07:50:43.000Z"
+      publishedAt: "2026-04-21T07:50:43.000Z",
+      importanceLevel: "S"
     });
+    expect(result.events[0]?.importanceSummaryZh).toContain("为什么重要");
   });
 });
 

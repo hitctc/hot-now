@@ -1,7 +1,8 @@
 import Parser from "rss-parser";
 import * as cheerio from "cheerio";
 import type { AnyNode } from "domhandler";
-import type { AiTimelineEventInput, AiTimelineEventType } from "./aiTimelineTypes.js";
+import type { AiTimelineEventInput } from "./aiTimelineTypes.js";
+import { classifyImportantAiTimelineEvent } from "./aiTimelineImportance.js";
 import {
   getOfficialAiTimelineSourceUrl,
   officialAiTimelineSources,
@@ -37,12 +38,6 @@ export type CollectAiTimelineEventsResult = {
   failures: AiTimelineCollectionFailure[];
 };
 
-type AiTimelineClassifierRule = {
-  eventType: AiTimelineEventType;
-  keywords: readonly string[];
-  importance: number;
-};
-
 type HuggingFaceModelApiItem = {
   id?: string;
   modelId?: string;
@@ -62,15 +57,6 @@ type EmbeddedJsonPostItem = {
     name?: string;
   };
 };
-
-const classifierRules: readonly AiTimelineClassifierRule[] = [
-  { eventType: "要闻", keywords: ["GPT-5", "GPT-5.5", "Gemini 3", "Claude 4", "DeepSeek", "Qwen3"], importance: 95 },
-  { eventType: "模型发布", keywords: ["model", "模型", "open model", "weights", "release", "released", "launched", "发布"], importance: 85 },
-  { eventType: "开发生态", keywords: ["API", "SDK", "CLI", "GitHub", "developer", "agent", "tools", "command"], importance: 75 },
-  { eventType: "产品应用", keywords: ["ChatGPT", "Gemini app", "Claude", "workspace", "app", "product"], importance: 70 },
-  { eventType: "行业动态", keywords: ["pricing", "price", "plan", "enterprise", "availability", "deprecation", "套餐", "价格"], importance: 65 },
-  { eventType: "官方前瞻", keywords: ["preview", "roadmap", "coming", "soon", "预览", "即将"], importance: 60 }
-] as const;
 
 // 采集器按来源类型分发，但统一执行官方 URL 白名单和发布时间校验，避免把二手或无时间点信息混入时间线。
 export async function collectAiTimelineEvents(
@@ -391,7 +377,15 @@ function createTimelineEvent(
     rawItem: unknown;
   }
 ): AiTimelineEventInput {
-  const classification = classifyTimelineEvent(source, `${input.title}\n${input.summary ?? ""}`);
+  const classification = classifyImportantAiTimelineEvent({
+    companyKey: source.companyKey,
+    companyName: source.companyName,
+    sourceLabel: source.sourceLabel,
+    defaultEventType: source.defaultEventType,
+    title: input.title,
+    summary: input.summary,
+    officialUrl: input.officialUrl
+  });
 
   return {
     companyKey: source.companyKey,
@@ -405,6 +399,11 @@ function createTimelineEvent(
     publishedAt: input.publishedAt,
     discoveredAt: input.discoveredAt,
     importance: classification.importance,
+    importanceLevel: classification.importanceLevel,
+    releaseStatus: classification.releaseStatus,
+    importanceSummaryZh: classification.importanceSummaryZh,
+    visibilityStatus: classification.visibilityStatus,
+    detectedEntities: classification.detectedEntities,
     rawSourceJson: {
       source: {
         companyKey: source.companyKey,
@@ -413,18 +412,6 @@ function createTimelineEvent(
       },
       item: input.rawItem
     }
-  };
-}
-
-function classifyTimelineEvent(source: OfficialAiTimelineSource, text: string) {
-  const normalized = text.toLowerCase();
-  const matchedRule = classifierRules.find((rule) =>
-    rule.keywords.some((keyword) => normalized.includes(keyword.toLowerCase()))
-  );
-
-  return matchedRule ?? {
-    eventType: source.defaultEventType,
-    importance: 50
   };
 }
 

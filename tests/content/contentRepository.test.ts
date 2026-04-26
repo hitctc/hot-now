@@ -95,6 +95,52 @@ describe("contentRepository", () => {
     ]);
   });
 
+  it("normalizes URL hash fragments before canonical_url deduplication", async () => {
+    const db = await createTestDatabase();
+    const source = resolveSourceByKind(db, "v2ex");
+
+    expect(source).toBeDefined();
+
+    upsertContentItems(db, {
+      sourceId: source!.id,
+      items: [
+        {
+          externalId: "v2ex:reply-1",
+          title: "OpenCode GO 已上线 deepseek v4",
+          canonicalUrl: "https://www.v2ex.com/t/1208454#reply1",
+          summary: "同一主题的回复锚点不应该生成多条内容。",
+          publishedAt: "2026-04-25T04:21:21.000Z",
+          fetchedAt: "2026-04-25T04:22:00.000Z"
+        },
+        {
+          externalId: "v2ex:reply-14",
+          title: "OpenCode GO 已上线 deepseek v4",
+          canonicalUrl: "https://www.v2ex.com/t/1208454#reply14",
+          summary: "同一主题的回复锚点不应该生成多条内容。",
+          publishedAt: "2026-04-25T04:21:21.000Z",
+          fetchedAt: "2026-04-25T04:23:00.000Z"
+        }
+      ]
+    });
+
+    const rows = db
+      .prepare(
+        `
+          SELECT external_id, canonical_url
+          FROM content_items
+          WHERE source_id = ?
+        `
+      )
+      .all(source!.id) as Array<{ external_id: string; canonical_url: string }>;
+
+    expect(rows).toEqual([
+      {
+        external_id: "v2ex:reply-14",
+        canonical_url: "https://www.v2ex.com/t/1208454"
+      }
+    ]);
+  });
+
   it("creates and finishes a collection run with the final status fields", async () => {
     const db = await createTestDatabase();
 

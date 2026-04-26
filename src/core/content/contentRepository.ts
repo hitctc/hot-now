@@ -137,7 +137,7 @@ export function upsertContentItems(
         sourceId: params.sourceId,
         externalId: item.externalId ?? null,
         title: item.title,
-        canonicalUrl: item.canonicalUrl,
+        canonicalUrl: normalizeCanonicalUrlForStorage(item.canonicalUrl),
         summary: item.summary ?? null,
         bodyMarkdown: item.bodyMarkdown ?? null,
         metadataJson: item.metadataJson ?? null,
@@ -148,6 +148,19 @@ export function upsertContentItems(
   });
 
   upsert(params.items);
+}
+
+function normalizeCanonicalUrlForStorage(value: string): string {
+  const trimmedValue = value.trim();
+
+  try {
+    const url = new URL(trimmedValue);
+    // RSS 聚合源有时会把论坛回复锚点当成不同链接；内容库按文章维度存储，锚点不应制造重复行。
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return trimmedValue;
+  }
 }
 
 // Keyword matches are stored separately so one tweet can belong to multiple search terms without

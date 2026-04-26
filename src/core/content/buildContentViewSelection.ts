@@ -158,25 +158,26 @@ export function buildContentViewSelection(
   const rankedCards = rankedCandidates
     .filter((card) => selectedSourceKinds === null || selectedSourceKinds.has(card.sourceKind))
     .sort((left, right) => compareBySelectionOrder(viewRuleConfig, left, right));
+  const dedupedRankedCards = dedupeRankedCardsForDisplay(rankedCards);
   const limit = resolveVisibleLimit(viewKey, options.limitOverride ?? viewRuleConfig.limit);
   const fullDisplaySourceKinds =
     selectedSourceKinds === null
       ? new Set<string>()
       : new Set(
-          rankedCards
+          dedupedRankedCards
             .filter((card) => card.showAllWhenSelected && selectedSourceKinds.has(card.sourceKind))
             .map((card) => card.sourceKind)
         );
   const visibleCards = [
-    ...rankedCards.filter((card) => fullDisplaySourceKinds.has(card.sourceKind)),
-    ...rankedCards.filter((card) => !fullDisplaySourceKinds.has(card.sourceKind)).slice(0, limit)
+    ...dedupedRankedCards.filter((card) => fullDisplaySourceKinds.has(card.sourceKind)),
+    ...dedupedRankedCards.filter((card) => !fullDisplaySourceKinds.has(card.sourceKind)).slice(0, limit)
   ]
     .sort((left, right) => compareVisibleCards(sortMode, viewRuleConfig, left, right))
     .map(stripInternalSelectionCard);
   // 旧来源 tag 仍暂时保留稳定单来源口径，便于旧调用方在这轮迁移里逐步切换。
   const visibleCountsBySourceKind = countStableVisibleCardsBySourceKind(rankedCandidates, limit);
   const currentPageMetricsBySourceKind = countCurrentPageMetricsBySourceKind(
-    rankedCards,
+    dedupedRankedCards,
     visibleCards,
     referenceTime
   );
@@ -184,7 +185,7 @@ export function buildContentViewSelection(
     .reduce((sum, entry) => sum + entry.todayVisibleCount, 0);
 
   return {
-    candidateCards: rankedCards.map(stripInternalSelectionCard),
+    candidateCards: dedupedRankedCards.map(stripInternalSelectionCard),
     visibleCards,
     visibleCountsBySourceKind,
     currentPageMetricsBySourceKind: applyCurrentPageVisibleShares(
@@ -193,6 +194,56 @@ export function buildContentViewSelection(
     ),
     currentPageTodayVisibleCount
   };
+}
+
+function dedupeRankedCardsForDisplay(cards: RankedContentCardCandidate[]): RankedContentCardCandidate[] {
+  const seenKeys = new Set<string>();
+  const dedupedCards: RankedContentCardCandidate[] = [];
+
+  for (const card of cards) {
+    const keys = buildContentDuplicateKeys(card);
+
+    if (keys.some((key) => seenKeys.has(key))) {
+      continue;
+    }
+
+    for (const key of keys) {
+      seenKeys.add(key);
+    }
+
+    dedupedCards.push(card);
+  }
+
+  return dedupedCards;
+}
+
+function buildContentDuplicateKeys(card: RankedContentCardCandidate): string[] {
+  const sourceKind = normalizeDuplicateKeyPart(card.sourceKind);
+  const title = normalizeDuplicateKeyPart(card.title);
+  const summary = normalizeDuplicateKeyPart(card.summary);
+  const timestamp = normalizeDuplicateKeyPart(card.publishedAt ?? card.rankingTimestamp ?? "");
+  const normalizedUrl = normalizeCanonicalUrlForDuplicateKey(card.canonicalUrl);
+
+  return [
+    `url:${sourceKind}:${normalizedUrl}`,
+    `semantic:${sourceKind}:${title}:${summary}:${timestamp}`
+  ];
+}
+
+function normalizeCanonicalUrlForDuplicateKey(value: string): string {
+  const trimmedValue = value.trim();
+
+  try {
+    const url = new URL(trimmedValue);
+    url.hash = "";
+    return url.toString().toLowerCase();
+  } catch {
+    return trimmedValue.toLowerCase();
+  }
+}
+
+function normalizeDuplicateKeyPart(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 export function collectIndependentTodayStatsBySourceForView(

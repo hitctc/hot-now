@@ -107,6 +107,40 @@ describe("buildContentPageModel", () => {
     });
   });
 
+  it("deduplicates identical content before content page pagination", async () => {
+    const handle = await createTestDatabase("hot-now-content-page-dedupe-");
+    handles.push(handle);
+
+    insertRawAiNewItem(
+      handle.db,
+      "OpenCode GO 已上线 deepseek v4",
+      "https://www.v2ex.com/t/1208454#reply1",
+      "5 小时限额 pro 1300 次, flash 7450 次 理论上可以用于其他工具比如 claude code ，opencode 说 go 可以用于第三方。",
+      "2026-03-31T03:00:00.000Z",
+      "2026-03-31T03:00:05.000Z"
+    );
+    insertRawAiNewItem(
+      handle.db,
+      "OpenCode GO 已上线 deepseek v4",
+      "https://www.v2ex.com/t/1208454#reply14",
+      "5 小时限额 pro 1300 次, flash 7450 次 理论上可以用于其他工具比如 claude code ，opencode 说 go 可以用于第三方。",
+      "2026-03-31T03:00:00.000Z",
+      "2026-03-31T03:01:05.000Z"
+    );
+
+    const model = buildContentPageModel(handle.db, "ai-new", {
+      searchKeyword: "deepseek"
+    });
+
+    expect(model.pagination).toEqual({
+      page: 1,
+      pageSize: 50,
+      totalResults: 1,
+      totalPages: 1
+    });
+    expect(model.cards.map((card) => card.title)).toEqual(["OpenCode GO 已上线 deepseek v4"]);
+  });
+
   it("returns a search-specific empty state when no title matches", async () => {
     const handle = await createTestDatabase("hot-now-content-page-search-empty-");
     handles.push(handle);
@@ -335,6 +369,46 @@ function insertPagedAiNewItem(
     `https://example.com/paged-${index}`,
     `Summary ${index}`,
     `Body ${index}`,
+    publishedAt,
+    fetchedAt
+  );
+}
+
+function insertRawAiNewItem(
+  db: Awaited<ReturnType<typeof createTestDatabase>>["db"],
+  title: string,
+  canonicalUrl: string,
+  summary: string,
+  publishedAt: string,
+  fetchedAt: string
+) {
+  db.prepare(
+    `
+      INSERT INTO content_items (
+        source_id,
+        title,
+        canonical_url,
+        summary,
+        body_markdown,
+        published_at,
+        fetched_at
+      )
+      SELECT
+        id,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?
+      FROM content_sources
+      WHERE kind = 'openai'
+    `
+  ).run(
+    title,
+    canonicalUrl,
+    summary,
+    `${title} body`,
     publishedAt,
     fetchedAt
   );

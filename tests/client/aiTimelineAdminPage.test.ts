@@ -1,4 +1,4 @@
-import { DOMWrapper, flushPromises, type VueWrapper } from "@vue/test-utils";
+import { flushPromises, type VueWrapper } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import AiTimelineAdminPage from "../../src/client/pages/settings/AiTimelineAdminPage.vue";
@@ -14,9 +14,7 @@ vi.mock("../../src/client/services/aiTimelineAdminApi", async () => {
   return {
     ...actual,
     readAiTimelineAdminWorkbench: vi.fn(),
-    readAiTimelineAdminEvents: vi.fn(),
-    updateAiTimelineAdminEvent: vi.fn(),
-    triggerAiTimelineAdminCollect: vi.fn()
+    readAiTimelineAdminEvents: vi.fn()
   };
 });
 
@@ -36,43 +34,16 @@ function mountAiTimelineAdminPage() {
   return wrapper;
 }
 
-function getDrawerNode() {
-  const node = document.body.querySelector("[data-ai-timeline-admin-edit-drawer]");
-
-  if (!(node instanceof HTMLElement)) {
-    throw new Error("Expected AI timeline edit drawer to exist.");
-  }
-
-  return new DOMWrapper(node);
-}
-
 function createAdminWorkbench() {
   return {
     overview: {
       visibleImportantCount7d: 3,
       latestVisiblePublishedAt: "2026-04-24T10:00:00.000Z",
-      latestCollectStartedAt: "2026-04-25T01:00:00.000Z",
-      failedSourceCount: 1,
-      staleSourceCount: 2
+      latestCollectStartedAt: null,
+      failedSourceCount: 0,
+      staleSourceCount: 0
     },
-    sources: [
-      {
-        sourceId: "openai-news",
-        companyKey: "openai",
-        companyName: "OpenAI",
-        sourceLabel: "OpenAI News",
-        sourceKind: "rss",
-        sourceUrl: "https://openai.com/news/rss.xml",
-        latestStatus: "success",
-        latestStartedAt: "2026-04-25T01:00:00.000Z",
-        latestFinishedAt: "2026-04-25T01:00:02.000Z",
-        fetchedItemCount: 12,
-        candidateEventCount: 4,
-        importantEventCount: 2,
-        latestOfficialPublishedAt: "2026-04-24T10:00:00.000Z",
-        errorMessage: null
-      }
-    ],
+    sources: [],
     options: {
       eventTypes: ["要闻", "模型发布", "开发生态", "产品应用", "行业动态", "官方前瞻"],
       importanceLevels: ["S", "A", "B", "C"],
@@ -150,45 +121,26 @@ describe("AiTimelineAdminPage", () => {
     mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount());
   });
 
-  it("registers the AI timeline admin entry in the system menu metadata", () => {
-    expect(systemShellPageMetas.map((meta) => meta.navLabel)).toContain("AI 时间线管理");
-    expect(systemShellPageMetas.find((meta) => meta.navLabel === "AI 时间线管理")?.path).toBe(
+  it("registers the AI timeline feed entry in the system menu metadata", () => {
+    expect(systemShellPageMetas.map((meta) => meta.navLabel)).toContain("AI 时间线 feed");
+    expect(systemShellPageMetas.find((meta) => meta.navLabel === "AI 时间线 feed")?.path).toBe(
       "/settings/ai-timeline"
     );
   });
 
-  it("renders the workbench sections and saves manual event summary", async () => {
+  it("renders the read-only feed workbench sections", async () => {
     const workbench = createAdminWorkbench();
     vi.mocked(aiTimelineAdminApi.readAiTimelineAdminWorkbench).mockResolvedValue(workbench);
-    vi.mocked(aiTimelineAdminApi.updateAiTimelineAdminEvent).mockResolvedValue({
-      ok: true,
-      event: workbench.events.events[0]
-    });
 
     const wrapper = mountAiTimelineAdminPage();
 
     await flushPromises();
 
-    expect(wrapper.get("[data-ai-timeline-admin-page]").text()).toContain("AI 时间线管理");
+    expect(wrapper.get("[data-ai-timeline-admin-page]").text()).toContain("AI 时间线 feed");
     expect(wrapper.get("[data-ai-timeline-admin-overview]").text()).toContain("主时间线状态");
-    expect(wrapper.get("[data-ai-timeline-source-health]").text()).toContain("官方源健康");
-    expect(wrapper.get("[data-ai-timeline-candidate-events]").text()).toContain("候选事件池");
-
-    await wrapper.get("[data-ai-timeline-admin-edit='101']").trigger("click");
-    await flushPromises();
-
-    const drawer = getDrawerNode();
-    expect(drawer.text()).toContain("编辑时间线事件");
-
-    await drawer.get("[data-ai-timeline-admin-manual-summary]").setValue("这是一条人工确认后的中文摘要。");
-    await drawer.get("[data-ai-timeline-admin-save]").trigger("click");
-    await flushPromises();
-
-    expect(aiTimelineAdminApi.updateAiTimelineAdminEvent).toHaveBeenCalledWith(
-      101,
-      expect.objectContaining({
-        manualSummaryZh: "这是一条人工确认后的中文摘要。"
-      })
-    );
+    expect(wrapper.get("[data-ai-timeline-source-health]").text()).toContain("feed 来源状态");
+    expect(wrapper.get("[data-ai-timeline-candidate-events]").text()).toContain("feed 事件");
+    expect(wrapper.get("[data-ai-timeline-candidate-events]").text()).toContain("read-only feed");
+    expect(wrapper.find("[data-ai-timeline-admin-edit='101']").exists()).toBe(false);
   });
 });

@@ -41,17 +41,7 @@ import { runHackerNewsCollection } from "./core/hackernews/runHackerNewsCollecti
 import { runBilibiliCollection } from "./core/bilibili/runBilibiliCollection.js";
 import { runWechatRssCollection } from "./core/wechatRss/runWechatRssCollection.js";
 import { readWeiboTrendingRunState, runWeiboTrendingCollection } from "./core/weibo/runWeiboTrendingCollection.js";
-import {
-  listAiTimelineAdminEvents,
-  listAiTimelineEvents,
-  updateAiTimelineEventManualFields
-} from "./core/aiTimeline/aiTimelineEventRepository.js";
-import {
-  listAiTimelineSourceHealth,
-  readAiTimelineHealthOverview
-} from "./core/aiTimeline/aiTimelineSourceHealthRepository.js";
-import { officialAiTimelineSources } from "./core/aiTimeline/officialAiTimelineSources.js";
-import { runAiTimelineCollection } from "./core/aiTimeline/runAiTimelineCollection.js";
+import { readAiTimelineFeedFile, readAiTimelineFeedPageModel } from "./core/aiTimeline/aiTimelineFeedFile.js";
 import {
   deleteSource as removeSource,
   saveSource as persistSource,
@@ -195,11 +185,6 @@ async function runWechatRssCollectionTask() {
 // 微博热搜榜匹配只做热点补充信号，不进默认采集调度。
 async function runWeiboTrendingCollectionTask() {
   return await runWeiboTrendingCollection(db);
-}
-
-// AI 时间线只收官方白名单来源，第一版保持手动触发，不进入默认定时采集。
-async function runAiTimelineCollectionTask() {
-  return await runAiTimelineCollection(db);
 }
 
 // Latest-email runs reuse the most recent report artifact and keep SMTP concerns out of the collection cadence.
@@ -551,13 +536,6 @@ const triggerManualWeiboTrendingCollect = config.manualActions.collectEnabled
     }
   : undefined;
 
-// AI 时间线和其他扩展来源共用运行锁，但写入独立事件表，不写 content_items。
-const triggerManualAiTimelineCollect = config.manualActions.collectEnabled
-  ? async () => {
-      return await lock.runExclusive(async () => await runAiTimelineCollectionTask());
-    }
-  : undefined;
-
 // 新增来源后先只补这一条 source 的内容入库，避免为了拿到首批数据就把整轮全站采集串进保存接口。
 async function saveAndHydrateSource(input: Parameters<typeof persistSource>[1]) {
   const result = await persistSource(db, input, {
@@ -638,12 +616,7 @@ const app = createServer({
   listBilibiliQueries: async () => listBilibiliQueries(db),
   listWechatRssSources: async () => listWechatRssSources(db),
   getWeiboTrendingState: async () => readWeiboTrendingRunState(db),
-  listAiTimelineEvents: async (query) => listAiTimelineEvents(db, query),
-  listAiTimelineAdminEvents: async (query) => listAiTimelineAdminEvents(db, query),
-  listAiTimelineSourceHealth: async () => listAiTimelineSourceHealth(db, officialAiTimelineSources),
-  readAiTimelineHealthOverview: async () => readAiTimelineHealthOverview(db),
-  updateAiTimelineEventManualFields: async (eventId, input) =>
-    updateAiTimelineEventManualFields(db, eventId, input),
+  readAiTimelinePage: async (query) => await readAiTimelineFeedPageModel(config.aiTimelineFeed, query),
   createTwitterAccount: async (input) => persistTwitterAccount(db, input),
   updateTwitterAccount: async (input) => persistTwitterAccountUpdate(db, input),
   deleteTwitterAccount: async (id) => removeTwitterAccount(db, id),
@@ -673,11 +646,11 @@ const app = createServer({
   triggerManualBilibiliCollect,
   triggerManualWechatRssCollect,
   triggerManualWeiboTrendingCollect,
-  triggerManualAiTimelineCollect,
   getCurrentUserProfile: async () => getCurrentUserProfile(),
   listReportSummaries: listStoredReportSummaries,
   latestReportDate: async () => (await listReportDates(config.report.dataDir))[0] ?? null,
   readReportHtml: async (date: string) => await readTextFile(config.report.dataDir, date, "report.html"),
+  readAiTimelineFeed: async () => await readAiTimelineFeedFile(config.aiTimelineFeed),
   triggerManualCollect,
   triggerManualSendLatestEmail,
   triggerManualRun: triggerManualCollect

@@ -3,6 +3,9 @@ import path from "node:path";
 import { RuntimeConfig } from "../types/appConfig.js";
 
 const defaultDatabaseFile = "./data/hot-now.sqlite";
+const defaultAiTimelineFeedFile = "./data/feeds/ai-timeline-feed.md";
+const defaultAiTimelineFeedUrl = "https://now.achuan.cc/feeds/ai-timeline-feed.md";
+const defaultAiTimelineFeedMaxFallbackVersions = 10;
 
 type Options = {
   configPath?: string;
@@ -19,6 +22,16 @@ export async function loadRuntimeConfig(options: Options = {}): Promise<RuntimeC
   const configDir = path.dirname(configPath);
   const reportDir = resolveRuntimePath(configDir, fileConfig.report.dataDir, env.HOT_NOW_REPORT_DATA_DIR);
   const databaseFile = resolveRuntimePath(configDir, fileConfig.database.file, env.HOT_NOW_DATABASE_FILE);
+  const aiTimelineFeedFile = resolveRuntimePath(
+    configDir,
+    fileConfig.aiTimelineFeed.file,
+    env.AI_TIMELINE_FEED_FILE
+  );
+  const aiTimelineFeedManifestFile = resolveRuntimePath(
+    configDir,
+    fileConfig.aiTimelineFeed.manifestFile ?? deriveAiTimelineFeedManifestFile(aiTimelineFeedFile),
+    env.AI_TIMELINE_FEED_MANIFEST_FILE
+  );
   const smtpPort = parseSmtpPort(required(env.SMTP_PORT, "SMTP_PORT"));
   const smtpSecure = parseSmtpSecure(required(env.SMTP_SECURE, "SMTP_SECURE"));
   const wechatResolverBaseUrl = env.WECHAT_RESOLVER_BASE_URL?.trim();
@@ -33,6 +46,16 @@ export async function loadRuntimeConfig(options: Options = {}): Promise<RuntimeC
     report: {
       ...fileConfig.report,
       dataDir: reportDir
+    },
+    aiTimelineFeed: {
+      ...fileConfig.aiTimelineFeed,
+      url: normalizeOptionalUrl(env.AI_TIMELINE_FEED_URL, fileConfig.aiTimelineFeed.url),
+      file: aiTimelineFeedFile,
+      manifestFile: aiTimelineFeedManifestFile,
+      maxFallbackVersions: parseAiTimelineFeedMaxFallbackVersions(
+        env.AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS,
+        fileConfig.aiTimelineFeed.maxFallbackVersions
+      )
     },
     smtp: {
       host: required(env.SMTP_HOST, "SMTP_HOST"),
@@ -119,6 +142,10 @@ function parseRuntimeConfigFile(fileText: string): Omit<RuntimeConfig, "smtp" | 
   const report = getRequiredObject(parsed.report, "report");
   const source = getRequiredObject(parsed.source, "source");
   const database = getOptionalObject(parsed.database, "database");
+  const aiTimelineFeed = getOptionalObject(parsed.aiTimelineFeed, "aiTimelineFeed");
+  const aiTimelineFeedFile =
+    optionalConfigString(aiTimelineFeed?.file, "aiTimelineFeed.file") ?? defaultAiTimelineFeedFile;
+  const aiTimelineFeedUrl = optionalConfigString(aiTimelineFeed?.url, "aiTimelineFeed.url") ?? defaultAiTimelineFeedUrl;
   const parsedMailSchedule = {
     enabled: requiredConfigBoolean(mailSchedule.enabled, "mailSchedule.enabled"),
     dailyTime: requiredMailScheduleDailyTime(mailSchedule.dailyTime, "mailSchedule.dailyTime"),
@@ -151,6 +178,16 @@ function parseRuntimeConfigFile(fileText: string): Omit<RuntimeConfig, "smtp" | 
       dataDir: requiredConfigString(report.dataDir, "report.dataDir"),
       allowDegraded: requiredConfigBoolean(report.allowDegraded, "report.allowDegraded")
     },
+    aiTimelineFeed: {
+      url: aiTimelineFeedUrl,
+      file: aiTimelineFeedFile,
+      manifestFile:
+        optionalConfigString(aiTimelineFeed?.manifestFile, "aiTimelineFeed.manifestFile") ??
+        deriveAiTimelineFeedManifestFile(aiTimelineFeedFile),
+      maxFallbackVersions:
+        optionalPositiveInteger(aiTimelineFeed?.maxFallbackVersions, "aiTimelineFeed.maxFallbackVersions") ??
+        defaultAiTimelineFeedMaxFallbackVersions
+    },
     source: {
       rssUrl: requiredConfigString(source.rssUrl, "source.rssUrl")
     },
@@ -158,6 +195,37 @@ function parseRuntimeConfigFile(fileText: string): Omit<RuntimeConfig, "smtp" | 
       file: requiredConfigString(database?.file ?? defaultDatabaseFile, "database.file")
     }
   };
+}
+
+function normalizeOptionalUrl(overrideValue: string | undefined, configValue: string | null) {
+  const trimmedOverride = overrideValue?.trim();
+
+  if (trimmedOverride) {
+    return trimmedOverride;
+  }
+
+  return configValue?.trim() || null;
+}
+
+function deriveAiTimelineFeedManifestFile(feedFile: string) {
+  const parsedPath = path.parse(feedFile);
+  return path.join(parsedPath.dir, `${parsedPath.name}-manifest.json`);
+}
+
+function parseAiTimelineFeedMaxFallbackVersions(value: string | undefined, configValue: number) {
+  const trimmedValue = value?.trim();
+
+  if (!trimmedValue) {
+    return configValue;
+  }
+
+  const parsedValue = Number(trimmedValue);
+
+  if (!Number.isInteger(parsedValue) || parsedValue < 1) {
+    throw new Error(`Invalid AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS: ${value}`);
+  }
+
+  return parsedValue;
 }
 
 function getRequiredObject(value: unknown, key: string) {
@@ -185,6 +253,18 @@ function getOptionalObject(value: unknown, key: string) {
 function requiredConfigString(value: unknown, key: string) {
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(`Missing required config field: ${key}`);
+  }
+
+  return value;
+}
+
+function optionalConfigString(value: unknown, key: string) {
+  if (value == null) {
+    return undefined;
+  }
+
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`Invalid ${key}`);
   }
 
   return value;
@@ -224,6 +304,14 @@ function requiredPositiveInteger(value: unknown, key: string) {
   }
 
   return number;
+}
+
+function optionalPositiveInteger(value: unknown, key: string) {
+  if (value == null) {
+    return undefined;
+  }
+
+  return requiredPositiveInteger(value, key);
 }
 
 function requiredCollectionIntervalMinutes(value: unknown, key: string) {

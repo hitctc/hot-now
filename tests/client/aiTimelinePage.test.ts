@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import Antd from "ant-design-vue";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import AiTimelinePage from "../../src/client/pages/content/AiTimelinePage.vue";
 
@@ -184,6 +184,10 @@ function triggerInfiniteLoad(): void {
 }
 
 describe("AiTimelinePage", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.resetAllMocks();
     installIntersectionObserverMock();
@@ -215,7 +219,7 @@ describe("AiTimelinePage", () => {
       page: 1
     });
     expect(wrapper.get("[data-ai-timeline-page]").text()).toContain("AI 官方发布时间线");
-    expect(wrapper.get("[data-ai-timeline-intro]").text()).toContain("这里只收一手官方来源");
+    expect(wrapper.get("[data-ai-timeline-intro]").text()).toContain("Markdown feed");
     expect(wrapper.get("[data-ai-timeline-filters]").text()).toContain("事件类型");
     expect(wrapper.findAll("[data-ai-timeline-event-card]")).toHaveLength(2);
     expect(wrapper.findAll("[data-ai-timeline-display-index]").map((node) => node.text())).toEqual(["1", "2"]);
@@ -268,7 +272,18 @@ describe("AiTimelinePage", () => {
     });
 
     await flushPromises();
+
+    vi.useFakeTimers();
     triggerInfiniteLoad();
+    await flushPromises();
+    expect(wrapper.get("[data-ai-timeline-infinite-load-status]").find(".ant-spin").exists()).toBe(true);
+    expect(aiTimelineApiMocks.readAiTimelinePage).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1999);
+    await flushPromises();
+    expect(aiTimelineApiMocks.readAiTimelinePage).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
     await flushPromises();
 
     expect(aiTimelineApiMocks.readAiTimelinePage).toHaveBeenNthCalledWith(2, {
@@ -280,6 +295,36 @@ describe("AiTimelinePage", () => {
     expect(wrapper.findAll("[data-ai-timeline-event-card]")).toHaveLength(3);
     expect(wrapper.findAll("[data-ai-timeline-display-index]").map((node) => node.text())).toEqual(["1", "2", "3"]);
     expect(wrapper.get("[data-ai-timeline-result-summary]").text()).toContain("已加载 3 条");
+  });
+
+  it("does not show delayed infinite loading when there is no next timeline page", async () => {
+    aiTimelineApiMocks.readAiTimelinePage.mockResolvedValueOnce(
+      createTimelineModel({
+        totalResults: 2,
+        totalPages: 1
+      })
+    );
+
+    const wrapper = mount(AiTimelinePage, {
+      global: {
+        plugins: [Antd]
+      }
+    });
+
+    await flushPromises();
+
+    vi.useFakeTimers();
+    triggerInfiniteLoad();
+    await flushPromises();
+
+    expect(wrapper.get("[data-ai-timeline-infinite-load-status]").find(".ant-spin").exists()).toBe(false);
+    expect(wrapper.get("[data-ai-timeline-infinite-load-status]").text()).toContain("已加载全部 2 条");
+
+    await vi.advanceTimersByTimeAsync(2000);
+    await flushPromises();
+
+    expect(aiTimelineApiMocks.readAiTimelinePage).toHaveBeenCalledTimes(1);
+    expect(wrapper.get("[data-ai-timeline-infinite-load-status]").find(".ant-spin").exists()).toBe(false);
   });
 
   it("shows the shared back-to-top button after scrolling down", async () => {
@@ -377,6 +422,6 @@ describe("AiTimelinePage", () => {
 
     await flushPromises();
 
-    expect(wrapper.get("[data-ai-timeline-empty]").text()).toContain("当前还没有官方时间线事件");
+    expect(wrapper.get("[data-ai-timeline-empty]").text()).toContain("等待外部 Markdown feed");
   });
 });

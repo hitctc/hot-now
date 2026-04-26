@@ -39,20 +39,36 @@ describe("loadRuntimeConfig", () => {
       collectEnabled: true,
       sendLatestEmailEnabled: true
     });
+    expect(config.aiTimelineFeed).toEqual({
+      url: "https://now.achuan.cc/feeds/ai-timeline-feed.md",
+      file: path.resolve("data/feeds/ai-timeline-feed.md"),
+      manifestFile: path.resolve("data/feeds/ai-timeline-feed-manifest.json"),
+      maxFallbackVersions: 10
+    });
   });
 
-  it("allows HOT_NOW_DATABASE_FILE and HOT_NOW_REPORT_DATA_DIR to override resolved runtime paths", async () => {
+  it("allows HOT_NOW_* paths to override resolved runtime paths", async () => {
     const config = await loadRuntimeConfig({
       configPath: path.resolve("config/hot-now.config.json"),
       env: {
         ...baseEnv,
         HOT_NOW_DATABASE_FILE: "/srv/hot-now/shared/data/hot-now.sqlite",
-        HOT_NOW_REPORT_DATA_DIR: "/srv/hot-now/shared/data/reports"
+        HOT_NOW_REPORT_DATA_DIR: "/srv/hot-now/shared/data/reports",
+        AI_TIMELINE_FEED_URL: "https://example.com/ai-timeline-feed.md",
+        AI_TIMELINE_FEED_FILE: "/srv/hot-now/shared/data/feeds/ai-timeline-feed.md",
+        AI_TIMELINE_FEED_MANIFEST_FILE: "/srv/hot-now/shared/data/feeds/ai-timeline-feed-manifest.json",
+        AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS: "7"
       }
     });
 
     expect(config.database.file).toBe("/srv/hot-now/shared/data/hot-now.sqlite");
     expect(config.report.dataDir).toBe("/srv/hot-now/shared/data/reports");
+    expect(config.aiTimelineFeed).toEqual({
+      url: "https://example.com/ai-timeline-feed.md",
+      file: "/srv/hot-now/shared/data/feeds/ai-timeline-feed.md",
+      manifestFile: "/srv/hot-now/shared/data/feeds/ai-timeline-feed-manifest.json",
+      maxFallbackVersions: 7
+    });
   });
 
   it("ignores blank HOT_NOW_* overrides and falls back to config paths", async () => {

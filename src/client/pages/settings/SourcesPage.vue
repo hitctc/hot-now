@@ -20,7 +20,6 @@ import WechatRssSourceModal from "../../components/settings/sources/WechatRssSou
 import WechatRssSourcesCard from "../../components/settings/sources/WechatRssSourcesCard.vue";
 import WeiboTrendingCard from "../../components/settings/sources/WeiboTrendingCard.vue";
 import { useSourcesPageController } from "../../components/settings/sources/useSourcesPageController";
-import { publicOfficialAiTimelineSources } from "../../../core/aiTimeline/officialAiTimelineSources";
 
 const {
   isLoading,
@@ -104,7 +103,6 @@ const {
   handleManualBilibiliCollect,
   handleManualWechatRssCollect,
   handleManualWeiboTrendingCollect,
-  handleManualAiTimelineCollect,
   handleManualSendLatestEmail,
   handleSubmitSource,
   handleSubmitTwitterAccount,
@@ -270,12 +268,8 @@ const {
         />
 
         <AiTimelineOfficialSourcesCard
-          :sources="publicOfficialAiTimelineSources"
           :admin-model="aiTimelineAdminModel"
           :summary-loading="isAiTimelineSummaryLoading"
-          :operations="sourcesModel.operations"
-          :is-action-pending="isActionPending"
-          @collect="handleManualAiTimelineCollect"
         />
 
         <SourceInventoryCard

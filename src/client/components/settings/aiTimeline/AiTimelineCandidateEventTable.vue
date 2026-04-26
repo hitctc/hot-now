@@ -5,12 +5,6 @@ import { editorialContentCardClass, readSafeUrl } from "../../content/contentCar
 
 defineProps<{
   eventsModel: SettingsAiTimelineEventsResponse;
-  isActionPending: (actionKey: string) => boolean;
-}>();
-
-const emit = defineEmits<{
-  edit: [event: AiTimelineEventRecord];
-  setVisibility: [event: AiTimelineEventRecord, visibilityStatus: AiTimelineVisibilityStatus];
 }>();
 
 function formatTime(value: string): string {
@@ -57,19 +51,19 @@ function readReliabilityLabel(event: AiTimelineEventRecord): string {
 <template>
   <a-card
     :class="editorialContentCardClass"
-    title="候选事件池"
+    title="feed 事件"
     size="small"
     data-ai-timeline-candidate-events
   >
     <div class="flex flex-col gap-3">
       <div class="flex flex-wrap items-center justify-between gap-2 text-sm">
-        <span class="font-semibold text-editorial-text-main">后台候选事件 {{ eventsModel.totalResults }} 条</span>
-        <span class="text-xs text-editorial-text-muted">这里包含隐藏、低等级和 7 天外事件，用来排查规则与人工修正。</span>
+        <span class="font-semibold text-editorial-text-main">当前 feed 事件 {{ eventsModel.totalResults }} 条</span>
+        <span class="text-xs text-editorial-text-muted">这里直接展示 Markdown feed 中通过质量门禁的事件，页面不再提供本地编辑。</span>
       </div>
 
       <a-empty
         v-if="eventsModel.events.length === 0"
-        description="还没有 AI 时间线候选事件"
+        description="当前 feed 中没有可展示的 AI 时间线事件"
       />
 
       <article
@@ -108,31 +102,10 @@ function readReliabilityLabel(event: AiTimelineEventRecord): string {
             </div>
           </div>
 
-          <div class="flex shrink-0 flex-wrap gap-2">
-            <a-button
-              size="small"
-              :data-ai-timeline-admin-edit="event.id"
-              @click="emit('edit', event)"
-            >
-              编辑
-            </a-button>
-            <a-button
-              v-if="event.visibilityStatus !== 'hidden'"
-              size="small"
-              danger
-              :loading="isActionPending(`ai-timeline-event:${event.id}`)"
-              @click="emit('setVisibility', event, 'hidden')"
-            >
-              隐藏
-            </a-button>
-            <a-button
-              v-else
-              size="small"
-              :loading="isActionPending(`ai-timeline-event:${event.id}`)"
-              @click="emit('setVisibility', event, 'manual_visible')"
-            >
-              恢复
-            </a-button>
+          <div class="flex shrink-0 flex-wrap gap-2 text-xs text-editorial-text-muted">
+            <span class="rounded-editorial-pill border border-editorial-border bg-editorial-panel/70 px-2.5 py-1">
+              read-only feed
+            </span>
           </div>
         </div>
       </article>

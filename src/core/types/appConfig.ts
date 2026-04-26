@@ -20,6 +20,7 @@ export type RuntimeConfig = {
   mailSchedule: MailScheduleConfig;
   manualActions: ManualActionsConfig;
   report: { topN: number; dataDir: string; allowDegraded: boolean };
+  aiTimelineFeed: { url: string | null; file: string; manifestFile: string; maxFallbackVersions: number };
   source: { rssUrl: string };
   database: { file: string };
   smtp: {

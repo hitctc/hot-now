@@ -10,7 +10,7 @@ import {
   editorialContentListSectionClass,
   editorialContentPageClass
 } from "../../components/content/contentCardShared";
-import { useInfiniteLoadTrigger } from "../../components/content/useInfiniteLoadTrigger";
+import { useInfiniteLoadTrigger, VISIBLE_INFINITE_LOAD_DELAY_MS } from "../../components/content/useInfiniteLoadTrigger";
 import { useContentPageScroll } from "../../components/content/useContentPageScroll";
 import { readAiTimelinePage, type AiTimelineEventRecord, type AiTimelinePageModel } from "../../services/aiTimelineApi";
 
@@ -124,18 +124,22 @@ function handleClear(): void {
   reloadFromFirstPage();
 }
 
-function loadNextTimelinePage(): void {
+async function loadNextTimelinePage(): Promise<void> {
   if (isLoading.value || isLoadingNextPage.value || !hasMoreEvents.value) {
     return;
   }
 
-  void loadTimelinePage({
+  await loadTimelinePage({
     page: currentPage.value + 1,
     append: true
   });
 }
 
-const { setInfiniteLoadTrigger } = useInfiniteLoadTrigger(loadNextTimelinePage);
+const { isInfiniteLoadTriggerPending, setInfiniteLoadTrigger } = useInfiniteLoadTrigger(loadNextTimelinePage, {
+  canTrigger: () => !isLoading.value && !isLoadingNextPage.value && hasMoreEvents.value,
+  delayMs: VISIBLE_INFINITE_LOAD_DELAY_MS
+});
+const isNextTimelinePageVisible = computed(() => isInfiniteLoadTriggerPending.value || isLoadingNextPage.value);
 
 onMounted(() => {
   void loadTimelinePage();
@@ -154,12 +158,12 @@ onMounted(() => {
             AI 官方发布时间线
           </h2>
           <p class="m-0 max-w-3xl text-sm leading-6 text-editorial-text-body">
-            这里只收一手官方来源，默认只展示最近 7 天内达到 S 级或 A 级的重要官方事件，按发布时间倒序追踪模型发布、开发生态、产品应用、行业动态和官方前瞻。
-            每条摘要都会用中文说明这件事为什么重要，媒体解读、传闻和没有官方链接的内容不会进入主时间线。
+            这里直接读取外部 AI 官方发布时间线 Markdown feed，只解析其中的 `json ai-timeline-feed` 数据块，并按发布时间倒序展示最近 7 天内达到 S 级或 A 级的重要官方事件。
+            事件筛选、官方证据和中文重要性说明都来自 feed，应用内不再维护官方源采集规则。
           </p>
         </div>
         <div class="flex flex-wrap gap-2 text-xs text-editorial-text-muted">
-          <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">官方白名单来源</span>
+          <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">外部 Markdown feed</span>
           <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">默认最近 7 天</span>
           <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">只展示 S / A 级</span>
           <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">每条保留官方链接</span>
@@ -205,7 +209,7 @@ onMounted(() => {
     <template v-else-if="events.length === 0">
       <EditorialEmptyState
         :title="hasActiveFilter ? '当前筛选下没有官方事件' : '当前还没有官方时间线事件'"
-        :description="hasActiveFilter ? '清空筛选后再看看，或稍后手动采集官方源。' : '页面已经准备好，等待手动采集官方白名单来源后展示。'"
+        :description="hasActiveFilter ? '清空筛选后再看看，或等待下一次 feed 自动化刷新。' : '页面已经准备好，等待外部 Markdown feed 自动化刷新后展示。'"
         status="info"
         data-ai-timeline-empty
       />
@@ -235,7 +239,7 @@ onMounted(() => {
         class="flex min-h-12 items-center justify-center rounded-editorial-card border border-dashed border-editorial-border bg-editorial-panel/55 px-4 py-3 text-sm text-editorial-text-muted"
         data-ai-timeline-infinite-load-status
       >
-        <a-spin v-if="isLoadingNextPage" />
+        <a-spin v-if="isNextTimelinePageVisible" />
         <span v-else-if="hasMoreEvents">继续向下滚动加载更多</span>
         <span v-else>已加载全部 {{ totalEventCount }} 条</span>
       </div>

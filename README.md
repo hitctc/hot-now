@@ -1,6 +1,6 @@
 # hot-now
 
-本地单机运行的科技资讯编辑台。它会按固定周期拉取多个已启用的 RSS 来源；Twitter 已拆成 `/settings/sources` 里的两条独立手动链路：`账号采集` 和 `关键词搜索`；Hacker News、B 站、微信公众号 RSS 和微博热搜也拆成独立手动链路。扩展来源都不再并入默认定时采集。`AI 时间线` 是独立官方事件流，只采集官方白名单来源，写入 `ai_timeline_events`，不混入普通新闻流；主时间线默认只展示最近 7 天的 S / A 级重要官方事件，并用中文说明“为什么重要”，同时展示官方证据数量和可靠性状态。普通采集结果会经过规则聚类、系统百分制评分和排序，生成多源汇总的 HTML/JSON 报告。邮件发送与采集解耦，可按每日固定时间或手动触发，对最新一份报告单独发信。统一站点继续由 Fastify 托管路由和登录态，但 `/settings/*` 系统页现在已经切到 `Vue 3 + Vite + Ant Design Vue + Tailwind CSS`。
+本地单机运行的科技资讯编辑台。它会按固定周期拉取多个已启用的 RSS 来源；Twitter 已拆成 `/settings/sources` 里的两条独立手动链路：`账号采集` 和 `关键词搜索`；Hacker News、B 站、微信公众号 RSS 和微博热搜也拆成独立手动链路。扩展来源都不再并入默认定时采集。`AI 时间线` 现在只读取外部 Markdown feed 的 `json ai-timeline-feed` 数据块，不再在应用内维护官方源白名单、采集规则或本地候选池；主时间线默认展示 feed 中最近 7 天的 S / A 级重要官方事件，并用中文说明“为什么重要”，同时展示官方证据数量和可靠性状态。普通采集结果会经过规则聚类、系统百分制评分和排序，生成多源汇总的 HTML/JSON 报告。邮件发送与采集解耦，可按每日固定时间或手动触发，对最新一份报告单独发信。统一站点继续由 Fastify 托管路由和登录态，但 `/settings/*` 系统页现在已经切到 `Vue 3 + Vite + Ant Design Vue + Tailwind CSS`。
 
 ## 本地启动
 
@@ -23,12 +23,17 @@ export LLM_SETTINGS_MASTER_KEY="replace-with-local-master-key"
 export TWITTER_API_KEY=""
 export HOT_NOW_DATABASE_FILE="/srv/hot-now/shared/data/hot-now.sqlite"
 export HOT_NOW_REPORT_DATA_DIR="/srv/hot-now/shared/data/reports"
+export AI_TIMELINE_FEED_URL="https://now.achuan.cc/feeds/ai-timeline-feed.md"
+export AI_TIMELINE_FEED_FILE="/srv/hot-now/shared/data/feeds/ai-timeline-feed.md"
+export AI_TIMELINE_FEED_MANIFEST_FILE="/srv/hot-now/shared/data/feeds/ai-timeline-feed-manifest.json"
+export AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS="10"
 export HOT_NOW_CLIENT_DEV_ORIGIN="http://127.0.0.1:35173"
 ```
 
 `LLM_SETTINGS_MASTER_KEY` 现在是可选覆盖项；如果你不单独配置，系统会回退使用 `SESSION_SECRET` 继续加密保存厂商 API key。
 `TWITTER_API_KEY` 是 TwitterAPI.io 的敏感密钥，只在需要执行 Twitter 账号采集或 Twitter 关键词搜索时配置；不配置时仍可在后台维护账号和关键词列表，但两类 Twitter 手动采集都会不可用，RSS、微信公众号 RSS、Hacker News、B 站和微博热搜不受影响。
 `HOT_NOW_DATABASE_FILE`、`HOT_NOW_REPORT_DATA_DIR` 是可选生产覆盖项，用来把 SQLite 和报告目录从代码树移到 `/srv/hot-now/shared/data`；本地开发不填时，系统继续按 `config/hot-now.config.json` 里的相对路径运行。
+`AI_TIMELINE_FEED_URL`、`AI_TIMELINE_FEED_FILE`、`AI_TIMELINE_FEED_MANIFEST_FILE` 和 `AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS` 是可选的外部 AI 官方发布时间线 feed 配置；默认优先读取 `https://now.achuan.cc/feeds/ai-timeline-feed.md`，URL 不可用时再按本地稳定文件、manifest 和版本文件回退。
 `HOT_NOW_CLIENT_DEV_ORIGIN` 也是可选开发辅助项；`npm run dev` 默认会把 Vite dev server 拉到 `http://127.0.0.1:35173`，并按这个地址接入，让 `3030` 页面直接拿到 HMR 和 Vue DevTools。只有你想改成别的开发端口时，才需要显式覆盖它。
 本地开发不再要求手工配置 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`；`npm run dev` 会自动拉起仓库内置的本地公众号解析 sidecar。只有你想覆盖到远端 relay 时，才需要显式配置这两个环境变量。
 
@@ -78,6 +83,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 ## 页面
 
 - 健康检查：`/health`
+- 外部 AI 官方发布时间线 feed：`/feeds/ai-timeline-feed.md`（公开 Markdown；读取 `AI_TIMELINE_FEED_FILE`，失败时按 `AI_TIMELINE_FEED_MANIFEST_FILE` 和版本文件回退）
 - 登录页：`/login`
 - 统一站点内容菜单（未登录也可访问）：`/`、`/ai-new`、`/ai-hot`、`/ai-timeline`
 - 统一站点系统菜单（登录后访问）：`/settings/view-rules`、`/settings/sources`、`/settings/ai-timeline`、`/settings/profile`
@@ -89,10 +95,10 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - `/`、`/ai-new`、`/ai-hot` 顶部现在还提供共享标题搜索框；搜索只匹配标题，按回车或点击按钮才生效，关键词保存在浏览器本地 `localStorage['hot-now-content-search']`
 - `/api/content/ai-new?page=<n>` 与 `/api/content/ai-hot?page=<n>` 现在支持分页，固定 `50` 条 / 页；前端内容页改为触底自动加载下一页，并在条目上方显示总条数和已加载条数
 - `AI 新讯` 固定按最近 `24` 小时窗口和 `ai_new` 门规则构建结果集；`AI 热点` 固定按 `ai_hot` 门规则与热点形成逻辑构建结果集，不会被额外压成 `24` 小时
-- `/ai-timeline` 是独立官方事件流，固定读取 `/api/ai-timeline`；当前使用代码内置官方多源白名单，支持 RSS、官方页面、官方 Release notes、Hugging Face 官方组织模型列表和 GitHub releases Atom，支持事件类型、公司和标题搜索筛选，每条事件必须保留官方来源链接
+- `/ai-timeline` 是独立官方事件流，固定读取 `/api/ai-timeline`；后端只解析外部 Markdown feed 的 `json ai-timeline-feed` 数据块，支持事件类型、公司和标题搜索筛选，每条事件必须保留官方来源链接
 - `/ai-timeline` 主列表默认只展示最近 `7` 天、`S / A` 级、未隐藏的官方重要事件；官方前瞻会进入时间线，但会标注“尚未正式发布”
-- `AI 时间线` 卡片优先展示中文重要性摘要，用人话说明这件事为什么重要；如后台做了人工修正，前台优先使用人工标题、摘要和重要级别
-- `AI 时间线` 卡片会展示官方证据数量和可靠性状态：`single_source` 表示单一官方证据，`multi_source` 表示多个官方入口交叉确认，`source_degraded` 表示事件可展示但来源近期异常，`manual_verified` 表示后台人工确认
+- `AI 时间线` 卡片优先展示 feed 中的中文标题、事实摘要和重要性说明，用人话说明这件事为什么重要
+- `AI 时间线` 卡片会展示官方证据数量和可靠性状态：`single_source` 表示单一官方证据，`multi_source` 表示多个官方入口交叉确认
 - `AI 时间线` 的事件类型固定为 `要闻`、`模型发布`、`开发生态`、`产品应用`、`行业动态`、`官方前瞻`
 - `AI 时间线` 不收媒体报道、二手解读、爆料或无官方链接的传闻，也不参与 `AI 新讯 / AI 热点` 的评分、热点归并、source filter 和反馈池
 - `AI 新讯`、`AI 热点` 与 `AI 时间线` 的条目卡片会在标题左侧显示连续排序序号；触底加载更多时序号按当前已加载列表连续递增
@@ -115,8 +121,8 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - `/settings/sources` 现在还包含独立的 B 站搜索分区，可新增 / 编辑 / 删除 query，控制 `采集启用`，并手动执行 B 站搜索；字段包含 query、优先级、备注；第一版只搜视频，固定每轮最多 5 个 query、每个 query 最多 10 条结果执行，结果进入 `AI 新讯` 与 `AI 热点`，也不混入普通 source 库存表
 - `/settings/sources` 现在还包含独立的微信公众号 RSS 分区，可批量新增 / 单条编辑 / 删除 RSS 链接，并手动执行公众号 RSS 采集；配置保存在独立 `wechat_rss_sources` 表，结果进入 `AI 新讯` 与 `AI 热点`，也不混入普通 source 库存表
 - `/settings/sources` 现在还包含独立的微博热搜榜匹配分区：固定 AI 关键词、只支持手动执行，不提供关键词 CRUD；第一版只匹配微博热搜榜，不做微博全文搜索，结果只进入 `AI 热点`，也不混入普通 source 库存表
-- `/settings/sources` 现在还包含 `AI 时间线官方源摘要` 手动采集卡片：只采集官方白名单来源，结果进入 `AI 时间线`，不进入 `AI 新讯 / AI 热点`，也不混入普通 source 库存表；卡片只展示源数量、最近采集、异常源数量、最近 7 天 S / A 事件数和少量官方源摘要，并提供进入 `/settings/ai-timeline` 的入口
-- `/settings/ai-timeline` 是独立 AI 时间线管理页：展示主时间线状态、官方源健康、候选事件池和规则说明；官方源健康包含最近状态、最近采集时间、最新官方发布时间、候选 / 重要事件数量和异常信息；候选事件池支持按类型、公司、等级、可见状态和最近天数筛选，并支持隐藏、恢复、人工确认、修正标题、中文摘要、重要级别和可靠性状态
+- `/settings/sources` 现在还包含 `AI 时间线 feed 摘要` 卡片：展示外部 Markdown feed 状态、最近 7 天 S / A 事件数和公网 feed 入口，不再提供应用内官方源采集按钮
+- `/settings/ai-timeline` 是独立 AI 时间线 feed 查看页：展示主时间线状态、feed 事件池和规则说明；事件列表支持按类型、公司、等级、可见状态和最近天数筛选
 - `/settings/sources` 现在支持逐 source 配置“选中该来源时全量展示”；开启后，该来源不会在内容页首次默认勾选，只有用户显式勾选后才会按全量模式展示
 - `/settings/profile` 现在会展示会话状态、用户名、角色和联系邮箱，不再停留在占位页
 - 当前支持的 LLM 厂商是 `DeepSeek`、`MiniMax`、`Kimi`；用户在页面里录入 API key，本地只保存加密后的密文；未显式配置 `LLM_SETTINGS_MASTER_KEY` 时，系统会回退使用 `SESSION_SECRET` 作为本地加密 key；当前版本先只保留这些配置入口，不再驱动内容筛选或采集后的自动评估
@@ -129,7 +135,6 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - B 站手动采集：`POST /actions/bilibili/collect`
 - 微信公众号 RSS 手动采集：`POST /actions/wechat-rss/collect`
 - 微博热搜榜匹配：`POST /actions/weibo/collect`
-- AI 时间线官方源采集：`POST /actions/ai-timeline/collect`
 - 手动发送最新报告：`POST /actions/send-latest-email`
 - 兼容别名：`POST /actions/run`（等价于手动采集）
 - 内容反馈写入：`POST /actions/content/:id/feedback-pool`
@@ -142,10 +147,10 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - B 站 query 动作：`POST /actions/bilibili/create`、`POST /actions/bilibili/update`、`POST /actions/bilibili/delete`、`POST /actions/bilibili/toggle`、`POST /actions/bilibili/collect`
 - 微信公众号 RSS 动作：`POST /actions/wechat-rss/create`、`POST /actions/wechat-rss/update`、`POST /actions/wechat-rss/delete`、`POST /actions/wechat-rss/collect`
 - 微博热搜榜匹配动作：`POST /actions/weibo/collect`
-- AI 时间线动作：`POST /actions/ai-timeline/collect`、`GET /api/settings/ai-timeline`、`GET /api/settings/ai-timeline/events`、`GET /api/settings/ai-timeline-events`（兼容旧入口）、`POST /actions/ai-timeline/events/:id/update`（可更新可见状态、可靠性状态和人工修正字段）
+- AI 时间线动作：`GET /api/ai-timeline`、`GET /api/settings/ai-timeline`、`GET /api/settings/ai-timeline/events`、`GET /api/settings/ai-timeline-events`（兼容旧入口）；旧的应用内采集和人工修正写接口保留鉴权但返回只读状态
 - 内容导航已收口为 AI-first：`/` 与 `/ai-new` 等同 `AI 新讯`，`/ai-hot` 承接 `AI 热点`，`/articles` 已移除
 
-统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。auth 开启后，内容菜单保持公开可读，但系统菜单和所有写操作仍然要求登录；`content_sources.is_enabled` 决定哪些普通 RSS source 参与定时 / 手动采集，`content_sources.show_all_when_selected` 决定该 source 在内容页被显式勾选时是否全量展示；Twitter 账号由独立 `twitter_accounts.is_enabled` 控制是否参与 Twitter 手动采集，Twitter 关键词由独立 `twitter_search_keywords.is_collect_enabled` 控制是否参与关键词搜索、由 `twitter_search_keywords.is_visible` 控制该关键词命中的内容是否继续进入内容页，关键词搜索固定追加 `lang:zh` 并在入库前排除日文假名 / 韩文内容，真实拉取都依赖环境变量 `TWITTER_API_KEY`；Hacker News query 由独立 `hackernews_queries.is_enabled` 控制是否参与 HN 手动搜索，当前不额外区分“展示启用”；B 站 query 由独立 `bilibili_queries.is_enabled` 控制是否参与 B 站手动搜索，第一版只搜视频且不额外区分“展示启用”；微信公众号 RSS 配置由独立 `wechat_rss_sources.is_enabled` 控制是否参与公众号 RSS 手动采集，当前支持批量新增链接、单条编辑和删除配置；微博热搜榜匹配没有单独配置表，只保留固定 AI 关键词和手动执行入口；AI 时间线官方源白名单写在 `src/core/aiTimeline/officialAiTimelineSources.ts`，当前覆盖 OpenAI News、Google AI Blog、Gemini API Release Notes、Claude Platform Release Notes、Claude Code Changelog、Anthropic News、Google DeepMind News、Mistral Docs Changelog、Mistral News、Azure OpenAI What's New、Qwen Blog、Kimi 开放平台更新记录、MiniMax API Release Notes、BigModel 新品发布，以及 Qwen / DeepSeek / Meta Llama / Mistral / ByteDance Seed 的 Hugging Face 官方组织模型列表和 GitHub releases Atom；采集结果写入独立 `ai_timeline_events` 表，不写入 `content_items`，并记录事件合并键、重要级别、发布状态、中文重要性摘要、可见状态、识别实体、官方证据数量、可靠性状态和最近校验时间；官方证据写入 `ai_timeline_event_evidence`，官方源健康写入 `ai_timeline_source_runs`；主时间线默认只展示最近 `7` 天、`S / A` 级、未隐藏的重要事件，后台候选池改由 `/settings/ai-timeline` 查看隐藏、低级别和 7 天外事件，并支持人工隐藏、恢复展示、人工确认、修正标题、中文摘要和重要级别；为满足 `content_items.source_id` 外键，系统会维护隐藏聚合 source `twitter_accounts`、`twitter_keyword_search`、`hackernews_search`、`bilibili_search`、`wechat_rss` 和 `weibo_trending`，它们都不承载配置，也不会出现在普通 source 库存表中；内容页来源筛选会暴露这些聚合 source，其中两个 Twitter 聚合 source 和微信公众号 RSS 聚合 source 会展开二级多选，HN 和 B 站第一版暂不提供内容页二级 query 筛选，微博热搜榜匹配则只进入 `AI 热点`、不进入 `AI 新讯`；`/settings/sources` 现在可以直接启用/停用 source、切换“选中时全量展示”、新增 / 编辑 / 删除自定义 RSS 来源，也可以单独维护 Twitter 账号列表、Twitter 关键词列表、Hacker News query 列表、B 站 query 列表、微信公众号 RSS 链接列表，执行微博热搜榜匹配，或手动采集 AI 时间线官方源并跳转到独立管理页；普通“新增来源”弹窗不再提供公众号入口，公众号 RSS 统一从独立分区维护；来源保存成功后，系统会自动补拉该来源的首批内容，不需要再手动先跑一次采集；内容页顶部的来源筛选和排序只影响当前浏览结果，不会改 source 启用状态；legacy `/control` 继续提供普通 RSS 采集与发信动作。
+统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。auth 开启后，内容菜单保持公开可读，但系统菜单和所有写操作仍然要求登录；普通 RSS、Twitter、Hacker News、B 站、微信公众号 RSS 和微博热搜继续按各自配置和手动入口工作。AI 时间线不再由应用内官方源采集规则驱动，也不再写入本地候选事件表；Codex 自动化生成并上传 Markdown feed，应用只解析 `json ai-timeline-feed` 数据块来渲染 `/ai-timeline` 和 `/settings/ai-timeline`。
 
 ### Vue 开发规范
 
@@ -195,7 +200,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - B 站搜索不依赖额外密钥；只要后台已有启用中的 query，就可以手动执行
 - 微信公众号 RSS 不依赖额外密钥；只要后台已有链接，就可以手动执行采集
 - 微博热搜榜匹配不依赖额外密钥；只要微博公开热搜接口可用，就可以手动执行固定 AI 关键词匹配
-- AI 时间线官方源采集不依赖额外密钥；只要官方白名单来源可访问，就可以手动采集候选事件，并在 `/settings/ai-timeline` 查看源健康、官方证据和候选事件池
+- AI 时间线不依赖应用内采集密钥；Codex 自动化负责生成并上传 Markdown feed，应用只读取 feed 并渲染事件
 
 默认报告目录是 `data/reports/<YYYY-MM-DD>/`，其中会保存：
 
@@ -226,6 +231,9 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 ```bash
 HOT_NOW_DATABASE_FILE=/srv/hot-now/shared/data/hot-now.sqlite
 HOT_NOW_REPORT_DATA_DIR=/srv/hot-now/shared/data/reports
+AI_TIMELINE_FEED_FILE=/srv/hot-now/shared/data/feeds/ai-timeline-feed.md
+AI_TIMELINE_FEED_MANIFEST_FILE=/srv/hot-now/shared/data/feeds/ai-timeline-feed-manifest.json
+AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS=10
 ```
 
 仓库内已经提供第一版部署模板：
@@ -282,6 +290,15 @@ cp .deploy.local.env.example .deploy.local.env
 
 - `/srv/hot-now/shared/data`
 - `/srv/hot-now/shared/.env`
+
+外部 AI 官方发布时间线 feed 推荐目录：
+
+- `/srv/hot-now/shared/data/feeds`
+- 稳定文件：`ai-timeline-feed.md`
+- manifest：`ai-timeline-feed-manifest.json`
+- 版本文件：`ai-timeline-feed-<YYYYMMDDTHHmmssZ>.md`
+
+生成自动化应先上传版本文件，再更新稳定文件和 manifest。公网读取统一走应用路由 `https://now.achuan.cc/feeds/ai-timeline-feed.md`，不要把整个 `/srv/hot-now/shared/data` 直接暴露给 Nginx。
 
 部署前需要先安装 sudoers 规则，推荐用 `visudo` 落成独立文件：
 
@@ -363,4 +380,4 @@ sudo visudo -cf /etc/sudoers.d/hot-now-systemctl
 - 如果要手动验证 B 站搜索，先在 `/settings/sources` 新增并启用至少一个 query，再点击“手动采集 B 站搜索”；当前第一版固定为“最多处理 5 个已启用 query、每个 query 最多取前 10 条视频结果”，成功后优先检查 query 的“最近成功 / 最近结果”是否回写，再到 `/ai-new`、`/ai-hot` 确认视频内容是否已入库并可见
 - 如果要手动验证微信公众号 RSS，先在 `/settings/sources` 的“微信公众号 RSS”分区批量新增一个或多个 RSS 链接，再点击“手动采集公众号 RSS”；成功后优先检查 RSS 行的“最近成功 / 最近结果”是否回写，再到 `/ai-new`、`/ai-hot` 勾选 `微信公众号 RSS`，并用二级“公众号 RSS 筛选”确认单个 RSS 的内容可筛选
 - 如果要手动验证微博热搜榜匹配，直接在 `/settings/sources` 点击“手动匹配微博热搜榜”；当前第一版固定按内置 AI 关键词匹配微博热搜榜，不提供关键词 CRUD，也不做微博全文搜索，成功后优先检查“最近抓取 / 最近成功 / 最近结果”是否回写，再到 `/ai-hot` 确认命中的微博热搜内容是否已入库并可见，同时确认它不会出现在 `/ai-new`
-- 如果要手动验证 AI 时间线，先在 `/settings/sources` 点击“手动采集官方事件”，确认摘要卡片只显示源健康概览和进入管理页入口；再到 `/settings/ai-timeline` 检查主时间线状态、官方源健康、候选事件池、隐藏 / 恢复展示、人工确认、修正标题和中文摘要；最后到 `/ai-timeline` 检查最近 7 天 S / A 级事件列表、事件类型筛选、公司筛选、标题搜索、官方来源链接、官方证据数量、可靠性状态、官方前瞻标注和中文重要性摘要，同时确认这些事件不会出现在 `/ai-new` 或 `/ai-hot` 的普通内容流里。OpenAI API changelog、ChatGPT Release Notes 和 xAI News 暂未接入，原因是服务器侧静态请求会被 Cloudflare challenge 阻断；腾讯 / 百度 / 小米暂放第二批，先确认稳定官方入口和可抽取发布时间后再接。
+- 如果要手动验证 AI 时间线，先确认 `https://now.achuan.cc/feeds/ai-timeline-feed.md` 可访问且包含 `json ai-timeline-feed` 代码块；再打开 `/api/ai-timeline` 检查 JSON 是否能解析出事件；最后到 `/ai-timeline` 检查最近 7 天 S / A 级事件列表、事件类型筛选、公司筛选、标题搜索、官方来源链接、官方证据数量、可靠性状态、官方前瞻标注和中文重要性摘要，同时确认这些事件不会出现在 `/ai-new` 或 `/ai-hot` 的普通内容流里。

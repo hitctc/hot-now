@@ -92,7 +92,16 @@ function readImportanceBadgeClass(): string {
 }
 
 function readReleaseStatusLabel(): string {
-  return props.event.releaseStatus === "official_preview" ? "官方前瞻，尚未正式发布" : "已正式发布";
+  switch (props.event.releaseStatus) {
+    case "official_preview":
+      return "官方前瞻，尚未正式发布";
+    case "open_sourced":
+      return "已开源";
+    case "updated":
+      return "重要更新";
+    case "released":
+      return "已正式发布";
+  }
 }
 
 function readReliabilityLabel(): string {

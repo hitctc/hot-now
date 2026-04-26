@@ -28,9 +28,9 @@ const appShellPages: AppShellPage[] = [
   { path: "/settings/sources", title: "数据收集", section: "system", description: "这里会管理 RSS 数据源的启用状态、抓取结果和手动采集。" },
   {
     path: "/settings/ai-timeline",
-    title: "AI 时间线管理",
+    title: "AI 时间线 feed",
     section: "system",
-    description: "这里会管理官方源健康、候选事件、证据链和主时间线展示规则。"
+    description: "这里会查看外部 Markdown feed 解析出的官方事件、证据链和展示规则。"
   },
   {
     path: "/settings/view-rules",

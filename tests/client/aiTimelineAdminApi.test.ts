@@ -40,31 +40,4 @@ describe("aiTimelineAdminApi", () => {
 
     expect(requestJson).toHaveBeenCalledWith("/api/settings/ai-timeline/events?importance=S&page=2");
   });
-
-  it("posts admin event updates and manual collection to the existing actions", async () => {
-    const {
-      triggerAiTimelineAdminCollect,
-      updateAiTimelineAdminEvent
-    } = await import("../../src/client/services/aiTimelineAdminApi");
-
-    requestJson.mockResolvedValue({ ok: true });
-
-    await updateAiTimelineAdminEvent(12, {
-      reliabilityStatus: "manual_verified",
-      manualSummaryZh: "人工确认过的摘要"
-    });
-    await triggerAiTimelineAdminCollect();
-
-    expect(requestJson).toHaveBeenNthCalledWith(1, "/actions/ai-timeline/events/12/update", {
-      method: "POST",
-      body: JSON.stringify({
-        reliabilityStatus: "manual_verified",
-        manualSummaryZh: "人工确认过的摘要"
-      })
-    });
-    expect(requestJson).toHaveBeenNthCalledWith(2, "/actions/ai-timeline/collect", {
-      method: "POST",
-      body: JSON.stringify({})
-    });
-  });
 });

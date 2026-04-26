@@ -45,11 +45,15 @@ function readSourceStatusLabel(status: SettingsAiTimelineSourceHealth["latestSta
 <template>
   <a-card
     :class="editorialContentCardClass"
-    title="官方源健康"
+    title="feed 来源状态"
     size="small"
     data-ai-timeline-source-health
   >
-    <div class="overflow-x-auto">
+    <a-empty
+      v-if="sources.length === 0"
+      description="当前时间线由外部 Markdown feed 驱动，应用内不再维护官方源采集健康表"
+    />
+    <div v-else class="overflow-x-auto">
       <table class="w-full min-w-[760px] border-separate border-spacing-y-2 text-left text-sm">
         <thead class="text-xs text-editorial-text-muted">
           <tr>

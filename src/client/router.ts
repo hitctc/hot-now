@@ -74,9 +74,9 @@ const aiTimelineAdminPageMeta = {
   key: "ai-timeline-admin",
   path: "/settings/ai-timeline",
   section: "system",
-  navLabel: "AI 时间线管理",
-  title: "AI 时间线管理",
-  description: "管理官方源健康、候选事件、证据链和主时间线展示规则。"
+  navLabel: "AI 时间线 feed",
+  title: "AI 时间线 feed",
+  description: "查看外部 Markdown feed 解析出的官方事件、证据链和展示规则。"
 } as const satisfies ShellPageMeta;
 
 const profilePageMeta = {

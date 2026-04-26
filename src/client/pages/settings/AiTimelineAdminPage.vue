@@ -5,7 +5,6 @@ import {
 } from "../../components/content/contentCardShared";
 import AiTimelineAdminOverview from "../../components/settings/aiTimeline/AiTimelineAdminOverview.vue";
 import AiTimelineCandidateEventTable from "../../components/settings/aiTimeline/AiTimelineCandidateEventTable.vue";
-import AiTimelineEventEditDrawer from "../../components/settings/aiTimeline/AiTimelineEventEditDrawer.vue";
 import AiTimelineRulesPanel from "../../components/settings/aiTimeline/AiTimelineRulesPanel.vue";
 import AiTimelineSourceHealthTable from "../../components/settings/aiTimeline/AiTimelineSourceHealthTable.vue";
 import { useAiTimelineAdminPageController } from "../../components/settings/aiTimeline/useAiTimelineAdminPageController";
@@ -19,16 +18,7 @@ const {
   overview,
   sourceHealthRows,
   eventsModel,
-  editingEvent,
-  editDraft,
-  isEditDrawerOpen,
-  isActionPending,
-  loadWorkbench,
-  handleManualCollect,
-  openEditEvent,
-  closeEditDrawer,
-  saveEditedEvent,
-  setEventVisibility
+  loadWorkbench
 } = useAiTimelineAdminPageController();
 </script>
 
@@ -69,25 +59,17 @@ const {
               <span class="rounded-editorial-pill border border-editorial-border bg-editorial-panel/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-editorial-text-muted">
                 AI Timeline Operations
               </span>
-              <span class="text-xs leading-6 text-editorial-text-muted">官方源健康、候选事件、证据链和展示规则集中管理。</span>
+              <span class="text-xs leading-6 text-editorial-text-muted">外部 Markdown feed、官方证据链和展示规则集中查看。</span>
             </div>
             <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div class="space-y-2">
                 <h2 class="m-0 text-[28px] font-semibold tracking-[-0.04em] text-editorial-text-main">
-                  AI 时间线管理
+                  AI 时间线 feed
                 </h2>
                 <p class="m-0 max-w-3xl text-sm leading-7 text-editorial-text-body">
-                  这里不再混在普通数据收集里，而是专门处理主流 AI 官方发布事件的可靠性、及时性和人工修正。
+                  这里只读取 Codex 自动化上传的 Markdown feed；应用内不再维护官方源白名单、采集规则、本地候选池或人工修正状态。
                 </p>
               </div>
-              <a-button
-                type="primary"
-                data-action="manual-ai-timeline-admin-collect"
-                :loading="isActionPending('manual:ai-timeline-collect')"
-                @click="handleManualCollect"
-              >
-                手动采集官方事件
-              </a-button>
             </div>
           </div>
         </section>
@@ -96,21 +78,9 @@ const {
         <AiTimelineSourceHealthTable :sources="sourceHealthRows" />
         <AiTimelineCandidateEventTable
           :events-model="eventsModel"
-          :is-action-pending="isActionPending"
-          @edit="openEditEvent"
-          @set-visibility="setEventVisibility"
         />
         <AiTimelineRulesPanel />
       </template>
-
-      <AiTimelineEventEditDrawer
-        :open="isEditDrawerOpen"
-        :event="editingEvent"
-        :draft="editDraft"
-        :is-saving="editingEvent ? isActionPending(`ai-timeline-event:${editingEvent.id}`) : false"
-        @close="closeEditDrawer"
-        @save="saveEditedEvent"
-      />
     </div>
   </a-spin>
 </template>

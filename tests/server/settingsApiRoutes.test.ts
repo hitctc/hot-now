@@ -173,17 +173,6 @@ function createAuthenticatedServer() {
     triggerManualHackerNewsCollect: vi.fn().mockResolvedValue({ accepted: true }),
     triggerManualBilibiliCollect: vi.fn().mockResolvedValue({ accepted: true }),
     triggerManualWeiboTrendingCollect: vi.fn().mockResolvedValue({ accepted: true }),
-    triggerManualAiTimelineCollect: vi.fn().mockResolvedValue({
-      accepted: true,
-      action: "collect-ai-timeline",
-      sourceCount: 2,
-      fetchedItemCount: 3,
-      persistedEventCount: 2,
-      insertedEventCount: 1,
-      updatedEventCount: 1,
-      skippedItemCount: 1,
-      failureCount: 0
-    }),
     triggerManualWechatRssCollect: vi.fn().mockResolvedValue({
       accepted: true,
       action: "collect-wechat-rss",
@@ -445,7 +434,7 @@ describe("settings api routes", () => {
     expect(response.json()).toEqual({ accepted: false, reason: "unauthorized" });
   });
 
-  it("accepts manual AI timeline collection for logged-in users", async () => {
+  it("keeps manual AI timeline collection disabled for logged-in users", async () => {
     const app = createAuthenticatedServer();
     const cookie = await loginAndGetCookie(app);
 
@@ -457,12 +446,10 @@ describe("settings api routes", () => {
       }
     });
 
-    expect(response.statusCode).toBe(202);
+    expect(response.statusCode).toBe(410);
     expect(response.json()).toMatchObject({
-      accepted: true,
-      action: "collect-ai-timeline",
-      sourceCount: 2,
-      persistedEventCount: 2
+      accepted: false,
+      reason: "ai-timeline-feed-automation-only"
     });
   });
 

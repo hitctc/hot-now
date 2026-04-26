@@ -586,40 +586,10 @@ export type ManualWeiboTrendingCollectResponse =
       reason?: "already-running";
     };
 
-export type ManualAiTimelineCollectResponse =
-  | {
-      accepted: true;
-      action: "collect-ai-timeline";
-      sourceCount: number;
-      fetchedItemCount: number;
-      persistedEventCount: number;
-      insertedEventCount: number;
-      updatedEventCount: number;
-      skippedItemCount: number;
-      failureCount: number;
-    }
-  | {
-      accepted: false;
-      reason?: "no-ai-timeline-sources" | "already-running";
-    };
-
 export type ManualSendLatestEmailResponse = {
   accepted: boolean;
   action?: "send-latest-email";
   reason?: string;
-};
-
-export type UpdateAiTimelineEventPayload = {
-  visibilityStatus?: AiTimelineVisibilityStatus;
-  reliabilityStatus?: AiTimelineReliabilityStatus | null;
-  manualTitle?: string | null;
-  manualSummaryZh?: string | null;
-  manualImportanceLevel?: AiTimelineImportanceLevel | null;
-};
-
-export type UpdateAiTimelineEventResponse = {
-  ok: true;
-  event: AiTimelineEventRecord;
 };
 
 // 读取当前登录用户摘要，401 代表匿名访问或会话失效，调用方可以把它当作“未登录”。
@@ -868,21 +838,6 @@ export function triggerManualWechatRssCollect(): Promise<ManualWechatRssCollectR
 // 微博热搜榜匹配只走独立手动入口，不进入默认采集链路。
 export function triggerManualWeiboTrendingCollect(): Promise<ManualWeiboTrendingCollectResponse> {
   return postSettingsAction<ManualWeiboTrendingCollectResponse>("/actions/weibo/collect", {});
-}
-
-// AI 时间线只采集官方白名单来源，结果写入独立时间线事件表，不进入普通内容流。
-export function triggerManualAiTimelineCollect(): Promise<ManualAiTimelineCollectResponse> {
-  return postSettingsAction<ManualAiTimelineCollectResponse>("/actions/ai-timeline/collect", {});
-}
-
-export function updateAiTimelineEventManualFields(
-  eventId: number,
-  payload: UpdateAiTimelineEventPayload
-): Promise<UpdateAiTimelineEventResponse> {
-  return postSettingsAction<UpdateAiTimelineEventResponse>(
-    `/actions/ai-timeline/events/${encodeURIComponent(String(eventId))}/update`,
-    payload
-  );
 }
 
 // 手动发送最新报告沿用现有后端接口，错误原因由调用方再翻译成用户提示。

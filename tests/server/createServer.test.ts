@@ -229,7 +229,7 @@ describe("createServer", () => {
   });
 
   it("returns AI timeline events with query filters", async () => {
-    const listAiTimelineEvents = vi.fn().mockResolvedValue({
+    const readAiTimelinePage = vi.fn().mockResolvedValue({
       events: [
         {
           id: 1,
@@ -270,7 +270,7 @@ describe("createServer", () => {
         totalPages: 2
       }
     });
-    const app = createServer({ listAiTimelineEvents });
+    const app = createServer({ readAiTimelinePage });
 
     const response = await app.inject({
       method: "GET",
@@ -278,7 +278,7 @@ describe("createServer", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(listAiTimelineEvents).toHaveBeenCalledWith({
+    expect(readAiTimelinePage).toHaveBeenCalledWith({
       eventType: "模型发布",
       companyKey: "openai",
       searchKeyword: "GPT",
@@ -302,8 +302,8 @@ describe("createServer", () => {
     });
   });
 
-  it("returns protected AI timeline admin events and updates manual fields", async () => {
-    const listAiTimelineAdminEvents = vi.fn().mockResolvedValue({
+  it("returns protected AI timeline admin events from the read-only feed model", async () => {
+    const readAiTimelinePage = vi.fn().mockResolvedValue({
       events: [],
       filters: {
         eventTypes: ["要闻", "模型发布", "开发生态", "产品应用", "行业动态", "官方前瞻"],
@@ -316,38 +316,6 @@ describe("createServer", () => {
         totalPages: 0
       }
     });
-    const updateAiTimelineEventManualFields = vi.fn().mockResolvedValue({
-      id: 12,
-      companyKey: "openai",
-      companyName: "OpenAI",
-      eventType: "模型发布",
-      title: "OpenAI 发布 GPT-5.5",
-      summary: "自动摘要。",
-      officialUrl: "https://openai.com/news/gpt-5-5/",
-      sourceLabel: "OpenAI News",
-      sourceKind: "official_blog",
-      publishedAt: "2026-04-24T10:00:00.000Z",
-      discoveredAt: "2026-04-24T12:00:00.000Z",
-      importance: 95,
-      importanceLevel: "A",
-      releaseStatus: "released",
-      importanceSummaryZh: "自动重要性摘要。",
-      visibilityStatus: "manual_visible",
-      manualTitle: "人工修正标题",
-      manualSummaryZh: "人工修正摘要",
-      manualImportanceLevel: "A",
-      detectedEntities: ["GPT-5.5"],
-      eventKey: "openai:gpt-5-5:2026-04-24",
-      reliabilityStatus: "manual_verified",
-      evidenceCount: 2,
-      lastVerifiedAt: "2026-04-24T12:05:00.000Z",
-      evidenceLinks: [],
-      displayTitle: "人工修正标题",
-      displaySummaryZh: "人工修正摘要",
-      rawSourceJson: {},
-      createdAt: "2026-04-24T12:00:00.000Z",
-      updatedAt: "2026-04-24T12:10:00.000Z"
-    });
     const app = createServer({
       auth: {
         requireLogin: true,
@@ -358,8 +326,7 @@ describe("createServer", () => {
           role: "owner"
         })
       },
-      listAiTimelineAdminEvents,
-      updateAiTimelineEventManualFields
+      readAiTimelinePage
     });
 
     const anonymousResponse = await app.inject({ method: "GET", url: "/api/settings/ai-timeline-events" });
@@ -377,46 +344,17 @@ describe("createServer", () => {
       url: "/api/settings/ai-timeline-events?importance=S,A&visibility=auto_visible,hidden&page=1",
       headers: { cookie: cookie ?? "" }
     });
-    const updateResponse = await app.inject({
-      method: "POST",
-      url: "/actions/ai-timeline/events/12/update",
-      headers: { cookie: cookie ?? "" },
-      payload: {
-        visibilityStatus: "manual_visible",
-        reliabilityStatus: "manual_verified",
-        manualTitle: "人工修正标题",
-        manualSummaryZh: "人工修正摘要",
-        manualImportanceLevel: "A"
-      }
-    });
 
     expect(adminResponse.statusCode).toBe(200);
-    expect(listAiTimelineAdminEvents).toHaveBeenCalledWith({
+    expect(readAiTimelinePage).toHaveBeenCalledWith({
       importanceLevels: ["S", "A"],
       visibilityStatuses: ["auto_visible", "hidden"],
       page: 1
     });
-    expect(updateResponse.statusCode).toBe(200);
-    expect(updateAiTimelineEventManualFields).toHaveBeenCalledWith(12, {
-      visibilityStatus: "manual_visible",
-      reliabilityStatus: "manual_verified",
-      manualTitle: "人工修正标题",
-      manualSummaryZh: "人工修正摘要",
-      manualImportanceLevel: "A"
-    });
-    expect(updateResponse.json()).toMatchObject({
-      ok: true,
-      event: {
-        id: 12,
-        displayTitle: "人工修正标题",
-        visibilityStatus: "manual_visible",
-        reliabilityStatus: "manual_verified"
-      }
-    });
   });
 
   it("returns the protected AI timeline admin workbench model", async () => {
-    const listAiTimelineAdminEvents = vi.fn().mockResolvedValue({
+    const readAiTimelinePage = vi.fn().mockResolvedValue({
       events: [
         {
           id: 8,
@@ -462,31 +400,6 @@ describe("createServer", () => {
         totalPages: 2
       }
     });
-    const listAiTimelineSourceHealth = vi.fn().mockResolvedValue([
-      {
-        sourceId: "openai-news-rss",
-        companyKey: "openai",
-        companyName: "OpenAI",
-        sourceLabel: "OpenAI News",
-        sourceKind: "rss_feed",
-        sourceUrl: "https://openai.com/news/rss.xml",
-        latestStatus: "success",
-        latestStartedAt: "2026-04-24T12:00:00.000Z",
-        latestFinishedAt: "2026-04-24T12:00:01.000Z",
-        fetchedItemCount: 10,
-        candidateEventCount: 2,
-        importantEventCount: 1,
-        latestOfficialPublishedAt: "2026-04-24T10:00:00.000Z",
-        errorMessage: null
-      }
-    ]);
-    const readAiTimelineHealthOverview = vi.fn().mockResolvedValue({
-      visibleImportantCount7d: 12,
-      latestVisiblePublishedAt: "2026-04-24T10:00:00.000Z",
-      latestCollectStartedAt: "2026-04-24T12:00:00.000Z",
-      failedSourceCount: 1,
-      staleSourceCount: 0
-    });
     const app = createServer({
       auth: {
         requireLogin: true,
@@ -497,9 +410,7 @@ describe("createServer", () => {
           role: "owner"
         })
       },
-      listAiTimelineAdminEvents,
-      listAiTimelineSourceHealth,
-      readAiTimelineHealthOverview
+      readAiTimelinePage
     });
 
     const anonymousResponse = await app.inject({ method: "GET", url: "/api/settings/ai-timeline" });
@@ -523,27 +434,28 @@ describe("createServer", () => {
     expect(anonymousResponse.statusCode).toBe(401);
     expect(response.statusCode).toBe(200);
     expect(eventsResponse.statusCode).toBe(200);
-    expect(listAiTimelineAdminEvents).toHaveBeenCalledWith({
+    expect(readAiTimelinePage).toHaveBeenCalledWith({
+      importanceLevels: ["S", "A"],
+      visibilityStatuses: ["auto_visible"],
+      recentDays: 7,
+      page: 1,
+      pageSize: 1
+    });
+    expect(readAiTimelinePage).toHaveBeenCalledWith({
       importanceLevels: ["S", "A"],
       visibilityStatuses: ["auto_visible"],
       page: 2
     });
-    expect(listAiTimelineAdminEvents).toHaveBeenCalledWith({
+    expect(readAiTimelinePage).toHaveBeenCalledWith({
       importanceLevels: ["S"],
       page: 2
     });
     expect(response.json()).toMatchObject({
       overview: {
-        visibleImportantCount7d: 12,
-        failedSourceCount: 1
+        visibleImportantCount7d: 51,
+        failedSourceCount: 0
       },
-      sources: [
-        {
-          sourceId: "openai-news-rss",
-          latestStatus: "success",
-          importantEventCount: 1
-        }
-      ],
+      sources: [],
       options: {
         reliabilityStatuses: ["single_source", "multi_source", "source_degraded", "manual_verified"]
       },
@@ -832,6 +744,39 @@ describe("createServer", () => {
     expect(cssResponse.headers["content-type"]).toContain("text/css");
     expect(cssResponse.body.length).toBeGreaterThan(0);
     expect(traversalResponse.statusCode).toBe(404);
+  });
+
+  it("serves the public AI timeline feed with fallback metadata headers", async () => {
+    const app = createServer({
+      readAiTimelineFeed: vi.fn().mockResolvedValue({
+        content: `# AI 官方发布时间线
+
+\`\`\`json ai-timeline-feed
+{"schemaVersion":"1.0","events":[]}
+\`\`\`
+`,
+        sourcePath: "/srv/hot-now/shared/data/feeds/ai-timeline-feed-20260425T120000Z.md",
+        isFallback: true
+      })
+    });
+
+    const response = await app.inject({ method: "GET", url: "/feeds/ai-timeline-feed.md" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("text/markdown");
+    expect(response.headers["x-hot-now-feed-fallback"]).toBe("true");
+    expect(response.body).toContain("json ai-timeline-feed");
+  });
+
+  it("returns unavailable when the AI timeline feed cannot be read", async () => {
+    const app = createServer({
+      readAiTimelineFeed: vi.fn().mockRejectedValue(new Error("bad feed"))
+    });
+
+    const response = await app.inject({ method: "GET", url: "/feeds/ai-timeline-feed.md" });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.body).toContain("AI timeline feed is unavailable");
   });
 
   it("serves brand png assets and a favicon alias for shell pages", async () => {

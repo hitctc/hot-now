@@ -1,10 +1,7 @@
 import { requestJson } from "./http";
 import type {
-  ManualAiTimelineCollectResponse,
   SettingsAiTimelineAdminResponse,
-  SettingsAiTimelineEventsResponse,
-  UpdateAiTimelineEventPayload,
-  UpdateAiTimelineEventResponse
+  SettingsAiTimelineEventsResponse
 } from "./settingsApi";
 
 export type AiTimelineAdminQuery = {
@@ -33,26 +30,6 @@ export function readAiTimelineAdminEvents(
   return requestJson<SettingsAiTimelineEventsResponse>(
     queryString ? `/api/settings/ai-timeline/events?${queryString}` : "/api/settings/ai-timeline/events"
   );
-}
-
-export function updateAiTimelineAdminEvent(
-  eventId: number,
-  input: UpdateAiTimelineEventPayload
-): Promise<UpdateAiTimelineEventResponse> {
-  return requestJson<UpdateAiTimelineEventResponse>(
-    `/actions/ai-timeline/events/${encodeURIComponent(String(eventId))}/update`,
-    {
-      method: "POST",
-      body: JSON.stringify(input)
-    }
-  );
-}
-
-export function triggerAiTimelineAdminCollect(): Promise<ManualAiTimelineCollectResponse> {
-  return requestJson<ManualAiTimelineCollectResponse>("/actions/ai-timeline/collect", {
-    method: "POST",
-    body: JSON.stringify({})
-  });
 }
 
 // 后台时间线筛选仍然走 query string，方便后续把页面状态同步到 URL。

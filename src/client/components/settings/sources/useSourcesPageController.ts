@@ -25,7 +25,6 @@ import {
   toggleSource,
   triggerManualBilibiliCollect,
   triggerManualHackerNewsCollect,
-  triggerManualAiTimelineCollect,
   triggerManualTwitterCollect,
   triggerManualTwitterKeywordCollect,
   triggerManualWeiboTrendingCollect,
@@ -41,7 +40,6 @@ import {
   triggerManualSendLatestEmail,
   type ManualBilibiliCollectResponse,
   type ManualHackerNewsCollectResponse,
-  type ManualAiTimelineCollectResponse,
   type ManualCollectResponse,
   type ManualTwitterCollectResponse,
   type ManualTwitterKeywordCollectResponse,
@@ -863,23 +861,6 @@ export function useSourcesPageController() {
     });
   }
 
-  // AI 时间线采集只写入官方事件表，不进入普通内容池，因此单独提示新增、更新和跳过数量。
-  async function handleManualAiTimelineCollect(): Promise<void> {
-    await runSourcesAction("manual:ai-timeline-collect", () => triggerManualAiTimelineCollect(), {
-      fallbackMessage: "AI 时间线官方源采集启动失败，请稍后再试。",
-      successMessage: (result: ManualAiTimelineCollectResponse) =>
-        result.accepted
-          ? `AI 时间线官方源采集已完成：官方源 ${result.sourceCount} 个，新事件 ${result.insertedEventCount} 条，更新 ${result.updatedEventCount} 条，跳过 ${result.skippedItemCount} 条，失败 ${result.failureCount} 个。`
-          : "AI 时间线官方源采集未成功启动。",
-      reasonMessages: {
-        "already-running": "当前已有任务执行中，请稍后再试。",
-        "no-ai-timeline-sources": "当前没有可采集的 AI 时间线官方源。",
-        unauthorized: "请先登录后再操作。"
-      }
-    });
-    await loadAiTimelineSummary({ silent: true });
-  }
-
   // 手动发送最新报告邮件沿用后端错误原因映射，用户能直接看懂当前阻塞点。
   async function handleManualSendLatestEmail(): Promise<void> {
     await runSourcesAction("manual:send-latest-email", () => triggerManualSendLatestEmail(), {
@@ -1500,7 +1481,6 @@ export function useSourcesPageController() {
     handleManualBilibiliCollect,
     handleManualWechatRssCollect,
     handleManualWeiboTrendingCollect,
-    handleManualAiTimelineCollect,
     handleManualSendLatestEmail,
     handleSubmitSource,
     handleSubmitTwitterAccount,

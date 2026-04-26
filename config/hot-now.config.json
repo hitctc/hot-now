@@ -4,6 +4,12 @@
   "mailSchedule": { "enabled": true, "dailyTime": "10:00", "timezone": "Asia/Shanghai" },
   "manualActions": { "collectEnabled": true, "sendLatestEmailEnabled": true },
   "report": { "topN": 10, "dataDir": "../data/reports", "allowDegraded": true },
+  "aiTimelineFeed": {
+    "url": "https://now.achuan.cc/feeds/ai-timeline-feed.md",
+    "file": "../data/feeds/ai-timeline-feed.md",
+    "manifestFile": "../data/feeds/ai-timeline-feed-manifest.json",
+    "maxFallbackVersions": 10
+  },
   "source": { "rssUrl": "https://imjuya.github.io/juya-ai-daily/rss.xml" },
   "database": { "file": "../data/hot-now.sqlite" }
 }

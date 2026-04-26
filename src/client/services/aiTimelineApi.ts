@@ -11,7 +11,7 @@ export const aiTimelineEventTypes = [
 
 export type AiTimelineEventType = (typeof aiTimelineEventTypes)[number];
 export type AiTimelineImportanceLevel = "S" | "A" | "B" | "C";
-export type AiTimelineReleaseStatus = "released" | "official_preview";
+export type AiTimelineReleaseStatus = "released" | "official_preview" | "open_sourced" | "updated";
 export type AiTimelineVisibilityStatus = "auto_visible" | "hidden" | "manual_visible";
 export type AiTimelineReliabilityStatus = "single_source" | "multi_source" | "source_degraded" | "manual_verified";
 

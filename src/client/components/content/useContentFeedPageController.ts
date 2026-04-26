@@ -7,28 +7,29 @@ import {
   deriveInitialSelectedSourceKinds,
   readStoredContentSearchKeyword,
   readStoredContentSortMode,
-	  readStoredContentSourceKinds,
-	  readStoredTwitterAccountIds,
-	  readStoredTwitterKeywordIds,
-	  readStoredWechatRssSourceIds,
-	  writeStoredContentSearchKeyword,
-	  writeStoredContentSortMode,
-	  writeStoredContentSourceKinds,
-	  writeStoredTwitterAccountIds,
-	  writeStoredTwitterKeywordIds,
-	  writeStoredWechatRssSourceIds,
+  readStoredContentSourceKinds,
+  readStoredTwitterAccountIds,
+  readStoredTwitterKeywordIds,
+  readStoredWechatRssSourceIds,
+  writeStoredContentSearchKeyword,
+  writeStoredContentSortMode,
+  writeStoredContentSourceKinds,
+  writeStoredTwitterAccountIds,
+  writeStoredTwitterKeywordIds,
+  writeStoredWechatRssSourceIds,
   type ContentPageModel,
   type ContentCard,
   type ContentSortMode
 } from "../../services/contentApi";
 import { useContentPageScroll } from "./useContentPageScroll";
-import { useInfiniteLoadTrigger } from "./useInfiniteLoadTrigger";
+import { useInfiniteLoadTrigger, VISIBLE_INFINITE_LOAD_DELAY_MS } from "./useInfiniteLoadTrigger";
 import type { ContentFeedPageConfig, ContentFeedPageReader } from "./contentFeedPageShared";
 
 export function useContentFeedPageController(options: {
   config: ContentFeedPageConfig;
   readPage: ContentFeedPageReader;
 }) {
+  const pageKey = options.config.pageKey;
   const isLoading = ref(true);
   const isRefreshing = ref(false);
   const isLoadingNextPage = ref(false);
@@ -36,12 +37,12 @@ export function useContentFeedPageController(options: {
   const pageModel = ref<ContentPageModel | null>(null);
   const accumulatedCards = ref<ContentCard[]>([]);
   const currentLoadedPage = ref(0);
-	  const selectedSourceKinds = ref<string[] | null>(readStoredContentSourceKinds());
-	  const selectedTwitterAccountIds = ref<number[] | null>(readStoredTwitterAccountIds());
-	  const selectedTwitterKeywordIds = ref<number[] | null>(readStoredTwitterKeywordIds());
-	  const selectedWechatRssSourceIds = ref<number[] | null>(readStoredWechatRssSourceIds());
-  const sortMode = ref<ContentSortMode>(readStoredContentSortMode() ?? "published_at");
-  const appliedSearchKeyword = ref(readStoredContentSearchKeyword() ?? "");
+  const selectedSourceKinds = ref<string[] | null>(readStoredContentSourceKinds(pageKey));
+  const selectedTwitterAccountIds = ref<number[] | null>(readStoredTwitterAccountIds(pageKey));
+  const selectedTwitterKeywordIds = ref<number[] | null>(readStoredTwitterKeywordIds(pageKey));
+  const selectedWechatRssSourceIds = ref<number[] | null>(readStoredWechatRssSourceIds(pageKey));
+  const sortMode = ref<ContentSortMode>(readStoredContentSortMode(pageKey) ?? "published_at");
+  const appliedSearchKeyword = ref(readStoredContentSearchKeyword(pageKey) ?? "");
   const route = useRoute();
   const router = useRouter();
   const { showBackToTopButton, scrollPageToTop, handleBackToTopClick } = useContentPageScroll();
@@ -54,13 +55,13 @@ export function useContentFeedPageController(options: {
     return selectedTwitterAccountIds.value === null ? undefined : selectedTwitterAccountIds.value;
   }
 
-	  function readPageTwitterKeywordIds(): number[] | undefined {
-	    return selectedTwitterKeywordIds.value === null ? undefined : selectedTwitterKeywordIds.value;
-	  }
+  function readPageTwitterKeywordIds(): number[] | undefined {
+    return selectedTwitterKeywordIds.value === null ? undefined : selectedTwitterKeywordIds.value;
+  }
 
-	  function readPageWechatRssSourceIds(): number[] | undefined {
-	    return selectedWechatRssSourceIds.value === null ? undefined : selectedWechatRssSourceIds.value;
-	  }
+  function readPageWechatRssSourceIds(): number[] | undefined {
+    return selectedWechatRssSourceIds.value === null ? undefined : selectedWechatRssSourceIds.value;
+  }
 
   function readCurrentPage(): number {
     const rawValue = route.query.page;
@@ -138,11 +139,11 @@ export function useContentFeedPageController(options: {
     try {
       const requestedPage = payload.page ?? 1;
       const nextModel = await options.readPage({
-	        selectedSourceKinds: payload.selectedKinds ?? readPageSourceKinds(),
-	        selectedTwitterAccountIds: readPageTwitterAccountIds(),
-	        selectedTwitterKeywordIds: readPageTwitterKeywordIds(),
-	        selectedWechatRssSourceIds: readPageWechatRssSourceIds(),
-	        sortMode: sortMode.value,
+        selectedSourceKinds: payload.selectedKinds ?? readPageSourceKinds(),
+        selectedTwitterAccountIds: readPageTwitterAccountIds(),
+        selectedTwitterKeywordIds: readPageTwitterKeywordIds(),
+        selectedWechatRssSourceIds: readPageWechatRssSourceIds(),
+        sortMode: sortMode.value,
         page: requestedPage,
         searchKeyword: payload.searchKeyword ?? appliedSearchKeyword.value
       });
@@ -161,7 +162,7 @@ export function useContentFeedPageController(options: {
           ? deriveInitialSelectedSourceKinds(nextModel.sourceFilter.options, selectedSourceKinds.value)
           : [];
         selectedSourceKinds.value = nextKinds;
-        writeStoredContentSourceKinds(nextKinds);
+        writeStoredContentSourceKinds(nextKinds, pageKey);
       }
 
       if (selectedTwitterAccountIds.value === null && nextModel.twitterAccountFilter) {
@@ -170,26 +171,26 @@ export function useContentFeedPageController(options: {
           selectedTwitterAccountIds.value
         );
         selectedTwitterAccountIds.value = nextIds;
-        writeStoredTwitterAccountIds(nextIds);
+        writeStoredTwitterAccountIds(nextIds, pageKey);
       }
 
-	      if (selectedTwitterKeywordIds.value === null && nextModel.twitterKeywordFilter) {
-	        const nextIds = deriveInitialSelectedEntityIds(
+      if (selectedTwitterKeywordIds.value === null && nextModel.twitterKeywordFilter) {
+        const nextIds = deriveInitialSelectedEntityIds(
           nextModel.twitterKeywordFilter.options,
           selectedTwitterKeywordIds.value
         );
         selectedTwitterKeywordIds.value = nextIds;
-	        writeStoredTwitterKeywordIds(nextIds);
-	      }
+        writeStoredTwitterKeywordIds(nextIds, pageKey);
+      }
 
-	      if (selectedWechatRssSourceIds.value === null && nextModel.wechatRssFilter) {
-	        const nextIds = deriveInitialSelectedEntityIds(
-	          nextModel.wechatRssFilter.options,
-	          selectedWechatRssSourceIds.value
-	        );
-	        selectedWechatRssSourceIds.value = nextIds;
-	        writeStoredWechatRssSourceIds(nextIds);
-	      }
+      if (selectedWechatRssSourceIds.value === null && nextModel.wechatRssFilter) {
+        const nextIds = deriveInitialSelectedEntityIds(
+          nextModel.wechatRssFilter.options,
+          selectedWechatRssSourceIds.value
+        );
+        selectedWechatRssSourceIds.value = nextIds;
+        writeStoredWechatRssSourceIds(nextIds, pageKey);
+      }
     } catch (error) {
       loadError.value = error instanceof HttpError && error.status === 401
         ? options.config.authErrorMessage
@@ -214,33 +215,33 @@ export function useContentFeedPageController(options: {
         selectedTwitterAccountIds.value
       );
       selectedTwitterAccountIds.value = nextIds;
-      writeStoredTwitterAccountIds(nextIds);
+      writeStoredTwitterAccountIds(nextIds, pageKey);
     }
 
-	    if (nextSourceKindSet.has("twitter_keyword_search") &&
-	      selectedTwitterKeywordIds.value === null &&
+    if (nextSourceKindSet.has("twitter_keyword_search") &&
+      selectedTwitterKeywordIds.value === null &&
       pageModel.value?.twitterKeywordFilter) {
       const nextIds = deriveInitialSelectedEntityIds(
         pageModel.value.twitterKeywordFilter.options,
         selectedTwitterKeywordIds.value
       );
       selectedTwitterKeywordIds.value = nextIds;
-	      writeStoredTwitterKeywordIds(nextIds);
-	    }
+      writeStoredTwitterKeywordIds(nextIds, pageKey);
+    }
 
-	    if (nextSourceKindSet.has("wechat_rss") &&
-	      selectedWechatRssSourceIds.value === null &&
-	      pageModel.value?.wechatRssFilter) {
-	      const nextIds = deriveInitialSelectedEntityIds(
-	        pageModel.value.wechatRssFilter.options,
-	        selectedWechatRssSourceIds.value
-	      );
-	      selectedWechatRssSourceIds.value = nextIds;
-	      writeStoredWechatRssSourceIds(nextIds);
-	    }
+    if (nextSourceKindSet.has("wechat_rss") &&
+      selectedWechatRssSourceIds.value === null &&
+      pageModel.value?.wechatRssFilter) {
+      const nextIds = deriveInitialSelectedEntityIds(
+        pageModel.value.wechatRssFilter.options,
+        selectedWechatRssSourceIds.value
+      );
+      selectedWechatRssSourceIds.value = nextIds;
+      writeStoredWechatRssSourceIds(nextIds, pageKey);
+    }
 
     selectedSourceKinds.value = nextKinds;
-    writeStoredContentSourceKinds(nextKinds);
+    writeStoredContentSourceKinds(nextKinds, pageKey);
     await replacePageQuery(1);
     scrollPageToTop("auto");
     await loadPage({ selectedKinds: nextKinds, silent: true });
@@ -248,31 +249,31 @@ export function useContentFeedPageController(options: {
 
   async function handleTwitterAccountsChange(nextIds: number[]): Promise<void> {
     selectedTwitterAccountIds.value = nextIds;
-    writeStoredTwitterAccountIds(nextIds);
+    writeStoredTwitterAccountIds(nextIds, pageKey);
     await replacePageQuery(1);
     scrollPageToTop("auto");
     await loadPage({ selectedKinds: readPageSourceKinds(), silent: true });
   }
 
-	  async function handleTwitterKeywordsChange(nextIds: number[]): Promise<void> {
-	    selectedTwitterKeywordIds.value = nextIds;
-	    writeStoredTwitterKeywordIds(nextIds);
+  async function handleTwitterKeywordsChange(nextIds: number[]): Promise<void> {
+    selectedTwitterKeywordIds.value = nextIds;
+    writeStoredTwitterKeywordIds(nextIds, pageKey);
     await replacePageQuery(1);
     scrollPageToTop("auto");
-	    await loadPage({ selectedKinds: readPageSourceKinds(), silent: true });
-	  }
+    await loadPage({ selectedKinds: readPageSourceKinds(), silent: true });
+  }
 
-	  async function handleWechatRssChange(nextIds: number[]): Promise<void> {
-	    selectedWechatRssSourceIds.value = nextIds;
-	    writeStoredWechatRssSourceIds(nextIds);
-	    await replacePageQuery(1);
-	    scrollPageToTop("auto");
-	    await loadPage({ selectedKinds: readPageSourceKinds(), silent: true });
-	  }
+  async function handleWechatRssChange(nextIds: number[]): Promise<void> {
+    selectedWechatRssSourceIds.value = nextIds;
+    writeStoredWechatRssSourceIds(nextIds, pageKey);
+    await replacePageQuery(1);
+    scrollPageToTop("auto");
+    await loadPage({ selectedKinds: readPageSourceKinds(), silent: true });
+  }
 
   async function handleSortModeChange(nextSortMode: ContentSortMode): Promise<void> {
     sortMode.value = nextSortMode;
-    writeStoredContentSortMode(nextSortMode);
+    writeStoredContentSortMode(nextSortMode, pageKey);
     await replacePageQuery(1);
     scrollPageToTop("auto");
     await loadPage({ selectedKinds: readPageSourceKinds(), silent: true });
@@ -281,7 +282,7 @@ export function useContentFeedPageController(options: {
   // 搜索提交采用“输入值 / 生效值”分离：只有提交后才刷新列表并持久化。
   async function handleSearchSubmit(nextKeyword: string): Promise<void> {
     appliedSearchKeyword.value = nextKeyword;
-    writeStoredContentSearchKeyword(nextKeyword);
+    writeStoredContentSearchKeyword(nextKeyword, pageKey);
     await replacePageQuery(1);
     scrollPageToTop("auto");
     await loadPage({
@@ -293,7 +294,7 @@ export function useContentFeedPageController(options: {
 
   async function handleSearchClear(): Promise<void> {
     appliedSearchKeyword.value = "";
-    writeStoredContentSearchKeyword("");
+    writeStoredContentSearchKeyword("", pageKey);
     await replacePageQuery(1);
     scrollPageToTop("auto");
     await loadPage({
@@ -316,8 +317,6 @@ export function useContentFeedPageController(options: {
     });
   }
 
-  const { setInfiniteLoadTrigger } = useInfiniteLoadTrigger(loadNextPage);
-
   const sourceFilter = computed(() => pageModel.value?.sourceFilter ?? null);
   const listCards = computed(() => accumulatedCards.value);
   const featuredCard = computed(() => pageModel.value?.featuredCard ?? null);
@@ -337,6 +336,11 @@ export function useContentFeedPageController(options: {
     return currentLoadedPage.value < currentPagination.totalPages &&
       loadedResultCount.value < currentPagination.totalResults;
   });
+  const { isInfiniteLoadTriggerPending, setInfiniteLoadTrigger } = useInfiniteLoadTrigger(loadNextPage, {
+    canTrigger: () => !isLoading.value && !isRefreshing.value && !isLoadingNextPage.value && hasMoreResults.value,
+    delayMs: VISIBLE_INFINITE_LOAD_DELAY_MS
+  });
+  const isNextPageLoadVisible = computed(() => isInfiniteLoadTriggerPending.value || isLoadingNextPage.value);
   const displayState = computed(() => {
     if (!pageModel.value && loadError.value) {
       return buildErrorState(loadError.value);
@@ -368,13 +372,13 @@ export function useContentFeedPageController(options: {
     handleSearchSubmit,
     handleSortModeChange,
     handleSourceKindsChange,
-	    handleTwitterAccountsChange,
-	    handleTwitterKeywordsChange,
-	    handleWechatRssChange,
+    handleTwitterAccountsChange,
+    handleTwitterKeywordsChange,
+    handleWechatRssChange,
     hasLoadError,
     hasMoreResults,
     isLoading,
-    isLoadingNextPage,
+    isLoadingNextPage: isNextPageLoadVisible,
     isRefreshing,
     listCards,
     loadedResultCount,
@@ -382,9 +386,9 @@ export function useContentFeedPageController(options: {
     pageModel,
     pagination,
     selectedSourceKinds,
-	    selectedTwitterAccountIds,
-	    selectedTwitterKeywordIds,
-	    selectedWechatRssSourceIds,
+    selectedTwitterAccountIds,
+    selectedTwitterKeywordIds,
+    selectedWechatRssSourceIds,
     showBackToTopButton,
     sortMode,
     sourceFilter,

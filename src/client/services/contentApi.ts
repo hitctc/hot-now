@@ -108,6 +108,23 @@ export type ReadContentPageOptions = {
   searchKeyword?: string;
 };
 
+// AI 新讯和 AI 热点的浏览偏好必须互不影响；旧共享 key 只作为迁移兜底读取。
+function buildPageScopedStorageKey(key: string, pageKey?: ContentPageKey): string {
+  return pageKey ? `${key}:${pageKey}` : key;
+}
+
+function hasPersistedValue(key: string): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    return window.localStorage.getItem(key) !== null;
+  } catch {
+    return false;
+  }
+}
+
 // 内容筛选偏好只允许 string[]，其他脏数据一律回落到 null，交给页面决定默认行为。
 function readPersistedStringArray(key: string): string[] | null {
   if (typeof window === "undefined") {
@@ -143,6 +160,16 @@ function writePersistedStringArray(key: string, values: string[]): void {
   } catch {
     // localStorage 不可写时只做静默降级，页面仍然继续使用当前会话内状态。
   }
+}
+
+function readScopedPersistedStringArray(key: string, pageKey?: ContentPageKey): string[] | null {
+  const scopedKey = buildPageScopedStorageKey(key, pageKey);
+
+  if (pageKey && hasPersistedValue(scopedKey)) {
+    return readPersistedStringArray(scopedKey);
+  }
+
+  return readPersistedStringArray(key);
 }
 
 function readPersistedNumberArray(key: string): number[] | null {
@@ -181,6 +208,16 @@ function writePersistedNumberArray(key: string, values: number[]): void {
   }
 }
 
+function readScopedPersistedNumberArray(key: string, pageKey?: ContentPageKey): number[] | null {
+  const scopedKey = buildPageScopedStorageKey(key, pageKey);
+
+  if (pageKey && hasPersistedValue(scopedKey)) {
+    return readPersistedNumberArray(scopedKey);
+  }
+
+  return readPersistedNumberArray(key);
+}
+
 function readPersistedStringValue(key: string): string | null {
   if (typeof window === "undefined") {
     return null;
@@ -204,6 +241,16 @@ function writePersistedStringValue(key: string, value: string): void {
   } catch {
     // localStorage 不可写时只做静默降级，页面仍然继续使用当前会话内状态。
   }
+}
+
+function readScopedPersistedStringValue(key: string, pageKey?: ContentPageKey): string | null {
+  const scopedKey = buildPageScopedStorageKey(key, pageKey);
+
+  if (pageKey && hasPersistedValue(scopedKey)) {
+    return readPersistedStringValue(scopedKey);
+  }
+
+  return readPersistedStringValue(key);
 }
 
 function normalizeSelectedSourceKinds(selectedSourceKinds: string[]): string[] {
@@ -291,67 +338,100 @@ function postContentAction<T>(path: string, body: unknown): Promise<T> {
   });
 }
 
-export function readStoredContentSourceKinds(): string[] | null {
-  if (typeof window !== "undefined" && window.localStorage.getItem(CONTENT_SOURCE_STORAGE_VERSION_KEY) !== contentSourceStorageVersion) {
+function isContentSourceStorageVersionCurrent(versionKey: string): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    return window.localStorage.getItem(versionKey) === contentSourceStorageVersion;
+  } catch {
+    return false;
+  }
+}
+
+export function readStoredContentSourceKinds(pageKey?: ContentPageKey): string[] | null {
+  const scopedStorageKey = buildPageScopedStorageKey(CONTENT_SOURCE_STORAGE_KEY, pageKey);
+  const scopedVersionKey = buildPageScopedStorageKey(CONTENT_SOURCE_STORAGE_VERSION_KEY, pageKey);
+
+  if (pageKey && (hasPersistedValue(scopedStorageKey) || hasPersistedValue(scopedVersionKey))) {
+    return isContentSourceStorageVersionCurrent(scopedVersionKey)
+      ? readPersistedStringArray(scopedStorageKey)
+      : null;
+  }
+
+  if (!isContentSourceStorageVersionCurrent(CONTENT_SOURCE_STORAGE_VERSION_KEY)) {
     return null;
   }
 
   return readPersistedStringArray(CONTENT_SOURCE_STORAGE_KEY);
 }
 
-export function writeStoredContentSourceKinds(selectedSourceKinds: string[]): void {
-  writePersistedStringArray(CONTENT_SOURCE_STORAGE_KEY, normalizeSelectedSourceKinds(selectedSourceKinds));
+export function writeStoredContentSourceKinds(selectedSourceKinds: string[], pageKey?: ContentPageKey): void {
+  const scopedStorageKey = buildPageScopedStorageKey(CONTENT_SOURCE_STORAGE_KEY, pageKey);
+  const scopedVersionKey = buildPageScopedStorageKey(CONTENT_SOURCE_STORAGE_VERSION_KEY, pageKey);
+
+  writePersistedStringArray(scopedStorageKey, normalizeSelectedSourceKinds(selectedSourceKinds));
 
   if (typeof window !== "undefined") {
     try {
-      window.localStorage.setItem(CONTENT_SOURCE_STORAGE_VERSION_KEY, contentSourceStorageVersion);
+      window.localStorage.setItem(scopedVersionKey, contentSourceStorageVersion);
     } catch {
       // localStorage 不可写时只影响下次刷新能否记住来源筛选，不影响当前页面渲染。
     }
   }
 }
 
-export function readStoredTwitterAccountIds(): number[] | null {
-  return readPersistedNumberArray(CONTENT_TWITTER_ACCOUNT_STORAGE_KEY);
+export function readStoredTwitterAccountIds(pageKey?: ContentPageKey): number[] | null {
+  return readScopedPersistedNumberArray(CONTENT_TWITTER_ACCOUNT_STORAGE_KEY, pageKey);
 }
 
-export function writeStoredTwitterAccountIds(selectedAccountIds: number[]): void {
-  writePersistedNumberArray(CONTENT_TWITTER_ACCOUNT_STORAGE_KEY, normalizeSelectedEntityIds(selectedAccountIds));
+export function writeStoredTwitterAccountIds(selectedAccountIds: number[], pageKey?: ContentPageKey): void {
+  writePersistedNumberArray(
+    buildPageScopedStorageKey(CONTENT_TWITTER_ACCOUNT_STORAGE_KEY, pageKey),
+    normalizeSelectedEntityIds(selectedAccountIds)
+  );
 }
 
-export function readStoredTwitterKeywordIds(): number[] | null {
-  return readPersistedNumberArray(CONTENT_TWITTER_KEYWORD_STORAGE_KEY);
+export function readStoredTwitterKeywordIds(pageKey?: ContentPageKey): number[] | null {
+  return readScopedPersistedNumberArray(CONTENT_TWITTER_KEYWORD_STORAGE_KEY, pageKey);
 }
 
-export function writeStoredTwitterKeywordIds(selectedKeywordIds: number[]): void {
-  writePersistedNumberArray(CONTENT_TWITTER_KEYWORD_STORAGE_KEY, normalizeSelectedEntityIds(selectedKeywordIds));
+export function writeStoredTwitterKeywordIds(selectedKeywordIds: number[], pageKey?: ContentPageKey): void {
+  writePersistedNumberArray(
+    buildPageScopedStorageKey(CONTENT_TWITTER_KEYWORD_STORAGE_KEY, pageKey),
+    normalizeSelectedEntityIds(selectedKeywordIds)
+  );
 }
 
-export function readStoredWechatRssSourceIds(): number[] | null {
-  return readPersistedNumberArray(CONTENT_WECHAT_RSS_STORAGE_KEY);
+export function readStoredWechatRssSourceIds(pageKey?: ContentPageKey): number[] | null {
+  return readScopedPersistedNumberArray(CONTENT_WECHAT_RSS_STORAGE_KEY, pageKey);
 }
 
-export function writeStoredWechatRssSourceIds(selectedSourceIds: number[]): void {
-  writePersistedNumberArray(CONTENT_WECHAT_RSS_STORAGE_KEY, normalizeSelectedEntityIds(selectedSourceIds));
+export function writeStoredWechatRssSourceIds(selectedSourceIds: number[], pageKey?: ContentPageKey): void {
+  writePersistedNumberArray(
+    buildPageScopedStorageKey(CONTENT_WECHAT_RSS_STORAGE_KEY, pageKey),
+    normalizeSelectedEntityIds(selectedSourceIds)
+  );
 }
 
-export function readStoredContentSortMode(): ContentSortMode | null {
-  const rawValue = readPersistedStringValue(CONTENT_SORT_STORAGE_KEY);
+export function readStoredContentSortMode(pageKey?: ContentPageKey): ContentSortMode | null {
+  const rawValue = readScopedPersistedStringValue(CONTENT_SORT_STORAGE_KEY, pageKey);
   return rawValue === "published_at" || rawValue === "content_score" ? rawValue : null;
 }
 
-export function writeStoredContentSortMode(sortMode: ContentSortMode): void {
-  writePersistedStringValue(CONTENT_SORT_STORAGE_KEY, sortMode);
+export function writeStoredContentSortMode(sortMode: ContentSortMode, pageKey?: ContentPageKey): void {
+  writePersistedStringValue(buildPageScopedStorageKey(CONTENT_SORT_STORAGE_KEY, pageKey), sortMode);
 }
 
-// 共享搜索词使用同一套 storage key，保证不同内容页切换时保留用户最近一次输入。
-export function readStoredContentSearchKeyword(): string | null {
-  return readPersistedStringValue(CONTENT_SEARCH_STORAGE_KEY);
+// 搜索词按内容页独立保存，避免 AI 新讯和 AI 热点互相带入上一次搜索。
+export function readStoredContentSearchKeyword(pageKey?: ContentPageKey): string | null {
+  return readScopedPersistedStringValue(CONTENT_SEARCH_STORAGE_KEY, pageKey);
 }
 
 // 持久化前会裁掉首尾空白，避免空格关键词污染 header 与本地偏好。
-export function writeStoredContentSearchKeyword(keyword: string): void {
-  writePersistedStringValue(CONTENT_SEARCH_STORAGE_KEY, keyword.trim());
+export function writeStoredContentSearchKeyword(keyword: string, pageKey?: ContentPageKey): void {
+  writePersistedStringValue(buildPageScopedStorageKey(CONTENT_SEARCH_STORAGE_KEY, pageKey), keyword.trim());
 }
 
 export function deriveInitialSelectedSourceKinds(

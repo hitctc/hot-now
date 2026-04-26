@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import Antd from "ant-design-vue";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import AiHotPage from "../../src/client/pages/content/AiHotPage.vue";
 
@@ -138,6 +138,10 @@ function triggerInfiniteLoad(): void {
 }
 
 describe("AiHotPage", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.resetAllMocks();
     installIntersectionObserverMock();
@@ -192,6 +196,7 @@ describe("AiHotPage", () => {
       selectedSourceKinds: ["openai"],
       selectedTwitterAccountIds: undefined,
       selectedTwitterKeywordIds: undefined,
+      selectedWechatRssSourceIds: undefined,
       sortMode: "content_score",
       page: 1,
       searchKeyword: ""
@@ -272,7 +277,7 @@ describe("AiHotPage", () => {
     expect(wrapper.get("[data-content-section='list']").text()).toContain("Hot AI Event");
   });
 
-  it("clears the shared search keyword, returns to page 1, and reloads the default result set", async () => {
+  it("clears the ai-hot search keyword, returns to page 1, and reloads the default result set", async () => {
     contentApiMocks.readStoredContentSearchKeyword.mockReturnValue("agent");
     contentApiMocks.readAiHotPage.mockResolvedValue(
       createModel({
@@ -291,7 +296,7 @@ describe("AiHotPage", () => {
     await wrapper.get("[data-content-search-clear]").trigger("click");
     await flushPromises();
 
-    expect(contentApiMocks.writeStoredContentSearchKeyword).toHaveBeenCalledWith("");
+    expect(contentApiMocks.writeStoredContentSearchKeyword).toHaveBeenCalledWith("", "ai-hot");
     expect(routerMocks.replace).toHaveBeenCalledWith({
       query: {
         page: "1"
@@ -301,6 +306,7 @@ describe("AiHotPage", () => {
       expect.objectContaining({
         selectedTwitterAccountIds: undefined,
         selectedTwitterKeywordIds: undefined,
+        selectedWechatRssSourceIds: undefined,
         page: 1,
         searchKeyword: ""
       })
@@ -322,7 +328,7 @@ describe("AiHotPage", () => {
     await wrapper.get("[data-content-sort-mode='published_at']").trigger("click");
     await flushPromises();
 
-    expect(contentApiMocks.writeStoredContentSortMode).toHaveBeenCalledWith("published_at");
+    expect(contentApiMocks.writeStoredContentSortMode).toHaveBeenCalledWith("published_at", "ai-hot");
     expect(routerMocks.replace).toHaveBeenCalledWith({
       query: {
         page: "1"
@@ -332,6 +338,7 @@ describe("AiHotPage", () => {
       selectedSourceKinds: ["openai"],
       selectedTwitterAccountIds: undefined,
       selectedTwitterKeywordIds: undefined,
+      selectedWechatRssSourceIds: undefined,
       sortMode: "published_at",
       page: 1,
       searchKeyword: ""
@@ -367,6 +374,7 @@ describe("AiHotPage", () => {
       selectedSourceKinds: ["openai", "ithome"],
       selectedTwitterAccountIds: undefined,
       selectedTwitterKeywordIds: undefined,
+      selectedWechatRssSourceIds: undefined,
       sortMode: "content_score",
       page: 1,
       searchKeyword: ""
@@ -374,6 +382,40 @@ describe("AiHotPage", () => {
 
     deferred.resolve(createModel());
     await flushPromises();
+  });
+
+  it("does not show delayed infinite loading when there is no next ai-hot page", async () => {
+    contentApiMocks.readAiHotPage.mockResolvedValueOnce(
+      createModel({
+        pagination: {
+          page: 1,
+          pageSize: 50,
+          totalResults: 1,
+          totalPages: 1
+        }
+      })
+    );
+
+    const wrapper = mount(AiHotPage, {
+      global: {
+        plugins: [Antd]
+      }
+    });
+
+    await flushPromises();
+
+    vi.useFakeTimers();
+    triggerInfiniteLoad();
+    await flushPromises();
+
+    expect(wrapper.get("[data-content-infinite-load-status]").find(".ant-spin").exists()).toBe(false);
+    expect(wrapper.get("[data-content-infinite-load-status]").text()).toContain("已加载全部 1 条");
+
+    await vi.advanceTimersByTimeAsync(2000);
+    await flushPromises();
+
+    expect(contentApiMocks.readAiHotPage).toHaveBeenCalledTimes(1);
+    expect(wrapper.get("[data-content-infinite-load-status]").find(".ant-spin").exists()).toBe(false);
   });
 
   it("appends the next ai-hot page when the infinite load trigger enters the viewport", async () => {
@@ -412,13 +454,25 @@ describe("AiHotPage", () => {
 
     await flushPromises();
     expect(wrapper.findAll("[data-content-display-index]").map((node) => node.text())).toEqual(["1"]);
+
+    vi.useFakeTimers();
     triggerInfiniteLoad();
+    await flushPromises();
+    expect(wrapper.get("[data-content-infinite-load-status]").find(".ant-spin").exists()).toBe(true);
+    expect(contentApiMocks.readAiHotPage).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1999);
+    await flushPromises();
+    expect(contentApiMocks.readAiHotPage).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
     await flushPromises();
 
     expect(contentApiMocks.readAiHotPage).toHaveBeenNthCalledWith(2, {
       selectedSourceKinds: ["openai"],
       selectedTwitterAccountIds: undefined,
       selectedTwitterKeywordIds: undefined,
+      selectedWechatRssSourceIds: undefined,
       sortMode: "content_score",
       page: 2,
       searchKeyword: ""

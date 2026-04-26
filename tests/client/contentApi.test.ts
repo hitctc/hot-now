@@ -99,6 +99,95 @@ describe("contentApi", () => {
     expect(readStoredContentSourceKinds()).toEqual(["openai", "ithome"]);
   });
 
+  it("keeps content page browse preferences isolated by page key", async () => {
+    const {
+      CONTENT_SEARCH_STORAGE_KEY,
+      CONTENT_SORT_STORAGE_KEY,
+      CONTENT_SOURCE_STORAGE_KEY,
+      CONTENT_TWITTER_ACCOUNT_STORAGE_KEY,
+      CONTENT_TWITTER_KEYWORD_STORAGE_KEY,
+      CONTENT_WECHAT_RSS_STORAGE_KEY,
+      readStoredContentSearchKeyword,
+      readStoredContentSortMode,
+      readStoredContentSourceKinds,
+      readStoredTwitterAccountIds,
+      readStoredTwitterKeywordIds,
+      readStoredWechatRssSourceIds,
+      writeStoredContentSearchKeyword,
+      writeStoredContentSortMode,
+      writeStoredContentSourceKinds,
+      writeStoredTwitterAccountIds,
+      writeStoredTwitterKeywordIds,
+      writeStoredWechatRssSourceIds
+    } = await import("../../src/client/services/contentApi");
+
+    writeStoredContentSourceKinds(["openai"], "ai-new");
+    writeStoredContentSourceKinds(["ithome"], "ai-hot");
+    writeStoredTwitterAccountIds([1], "ai-new");
+    writeStoredTwitterAccountIds([2], "ai-hot");
+    writeStoredTwitterKeywordIds([11], "ai-new");
+    writeStoredTwitterKeywordIds([12], "ai-hot");
+    writeStoredWechatRssSourceIds([21], "ai-new");
+    writeStoredWechatRssSourceIds([22], "ai-hot");
+    writeStoredContentSortMode("content_score", "ai-new");
+    writeStoredContentSortMode("published_at", "ai-hot");
+    writeStoredContentSearchKeyword("agent", "ai-new");
+    writeStoredContentSearchKeyword("deepseek", "ai-hot");
+
+    expect(window.localStorage.getItem(`${CONTENT_SOURCE_STORAGE_KEY}:ai-new`)).toBe('["openai"]');
+    expect(window.localStorage.getItem(`${CONTENT_SOURCE_STORAGE_KEY}:ai-hot`)).toBe('["ithome"]');
+    expect(window.localStorage.getItem(`${CONTENT_TWITTER_ACCOUNT_STORAGE_KEY}:ai-new`)).toBe("[1]");
+    expect(window.localStorage.getItem(`${CONTENT_TWITTER_ACCOUNT_STORAGE_KEY}:ai-hot`)).toBe("[2]");
+    expect(window.localStorage.getItem(`${CONTENT_TWITTER_KEYWORD_STORAGE_KEY}:ai-new`)).toBe("[11]");
+    expect(window.localStorage.getItem(`${CONTENT_TWITTER_KEYWORD_STORAGE_KEY}:ai-hot`)).toBe("[12]");
+    expect(window.localStorage.getItem(`${CONTENT_WECHAT_RSS_STORAGE_KEY}:ai-new`)).toBe("[21]");
+    expect(window.localStorage.getItem(`${CONTENT_WECHAT_RSS_STORAGE_KEY}:ai-hot`)).toBe("[22]");
+    expect(window.localStorage.getItem(`${CONTENT_SORT_STORAGE_KEY}:ai-new`)).toBe("content_score");
+    expect(window.localStorage.getItem(`${CONTENT_SORT_STORAGE_KEY}:ai-hot`)).toBe("published_at");
+    expect(window.localStorage.getItem(`${CONTENT_SEARCH_STORAGE_KEY}:ai-new`)).toBe("agent");
+    expect(window.localStorage.getItem(`${CONTENT_SEARCH_STORAGE_KEY}:ai-hot`)).toBe("deepseek");
+    expect(readStoredContentSourceKinds("ai-new")).toEqual(["openai"]);
+    expect(readStoredContentSourceKinds("ai-hot")).toEqual(["ithome"]);
+    expect(readStoredTwitterAccountIds("ai-new")).toEqual([1]);
+    expect(readStoredTwitterAccountIds("ai-hot")).toEqual([2]);
+    expect(readStoredTwitterKeywordIds("ai-new")).toEqual([11]);
+    expect(readStoredTwitterKeywordIds("ai-hot")).toEqual([12]);
+    expect(readStoredWechatRssSourceIds("ai-new")).toEqual([21]);
+    expect(readStoredWechatRssSourceIds("ai-hot")).toEqual([22]);
+    expect(readStoredContentSortMode("ai-new")).toBe("content_score");
+    expect(readStoredContentSortMode("ai-hot")).toBe("published_at");
+    expect(readStoredContentSearchKeyword("ai-new")).toBe("agent");
+    expect(readStoredContentSearchKeyword("ai-hot")).toBe("deepseek");
+  });
+
+  it("uses legacy shared content preferences only when page-specific values are absent", async () => {
+    const {
+      readStoredContentSearchKeyword,
+      readStoredContentSortMode,
+      readStoredContentSourceKinds,
+      readStoredTwitterAccountIds,
+      writeStoredContentSearchKeyword,
+      writeStoredContentSortMode,
+      writeStoredContentSourceKinds,
+      writeStoredTwitterAccountIds
+    } = await import("../../src/client/services/contentApi");
+
+    writeStoredContentSourceKinds(["openai"]);
+    writeStoredTwitterAccountIds([1]);
+    writeStoredContentSortMode("content_score");
+    writeStoredContentSearchKeyword("agent");
+
+    expect(readStoredContentSourceKinds("ai-new")).toEqual(["openai"]);
+    expect(readStoredTwitterAccountIds("ai-new")).toEqual([1]);
+    expect(readStoredContentSortMode("ai-new")).toBe("content_score");
+    expect(readStoredContentSearchKeyword("ai-new")).toBe("agent");
+
+    writeStoredContentSearchKeyword("", "ai-new");
+
+    expect(readStoredContentSearchKeyword("ai-new")).toBeNull();
+    expect(readStoredContentSearchKeyword("ai-hot")).toBe("agent");
+  });
+
   it("persists and restores twitter account, keyword, and WeChat RSS filters", async () => {
     const {
       CONTENT_TWITTER_ACCOUNT_STORAGE_KEY,

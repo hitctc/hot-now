@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import Antd from "ant-design-vue";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import AiNewPage from "../../src/client/pages/content/AiNewPage.vue";
 
@@ -149,6 +149,10 @@ function triggerInfiniteLoad(): void {
 }
 
 describe("AiNewPage", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.resetAllMocks();
     installIntersectionObserverMock();
@@ -203,6 +207,7 @@ describe("AiNewPage", () => {
       selectedSourceKinds: ["openai"],
       selectedTwitterAccountIds: undefined,
       selectedTwitterKeywordIds: undefined,
+      selectedWechatRssSourceIds: undefined,
       sortMode: "published_at",
       page: 1,
       searchKeyword: ""
@@ -299,8 +304,8 @@ describe("AiNewPage", () => {
     await wrapper.get("[data-source-kind='ithome']").setValue(true);
     await flushPromises();
 
-    expect(contentApiMocks.writeStoredContentSourceKinds).toHaveBeenCalledWith(["openai"]);
-    expect(contentApiMocks.writeStoredContentSourceKinds).toHaveBeenCalledWith(["openai", "ithome"]);
+    expect(contentApiMocks.writeStoredContentSourceKinds).toHaveBeenCalledWith(["openai"], "ai-new");
+    expect(contentApiMocks.writeStoredContentSourceKinds).toHaveBeenCalledWith(["openai", "ithome"], "ai-new");
     expect(routerMocks.replace).toHaveBeenCalledWith({
       query: {
         page: "1"
@@ -311,6 +316,7 @@ describe("AiNewPage", () => {
       selectedSourceKinds: ["openai", "ithome"],
       selectedTwitterAccountIds: undefined,
       selectedTwitterKeywordIds: undefined,
+      selectedWechatRssSourceIds: undefined,
       sortMode: "published_at",
       page: 1,
       searchKeyword: ""
@@ -341,7 +347,7 @@ describe("AiNewPage", () => {
     expect(wrapper.get("[data-content-section='list']").text()).toContain("AI Weekly Insight");
   });
 
-  it("persists sort mode changes and reloads with the shared sort preference", async () => {
+  it("persists sort mode changes and reloads with the ai-new sort preference", async () => {
     contentApiMocks.readAiNewPage
       .mockResolvedValueOnce(createModel())
       .mockResolvedValueOnce(createModel());
@@ -356,7 +362,7 @@ describe("AiNewPage", () => {
     await wrapper.get("[data-content-sort-mode='content_score']").trigger("click");
     await flushPromises();
 
-    expect(contentApiMocks.writeStoredContentSortMode).toHaveBeenCalledWith("content_score");
+    expect(contentApiMocks.writeStoredContentSortMode).toHaveBeenCalledWith("content_score", "ai-new");
     expect(routerMocks.replace).toHaveBeenCalledWith({
       query: {
         page: "1"
@@ -366,13 +372,14 @@ describe("AiNewPage", () => {
       selectedSourceKinds: ["openai"],
       selectedTwitterAccountIds: undefined,
       selectedTwitterKeywordIds: undefined,
+      selectedWechatRssSourceIds: undefined,
       sortMode: "content_score",
       page: 1,
       searchKeyword: ""
     });
   });
 
-  it("submits the shared title search keyword and reloads ai-new from page 1", async () => {
+  it("submits the ai-new title search keyword and reloads from page 1", async () => {
     contentApiMocks.readStoredContentSearchKeyword.mockReturnValue("agent");
     contentApiMocks.readAiNewPage.mockResolvedValue(createModel());
 
@@ -383,12 +390,13 @@ describe("AiNewPage", () => {
     await wrapper.get("[data-content-search-submit]").trigger("click");
     await flushPromises();
 
-    expect(contentApiMocks.writeStoredContentSearchKeyword).toHaveBeenCalledWith("openai");
+    expect(contentApiMocks.writeStoredContentSearchKeyword).toHaveBeenCalledWith("openai", "ai-new");
     expect(routerMocks.replace).toHaveBeenCalledWith({ query: { page: "1" } });
     expect(contentApiMocks.readAiNewPage).toHaveBeenLastCalledWith({
       selectedSourceKinds: ["openai"],
       selectedTwitterAccountIds: undefined,
       selectedTwitterKeywordIds: undefined,
+      selectedWechatRssSourceIds: undefined,
       sortMode: "published_at",
       page: 1,
       searchKeyword: "openai"
@@ -449,6 +457,40 @@ describe("AiNewPage", () => {
     });
   });
 
+  it("does not show delayed infinite loading when there is no next page", async () => {
+    contentApiMocks.readAiNewPage.mockResolvedValueOnce(
+      createModel({
+        pagination: {
+          page: 1,
+          pageSize: 50,
+          totalResults: 2,
+          totalPages: 1
+        }
+      })
+    );
+
+    const wrapper = mount(AiNewPage, {
+      global: {
+        plugins: [Antd]
+      }
+    });
+
+    await flushPromises();
+
+    vi.useFakeTimers();
+    triggerInfiniteLoad();
+    await flushPromises();
+
+    expect(wrapper.get("[data-content-infinite-load-status]").find(".ant-spin").exists()).toBe(false);
+    expect(wrapper.get("[data-content-infinite-load-status]").text()).toContain("已加载全部 2 条");
+
+    await vi.advanceTimersByTimeAsync(2000);
+    await flushPromises();
+
+    expect(contentApiMocks.readAiNewPage).toHaveBeenCalledTimes(1);
+    expect(wrapper.get("[data-content-infinite-load-status]").find(".ant-spin").exists()).toBe(false);
+  });
+
   it("loads the next page when the infinite load trigger enters the viewport", async () => {
     contentApiMocks.readAiNewPage
       .mockResolvedValueOnce(createModel())
@@ -495,13 +537,25 @@ describe("AiNewPage", () => {
 
     await flushPromises();
     expect(wrapper.findAll("[data-content-display-index]").map((node) => node.text())).toEqual(["1", "2"]);
+
+    vi.useFakeTimers();
     triggerInfiniteLoad();
+    await flushPromises();
+    expect(wrapper.get("[data-content-infinite-load-status]").find(".ant-spin").exists()).toBe(true);
+    expect(contentApiMocks.readAiNewPage).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1999);
+    await flushPromises();
+    expect(contentApiMocks.readAiNewPage).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
     await flushPromises();
 
     expect(contentApiMocks.readAiNewPage).toHaveBeenNthCalledWith(1, {
       selectedSourceKinds: ["openai"],
       selectedTwitterAccountIds: undefined,
       selectedTwitterKeywordIds: undefined,
+      selectedWechatRssSourceIds: undefined,
       sortMode: "published_at",
       page: 1,
       searchKeyword: ""
@@ -510,6 +564,7 @@ describe("AiNewPage", () => {
       selectedSourceKinds: ["openai"],
       selectedTwitterAccountIds: undefined,
       selectedTwitterKeywordIds: undefined,
+      selectedWechatRssSourceIds: undefined,
       sortMode: "published_at",
       page: 2,
       searchKeyword: ""

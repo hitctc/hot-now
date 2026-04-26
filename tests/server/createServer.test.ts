@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,7 +8,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { sessionCookieName } from "../../src/core/auth/session.js";
 import { createServer } from "../../src/server/createServer.js";
 
-function makeAppEnv() {
+function makeAppEnv(runtimeRoot?: string) {
   return {
     ...process.env,
     PORT: "0",
@@ -21,7 +21,15 @@ function makeAppEnv() {
     BASE_URL: "http://127.0.0.1:3030",
     AUTH_USERNAME: "admin",
     AUTH_PASSWORD: "admin",
-    SESSION_SECRET: "test-session-secret"
+    SESSION_SECRET: "test-session-secret",
+    ...(runtimeRoot
+      ? {
+          HOT_NOW_DATABASE_FILE: path.join(runtimeRoot, "hot-now.sqlite"),
+          HOT_NOW_REPORT_DATA_DIR: path.join(runtimeRoot, "reports"),
+          AI_TIMELINE_FEED_FILE: path.join(runtimeRoot, "feeds", "ai-timeline-feed.md"),
+          AI_TIMELINE_FEED_MANIFEST_FILE: path.join(runtimeRoot, "feeds", "ai-timeline-feed-manifest.json")
+        }
+      : {})
   };
 }
 
@@ -175,9 +183,10 @@ describe("createServer", () => {
   });
 
   it("starts the built entry point and returns health", async () => {
+    const runtimeRoot = mkdtempSync(path.join(tmpdir(), "hot-now-built-entry-"));
     const child = spawn(process.execPath, [fileURLToPath(new URL("../../dist/server/main.js", import.meta.url))], {
-      // The built entry now boots the real digest app, so the smoke test has to provide the required runtime env.
-      env: makeAppEnv(),
+      // The built entry runs real startup code, so isolate mutable files from the developer database.
+      env: makeAppEnv(runtimeRoot),
       stdio: ["ignore", "pipe", "pipe"]
     });
     const childExit = once(child, "exit");
@@ -206,6 +215,8 @@ describe("createServer", () => {
         child.kill();
         await childExit;
       }
+
+      rmSync(runtimeRoot, { recursive: true, force: true });
     }
   });
 

@@ -234,6 +234,12 @@ describe("AiTimelinePage", () => {
     expect(wrapper.get("[data-ai-timeline-display-index]").classes()).toEqual(
       expect.arrayContaining(["text-white", "font-black"])
     );
+    expect(wrapper.findAll("[data-ai-timeline-display-index]")[0].classes()).toEqual(
+      expect.arrayContaining(["bg-red-500"])
+    );
+    expect(wrapper.findAll("[data-ai-timeline-display-index]")[1].classes()).toEqual(
+      expect.arrayContaining(["bg-sky-500"])
+    );
     expect(wrapper.get("[data-ai-timeline-list]").text()).toContain("Introducing GPT-5.5");
     expect(wrapper.get("[data-ai-timeline-list]").text()).toContain("Google AI releases a new developer tool");
     expect(wrapper.get("[data-ai-timeline-evidence-badge]").text()).toContain("2 条官方证据");

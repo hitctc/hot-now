@@ -56,25 +56,15 @@ function formatTimelineTime(): string {
 }
 
 function readNodeAccentClass(): string {
-  if (props.event.importanceLevel === "S") {
-    return "border-red-200/80 bg-red-500 text-white shadow-[0_0_34px_rgba(248,113,113,0.46)]";
-  }
-
-  switch (props.event.eventType) {
-    case "要闻":
+  switch (props.event.importanceLevel) {
+    case "S":
       return "border-red-200/80 bg-red-500 text-white shadow-[0_0_30px_rgba(248,113,113,0.42)]";
-    case "模型发布":
+    case "A":
       return "border-sky-200/80 bg-sky-500 text-white shadow-[0_0_30px_rgba(56,189,248,0.42)]";
-    case "开发生态":
-      return "border-emerald-200/80 bg-emerald-500 text-white shadow-[0_0_30px_rgba(52,211,153,0.38)]";
-    case "产品应用":
-      return "border-violet-200/80 bg-violet-500 text-white shadow-[0_0_30px_rgba(167,139,250,0.38)]";
-    case "行业动态":
+    case "B":
       return "border-amber-200/80 bg-amber-500 text-white shadow-[0_0_30px_rgba(251,191,36,0.36)]";
-    case "官方前瞻":
-      return "border-cyan-200/80 bg-cyan-500 text-white shadow-[0_0_30px_rgba(34,211,238,0.36)]";
-    default:
-      return "border-editorial-border-strong bg-editorial-text-main text-editorial-panel shadow-editorial-accent";
+    case "C":
+      return "border-slate-200/70 bg-slate-500 text-white shadow-[0_0_24px_rgba(100,116,139,0.32)]";
   }
 }
 

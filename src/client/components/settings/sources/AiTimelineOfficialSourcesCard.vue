@@ -48,7 +48,7 @@ function formatTime(value: string | null | undefined): string {
                 最新事件 {{ formatTime(adminModel?.overview.latestVisiblePublishedAt) }}
               </span>
               <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">
-                7 天 S/A {{ adminModel?.overview.visibleImportantCount7d ?? 0 }}
+                7 天事件 {{ adminModel?.overview.visibleImportantCount7d ?? 0 }}
               </span>
             </div>
           </div>

@@ -158,14 +158,14 @@ onMounted(() => {
             AI 官方发布时间线
           </h2>
           <p class="m-0 max-w-3xl text-sm leading-6 text-editorial-text-body">
-            这里直接读取外部 AI 官方发布时间线 Markdown feed，只解析其中的 `json ai-timeline-feed` 数据块，并按发布时间倒序展示最近 7 天内达到 S 级或 A 级的重要官方事件。
+            这里直接读取外部 AI 官方发布时间线 Markdown feed，只解析其中的 `json ai-timeline-feed` 数据块，并按发布时间倒序展示最近 7 天内可见且有官方证据的事件。
             事件筛选、官方证据和中文重要性说明都来自 feed，应用内不再维护官方源采集规则。
           </p>
         </div>
         <div class="flex flex-wrap gap-2 text-xs text-editorial-text-muted">
           <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">外部 Markdown feed</span>
           <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">默认最近 7 天</span>
-          <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">只展示 S / A 级</span>
+          <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">不按等级裁剪</span>
           <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">每条保留官方链接</span>
         </div>
       </div>

@@ -36,7 +36,7 @@ function formatTime(value: string | null): string {
   >
     <div class="grid gap-3 md:grid-cols-5">
       <article class="rounded-editorial-card border border-editorial-border bg-editorial-panel/55 p-4">
-        <p class="m-0 text-xs text-editorial-text-muted">7 天 S/A 事件</p>
+        <p class="m-0 text-xs text-editorial-text-muted">7 天 feed 事件</p>
         <strong class="mt-2 block text-2xl text-editorial-text-main">{{ overview.visibleImportantCount7d }}</strong>
       </article>
       <article class="rounded-editorial-card border border-editorial-border bg-editorial-panel/55 p-4">

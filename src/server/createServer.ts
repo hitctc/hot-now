@@ -2596,7 +2596,6 @@ async function readSettingsAiTimelineHealthOverview(deps: ServerDeps): Promise<A
   }
 
   const model = await deps.readAiTimelinePage({
-    importanceLevels: ["S", "A"],
     visibilityStatuses: ["auto_visible"],
     recentDays: 7,
     page: 1,

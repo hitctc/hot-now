@@ -30,7 +30,7 @@ export function useAiTimelineAdminPageController() {
     eventType: undefined as string | undefined,
     company: undefined as string | undefined,
     searchKeyword: "",
-    importance: ["S", "A"] as AiTimelineImportanceLevel[],
+    importance: [] as AiTimelineImportanceLevel[],
     visibility: ["auto_visible", "manual_visible"] as AiTimelineVisibilityStatus[],
     recentDays: 30,
     page: 1

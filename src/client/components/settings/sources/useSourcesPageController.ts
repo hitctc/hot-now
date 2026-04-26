@@ -666,7 +666,6 @@ export function useSourcesPageController() {
 
     try {
       aiTimelineAdminModel.value = await readAiTimelineAdminWorkbench({
-        importance: ["S", "A"],
         visibility: ["auto_visible", "manual_visible"],
         recentDays: 7,
         page: 1

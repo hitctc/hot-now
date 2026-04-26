@@ -17,9 +17,9 @@ import { editorialContentCardClass } from "../../content/contentCardShared";
         </p>
       </div>
       <div class="rounded-editorial-card border border-editorial-border bg-editorial-panel/55 p-4">
-        <h4 class="m-0 text-sm font-semibold text-editorial-text-main">只进重要事件</h4>
+        <h4 class="m-0 text-sm font-semibold text-editorial-text-main">不按等级裁剪</h4>
         <p class="m-0 mt-2 text-sm leading-6 text-editorial-text-body">
-          主时间线默认展示最近 7 天 S/A 级事件；小修补、普通文档更新和弱相关内容留在候选池。
+          主时间线默认展示最近 7 天内 feed 标记为可见且有官方证据的事件；S/A/B/C 等级只影响展示样式和筛选。
         </p>
       </div>
       <div class="rounded-editorial-card border border-editorial-border bg-editorial-panel/55 p-4">

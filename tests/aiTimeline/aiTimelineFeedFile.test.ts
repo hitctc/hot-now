@@ -184,6 +184,55 @@ describe("buildAiTimelinePageModelFromMarkdown", () => {
     expect(model.events[0].releaseStatus).toBe("updated");
   });
 
+  it("keeps B level events from the source feed", () => {
+    const model = buildAiTimelinePageModelFromMarkdown(`# AI 官方发布时间线
+
+\`\`\`json ai-timeline-feed
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-04-26T09:00:00+08:00",
+  "events": [
+    {
+      "id": "2026-04-24-qwen-doc-update",
+      "eventKey": "qwen:docs:product_update:2026-04-24",
+      "title": "Qwen updates model documentation",
+      "titleZh": "通义千问更新模型文档",
+      "company": "Qwen",
+      "companyKey": "qwen",
+      "product": "Qwen",
+      "eventType": "开发生态",
+      "actionType": "product_update",
+      "releaseStatus": "updated",
+      "importance": "B",
+      "eventTime": "2026-04-24T09:00:00+08:00",
+      "summaryZh": "通义千问发布一项开发生态更新。",
+      "whyItMattersZh": "这会影响开发者查看和接入模型能力。",
+      "officialUrl": "https://qwen.ai/blog/update",
+      "officialSources": [
+        {
+          "type": "official_blog",
+          "title": "Qwen update",
+          "url": "https://qwen.ai/blog/update",
+          "publishedAt": "2026-04-24T09:00:00+08:00"
+        }
+      ],
+      "confidence": "high",
+      "visibility": "show",
+      "tags": ["Qwen"]
+    }
+  ]
+}
+\`\`\`
+`);
+
+    expect(model.pagination.totalResults).toBe(1);
+    expect(model.events[0]).toMatchObject({
+      companyKey: "qwen",
+      importance: 60,
+      importanceLevel: "B"
+    });
+  });
+
   it("drops feed events that have no usable official evidence", () => {
     const model = buildAiTimelinePageModelFromMarkdown(`# AI 官方发布时间线
 

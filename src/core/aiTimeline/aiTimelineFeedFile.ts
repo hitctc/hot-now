@@ -265,7 +265,9 @@ function normalizeFeedEvent(
   const id = hashStringToPositiveInteger(readString(event.id) || eventKey || `${companyKey}:${index}`);
   const displaySummaryZh = [summaryZh, whyItMattersZh].filter(Boolean).join("\n\n");
 
-  if (!["S", "A"].includes(importance) || confidence !== "high" || visibility !== "show" || resolvedEvidenceLinks.length === 0) {
+  const importanceLevel = importance && isAiTimelineImportanceLevel(importance) ? importance : "B";
+
+  if (confidence !== "high" || visibility !== "show" || resolvedEvidenceLinks.length === 0) {
     return null;
   }
 
@@ -281,8 +283,8 @@ function normalizeFeedEvent(
     sourceKind: "ai_timeline_feed",
     publishedAt: eventTime,
     discoveredAt: generatedAt,
-    importance: importance === "S" ? 100 : importance === "A" ? 80 : 60,
-    importanceLevel: importance && isAiTimelineImportanceLevel(importance) ? importance : "A",
+    importance: readImportanceScore(importanceLevel),
+    importanceLevel,
     releaseStatus: releaseStatus && isAiTimelineReleaseStatus(releaseStatus) ? releaseStatus : "released",
     importanceSummaryZh: displaySummaryZh || null,
     visibilityStatus: "auto_visible",
@@ -301,6 +303,19 @@ function normalizeFeedEvent(
     createdAt: generatedAt,
     updatedAt: generatedAt
   };
+}
+
+function readImportanceScore(importanceLevel: AiTimelineEventRecord["importanceLevel"]): number {
+  switch (importanceLevel) {
+    case "S":
+      return 100;
+    case "A":
+      return 80;
+    case "B":
+      return 60;
+    case "C":
+      return 40;
+  }
 }
 
 function normalizeFeedOfficialSource(

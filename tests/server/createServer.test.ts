@@ -446,7 +446,6 @@ describe("createServer", () => {
     expect(response.statusCode).toBe(200);
     expect(eventsResponse.statusCode).toBe(200);
     expect(readAiTimelinePage).toHaveBeenCalledWith({
-      importanceLevels: ["S", "A"],
       visibilityStatuses: ["auto_visible"],
       recentDays: 7,
       page: 1,

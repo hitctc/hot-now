@@ -1,7 +1,12 @@
 {
   "server": { "port": 3030 },
   "collectionSchedule": { "enabled": true, "intervalMinutes": 10 },
-  "mailSchedule": { "enabled": true, "dailyTime": "10:00", "timezone": "Asia/Shanghai" },
+  "mailSchedule": { "enabled": false, "dailyTime": "10:00", "timezone": "Asia/Shanghai" },
+  "aiTimelineAlerts": {
+    "enabled": true,
+    "intervalMinutes": 5,
+    "channels": { "feishu": true, "email": true }
+  },
   "manualActions": { "collectEnabled": true, "sendLatestEmailEnabled": true },
   "report": { "topN": 10, "dataDir": "../data/reports", "allowDegraded": true },
   "aiTimelineFeed": {

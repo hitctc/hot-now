@@ -18,6 +18,7 @@ const expectedTables = [
   "feedback_pool",
   "ai_timeline_event_evidence",
   "ai_timeline_events",
+  "ai_timeline_event_notifications",
   "ai_timeline_source_runs",
   "bilibili_queries",
   "hackernews_queries",
@@ -74,7 +75,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(16);
+    expect(schemaVersion).toBe(17);
 
     const appliedMigrations = db
       .prepare(
@@ -102,7 +103,8 @@ describe("runMigrations", () => {
       { version: 13, name: "013_wechat_rss_sources" },
       { version: 14, name: "014_ai_timeline_events" },
       { version: 15, name: "015_ai_timeline_event_importance" },
-      { version: 16, name: "016_ai_timeline_reliability_workspace" }
+      { version: 16, name: "016_ai_timeline_reliability_workspace" },
+      { version: 17, name: "017_ai_timeline_event_notifications" }
     ]);
 
     const hiddenAggregates = db
@@ -496,9 +498,13 @@ describe("runMigrations", () => {
     const sourceRunsTable = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ai_timeline_source_runs'")
       .get();
+    const notificationsTable = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ai_timeline_event_notifications'")
+      .get();
 
     expect(evidenceTable).toBeTruthy();
     expect(sourceRunsTable).toBeTruthy();
-    expect(db.pragma("user_version", { simple: true })).toBe(16);
+    expect(notificationsTable).toBeTruthy();
+    expect(db.pragma("user_version", { simple: true })).toBe(17);
   });
 });

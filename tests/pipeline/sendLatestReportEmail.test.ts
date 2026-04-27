@@ -201,6 +201,12 @@ function makeConfig(rootDir: string): RuntimeConfig {
     server: { port: 3030 },
     collectionSchedule: { enabled: true, intervalMinutes: 10 },
     mailSchedule: { enabled: true, dailyTime: "10:00", timezone: "Asia/Shanghai" },
+    aiTimelineAlerts: {
+      enabled: false,
+      intervalMinutes: 5,
+      channels: { feishu: false, email: false },
+      feishuWebhookUrl: null
+    },
     manualActions: { collectEnabled: true, sendLatestEmailEnabled: true },
     report: { topN: 10, dataDir: rootDir, allowDegraded: true },
     source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },

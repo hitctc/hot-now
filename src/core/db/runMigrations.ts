@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 16;
+const schemaVersion = 17;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -17,6 +17,7 @@ const wechatRssSourcesMigrationName = "013_wechat_rss_sources";
 const aiTimelineEventsMigrationName = "014_ai_timeline_events";
 const aiTimelineEventImportanceMigrationName = "015_ai_timeline_event_importance";
 const aiTimelineReliabilityWorkspaceMigrationName = "016_ai_timeline_reliability_workspace";
+const aiTimelineEventNotificationsMigrationName = "017_ai_timeline_event_notifications";
 
 const migrationStatements = [
   `
@@ -895,6 +896,35 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(16, aiTimelineReliabilityWorkspaceMigrationName);
+
+    // S 级事件提醒只需要记录已经通知过的 event_key，避免 5 分钟轮询重复打扰。
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS ai_timeline_event_notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_key TEXT NOT NULL UNIQUE,
+        title TEXT NOT NULL,
+        published_at TEXT NOT NULL,
+        feishu_status TEXT NOT NULL DEFAULT 'skipped',
+        email_status TEXT NOT NULL DEFAULT 'skipped',
+        last_error TEXT,
+        notified_at TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_ai_timeline_event_notifications_notified_at
+      ON ai_timeline_event_notifications(notified_at DESC)
+    `);
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(17, aiTimelineEventNotificationsMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

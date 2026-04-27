@@ -25,11 +25,12 @@ import {
 import { sendDailyEmail } from "./core/mail/sendDailyEmail.js";
 import { LatestReportEmailError, sendLatestReportEmail } from "./core/pipeline/sendLatestReportEmail.js";
 import { runCollectionCycle } from "./core/pipeline/runCollectionCycle.js";
+import { runAiTimelineAlertCycle } from "./core/notifications/runAiTimelineAlertCycle.js";
 import { listRatingDimensions, saveRatings } from "./core/ratings/ratingRepository.js";
 import type { DailyReportTrigger } from "./core/report/buildDailyReport.js";
 import { createRunLock } from "./core/runtime/runLock.js";
 import { installGracefulShutdown } from "./core/runtime/installGracefulShutdown.js";
-import { startCollectionScheduler, startMailScheduler } from "./core/scheduler/startScheduler.js";
+import { startAiTimelineAlertScheduler, startCollectionScheduler, startMailScheduler } from "./core/scheduler/startScheduler.js";
 import { listContentSources } from "./core/source/listContentSources.js";
 import { listSourceWorkbench } from "./core/source/listSourceWorkbench.js";
 import { readSourcesOperationSummary } from "./core/source/readSourcesOperationSummary.js";
@@ -126,6 +127,7 @@ seedInitialData(db, {
   juyaRssUrl: config.source.rssUrl
 });
 const lock = createRunLock();
+const aiTimelineAlertLock = createRunLock();
 const readAdminProfile = db.prepare(
   `
     SELECT username, password_hash, role, display_name
@@ -193,6 +195,11 @@ async function runLatestEmailTask() {
     db,
     sendDailyEmail
   });
+}
+
+// S-level timeline alerts are checked separately from reports so urgent events do not wait for the daily mail window.
+async function runAiTimelineAlertTask() {
+  return await runAiTimelineAlertCycle(config, db);
 }
 
 // History entries are rebuilt from stored run metadata so the server can boot without a database.
@@ -685,6 +692,18 @@ const mailScheduler = startMailScheduler(config, async () => {
   }
 });
 
+const aiTimelineAlertScheduler = startAiTimelineAlertScheduler(config, async () => {
+  try {
+    const result = await aiTimelineAlertLock.runExclusive(async () => await runAiTimelineAlertTask());
+
+    if (result.notifiedEventCount > 0 || result.failedEventCount > 0) {
+      app.log.info(result, "AI timeline S-level alert cycle finished");
+    }
+  } catch (error) {
+    app.log.error(error);
+  }
+});
+
 await app.listen({ host: "127.0.0.1", port: resolveListenPort(process.env.PORT, config.server.port) });
 installGracefulShutdown({
   process,
@@ -693,10 +712,10 @@ installGracefulShutdown({
     info: (context, message) => app.log.info(context, message),
     error: (context, message) => app.log.error(context, message)
   },
-  scheduledTasks: [collectionScheduler, mailScheduler],
+  scheduledTasks: [collectionScheduler, mailScheduler, aiTimelineAlertScheduler],
   waitForIdle: async () => {
-    // 当前版本只需要等采集和发信任务收口，LLM 相关运行时已经不再参与主链路。
-    while (lock.isRunning()) {
+    // 当前版本只需要等采集、发信和 S 级提醒任务收口，LLM 相关运行时已经不再参与主链路。
+    while (lock.isRunning() || aiTimelineAlertLock.isRunning()) {
       await wait(100);
     }
   },

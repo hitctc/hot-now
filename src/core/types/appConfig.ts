@@ -9,6 +9,16 @@ export type MailScheduleConfig = {
   timezone: string;
 };
 
+export type AiTimelineAlertConfig = {
+  enabled: boolean;
+  intervalMinutes: number;
+  channels: {
+    feishu: boolean;
+    email: boolean;
+  };
+  feishuWebhookUrl: string | null;
+};
+
 export type ManualActionsConfig = {
   collectEnabled: boolean;
   sendLatestEmailEnabled: boolean;
@@ -18,6 +28,7 @@ export type RuntimeConfig = {
   server: { port: number };
   collectionSchedule: CollectionScheduleConfig;
   mailSchedule: MailScheduleConfig;
+  aiTimelineAlerts: AiTimelineAlertConfig;
   manualActions: ManualActionsConfig;
   report: { topN: number; dataDir: string; allowDegraded: boolean };
   aiTimelineFeed: { url: string | null; file: string; manifestFile: string; maxFallbackVersions: number };

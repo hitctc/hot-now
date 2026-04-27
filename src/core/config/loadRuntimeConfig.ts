@@ -6,6 +6,7 @@ const defaultDatabaseFile = "./data/hot-now.sqlite";
 const defaultAiTimelineFeedFile = "./data/feeds/ai-timeline-feed.md";
 const defaultAiTimelineFeedUrl = "https://now.achuan.cc/feeds/ai-timeline-feed.md";
 const defaultAiTimelineFeedMaxFallbackVersions = 10;
+const defaultAiTimelineAlertIntervalMinutes = 5;
 
 type Options = {
   configPath?: string;
@@ -56,6 +57,10 @@ export async function loadRuntimeConfig(options: Options = {}): Promise<RuntimeC
         env.AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS,
         fileConfig.aiTimelineFeed.maxFallbackVersions
       )
+    },
+    aiTimelineAlerts: {
+      ...fileConfig.aiTimelineAlerts,
+      feishuWebhookUrl: normalizeOptionalUrl(env.FEISHU_ALERT_WEBHOOK_URL, null)
     },
     smtp: {
       host: required(env.SMTP_HOST, "SMTP_HOST"),
@@ -143,6 +148,8 @@ function parseRuntimeConfigFile(fileText: string): Omit<RuntimeConfig, "smtp" | 
   const source = getRequiredObject(parsed.source, "source");
   const database = getOptionalObject(parsed.database, "database");
   const aiTimelineFeed = getOptionalObject(parsed.aiTimelineFeed, "aiTimelineFeed");
+  const aiTimelineAlerts = getOptionalObject(parsed.aiTimelineAlerts, "aiTimelineAlerts");
+  const aiTimelineAlertChannels = getOptionalObject(aiTimelineAlerts?.channels, "aiTimelineAlerts.channels");
   const aiTimelineFeedFile =
     optionalConfigString(aiTimelineFeed?.file, "aiTimelineFeed.file") ?? defaultAiTimelineFeedFile;
   const aiTimelineFeedUrl = optionalConfigString(aiTimelineFeed?.url, "aiTimelineFeed.url") ?? defaultAiTimelineFeedUrl;
@@ -165,6 +172,17 @@ function parseRuntimeConfigFile(fileText: string): Omit<RuntimeConfig, "smtp" | 
       "manualActions.sendLatestEmailEnabled"
     )
   };
+  const parsedAiTimelineAlerts = {
+    enabled: optionalConfigBoolean(aiTimelineAlerts?.enabled, "aiTimelineAlerts.enabled") ?? false,
+    intervalMinutes:
+      optionalScheduleIntervalMinutes(aiTimelineAlerts?.intervalMinutes, "aiTimelineAlerts.intervalMinutes") ??
+      defaultAiTimelineAlertIntervalMinutes,
+    channels: {
+      feishu: optionalConfigBoolean(aiTimelineAlertChannels?.feishu, "aiTimelineAlerts.channels.feishu") ?? false,
+      email: optionalConfigBoolean(aiTimelineAlertChannels?.email, "aiTimelineAlerts.channels.email") ?? false
+    },
+    feishuWebhookUrl: null
+  };
 
   return {
     server: {
@@ -172,6 +190,7 @@ function parseRuntimeConfigFile(fileText: string): Omit<RuntimeConfig, "smtp" | 
     },
     collectionSchedule: parsedCollectionSchedule,
     mailSchedule: parsedMailSchedule,
+    aiTimelineAlerts: parsedAiTimelineAlerts,
     manualActions: parsedManualActions,
     report: {
       topN: requiredPositiveInteger(report.topN, "report.topN"),
@@ -286,6 +305,15 @@ function requiredConfigBoolean(value: unknown, key: string) {
   return value;
 }
 
+function optionalConfigBoolean(value: unknown, key: string) {
+  // Optional feature blocks default safely when absent, but reject misspelled boolean values early.
+  if (value == null) {
+    return undefined;
+  }
+
+  return requiredConfigBoolean(value, key);
+}
+
 function requiredRunnablePort(value: unknown, key: string) {
   const port = requiredConfigNumber(value, key);
 
@@ -322,6 +350,15 @@ function requiredCollectionIntervalMinutes(value: unknown, key: string) {
   }
 
   return intervalMinutes;
+}
+
+function optionalScheduleIntervalMinutes(value: unknown, key: string) {
+  // Alert polling uses the same cron-friendly interval shape as collection polling.
+  if (value == null) {
+    return undefined;
+  }
+
+  return requiredCollectionIntervalMinutes(value, key);
 }
 
 function requiredMailScheduleDailyTime(value: unknown, key: string) {

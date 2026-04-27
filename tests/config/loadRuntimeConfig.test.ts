@@ -31,9 +31,15 @@ describe("loadRuntimeConfig", () => {
       intervalMinutes: 10
     });
     expect(config.mailSchedule).toEqual({
-      enabled: true,
+      enabled: false,
       dailyTime: "10:00",
       timezone: "Asia/Shanghai"
+    });
+    expect(config.aiTimelineAlerts).toEqual({
+      enabled: true,
+      intervalMinutes: 5,
+      channels: { feishu: true, email: true },
+      feishuWebhookUrl: null
     });
     expect(config.manualActions).toEqual({
       collectEnabled: true,
@@ -57,7 +63,8 @@ describe("loadRuntimeConfig", () => {
         AI_TIMELINE_FEED_URL: "https://example.com/ai-timeline-feed.md",
         AI_TIMELINE_FEED_FILE: "/srv/hot-now/shared/data/feeds/ai-timeline-feed.md",
         AI_TIMELINE_FEED_MANIFEST_FILE: "/srv/hot-now/shared/data/feeds/ai-timeline-feed-manifest.json",
-        AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS: "7"
+        AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS: "7",
+        FEISHU_ALERT_WEBHOOK_URL: "https://open.feishu.cn/open-apis/bot/v2/hook/test"
       }
     });
 
@@ -69,6 +76,7 @@ describe("loadRuntimeConfig", () => {
       manifestFile: "/srv/hot-now/shared/data/feeds/ai-timeline-feed-manifest.json",
       maxFallbackVersions: 7
     });
+    expect(config.aiTimelineAlerts.feishuWebhookUrl).toBe("https://open.feishu.cn/open-apis/bot/v2/hook/test");
   });
 
   it("ignores blank HOT_NOW_* overrides and falls back to config paths", async () => {
@@ -176,6 +184,12 @@ describe("loadRuntimeConfig", () => {
     expect(config.manualActions).toEqual({
       collectEnabled: true,
       sendLatestEmailEnabled: true
+    });
+    expect(config.aiTimelineAlerts).toEqual({
+      enabled: false,
+      intervalMinutes: 5,
+      channels: { feishu: false, email: false },
+      feishuWebhookUrl: null
     });
     expect(config.auth).toEqual({
       username: "admin",

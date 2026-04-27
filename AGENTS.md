@@ -23,7 +23,8 @@
   - `微信公众号 RSS 链路`：`后台批量维护 RSS 链接 -> 手动执行公众号 RSS 采集 -> 去重入库 / 按 RSS 来源筛选 -> 内容页查看`
   - `微博热搜链路`：`固定 AI 关键词 -> 手动执行微博热搜榜匹配 -> 热搜命中入库 -> AI 热点查看`
   - `AI 时间线链路`：`Codex 自动化生成官方发布时间线 Markdown -> 上传公网 feed -> 应用拉取并解析 json ai-timeline-feed -> AI 时间线查看 / feed 后台只读查看`
-  - `发信链路`：`定时 / 手动发信 -> 读取最新一份已生成报告 -> SMTP 发邮件`
+  - `AI 时间线提醒链路`：`定时读取 AI 时间线 feed -> 筛选新增 S 级官方事件 -> 按 eventKey 去重 -> 飞书主通道 + 邮件备份通道推送`
+  - `发信链路`：`手动发信 -> 读取最新一份已生成报告 -> SMTP 发邮件`；每日早报发信默认关闭，SMTP 同时作为 S 级事件邮件备份通道
 - 当前数据源：内置 RSS 库已扩展到 `21` 个，覆盖聚合日报、国际官方 AI 博客、国内科技媒体、创投资讯、开发者社区与综合新闻；Twitter 已拆成两类独立来源类型：账号采集配置保存在 `twitter_accounts`，关键词搜索配置保存在 `twitter_search_keywords`；Hacker News 搜索配置保存在 `hackernews_queries`；B 站搜索配置保存在 `bilibili_queries`；微信公众号 RSS 配置保存在 `wechat_rss_sources`；微博热搜榜匹配使用固定 AI 关键词，不提供独立配置表；AI 时间线不再维护应用内官方源白名单和采集规则，只读取 `AI_TIMELINE_FEED_URL` 指向的公网 Markdown feed，解析其中唯一的 `json ai-timeline-feed` 代码块，并按 feed 内的官方证据、官方发布时间、重要级别和可见状态渲染 `/ai-timeline`。这些扩展链路除 AI 时间线 feed 外都只支持后台手动执行，完整清单和边界见本文第 `9` 节阶段快照和 `README.md`
 - 当前采集语义：以 `is_enabled` 为准决定是否参与采集；`is_active` 仅保留兼容，不再作为系统菜单主语义
 - 当前技术栈：`Node.js + TypeScript + Fastify + Vue 3 + Vite + Ant Design Vue + Tailwind CSS + Vitest`
@@ -229,7 +230,7 @@ SQLite 可靠性约定：
 ## 6. 配置与安全约束
 
 - 非敏感配置放在 `config/hot-now.config.json`
-- 敏感信息必须通过环境变量提供，尤其是 QQ SMTP 授权码
+- 敏感信息必须通过环境变量提供，尤其是 QQ SMTP 授权码和飞书机器人 webhook
 - 不要把 `.env`、授权码、邮箱密码、cookies 或外部账号信息提交进仓库
 - 除非需求明确变化，否则不要新增外部 telemetry、analytics 或额外网络上报
 
@@ -247,6 +248,7 @@ SQLite 可靠性约定：
 - `SESSION_SECRET`
 - `LLM_SETTINGS_MASTER_KEY`
 - `TWITTER_API_KEY`（可选 TwitterAPI.io 密钥；在 Twitter 账号采集和 Twitter 关键词搜索时需要，缺失时不阻断普通 RSS、微信公众号 RSS、Hacker News、B 站或微博热搜采集）
+- `FEISHU_ALERT_WEBHOOK_URL`（可选 S 级 AI 时间线事件飞书提醒 webhook；缺失时飞书通道失败但邮件备份仍会尝试发送）
 - `HOT_NOW_DATABASE_FILE`（可选生产覆盖项；显式指定生产 SQLite 文件路径，例如 `/srv/hot-now/shared/data/hot-now.sqlite`）
 - `HOT_NOW_REPORT_DATA_DIR`（可选生产覆盖项；显式指定生产报告目录，例如 `/srv/hot-now/shared/data/reports`）
 - `AI_TIMELINE_FEED_FILE`（可选外部 AI 官方发布时间线 feed 稳定文件路径，生产推荐 `/srv/hot-now/shared/data/feeds/ai-timeline-feed.md`）
@@ -333,7 +335,7 @@ SQLite 可靠性约定：
   - Playwright MCP 本地验收已跑通：`/login` 登录成功；`/`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常
   - 浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持
   - 内容页来源筛选写入 `localStorage['hot-now-content-sources']`，Twitter 二级筛选写入 `localStorage['hot-now-twitter-account-filter']` / `localStorage['hot-now-twitter-keyword-filter']`，微信公众号 RSS 二级筛选写入 `localStorage['hot-now-wechat-rss-filter']`
-- 真实 SMTP 发信已验证通过；当前采集链路与发信链路已拆开，采集只生成报告，发信单独读取最新报告
+- 真实 SMTP 发信已验证通过；当前采集链路与发信链路已拆开，采集只生成报告，发信单独读取最新报告；每日早报发信默认关闭，S 级 AI 时间线事件改为独立 5 分钟轮询并推送飞书 + 邮件
 - 原文抓取过程中出现过一次 `jsdom` 的 `Could not parse CSS stylesheet` 日志噪音，未阻断本轮任务完成；如果后续要收口发布质量，可以继续评估是否需要单独治理
 - Task4（single-user login + unified app shell）已落地：新增 `passwords/session` auth helper、登录页与统一壳层菜单路由，且保留 legacy 报告路由兼容
 - 真实入口已收口为“内容公开、系统受保护”：`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 现在是必填；auth 开启时 `/`、`/ai-new`、`/ai-hot` 允许匿名查看，但 `/settings/*`、legacy 路由和 `POST /actions/collect`、`POST /actions/send-latest-email`、`POST /actions/run` 都要求登录

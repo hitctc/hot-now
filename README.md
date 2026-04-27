@@ -1,6 +1,6 @@
 # hot-now
 
-本地单机运行的科技资讯编辑台。它会按固定周期拉取多个已启用的 RSS 来源；Twitter 已拆成 `/settings/sources` 里的两条独立手动链路：`账号采集` 和 `关键词搜索`；Hacker News、B 站、微信公众号 RSS 和微博热搜也拆成独立手动链路。扩展来源都不再并入默认定时采集。`AI 时间线` 现在只读取外部 Markdown feed 的 `json ai-timeline-feed` 数据块，不再在应用内维护官方源白名单、采集规则或本地候选池；主时间线默认展示 feed 中最近 7 天、可见且有官方证据的官方事件，并用中文说明“为什么重要”，同时展示官方证据数量和可靠性状态。普通采集结果会经过规则聚类、系统百分制评分和排序，生成多源汇总的 HTML/JSON 报告。邮件发送与采集解耦，可按每日固定时间或手动触发，对最新一份报告单独发信。统一站点继续由 Fastify 托管路由和登录态，但 `/settings/*` 系统页现在已经切到 `Vue 3 + Vite + Ant Design Vue + Tailwind CSS`。
+本地单机运行的科技资讯编辑台。它会按固定周期拉取多个已启用的 RSS 来源；Twitter 已拆成 `/settings/sources` 里的两条独立手动链路：`账号采集` 和 `关键词搜索`；Hacker News、B 站、微信公众号 RSS 和微博热搜也拆成独立手动链路。扩展来源都不再并入默认定时采集。`AI 时间线` 现在只读取外部 Markdown feed 的 `json ai-timeline-feed` 数据块，不再在应用内维护官方源白名单、采集规则或本地候选池；主时间线默认展示 feed 中最近 7 天、可见且有官方证据的官方事件，并用中文说明“为什么重要”，同时展示官方证据数量和可靠性状态。S 级 AI 时间线事件会按独立 5 分钟轮询推送到飞书和邮件，普通每日早报邮件默认关闭；手动发送最新报告入口仍保留。普通采集结果会经过规则聚类、系统百分制评分和排序，生成多源汇总的 HTML/JSON 报告。统一站点继续由 Fastify 托管路由和登录态，但 `/settings/*` 系统页现在已经切到 `Vue 3 + Vite + Ant Design Vue + Tailwind CSS`。
 
 ## 本地启动
 
@@ -27,6 +27,7 @@ export AI_TIMELINE_FEED_URL="https://now.achuan.cc/feeds/ai-timeline-feed.md"
 export AI_TIMELINE_FEED_FILE="/srv/hot-now/shared/data/feeds/ai-timeline-feed.md"
 export AI_TIMELINE_FEED_MANIFEST_FILE="/srv/hot-now/shared/data/feeds/ai-timeline-feed-manifest.json"
 export AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS="10"
+export FEISHU_ALERT_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/replace-with-secret"
 export HOT_NOW_CLIENT_DEV_ORIGIN="http://127.0.0.1:35173"
 ```
 
@@ -34,6 +35,7 @@ export HOT_NOW_CLIENT_DEV_ORIGIN="http://127.0.0.1:35173"
 `TWITTER_API_KEY` 是 TwitterAPI.io 的敏感密钥，只在需要执行 Twitter 账号采集或 Twitter 关键词搜索时配置；不配置时仍可在后台维护账号和关键词列表，但两类 Twitter 手动采集都会不可用，RSS、微信公众号 RSS、Hacker News、B 站和微博热搜不受影响。
 `HOT_NOW_DATABASE_FILE`、`HOT_NOW_REPORT_DATA_DIR` 是可选生产覆盖项，用来把 SQLite 和报告目录从代码树移到 `/srv/hot-now/shared/data`；本地开发不填时，系统继续按 `config/hot-now.config.json` 里的相对路径运行。
 `AI_TIMELINE_FEED_URL`、`AI_TIMELINE_FEED_FILE`、`AI_TIMELINE_FEED_MANIFEST_FILE` 和 `AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS` 是可选的外部 AI 官方发布时间线 feed 配置；默认优先读取 `https://now.achuan.cc/feeds/ai-timeline-feed.md`，URL 不可用时再按本地稳定文件、manifest 和版本文件回退。
+`FEISHU_ALERT_WEBHOOK_URL` 是 S 级 AI 时间线事件飞书提醒的敏感 webhook，只能放在 `.env` 或生产环境变量里，不要写进仓库；缺失时飞书通道会失败，但邮件备份通道仍会尝试发送。
 `HOT_NOW_CLIENT_DEV_ORIGIN` 也是可选开发辅助项；`npm run dev` 默认会把 Vite dev server 拉到 `http://127.0.0.1:35173`，并按这个地址接入，让 `3030` 页面直接拿到 HMR 和 Vue DevTools。只有你想改成别的开发端口时，才需要显式覆盖它。
 本地开发不再要求手工配置 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`；`npm run dev` 会自动拉起仓库内置的本地公众号解析 sidecar。只有你想覆盖到远端 relay 时，才需要显式配置这两个环境变量。
 
@@ -101,6 +103,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - `AI 时间线` 卡片会展示官方证据数量和可靠性状态：`single_source` 表示单一官方证据，`multi_source` 表示多个官方入口交叉确认
 - `AI 时间线` 的事件类型固定为 `要闻`、`模型发布`、`开发生态`、`产品应用`、`行业动态`、`官方前瞻`
 - `AI 时间线` 不收媒体报道、二手解读、爆料或无官方链接的传闻，也不参与 `AI 新讯 / AI 热点` 的评分、热点归并、source filter 和反馈池
+- `AI 时间线` 的 S 级事件会由服务端独立轮询 feed，按 `eventKey` 去重后推送飞书和邮件；这个轮询只拉取 Markdown feed，不会刷新网页页面
 - `AI 新讯`、`AI 热点` 与 `AI 时间线` 的条目卡片会在标题左侧显示连续排序序号；触底加载更多时序号按当前已加载列表连续递增
 - 内容页顶部的来源筛选与排序控制会保持悬浮；筛选、排序或搜索重置后会自动回到顶部，长列表滚动时右下角会出现“回到顶部”按钮
 - 内容卡片现在只保留局部 `补充反馈` 面板，反馈词会先进入反馈池，不会直接改正式策略或生成草稿
@@ -186,14 +189,14 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 
 ## 配置
 
-- `config/hot-now.config.json`：服务端口、`collectionSchedule` 采集周期、`mailSchedule` 发信时间、`manualActions` 手动动作开关、报告目录，以及兼容旧逻辑的 `source.rssUrl`
-- 环境变量：SMTP 主机、端口、发件人、授权码、收件人、网页基础地址、统一站点登录凭据与会话密钥、作为独立覆盖项的 `LLM_SETTINGS_MASTER_KEY`、TwitterAPI.io 账号采集 / 关键词搜索密钥 `TWITTER_API_KEY`、生产路径覆盖项 `HOT_NOW_DATABASE_FILE` / `HOT_NOW_REPORT_DATA_DIR`，以及用于覆盖本地公众号解析 sidecar 或接入远端 relay 的 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`
+- `config/hot-now.config.json`：服务端口、`collectionSchedule` 采集周期、`mailSchedule` 发信时间、`aiTimelineAlerts` S 级事件提醒周期和通道开关、`manualActions` 手动动作开关、报告目录，以及兼容旧逻辑的 `source.rssUrl`
+- 环境变量：SMTP 主机、端口、发件人、授权码、收件人、网页基础地址、统一站点登录凭据与会话密钥、作为独立覆盖项的 `LLM_SETTINGS_MASTER_KEY`、TwitterAPI.io 账号采集 / 关键词搜索密钥 `TWITTER_API_KEY`、S 级事件飞书 webhook `FEISHU_ALERT_WEBHOOK_URL`、生产路径覆盖项 `HOT_NOW_DATABASE_FILE` / `HOT_NOW_REPORT_DATA_DIR`，以及用于覆盖本地公众号解析 sidecar 或接入远端 relay 的 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`
 
 默认配置下：
 
 - 采集任务每 `10` 分钟执行一次
-- 发信任务每天 `10:00`（`Asia/Shanghai`）执行一次
-- 两个任务都可以在页面中手动触发
+- 每日早报发信任务默认关闭；如需临时发送最新报告，仍可在页面中手动触发
+- S 级 AI 时间线事件提醒每 `5` 分钟检查一次 feed，按 `eventKey` 去重后推送飞书主通道和邮件备份通道
 - `/settings/sources` 会直接按当前采集调度显示下一次自动采集时间；调度关闭时回显 `未启用定时采集`
 - 未配置 `TWITTER_API_KEY` 时，Twitter 账号手动采集和 Twitter 关键词手动采集都会被标记为不可用，但不会阻断普通 RSS、微信公众号 RSS、Hacker News、B 站、微博热搜采集和报告生成
 - Hacker News 搜索不依赖额外密钥；只要后台已有启用中的 query，就可以手动执行

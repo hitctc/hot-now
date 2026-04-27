@@ -1,46 +1,11 @@
-import { createRequire } from "node:module";
 import type { DailyReport } from "../report/buildDailyReport.js";
 import type { RuntimeConfig } from "../types/appConfig.js";
-
-type EmailMessage = {
-  from: string;
-  to: string;
-  subject: string;
-  html: string;
-};
-
-type SendMail = (message: EmailMessage) => Promise<unknown>;
-
-const require = createRequire(import.meta.url);
-const { createTransport } = require("nodemailer") as {
-  createTransport: (options: {
-    host: string;
-    port: number;
-    secure: boolean;
-    auth: { user: string; pass: string };
-  }) => { sendMail(message: EmailMessage): Promise<unknown> };
-};
+import { sendEmailMessage, type EmailMessage, type SendMail } from "./sendEmailMessage.js";
 
 // This sends one daily digest email and keeps the transport injectable so tests never need real SMTP.
 export async function sendDailyEmail(config: RuntimeConfig, report: DailyReport, sendMail?: SendMail) {
   const message = buildEmailMessage(config, report);
-
-  if (sendMail) {
-    await sendMail(message);
-    return;
-  }
-
-  const transport = createTransport({
-    host: config.smtp.host,
-    port: config.smtp.port,
-    secure: config.smtp.secure,
-    auth: {
-      user: config.smtp.user,
-      pass: config.smtp.pass
-    }
-  });
-
-  await transport.sendMail(message);
+  await sendEmailMessage(config, message, sendMail);
 }
 
 // The email body is kept deterministic so the daily report stays easy to scan in both mail and HTML views.

@@ -28,6 +28,15 @@ export function startMailScheduler(config: RuntimeConfig, run: () => Promise<voi
   });
 }
 
+// AI timeline alerts poll one small feed file and only notify previously unseen S-level events.
+export function startAiTimelineAlertScheduler(config: RuntimeConfig, run: () => Promise<void>): ScheduledTask | null {
+  if (!config.aiTimelineAlerts.enabled) {
+    return null;
+  }
+
+  return cron.schedule(`*/${config.aiTimelineAlerts.intervalMinutes} * * * *`, run);
+}
+
 // The scheduler only accepts a strict HH:MM value so startup fails fast on malformed config.
 function parseDailyTime(dailyTime: string) {
   const match = dailyTime.match(/^([01]\d|2[0-3]):([0-5]\d)$/);

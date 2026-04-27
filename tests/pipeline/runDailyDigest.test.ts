@@ -7,6 +7,7 @@ import { openDatabase } from "../../src/core/db/openDatabase.js";
 import { runDailyDigest } from "../../src/core/pipeline/runDailyDigest.js";
 import { createRunLock } from "../../src/core/runtime/runLock.js";
 import {
+  startAiTimelineAlertScheduler,
   startCollectionScheduler,
   startMailScheduler
 } from "../../src/core/scheduler/startScheduler.js";
@@ -29,6 +30,12 @@ function makeConfig(rootDir: string): RuntimeConfig {
     server: { port: 3030 },
     collectionSchedule: { enabled: true, intervalMinutes: 10 },
     mailSchedule: { enabled: true, dailyTime: "10:00", timezone: "Asia/Shanghai" },
+    aiTimelineAlerts: {
+      enabled: true,
+      intervalMinutes: 5,
+      channels: { feishu: true, email: true },
+      feishuWebhookUrl: "https://open.feishu.cn/open-apis/bot/v2/hook/test"
+    },
     manualActions: { collectEnabled: true, sendLatestEmailEnabled: true },
     report: { topN: 10, dataDir: rootDir, allowDegraded: true },
     source: { rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml" },
@@ -106,6 +113,27 @@ describe("startMailScheduler", () => {
     expect(scheduleMock).toHaveBeenCalledWith("0 10 * * *", expect.any(Function), {
       timezone: "Asia/Shanghai"
     });
+    expect(result).toBe(task);
+  });
+});
+
+describe("startAiTimelineAlertScheduler", () => {
+  it("returns null when AI timeline alert scheduling is disabled", () => {
+    const config = makeConfig("/tmp");
+    config.aiTimelineAlerts.enabled = false;
+
+    expect(startAiTimelineAlertScheduler(config, vi.fn())).toBeNull();
+  });
+
+  it("registers a cron job with the configured alert interval", () => {
+    const scheduleMock = vi.mocked(cron.schedule);
+    const task = { stop: vi.fn() } as never;
+    scheduleMock.mockReturnValue(task);
+
+    const config = makeConfig("/tmp");
+    const result = startAiTimelineAlertScheduler(config, vi.fn());
+
+    expect(scheduleMock).toHaveBeenCalledWith("*/5 * * * *", expect.any(Function));
     expect(result).toBe(task);
   });
 });

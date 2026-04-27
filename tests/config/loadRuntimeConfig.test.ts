@@ -194,8 +194,18 @@ describe("loadRuntimeConfig", () => {
     expect(config.auth).toEqual({
       username: "admin",
       password: "super-secret",
-      sessionSecret: "session-secret-value"
+      sessionSecret: "session-secret-value",
+      sessionTtlSeconds: 60 * 60 * 24 * 7
     });
+  });
+
+  it("allows AUTH_SESSION_TTL_SECONDS to override the fixed login session ttl", async () => {
+    const config = await loadRuntimeConfig({
+      configPath: path.resolve("config/hot-now.config.json"),
+      env: { ...baseEnv, AUTH_SESSION_TTL_SECONDS: String(60 * 60 * 24 * 3) }
+    });
+
+    expect(config.auth.sessionTtlSeconds).toBe(60 * 60 * 24 * 3);
   });
 
   it("loads optional llm master key when provided", async () => {

@@ -19,6 +19,7 @@ export BASE_URL="http://127.0.0.1:3030"
 export AUTH_USERNAME="admin"
 export AUTH_PASSWORD="replace-with-strong-password"
 export SESSION_SECRET="replace-with-long-random-secret"
+export AUTH_SESSION_TTL_SECONDS="604800"
 export LLM_SETTINGS_MASTER_KEY="replace-with-local-master-key"
 export TWITTER_API_KEY=""
 export HOT_NOW_DATABASE_FILE="/srv/hot-now/shared/data/hot-now.sqlite"
@@ -33,6 +34,7 @@ export HOT_NOW_CLIENT_DEV_ORIGIN="http://127.0.0.1:35173"
 
 `LLM_SETTINGS_MASTER_KEY` 现在是可选覆盖项；如果你不单独配置，系统会回退使用 `SESSION_SECRET` 继续加密保存厂商 API key。
 `TWITTER_API_KEY` 是 TwitterAPI.io 的敏感密钥，只在需要执行 Twitter 账号采集或 Twitter 关键词搜索时配置；不配置时仍可在后台维护账号和关键词列表，但两类 Twitter 手动采集都会不可用，RSS、微信公众号 RSS、Hacker News、B 站和微博热搜不受影响。
+`AUTH_SESSION_TTL_SECONDS` 是可选的登录会话固定有效期，单位为秒；不配置时默认 `604800` 秒，也就是 7 天。当前登录态不是滑动续期，到期后需要重新登录。
 `HOT_NOW_DATABASE_FILE`、`HOT_NOW_REPORT_DATA_DIR` 是可选生产覆盖项，用来把 SQLite 和报告目录从代码树移到 `/srv/hot-now/shared/data`；本地开发不填时，系统继续按 `config/hot-now.config.json` 里的相对路径运行。
 `AI_TIMELINE_FEED_URL`、`AI_TIMELINE_FEED_FILE`、`AI_TIMELINE_FEED_MANIFEST_FILE` 和 `AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS` 是可选的外部 AI 官方发布时间线 feed 配置；默认优先读取 `https://now.achuan.cc/feeds/ai-timeline-feed.md`，URL 不可用时再按本地稳定文件、manifest 和版本文件回退。
 `FEISHU_ALERT_WEBHOOK_URL` 是 S 级 AI 时间线事件飞书提醒的敏感 webhook，只能放在 `.env` 或生产环境变量里，不要写进仓库；缺失时飞书通道会失败，但邮件备份通道仍会尝试发送。
@@ -153,7 +155,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - AI 时间线动作：`GET /api/ai-timeline`、`GET /api/settings/ai-timeline`、`GET /api/settings/ai-timeline/events`、`GET /api/settings/ai-timeline-events`（兼容旧入口）；旧的应用内采集和人工修正写接口保留鉴权但返回只读状态
 - 内容导航已收口为 AI-first：`/` 与 `/ai-new` 等同 `AI 新讯`，`/ai-hot` 承接 `AI 热点`，`/articles` 已移除
 
-统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量。auth 开启后，内容菜单保持公开可读，但系统菜单和所有写操作仍然要求登录；普通 RSS、Twitter、Hacker News、B 站、微信公众号 RSS 和微博热搜继续按各自配置和手动入口工作。AI 时间线不再由应用内官方源采集规则驱动，也不再写入本地候选事件表；Codex 自动化生成并上传 Markdown feed，应用只解析 `json ai-timeline-feed` 数据块来渲染 `/ai-timeline` 和 `/settings/ai-timeline`。
+统一站点默认启用单用户登录壳层，`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 是必填环境变量，登录会话默认固定 7 天过期，可用 `AUTH_SESSION_TTL_SECONDS` 覆盖。auth 开启后，内容菜单保持公开可读，但系统菜单和所有写操作仍然要求登录；普通 RSS、Twitter、Hacker News、B 站、微信公众号 RSS 和微博热搜继续按各自配置和手动入口工作。AI 时间线不再由应用内官方源采集规则驱动，也不再写入本地候选事件表；Codex 自动化生成并上传 Markdown feed，应用只解析 `json ai-timeline-feed` 数据块来渲染 `/ai-timeline` 和 `/settings/ai-timeline`。
 
 ### Vue 开发规范
 
@@ -190,7 +192,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 ## 配置
 
 - `config/hot-now.config.json`：服务端口、`collectionSchedule` 采集周期、`mailSchedule` 发信时间、`aiTimelineAlerts` S 级事件提醒周期和通道开关、`manualActions` 手动动作开关、报告目录，以及兼容旧逻辑的 `source.rssUrl`
-- 环境变量：SMTP 主机、端口、发件人、授权码、收件人、网页基础地址、统一站点登录凭据与会话密钥、作为独立覆盖项的 `LLM_SETTINGS_MASTER_KEY`、TwitterAPI.io 账号采集 / 关键词搜索密钥 `TWITTER_API_KEY`、S 级事件飞书 webhook `FEISHU_ALERT_WEBHOOK_URL`、生产路径覆盖项 `HOT_NOW_DATABASE_FILE` / `HOT_NOW_REPORT_DATA_DIR`，以及用于覆盖本地公众号解析 sidecar 或接入远端 relay 的 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`
+- 环境变量：SMTP 主机、端口、发件人、授权码、收件人、网页基础地址、统一站点登录凭据、会话密钥与可选会话有效期 `AUTH_SESSION_TTL_SECONDS`、作为独立覆盖项的 `LLM_SETTINGS_MASTER_KEY`、TwitterAPI.io 账号采集 / 关键词搜索密钥 `TWITTER_API_KEY`、S 级事件飞书 webhook `FEISHU_ALERT_WEBHOOK_URL`、生产路径覆盖项 `HOT_NOW_DATABASE_FILE` / `HOT_NOW_REPORT_DATA_DIR`，以及用于覆盖本地公众号解析 sidecar 或接入远端 relay 的 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`
 
 默认配置下：
 

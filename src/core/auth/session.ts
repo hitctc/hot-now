@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 export const sessionCookieName = "hot_now_session";
 
-const defaultSessionMaxAgeSeconds = 60 * 60 * 12;
+export const defaultSessionMaxAgeSeconds = 60 * 60 * 24 * 7;
 
 export type SessionUser = {
   username: string;

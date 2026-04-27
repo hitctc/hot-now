@@ -570,6 +570,7 @@ const app = createServer({
   auth: {
     requireLogin: true,
     sessionSecret: config.auth.sessionSecret,
+    sessionTtlSeconds: config.auth.sessionTtlSeconds,
     verifyLogin
   },
   isRunning: () => lock.isRunning(),

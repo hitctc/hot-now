@@ -47,6 +47,7 @@ export type RuntimeConfig = {
     username: string;
     password: string;
     sessionSecret: string;
+    sessionTtlSeconds: number;
   };
   llm?: {
     // Runtime always resolves one encryption key for provider storage: prefer the dedicated

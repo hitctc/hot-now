@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { defaultSessionMaxAgeSeconds } from "../auth/session.js";
 import { RuntimeConfig } from "../types/appConfig.js";
 
 const defaultDatabaseFile = "./data/hot-now.sqlite";
@@ -76,7 +77,8 @@ export async function loadRuntimeConfig(options: Options = {}): Promise<RuntimeC
       // must be explicit env values instead of silent development defaults.
       username: required(env.AUTH_USERNAME, "AUTH_USERNAME"),
       password: required(env.AUTH_PASSWORD, "AUTH_PASSWORD"),
-      sessionSecret: required(env.SESSION_SECRET, "SESSION_SECRET")
+      sessionSecret: required(env.SESSION_SECRET, "SESSION_SECRET"),
+      sessionTtlSeconds: parseAuthSessionTtlSeconds(env.AUTH_SESSION_TTL_SECONDS)
     },
     llm: {
       // Provider API keys still need encrypted storage in local mode, so explicit LLM master keys
@@ -242,6 +244,23 @@ function parseAiTimelineFeedMaxFallbackVersions(value: string | undefined, confi
 
   if (!Number.isInteger(parsedValue) || parsedValue < 1) {
     throw new Error(`Invalid AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS: ${value}`);
+  }
+
+  return parsedValue;
+}
+
+function parseAuthSessionTtlSeconds(value: string | undefined) {
+  // Login sessions keep a fixed lifetime per token; this setting changes only that duration.
+  const trimmedValue = value?.trim();
+
+  if (!trimmedValue) {
+    return defaultSessionMaxAgeSeconds;
+  }
+
+  const parsedValue = Number(trimmedValue);
+
+  if (!Number.isInteger(parsedValue) || parsedValue < 1) {
+    throw new Error(`Invalid AUTH_SESSION_TTL_SECONDS: ${value}`);
   }
 
   return parsedValue;

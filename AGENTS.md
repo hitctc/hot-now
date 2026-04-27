@@ -246,6 +246,7 @@ SQLite 可靠性约定：
 - `AUTH_USERNAME`
 - `AUTH_PASSWORD`
 - `SESSION_SECRET`
+- `AUTH_SESSION_TTL_SECONDS`（可选登录会话固定有效期，单位秒；默认 `604800`，即 7 天，不做滑动续期）
 - `LLM_SETTINGS_MASTER_KEY`
 - `TWITTER_API_KEY`（可选 TwitterAPI.io 密钥；在 Twitter 账号采集和 Twitter 关键词搜索时需要，缺失时不阻断普通 RSS、微信公众号 RSS、Hacker News、B 站或微博热搜采集）
 - `FEISHU_ALERT_WEBHOOK_URL`（可选 S 级 AI 时间线事件飞书提醒 webhook；缺失时飞书通道失败但邮件备份仍会尝试发送）

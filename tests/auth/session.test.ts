@@ -20,6 +20,17 @@ describe("auth session helpers", () => {
     });
   });
 
+  it("uses a fixed 7 day default session ttl", () => {
+    const token = createSessionToken(
+      { username: "admin", displayName: "Admin", role: "admin" },
+      "test-secret",
+      { now: () => 1_000 }
+    );
+    const parsed = readSessionToken(token, "test-secret", { now: () => 1_100 });
+
+    expect(parsed?.expiresAt).toBe(1_000 + 60 * 60 * 24 * 7);
+  });
+
   it("returns null for a tampered token", () => {
     const token = createSessionToken({ username: "admin", displayName: "Admin", role: "admin" }, "test-secret");
     const tamperedToken = token.slice(0, -1) + (token.endsWith("a") ? "b" : "a");

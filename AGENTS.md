@@ -243,6 +243,7 @@ SQLite 可靠性约定：
 - `SMTP_PASS`
 - `MAIL_TO`
 - `BASE_URL`
+- `PUBLIC_BASE_URL`（可选对外正式站点地址；飞书提醒和邮件里的用户可点击链接优先使用它，缺失时回退 `BASE_URL`）
 - `AUTH_USERNAME`
 - `AUTH_PASSWORD`
 - `SESSION_SECRET`

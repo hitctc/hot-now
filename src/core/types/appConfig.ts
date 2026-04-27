@@ -26,6 +26,7 @@ export type ManualActionsConfig = {
 
 export type RuntimeConfig = {
   server: { port: number };
+  publicBaseUrl: string;
   collectionSchedule: CollectionScheduleConfig;
   mailSchedule: MailScheduleConfig;
   aiTimelineAlerts: AiTimelineAlertConfig;

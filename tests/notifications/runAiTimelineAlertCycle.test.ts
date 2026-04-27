@@ -42,6 +42,8 @@ describe("runAiTimelineAlertCycle", () => {
         failedEventCount: 0
       });
       expect(fetchImpl).toHaveBeenCalledTimes(1);
+      const [, request] = fetchImpl.mock.calls[0];
+      expect(String(request?.body)).toContain("https://now.achuan.cc/ai-timeline");
       expect(sendMail).toHaveBeenCalledTimes(1);
       expect(sendMail).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -68,6 +70,7 @@ describe("runAiTimelineAlertCycle", () => {
 function makeConfig(rootDir: string, feedFile: string): RuntimeConfig {
   return {
     server: { port: 3030 },
+    publicBaseUrl: "https://now.achuan.cc",
     collectionSchedule: { enabled: true, intervalMinutes: 10 },
     mailSchedule: { enabled: false, dailyTime: "10:00", timezone: "Asia/Shanghai" },
     aiTimelineAlerts: {

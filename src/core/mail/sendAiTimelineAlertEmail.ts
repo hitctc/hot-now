@@ -22,7 +22,7 @@ export async function sendAiTimelineAlertEmail(
 
 // The email body mirrors the Feishu alert fields and keeps external feed text escaped.
 function renderAiTimelineAlertEmailHtml(config: RuntimeConfig, event: AiTimelineEventRecord) {
-  const timelineUrl = new URL("/ai-timeline", config.smtp.baseUrl).toString();
+  const timelineUrl = new URL("/ai-timeline", config.publicBaseUrl).toString();
   const officialLinks = event.evidenceLinks
     .slice(0, 3)
     .map((source) => `<li><a href="${escapeHtml(source.officialUrl)}">${escapeHtml(source.title)}</a></li>`)

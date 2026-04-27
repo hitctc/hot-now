@@ -26,6 +26,7 @@ describe("loadRuntimeConfig", () => {
     });
 
     expect(config.report.dataDir).toBe(path.resolve("data/reports"));
+    expect(config.publicBaseUrl).toBe("http://127.0.0.1:3030");
     expect(config.collectionSchedule).toEqual({
       enabled: true,
       intervalMinutes: 10
@@ -64,10 +65,12 @@ describe("loadRuntimeConfig", () => {
         AI_TIMELINE_FEED_FILE: "/srv/hot-now/shared/data/feeds/ai-timeline-feed.md",
         AI_TIMELINE_FEED_MANIFEST_FILE: "/srv/hot-now/shared/data/feeds/ai-timeline-feed-manifest.json",
         AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS: "7",
+        PUBLIC_BASE_URL: "https://now.achuan.cc",
         FEISHU_ALERT_WEBHOOK_URL: "https://open.feishu.cn/open-apis/bot/v2/hook/test"
       }
     });
 
+    expect(config.publicBaseUrl).toBe("https://now.achuan.cc");
     expect(config.database.file).toBe("/srv/hot-now/shared/data/hot-now.sqlite");
     expect(config.report.dataDir).toBe("/srv/hot-now/shared/data/reports");
     expect(config.aiTimelineFeed).toEqual({
@@ -77,6 +80,15 @@ describe("loadRuntimeConfig", () => {
       maxFallbackVersions: 7
     });
     expect(config.aiTimelineAlerts.feishuWebhookUrl).toBe("https://open.feishu.cn/open-apis/bot/v2/hook/test");
+  });
+
+  it("falls back to BASE_URL when PUBLIC_BASE_URL is not configured", async () => {
+    const config = await loadRuntimeConfig({
+      configPath: path.resolve("config/hot-now.config.json"),
+      env: baseEnv
+    });
+
+    expect(config.publicBaseUrl).toBe(baseEnv.BASE_URL);
   });
 
   it("ignores blank HOT_NOW_* overrides and falls back to config paths", async () => {

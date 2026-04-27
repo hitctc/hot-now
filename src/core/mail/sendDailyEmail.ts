@@ -20,7 +20,7 @@ function buildEmailMessage(config: RuntimeConfig, report: DailyReport): EmailMes
 
 // The email content mirrors the report summary without depending on the HTML report page.
 function renderEmailHtml(config: RuntimeConfig, report: DailyReport) {
-  const reportUrl = new URL(`/reports/${report.meta.date}`, config.smtp.baseUrl).toString();
+  const reportUrl = new URL(`/reports/${report.meta.date}`, config.publicBaseUrl).toString();
   const sourceKindsText = report.meta.sourceKinds.length > 0 ? report.meta.sourceKinds.map(escapeHtml).join(" / ") : "未记录";
   const failureNotice =
     report.meta.sourceFailureCount > 0

@@ -36,11 +36,13 @@ export async function loadRuntimeConfig(options: Options = {}): Promise<RuntimeC
   );
   const smtpPort = parseSmtpPort(required(env.SMTP_PORT, "SMTP_PORT"));
   const smtpSecure = parseSmtpSecure(required(env.SMTP_SECURE, "SMTP_SECURE"));
+  const baseUrl = required(env.BASE_URL, "BASE_URL");
   const wechatResolverBaseUrl = env.WECHAT_RESOLVER_BASE_URL?.trim();
   const wechatResolverToken = env.WECHAT_RESOLVER_TOKEN?.trim();
 
   return {
     ...fileConfig,
+    publicBaseUrl: normalizeOptionalUrl(env.PUBLIC_BASE_URL, baseUrl) ?? baseUrl,
     database: {
       ...fileConfig.database,
       file: databaseFile
@@ -70,7 +72,7 @@ export async function loadRuntimeConfig(options: Options = {}): Promise<RuntimeC
       user: required(env.SMTP_USER, "SMTP_USER"),
       pass: required(env.SMTP_PASS, "SMTP_PASS"),
       to: required(env.MAIL_TO, "MAIL_TO"),
-      baseUrl: required(env.BASE_URL, "BASE_URL")
+      baseUrl
     },
     auth: {
       // Unified shell auth is enabled in the real entry point, so credentials and session secret
@@ -139,7 +141,7 @@ function parseSmtpSecure(value: string) {
   throw new Error(`Invalid SMTP_SECURE: ${value}`);
 }
 
-function parseRuntimeConfigFile(fileText: string): Omit<RuntimeConfig, "smtp" | "auth"> {
+function parseRuntimeConfigFile(fileText: string): Omit<RuntimeConfig, "publicBaseUrl" | "smtp" | "auth"> {
   // The config file keeps deploy-time knobs only; secrets stay out of JSON and are injected later.
   const parsed = JSON.parse(fileText) as Record<string, unknown>;
   const server = getRequiredObject(parsed.server, "server");

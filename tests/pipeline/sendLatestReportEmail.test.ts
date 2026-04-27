@@ -199,6 +199,7 @@ describe("sendLatestReportEmail", () => {
 function makeConfig(rootDir: string): RuntimeConfig {
   return {
     server: { port: 3030 },
+    publicBaseUrl: "https://now.achuan.cc",
     collectionSchedule: { enabled: true, intervalMinutes: 10 },
     mailSchedule: { enabled: true, dailyTime: "10:00", timezone: "Asia/Shanghai" },
     aiTimelineAlerts: {

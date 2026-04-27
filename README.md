@@ -16,6 +16,7 @@ export SMTP_USER="your-qq-mail@qq.com"
 export SMTP_PASS="your-qq-smtp-auth-code"
 export MAIL_TO="receiver@example.com"
 export BASE_URL="http://127.0.0.1:3030"
+export PUBLIC_BASE_URL="https://now.achuan.cc"
 export AUTH_USERNAME="admin"
 export AUTH_PASSWORD="replace-with-strong-password"
 export SESSION_SECRET="replace-with-long-random-secret"
@@ -35,6 +36,7 @@ export HOT_NOW_CLIENT_DEV_ORIGIN="http://127.0.0.1:35173"
 `LLM_SETTINGS_MASTER_KEY` 现在是可选覆盖项；如果你不单独配置，系统会回退使用 `SESSION_SECRET` 继续加密保存厂商 API key。
 `TWITTER_API_KEY` 是 TwitterAPI.io 的敏感密钥，只在需要执行 Twitter 账号采集或 Twitter 关键词搜索时配置；不配置时仍可在后台维护账号和关键词列表，但两类 Twitter 手动采集都会不可用，RSS、微信公众号 RSS、Hacker News、B 站和微博热搜不受影响。
 `AUTH_SESSION_TTL_SECONDS` 是可选的登录会话固定有效期，单位为秒；不配置时默认 `604800` 秒，也就是 7 天。当前登录态不是滑动续期，到期后需要重新登录。
+`PUBLIC_BASE_URL` 是对外可点击的正式站点地址，飞书提醒和邮件里的报告 / 时间线链接都使用它；不配置时会回退到 `BASE_URL`，用于兼容旧环境。
 `HOT_NOW_DATABASE_FILE`、`HOT_NOW_REPORT_DATA_DIR` 是可选生产覆盖项，用来把 SQLite 和报告目录从代码树移到 `/srv/hot-now/shared/data`；本地开发不填时，系统继续按 `config/hot-now.config.json` 里的相对路径运行。
 `AI_TIMELINE_FEED_URL`、`AI_TIMELINE_FEED_FILE`、`AI_TIMELINE_FEED_MANIFEST_FILE` 和 `AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS` 是可选的外部 AI 官方发布时间线 feed 配置；默认优先读取 `https://now.achuan.cc/feeds/ai-timeline-feed.md`，URL 不可用时再按本地稳定文件、manifest 和版本文件回退。
 `FEISHU_ALERT_WEBHOOK_URL` 是 S 级 AI 时间线事件飞书提醒的敏感 webhook，只能放在 `.env` 或生产环境变量里，不要写进仓库；缺失时飞书通道会失败，但邮件备份通道仍会尝试发送。
@@ -192,7 +194,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 ## 配置
 
 - `config/hot-now.config.json`：服务端口、`collectionSchedule` 采集周期、`mailSchedule` 发信时间、`aiTimelineAlerts` S 级事件提醒周期和通道开关、`manualActions` 手动动作开关、报告目录，以及兼容旧逻辑的 `source.rssUrl`
-- 环境变量：SMTP 主机、端口、发件人、授权码、收件人、网页基础地址、统一站点登录凭据、会话密钥与可选会话有效期 `AUTH_SESSION_TTL_SECONDS`、作为独立覆盖项的 `LLM_SETTINGS_MASTER_KEY`、TwitterAPI.io 账号采集 / 关键词搜索密钥 `TWITTER_API_KEY`、S 级事件飞书 webhook `FEISHU_ALERT_WEBHOOK_URL`、生产路径覆盖项 `HOT_NOW_DATABASE_FILE` / `HOT_NOW_REPORT_DATA_DIR`，以及用于覆盖本地公众号解析 sidecar 或接入远端 relay 的 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`
+- 环境变量：SMTP 主机、端口、发件人、授权码、收件人、网页基础地址 `BASE_URL`、用户可点击的正式站点地址 `PUBLIC_BASE_URL`、统一站点登录凭据、会话密钥与可选会话有效期 `AUTH_SESSION_TTL_SECONDS`、作为独立覆盖项的 `LLM_SETTINGS_MASTER_KEY`、TwitterAPI.io 账号采集 / 关键词搜索密钥 `TWITTER_API_KEY`、S 级事件飞书 webhook `FEISHU_ALERT_WEBHOOK_URL`、生产路径覆盖项 `HOT_NOW_DATABASE_FILE` / `HOT_NOW_REPORT_DATA_DIR`，以及用于覆盖本地公众号解析 sidecar 或接入远端 relay 的 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`
 
 默认配置下：
 
@@ -236,6 +238,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 ```bash
 HOT_NOW_DATABASE_FILE=/srv/hot-now/shared/data/hot-now.sqlite
 HOT_NOW_REPORT_DATA_DIR=/srv/hot-now/shared/data/reports
+PUBLIC_BASE_URL=https://now.achuan.cc
 AI_TIMELINE_FEED_FILE=/srv/hot-now/shared/data/feeds/ai-timeline-feed.md
 AI_TIMELINE_FEED_MANIFEST_FILE=/srv/hot-now/shared/data/feeds/ai-timeline-feed-manifest.json
 AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS=10

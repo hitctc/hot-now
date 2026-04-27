@@ -39,7 +39,7 @@ export async function sendFeishuAiTimelineAlert(
 
 // The text body is deliberately plain because Feishu text messages are the most stable webhook format.
 function buildFeishuAlertText(config: RuntimeConfig, event: AiTimelineEventRecord) {
-  const timelineUrl = new URL("/ai-timeline", config.smtp.baseUrl).toString();
+  const timelineUrl = new URL("/ai-timeline", config.publicBaseUrl).toString();
   const officialSource = event.evidenceLinks[0];
 
   return [

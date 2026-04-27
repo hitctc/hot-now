@@ -37,6 +37,7 @@ describe("sendDailyEmail", () => {
 
     await sendDailyEmail(
       {
+        publicBaseUrl: "https://now.achuan.cc",
         smtp: {
           host: "smtp.qq.com",
           port: 465,
@@ -62,7 +63,7 @@ describe("sendDailyEmail", () => {
 
     const [[message]] = sendMail.mock.calls;
     expect(message.html).toContain("2026-03-26");
-    expect(message.html).toContain("http://127.0.0.1:3030/reports/2026-03-26");
+    expect(message.html).toContain("https://now.achuan.cc/reports/2026-03-26");
     expect(message.html).toContain("HotNow 多源热点汇总");
     expect(message.html).toContain("数据源：openai / google_ai");
     expect(message.html).toContain("本次有 1 个来源抓取失败：juya");
@@ -75,6 +76,7 @@ describe("sendAiTimelineAlertEmail", () => {
 
     await sendAiTimelineAlertEmail(
       {
+        publicBaseUrl: "https://now.achuan.cc",
         smtp: {
           host: "smtp.qq.com",
           port: 465,
@@ -94,7 +96,7 @@ describe("sendAiTimelineAlertEmail", () => {
         from: "sender@qq.com",
         to: "receiver@example.com",
         subject: "AI S级事件提醒：OpenAI 发布重要模型",
-        html: expect.stringContaining("http://127.0.0.1:3030/ai-timeline")
+        html: expect.stringContaining("https://now.achuan.cc/ai-timeline")
       })
     );
   });

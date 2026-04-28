@@ -1,30 +1,14 @@
 <script setup lang="ts">
 import type { SettingsAiTimelineHealthOverview } from "../../../services/settingsApi";
 import { editorialContentCardClass } from "../../content/contentCardShared";
+import { formatAiTimelineDateTime } from "../../../utils/formatAiTimelineDateTime";
 
 defineProps<{
   overview: SettingsAiTimelineHealthOverview;
 }>();
 
-function formatTime(value: string | null): string {
-  if (!value) {
-    return "暂无";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "时间无效";
-  }
-
-  return date.toLocaleString("zh-CN", {
-    timeZone: "Asia/Shanghai",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-}
+// 后台概览和前台卡片共用同一格式，避免同一个事件在不同页面显示不一致。
+const formatTime = formatAiTimelineDateTime;
 </script>
 
 <template>

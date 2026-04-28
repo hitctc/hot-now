@@ -1,4 +1,5 @@
 import type { AiTimelineEventRecord } from "../aiTimeline/aiTimelineTypes.js";
+import { formatAiTimelineDateTime } from "../aiTimeline/formatAiTimelineDateTime.js";
 import type { RuntimeConfig } from "../types/appConfig.js";
 
 type FetchLike = typeof fetch;
@@ -46,7 +47,7 @@ function buildFeishuAlertText(config: RuntimeConfig, event: AiTimelineEventRecor
     "AI S级事件提醒",
     event.displayTitle,
     `公司：${event.companyName}`,
-    `发布时间：${event.publishedAt}`,
+    `发布时间：${formatAiTimelineDateTime(event.publishedAt)}`,
     `重要性：${event.importanceSummaryZh || event.displaySummaryZh || "暂无说明"}`,
     officialSource ? `官方来源：${officialSource.title} ${officialSource.officialUrl}` : null,
     `查看时间线：${timelineUrl}`

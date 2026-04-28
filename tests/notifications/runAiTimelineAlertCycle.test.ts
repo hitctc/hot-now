@@ -43,11 +43,14 @@ describe("runAiTimelineAlertCycle", () => {
       });
       expect(fetchImpl).toHaveBeenCalledTimes(1);
       const [, request] = fetchImpl.mock.calls[0];
-      expect(String(request?.body)).toContain("https://now.achuan.cc/ai-timeline");
+      const feishuPayload = JSON.parse(String(request?.body)) as { content: { text: string } };
+      expect(feishuPayload.content.text).toContain("发布时间：2026-04-27 17:00:00");
+      expect(feishuPayload.content.text).toContain("https://now.achuan.cc/ai-timeline");
       expect(sendMail).toHaveBeenCalledTimes(1);
       expect(sendMail).toHaveBeenCalledWith(
         expect.objectContaining({
-          subject: "AI S级事件提醒：OpenAI 发布重要模型"
+          subject: "AI S级事件提醒：OpenAI 发布重要模型",
+          html: expect.stringContaining("发布时间：2026-04-27 17:00:00")
         })
       );
 

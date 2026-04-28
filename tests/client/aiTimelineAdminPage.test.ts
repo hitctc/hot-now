@@ -138,8 +138,10 @@ describe("AiTimelineAdminPage", () => {
 
     expect(wrapper.get("[data-ai-timeline-admin-page]").text()).toContain("AI 时间线 feed");
     expect(wrapper.get("[data-ai-timeline-admin-overview]").text()).toContain("主时间线状态");
+    expect(wrapper.get("[data-ai-timeline-admin-overview]").text()).toContain("2026-04-24 18:00:00");
     expect(wrapper.get("[data-ai-timeline-source-health]").text()).toContain("feed 来源状态");
     expect(wrapper.get("[data-ai-timeline-candidate-events]").text()).toContain("feed 事件");
+    expect(wrapper.get("[data-ai-timeline-candidate-events]").text()).toContain("2026-04-24 18:00:00");
     expect(wrapper.get("[data-ai-timeline-candidate-events]").text()).toContain("read-only feed");
     expect(wrapper.find("[data-ai-timeline-admin-edit='101']").exists()).toBe(false);
   });

@@ -96,9 +96,10 @@ describe("sendAiTimelineAlertEmail", () => {
         from: "sender@qq.com",
         to: "receiver@example.com",
         subject: "AI S级事件提醒：OpenAI 发布重要模型",
-        html: expect.stringContaining("https://now.achuan.cc/ai-timeline")
+        html: expect.stringContaining("发布时间：2026-04-27 17:00:00")
       })
     );
+    expect(sendMail.mock.calls[0][0].html).toContain("https://now.achuan.cc/ai-timeline");
   });
 });
 

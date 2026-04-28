@@ -223,13 +223,14 @@ describe("AiTimelinePage", () => {
     expect(wrapper.get("[data-ai-timeline-filters]").text()).toContain("事件类型");
     expect(wrapper.findAll("[data-ai-timeline-event-card]")).toHaveLength(2);
     expect(wrapper.findAll("[data-ai-timeline-display-index]").map((node) => node.text())).toEqual(["1", "2"]);
-    expect(wrapper.get("[data-ai-timeline-time]").text()).toContain("18:00");
-    expect(wrapper.get("[data-ai-timeline-time]").text()).toContain("04/24");
+    expect(wrapper.get("[data-ai-timeline-time]").text()).toContain("2026-04-24 18:00:00");
+    expect(wrapper.get("[data-ai-timeline-time]").attributes("title")).toBe("2026-04-24 18:00:00");
     expect(wrapper.get("[data-ai-timeline-event-card]").classes()).toEqual(
-      expect.arrayContaining(["grid", "grid-cols-[52px_32px_minmax(0,1fr)]"])
+      expect.arrayContaining(["grid", "grid-cols-[76px_32px_minmax(0,1fr)]"])
     );
+    expect(wrapper.find("[data-ai-timeline-track]").exists()).toBe(true);
     expect(wrapper.get("[data-ai-timeline-axis-line]").classes()).toEqual(
-      expect.arrayContaining(["w-[2px]", "bg-editorial-border-strong"])
+      expect.arrayContaining(["left-[92px]", "sm:left-[190px]", "w-[2px]", "bg-editorial-border-strong"])
     );
     expect(wrapper.get("[data-ai-timeline-display-index]").classes()).toEqual(
       expect.arrayContaining(["text-white", "font-black"])
@@ -245,9 +246,7 @@ describe("AiTimelinePage", () => {
     expect(wrapper.get("[data-ai-timeline-evidence-badge]").text()).toContain("2 条官方证据");
     expect(wrapper.get("[data-ai-timeline-reliability-badge]").text()).toContain("多官方证据确认");
     expect(wrapper.findAll("[data-ai-timeline-event-card]")[1].text()).toContain("来源近期异常，已保留官方事件");
-    expect(wrapper.get("[data-ai-timeline-official-link]").attributes("href")).toBe(
-      "https://openai.com/news/introducing-gpt-5-5/"
-    );
+    expect(wrapper.find("[data-ai-timeline-official-link]").exists()).toBe(false);
     expect(wrapper.get("[data-ai-timeline-result-summary]").text()).toContain("共 51 条");
     expect(wrapper.get("[data-ai-timeline-result-summary]").text()).toContain("已加载 2 条");
   });

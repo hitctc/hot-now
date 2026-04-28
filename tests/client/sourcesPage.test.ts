@@ -347,6 +347,7 @@ describe("SourcesPage", () => {
     expect(wrapper.find("[data-sources-section='analytics']").exists()).toBe(false);
     expect(wrapper.get("[data-sources-section='manual-send-latest-email']").text()).toContain("发送最新报告");
     expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("AI 时间线 feed 摘要");
+    expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("2026-04-24 18:00:00");
     expect(wrapper.get("[data-sources-section='ai-timeline']").text()).toContain("查看 feed");
     expect(wrapper.get("[data-sources-section='ai-timeline']").find("[data-ai-timeline-admin-events]").exists()).toBe(false);
     expect(wrapper.get("[data-action='open-ai-timeline-admin']").attributes("href")).toBe("/settings/ai-timeline");

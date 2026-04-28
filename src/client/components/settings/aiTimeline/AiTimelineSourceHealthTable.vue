@@ -1,30 +1,14 @@
 <script setup lang="ts">
 import type { SettingsAiTimelineSourceHealth } from "../../../services/settingsApi";
 import { editorialContentCardClass, readSafeUrl } from "../../content/contentCardShared";
+import { formatAiTimelineDateTime } from "../../../utils/formatAiTimelineDateTime";
 
 defineProps<{
   sources: readonly SettingsAiTimelineSourceHealth[];
 }>();
 
-function formatTime(value: string | null): string {
-  if (!value) {
-    return "暂无";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "时间无效";
-  }
-
-  return date.toLocaleString("zh-CN", {
-    timeZone: "Asia/Shanghai",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-}
+// 健康表里的采集时间和官方发布时间都按统一的人读格式展示。
+const formatTime = formatAiTimelineDateTime;
 
 function readSourceStatusLabel(status: SettingsAiTimelineSourceHealth["latestStatus"]): string {
   switch (status) {

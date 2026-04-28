@@ -1,31 +1,15 @@
 <script setup lang="ts">
 import type { SettingsAiTimelineAdminResponse } from "../../../services/settingsApi";
 import { editorialContentCardClass } from "../../content/contentCardShared";
+import { formatAiTimelineDateTime } from "../../../utils/formatAiTimelineDateTime";
 
 defineProps<{
   adminModel: SettingsAiTimelineAdminResponse | null;
   summaryLoading: boolean;
 }>();
 
-function formatTime(value: string | null | undefined): string {
-  if (!value) {
-    return "暂无";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "时间无效";
-  }
-
-  return date.toLocaleString("zh-CN", {
-    timeZone: "Asia/Shanghai",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-}
+// feed 摘要只关心给人看的发布时间格式，原始时间字段仍由 API 保持不变。
+const formatTime = formatAiTimelineDateTime;
 </script>
 
 <template>

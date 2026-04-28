@@ -225,12 +225,20 @@ onMounted(() => {
           <span class="text-xs text-editorial-text-muted">已加载 {{ loadedEventCount }} 条</span>
         </div>
 
-        <AiTimelineEventCard
-          v-for="(event, index) in events"
-          :key="event.id"
-          :event="event"
-          :display-index="index + 1"
-        />
+        <div class="relative" data-ai-timeline-track>
+          <div
+            class="absolute bottom-3 top-3 left-[92px] w-[2px] rounded-full bg-editorial-border-strong shadow-[0_0_18px_rgba(148,163,184,0.32)] sm:left-[190px]"
+            data-ai-timeline-axis-line
+            aria-hidden="true"
+          />
+
+          <AiTimelineEventCard
+            v-for="(event, index) in events"
+            :key="event.id"
+            :event="event"
+            :display-index="index + 1"
+          />
+        </div>
       </section>
 
       <div

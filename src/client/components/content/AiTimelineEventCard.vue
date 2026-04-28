@@ -6,14 +6,14 @@ import {
   editorialContentMetaClass,
   readSafeUrl
 } from "./contentCardShared";
+import { formatAiTimelineDateTime } from "../../utils/formatAiTimelineDateTime";
 
 const props = defineProps<{
   event: AiTimelineEventRecord;
   displayIndex: number;
 }>();
 
-// 官方来源链接只允许 http(s)，避免把异常协议从数据层直接渲染成可点击入口。
-const safeOfficialUrl = readSafeUrl(props.event.officialUrl);
+// 官方证据链接只允许 http(s)，避免把异常协议从数据层直接渲染成可点击入口。
 const safeEvidenceLinks = props.event.evidenceLinks
   .map((evidence) => ({
     ...evidence,
@@ -21,38 +21,17 @@ const safeEvidenceLinks = props.event.evidenceLinks
   }))
   .filter((evidence) => evidence.safeUrl);
 
-function readPublishedDate(): Date | null {
-  const date = new Date(props.event.publishedAt);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-// 时间轴左侧需要把日期和时间拆开，便于用户按节点扫描发布节奏。
-function formatTimelineDate(): string {
-  const date = readPublishedDate();
-
-  if (!date) {
-    return "日期未知";
-  }
-
-  return date.toLocaleDateString("zh-CN", {
-    timeZone: "Asia/Shanghai",
-    month: "2-digit",
-    day: "2-digit"
-  });
-}
-
+// 时间轴节点直接显示完整发布时间，避免读者再从 ISO 字符串里判断具体时刻。
 function formatTimelineTime(): string {
-  const date = readPublishedDate();
+  return formatAiTimelineDateTime(props.event.publishedAt);
+}
 
-  if (!date) {
-    return "时间未知";
-  }
+function readTimelineDatePart(): string {
+  return formatTimelineTime().split(" ")[0] ?? "日期未知";
+}
 
-  return date.toLocaleTimeString("zh-CN", {
-    timeZone: "Asia/Shanghai",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
+function readTimelineClockPart(): string {
+  return formatTimelineTime().split(" ")[1] ?? "时间未知";
 }
 
 function readNodeAccentClass(): string {
@@ -110,22 +89,22 @@ function readReliabilityLabel(): string {
 
 <template>
   <article
-    class="grid grid-cols-[52px_32px_minmax(0,1fr)] gap-3 py-3 sm:grid-cols-[76px_52px_minmax(0,1fr)] sm:gap-4"
+    class="grid grid-cols-[76px_32px_minmax(0,1fr)] gap-2 py-3 sm:grid-cols-[148px_52px_minmax(0,1fr)] sm:gap-4"
     data-ai-timeline-event-card
   >
     <div
-      class="pt-1 text-right font-mono text-[11px] leading-5 text-editorial-text-muted sm:text-xs"
+      class="pt-1 text-right font-mono text-[10px] leading-4 text-editorial-text-muted sm:whitespace-nowrap sm:text-xs sm:leading-5"
       data-ai-timeline-time
+      :title="formatTimelineTime()"
     >
-      <div class="font-semibold text-editorial-text-body">{{ formatTimelineTime() }}</div>
-      <div class="text-[10px] text-editorial-text-muted sm:text-[11px]">{{ formatTimelineDate() }}</div>
+      <div class="hidden font-semibold text-editorial-text-body sm:block">{{ formatTimelineTime() }}</div>
+      <div class="font-semibold text-editorial-text-body sm:hidden">
+        <div>{{ readTimelineDatePart() }}</div>
+        <div>{{ readTimelineClockPart() }}</div>
+      </div>
     </div>
 
     <div class="relative flex min-h-full self-stretch justify-center" aria-hidden="true">
-      <div
-        class="absolute left-1/2 top-[-12px] bottom-[-12px] w-[2px] -translate-x-1/2 rounded-full bg-editorial-border-strong shadow-[0_0_18px_rgba(148,163,184,0.32)]"
-        data-ai-timeline-axis-line
-      />
       <div
         :class="[
           'relative z-[1] flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-black backdrop-blur-xl ring-4 ring-editorial-panel sm:h-11 sm:w-11 sm:text-sm',
@@ -138,7 +117,7 @@ function readReliabilityLabel(): string {
     </div>
 
     <div :class="[editorialContentCardClass, 'min-w-0 px-4 py-4 sm:px-5']">
-      <div class="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+      <div class="grid gap-4">
         <div class="min-w-0 space-y-3">
           <div :class="editorialContentMetaClass">
             <span>{{ event.companyName }}</span>
@@ -217,16 +196,6 @@ function readReliabilityLabel(): string {
           </div>
         </div>
 
-        <a
-          v-if="safeOfficialUrl"
-          :href="safeOfficialUrl"
-          target="_blank"
-          rel="noreferrer"
-          class="inline-flex shrink-0 items-center justify-center rounded-editorial-pill border border-editorial-border bg-editorial-panel px-3.5 py-2 text-xs font-semibold text-editorial-text-main no-underline transition hover:bg-editorial-link-active hover:text-editorial-text-main hover:no-underline"
-          data-ai-timeline-official-link
-        >
-          官方来源
-        </a>
       </div>
     </div>
   </article>

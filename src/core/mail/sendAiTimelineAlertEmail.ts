@@ -1,4 +1,5 @@
 import type { AiTimelineEventRecord } from "../aiTimeline/aiTimelineTypes.js";
+import { formatAiTimelineDateTime } from "../aiTimeline/formatAiTimelineDateTime.js";
 import type { RuntimeConfig } from "../types/appConfig.js";
 import { sendEmailMessage, type SendMail } from "./sendEmailMessage.js";
 
@@ -34,7 +35,7 @@ function renderAiTimelineAlertEmailHtml(config: RuntimeConfig, event: AiTimeline
     <h1>AI S级事件提醒</h1>
     <h2>${escapeHtml(event.displayTitle)}</h2>
     <p>公司：${escapeHtml(event.companyName)}</p>
-    <p>发布时间：${escapeHtml(event.publishedAt)}</p>
+    <p>发布时间：${escapeHtml(formatAiTimelineDateTime(event.publishedAt))}</p>
     <p>重要性说明：${escapeHtml(event.importanceSummaryZh || event.displaySummaryZh || "暂无说明")}</p>
     <p>AI 时间线：<a href="${escapeHtml(timelineUrl)}">${escapeHtml(timelineUrl)}</a></p>
     <h3>官方来源</h3>

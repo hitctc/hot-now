@@ -2,26 +2,14 @@
 import type { AiTimelineEventRecord, AiTimelineVisibilityStatus } from "../../../services/aiTimelineApi";
 import type { SettingsAiTimelineEventsResponse } from "../../../services/settingsApi";
 import { editorialContentCardClass, readSafeUrl } from "../../content/contentCardShared";
+import { formatAiTimelineDateTime } from "../../../utils/formatAiTimelineDateTime";
 
 defineProps<{
   eventsModel: SettingsAiTimelineEventsResponse;
 }>();
 
-function formatTime(value: string): string {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "时间无效";
-  }
-
-  return date.toLocaleString("zh-CN", {
-    timeZone: "Asia/Shanghai",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-}
+// 事件池保持只读，但展示层把 feed 时间转成完整日期时间，降低人工核对成本。
+const formatTime = formatAiTimelineDateTime;
 
 function readVisibilityLabel(status: AiTimelineVisibilityStatus): string {
   switch (status) {

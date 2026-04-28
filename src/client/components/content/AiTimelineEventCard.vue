@@ -21,17 +21,9 @@ const safeEvidenceLinks = props.event.evidenceLinks
   }))
   .filter((evidence) => evidence.safeUrl);
 
-// 时间轴节点直接显示完整发布时间，避免读者再从 ISO 字符串里判断具体时刻。
+// 时间轴节点显示统一短时间，兼顾 PC 和移动端的扫读效率。
 function formatTimelineTime(): string {
   return formatAiTimelineDateTime(props.event.publishedAt);
-}
-
-function readTimelineDatePart(): string {
-  return formatTimelineTime().split(" ")[0] ?? "日期未知";
-}
-
-function readTimelineClockPart(): string {
-  return formatTimelineTime().split(" ")[1] ?? "时间未知";
 }
 
 function readNodeAccentClass(): string {
@@ -89,19 +81,15 @@ function readReliabilityLabel(): string {
 
 <template>
   <article
-    class="grid grid-cols-[76px_32px_minmax(0,1fr)] gap-2 py-3 sm:grid-cols-[148px_52px_minmax(0,1fr)] sm:gap-4"
+    class="grid grid-cols-[68px_32px_minmax(0,1fr)] gap-2 py-3 sm:grid-cols-[112px_52px_minmax(0,1fr)] sm:gap-4"
     data-ai-timeline-event-card
   >
     <div
-      class="pt-1 text-right font-mono text-[10px] leading-4 text-editorial-text-muted sm:whitespace-nowrap sm:text-xs sm:leading-5"
+      class="flex h-8 items-center justify-end text-right font-mono text-[10px] font-semibold leading-4 text-editorial-text-body sm:h-11 sm:whitespace-nowrap sm:text-xs sm:leading-5"
       data-ai-timeline-time
       :title="formatTimelineTime()"
     >
-      <div class="hidden font-semibold text-editorial-text-body sm:block">{{ formatTimelineTime() }}</div>
-      <div class="font-semibold text-editorial-text-body sm:hidden">
-        <div>{{ readTimelineDatePart() }}</div>
-        <div>{{ readTimelineClockPart() }}</div>
-      </div>
+      {{ formatTimelineTime() }}
     </div>
 
     <div class="relative flex min-h-full self-stretch justify-center" aria-hidden="true">

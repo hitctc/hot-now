@@ -13,6 +13,7 @@ import {
 import { useInfiniteLoadTrigger, VISIBLE_INFINITE_LOAD_DELAY_MS } from "../../components/content/useInfiniteLoadTrigger";
 import { useContentPageScroll } from "../../components/content/useContentPageScroll";
 import { readAiTimelinePage, type AiTimelineEventRecord, type AiTimelinePageModel } from "../../services/aiTimelineApi";
+import { formatAiTimelineDateTime } from "../../utils/formatAiTimelineDateTime";
 
 type LoadState = "idle" | "loading" | "loaded" | "error";
 
@@ -41,6 +42,13 @@ const hasActiveFilter = computed(
 );
 const loadedEventCount = computed(() => events.value.length);
 const totalEventCount = computed(() => pagination.value.totalResults);
+const generatedAtLabel = computed(() => {
+  if (!pageModel.value?.generatedAt) {
+    return "";
+  }
+
+  return formatAiTimelineDateTime(pageModel.value.generatedAt);
+});
 const hasMoreEvents = computed(() => (
   currentPage.value < pagination.value.totalPages && loadedEventCount.value < pagination.value.totalResults
 ));
@@ -164,6 +172,13 @@ onMounted(() => {
         </div>
         <div class="flex flex-wrap gap-2 text-xs text-editorial-text-muted">
           <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">外部 Markdown feed</span>
+          <span
+            v-if="generatedAtLabel"
+            class="rounded-editorial-pill bg-editorial-link px-2.5 py-1"
+            data-ai-timeline-generated-at
+          >
+            数据生成 {{ generatedAtLabel }}
+          </span>
           <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">默认最近 7 天</span>
           <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">不按等级裁剪</span>
           <span class="rounded-editorial-pill bg-editorial-link px-2.5 py-1">每条保留官方链接</span>
@@ -227,7 +242,7 @@ onMounted(() => {
 
         <div class="relative" data-ai-timeline-track>
           <div
-            class="absolute bottom-3 top-3 left-[92px] w-[2px] rounded-full bg-editorial-border-strong shadow-[0_0_18px_rgba(148,163,184,0.32)] sm:left-[190px]"
+            class="absolute bottom-3 top-3 left-[92px] w-[2px] rounded-full bg-editorial-border-strong shadow-[0_0_18px_rgba(148,163,184,0.32)] sm:left-[154px]"
             data-ai-timeline-axis-line
             aria-hidden="true"
           />

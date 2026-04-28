@@ -2541,6 +2541,7 @@ async function readAiTimelineApiData(deps: ServerDeps, request: FastifyRequest) 
         eventTypes: [...aiTimelineEventTypes],
         companies: []
       },
+      generatedAt: null,
       events: []
     };
   }
@@ -2553,6 +2554,7 @@ async function readAiTimelineApiData(deps: ServerDeps, request: FastifyRequest) 
     totalResults: model.pagination.totalResults,
     totalPages: model.pagination.totalPages,
     filters: model.filters,
+    generatedAt: model.generatedAt,
     events: model.events
   };
 }

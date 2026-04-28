@@ -98,6 +98,7 @@ export async function readAiTimelineFeedPageModel(
 
 export function buildAiTimelinePageModelFromMarkdown(content: string, query: AiTimelineListQuery = {}): AiTimelinePageModel {
   const data = parseAiTimelineFeedMarkdown(content);
+  const generatedAt = typeof data.generatedAt === "string" ? data.generatedAt : new Date().toISOString();
   const allEvents = normalizeFeedEvents(data);
   const filteredEvents = filterFeedEvents(allEvents, query);
   const pageSize = normalizePositiveInteger(query.pageSize, 50);
@@ -112,6 +113,7 @@ export function buildAiTimelinePageModelFromMarkdown(content: string, query: AiT
       eventTypes: [...aiTimelineEventTypes],
       companies: buildCompanyFilters(allEvents)
     },
+    generatedAt,
     pagination: {
       page,
       pageSize,

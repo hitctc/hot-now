@@ -24,6 +24,7 @@ const baseTimelineModel = {
   pageSize: 50,
   totalResults: 51,
   totalPages: 2,
+  generatedAt: "2026-04-26T09:00:00+08:00",
   filters: {
     eventTypes: ["要闻", "模型发布", "开发生态", "产品应用", "行业动态", "官方前瞻"],
     companies: [
@@ -220,17 +221,21 @@ describe("AiTimelinePage", () => {
     });
     expect(wrapper.get("[data-ai-timeline-page]").text()).toContain("AI 官方发布时间线");
     expect(wrapper.get("[data-ai-timeline-intro]").text()).toContain("Markdown feed");
+    expect(wrapper.get("[data-ai-timeline-generated-at]").text()).toContain("数据生成 04-26 09:00");
     expect(wrapper.get("[data-ai-timeline-filters]").text()).toContain("事件类型");
     expect(wrapper.findAll("[data-ai-timeline-event-card]")).toHaveLength(2);
     expect(wrapper.findAll("[data-ai-timeline-display-index]").map((node) => node.text())).toEqual(["1", "2"]);
-    expect(wrapper.get("[data-ai-timeline-time]").text()).toContain("2026-04-24 18:00:00");
-    expect(wrapper.get("[data-ai-timeline-time]").attributes("title")).toBe("2026-04-24 18:00:00");
+    expect(wrapper.get("[data-ai-timeline-time]").text()).toContain("04-24 18:00");
+    expect(wrapper.get("[data-ai-timeline-time]").attributes("title")).toBe("04-24 18:00");
+    expect(wrapper.get("[data-ai-timeline-time]").classes()).toEqual(
+      expect.arrayContaining(["flex", "h-8", "items-center", "justify-end", "sm:h-11"])
+    );
     expect(wrapper.get("[data-ai-timeline-event-card]").classes()).toEqual(
-      expect.arrayContaining(["grid", "grid-cols-[76px_32px_minmax(0,1fr)]"])
+      expect.arrayContaining(["grid", "grid-cols-[68px_32px_minmax(0,1fr)]"])
     );
     expect(wrapper.find("[data-ai-timeline-track]").exists()).toBe(true);
     expect(wrapper.get("[data-ai-timeline-axis-line]").classes()).toEqual(
-      expect.arrayContaining(["left-[92px]", "sm:left-[190px]", "w-[2px]", "bg-editorial-border-strong"])
+      expect.arrayContaining(["left-[92px]", "sm:left-[154px]", "w-[2px]", "bg-editorial-border-strong"])
     );
     expect(wrapper.get("[data-ai-timeline-display-index]").classes()).toEqual(
       expect.arrayContaining(["text-white", "font-black"])

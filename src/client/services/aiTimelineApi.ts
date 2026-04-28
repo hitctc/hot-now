@@ -79,6 +79,7 @@ export type AiTimelinePageModel = {
   pageSize: number;
   totalResults: number;
   totalPages: number;
+  generatedAt: string | null;
   filters: AiTimelineFilterOptions;
   events: AiTimelineEventRecord[];
 };

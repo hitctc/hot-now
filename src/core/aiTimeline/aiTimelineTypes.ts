@@ -184,6 +184,7 @@ export type AiTimelineFilterOptions = {
 export type AiTimelinePageModel = {
   events: AiTimelineEventRecord[];
   filters: AiTimelineFilterOptions;
+  generatedAt: string | null;
   pagination: {
     page: number;
     pageSize: number;

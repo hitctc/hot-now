@@ -155,6 +155,7 @@ describe("buildAiTimelinePageModelFromMarkdown", () => {
       referenceTime: new Date("2026-04-26T00:00:00.000Z")
     });
 
+    expect(model.generatedAt).toBe("2026-04-26T09:00:00+08:00");
     expect(model.pagination.totalResults).toBe(2);
     expect(model.filters.companies).toEqual([
       { key: "google-ai", name: "Google AI", eventCount: 1 },

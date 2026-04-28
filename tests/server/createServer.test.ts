@@ -274,6 +274,7 @@ describe("createServer", () => {
         eventTypes: ["要闻", "模型发布", "开发生态", "产品应用", "行业动态", "官方前瞻"],
         companies: [{ key: "openai", name: "OpenAI", eventCount: 1 }]
       },
+      generatedAt: "2026-04-26T09:00:00+08:00",
       pagination: {
         page: 2,
         pageSize: 50,
@@ -303,6 +304,7 @@ describe("createServer", () => {
       filters: {
         companies: [{ key: "openai", name: "OpenAI", eventCount: 1 }]
       },
+      generatedAt: "2026-04-26T09:00:00+08:00",
       events: [
         {
           companyKey: "openai",

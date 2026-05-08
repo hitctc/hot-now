@@ -34,21 +34,24 @@ echo "Deploy target: ${REMOTE_TARGET}:${DEPLOY_APP_DIR}"
 
 cd "${REPO_ROOT}"
 
+echo "Building locally..."
+npm run build
+
+echo "Syncing code + dist to server..."
 rsync -az --delete \
   --exclude ".git" \
   --exclude ".vscode" \
   --exclude "node_modules" \
-  --exclude "dist" \
   --exclude "data" \
   --exclude ".env" \
   --exclude ".DS_Store" \
   ./ "${REMOTE_TARGET}:${DEPLOY_APP_DIR}/"
 
+echo "Installing production dependencies and restarting service..."
 ssh "${REMOTE_TARGET}" \
   "set -euo pipefail
   cd '${DEPLOY_APP_DIR}'
   npm ci
-  npm run build
   if ! sudo -n systemctl restart '${DEPLOY_SERVICE}'; then
     echo 'Passwordless sudo for systemctl restart is not configured.' >&2
     echo 'Install the deploy sudoers rule from deploy/sudoers/hot-now-systemctl.' >&2

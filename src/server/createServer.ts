@@ -73,8 +73,21 @@ import type {
 import type { WeiboTrendingRunState } from "../core/weibo/runWeiboTrendingCollection.js";
 import type { RuntimeConfig } from "../core/types/appConfig.js";
 import type { SqliteDatabase } from "../core/db/openDatabase.js";
-import { insertCreativeSourceItem, findCreativeSourceItemByExternalId } from "../core/creative/creativeSourceItemRepository.js";
-import { insertCreativeFinishedArticle, findCreativeFinishedArticleBySourceItemId } from "../core/creative/creativeFinishedArticleRepository.js";
+import {
+  insertCreativeSourceItem,
+  findCreativeSourceItemByExternalId,
+  listCreativeSourceItems,
+  findCreativeSourceItemById,
+  updateCreativeSourceItemQualityStatus
+} from "../core/creative/creativeSourceItemRepository.js";
+import {
+  insertCreativeFinishedArticle,
+  findCreativeFinishedArticleBySourceItemId,
+  listCreativeFinishedArticles,
+  findCreativeFinishedArticleById,
+  updateCreativeFinishedArticleStatus,
+  editCreativeFinishedArticle
+} from "../core/creative/creativeFinishedArticleRepository.js";
 import { readNextCollectionRunAt } from "../core/scheduler/readNextCollectionRunAt.js";
 import {
   createSessionToken,
@@ -730,6 +743,160 @@ export function createServer(deps: ServerDeps = {}) {
       sourceItemId: sourceItem.id,
       created: true
     });
+  });
+
+  // ─── Creative: Query API (session-authenticated) ───
+
+  app.get("/api/creative/source-items", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const query = request.query as Record<string, string | undefined>;
+    const result = listCreativeSourceItems(db, {
+      page: query.page ? parseInt(query.page, 10) : undefined,
+      pageSize: query.pageSize ? parseInt(query.pageSize, 10) : undefined,
+      qualityStatus: query.qualityStatus as "pending" | "accepted" | "rejected" | undefined,
+      collectorAgent: query.collectorAgent,
+      search: query.search
+    });
+    return reply.send(result);
+  });
+
+  app.get("/api/creative/source-items/:id", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const params = request.params as { id: string };
+    const id = parseInt(params.id, 10);
+    const item = findCreativeSourceItemById(db, id);
+    if (!item) {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+    return reply.send(item);
+  });
+
+  app.get("/api/creative/finished-articles", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const query = request.query as Record<string, string | undefined>;
+    const result = listCreativeFinishedArticles(db, {
+      page: query.page ? parseInt(query.page, 10) : undefined,
+      pageSize: query.pageSize ? parseInt(query.pageSize, 10) : undefined,
+      status: query.status as "generated" | "edited" | "approved" | "published" | "rejected" | "completed" | undefined,
+      search: query.search
+    });
+    return reply.send(result);
+  });
+
+  app.get("/api/creative/finished-articles/:id", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const params = request.params as { id: string };
+    const id = parseInt(params.id, 10);
+    const article = findCreativeFinishedArticleById(db, id);
+    if (!article) {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+    return reply.send(article);
+  });
+
+  // ─── Creative: Actions (session-authenticated) ───
+
+  app.post("/actions/creative/source-items/:id/quality-status", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const params = request.params as { id: string };
+    const body = request.body as { qualityStatus?: unknown } | undefined;
+    const id = parseInt(params.id, 10);
+    const status = typeof body?.qualityStatus === "string" ? body.qualityStatus : "";
+    if (!["accepted", "rejected"].includes(status)) {
+      return reply.code(400).send({ ok: false, reason: "invalid-status" });
+    }
+    const updated = updateCreativeSourceItemQualityStatus(db, id, status as "accepted" | "rejected");
+    if (!updated) {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+    return reply.send({ ok: true });
+  });
+
+  app.post("/actions/creative/finished-articles/:id/status", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const params = request.params as { id: string };
+    const body = request.body as { status?: unknown } | undefined;
+    const id = parseInt(params.id, 10);
+    const newStatus = typeof body?.status === "string" ? body.status : "";
+    if (!newStatus) {
+      return reply.code(400).send({ ok: false, reason: "missing-status" });
+    }
+    const result = updateCreativeFinishedArticleStatus(db, id, newStatus as any);
+    if (!result.ok && result.reason === "article not found") {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+    if (!result.ok) {
+      return reply.code(400).send({ ok: false, reason: "invalid-transition", detail: result.reason });
+    }
+    return reply.send({ ok: true });
+  });
+
+  app.put("/actions/creative/finished-articles/:id", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const params = request.params as { id: string };
+    const body = request.body as Record<string, unknown> | undefined;
+    const id = parseInt(params.id, 10);
+    const result = editCreativeFinishedArticle(db, id, {
+      contentMarkdown: typeof body?.contentMarkdown === "string" ? body.contentMarkdown : undefined,
+      thesis: typeof body?.thesis === "string" ? body.thesis : undefined,
+      titles: Array.isArray(body?.titles) ? body.titles as string[] : undefined,
+      hooks: Array.isArray(body?.hooks) ? body.hooks as string[] : undefined,
+      quotes: Array.isArray(body?.quotes) ? body.quotes as string[] : undefined,
+      summary100: typeof body?.summary100 === "string" ? body.summary100 : undefined,
+      images: Array.isArray(body?.images) ? body.images as any[] : undefined
+    });
+    if (!result.ok && result.reason === "article not found") {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+    if (!result.ok) {
+      return reply.code(400).send({ ok: false, reason: result.reason });
+    }
+    return reply.send({ ok: true });
   });
 
   if (authEnabled) {

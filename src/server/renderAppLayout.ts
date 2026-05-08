@@ -7,7 +7,7 @@ type AppShellUser = {
 export type AppShellPage = {
   path: string;
   title: string;
-  section: "content" | "system";
+  section: "content" | "system" | "creative";
   description: string;
 };
 
@@ -25,6 +25,8 @@ const appShellPages: AppShellPage[] = [
   { path: "/ai-new", title: "AI 新讯", section: "content", description: "这里会展示最新 AI 新闻、模型、事件与智能体信号。" },
   { path: "/ai-hot", title: "AI 热点", section: "content", description: "这里会承接已经开始形成热度的 AI 热点内容。" },
   { path: "/ai-timeline", title: "AI 时间线", section: "content", description: "这里会按时间追踪主流 AI 公司官方发布的模型、产品、开发生态和行业动态。" },
+  { path: "/creative/source-items", title: "素材库", section: "creative", description: "查看外部 agent 推送的新闻素材和关联的成品文章。" },
+  { path: "/creative/finished-articles", title: "成品文章", section: "creative", description: "查看、编辑和管理 AI 写作的成品文章。" },
   { path: "/settings/sources", title: "数据收集", section: "system", description: "这里会管理 RSS 数据源的启用状态、抓取结果和手动采集。" },
   {
     path: "/settings/ai-timeline",
@@ -57,6 +59,7 @@ export function renderAppLayout(view: AppShellView): string {
     appShellPages.filter((page) => page.section === "content" && page.path !== "/"),
     view.currentPath
   );
+  const creativeLinks = renderNavGroup(appShellPages.filter((page) => page.section === "creative"), view.currentPath);
   const systemLinks = renderNavGroup(appShellPages.filter((page) => page.section === "system"), view.currentPath);
   const showSystemMenu = view.showSystemMenu ?? true;
   const pageContent = view.contentHtml ?? renderPlaceholder(view.page.description);
@@ -97,6 +100,10 @@ export function renderAppLayout(view: AppShellView): string {
           <p class="nav-title">内容菜单</p>
           ${contentLinks}
         </nav>
+        ${showSystemMenu ? `<nav class="nav-group nav-group--creative">
+          <p class="nav-title">内容创作</p>
+          ${creativeLinks}
+        </nav>` : ""}
         ${showSystemMenu ? `<nav class="nav-group nav-group--system">
           <p class="nav-title">系统菜单</p>
           ${systemLinks}

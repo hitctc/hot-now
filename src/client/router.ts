@@ -7,6 +7,8 @@ export type ShellPageKey =
   | "ai-hot"
   | "ai-timeline"
   | "ai-timeline-admin"
+  | "creative-source-items"
+  | "creative-finished-articles"
   | "view-rules"
   | "sources"
   | "profile";
@@ -14,7 +16,7 @@ export type ShellPageKey =
 export type ShellPageMeta = {
   key: ShellPageKey;
   path: string;
-  section: "content" | "system";
+  section: "content" | "system" | "creative";
   navLabel: string;
   title: string;
   description: string;
@@ -50,6 +52,24 @@ const aiTimelinePageMeta = {
   navLabel: "AI 时间线",
   title: "AI 时间线",
   description: "按时间追踪主流 AI 公司官方发布的模型、产品、开发生态和行业动态。"
+} as const satisfies ShellPageMeta;
+
+const creativeSourceItemsPageMeta = {
+  key: "creative-source-items",
+  path: "/creative/source-items",
+  section: "creative",
+  navLabel: "素材库",
+  title: "素材库",
+  description: "查看外部 agent 推送的新闻素材和关联的成品文章。"
+} as const satisfies ShellPageMeta;
+
+const creativeFinishedArticlesPageMeta = {
+  key: "creative-finished-articles",
+  path: "/creative/finished-articles",
+  section: "creative",
+  navLabel: "成品文章",
+  title: "成品文章",
+  description: "查看、编辑和管理 AI 写作的成品文章。"
 } as const satisfies ShellPageMeta;
 
 const viewRulesPageMeta = {
@@ -92,6 +112,8 @@ export const shellPageMetas = [
   aiNewPageMeta,
   aiHotPageMeta,
   aiTimelinePageMeta,
+  creativeSourceItemsPageMeta,
+  creativeFinishedArticlesPageMeta,
   sourcesPageMeta,
   aiTimelineAdminPageMeta,
   viewRulesPageMeta,
@@ -147,12 +169,16 @@ const profilePage = () => import("./pages/settings/ProfilePage.vue");
 const aiNewPage = () => import("./pages/content/AiNewPage.vue");
 const aiHotPage = () => import("./pages/content/AiHotPage.vue");
 const aiTimelinePage = () => import("./pages/content/AiTimelinePage.vue");
+const creativeSourceItemsPage = () => import("./pages/creative/SourceItemsPage.vue");
+const creativeFinishedArticlesPage = () => import("./pages/creative/FinishedArticlesPage.vue");
 
 const routes: RouteRecordRaw[] = [
   createShellRoute(aiNewRootPageMeta, aiNewPage),
   createShellRoute(aiNewPageMeta, aiNewPage),
   createShellRoute(aiHotPageMeta, aiHotPage),
   createShellRoute(aiTimelinePageMeta, aiTimelinePage),
+  createShellRoute(creativeSourceItemsPageMeta, creativeSourceItemsPage),
+  createShellRoute(creativeFinishedArticlesPageMeta, creativeFinishedArticlesPage),
   createShellRoute(viewRulesPageMeta, viewRulesPage),
   createShellRoute(sourcesPageMeta, sourcesPage),
   createShellRoute(aiTimelineAdminPageMeta, aiTimelineAdminPage),

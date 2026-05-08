@@ -976,7 +976,7 @@ export function createServer(deps: ServerDeps = {}) {
         const session = readAuthenticatedSession(request.headers.cookie, authConfig?.sessionSecret ?? "");
 
         // Content pages stay readable without a session, but system pages still require an authenticated user.
-        if (!session && currentPage.section === "system") {
+        if (!session && (currentPage.section === "system" || currentPage.section === "creative")) {
           return reply.redirect("/login");
         }
 
@@ -987,7 +987,7 @@ export function createServer(deps: ServerDeps = {}) {
           });
         }
 
-        if (currentPage.section === "content") {
+        if (currentPage.section === "content" || currentPage.section === "creative") {
           return await serveClientContentShell(reply, clientIndexPath, {
             clientDevOrigin,
             readClientDevEntryHtml: deps.readClientDevEntryHtml
@@ -1030,7 +1030,7 @@ export function createServer(deps: ServerDeps = {}) {
           });
         }
 
-        if (currentPage.section === "content") {
+        if (currentPage.section === "content" || currentPage.section === "creative") {
           return await serveClientContentShell(reply, clientIndexPath, {
             clientDevOrigin,
             readClientDevEntryHtml: deps.readClientDevEntryHtml

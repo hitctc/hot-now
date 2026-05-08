@@ -25,6 +25,7 @@ const themeOptions = [
 ];
 
 const contentNavPages = shellPageMetas.filter((page) => page.section === "content");
+const creativeNavPages = shellPageMetas.filter((page) => page.section === "creative");
 const systemNavPages = shellPageMetas.filter((page) => page.section === "system");
 
 const currentPageTitle = computed(() => route.meta.title ?? "系统页底座");
@@ -35,6 +36,7 @@ const shellLogoSrc = "/brand/hotnow-logo-mark.png";
 const loggedInProfile = computed(() => (profile.value?.loggedIn ? profile.value : null));
 const guestProfile = computed(() => (profile.value && !profile.value.loggedIn ? profile.value : null));
 const shouldShowSystemMenu = computed(() => Boolean(loggedInProfile.value));
+const shouldShowCreativeMenu = computed(() => Boolean(loggedInProfile.value));
 
 function buildGuestProfile(): SettingsProfile {
   return {
@@ -265,6 +267,26 @@ onBeforeUnmount(() => {
             >
               <span class="text-sm font-medium leading-5">{{ page.navLabel }}</span>
               <span :class="getShellNavDescriptionClasses(isActiveContentPath(page.path))" class="text-xs leading-5">
+                {{ page.description }}
+              </span>
+            </RouterLink>
+          </nav>
+        </section>
+
+        <section v-if="shouldShowCreativeMenu" class="flex shrink-0 flex-col gap-1" data-shell-creative-menu-section>
+          <p class="px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
+            内容创作
+          </p>
+          <nav class="flex flex-col gap-1" aria-label="内容创作">
+            <RouterLink
+              v-for="page in creativeNavPages"
+              :key="page.key"
+              :to="page.path"
+              :class="getShellNavLinkClasses(route.path === page.path)"
+              :data-shell-nav-link="page.path"
+            >
+              <span class="text-sm font-medium leading-5">{{ page.navLabel }}</span>
+              <span :class="getShellNavDescriptionClasses(route.path === page.path)" class="text-xs leading-5">
                 {{ page.description }}
               </span>
             </RouterLink>

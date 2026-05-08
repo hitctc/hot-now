@@ -193,7 +193,7 @@
 - 生成 verified snapshot：`npm run db:snapshot`
 - 从快照恢复主库：`npm run db:restore -- <snapshot-file>`
 - 生产部署：`./scripts/deploy-prod.sh`（默认会先读取仓库根 `.deploy.local.env`；如需临时覆盖，再显式传 `HOT_NOW_DEPLOY_*`）
-- 生产 Nginx：`deploy/nginx/hot-now.conf` 会直接服务 `/client/assets/` 下的 Vite hash 资源，并对 JS/CSS 开启 gzip 与长缓存；更新该模板后，服务器侧需要执行 `nginx -t` 并 reload Nginx，避免静态资源继续绕到 Node 进程。
+- 生产 Nginx：`deploy/nginx/hot-now.conf` 包含 `80 -> 443` 跳转、`now.achuan.cc` HTTPS 反代，并直接服务 `/client/assets/` 下的 Vite hash 资源，对 JS/CSS 开启 gzip 与长缓存；更新该模板后，服务器侧需要执行 `nginx -t` 并 reload Nginx，避免静态资源继续绕到 Node 进程。
 - 拉取生产数据副本：`./scripts/pull-prod-data.sh`（默认从生产服务器拉 `hot-now.sqlite + reports/` 到本地 `data/prod-sync/`）
 - 基于生产副本启动本地开发：`./scripts/dev-prod-sync.sh`（固定使用本地 `data/prod-sync/`，不直连服务器 live 数据）
 - 类型构建：`npm run build`

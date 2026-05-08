@@ -294,7 +294,7 @@ cp .deploy.local.env.example .deploy.local.env
 - 通过免密 `sudo -n systemctl` 重启并检查 `hot-now` 服务
 - 最后调用 `http://127.0.0.1:3030/health` 做健康检查
 
-`deploy/nginx/hot-now.conf` 会让 Nginx 直接服务 `/client/assets/` 下的 Vite hash 资源，并给这些 JS/CSS 加 gzip 与长缓存；安装或更新该模板后需要在服务器执行 `nginx -t` 和 reload，避免静态资源请求继续绕到 Node 进程后被业务接口阻塞。
+`deploy/nginx/hot-now.conf` 包含 `80 -> 443` 跳转、`now.achuan.cc` HTTPS 反代，以及 `/client/assets/` 下 Vite hash 资源的 Nginx 直出、gzip 与长缓存；安装或更新该模板后需要在服务器执行 `nginx -t` 和 reload，避免静态资源请求继续绕到 Node 进程后被业务接口阻塞。
 
 部署脚本不会触碰：
 

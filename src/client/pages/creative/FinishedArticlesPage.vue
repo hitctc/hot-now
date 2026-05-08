@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { message } from "ant-design-vue";
 
 import {
   editFinishedArticle,
@@ -234,6 +235,28 @@ function truncateText(text: string, maxLen: number): string {
   return text.slice(0, maxLen) + "...";
 }
 
+// ─── 纯文本复制 ───
+
+function markdownToPlainText(md: string): string {
+  return md
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/`(.*?)`/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/^[-*]\s+/gm, "")
+    .replace(/^>\s+/gm, "")
+    .replace(/---+/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+async function copyPlainText(contentMarkdown: string): Promise<void> {
+  const text = markdownToPlainText(contentMarkdown);
+  await navigator.clipboard.writeText(text);
+  message.success("已复制纯文本到剪贴板");
+}
+
 // ─── 表格列 ───
 
 const columns = [
@@ -414,6 +437,15 @@ const pagination = computed(() => ({
                 @click="openEditModal(record)"
               >
                 编辑内容
+              </a-button>
+
+              <!-- 复制纯文本按钮 -->
+              <a-button
+                v-if="record.contentMarkdown"
+                size="small"
+                @click="copyPlainText(record.contentMarkdown)"
+              >
+                复制纯文本
               </a-button>
             </div>
           </div>

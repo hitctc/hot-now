@@ -157,6 +157,7 @@ scripts/
 - `LLM_SETTINGS_MASTER_KEY` —— 可选：用于加密保存厂商 API key（未配置时回退到 `SESSION_SECRET`）
 - `HOT_NOW_DATABASE_FILE`、`HOT_NOW_REPORT_DATA_DIR` —— 可选生产路径覆盖项
 - `AI_TIMELINE_FEED_URL`、`AI_TIMELINE_FEED_FILE`、`AI_TIMELINE_FEED_MANIFEST_FILE` —— 外部 AI 时间线 feed 配置
+- `CREATIVE_API_TOKEN` —— 创作模块 API 访问令牌（成品文章接口鉴权）
 
 ### 公众号解析 Sidecar
 

@@ -36,6 +36,25 @@ describe("readAiTimelineFeedFile", () => {
     expect(result.isFallback).toBe(false);
   });
 
+  it("prefers the local stable feed before trying the public URL", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-feed-"));
+    const feedFile = path.join(tempDir, "ai-timeline-feed.md");
+    const manifestFile = path.join(tempDir, "ai-timeline-feed-manifest.json");
+
+    await writeFile(feedFile, validFeed("local"));
+
+    const result = await readAiTimelineFeedFile({
+      url: "http://127.0.0.1:9/unreachable-feed.md",
+      file: feedFile,
+      manifestFile,
+      maxFallbackVersions: 5
+    });
+
+    expect(result.content).toContain('"title":"local"');
+    expect(result.sourcePath).toBe(feedFile);
+    expect(result.isFallback).toBe(false);
+  });
+
   it("falls back to manifest versions when the latest feed is invalid", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-feed-"));
     const feedFile = path.join(tempDir, "ai-timeline-feed.md");

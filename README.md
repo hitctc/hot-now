@@ -38,7 +38,7 @@ export HOT_NOW_CLIENT_DEV_ORIGIN="http://127.0.0.1:35173"
 `AUTH_SESSION_TTL_SECONDS` 是可选的登录会话固定有效期，单位为秒；不配置时默认 `604800` 秒，也就是 7 天。当前登录态不是滑动续期，到期后需要重新登录。
 `PUBLIC_BASE_URL` 是对外可点击的正式站点地址，飞书提醒和邮件里的报告 / 时间线链接都使用它；不配置时会回退到 `BASE_URL`，用于兼容旧环境。
 `HOT_NOW_DATABASE_FILE`、`HOT_NOW_REPORT_DATA_DIR` 是可选生产覆盖项，用来把 SQLite 和报告目录从代码树移到 `/srv/hot-now/shared/data`；本地开发不填时，系统继续按 `config/hot-now.config.json` 里的相对路径运行。
-`AI_TIMELINE_FEED_URL`、`AI_TIMELINE_FEED_FILE`、`AI_TIMELINE_FEED_MANIFEST_FILE` 和 `AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS` 是可选的外部 AI 官方发布时间线 feed 配置；默认优先读取 `https://now.achuan.cc/feeds/ai-timeline-feed.md`，URL 不可用时再按本地稳定文件、manifest 和版本文件回退。
+`AI_TIMELINE_FEED_URL`、`AI_TIMELINE_FEED_FILE`、`AI_TIMELINE_FEED_MANIFEST_FILE` 和 `AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS` 是可选的外部 AI 官方发布时间线 feed 配置；服务端接口优先读取本地稳定文件和回退版本，公网 URL 只作为兜底来源，避免生产接口每次请求都绕公网访问自己。
 `FEISHU_ALERT_WEBHOOK_URL` 是 S 级 AI 时间线事件飞书提醒的敏感 webhook，只能放在 `.env` 或生产环境变量里，不要写进仓库；缺失时飞书通道会失败，但邮件备份通道仍会尝试发送。
 `HOT_NOW_CLIENT_DEV_ORIGIN` 也是可选开发辅助项；`npm run dev` 默认会把 Vite dev server 拉到 `http://127.0.0.1:35173`，并按这个地址接入，让 `3030` 页面直接拿到 HMR 和 Vue DevTools。只有你想改成别的开发端口时，才需要显式覆盖它。
 本地开发不再要求手工配置 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`；`npm run dev` 会自动拉起仓库内置的本地公众号解析 sidecar。只有你想覆盖到远端 relay 时，才需要显式配置这两个环境变量。
@@ -293,6 +293,8 @@ cp .deploy.local.env.example .deploy.local.env
 - 在服务器执行 `npm ci` 和 `npm run build`
 - 通过免密 `sudo -n systemctl` 重启并检查 `hot-now` 服务
 - 最后调用 `http://127.0.0.1:3030/health` 做健康检查
+
+`deploy/nginx/hot-now.conf` 会让 Nginx 直接服务 `/client/assets/` 下的 Vite hash 资源，并给这些 JS/CSS 加 gzip 与长缓存；安装或更新该模板后需要在服务器执行 `nginx -t` 和 reload，避免静态资源请求继续绕到 Node 进程后被业务接口阻塞。
 
 部署脚本不会触碰：
 

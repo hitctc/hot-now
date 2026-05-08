@@ -57,6 +57,8 @@ type AiTimelineFeedManifest = {
   versions?: Array<string | { fileName?: string; file?: string; path?: string }>;
 };
 
+const feedUrlReadTimeoutMs = 3000;
+
 export async function readAiTimelineFeedFile(options: {
   url?: string | null;
   file: string;
@@ -134,17 +136,23 @@ async function collectFeedCandidates(options: {
   const fileCandidates = [options.file, ...manifestVersions, ...scannedVersions].map((candidate) =>
     path.resolve(path.dirname(options.file), candidate)
   );
-  const candidates = [options.url?.trim() ?? "", ...fileCandidates].filter(Boolean);
+  // Runtime reads prefer the local stable feed first: production already writes that file before exposing
+  // /feeds/ai-timeline-feed.md, so API requests should not wait on a public self-request before rendering.
+  const candidates = [...fileCandidates, options.url?.trim() ?? ""].filter(Boolean);
 
   return [...new Set(candidates)];
 }
 
 async function readFeedUrl(url: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), feedUrlReadTimeoutMs);
+
   const response = await fetch(url, {
+    signal: controller.signal,
     headers: {
       accept: "text/markdown,text/plain,*/*"
     }
-  });
+  }).finally(() => clearTimeout(timeout));
 
   if (!response.ok) {
     throw new Error(`HTTP ${response.status} ${response.statusText}`);

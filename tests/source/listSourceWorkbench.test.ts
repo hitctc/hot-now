@@ -159,6 +159,60 @@ describe("listSourceWorkbench", () => {
     });
   });
 
+  it("keeps blocked NL evaluations out of fast workbench metrics", async () => {
+    const db = await createTestDatabase(databasesToClose);
+    const openai = resolveSourceByKind(db, "openai");
+
+    upsertContentItems(db, {
+      sourceId: openai!.id,
+      items: [
+        {
+          title: "Visible AI item",
+          canonicalUrl: "https://example.com/visible-ai-item",
+          summary: "Visible AI summary",
+          bodyMarkdown: "Visible AI body",
+          publishedAt: "2026-03-31T01:00:00.000Z",
+          fetchedAt: "2026-03-31T01:05:00.000Z"
+        },
+        {
+          title: "Blocked AI item",
+          canonicalUrl: "https://example.com/blocked-ai-item",
+          summary: "Blocked AI summary",
+          bodyMarkdown: "Blocked AI body",
+          publishedAt: "2026-03-31T02:00:00.000Z",
+          fetchedAt: "2026-03-31T02:05:00.000Z"
+        }
+      ]
+    });
+    const blockedItem = db
+      .prepare("SELECT id FROM content_items WHERE canonical_url = ?")
+      .get("https://example.com/blocked-ai-item") as { id: number };
+
+    db.prepare(
+      `
+        INSERT INTO content_nl_evaluations (
+          content_item_id,
+          scope,
+          decision,
+          provider_kind
+        )
+        VALUES (?, 'base', 'block', 'test')
+      `
+    ).run(blockedItem.id);
+
+    const workbench = listSourceWorkbench(db);
+    const openaiRow = workbench.find((row) => row.kind === "openai");
+
+    expect(openaiRow?.viewStats.hot).toMatchObject({
+      candidateCount: 1,
+      visibleCount: 1
+    });
+    expect(openaiRow?.viewStats.ai).toMatchObject({
+      candidateCount: 1,
+      visibleCount: 1
+    });
+  });
+
   it("counts full-display sources with their own independent today contribution", async () => {
     const db = await createTestDatabase(databasesToClose);
     const juya = resolveSourceByKind(db, "juya");

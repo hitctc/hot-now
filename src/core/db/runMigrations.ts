@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 17;
+const schemaVersion = 18;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -18,6 +18,7 @@ const aiTimelineEventsMigrationName = "014_ai_timeline_events";
 const aiTimelineEventImportanceMigrationName = "015_ai_timeline_event_importance";
 const aiTimelineReliabilityWorkspaceMigrationName = "016_ai_timeline_reliability_workspace";
 const aiTimelineEventNotificationsMigrationName = "017_ai_timeline_event_notifications";
+const creativeContentWorkflowMigrationName = "018_creative_content_workflow";
 
 const migrationStatements = [
   `
@@ -925,6 +926,94 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(17, aiTimelineEventNotificationsMigrationName);
+
+    // 内容创作模块：素材库和成品文章两张独立表，不复用 content_items。
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS creative_source_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        external_id TEXT NOT NULL,
+        collector_agent TEXT NOT NULL,
+        title TEXT NOT NULL,
+        url TEXT NOT NULL,
+        source_name TEXT,
+        summary TEXT,
+        full_content TEXT,
+        author TEXT,
+        cover_image_url TEXT,
+        tags TEXT,
+        language TEXT NOT NULL DEFAULT 'zh',
+        word_count INTEGER,
+        content_type TEXT,
+        score REAL,
+        published_at TEXT,
+        collector_timestamp TEXT,
+        quality_status TEXT NOT NULL DEFAULT 'pending',
+        raw_payload_json TEXT NOT NULL,
+        linked_article_id INTEGER,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(external_id, collector_agent),
+        FOREIGN KEY (linked_article_id) REFERENCES creative_finished_articles(id)
+      )
+    `);
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_creative_source_items_quality_status
+      ON creative_source_items(quality_status)
+    `);
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_creative_source_items_collector_agent
+      ON creative_source_items(collector_agent)
+    `);
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_creative_source_items_created_at
+      ON creative_source_items(created_at DESC)
+    `);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS creative_finished_articles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_item_id INTEGER NOT NULL,
+        mode TEXT,
+        thesis TEXT,
+        content_markdown TEXT NOT NULL,
+        titles TEXT,
+        hooks TEXT,
+        quotes TEXT,
+        summary_100 TEXT,
+        images_json TEXT,
+        status TEXT NOT NULL DEFAULT 'generated',
+        raw_response_text TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (source_item_id) REFERENCES creative_source_items(id)
+      )
+    `);
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_creative_finished_articles_status
+      ON creative_finished_articles(status)
+    `);
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_creative_finished_articles_source_item_id
+      ON creative_finished_articles(source_item_id)
+    `);
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_creative_finished_articles_created_at
+      ON creative_finished_articles(created_at DESC)
+    `);
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(18, creativeContentWorkflowMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

@@ -565,6 +565,8 @@ async function saveAndHydrateSource(input: Parameters<typeof persistSource>[1]) 
 }
 
 const app = createServer({
+  db,
+  creativeApiToken: process.env.CREATIVE_API_TOKEN,
   config,
   clientDevOrigin: process.env.HOT_NOW_CLIENT_DEV_ORIGIN?.trim() || undefined,
   auth: {

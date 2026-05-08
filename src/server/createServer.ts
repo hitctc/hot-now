@@ -72,6 +72,9 @@ import type {
 } from "../core/wechatRss/wechatRssSourceRepository.js";
 import type { WeiboTrendingRunState } from "../core/weibo/runWeiboTrendingCollection.js";
 import type { RuntimeConfig } from "../core/types/appConfig.js";
+import type { SqliteDatabase } from "../core/db/openDatabase.js";
+import { insertCreativeSourceItem, findCreativeSourceItemByExternalId } from "../core/creative/creativeSourceItemRepository.js";
+import { insertCreativeFinishedArticle, findCreativeFinishedArticleBySourceItemId } from "../core/creative/creativeFinishedArticleRepository.js";
 import { readNextCollectionRunAt } from "../core/scheduler/readNextCollectionRunAt.js";
 import {
   createSessionToken,
@@ -297,6 +300,8 @@ type ServerDeps = {
   clientDevOrigin?: string;
   readClientDevEntryHtml?: () => Promise<string | null> | string | null;
   config?: Partial<RuntimeConfig>;
+  db?: SqliteDatabase;
+  creativeApiToken?: string;
   listReportSummaries?: () => Promise<ReportSummary[]>;
   latestReportDate?: () => Promise<string | null>;
   readReportHtml?: (date: string) => Promise<string>;
@@ -445,6 +450,8 @@ export function createServer(deps: ServerDeps = {}) {
   const app = Fastify({ logger: true });
   const authConfig = deps.auth;
   const authEnabled = authConfig?.requireLogin === true;
+  const db = deps.db;
+  const creativeApiToken = deps.creativeApiToken;
   const hasUnifiedShellDeps = Boolean(
     deps.listContentView || deps.getViewRulesWorkbenchData || deps.listSources || deps.getCurrentUserProfile
   );
@@ -628,6 +635,101 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     return reply.send(await readAiTimelineAdminApiData(deps, request));
+  });
+
+  // ─── Creative: Push API (token-authenticated) ───
+
+  app.post("/api/creative/source-items", async (request, reply) => {
+    if (!validateCreativeApiToken(request, reply, creativeApiToken)) {
+      return;
+    }
+
+    const body = request.body as Record<string, unknown> | undefined;
+    const externalId = typeof body?.externalId === "string" ? body.externalId.trim() : "";
+    const collectorAgent = typeof body?.collectorAgent === "string" ? body.collectorAgent.trim() : "";
+    const title = typeof body?.title === "string" ? body.title.trim() : "";
+    const url = typeof body?.url === "string" ? body.url.trim() : "";
+
+    if (!externalId || !collectorAgent || !title || !url) {
+      return reply.code(400).send({ ok: false, reason: "missing-required-fields" });
+    }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const result = insertCreativeSourceItem(db, {
+      externalId,
+      collectorAgent,
+      title,
+      url,
+      sourceName: typeof body?.sourceName === "string" ? body.sourceName : undefined,
+      summary: typeof body?.summary === "string" ? body.summary : undefined,
+      fullContent: typeof body?.fullContent === "string" ? body.fullContent : undefined,
+      author: typeof body?.author === "string" ? body.author : undefined,
+      coverImageUrl: typeof body?.coverImageUrl === "string" ? body.coverImageUrl : undefined,
+      tags: typeof body?.tags === "string" ? body.tags : (Array.isArray(body?.tags) ? JSON.stringify(body.tags) : undefined),
+      language: typeof body?.language === "string" ? body.language : undefined,
+      wordCount: typeof body?.wordCount === "number" ? body.wordCount : undefined,
+      contentType: typeof body?.contentType === "string" ? body.contentType : undefined,
+      score: typeof body?.score === "number" ? body.score : undefined,
+      publishedAt: typeof body?.publishedAt === "string" ? body.publishedAt : undefined,
+      collectorTimestamp: typeof body?.collectorTimestamp === "string" ? body.collectorTimestamp : undefined
+    });
+
+    return reply.code(result.created ? 201 : 200).send({
+      id: result.id,
+      externalId,
+      created: result.created
+    });
+  });
+
+  app.post("/api/creative/finished-articles", async (request, reply) => {
+    if (!validateCreativeApiToken(request, reply, creativeApiToken)) {
+      return;
+    }
+
+    const body = request.body as Record<string, unknown> | undefined;
+    const sourceExternalId = typeof body?.sourceExternalId === "string" ? body.sourceExternalId.trim() : "";
+    const collectorAgent = typeof body?.collectorAgent === "string" ? body.collectorAgent.trim() : "";
+    const contentMarkdown = typeof body?.contentMarkdown === "string" ? body.contentMarkdown.trim() : "";
+
+    if (!sourceExternalId || !collectorAgent || !contentMarkdown) {
+      return reply.code(400).send({ ok: false, reason: "missing-required-fields" });
+    }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const sourceItem = findCreativeSourceItemByExternalId(db, sourceExternalId, collectorAgent);
+    if (!sourceItem) {
+      return reply.code(404).send({ ok: false, reason: "source-item-not-found" });
+    }
+
+    const existing = findCreativeFinishedArticleBySourceItemId(db, sourceItem.id);
+    if (existing) {
+      return reply.code(409).send({ ok: false, reason: "article-already-exists" });
+    }
+
+    const article = insertCreativeFinishedArticle(db, {
+      sourceItemId: sourceItem.id,
+      mode: typeof body?.mode === "string" ? (body.mode as "A" | "B") : undefined,
+      thesis: typeof body?.thesis === "string" ? body.thesis : undefined,
+      contentMarkdown,
+      titles: Array.isArray(body?.titles) ? body.titles as string[] : undefined,
+      hooks: Array.isArray(body?.hooks) ? body.hooks as string[] : undefined,
+      quotes: Array.isArray(body?.quotes) ? body.quotes as string[] : undefined,
+      summary100: typeof body?.summary100 === "string" ? body.summary100 : undefined,
+      images: Array.isArray(body?.images) ? body.images as any[] : undefined,
+      rawResponseText: typeof body?.rawResponseText === "string" ? body.rawResponseText : undefined
+    });
+
+    return reply.code(201).send({
+      id: article.id,
+      sourceItemId: sourceItem.id,
+      created: true
+    });
   });
 
   if (authEnabled) {
@@ -3255,6 +3357,23 @@ function ensureStateActionAuthorized(
     return false;
   }
 
+  return true;
+}
+
+function validateCreativeApiToken(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  expectedToken: string | undefined
+): boolean {
+  if (!expectedToken) {
+    void reply.code(503).send({ ok: false, reason: "creative-api-token-not-configured" });
+    return false;
+  }
+  const token = request.headers["x-creative-token"];
+  if (token !== expectedToken) {
+    void reply.code(401).send({ ok: false, reason: "invalid-token" });
+    return false;
+  }
   return true;
 }
 

@@ -830,8 +830,11 @@ export function createServer(deps: ServerDeps = {}) {
   // ─── Creative: Actions (session-authenticated) ───
 
   app.post("/actions/creative/source-items/:id/quality-status", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
+    const hasToken = creativeApiToken && request.headers["x-creative-token"] === creativeApiToken;
+    if (!hasToken) {
+      if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+        return;
+      }
     }
 
     if (!db) {

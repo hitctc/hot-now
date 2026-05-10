@@ -124,6 +124,7 @@ export type InsertCreativeSourceItemInput = {
   score?: number | null;
   publishedAt?: string | null;
   collectorTimestamp?: string | null;
+  qualityStatus?: CreativeSourceItemQualityStatus;
 };
 
 export type ListCreativeSourceItemsFilters = {
@@ -178,9 +179,10 @@ export function insertCreativeSourceItem(
         score,
         published_at,
         collector_timestamp,
+        quality_status,
         raw_payload_json
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
   ).run(
     input.externalId,
@@ -199,6 +201,7 @@ export function insertCreativeSourceItem(
     input.score ?? null,
     input.publishedAt ?? null,
     input.collectorTimestamp ?? null,
+    input.qualityStatus ?? "pending",
     rawPayloadJson
   );
 

@@ -687,7 +687,8 @@ export function createServer(deps: ServerDeps = {}) {
       contentType: typeof body?.contentType === "string" ? body.contentType : undefined,
       score: typeof body?.score === "number" ? body.score : undefined,
       publishedAt: typeof body?.publishedAt === "string" ? body.publishedAt : undefined,
-      collectorTimestamp: typeof body?.collectorTimestamp === "string" ? body.collectorTimestamp : undefined
+      collectorTimestamp: typeof body?.collectorTimestamp === "string" ? body.collectorTimestamp : undefined,
+      qualityStatus: typeof body?.qualityStatus === "string" && ["accepted", "pending"].includes(body.qualityStatus) ? body.qualityStatus as "accepted" | "pending" : undefined
     });
 
     return reply.code(result.created ? 201 : 200).send({

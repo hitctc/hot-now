@@ -748,8 +748,12 @@ export function createServer(deps: ServerDeps = {}) {
   // ─── Creative: Query API (session-authenticated) ───
 
   app.get("/api/creative/source-items", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-    if (session === undefined) { return; }
+    // 支持两种认证：token（外部 Agent）或 session（管理 UI）
+    const hasToken = creativeApiToken && request.headers["x-creative-token"] === creativeApiToken;
+    if (!hasToken) {
+      const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+      if (session === undefined) { return; }
+    }
 
     if (!db) {
       return reply.code(503).send({ ok: false, reason: "database-not-available" });
@@ -767,8 +771,12 @@ export function createServer(deps: ServerDeps = {}) {
   });
 
   app.get("/api/creative/source-items/:id", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-    if (session === undefined) { return; }
+    // 支持两种认证：token（外部 Agent）或 session（管理 UI）
+    const hasToken = creativeApiToken && request.headers["x-creative-token"] === creativeApiToken;
+    if (!hasToken) {
+      const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+      if (session === undefined) { return; }
+    }
 
     if (!db) {
       return reply.code(503).send({ ok: false, reason: "database-not-available" });

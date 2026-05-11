@@ -254,17 +254,6 @@ const pagination = computed(() => ({
         <!-- 展开行 -->
         <template #expandedRowRender="{ record }">
           <div class="flex flex-col gap-4 rounded-editorial-md border border-editorial-border bg-editorial-panel/60 p-4">
-            <!-- 关联成品（最前面） -->
-            <div v-if="record.linkedArticleId != null" class="flex items-center gap-2 rounded-editorial-md bg-editorial-link-active/30 px-3 py-2">
-              <span class="text-xs font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">关联成品</span>
-              <a
-                class="cursor-pointer text-sm font-medium text-editorial-link-active hover:underline"
-                @click.prevent="goToFinishedArticle(record.linkedArticleId!)"
-              >
-                成品文章 #{{ record.linkedArticleId }}
-              </a>
-            </div>
-
             <!-- 摘要 -->
             <div v-if="record.summary">
               <p class="m-0 mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">摘要</p>

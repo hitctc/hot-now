@@ -2,11 +2,16 @@
 
 ## 你的任务
 
-你是一个内容生产 Agent，负责两条自动化链路：
+你是一个内容生产 Agent，负责三条自动化链路：
 
-**链路 A：采集素材**
+**链路 A：采集外部素材并推送**
 1. 从外部数据源采集科技资讯
 2. 推送到 hot-now 素材库，直接标记为已审核
+
+**链路 C：从 AI 新讯 feed 拉取高分候选并推送为素材**
+1. 从 hot-now AI 新讯 feed 拉取评分 ≥ 80 的候选文章
+2. 自行抓取原文（`fullContent` 为 null 时）
+3. 推送到 hot-now 素材库，标记为已审核
 
 **链路 B：生成成品文章**
 1. 从 hot-now 拉取已审核但未生成文章的素材
@@ -91,6 +96,75 @@ x-creative-token: <token>
 | 400 | `missing-required-fields` | 补全 externalId、collectorAgent、title、url |
 | 401 | `invalid-token` | 重新获取 token |
 | 503 | `database-not-available` | 等待后重试 |
+
+---
+
+## 链路 C：从 AI 新讯 feed 拉取高分候选
+
+### GET `/api/creative/feed/ai-new`
+
+```
+GET https://now.achuan.cc/api/creative/feed/ai-new?minScore=80
+x-creative-token: <token>
+```
+
+#### 查询参数
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `minScore` | number | 80 | 分数下限（0–100 整数），过滤 contentScore 低于此值的条目 |
+
+#### 响应示例
+
+```json
+{
+  "ok": true,
+  "total": 23,
+  "items": [
+    {
+      "id": 1234,
+      "title": "OpenAI 发布 GPT-5",
+      "summary": "OpenAI 官宣 GPT-5...",
+      "fullContent": "## GPT-5 正式发布\n\n...",
+      "canonicalUrl": "https://techcrunch.com/...",
+      "publishedAt": "2026-05-12T08:00:00.000Z",
+      "contentScore": 87,
+      "sourceName": "TechCrunch",
+      "sourceKind": "techcrunch_ai"
+    }
+  ]
+}
+```
+
+#### 字段说明
+
+| 字段 | 说明 |
+|------|------|
+| `contentScore` | 0–100 整数，hot-now 内部综合评分（时效、来源、完整度、AI 相关性等） |
+| `fullContent` | 原文 Markdown，**RSS 来源大多为 null**，null 时需自行用 `canonicalUrl` 抓取 |
+| `canonicalUrl` | 原始链接，推素材时作为 `url` 字段传入 |
+| `id` | hot-now 内部 content_item id，仅用于参考，不需要传回 |
+
+**接口已自动去重**：已推入素材库的 URL 不会再出现在返回列表中，无需 Agent 侧去重。固定返回最多 50 条，不分页。
+
+#### 推送到素材库
+
+拿到候选后，按链路 A 的推送接口将条目写入素材库。推荐字段映射：
+
+```jsonc
+{
+  "externalId": "hotnow-<id>",          // 用 hot-now id 构造，避免重复
+  "collectorAgent": "hotnow-feed",       // 固定标识
+  "title": "<title>",
+  "url": "<canonicalUrl>",
+  "sourceName": "<sourceName>",
+  "summary": "<summary>",
+  "fullContent": "<fullContent 或自行抓取的原文>",
+  "score": "<contentScore>",
+  "publishedAt": "<publishedAt>",
+  "qualityStatus": "accepted"
+}
+```
 
 ---
 
@@ -293,7 +367,7 @@ loop:
 
 ## 注意事项
 
-1. **采集端尽量提供 fullContent**：推送时带上解析后的全文，部分数据源（如 RSS 摘要）可能无法提取全文，此时可不传
+1. **fullContent 说明**：链路 A 推送时尽量提供全文；链路 C 从 feed 拉取时，RSS 来源的 `fullContent` 大多为 null，需用 `canonicalUrl` 自行抓取原文后再推入素材库
 2. **推送时传 qualityStatus: "accepted"**：跳过人工审核，Writer Agent 可立即拉取处理
 3. **sourceExternalId 和 collectorAgent 必须原样传回**：系统通过这两个字段关联素材和成品文章
 4. **幂等安全**：重复推送素材不会覆盖已有数据，但会补充空字段；重复推送成品文章会返回 409

@@ -149,6 +149,46 @@ x-creative-token: <token>
 
 ## 辅助接口
 
+### 拉取 AI 新讯高分候选（用于自动入库）
+
+```
+GET https://now.achuan.cc/api/creative/feed/ai-new?minScore=80
+x-creative-token: <token>
+```
+
+| 参数 | 默认 | 说明 |
+|------|------|------|
+| `minScore` | 80 | 分数下限，0–100 整数，对应 `contentScore` |
+
+响应：
+
+```json
+{
+  "ok": true,
+  "total": 23,
+  "items": [
+    {
+      "id": 1234,
+      "title": "...",
+      "summary": "...",
+      "fullContent": "...或 null",
+      "canonicalUrl": "https://...",
+      "publishedAt": "2026-05-12T08:00:00.000Z",
+      "contentScore": 87,
+      "sourceName": "TechCrunch",
+      "sourceKind": "techcrunch_ai"
+    }
+  ]
+}
+```
+
+- `contentScore` 为 0–100 整数（百分制）
+- `fullContent` RSS 来源大多为 null，null 时需自行抓取原文
+- 已推入素材库的 URL 自动排除，无需 Agent 侧去重
+- 固定最多 50 条，不分页
+
+---
+
 ### 更新素材质量状态
 
 ```

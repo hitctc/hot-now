@@ -746,6 +746,51 @@ export function createServer(deps: ServerDeps = {}) {
     });
   });
 
+  // ─── Creative: Feed API（为外部 Agent 暴露高分 AI 新讯候选，token 鉴权） ───
+
+  app.get("/api/creative/feed/ai-new", async (request, reply) => {
+    if (!validateCreativeApiToken(request, reply, creativeApiToken)) {
+      return;
+    }
+
+    if (!deps.listContentView) {
+      return reply.code(503).send({ ok: false, reason: "content-view-not-available" });
+    }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    // minScore 支持 query 传入覆盖，默认 0.8（即百分制 80 分）
+    const query = request.query as Record<string, string | undefined>;
+    const rawMinScore = parseFloat(query.minScore ?? "0.8");
+    const minScore = Number.isFinite(rawMinScore) && rawMinScore >= 0 && rawMinScore <= 1 ? rawMinScore : 0.8;
+
+    // 按评分降序拉取 AI 新讯全量候选（不传 selectedSourceKinds，不受用户来源偏好影响）
+    const allCards = await deps.listContentView("ai", { sortMode: "content_score" });
+
+    // 查出已推入素材库的 URL 集合，用于去重
+    const pushedUrls = new Set<string>(
+      (db.prepare("SELECT url FROM creative_source_items").all() as Array<{ url: string }>).map((r) => r.url)
+    );
+
+    const candidates = allCards
+      .filter((card) => card.contentScore >= minScore && !pushedUrls.has(card.canonicalUrl))
+      .slice(0, 50)
+      .map((card) => ({
+        id: card.id,
+        title: card.title,
+        summary: card.summary,
+        canonicalUrl: card.canonicalUrl,
+        publishedAt: card.publishedAt,
+        contentScore: card.contentScore,
+        sourceName: card.sourceName,
+        sourceKind: card.sourceKind
+      }));
+
+    return reply.send({ ok: true, total: candidates.length, items: candidates });
+  });
+
   // ─── Creative: Query API (session-authenticated) ───
 
   app.get("/api/creative/source-items", async (request, reply) => {

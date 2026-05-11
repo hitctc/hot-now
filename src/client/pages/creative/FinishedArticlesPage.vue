@@ -31,7 +31,7 @@ const isLoading = ref(false);
 const items = ref<CreativeFinishedArticle[]>([]);
 const total = ref(0);
 const currentPage = ref(1);
-const pageSize = ref(20);
+const pageSize = ref(50);
 
 // 筛选条件
 const statusFilter = ref<string | undefined>(undefined);

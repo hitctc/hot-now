@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 
 import {
   readCreativeSourceItems,
   updateSourceItemQualityStatus,
   type CreativeSourceItem
 } from "../../services/creativeApi.js";
+
+const router = useRouter();
 
 // ─── 状态 ───
 
@@ -21,6 +24,9 @@ const searchText = ref("");
 
 // 操作锁
 const actionPendingId = ref<number | null>(null);
+
+// 手动控制展开行
+const expandedRowKeys = ref<number[]>([]);
 
 const qualityStatusOptions = [
   { label: "全部", value: "" },
@@ -51,7 +57,6 @@ onMounted(() => {
   void loadItems();
 });
 
-// 筛选变化时重置到第一页并重新加载
 watch(qualityStatusFilter, () => {
   currentPage.value = 1;
   void loadItems();
@@ -69,6 +74,21 @@ function handleTableChange(pagination: { current?: number; pageSize?: number }):
   void loadItems();
 }
 
+// ─── 展开控制 ───
+
+function toggleExpand(id: number): void {
+  const idx = expandedRowKeys.value.indexOf(id);
+  if (idx >= 0) {
+    expandedRowKeys.value.splice(idx, 1);
+  } else {
+    expandedRowKeys.value.push(id);
+  }
+}
+
+function goToFinishedArticle(articleId: number): void {
+  router.push({ path: "/creative/finished-articles", query: { expand: String(articleId) } });
+}
+
 // ─── 质量状态操作 ───
 
 async function handleQualityAction(
@@ -78,7 +98,6 @@ async function handleQualityAction(
   actionPendingId.value = item.id;
   try {
     await updateSourceItemQualityStatus(item.id, nextStatus);
-    // 原地更新状态，避免全量刷新
     item.qualityStatus = nextStatus;
   } finally {
     actionPendingId.value = null;
@@ -126,12 +145,12 @@ function qualityStatusLabel(status: string): string {
 
 const columns = [
   { title: "标题", dataIndex: "title", key: "title", ellipsis: true },
+  { title: "成品", key: "linkedArticle", width: 80 },
   { title: "来源", dataIndex: "sourceName", key: "sourceName", width: 120 },
   { title: "评分", dataIndex: "score", key: "score", width: 72 },
   { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 110 },
   { title: "发布时间", dataIndex: "publishedAt", key: "publishedAt", width: 120 },
-  { title: "状态", dataIndex: "qualityStatus", key: "qualityStatus", width: 80 },
-  { title: "成品", key: "linkedArticle", width: 80 }
+  { title: "状态", dataIndex: "qualityStatus", key: "qualityStatus", width: 80 }
 ];
 
 const pagination = computed(() => ({
@@ -168,15 +187,34 @@ const pagination = computed(() => ({
         :data-source="items"
         :pagination="pagination"
         :scroll="{ x: 900 }"
+        :expanded-row-keys="expandedRowKeys"
         row-key="id"
         data-source-item-table
         size="middle"
         @change="handleTableChange"
+        @expand="(expanded: boolean, record: CreativeSourceItem) => toggleExpand(record.id)"
       >
-        <!-- 标题列 -->
+        <!-- 标题列：点击展开/折叠 -->
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'title'">
-            <span class="font-medium text-editorial-text-main">{{ record.title }}</span>
+            <span
+              class="cursor-pointer font-medium text-editorial-text-main hover:text-editorial-link-active"
+              @click="toggleExpand(record.id)"
+            >
+              {{ record.title }}
+            </span>
+          </template>
+
+          <!-- 成品列：直接显示关联链接 -->
+          <template v-else-if="column.key === 'linkedArticle'">
+            <a
+              v-if="record.linkedArticleId != null"
+              class="cursor-pointer text-xs font-medium text-editorial-link-active hover:underline"
+              @click.prevent="goToFinishedArticle(record.linkedArticleId)"
+            >
+              #{{ record.linkedArticleId }}
+            </a>
+            <span v-else class="text-xs text-editorial-text-muted">-</span>
           </template>
 
           <!-- 来源列 -->
@@ -211,31 +249,39 @@ const pagination = computed(() => ({
               {{ qualityStatusLabel(record.qualityStatus) }}
             </a-tag>
           </template>
-
-          <!-- 成品状态列 -->
-          <template v-else-if="column.key === 'linkedArticle'">
-            <a-tag v-if="record.linkedArticleId != null" color="green">已生成</a-tag>
-            <a-tag v-else color="default">未生成</a-tag>
-          </template>
         </template>
 
         <!-- 展开行 -->
         <template #expandedRowRender="{ record }">
           <div class="flex flex-col gap-4 rounded-editorial-md border border-editorial-border bg-editorial-panel/60 p-4">
+            <!-- 关联成品（最前面） -->
+            <div v-if="record.linkedArticleId != null" class="flex items-center gap-2 rounded-editorial-md bg-editorial-link-active/30 px-3 py-2">
+              <span class="text-xs font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">关联成品</span>
+              <a
+                class="cursor-pointer text-sm font-medium text-editorial-link-active hover:underline"
+                @click.prevent="goToFinishedArticle(record.linkedArticleId!)"
+              >
+                成品文章 #{{ record.linkedArticleId }}
+              </a>
+            </div>
+
             <!-- 摘要 -->
             <div v-if="record.summary">
               <p class="m-0 mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">摘要</p>
               <p class="m-0 text-sm leading-6 text-editorial-text-body">{{ record.summary }}</p>
             </div>
 
-            <!-- 全文（可折叠） -->
-            <a-collapse v-if="record.fullContent" :bordered="false" class="!bg-transparent">
-              <a-collapse-panel key="fullContent" header="全文内容">
-                <div class="max-h-60 overflow-y-auto whitespace-pre-wrap text-sm leading-6 text-editorial-text-body">
-                  {{ record.fullContent }}
-                </div>
-              </a-collapse-panel>
-            </a-collapse>
+            <!-- 原文内容 -->
+            <div>
+              <p class="m-0 mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">原文内容</p>
+              <div
+                v-if="record.fullContent"
+                class="max-h-60 overflow-y-auto whitespace-pre-wrap rounded-editorial-md bg-editorial-page p-3 text-sm leading-6 text-editorial-text-body"
+              >
+                {{ record.fullContent }}
+              </div>
+              <p v-else class="m-0 text-sm italic text-editorial-text-muted">采集未提供原文</p>
+            </div>
 
             <!-- 元信息 -->
             <a-descriptions :column="{ xs: 1, sm: 2, md: 3 }" size="small" bordered>
@@ -267,16 +313,6 @@ const pagination = computed(() => ({
                   </a-tag>
                 </template>
                 <span v-else class="text-editorial-text-muted">-</span>
-              </a-descriptions-item>
-              <a-descriptions-item label="关联成品">
-                <RouterLink
-                  v-if="record.linkedArticleId != null"
-                  to="/creative/finished-articles"
-                  class="text-sm font-medium text-editorial-text-main underline"
-                >
-                  已关联 #{{ record.linkedArticleId }}
-                </RouterLink>
-                <span v-else class="text-editorial-text-muted">未生成</span>
               </a-descriptions-item>
             </a-descriptions>
 

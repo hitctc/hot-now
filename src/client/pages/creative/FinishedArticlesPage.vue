@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { message } from "ant-design-vue";
+import { useRoute, useRouter } from "vue-router";
 
 import {
   editFinishedArticle,
@@ -8,6 +9,9 @@ import {
   updateFinishedArticleStatus,
   type CreativeFinishedArticle
 } from "../../services/creativeApi.js";
+
+const route = useRoute();
+const router = useRouter();
 
 // ─── JSON 解析辅助 ───
 
@@ -59,6 +63,10 @@ const statusOptions = [
   { label: "已完成", value: "completed" }
 ];
 
+// ─── 手动控制展开行 ───
+
+const expandedRowKeys = ref<number[]>([]);
+
 // ─── 数据加载 ───
 
 async function loadItems(): Promise<void> {
@@ -72,6 +80,17 @@ async function loadItems(): Promise<void> {
     });
     items.value = res.items;
     total.value = res.total;
+
+    // 处理 ?expand=文章ID query param
+    const expandId = route.query.expand;
+    if (expandId) {
+      const id = Number(expandId);
+      if (!expandedRowKeys.value.includes(id) && res.items.some(item => item.id === id)) {
+        expandedRowKeys.value.push(id);
+      }
+      // 清掉 query param 避免后续刷新重复展开
+      router.replace({ query: {} });
+    }
   } finally {
     isLoading.value = false;
   }
@@ -301,10 +320,16 @@ const pagination = computed(() => ({
         :data-source="items"
         :pagination="pagination"
         :scroll="{ x: 800 }"
+        :expanded-row-keys="expandedRowKeys"
         row-key="id"
         data-article-table
         size="middle"
         @change="handleTableChange"
+        @expand="(expanded: boolean, record: CreativeFinishedArticle) => {
+          const idx = expandedRowKeys.indexOf(record.id);
+          if (expanded && idx < 0) expandedRowKeys.push(record.id);
+          else if (!expanded && idx >= 0) expandedRowKeys.splice(idx, 1);
+        }"
       >
         <template #bodyCell="{ column, record }">
           <!-- 标题列 -->

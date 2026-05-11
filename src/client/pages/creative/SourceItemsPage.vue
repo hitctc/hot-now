@@ -149,7 +149,8 @@ const columns = [
   { title: "评分", dataIndex: "score", key: "score", width: 72 },
   { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 110 },
   { title: "发布时间", dataIndex: "publishedAt", key: "publishedAt", width: 120 },
-  { title: "状态", dataIndex: "qualityStatus", key: "qualityStatus", width: 80 }
+  { title: "状态", dataIndex: "qualityStatus", key: "qualityStatus", width: 80 },
+  { title: "成品", key: "linkedArticle", width: 100, align: "center" as const }
 ];
 
 const pagination = computed(() => ({
@@ -205,14 +206,20 @@ const pagination = computed(() => ({
                   {{ record.title }}
                 </span>
               </a-tooltip>
-              <a
-                v-if="record.linkedArticleId != null"
-                class="inline-flex shrink-0 cursor-pointer items-center rounded-editorial-pill bg-editorial-link-active/30 px-2 py-0.5 text-[11px] font-semibold text-editorial-link-active hover:bg-editorial-link-active/50"
-                @click.prevent="goToFinishedArticle(record.linkedArticleId)"
-              >
-                成品 #{{ record.linkedArticleId }}
-              </a>
             </div>
+          </template>
+
+          <!-- 成品列 -->
+          <template v-else-if="column.key === 'linkedArticle'">
+            <a
+              v-if="record.linkedArticleId != null"
+              class="inline-flex cursor-pointer items-center gap-1 rounded-editorial-pill bg-editorial-link-active/30 px-2.5 py-1 text-[11px] font-semibold text-editorial-link-active hover:bg-editorial-link-active/50"
+              @click.prevent="goToFinishedArticle(record.linkedArticleId)"
+            >
+              #{{ record.linkedArticleId }}
+              <span class="text-[10px] opacity-70">→</span>
+            </a>
+            <span v-else class="text-xs text-editorial-text-muted">-</span>
           </template>
 
           <!-- 来源列 -->

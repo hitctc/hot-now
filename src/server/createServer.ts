@@ -761,10 +761,10 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.code(503).send({ ok: false, reason: "database-not-available" });
     }
 
-    // minScore 支持 query 传入覆盖，默认 0.8（即百分制 80 分）
+    // minScore 为百分制整数（0-100），默认 80
     const query = request.query as Record<string, string | undefined>;
-    const rawMinScore = parseFloat(query.minScore ?? "0.8");
-    const minScore = Number.isFinite(rawMinScore) && rawMinScore >= 0 && rawMinScore <= 1 ? rawMinScore : 0.8;
+    const rawMinScore = parseFloat(query.minScore ?? "80");
+    const minScore = Number.isFinite(rawMinScore) && rawMinScore >= 0 && rawMinScore <= 100 ? rawMinScore : 80;
 
     // 按评分降序拉取 AI 新讯全量候选（不传 selectedSourceKinds，不受用户来源偏好影响）
     const allCards = await deps.listContentView("ai", { sortMode: "content_score" });

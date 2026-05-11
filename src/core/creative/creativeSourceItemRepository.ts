@@ -148,14 +148,42 @@ export function insertCreativeSourceItem(
   db: SqliteDatabase,
   input: InsertCreativeSourceItemInput
 ): { id: number; created: boolean } {
-  // Idempotent insert: if the same externalId + collectorAgent pair already exists, return the
-  // existing row id without overwriting any data. This keeps repeated collector runs safe.
+  // Idempotent insert: if the same externalId + collectorAgent pair already exists,
+  // supplement any empty fields with new data, but never overwrite existing non-empty values.
   const existing = db
-    .prepare("SELECT id FROM creative_source_items WHERE external_id = ? AND collector_agent = ?")
-    .get(input.externalId, input.collectorAgent) as { id: number } | undefined;
+    .prepare("SELECT id, full_content, summary, source_name, author, cover_image_url, tags, word_count, content_type, score, published_at, collector_timestamp FROM creative_source_items WHERE external_id = ? AND collector_agent = ?")
+    .get(input.externalId, input.collectorAgent) as Record<string, unknown> | undefined;
 
   if (existing) {
-    return { id: existing.id, created: false };
+    // 空字段补充：逐字段检查，DB 中为 NULL 且新推送有值时才更新
+    const patches: { col: string; val: unknown }[] = [];
+    type FieldMap = { input: string | number | null | undefined; col: string };
+    const fields: FieldMap[] = [
+      { input: input.fullContent, col: "full_content" },
+      { input: input.summary, col: "summary" },
+      { input: input.sourceName, col: "source_name" },
+      { input: input.author, col: "author" },
+      { input: input.coverImageUrl, col: "cover_image_url" },
+      { input: input.tags, col: "tags" },
+      { input: input.wordCount, col: "word_count" },
+      { input: input.contentType, col: "content_type" },
+      { input: input.score, col: "score" },
+      { input: input.publishedAt, col: "published_at" },
+      { input: input.collectorTimestamp, col: "collector_timestamp" },
+    ];
+    for (const f of fields) {
+      if (f.input != null && (existing[f.col] === null || existing[f.col] === undefined)) {
+        patches.push({ col: f.col, val: f.input });
+      }
+    }
+    if (patches.length > 0) {
+      const setClause = patches.map(p => `${p.col} = ?`).join(", ") + ", updated_at = CURRENT_TIMESTAMP";
+      db.prepare(`UPDATE creative_source_items SET ${setClause} WHERE id = ?`).run(
+        ...patches.map(p => p.val),
+        existing.id
+      );
+    }
+    return { id: existing.id as number, created: false };
   }
 
   const rawPayloadJson = JSON.stringify(input);

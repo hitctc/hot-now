@@ -145,7 +145,6 @@ function qualityStatusLabel(status: string): string {
 
 const columns = [
   { title: "标题", dataIndex: "title", key: "title", ellipsis: true },
-  { title: "成品", key: "linkedArticle", width: 80 },
   { title: "来源", dataIndex: "sourceName", key: "sourceName", width: 120 },
   { title: "评分", dataIndex: "score", key: "score", width: 72 },
   { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 110 },
@@ -197,24 +196,21 @@ const pagination = computed(() => ({
         <!-- 标题列：点击展开/折叠 -->
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'title'">
-            <span
-              class="cursor-pointer font-medium text-editorial-text-main hover:text-editorial-link-active"
-              @click="toggleExpand(record.id)"
-            >
-              {{ record.title }}
-            </span>
-          </template>
-
-          <!-- 成品列：直接显示关联链接 -->
-          <template v-else-if="column.key === 'linkedArticle'">
-            <a
-              v-if="record.linkedArticleId != null"
-              class="cursor-pointer text-xs font-medium text-editorial-link-active hover:underline"
-              @click.prevent="goToFinishedArticle(record.linkedArticleId)"
-            >
-              #{{ record.linkedArticleId }}
-            </a>
-            <span v-else class="text-xs text-editorial-text-muted">-</span>
+            <div class="flex items-center gap-2">
+              <span
+                class="cursor-pointer font-medium text-editorial-text-main hover:text-editorial-link-active"
+                @click="toggleExpand(record.id)"
+              >
+                {{ record.title }}
+              </span>
+              <a
+                v-if="record.linkedArticleId != null"
+                class="inline-flex shrink-0 cursor-pointer items-center rounded-editorial-pill bg-editorial-link-active/30 px-2 py-0.5 text-[11px] font-semibold text-editorial-link-active hover:bg-editorial-link-active/50"
+                @click.prevent="goToFinishedArticle(record.linkedArticleId)"
+              >
+                成品 #{{ record.linkedArticleId }}
+              </a>
+            </div>
           </template>
 
           <!-- 来源列 -->

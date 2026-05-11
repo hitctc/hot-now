@@ -1,7 +1,6 @@
 # 素材推送接口 — 外部 Agent 接入文档
 
 > 本文档面向外部采集 Agent，说明如何向 hot-now 推送原始素材（source items）。
-> 成品文章（finished articles）推送接口另行提供。
 
 ---
 
@@ -19,17 +18,13 @@ https://now.achuan.cc
 
 ### 获取认证 Token
 
-Token 在服务器上通过环境变量 `CREATIVE_API_TOKEN` 配置。如果 Agent 运行在本机，可以从本地项目文件读取：
+Token 在服务器上通过环境变量 `CREATIVE_API_TOKEN` 配置。本地项目文件也可读取：
 
 ```bash
-# 项目路径
-/Users/tc-nihao/100-tc/700-code/100-center/hot-now
-
-# 提取 token
 grep '^CREATIVE_API_TOKEN=' /Users/tc-nihao/100-tc/700-code/100-center/hot-now/.env | cut -d= -f2
 ```
 
-> 注意：本地 `.env` 中的 token 是开发环境值。线上服务器的 token 以服务器 `/srv/hot-now/shared/.env` 中的值为准。如果本地和线上 token 不同，需要向管理员确认线上 token。
+> 注意：本地 `.env` 中的 token 是开发环境值。线上服务器的 token 以服务器 `/srv/hot-now/shared/.env` 中的值为准。
 
 ### 确认服务可用
 
@@ -49,7 +44,7 @@ curl -s https://now.achuan.cc/api/health
 | 协议 | HTTPS |
 | 编码 | UTF-8，JSON body |
 | 认证 | 请求头 `x-creative-token: <token>` |
-| 幂等性 | 同一 `externalId` + `collectorAgent` 组合重复推送不会覆盖，返回已有记录的 ID |
+| 幂等性 | 相同 `externalId` + `collectorAgent` 重复推送不报错，空字段可补充，已有数据不覆盖 |
 
 ---
 
@@ -62,68 +57,66 @@ curl -s https://now.achuan.cc/api/health
 #### 请求
 
 ```
-POST /api/creative/source-items
+POST https://now.achuan.cc/api/creative/source-items
 Content-Type: application/json
-x-creative-token: <your-token>
+x-creative-token: <token>
 ```
 
 #### 请求体
 
 ```jsonc
 {
-  // ── 必填字段 ──────────────────────────────────────────────
-  "externalId": "string",          // 该素材在来源系统中的唯一标识（如推文 ID、HN post ID、文章 URL hash）
-  "collectorAgent": "string",      // 采集 Agent 标识，用于区分不同采集器（如 "twitter-collector"、"hn-collector"）
-  "title": "string",               // 素材标题
-  "url": "string",                 // 素材原始链接（必须可访问）
+  // ── 必填字段 ──
+  "externalId": "string",          // 来源系统中的唯一标识
+  "collectorAgent": "string",      // 采集器标识，如 "aihot-collector"
+  "title": "string",               // 标题
+  "url": "string",                 // 原始链接
 
-  // ── 可选字段 ──────────────────────────────────────────────
-  "sourceName": "string | null",   // 来源名称（如 "Twitter @elonmusk"、"Hacker News"）
-  "summary": "string | null",      // 摘要 / 简述
-  "fullContent": "string | null",  // 全文内容（Markdown 或纯文本）
-  "author": "string | null",       // 作者名
-  "coverImageUrl": "string | null",// 封面图片 URL
-  "tags": "string | string[] | null",  // 标签。字符串（逗号分隔）或字符串数组均可
+  // ── 可选字段 ──
+  "sourceName": "string",          // 来源名称，如 "Hacker News"
+  "summary": "string",             // 摘要
+  "fullContent": "string",         // 解析后的全文内容（尽量提供）
+  "author": "string",              // 作者
+  "coverImageUrl": "string",       // 封面图 URL
+  "tags": "string | string[]",     // 标签。字符串或数组均可
   "language": "string",            // 语言代码，默认 "zh"
-  "wordCount": "number | null",    // 正文字数
-  "contentType": "string | null",  // 内容类型标识（如 "tweet"、"article"、"video"）
-  "score": "number | null",        // 采集时的原始评分（0-100）
-  "publishedAt": "string | null",  // 原始发布时间，ISO 8601 格式（如 "2026-05-10T08:30:00Z"）
-  "collectorTimestamp": "string | null"  // 采集时间戳，ISO 8601 格式
+  "wordCount": "number",           // 正文字数
+  "contentType": "string",         // 内容类型，如 "tweet"、"article"
+  "score": "number",               // 评分 0-100
+  "publishedAt": "string",         // 发布时间 ISO 8601
+  "collectorTimestamp": "string",  // 采集时间 ISO 8601
+  "qualityStatus": "accepted"      // 直接标记为已审核（"accepted" 或 "pending"）
 }
 ```
 
-#### 最小可用请求示例
+#### 最小可用请求
 
 ```json
 {
   "externalId": "hn-42134567",
-  "collectorAgent": "hn-collector",
+  "collectorAgent": "aihot-collector",
   "title": "OpenAI announces GPT-5",
   "url": "https://news.ycombinator.com/item?id=42134567"
 }
 ```
 
-#### 完整请求示例
+#### 推荐请求（带全文 + 直接审核通过）
 
 ```json
 {
-  "externalId": "tweet-1891234567890",
-  "collectorAgent": "twitter-collector",
-  "title": "我们刚刚发布了 Claude 5",
-  "url": "https://x.com/AnthropicAI/status/1891234567890",
-  "sourceName": "Twitter @AnthropicAI",
-  "summary": "Anthropic 官宣 Claude 5 模型上线，支持 1M 上下文窗口和原生工具调用",
-  "fullContent": "## Claude 5 正式发布\n\n今天我们很高兴地宣布 Claude 5 已正式上线...\n\n### 主要特性\n- 1M 上下文窗口\n- 原生工具调用\n- 多模态推理",
-  "author": "Anthropic",
-  "coverImageUrl": "https://pbs.twimg.com/media/example.jpg",
-  "tags": ["AI", "Claude", "Anthropic", "LLM"],
-  "language": "zh",
-  "wordCount": 850,
-  "contentType": "tweet",
+  "externalId": "hn-42134567",
+  "collectorAgent": "aihot-collector",
+  "title": "OpenAI announces GPT-5",
+  "url": "https://news.ycombinator.com/item?id=42134567",
+  "sourceName": "Hacker News",
+  "summary": "OpenAI 官宣 GPT-5 模型上线",
+  "fullContent": "## GPT-5 正式发布\n\n今天 OpenAI 宣布...",
+  "author": "OpenAI",
+  "tags": ["AI", "GPT"],
   "score": 92,
+  "contentType": "article",
   "publishedAt": "2026-05-10T08:30:00Z",
-  "collectorTimestamp": "2026-05-10T09:15:00Z"
+  "qualityStatus": "accepted"
 }
 ```
 
@@ -132,44 +125,67 @@ x-creative-token: <your-token>
 **成功 — 新创建（201）**
 
 ```json
-{
-  "id": 42,
-  "externalId": "hn-42134567",
-  "created": true
-}
+{ "id": 42, "externalId": "hn-42134567", "created": true }
 ```
 
-**成功 — 已存在，幂等返回（200）**
+**成功 — 已存在，空字段已补充（200）**
 
-相同 `externalId` + `collectorAgent` 重复推送时返回已有记录，不做任何覆盖。
+相同 `externalId` + `collectorAgent` 重复推送时，如果 DB 中有空字段而新推送有值，会自动补充。
 
 ```json
-{
-  "id": 42,
-  "externalId": "hn-42134567",
-  "created": false
-}
+{ "id": 42, "externalId": "hn-42134567", "created": false }
 ```
 
-通过 `created` 字段区分是新建还是已存在，`id` 是系统内部的主键。
+通过 `created` 字段区分新建还是已存在。
 
 #### 错误响应
 
-所有错误响应体格式统一：
-
-```json
-{
-  "ok": false,
-  "reason": "string"
-}
-```
-
 | HTTP 状态码 | reason | 触发条件 |
 |-------------|--------|----------|
-| 400 | `missing-required-fields` | `externalId`、`collectorAgent`、`title`、`url` 任一缺失或为空字符串 |
-| 401 | `invalid-token` | `x-creative-token` 请求头缺失或不匹配 |
-| 503 | `creative-api-token-not-configured` | 服务端未配置 token（环境变量 `CREATIVE_API_TOKEN` 未设置） |
+| 400 | `missing-required-fields` | `externalId`、`collectorAgent`、`title`、`url` 任一缺失或为空 |
+| 401 | `invalid-token` | `x-creative-token` 不匹配 |
+| 503 | `creative-api-token-not-configured` | 服务端未配置 token |
 | 503 | `database-not-available` | 数据库不可用 |
+
+---
+
+## 幂等性与空字段补充
+
+接口天然幂等，设计为可安全重试：
+
+1. 首次推送 → 201 + `created: true`
+2. 重复推送 → 200 + `created: false`
+3. **空字段补充**：如果 DB 中某字段为 NULL 而新推送有值，会自动更新该字段
+4. 已有数据的字段**不会被覆盖**
+
+受空字段补充影响的字段：`fullContent`、`summary`、`sourceName`、`author`、`coverImageUrl`、`tags`、`wordCount`、`contentType`、`score`、`publishedAt`、`collectorTimestamp`
+
+采集器升级后重新推送即可补充之前缺失的字段（如 `fullContent`），无需担心覆盖已有数据。
+
+---
+
+## 辅助接口
+
+### 更新素材质量状态
+
+```
+POST https://now.achuan.cc/actions/creative/source-items/:id/quality-status
+Content-Type: application/json
+x-creative-token: <token>
+
+{ "qualityStatus": "accepted" }
+```
+
+允许值：`"accepted"` 或 `"rejected"`。
+
+### 查询素材列表
+
+```
+GET https://now.achuan.cc/api/creative/source-items?qualityStatus=accepted&pageSize=50
+x-creative-token: <token>
+```
+
+查询参数：`qualityStatus`、`collectorAgent`、`search`、`page`、`pageSize`。
 
 ---
 
@@ -177,38 +193,26 @@ x-creative-token: <your-token>
 
 ### `externalId` 设计建议
 
-- 应在 `collectorAgent` 范围内全局唯一
-- 推荐格式：`{来源类型}-{原始ID}`，如 `tweet-1891234567890`、`hn-42134567`、`bili-BV1xx411c7mD`
-- 不要用 URL 作为 externalId（URL 可能过长且包含查询参数变化），URL 放 `url` 字段
+- 在 `collectorAgent` 范围内全局唯一
+- 推荐格式：`{来源类型}-{原始ID}`，如 `tweet-1891234567890`、`hn-42134567`
 
 ### `collectorAgent` 设计建议
 
-- 用简短英文标识，如 `twitter-collector`、`hn-collector`、`rss-techcrunch`
-- 同一 Agent 内的 `externalId` 必须唯一；不同 Agent 之间允许 `externalId` 冲突
+- 简短英文标识，如 `aihot-collector`、`hn-collector`
+- 不同 Agent 之间允许 `externalId` 冲突
 
-### `tags` 字段
+### `fullContent` 字段
 
-支持两种格式，等价处理：
-- 字符串：`"AI, Claude, Anthropic"`（逗号分隔）
-- 数组：`["AI", "Claude", "Anthropic"]`
+- 尽量提供解析后的原文全文
+- 部分数据源（如 RSS 摘要）可能无法提取全文，此时可不传
+- 素材库页面会直接展示该字段内容，无原文时标注"采集未提供原文"
+- 后续重新推送可补充
 
-### `score` 字段
+### `qualityStatus` 字段
 
-- 0-100 整数，由采集 Agent 自行打分
-- 进入系统后可由编辑手动调整质量状态（pending → accepted / rejected）
-- score 不影响质量状态，只是采集时的参考评分
-
----
-
-## 幂等性保障
-
-接口天然幂等，设计为可安全重试：
-
-1. 发送请求 → 收到网络错误或超时 → 直接重发即可
-2. 首次推送返回 `201` + `created: true`
-3. 重复推送返回 `200` + `created: false`（返回相同 `id`，不覆盖已有数据）
-
-Agent 不需要自行实现去重逻辑，只需保证每次推送时 `externalId` + `collectorAgent` 组合一致即可。
+- `"accepted"` — 直接标记为已审核，Writer Agent 可立即拉取生成文章
+- `"pending"` — 等待人工审核（默认值）
+- 推荐自动化场景传 `"accepted"`
 
 ---
 
@@ -226,7 +230,9 @@ curl -X POST https://now.achuan.cc/api/creative/source-items \
     "externalId": "test-001",
     "collectorAgent": "test-agent",
     "title": "测试素材",
-    "url": "https://example.com/test-001"
+    "url": "https://example.com/test-001",
+    "fullContent": "这是测试素材的全文内容。",
+    "qualityStatus": "accepted"
   }'
 ```
 

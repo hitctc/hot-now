@@ -196,13 +196,15 @@ const pagination = computed(() => ({
         <!-- 标题列：点击展开/折叠 -->
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'title'">
-            <div class="flex items-center gap-2">
-              <span
-                class="cursor-pointer font-medium text-editorial-text-main hover:text-editorial-link-active"
-                @click="toggleExpand(record.id)"
-              >
-                {{ record.title }}
-              </span>
+            <div class="flex items-center gap-2 min-w-0">
+              <a-tooltip :title="record.title" placement="topLeft" :mouse-enter-delay="0.3">
+                <span
+                  class="cursor-pointer truncate font-medium text-editorial-text-main hover:text-editorial-link-active"
+                  @click="toggleExpand(record.id)"
+                >
+                  {{ record.title }}
+                </span>
+              </a-tooltip>
               <a
                 v-if="record.linkedArticleId != null"
                 class="inline-flex shrink-0 cursor-pointer items-center rounded-editorial-pill bg-editorial-link-active/30 px-2 py-0.5 text-[11px] font-semibold text-editorial-link-active hover:bg-editorial-link-active/50"
@@ -215,7 +217,9 @@ const pagination = computed(() => ({
 
           <!-- 来源列 -->
           <template v-else-if="column.key === 'sourceName'">
-            <span class="text-editorial-text-body">{{ record.sourceName || "-" }}</span>
+            <a-tooltip :title="record.sourceName || ''" placement="topLeft" :mouse-enter-delay="0.3">
+              <span class="block truncate text-editorial-text-body">{{ record.sourceName || "-" }}</span>
+            </a-tooltip>
           </template>
 
           <!-- 评分列 -->

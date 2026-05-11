@@ -774,19 +774,28 @@ export function createServer(deps: ServerDeps = {}) {
       (db.prepare("SELECT url FROM creative_source_items").all() as Array<{ url: string }>).map((r) => r.url)
     );
 
-    const candidates = allCards
+    const filtered = allCards
       .filter((card) => card.contentScore >= minScore && !pushedUrls.has(card.canonicalUrl))
-      .slice(0, 50)
-      .map((card) => ({
-        id: card.id,
-        title: card.title,
-        summary: card.summary,
-        canonicalUrl: card.canonicalUrl,
-        publishedAt: card.publishedAt,
-        contentScore: card.contentScore,
-        sourceName: card.sourceName,
-        sourceKind: card.sourceKind
-      }));
+      .slice(0, 50);
+
+    // 批量取 body_markdown，RSS 来源大多为空，Agent 需自行抓取原文
+    const idPlaceholders = filtered.map(() => "?").join(", ");
+    const bodyRows = filtered.length > 0
+      ? (db.prepare(`SELECT id, body_markdown FROM content_items WHERE id IN (${idPlaceholders})`).all(...filtered.map((c) => c.id)) as Array<{ id: number; body_markdown: string | null }>)
+      : [];
+    const bodyById = new Map(bodyRows.map((r) => [r.id, r.body_markdown]));
+
+    const candidates = filtered.map((card) => ({
+      id: card.id,
+      title: card.title,
+      summary: card.summary,
+      fullContent: bodyById.get(card.id) ?? null,
+      canonicalUrl: card.canonicalUrl,
+      publishedAt: card.publishedAt,
+      contentScore: card.contentScore,
+      sourceName: card.sourceName,
+      sourceKind: card.sourceKind
+    }));
 
     return reply.send({ ok: true, total: candidates.length, items: candidates });
   });

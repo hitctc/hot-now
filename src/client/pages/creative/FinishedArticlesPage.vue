@@ -382,7 +382,7 @@ const pagination = computed(() => ({
             <span class="text-xs text-editorial-text-muted">{{ formatCreatedAt(detailArticle.createdAt) }}</span>
             <a
               class="cursor-pointer text-xs text-editorial-link-active hover:underline"
-              @click.prevent="closeDetail(); goToSourceItem(detailArticle.sourceItemId)"
+              @click.prevent="goToSourceItem(detailArticle.sourceItemId); closeDetail()"
             >素材 #{{ detailArticle.sourceItemId }}</a>
           </div>
 

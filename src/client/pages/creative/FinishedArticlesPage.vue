@@ -361,7 +361,7 @@ const pagination = computed(() => ({
       :mask-closable="true"
       width="100%"
       wrap-class-name="article-detail-fullscreen"
-      :body-style="{ padding: 0, height: '100vh', overflow: 'auto', background: '#ffffff' }"
+      :body-style="{ padding: 0, background: '#ffffff' }"
       :style="{ top: 0, maxWidth: '100vw', paddingBottom: 0 }"
       destroy-on-close
       @cancel="closeDetail"
@@ -510,13 +510,37 @@ const pagination = computed(() => ({
 </template>
 
 <style>
+.article-detail-fullscreen {
+  /* 弹窗打开时锁定背景滚动 */
+  overflow: hidden !important;
+}
+.article-detail-fullscreen .ant-modal {
+  top: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  max-width: 100vw !important;
+}
 .article-detail-fullscreen .ant-modal-content {
   background: #ffffff !important;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0 !important;
 }
 .article-detail-fullscreen .ant-modal-header {
   background: #ffffff !important;
+  flex-shrink: 0;
+  border-bottom: 1px solid #e5e7eb;
+  border-radius: 0 !important;
+  padding: 12px 24px;
 }
 .article-detail-fullscreen .ant-modal-body {
   background: #ffffff !important;
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+.article-detail-fullscreen .ant-modal-close {
+  top: 8px !important;
 }
 </style>

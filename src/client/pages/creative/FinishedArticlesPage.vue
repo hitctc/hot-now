@@ -363,15 +363,69 @@ const pagination = computed(() => ({
         <!-- 展开行 -->
         <template #expandedRowRender="{ record }">
           <div class="flex flex-col gap-4 rounded-editorial-md border border-editorial-border bg-editorial-panel/60 p-4">
+            <!-- 备选标题（最高频复制，放最前面） -->
+            <div v-if="parseJsonArray(record.titles).length > 0">
+              <div class="mb-1 flex items-center justify-between">
+                <p class="m-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">备选标题</p>
+                <a-button type="link" size="small" class="!p-0 text-[11px]" @click="copyPlainText(parseJsonArray(record.titles).join('\n'))">复制全部</a-button>
+              </div>
+              <ul class="m-0 list-inside list-disc pl-1">
+                <li v-for="(t, idx) in parseJsonArray(record.titles)" :key="idx" class="group flex items-start gap-2 text-sm leading-7 text-editorial-text-body">
+                  <span class="flex-1">{{ t }}</span>
+                  <a-button type="link" size="small" class="!p-0 !text-[11px] opacity-0 group-hover:opacity-100" @click="copyPlainText(t)">复制</a-button>
+                </li>
+              </ul>
+            </div>
+
             <!-- 核心立意 -->
             <div v-if="record.thesis">
-              <p class="m-0 mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">核心立意</p>
+              <div class="mb-1 flex items-center justify-between">
+                <p class="m-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">核心立意</p>
+                <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyPlainText(record.thesis!)">复制</a-button>
+              </div>
               <p class="m-0 text-sm leading-6 text-editorial-text-body">{{ record.thesis }}</p>
             </div>
 
-            <!-- 正文预览 -->
+            <!-- 百字摘要 -->
+            <div v-if="record.summary100">
+              <div class="mb-1 flex items-center justify-between">
+                <p class="m-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">百字摘要</p>
+                <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyPlainText(record.summary100!)">复制</a-button>
+              </div>
+              <p class="m-0 text-sm leading-6 text-editorial-text-body">{{ record.summary100 }}</p>
+            </div>
+
+            <!-- 开头钩子 -->
+            <div v-if="parseJsonArray(record.hooks).length > 0">
+              <div class="mb-1 flex items-center justify-between">
+                <p class="m-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">开头钩子</p>
+                <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyPlainText(parseJsonArray(record.hooks).join('\n'))">复制全部</a-button>
+              </div>
+              <ul class="m-0 list-inside list-disc pl-1">
+                <li v-for="(h, idx) in parseJsonArray(record.hooks)" :key="idx" class="group flex items-start gap-2 text-sm leading-6 text-editorial-text-body">
+                  <span class="flex-1">{{ h }}</span>
+                  <a-button type="link" size="small" class="!p-0 !text-[11px] opacity-0 group-hover:opacity-100" @click="copyPlainText(h)">复制</a-button>
+                </li>
+              </ul>
+            </div>
+
+            <!-- 可摘句 -->
+            <div v-if="parseJsonArray(record.quotes).length > 0">
+              <div class="mb-1 flex items-center justify-between">
+                <p class="m-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">可摘句</p>
+                <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyPlainText(parseJsonArray(record.quotes).join('\n'))">复制全部</a-button>
+              </div>
+              <ul class="m-0 list-inside list-disc pl-1">
+                <li v-for="(q, idx) in parseJsonArray(record.quotes)" :key="idx" class="text-sm leading-6 text-editorial-text-body">{{ q }}</li>
+              </ul>
+            </div>
+
+            <!-- 正文（放最后，默认折叠） -->
             <div v-if="record.contentMarkdown">
-              <p class="m-0 mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">正文</p>
+              <div class="mb-1 flex items-center justify-between">
+                <p class="m-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">正文</p>
+                <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyPlainText(record.contentMarkdown)">复制正文</a-button>
+              </div>
               <div class="text-sm leading-6 text-editorial-text-body whitespace-pre-wrap">
                 {{ expandedContentIds.has(record.id) ? record.contentMarkdown : truncateText(record.contentMarkdown, 300) }}
               </div>
@@ -384,42 +438,6 @@ const pagination = computed(() => ({
               >
                 {{ expandedContentIds.has(record.id) ? "收起" : "查看完整" }}
               </a-button>
-            </div>
-
-            <!-- 百字摘要 -->
-            <div v-if="record.summary100">
-              <p class="m-0 mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">百字摘要</p>
-              <p class="m-0 text-sm leading-6 text-editorial-text-body">{{ record.summary100 }}</p>
-            </div>
-
-            <!-- 备选标题 -->
-            <div v-if="parseJsonArray(record.titles).length > 0">
-              <p class="m-0 mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">备选标题</p>
-              <ul class="m-0 list-inside list-disc pl-1">
-                <li v-for="(t, idx) in parseJsonArray(record.titles)" :key="idx" class="text-sm leading-6 text-editorial-text-body">
-                  {{ t }}
-                </li>
-              </ul>
-            </div>
-
-            <!-- 开头钩子 -->
-            <div v-if="parseJsonArray(record.hooks).length > 0">
-              <p class="m-0 mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">开头钩子</p>
-              <ul class="m-0 list-inside list-disc pl-1">
-                <li v-for="(h, idx) in parseJsonArray(record.hooks)" :key="idx" class="text-sm leading-6 text-editorial-text-body">
-                  {{ h }}
-                </li>
-              </ul>
-            </div>
-
-            <!-- 可摘句 -->
-            <div v-if="parseJsonArray(record.quotes).length > 0">
-              <p class="m-0 mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">可摘句</p>
-              <ul class="m-0 list-inside list-disc pl-1">
-                <li v-for="(q, idx) in parseJsonArray(record.quotes)" :key="idx" class="text-sm leading-6 text-editorial-text-body">
-                  {{ q }}
-                </li>
-              </ul>
             </div>
 
             <!-- 图片列表 -->

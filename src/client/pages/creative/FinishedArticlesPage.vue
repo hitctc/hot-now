@@ -124,13 +124,15 @@ async function handleEditSubmit(): Promise<void> {
       thesis: editForm.value.thesis,
       summary100: editForm.value.summary100
     });
+    message.success("保存成功");
     editModalOpen.value = false;
     await loadItems();
-    // 同步更新详情弹窗中的数据
     if (detailArticle.value && detailArticle.value.id === editForm.value.id) {
       const updated = items.value.find(item => item.id === editForm.value.id);
       if (updated) detailArticle.value = updated;
     }
+  } catch {
+    message.error("保存失败，请重试");
   } finally {
     editPending.value = false;
   }

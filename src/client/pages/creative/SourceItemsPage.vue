@@ -167,7 +167,8 @@ const columns = [
   { title: "标题", dataIndex: "title", key: "title", ellipsis: true },
   { title: "来源", dataIndex: "sourceName", key: "sourceName", width: 120 },
   { title: "评分", dataIndex: "score", key: "score", width: 72 },
-  { title: "传播趋势", key: "trend", width: 130 },
+  { title: "传播分", key: "trendScore", width: 72 },
+  { title: "评分维度", key: "trendBreakdown", width: 200 },
   { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 110 },
   { title: "发布时间", dataIndex: "publishedAt", key: "publishedAt", width: 120 },
   { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: 90 },
@@ -261,21 +262,27 @@ const pagination = computed(() => ({
             <span v-else class="text-editorial-text-muted">-</span>
           </template>
 
-          <!-- 传播趋势列 -->
-          <template v-else-if="column.key === 'trend'">
-            <template v-if="record.trendScore != null">
+          <!-- 传播分列 -->
+          <template v-else-if="column.key === 'trendScore'">
+            <span v-if="record.trendScore != null" class="inline-flex items-center rounded-editorial-pill border border-orange-300 bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-orange-700">{{ record.trendScore }}</span>
+            <span v-else class="text-xs text-editorial-text-muted">未评分</span>
+          </template>
+
+          <!-- 评分维度列 -->
+          <template v-else-if="column.key === 'trendBreakdown'">
+            <template v-if="record.trendBreakdown">
               <a-tooltip :mouse-enter-delay="0.3">
                 <template #title>
                   <div class="text-xs leading-5">
-                    话题{{ record.trendBreakdown?.topicPower ?? '-' }} | 情绪{{ record.trendBreakdown?.emotionResonance ?? '-' }} | 信息差{{ record.trendBreakdown?.infoGap ?? '-' }} | 社交{{ record.trendBreakdown?.socialCurrency ?? '-' }} | 时效{{ record.trendBreakdown?.timingWindow ?? '-' }} | 受众{{ record.trendBreakdown?.audienceBreadth ?? '-' }}
+                    话题 {{ record.trendBreakdown.topicPower}} | 情绪 {{ record.trendBreakdown.emotionResonance }} | 信息差 {{ record.trendBreakdown.infoGap }} | 社交 {{ record.trendBreakdown.socialCurrency }} | 时效 {{ record.trendBreakdown.timingWindow }} | 受众 {{ record.trendBreakdown.audienceBreadth }}
                   </div>
                 </template>
-                <span class="inline-flex items-center rounded-editorial-pill border border-orange-300 bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-orange-700">
-                  {{ record.trendScore }}
+                <span class="block truncate text-[11px] leading-5 text-editorial-text-body">
+                  话题{{ record.trendBreakdown.topicPower }} | 情绪{{ record.trendBreakdown.emotionResonance }} | 信息差{{ record.trendBreakdown.infoGap }} | 社交{{ record.trendBreakdown.socialCurrency }} | 时效{{ record.trendBreakdown.timingWindow }} | 受众{{ record.trendBreakdown.audienceBreadth }}
                 </span>
               </a-tooltip>
             </template>
-            <span v-else class="text-xs text-editorial-text-muted">未评分</span>
+            <span v-else class="text-xs text-editorial-text-muted">-</span>
           </template>
 
           <!-- Agent 列 -->

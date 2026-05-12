@@ -361,7 +361,7 @@ const pagination = computed(() => ({
       :mask-closable="true"
       width="100%"
       wrap-class-name="article-detail-fullscreen"
-      :body-style="{ padding: 0, height: '100vh', overflow: 'auto' }"
+      :body-style="{ padding: 0, height: '100vh', overflow: 'auto', background: '#ffffff' }"
       :style="{ top: 0, maxWidth: '100vw', paddingBottom: 0 }"
       destroy-on-close
       @cancel="closeDetail"
@@ -508,3 +508,15 @@ const pagination = computed(() => ({
     </a-modal>
   </div>
 </template>
+
+<style>
+.article-detail-fullscreen .ant-modal-content {
+  background: #ffffff !important;
+}
+.article-detail-fullscreen .ant-modal-header {
+  background: #ffffff !important;
+}
+.article-detail-fullscreen .ant-modal-body {
+  background: #ffffff !important;
+}
+</style>

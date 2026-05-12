@@ -41,6 +41,9 @@ const searchText = ref("");
 // 操作锁
 const actionPendingId = ref<number | null>(null);
 
+// 文章详情全屏弹窗
+const detailArticle = ref<CreativeFinishedArticle | null>(null);
+
 // 编辑弹窗
 const editModalOpen = ref(false);
 const editPending = ref(false);
@@ -51,9 +54,6 @@ const editForm = ref<{ id: number; contentMarkdown: string; thesis: string; summ
   summary100: ""
 });
 
-// 正文展开状态
-const expandedContentIds = ref<Set<number>>(new Set());
-
 const statusOptions = [
   { label: "全部", value: "" },
   { label: "已生成", value: "generated" },
@@ -63,10 +63,6 @@ const statusOptions = [
   { label: "已拒绝", value: "rejected" },
   { label: "已完成", value: "completed" }
 ];
-
-// ─── 手动控制展开行 ───
-
-const expandedRowKeys = ref<number[]>([]);
 
 // ─── 数据加载 ───
 
@@ -82,14 +78,12 @@ async function loadItems(): Promise<void> {
     items.value = res.items;
     total.value = res.total;
 
-    // 处理 ?expand=文章ID query param
+    // 处理 ?expand=文章ID query param，自动打开详情弹窗
     const expandId = route.query.expand;
     if (expandId) {
       const id = Number(expandId);
-      if (!expandedRowKeys.value.includes(id) && res.items.some(item => item.id === id)) {
-        expandedRowKeys.value.push(id);
-      }
-      // 清掉 query param 避免后续刷新重复展开
+      const found = res.items.find(item => item.id === id);
+      if (found) detailArticle.value = found;
       router.replace({ query: {} });
     }
   } finally {
@@ -116,6 +110,16 @@ function handleTableChange(pagination: { current?: number; pageSize?: number }):
   if (pagination.current) currentPage.value = pagination.current;
   if (pagination.pageSize) pageSize.value = pagination.pageSize;
   void loadItems();
+}
+
+// ─── 详情弹窗 ───
+
+function openDetail(article: CreativeFinishedArticle): void {
+  detailArticle.value = article;
+}
+
+function closeDetail(): void {
+  detailArticle.value = null;
 }
 
 // ─── 状态操作 ───
@@ -183,15 +187,6 @@ async function handleEditSubmit(): Promise<void> {
   }
 }
 
-// ─── 正文展开/折叠 ───
-
-function toggleContentExpand(id: number): void {
-  const s = new Set(expandedContentIds.value);
-  if (s.has(id)) s.delete(id);
-  else s.add(id);
-  expandedContentIds.value = s;
-}
-
 // ─── 格式化辅助 ───
 
 function formatCreatedAt(value: string): string {
@@ -250,15 +245,15 @@ function getFirstTitle(titles: string | null): string {
   return parsed.length > 0 ? parsed[0] : "无标题";
 }
 
-function truncateText(text: string, maxLen: number): string {
-  if (text.length <= maxLen) return text;
-  return text.slice(0, maxLen) + "...";
-}
-
 // ─── 纯文本复制 ───
 
-function markdownToPlainText(md: string): string {
-  return md
+async function copyText(text: string): Promise<void> {
+  await navigator.clipboard.writeText(text);
+  message.success("已复制到剪贴板");
+}
+
+async function copyMarkdownAsPlainText(md: string): Promise<void> {
+  const text = md
     .replace(/^#{1,6}\s+/gm, "")
     .replace(/\*\*(.*?)\*\*/g, "$1")
     .replace(/\*(.*?)\*/g, "$1")
@@ -269,10 +264,6 @@ function markdownToPlainText(md: string): string {
     .replace(/---+/g, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-}
-
-async function copyPlainText(contentMarkdown: string): Promise<void> {
-  const text = markdownToPlainText(contentMarkdown);
   await navigator.clipboard.writeText(text);
   message.success("已复制纯文本到剪贴板");
 }
@@ -321,21 +312,20 @@ const pagination = computed(() => ({
         :data-source="items"
         :pagination="pagination"
         :scroll="{ x: 800 }"
-        :expanded-row-keys="expandedRowKeys"
         row-key="id"
         data-article-table
         size="middle"
         @change="handleTableChange"
-        @expand="(expanded: boolean, record: CreativeFinishedArticle) => {
-          const idx = expandedRowKeys.indexOf(record.id);
-          if (expanded && idx < 0) expandedRowKeys.push(record.id);
-          else if (!expanded && idx >= 0) expandedRowKeys.splice(idx, 1);
-        }"
       >
         <template #bodyCell="{ column, record }">
-          <!-- 标题列 -->
+          <!-- 标题列：点击打开详情弹窗 -->
           <template v-if="column.key === 'title'">
-            <span class="font-medium text-editorial-text-main">{{ getFirstTitle(record.titles) }}</span>
+            <span
+              class="cursor-pointer font-medium text-editorial-text-main transition-colors hover:text-editorial-link-active"
+              @click="openDetail(record)"
+            >
+              {{ getFirstTitle(record.titles) }}
+            </span>
           </template>
 
           <!-- 来源素材列 -->
@@ -360,142 +350,142 @@ const pagination = computed(() => ({
             <span class="text-xs text-editorial-text-muted">{{ formatCreatedAt(record.createdAt) }}</span>
           </template>
         </template>
-
-        <!-- 展开行 -->
-        <template #expandedRowRender="{ record }">
-          <div class="flex flex-col gap-4 rounded-editorial-md border border-editorial-border bg-editorial-panel/60 p-4">
-            <!-- 备选标题（最高频复制，放最前面） -->
-            <div v-if="parseJsonArray(record.titles).length > 0">
-              <div class="mb-1 flex items-center justify-between">
-                <p class="m-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">备选标题</p>
-                <a-button type="link" size="small" class="!p-0 text-[11px]" @click="copyPlainText(parseJsonArray(record.titles).join('\n'))">复制全部</a-button>
-              </div>
-              <ul class="m-0 list-inside list-disc pl-1">
-                <li v-for="(t, idx) in parseJsonArray(record.titles)" :key="idx" class="group flex items-start gap-2 text-sm leading-7 text-editorial-text-body">
-                  <span class="flex-1">{{ t }}</span>
-                  <a-button type="link" size="small" class="!p-0 !text-[11px] opacity-0 group-hover:opacity-100" @click="copyPlainText(t)">复制</a-button>
-                </li>
-              </ul>
-            </div>
-
-            <!-- 核心立意 -->
-            <div v-if="record.thesis">
-              <div class="mb-1 flex items-center justify-between">
-                <p class="m-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">核心立意</p>
-                <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyPlainText(record.thesis!)">复制</a-button>
-              </div>
-              <p class="m-0 text-sm leading-6 text-editorial-text-body">{{ record.thesis }}</p>
-            </div>
-
-            <!-- 百字摘要 -->
-            <div v-if="record.summary100">
-              <div class="mb-1 flex items-center justify-between">
-                <p class="m-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">百字摘要</p>
-                <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyPlainText(record.summary100!)">复制</a-button>
-              </div>
-              <p class="m-0 text-sm leading-6 text-editorial-text-body">{{ record.summary100 }}</p>
-            </div>
-
-            <!-- 开头钩子 -->
-            <div v-if="parseJsonArray(record.hooks).length > 0">
-              <div class="mb-1 flex items-center justify-between">
-                <p class="m-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">开头钩子</p>
-                <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyPlainText(parseJsonArray(record.hooks).join('\n'))">复制全部</a-button>
-              </div>
-              <ul class="m-0 list-inside list-disc pl-1">
-                <li v-for="(h, idx) in parseJsonArray(record.hooks)" :key="idx" class="group flex items-start gap-2 text-sm leading-6 text-editorial-text-body">
-                  <span class="flex-1">{{ h }}</span>
-                  <a-button type="link" size="small" class="!p-0 !text-[11px] opacity-0 group-hover:opacity-100" @click="copyPlainText(h)">复制</a-button>
-                </li>
-              </ul>
-            </div>
-
-            <!-- 可摘句 -->
-            <div v-if="parseJsonArray(record.quotes).length > 0">
-              <div class="mb-1 flex items-center justify-between">
-                <p class="m-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">可摘句</p>
-                <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyPlainText(parseJsonArray(record.quotes).join('\n'))">复制全部</a-button>
-              </div>
-              <ul class="m-0 list-inside list-disc pl-1">
-                <li v-for="(q, idx) in parseJsonArray(record.quotes)" :key="idx" class="text-sm leading-6 text-editorial-text-body">{{ q }}</li>
-              </ul>
-            </div>
-
-            <!-- 正文（放最后，默认折叠） -->
-            <div v-if="record.contentMarkdown">
-              <div class="mb-1 flex items-center justify-between">
-                <p class="m-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">正文</p>
-                <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyPlainText(record.contentMarkdown)">复制正文</a-button>
-              </div>
-              <div class="text-sm leading-6 text-editorial-text-body whitespace-pre-wrap">
-                {{ expandedContentIds.has(record.id) ? record.contentMarkdown : truncateText(record.contentMarkdown, 300) }}
-              </div>
-              <a-button
-                v-if="record.contentMarkdown.length > 300"
-                type="link"
-                size="small"
-                class="!p-0 mt-1"
-                @click="toggleContentExpand(record.id)"
-              >
-                {{ expandedContentIds.has(record.id) ? "收起" : "查看完整" }}
-              </a-button>
-            </div>
-
-            <!-- 图片列表 -->
-            <div v-if="parseJsonArray(record.imagesJson).length > 0">
-              <p class="m-0 mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">图片列表</p>
-              <ul class="m-0 list-inside list-disc pl-1">
-                <li v-for="(img, idx) in parseJsonArray(record.imagesJson)" :key="idx" class="truncate text-xs leading-5 text-editorial-text-muted">
-                  {{ img }}
-                </li>
-              </ul>
-            </div>
-
-            <!-- 操作区 -->
-            <div class="flex flex-wrap items-center gap-3 border-t border-editorial-border pt-3">
-              <!-- 状态流转按钮 -->
-              <template v-if="getStatusActions(record.status).length > 0">
-                <span class="text-xs font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">状态操作：</span>
-                <a-button
-                  v-for="action in getStatusActions(record.status)"
-                  :key="action.nextStatus"
-                  size="small"
-                  :type="action.danger ? 'default' : 'primary'"
-                  :danger="action.danger"
-                  :disabled="actionPendingId === record.id"
-                  :loading="actionPendingId === record.id"
-                  @click="handleStatusAction(record, action.nextStatus)"
-                >
-                  {{ action.label }}
-                </a-button>
-              </template>
-              <template v-else>
-                <span class="text-xs font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">状态操作：</span>
-                <span class="text-xs text-editorial-text-muted">无可用操作</span>
-              </template>
-
-              <!-- 编辑按钮 -->
-              <a-button
-                size="small"
-                class="ml-auto"
-                @click="openEditModal(record)"
-              >
-                编辑内容
-              </a-button>
-
-              <!-- 复制纯文本按钮 -->
-              <a-button
-                v-if="record.contentMarkdown"
-                size="small"
-                @click="copyPlainText(record.contentMarkdown)"
-              >
-                复制纯文本
-              </a-button>
-            </div>
-          </div>
-        </template>
       </a-table>
     </a-spin>
+
+    <!-- 文章详情全屏弹窗 -->
+    <a-modal
+      :open="detailArticle !== null"
+      :footer="null"
+      :closable="true"
+      :mask-closable="true"
+      width="100%"
+      wrap-class-name="article-detail-fullscreen"
+      :body-style="{ padding: 0, height: '100vh', overflow: 'auto' }"
+      :style="{ top: 0, maxWidth: '100vw', paddingBottom: 0 }"
+      destroy-on-close
+      @cancel="closeDetail"
+    >
+      <template v-if="detailArticle">
+        <div class="mx-auto flex max-w-[860px] flex-col gap-6 px-8 py-6">
+          <!-- 顶部元信息 -->
+          <div class="flex items-center gap-3">
+            <a-tag :color="statusColor(detailArticle.status)">{{ statusLabel(detailArticle.status) }}</a-tag>
+            <span class="text-xs text-editorial-text-muted">模式 {{ detailArticle.mode || "-" }}</span>
+            <span class="text-xs text-editorial-text-muted">{{ formatCreatedAt(detailArticle.createdAt) }}</span>
+            <span class="text-xs text-editorial-text-muted">素材 #{{ detailArticle.sourceItemId }}</span>
+          </div>
+
+          <!-- 备选标题 -->
+          <section v-if="parseJsonArray(detailArticle.titles).length > 0">
+            <div class="mb-2 flex items-center justify-between">
+              <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">备选标题</h3>
+              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(parseJsonArray(detailArticle.titles).join('\n'))">复制全部</a-button>
+            </div>
+            <ul class="m-0 list-none space-y-1 pl-0">
+              <li
+                v-for="(t, idx) in parseJsonArray(detailArticle.titles)"
+                :key="idx"
+                class="group flex items-start gap-3 rounded-editorial-sm border border-editorial-border px-3 py-2 transition-colors hover:border-editorial-link-active/40"
+              >
+                <span class="flex-shrink-0 text-[11px] font-bold tabular-nums text-editorial-text-muted">{{ idx + 1 }}</span>
+                <span class="flex-1 text-sm leading-6 text-editorial-text-main">{{ t }}</span>
+                <a-button type="link" size="small" class="!p-0 !text-[11px] opacity-0 group-hover:opacity-100" @click="copyText(t)">复制</a-button>
+              </li>
+            </ul>
+          </section>
+
+          <!-- 核心立意 -->
+          <section v-if="detailArticle.thesis">
+            <div class="mb-2 flex items-center justify-between">
+              <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">核心立意</h3>
+              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(detailArticle.thesis!)">复制</a-button>
+            </div>
+            <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ detailArticle.thesis }}</p>
+          </section>
+
+          <!-- 百字摘要 -->
+          <section v-if="detailArticle.summary100">
+            <div class="mb-2 flex items-center justify-between">
+              <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">百字摘要</h3>
+              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(detailArticle.summary100!)">复制</a-button>
+            </div>
+            <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ detailArticle.summary100 }}</p>
+          </section>
+
+          <!-- 开头钩子 -->
+          <section v-if="parseJsonArray(detailArticle.hooks).length > 0">
+            <div class="mb-2 flex items-center justify-between">
+              <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">开头钩子</h3>
+              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(parseJsonArray(detailArticle.hooks).join('\n'))">复制全部</a-button>
+            </div>
+            <ul class="m-0 list-none space-y-1 pl-0">
+              <li
+                v-for="(h, idx) in parseJsonArray(detailArticle.hooks)"
+                :key="idx"
+                class="group flex items-start gap-3 rounded-editorial-sm bg-editorial-panel/40 px-3 py-2"
+              >
+                <span class="flex-1 text-sm leading-6 text-editorial-text-body">{{ h }}</span>
+                <a-button type="link" size="small" class="!p-0 !text-[11px] opacity-0 group-hover:opacity-100" @click="copyText(h)">复制</a-button>
+              </li>
+            </ul>
+          </section>
+
+          <!-- 可摘句 -->
+          <section v-if="parseJsonArray(detailArticle.quotes).length > 0">
+            <div class="mb-2 flex items-center justify-between">
+              <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">可摘句</h3>
+              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(parseJsonArray(detailArticle.quotes).join('\n'))">复制全部</a-button>
+            </div>
+            <ul class="m-0 list-inside list-disc pl-1">
+              <li v-for="(q, idx) in parseJsonArray(detailArticle.quotes)" :key="idx" class="text-sm leading-6 text-editorial-text-body">{{ q }}</li>
+            </ul>
+          </section>
+
+          <!-- 正文 -->
+          <section v-if="detailArticle.contentMarkdown">
+            <div class="mb-2 flex items-center justify-between">
+              <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文</h3>
+              <div class="flex gap-2">
+                <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(detailArticle.contentMarkdown)">复制原文</a-button>
+                <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyMarkdownAsPlainText(detailArticle.contentMarkdown)">复制纯文本</a-button>
+              </div>
+            </div>
+            <div class="whitespace-pre-wrap rounded-editorial-md border border-editorial-border bg-editorial-panel/30 px-4 py-3 text-sm leading-7 text-editorial-text-body">
+              {{ detailArticle.contentMarkdown }}
+            </div>
+          </section>
+
+          <!-- 图片列表 -->
+          <section v-if="parseJsonArray(detailArticle.imagesJson).length > 0">
+            <h3 class="m-0 mb-2 text-sm font-semibold text-editorial-text-muted">图片列表</h3>
+            <ul class="m-0 list-inside list-disc pl-1">
+              <li v-for="(img, idx) in parseJsonArray(detailArticle.imagesJson)" :key="idx" class="truncate text-xs leading-5 text-editorial-text-muted">{{ img }}</li>
+            </ul>
+          </section>
+
+          <!-- 操作区 -->
+          <section class="flex flex-wrap items-center gap-3 border-t border-editorial-border pt-4">
+            <template v-if="getStatusActions(detailArticle.status).length > 0">
+              <span class="text-xs font-semibold text-editorial-text-muted">状态：</span>
+              <a-button
+                v-for="action in getStatusActions(detailArticle.status)"
+                :key="action.nextStatus"
+                size="small"
+                :type="action.danger ? 'default' : 'primary'"
+                :danger="action.danger"
+                :disabled="actionPendingId === detailArticle.id"
+                :loading="actionPendingId === detailArticle.id"
+                @click="handleStatusAction(detailArticle, action.nextStatus)"
+              >
+                {{ action.label }}
+              </a-button>
+            </template>
+            <a-button size="small" class="ml-auto" @click="openEditModal(detailArticle)">编辑内容</a-button>
+          </section>
+        </div>
+      </template>
+    </a-modal>
 
     <!-- 编辑弹窗 -->
     <a-modal

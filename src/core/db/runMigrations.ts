@@ -948,7 +948,7 @@ export function runMigrations(db: SqliteDatabase): void {
         score REAL,
         published_at TEXT,
         collector_timestamp TEXT,
-        writing_status TEXT NOT NULL DEFAULT 'ready',
+        quality_status TEXT NOT NULL DEFAULT 'pending',
         raw_payload_json TEXT NOT NULL,
         linked_article_id INTEGER,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -959,8 +959,8 @@ export function runMigrations(db: SqliteDatabase): void {
     `);
 
     db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_creative_source_items_writing_status
-      ON creative_source_items(writing_status)
+      CREATE INDEX IF NOT EXISTS idx_creative_source_items_quality_status
+      ON creative_source_items(quality_status)
     `);
 
     db.exec(`

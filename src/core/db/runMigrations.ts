@@ -958,10 +958,10 @@ export function runMigrations(db: SqliteDatabase): void {
       )
     `);
 
-    db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_creative_source_items_quality_status
-      ON creative_source_items(quality_status)
-    `);
+    // 索引列名兼容：019 迁移后列名从 quality_status 变为 writing_status
+    const statusColumnName = hasColumn(db, "creative_source_items", "writing_status") ? "writing_status" : "quality_status";
+    const statusIndexName = `idx_creative_source_items_${statusColumnName}`;
+    db.exec(`CREATE INDEX IF NOT EXISTS ${statusIndexName} ON creative_source_items(${statusColumnName})`);
 
     db.exec(`
       CREATE INDEX IF NOT EXISTS idx_creative_source_items_collector_agent

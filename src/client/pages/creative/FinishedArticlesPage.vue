@@ -387,7 +387,6 @@ const pagination = computed(() => ({
       cancel-text="取消"
       width="900px"
       centered
-      :body-style="{ maxHeight: '75vh', overflowY: 'auto' }"
       @ok="handleEditSubmit"
     >
       <a-form layout="vertical" class="mt-4">

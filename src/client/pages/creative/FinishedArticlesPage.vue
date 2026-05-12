@@ -186,8 +186,8 @@ async function copyMarkdownAsPlainText(md: string): Promise<void> {
 const columns = [
   { title: "标题", key: "title", width: 200, ellipsis: true },
   { title: "来源素材", key: "sourceItem", width: 110, ellipsis: true },
-  { title: "传播分", key: "trendScore", width: 72, ellipsis: true },
-  { title: "评分维度", key: "trendBreakdown", width: 240, ellipsis: true },
+  { title: "爆文分", key: "trendScore", width: 72, ellipsis: true },
+  { title: "爆文维度", key: "trendBreakdown", width: 240, ellipsis: true },
   { title: "模式", key: "mode", width: 72, ellipsis: true },
   { title: "创建时间", key: "createdAt", width: 140, ellipsis: true }
 ];

@@ -330,7 +330,10 @@ const pagination = computed(() => ({
 
           <!-- 来源素材列 -->
           <template v-else-if="column.key === 'sourceItem'">
-            <span class="text-xs text-editorial-text-body">素材 #{{ record.sourceItemId }}</span>
+            <a
+              class="cursor-pointer text-xs text-editorial-link-active hover:underline"
+              @click.prevent="router.push({ path: '/creative/source-items', query: { expand: String(record.sourceItemId) } })"
+            >素材 #{{ record.sourceItemId }}</a>
           </template>
 
           <!-- 模式列 -->
@@ -373,7 +376,10 @@ const pagination = computed(() => ({
             <a-tag :color="statusColor(detailArticle.status)">{{ statusLabel(detailArticle.status) }}</a-tag>
             <span class="text-xs text-editorial-text-muted">模式 {{ detailArticle.mode || "-" }}</span>
             <span class="text-xs text-editorial-text-muted">{{ formatCreatedAt(detailArticle.createdAt) }}</span>
-            <span class="text-xs text-editorial-text-muted">素材 #{{ detailArticle.sourceItemId }}</span>
+            <a
+              class="cursor-pointer text-xs text-editorial-link-active hover:underline"
+              @click.prevent="closeDetail(); router.push({ path: '/creative/source-items', query: { expand: String(detailArticle.sourceItemId) } })"
+            >素材 #{{ detailArticle.sourceItemId }}</a>
           </div>
 
           <!-- 备选标题 -->
@@ -492,6 +498,8 @@ const pagination = computed(() => ({
       v-model:open="editModalOpen"
       title="编辑成品文章"
       :confirm-loading="editPending"
+      width="900px"
+      :body-style="{ maxHeight: '75vh', overflowY: 'auto' }"
       @ok="handleEditSubmit"
     >
       <a-form layout="vertical" class="mt-4">
@@ -499,10 +507,10 @@ const pagination = computed(() => ({
           <a-input v-model:value="editForm.thesis" placeholder="核心立意" />
         </a-form-item>
         <a-form-item label="百字摘要">
-          <a-textarea v-model:value="editForm.summary100" :rows="3" placeholder="百字摘要" />
+          <a-textarea v-model:value="editForm.summary100" :rows="4" placeholder="百字摘要" />
         </a-form-item>
         <a-form-item label="正文 Markdown">
-          <a-textarea v-model:value="editForm.contentMarkdown" :rows="10" placeholder="正文内容" />
+          <a-textarea v-model:value="editForm.contentMarkdown" :rows="25" placeholder="正文内容" />
         </a-form-item>
       </a-form>
     </a-modal>

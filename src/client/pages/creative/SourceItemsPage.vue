@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 import {
   readCreativeSourceItems,
@@ -8,6 +8,7 @@ import {
   type CreativeSourceItem
 } from "../../services/creativeApi.js";
 
+const route = useRoute();
 const router = useRouter();
 
 // ─── 状态 ───
@@ -48,6 +49,16 @@ async function loadItems(): Promise<void> {
     });
     items.value = res.items;
     total.value = res.total;
+
+    // 处理 ?expand=素材ID query param，自动展开对应条目
+    const expandId = route.query.expand;
+    if (expandId) {
+      const id = Number(expandId);
+      if (!expandedRowKeys.value.includes(id) && res.items.some(item => item.id === id)) {
+        expandedRowKeys.value.push(id);
+      }
+      router.replace({ query: {} });
+    }
   } finally {
     isLoading.value = false;
   }

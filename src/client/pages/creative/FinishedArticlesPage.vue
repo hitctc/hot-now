@@ -126,6 +126,11 @@ async function handleEditSubmit(): Promise<void> {
     });
     editModalOpen.value = false;
     await loadItems();
+    // 同步更新详情弹窗中的数据
+    if (detailArticle.value && detailArticle.value.id === editForm.value.id) {
+      const updated = items.value.find(item => item.id === editForm.value.id);
+      if (updated) detailArticle.value = updated;
+    }
   } finally {
     editPending.value = false;
   }
@@ -361,10 +366,12 @@ const pagination = computed(() => ({
             </ul>
           </section>
 
-          <!-- 操作区 -->
-          <section class="flex items-center border-t border-editorial-border pt-4">
-            <a-button size="small" class="ml-auto" @click="openEditModal(detailArticle)">编辑内容</a-button>
-          </section>
+          <!-- 编辑按钮：悬浮固定右下角 -->
+          <a-button
+            type="primary"
+            class="!fixed !bottom-6 !right-6 !z-50 !shadow-lg"
+            @click="openEditModal(detailArticle)"
+          >编辑内容</a-button>
         </div>
       </template>
     </a-modal>
@@ -374,7 +381,10 @@ const pagination = computed(() => ({
       v-model:open="editModalOpen"
       title="编辑成品文章"
       :confirm-loading="editPending"
+      ok-text="确认"
+      cancel-text="取消"
       width="900px"
+      centered
       :body-style="{ maxHeight: '75vh', overflowY: 'auto' }"
       @ok="handleEditSubmit"
     >

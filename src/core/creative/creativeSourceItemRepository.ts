@@ -1,5 +1,5 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
-import type { CreativeSourceItemQualityStatus } from "./types.js";
+import type { CreativeSourceItemWritingStatus } from "./types.js";
 
 // ── Column selection & row mapping ──────────────────────────────────────────
 
@@ -21,7 +21,7 @@ const SELECT_COLUMNS = `
   score,
   published_at,
   collector_timestamp,
-  quality_status,
+  writing_status,
   raw_payload_json,
   linked_article_id,
   created_at,
@@ -46,7 +46,7 @@ type SourceItemRow = {
   score: number | null;
   published_at: string | null;
   collector_timestamp: string | null;
-  quality_status: string;
+  writing_status: string;
   raw_payload_json: string;
   linked_article_id: number | null;
   created_at: string;
@@ -72,7 +72,7 @@ function mapRow(row: SourceItemRow): CreativeSourceItemRecord {
     score: row.score,
     publishedAt: row.published_at,
     collectorTimestamp: row.collector_timestamp,
-    qualityStatus: row.quality_status as CreativeSourceItemQualityStatus,
+    writingStatus: row.writing_status as CreativeSourceItemWritingStatus,
     rawPayloadJson: row.raw_payload_json,
     linkedArticleId: row.linked_article_id,
     createdAt: row.created_at,
@@ -100,7 +100,7 @@ export type CreativeSourceItemRecord = {
   score: number | null;
   publishedAt: string | null;
   collectorTimestamp: string | null;
-  qualityStatus: CreativeSourceItemQualityStatus;
+  writingStatus: CreativeSourceItemWritingStatus;
   rawPayloadJson: string;
   linkedArticleId: number | null;
   createdAt: string;
@@ -124,13 +124,13 @@ export type InsertCreativeSourceItemInput = {
   score?: number | null;
   publishedAt?: string | null;
   collectorTimestamp?: string | null;
-  qualityStatus?: CreativeSourceItemQualityStatus;
+  writingStatus?: CreativeSourceItemWritingStatus;
 };
 
 export type ListCreativeSourceItemsFilters = {
   page?: number;
   pageSize?: number;
-  qualityStatus?: CreativeSourceItemQualityStatus;
+  writingStatus?: CreativeSourceItemWritingStatus;
   collectorAgent?: string;
   search?: string;
 };
@@ -148,14 +148,12 @@ export function insertCreativeSourceItem(
   db: SqliteDatabase,
   input: InsertCreativeSourceItemInput
 ): { id: number; created: boolean } {
-  // Idempotent insert: if the same externalId + collectorAgent pair already exists,
-  // supplement any empty fields with new data, but never overwrite existing non-empty values.
+  // 幂等插入：相同 externalId + collectorAgent 已存在时，补充空字段但不覆盖
   const existing = db
     .prepare("SELECT id, full_content, summary, source_name, author, cover_image_url, tags, word_count, content_type, score, published_at, collector_timestamp FROM creative_source_items WHERE external_id = ? AND collector_agent = ?")
     .get(input.externalId, input.collectorAgent) as Record<string, unknown> | undefined;
 
   if (existing) {
-    // 空字段补充：逐字段检查，DB 中为 NULL 且新推送有值时才更新
     const patches: { col: string; val: unknown }[] = [];
     type FieldMap = { input: string | number | null | undefined; col: string };
     const fields: FieldMap[] = [
@@ -207,7 +205,7 @@ export function insertCreativeSourceItem(
         score,
         published_at,
         collector_timestamp,
-        quality_status,
+        writing_status,
         raw_payload_json
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -229,7 +227,7 @@ export function insertCreativeSourceItem(
     input.score ?? null,
     input.publishedAt ?? null,
     input.collectorTimestamp ?? null,
-    input.qualityStatus ?? "pending",
+    input.writingStatus ?? "ready",
     rawPayloadJson
   );
 
@@ -280,9 +278,9 @@ export function listCreativeSourceItems(
   const whereClauses: string[] = [];
   const params: unknown[] = [];
 
-  if (filters.qualityStatus) {
-    whereClauses.push("quality_status = ?");
-    params.push(filters.qualityStatus);
+  if (filters.writingStatus) {
+    whereClauses.push("writing_status = ?");
+    params.push(filters.writingStatus);
   }
 
   if (filters.collectorAgent) {
@@ -317,15 +315,15 @@ export function listCreativeSourceItems(
   };
 }
 
-// ── Update quality status ───────────────────────────────────────────────────
+// ── Update writing status ───────────────────────────────────────────────────
 
-export function updateCreativeSourceItemQualityStatus(
+export function updateCreativeSourceItemWritingStatus(
   db: SqliteDatabase,
   id: number,
-  status: CreativeSourceItemQualityStatus
+  status: CreativeSourceItemWritingStatus
 ): boolean {
   const result = db
-    .prepare("UPDATE creative_source_items SET quality_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+    .prepare("UPDATE creative_source_items SET writing_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
     .run(status, id);
 
   return result.changes > 0;

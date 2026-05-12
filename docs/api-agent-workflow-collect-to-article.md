@@ -1,6 +1,6 @@
 # 素材 → 成品文章 自动化流程 — 外部 Agent 接入文档
 
-> 本文档描述外部 Agent 如何从 hot-now 拉取已收集的素材，生成成品文章，再推送回 hot-now 的完整流程。
+> 本文档描述外部 Agent 如何从 hot-now 拉取待写作的素材，生成成品文章，再推送回 hot-now 的完整流程。
 
 ---
 
@@ -33,7 +33,7 @@
 ### 请求
 
 ```
-GET https://now.achuan.cc/api/creative/source-items?qualityStatus=accepted&pageSize=50
+GET https://now.achuan.cc/api/creative/source-items?writingStatus=ready&pageSize=50
 x-creative-token: <token>
 ```
 
@@ -41,13 +41,13 @@ x-creative-token: <token>
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| `qualityStatus` | string | 过滤质量状态：`pending`、`accepted`、`rejected` |
+| `writingStatus` | string | 过滤写作状态：`ready`、`writing`、`done`、`skipped` |
 | `collectorAgent` | string | 按采集 Agent 过滤 |
 | `search` | string | 搜索标题和摘要 |
 | `page` | number | 页码，默认 1 |
-| `pageSize` | number | 每页条数，默认 20 |
+| `pageSize` | number | 每页条数，默认 50 |
 
-Agent 应使用 `qualityStatus=accepted` 只拉取已通过质量审核的素材。
+Agent 应使用 `writingStatus=ready` 只拉取待写作的素材。
 
 ### 响应
 
@@ -63,7 +63,7 @@ Agent 应使用 `qualityStatus=accepted` 只拉取已通过质量审核的素材
       "sourceName": "Hacker News",
       "summary": "OpenAI 官宣 GPT-5...",
       "fullContent": "## GPT-5 正式发布\n\n...",
-      "qualityStatus": "accepted",
+      "writingStatus": "ready",
       "linkedArticleId": null  // 关键字段：null 表示没有成品文章
     }
   ],
@@ -192,20 +192,20 @@ x-creative-token: <token>
 ### 更新素材质量状态
 
 ```
-POST https://now.achuan.cc/actions/creative/source-items/:id/quality-status
+POST https://now.achuan.cc/actions/creative/source-items/:id/writing-status
 x-creative-token: <token>
 
-{ "qualityStatus": "accepted" }
+{ "writingStatus": "ready" }
 ```
 
-允许值：`"accepted"` 或 `"rejected"`。
+允许值：`"ready"` 或 `"skipped"`。
 
 ---
 
 ## 已完成
 
 - [x] **查询素材接口已支持 token 认证**。所有 creative 模块接口统一使用 `x-creative-token`。
-- [x] **推送素材接口支持 `qualityStatus` 字段**。传 `"accepted"` 跳过人工审核。
+- [x] **推送素材接口支持 `writingStatus` 字段**。传 `"ready"` 跳过人工审核。
 - [x] **幂等推送支持空字段补充**。重复推送时 DB 中为空的字段会被新数据补充，已有数据不覆盖。
 - [x] **素材质量状态接口支持 token 认证**。可通过 token 调用状态更新接口。
 
@@ -215,7 +215,7 @@ x-creative-token: <token>
 
 ```
 loop:
-    1. GET  /api/creative/source-items?qualityStatus=accepted&pageSize=50
+    1. GET  /api/creative/source-items?writingStatus=ready&pageSize=50
     2. 过滤出 linkedArticleId === null 的素材
     3. 如果没有待处理素材 → 等待后重试
     4. 对每条素材：

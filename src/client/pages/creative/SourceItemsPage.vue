@@ -4,7 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 
 import {
   readCreativeSourceItems,
-  updateSourceItemQualityStatus,
+  updateSourceItemWritingStatus,
   type CreativeSourceItem
 } from "../../services/creativeApi.js";
 
@@ -20,7 +20,7 @@ const currentPage = ref(1);
 const pageSize = ref(50);
 
 // 筛选条件
-const qualityStatusFilter = ref<string | undefined>(undefined);
+const writingStatusFilter = ref<string | undefined>(undefined);
 const searchText = ref("");
 
 // 操作锁
@@ -29,11 +29,12 @@ const actionPendingId = ref<number | null>(null);
 // 手动控制展开行
 const expandedRowKeys = ref<number[]>([]);
 
-const qualityStatusOptions = [
+const writingStatusOptions = [
   { label: "全部", value: "" },
-  { label: "待审", value: "pending" },
-  { label: "已采纳", value: "accepted" },
-  { label: "已拒绝", value: "rejected" }
+  { label: "待写作", value: "ready" },
+  { label: "写作中", value: "writing" },
+  { label: "已完成", value: "done" },
+  { label: "跳过不写", value: "skipped" }
 ];
 
 // ─── 数据加载 ───
@@ -44,7 +45,7 @@ async function loadItems(): Promise<void> {
     const res = await readCreativeSourceItems({
       page: currentPage.value,
       pageSize: pageSize.value,
-      qualityStatus: qualityStatusFilter.value || undefined,
+      writingStatus: writingStatusFilter.value || undefined,
       search: searchText.value || undefined
     });
     items.value = res.items;
@@ -68,7 +69,7 @@ onMounted(() => {
   void loadItems();
 });
 
-watch(qualityStatusFilter, () => {
+watch(writingStatusFilter, () => {
   currentPage.value = 1;
   void loadItems();
 });
@@ -102,14 +103,14 @@ function goToFinishedArticle(articleId: number): void {
 
 // ─── 质量状态操作 ───
 
-async function handleQualityAction(
+async function handleWritingAction(
   item: CreativeSourceItem,
-  nextStatus: "accepted" | "rejected"
+  nextStatus: "ready" | "writing" | "done" | "skipped"
 ): Promise<void> {
   actionPendingId.value = item.id;
   try {
-    await updateSourceItemQualityStatus(item.id, nextStatus);
-    item.qualityStatus = nextStatus;
+    await updateSourceItemWritingStatus(item.id, nextStatus);
+    item.writingStatus = nextStatus;
   } finally {
     actionPendingId.value = null;
   }
@@ -130,25 +131,33 @@ function formatPublishedAt(value: string | null): string {
   });
 }
 
-function qualityStatusColor(status: string): string {
+function writingStatusColor(status: string): string {
   switch (status) {
-    case "accepted":
+    case "ready":
+      return "blue";
+    case "writing":
+      return "orange";
+    case "done":
       return "green";
-    case "rejected":
-      return "red";
+    case "skipped":
+      return "default";
     default:
       return "blue";
   }
 }
 
-function qualityStatusLabel(status: string): string {
+function writingStatusLabel(status: string): string {
   switch (status) {
-    case "accepted":
-      return "已采纳";
-    case "rejected":
-      return "已拒绝";
+    case "ready":
+      return "待写作";
+    case "writing":
+      return "写作中";
+    case "done":
+      return "已完成";
+    case "skipped":
+      return "跳过不写";
     default:
-      return "待审";
+      return status;
   }
 }
 
@@ -160,7 +169,7 @@ const columns = [
   { title: "评分", dataIndex: "score", key: "score", width: 72 },
   { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 110 },
   { title: "发布时间", dataIndex: "publishedAt", key: "publishedAt", width: 120 },
-  { title: "状态", dataIndex: "qualityStatus", key: "qualityStatus", width: 80 },
+  { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: 90 },
   { title: "成品", key: "linkedArticle", width: 100, align: "center" as const }
 ];
 
@@ -178,9 +187,9 @@ const pagination = computed(() => ({
     <!-- 筛选栏 -->
     <div class="flex flex-wrap items-center gap-3">
       <a-select
-        v-model:value="qualityStatusFilter"
-        :options="qualityStatusOptions"
-        placeholder="质量状态"
+        v-model:value="writingStatusFilter"
+        :options="writingStatusOptions"
+        placeholder="写作状态"
         class="!w-[140px]"
       />
       <a-input-search
@@ -261,10 +270,10 @@ const pagination = computed(() => ({
             <span class="text-xs text-editorial-text-muted">{{ formatPublishedAt(record.publishedAt) }}</span>
           </template>
 
-          <!-- 质量状态列 -->
-          <template v-else-if="column.key === 'qualityStatus'">
-            <a-tag :color="qualityStatusColor(record.qualityStatus)">
-              {{ qualityStatusLabel(record.qualityStatus) }}
+          <!-- 写作状态列 -->
+          <template v-else-if="column.key === 'writingStatus'">
+            <a-tag :color="writingStatusColor(record.writingStatus)">
+              {{ writingStatusLabel(record.writingStatus) }}
             </a-tag>
           </template>
         </template>
@@ -323,26 +332,26 @@ const pagination = computed(() => ({
               </a-descriptions-item>
             </a-descriptions>
 
-            <!-- 质量操作 -->
+            <!-- 写作状态操作 -->
             <div class="flex items-center gap-3 border-t border-editorial-border pt-3">
-              <span class="text-xs font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">质量判定：</span>
+              <span class="text-xs font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">写作状态：</span>
               <a-button
                 size="small"
                 type="primary"
-                :disabled="record.qualityStatus === 'accepted' || actionPendingId === record.id"
+                :disabled="record.writingStatus === 'done' || actionPendingId === record.id"
                 :loading="actionPendingId === record.id"
-                @click="handleQualityAction(record, 'accepted')"
+                @click="handleWritingAction(record, 'done')"
               >
-                采纳
+                标记完成
               </a-button>
               <a-button
                 size="small"
                 danger
-                :disabled="record.qualityStatus === 'rejected' || actionPendingId === record.id"
+                :disabled="record.writingStatus === 'skipped' || actionPendingId === record.id"
                 :loading="actionPendingId === record.id"
-                @click="handleQualityAction(record, 'rejected')"
+                @click="handleWritingAction(record, 'skipped')"
               >
-                拒绝
+                跳过不写
               </a-button>
             </div>
 

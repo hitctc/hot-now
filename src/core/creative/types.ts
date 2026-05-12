@@ -1,4 +1,4 @@
-export type CreativeSourceItemQualityStatus = "pending" | "accepted" | "rejected";
+export type CreativeSourceItemWritingStatus = "ready" | "writing" | "done" | "skipped";
 
 export type CreativeFinishedArticleStatus =
   | "generated"

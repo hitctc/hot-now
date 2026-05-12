@@ -78,7 +78,8 @@ import {
   findCreativeSourceItemByExternalId,
   listCreativeSourceItems,
   findCreativeSourceItemById,
-  updateCreativeSourceItemQualityStatus
+  updateCreativeSourceItemWritingStatus,
+  updateCreativeSourceItemLinkedArticle
 } from "../core/creative/creativeSourceItemRepository.js";
 import {
   insertCreativeFinishedArticle,
@@ -688,7 +689,7 @@ export function createServer(deps: ServerDeps = {}) {
       score: typeof body?.score === "number" ? body.score : undefined,
       publishedAt: typeof body?.publishedAt === "string" ? body.publishedAt : undefined,
       collectorTimestamp: typeof body?.collectorTimestamp === "string" ? body.collectorTimestamp : undefined,
-      qualityStatus: typeof body?.qualityStatus === "string" && ["accepted", "pending"].includes(body.qualityStatus) ? body.qualityStatus as "accepted" | "pending" : undefined
+      writingStatus: typeof body?.writingStatus === "string" && ["ready", "writing", "done", "skipped"].includes(body.writingStatus) ? body.writingStatus as "ready" | "writing" | "done" | "skipped" : undefined
     });
 
     return reply.code(result.created ? 201 : 200).send({
@@ -738,6 +739,10 @@ export function createServer(deps: ServerDeps = {}) {
       images: Array.isArray(body?.images) ? body.images as any[] : undefined,
       rawResponseText: typeof body?.rawResponseText === "string" ? body.rawResponseText : undefined
     });
+
+    // 推送成品文章后，自动将素材写作状态标为 done
+    updateCreativeSourceItemLinkedArticle(db, sourceItem.id, article.id);
+    updateCreativeSourceItemWritingStatus(db, sourceItem.id, "done");
 
     return reply.code(201).send({
       id: article.id,
@@ -818,7 +823,7 @@ export function createServer(deps: ServerDeps = {}) {
     const result = listCreativeSourceItems(db, {
       page: query.page ? parseInt(query.page, 10) : undefined,
       pageSize: query.pageSize ? parseInt(query.pageSize, 10) : undefined,
-      qualityStatus: query.qualityStatus as "pending" | "accepted" | "rejected" | undefined,
+      writingStatus: query.writingStatus as "ready" | "writing" | "done" | "skipped" | undefined,
       collectorAgent: query.collectorAgent,
       search: query.search
     });
@@ -883,7 +888,7 @@ export function createServer(deps: ServerDeps = {}) {
 
   // ─── Creative: Actions (session-authenticated) ───
 
-  app.post("/actions/creative/source-items/:id/quality-status", async (request, reply) => {
+  app.post("/actions/creative/source-items/:id/writing-status", async (request, reply) => {
     const hasToken = creativeApiToken && request.headers["x-creative-token"] === creativeApiToken;
     if (!hasToken) {
       if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
@@ -896,13 +901,13 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     const params = request.params as { id: string };
-    const body = request.body as { qualityStatus?: unknown } | undefined;
+    const body = request.body as { writingStatus?: unknown } | undefined;
     const id = parseInt(params.id, 10);
-    const status = typeof body?.qualityStatus === "string" ? body.qualityStatus : "";
-    if (!["accepted", "rejected"].includes(status)) {
+    const status = typeof body?.writingStatus === "string" ? body.writingStatus : "";
+    if (!["ready", "writing", "done", "skipped"].includes(status)) {
       return reply.code(400).send({ ok: false, reason: "invalid-status" });
     }
-    const updated = updateCreativeSourceItemQualityStatus(db, id, status as "accepted" | "rejected");
+    const updated = updateCreativeSourceItemWritingStatus(db, id, status as "ready" | "writing" | "done" | "skipped");
     if (!updated) {
       return reply.code(404).send({ ok: false, reason: "not-found" });
     }

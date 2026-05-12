@@ -20,7 +20,7 @@ export type CreativeSourceItem = {
   score: number | null;
   publishedAt: string | null;
   collectorTimestamp: string | null;
-  qualityStatus: string;
+  writingStatus: string;
   rawPayloadJson: string;
   linkedArticleId: number | null;
   createdAt: string;
@@ -63,14 +63,14 @@ export type FinishedArticleListResponse = {
 export function readCreativeSourceItems(params?: {
   page?: number;
   pageSize?: number;
-  qualityStatus?: string;
+  writingStatus?: string;
   collectorAgent?: string;
   search?: string;
 }): Promise<SourceItemListResponse> {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
   if (params?.pageSize) query.set("pageSize", String(params.pageSize));
-  if (params?.qualityStatus) query.set("qualityStatus", params.qualityStatus);
+  if (params?.writingStatus) query.set("writingStatus", params.writingStatus);
   if (params?.collectorAgent) query.set("collectorAgent", params.collectorAgent);
   if (params?.search) query.set("search", params.search);
   const qs = query.toString();
@@ -104,13 +104,13 @@ export function readCreativeFinishedArticle(id: number): Promise<CreativeFinishe
 
 // ─── Actions ───
 
-export function updateSourceItemQualityStatus(
+export function updateSourceItemWritingStatus(
   id: number,
-  qualityStatus: "accepted" | "rejected"
+  writingStatus: "ready" | "writing" | "done" | "skipped"
 ): Promise<{ ok: boolean }> {
-  return requestJson<{ ok: boolean }>(`/actions/creative/source-items/${id}/quality-status`, {
+  return requestJson<{ ok: boolean }>(`/actions/creative/source-items/${id}/writing-status`, {
     method: "POST",
-    body: JSON.stringify({ qualityStatus })
+    body: JSON.stringify({ writingStatus })
   });
 }
 

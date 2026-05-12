@@ -6,15 +6,15 @@
 
 **链路 A：采集外部素材并推送**
 1. 从外部数据源采集科技资讯
-2. 推送到 hot-now 素材库，直接标记为已审核
+2. 推送到 hot-now 素材库，直接标记为待写作
 
 **链路 C：从 AI 新讯 feed 拉取高分候选并推送为素材**
 1. 从 hot-now AI 新讯 feed 拉取评分 ≥ 80 的候选文章
 2. 自行抓取原文（`fullContent` 为 null 时）
-3. 推送到 hot-now 素材库，标记为已审核
+3. 推送到 hot-now 素材库，标记为待写作
 
 **链路 B：生成成品文章**
-1. 从 hot-now 拉取已审核但未生成文章的素材
+1. 从 hot-now 拉取已确认待写但未生成文章的素材
 2. 用 LLM 生成高质量成品文章
 3. 推送回 hot-now 系统
 
@@ -62,11 +62,11 @@ x-creative-token: <token>
   "score": "number",               // 评分 0-100
   "publishedAt": "string",         // 发布时间 ISO 8601
   "collectorTimestamp": "string",  // 采集时间 ISO 8601
-  "qualityStatus": "accepted"      // 直接标记为已审核，跳过人工审核
+  "writingStatus": "ready"      // 直接标记为待写作，跳过等待直接进入待写作
 }
 ```
 
-**重要**：推送时传 `"qualityStatus": "accepted"` 可直接标记为已审核，Writer Agent 就能立即拉取并生成文章。不传则默认 `pending`，需要人工审核。
+**重要**：推送时传 `"writingStatus": "ready"` 可直接标记为待写作，Writer Agent 就能立即拉取并生成文章。不传则默认 `ready`。
 
 #### 幂等与空字段补充
 
@@ -162,7 +162,7 @@ x-creative-token: <token>
   "fullContent": "<fullContent 或自行抓取的原文>",
   "score": "<contentScore>",
   "publishedAt": "<publishedAt>",
-  "qualityStatus": "accepted"
+  "writingStatus": "ready"
 }
 ```
 
@@ -173,12 +173,12 @@ x-creative-token: <token>
 ### 第一步：拉取待处理素材
 
 ```
-GET https://now.achuan.cc/api/creative/source-items?qualityStatus=accepted&pageSize=50
+GET https://now.achuan.cc/api/creative/source-items?writingStatus=ready&pageSize=50
 x-creative-token: <token>
 ```
 
 查询参数（均可选）：
-- `qualityStatus=accepted` — 只拉取已审核通过的素材
+- `writingStatus=ready` — 只拉取待写作的素材
 - `collectorAgent=xxx` — 按采集来源过滤
 - `search=关键词` — 搜索标题和摘要
 - `page=1` — 页码
@@ -206,7 +206,7 @@ x-creative-token: <token>
       "contentType": "article",
       "score": 88,
       "publishedAt": "2026-05-10T08:30:00Z",
-      "qualityStatus": "accepted",
+      "writingStatus": "ready",
       "linkedArticleId": null,
       "createdAt": "2026-05-10T09:15:00Z"
     }
@@ -305,17 +305,17 @@ x-creative-token: <token>
 
 ## 辅助接口：更新素材质量状态
 
-如果需要手动将 pending 素材标记为 accepted 或 rejected：
+如果需要手动更新素材的写作状态：
 
 ```
-POST https://now.achuan.cc/actions/creative/source-items/:id/quality-status
+POST https://now.achuan.cc/actions/creative/source-items/:id/writing-status
 Content-Type: application/json
 x-creative-token: <token>
 
-{ "qualityStatus": "accepted" }
+{ "writingStatus": "ready" }
 ```
 
-`qualityStatus` 允许值：`"accepted"` 或 `"rejected"`。
+`writingStatus` 允许值：`"ready"` 或 `"skipped"`。
 
 ---
 
@@ -328,7 +328,7 @@ headers = { "x-creative-token": token }
 loop:
     # 1. 拉取素材
     response = GET https://now.achuan.cc/api/creative/source-items
-                 ?qualityStatus=accepted&pageSize=50
+                 ?writingStatus=ready&pageSize=50
                  headers=headers
 
     # 2. 过滤出未处理的素材
@@ -368,7 +368,7 @@ loop:
 ## 注意事项
 
 1. **fullContent 说明**：链路 A 推送时尽量提供全文；链路 C 从 feed 拉取时，RSS 来源的 `fullContent` 大多为 null，需用 `canonicalUrl` 自行抓取原文后再推入素材库
-2. **推送时传 qualityStatus: "accepted"**：跳过人工审核，Writer Agent 可立即拉取处理
+2. **推送时传 writingStatus: "ready"**：跳过等待直接进入待写作，Writer Agent 可立即拉取处理
 3. **sourceExternalId 和 collectorAgent 必须原样传回**：系统通过这两个字段关联素材和成品文章
 4. **幂等安全**：重复推送素材不会覆盖已有数据，但会补充空字段；重复推送成品文章会返回 409
 5. **分页处理**：素材总量超过 pageSize 时需要翻页（page=1, page=2, ...）

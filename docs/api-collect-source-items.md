@@ -85,7 +85,7 @@ x-creative-token: <token>
   "score": "number",               // 评分 0-100
   "publishedAt": "string",         // 发布时间 ISO 8601
   "collectorTimestamp": "string",  // 采集时间 ISO 8601
-  "qualityStatus": "accepted"      // 直接标记为已审核（"accepted" 或 "pending"）
+  "writingStatus": "ready"      // 直接标记为待写作，跳过等待直接进入待写作
 }
 ```
 
@@ -100,7 +100,7 @@ x-creative-token: <token>
 }
 ```
 
-#### 推荐请求（带全文 + 直接审核通过）
+#### 推荐请求（带全文 + 直接标记待写作）
 
 ```json
 {
@@ -116,7 +116,7 @@ x-creative-token: <token>
   "score": 92,
   "contentType": "article",
   "publishedAt": "2026-05-10T08:30:00Z",
-  "qualityStatus": "accepted"
+  "writingStatus": "ready"
 }
 ```
 
@@ -169,23 +169,23 @@ x-creative-token: <token>
 ### 更新素材质量状态
 
 ```
-POST https://now.achuan.cc/actions/creative/source-items/:id/quality-status
+POST https://now.achuan.cc/actions/creative/source-items/:id/writing-status
 Content-Type: application/json
 x-creative-token: <token>
 
-{ "qualityStatus": "accepted" }
+{ "writingStatus": "ready" }
 ```
 
-允许值：`"accepted"` 或 `"rejected"`。
+允许值：`"ready"` 或 `"skipped"`。
 
 ### 查询素材列表
 
 ```
-GET https://now.achuan.cc/api/creative/source-items?qualityStatus=accepted&pageSize=50
+GET https://now.achuan.cc/api/creative/source-items?writingStatus=ready&pageSize=50
 x-creative-token: <token>
 ```
 
-查询参数：`qualityStatus`、`collectorAgent`、`search`、`page`、`pageSize`。
+查询参数：`writingStatus`、`collectorAgent`、`search`、`page`、`pageSize`。
 
 ---
 
@@ -208,11 +208,13 @@ x-creative-token: <token>
 - 素材库页面会直接展示该字段内容，无原文时标注"采集未提供原文"
 - 后续重新推送可补充
 
-### `qualityStatus` 字段
+### `writingStatus` 字段
 
-- `"accepted"` — 直接标记为已审核，Writer Agent 可立即拉取生成文章
-- `"pending"` — 等待人工审核（默认值）
-- 推荐自动化场景传 `"accepted"`
+- `"ready"` — 待写作，Writer Agent 可立即拉取生成文章（默认值）
+- `"writing"` — 写作中
+- `"done"` — 已完成
+- `"skipped"` — 跳过不写
+- 推荐自动化场景传 `"ready"`
 
 ---
 
@@ -232,7 +234,7 @@ curl -X POST https://now.achuan.cc/api/creative/source-items \
     "title": "测试素材",
     "url": "https://example.com/test-001",
     "fullContent": "这是测试素材的全文内容。",
-    "qualityStatus": "accepted"
+    "writingStatus": "ready"
   }'
 ```
 

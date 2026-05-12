@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 18;
+const schemaVersion = 19;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -19,6 +19,7 @@ const aiTimelineEventImportanceMigrationName = "015_ai_timeline_event_importance
 const aiTimelineReliabilityWorkspaceMigrationName = "016_ai_timeline_reliability_workspace";
 const aiTimelineEventNotificationsMigrationName = "017_ai_timeline_event_notifications";
 const creativeContentWorkflowMigrationName = "018_creative_content_workflow";
+const writingStatusMigrationName = "019_writing_status";
 
 const migrationStatements = [
   `
@@ -947,7 +948,7 @@ export function runMigrations(db: SqliteDatabase): void {
         score REAL,
         published_at TEXT,
         collector_timestamp TEXT,
-        quality_status TEXT NOT NULL DEFAULT 'pending',
+        writing_status TEXT NOT NULL DEFAULT 'ready',
         raw_payload_json TEXT NOT NULL,
         linked_article_id INTEGER,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -958,8 +959,8 @@ export function runMigrations(db: SqliteDatabase): void {
     `);
 
     db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_creative_source_items_quality_status
-      ON creative_source_items(quality_status)
+      CREATE INDEX IF NOT EXISTS idx_creative_source_items_writing_status
+      ON creative_source_items(writing_status)
     `);
 
     db.exec(`
@@ -1014,6 +1015,24 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(18, creativeContentWorkflowMigrationName);
+
+    // 019: quality_status → writing_status，状态值迁移
+    if (hasColumn(db, "creative_source_items", "quality_status")) {
+      db.exec(`UPDATE creative_source_items SET quality_status = 'done' WHERE quality_status = 'accepted'`);
+      db.exec(`UPDATE creative_source_items SET quality_status = 'ready' WHERE quality_status = 'pending'`);
+      db.exec(`UPDATE creative_source_items SET quality_status = 'skipped' WHERE quality_status = 'rejected'`);
+      db.exec(`ALTER TABLE creative_source_items RENAME COLUMN quality_status TO writing_status`);
+      db.exec(`DROP INDEX IF EXISTS idx_creative_source_items_quality_status`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_creative_source_items_writing_status ON creative_source_items(writing_status)`);
+    }
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(19, writingStatusMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

@@ -86,7 +86,6 @@ import {
   findCreativeFinishedArticleBySourceItemId,
   listCreativeFinishedArticles,
   findCreativeFinishedArticleById,
-  updateCreativeFinishedArticleStatus,
   editCreativeFinishedArticle
 } from "../core/creative/creativeFinishedArticleRepository.js";
 import { readNextCollectionRunAt } from "../core/scheduler/readNextCollectionRunAt.js";
@@ -863,7 +862,6 @@ export function createServer(deps: ServerDeps = {}) {
     const result = listCreativeFinishedArticles(db, {
       page: query.page ? parseInt(query.page, 10) : undefined,
       pageSize: query.pageSize ? parseInt(query.pageSize, 10) : undefined,
-      status: query.status as "generated" | "edited" | "approved" | "published" | "rejected" | "completed" | undefined,
       search: query.search
     });
     return reply.send(result);
@@ -910,32 +908,6 @@ export function createServer(deps: ServerDeps = {}) {
     const updated = updateCreativeSourceItemWritingStatus(db, id, status as "ready" | "writing" | "done" | "skipped");
     if (!updated) {
       return reply.code(404).send({ ok: false, reason: "not-found" });
-    }
-    return reply.send({ ok: true });
-  });
-
-  app.post("/actions/creative/finished-articles/:id/status", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!db) {
-      return reply.code(503).send({ ok: false, reason: "database-not-available" });
-    }
-
-    const params = request.params as { id: string };
-    const body = request.body as { status?: unknown } | undefined;
-    const id = parseInt(params.id, 10);
-    const newStatus = typeof body?.status === "string" ? body.status : "";
-    if (!newStatus) {
-      return reply.code(400).send({ ok: false, reason: "missing-status" });
-    }
-    const result = updateCreativeFinishedArticleStatus(db, id, newStatus as any);
-    if (!result.ok && result.reason === "article not found") {
-      return reply.code(404).send({ ok: false, reason: "not-found" });
-    }
-    if (!result.ok) {
-      return reply.code(400).send({ ok: false, reason: "invalid-transition", detail: result.reason });
     }
     return reply.send({ ok: true });
   });

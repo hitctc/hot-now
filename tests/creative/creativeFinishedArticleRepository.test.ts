@@ -4,7 +4,6 @@ import {
   findCreativeFinishedArticleById,
   findCreativeFinishedArticleBySourceItemId,
   listCreativeFinishedArticles,
-  updateCreativeFinishedArticleStatus,
   editCreativeFinishedArticle
 } from "../../src/core/creative/creativeFinishedArticleRepository.js";
 import { insertCreativeSourceItem, findCreativeSourceItemById } from "../../src/core/creative/creativeSourceItemRepository.js";
@@ -59,7 +58,6 @@ describe("insertCreativeFinishedArticle", () => {
     expect(article.quotes).toEqual(["Quote 1"]);
     expect(article.summary100).toBe("Short summary");
     expect(article.imagesJson).toEqual([{ url: "https://img.example.com/1.jpg", alt: "test" }]);
-    expect(article.status).toBe("generated");
     expect(article.rawResponseText).toBe("raw LLM output");
   });
 
@@ -77,7 +75,7 @@ describe("insertCreativeFinishedArticle", () => {
     expect(updatedSource!.linkedArticleId).toBe(article.id);
   });
 
-  it("defaults optional fields to null and status to generated", async () => {
+  it("defaults optional fields to null", async () => {
     const handle = await makeHandle();
     handles.push(handle);
 
@@ -94,7 +92,6 @@ describe("insertCreativeFinishedArticle", () => {
     expect(article.quotes).toBeNull();
     expect(article.summary100).toBeNull();
     expect(article.imagesJson).toBeNull();
-    expect(article.status).toBe("generated");
     expect(article.rawResponseText).toBeNull();
   });
 });
@@ -149,129 +146,6 @@ describe("findCreativeFinishedArticleBySourceItemId", () => {
   });
 });
 
-describe("updateCreativeFinishedArticleStatus", () => {
-  it("follows valid transition path: generated -> edited -> approved -> published -> completed", async () => {
-    const handle = await makeHandle();
-    handles.push(handle);
-
-    const source = createSourceItem(handle.db);
-    const article = insertCreativeFinishedArticle(handle.db, {
-      sourceItemId: source.id,
-      contentMarkdown: "status flow"
-    });
-    expect(article.status).toBe("generated");
-
-    const r1 = updateCreativeFinishedArticleStatus(handle.db, article.id, "edited");
-    expect(r1.ok).toBe(true);
-    expect(findCreativeFinishedArticleById(handle.db, article.id)!.status).toBe("edited");
-
-    const r2 = updateCreativeFinishedArticleStatus(handle.db, article.id, "approved");
-    expect(r2.ok).toBe(true);
-    expect(findCreativeFinishedArticleById(handle.db, article.id)!.status).toBe("approved");
-
-    const r3 = updateCreativeFinishedArticleStatus(handle.db, article.id, "published");
-    expect(r3.ok).toBe(true);
-    expect(findCreativeFinishedArticleById(handle.db, article.id)!.status).toBe("published");
-
-    const r4 = updateCreativeFinishedArticleStatus(handle.db, article.id, "completed");
-    expect(r4.ok).toBe(true);
-    expect(findCreativeFinishedArticleById(handle.db, article.id)!.status).toBe("completed");
-  });
-
-  it("rejects invalid transition generated -> approved", async () => {
-    const handle = await makeHandle();
-    handles.push(handle);
-
-    const source = createSourceItem(handle.db);
-    const article = insertCreativeFinishedArticle(handle.db, {
-      sourceItemId: source.id,
-      contentMarkdown: "invalid"
-    });
-
-    const result = updateCreativeFinishedArticleStatus(handle.db, article.id, "approved");
-    expect(result.ok).toBe(false);
-    expect(result.reason).toContain("not allowed");
-    // Status should remain unchanged
-    expect(findCreativeFinishedArticleById(handle.db, article.id)!.status).toBe("generated");
-  });
-
-  it("allows rejected -> edited re-edit", async () => {
-    const handle = await makeHandle();
-    handles.push(handle);
-
-    const source = createSourceItem(handle.db);
-    const article = insertCreativeFinishedArticle(handle.db, {
-      sourceItemId: source.id,
-      contentMarkdown: "re-edit"
-    });
-
-    // generated -> rejected
-    const r1 = updateCreativeFinishedArticleStatus(handle.db, article.id, "rejected");
-    expect(r1.ok).toBe(true);
-
-    // rejected -> edited
-    const r2 = updateCreativeFinishedArticleStatus(handle.db, article.id, "edited");
-    expect(r2.ok).toBe(true);
-    expect(findCreativeFinishedArticleById(handle.db, article.id)!.status).toBe("edited");
-  });
-
-  it("allows rejection from generated, edited, approved", async () => {
-    const handle = await makeHandle();
-    handles.push(handle);
-
-    const source1 = createSourceItem(handle.db);
-    const a1 = insertCreativeFinishedArticle(handle.db, {
-      sourceItemId: source1.id,
-      contentMarkdown: "reject from generated"
-    });
-    expect(updateCreativeFinishedArticleStatus(handle.db, a1.id, "rejected").ok).toBe(true);
-
-    const source2 = createSourceItem(handle.db);
-    const a2 = insertCreativeFinishedArticle(handle.db, {
-      sourceItemId: source2.id,
-      contentMarkdown: "reject from edited"
-    });
-    updateCreativeFinishedArticleStatus(handle.db, a2.id, "edited");
-    expect(updateCreativeFinishedArticleStatus(handle.db, a2.id, "rejected").ok).toBe(true);
-
-    const source3 = createSourceItem(handle.db);
-    const a3 = insertCreativeFinishedArticle(handle.db, {
-      sourceItemId: source3.id,
-      contentMarkdown: "reject from approved"
-    });
-    updateCreativeFinishedArticleStatus(handle.db, a3.id, "edited");
-    updateCreativeFinishedArticleStatus(handle.db, a3.id, "approved");
-    expect(updateCreativeFinishedArticleStatus(handle.db, a3.id, "rejected").ok).toBe(true);
-  });
-
-  it("blocks transition from completed", async () => {
-    const handle = await makeHandle();
-    handles.push(handle);
-
-    const source = createSourceItem(handle.db);
-    const article = insertCreativeFinishedArticle(handle.db, {
-      sourceItemId: source.id,
-      contentMarkdown: "completed flow"
-    });
-    updateCreativeFinishedArticleStatus(handle.db, article.id, "edited");
-    updateCreativeFinishedArticleStatus(handle.db, article.id, "approved");
-    updateCreativeFinishedArticleStatus(handle.db, article.id, "published");
-    updateCreativeFinishedArticleStatus(handle.db, article.id, "completed");
-
-    const result = updateCreativeFinishedArticleStatus(handle.db, article.id, "edited");
-    expect(result.ok).toBe(false);
-  });
-
-  it("returns error for non-existent article", async () => {
-    const handle = await makeHandle();
-    handles.push(handle);
-
-    const result = updateCreativeFinishedArticleStatus(handle.db, 99999, "edited");
-    expect(result.ok).toBe(false);
-    expect(result.reason).toContain("not found");
-  });
-});
-
 describe("editCreativeFinishedArticle", () => {
   it("updates provided fields and leaves others unchanged", async () => {
     const handle = await makeHandle();
@@ -297,7 +171,6 @@ describe("editCreativeFinishedArticle", () => {
     expect(updated.contentMarkdown).toBe("updated content");
     expect(updated.titles).toEqual(["new title 1", "new title 2"]);
     expect(updated.hooks).toEqual(["a hook"]);
-    // Untouched field retains its value
     expect(updated.thesis).toBe("original thesis");
   });
 
@@ -324,14 +197,14 @@ describe("editCreativeFinishedArticle", () => {
     expect(result.reason).toContain("not found");
   });
 
-  it("can clear optional fields by setting to null-like values", async () => {
+  it("can update optional fields", async () => {
     const handle = await makeHandle();
     handles.push(handle);
 
     const source = createSourceItem(handle.db);
     const article = insertCreativeFinishedArticle(handle.db, {
       sourceItemId: source.id,
-      contentMarkdown: "clear test",
+      contentMarkdown: "update test",
       thesis: "will be replaced",
       summary100: "will be replaced"
     });
@@ -366,7 +239,6 @@ describe("listCreativeFinishedArticles", () => {
     expect(result.items).toHaveLength(2);
     expect(result.page).toBe(1);
     expect(result.pageSize).toBe(2);
-    // All items are from the correct table
     expect(result.items.every((item) => typeof item.id === "number")).toBe(true);
   });
 
@@ -387,23 +259,6 @@ describe("listCreativeFinishedArticles", () => {
     expect(result.total).toBe(3);
     expect(result.items).toHaveLength(1);
     expect(result.page).toBe(2);
-  });
-
-  it("filters by status", async () => {
-    const handle = await makeHandle();
-    handles.push(handle);
-
-    const s1 = createSourceItem(handle.db);
-    const s2 = createSourceItem(handle.db);
-
-    const a1 = insertCreativeFinishedArticle(handle.db, { sourceItemId: s1.id, contentMarkdown: "keep generated" });
-    insertCreativeFinishedArticle(handle.db, { sourceItemId: s2.id, contentMarkdown: "will be edited" });
-
-    updateCreativeFinishedArticleStatus(handle.db, a1.id, "edited");
-
-    const result = listCreativeFinishedArticles(handle.db, { status: "edited" });
-    expect(result.total).toBe(1);
-    expect(result.items[0].id).toBe(a1.id);
   });
 
   it("filters by search matching content_markdown or thesis", async () => {

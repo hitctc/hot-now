@@ -1,17 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { message } from "ant-design-vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 
 import {
   editFinishedArticle,
   readCreativeFinishedArticles,
-  updateFinishedArticleStatus,
   type CreativeFinishedArticle
 } from "../../services/creativeApi.js";
 
 const route = useRoute();
-const router = useRouter();
 
 // ─── JSON 解析辅助 ───
 
@@ -35,11 +33,7 @@ const currentPage = ref(1);
 const pageSize = ref(50);
 
 // 筛选条件
-const statusFilter = ref<string | undefined>(undefined);
 const searchText = ref("");
-
-// 操作锁
-const actionPendingId = ref<number | null>(null);
 
 // 文章详情全屏弹窗
 const detailArticle = ref<CreativeFinishedArticle | null>(null);
@@ -54,16 +48,6 @@ const editForm = ref<{ id: number; contentMarkdown: string; thesis: string; summ
   summary100: ""
 });
 
-const statusOptions = [
-  { label: "全部", value: "" },
-  { label: "已生成", value: "generated" },
-  { label: "已编辑", value: "edited" },
-  { label: "已通过", value: "approved" },
-  { label: "已发布", value: "published" },
-  { label: "已拒绝", value: "rejected" },
-  { label: "已完成", value: "completed" }
-];
-
 // ─── 数据加载 ───
 
 async function loadItems(): Promise<void> {
@@ -72,7 +56,6 @@ async function loadItems(): Promise<void> {
     const res = await readCreativeFinishedArticles({
       page: currentPage.value,
       pageSize: pageSize.value,
-      status: statusFilter.value || undefined,
       search: searchText.value || undefined
     });
     items.value = res.items;
@@ -84,7 +67,7 @@ async function loadItems(): Promise<void> {
       const id = Number(expandId);
       const found = res.items.find(item => item.id === id);
       if (found) detailArticle.value = found;
-      router.replace({ query: {} });
+      history.replaceState(null, "", location.pathname);
     }
   } finally {
     isLoading.value = false;
@@ -92,11 +75,6 @@ async function loadItems(): Promise<void> {
 }
 
 onMounted(() => {
-  void loadItems();
-});
-
-watch(statusFilter, () => {
-  currentPage.value = 1;
   void loadItems();
 });
 
@@ -124,44 +102,6 @@ function closeDetail(): void {
 
 function goToSourceItem(sourceItemId: number): void {
   window.open(`/creative/source-items?expand=${sourceItemId}`, "_blank");
-}
-
-// ─── 状态操作 ───
-
-async function handleStatusAction(article: CreativeFinishedArticle, nextStatus: string): Promise<void> {
-  actionPendingId.value = article.id;
-  try {
-    await updateFinishedArticleStatus(article.id, nextStatus);
-    article.status = nextStatus;
-  } finally {
-    actionPendingId.value = null;
-  }
-}
-
-function getStatusActions(status: string): { label: string; nextStatus: string; danger?: boolean }[] {
-  switch (status) {
-    case "generated":
-      return [
-        { label: "编辑", nextStatus: "edited" },
-        { label: "拒绝", nextStatus: "rejected", danger: true }
-      ];
-    case "edited":
-      return [
-        { label: "通过", nextStatus: "approved" },
-        { label: "拒绝", nextStatus: "rejected", danger: true }
-      ];
-    case "approved":
-      return [
-        { label: "发布", nextStatus: "published" },
-        { label: "拒绝", nextStatus: "rejected", danger: true }
-      ];
-    case "published":
-      return [{ label: "完成", nextStatus: "completed" }];
-    case "rejected":
-      return [{ label: "重新编辑", nextStatus: "edited" }];
-    default:
-      return [];
-  }
 }
 
 // ─── 编辑弹窗 ───
@@ -206,44 +146,6 @@ function formatCreatedAt(value: string): string {
   });
 }
 
-function statusColor(status: string): string {
-  switch (status) {
-    case "generated":
-      return "blue";
-    case "edited":
-      return "cyan";
-    case "approved":
-      return "green";
-    case "published":
-      return "orange";
-    case "rejected":
-      return "red";
-    case "completed":
-      return "purple";
-    default:
-      return "default";
-  }
-}
-
-function statusLabel(status: string): string {
-  switch (status) {
-    case "generated":
-      return "已生成";
-    case "edited":
-      return "已编辑";
-    case "approved":
-      return "已通过";
-    case "published":
-      return "已发布";
-    case "rejected":
-      return "已拒绝";
-    case "completed":
-      return "已完成";
-    default:
-      return status;
-  }
-}
-
 function getFirstTitle(titles: string | null): string {
   const parsed = parseJsonArray(titles);
   return parsed.length > 0 ? parsed[0] : "无标题";
@@ -278,7 +180,6 @@ const columns = [
   { title: "标题", key: "title", ellipsis: true },
   { title: "来源素材", key: "sourceItem", width: 110 },
   { title: "模式", key: "mode", width: 72 },
-  { title: "状态", key: "status", width: 90 },
   { title: "创建时间", key: "createdAt", width: 140 }
 ];
 
@@ -295,12 +196,6 @@ const pagination = computed(() => ({
   <div class="flex w-full flex-col gap-5" data-page="creative-finished-articles">
     <!-- 筛选栏 -->
     <div class="flex flex-wrap items-center gap-3">
-      <a-select
-        v-model:value="statusFilter"
-        :options="statusOptions"
-        placeholder="文章状态"
-        class="!w-[140px]"
-      />
       <a-input-search
         placeholder="搜索标题"
         class="!w-[240px]"
@@ -345,13 +240,6 @@ const pagination = computed(() => ({
             <span class="text-xs text-editorial-text-body">{{ record.mode || "-" }}</span>
           </template>
 
-          <!-- 状态列 -->
-          <template v-else-if="column.key === 'status'">
-            <a-tag :color="statusColor(record.status)">
-              {{ statusLabel(record.status) }}
-            </a-tag>
-          </template>
-
           <!-- 创建时间列 -->
           <template v-else-if="column.key === 'createdAt'">
             <span class="text-xs text-editorial-text-muted">{{ formatCreatedAt(record.createdAt) }}</span>
@@ -377,7 +265,6 @@ const pagination = computed(() => ({
         <div class="mx-auto flex max-w-[860px] flex-col gap-6 px-8 py-6">
           <!-- 顶部元信息 -->
           <div class="flex items-center gap-3">
-            <a-tag :color="statusColor(detailArticle.status)">{{ statusLabel(detailArticle.status) }}</a-tag>
             <span class="text-xs text-editorial-text-muted">模式 {{ detailArticle.mode || "-" }}</span>
             <span class="text-xs text-editorial-text-muted">{{ formatCreatedAt(detailArticle.createdAt) }}</span>
             <a
@@ -475,22 +362,7 @@ const pagination = computed(() => ({
           </section>
 
           <!-- 操作区 -->
-          <section class="flex flex-wrap items-center gap-3 border-t border-editorial-border pt-4">
-            <template v-if="getStatusActions(detailArticle.status).length > 0">
-              <span class="text-xs font-semibold text-editorial-text-muted">状态：</span>
-              <a-button
-                v-for="action in getStatusActions(detailArticle.status)"
-                :key="action.nextStatus"
-                size="small"
-                :type="action.danger ? 'default' : 'primary'"
-                :danger="action.danger"
-                :disabled="actionPendingId === detailArticle.id"
-                :loading="actionPendingId === detailArticle.id"
-                @click="handleStatusAction(detailArticle, action.nextStatus)"
-              >
-                {{ action.label }}
-              </a-button>
-            </template>
+          <section class="flex items-center border-t border-editorial-border pt-4">
             <a-button size="small" class="ml-auto" @click="openEditModal(detailArticle)">编辑内容</a-button>
           </section>
         </div>

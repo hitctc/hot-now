@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
 import { updateCreativeSourceItemLinkedArticle } from "./creativeSourceItemRepository.js";
-import type { CreativeFinishedArticleMode, CreativeFinishedArticleStatus } from "./types.js";
+import type { CreativeFinishedArticleMode } from "./types.js";
 
 // ── Column selection & row mapping ──────────────────────────────────────────
 
@@ -50,7 +50,7 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     quotes: row.quotes ? JSON.parse(row.quotes) : null,
     summary100: row.summary_100,
     imagesJson: row.images_json ? JSON.parse(row.images_json) : null,
-    status: row.status as CreativeFinishedArticleStatus,
+    status: row.status,
     rawResponseText: row.raw_response_text,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -70,7 +70,7 @@ export type CreativeFinishedArticleRecord = {
   quotes: string[] | null;
   summary100: string | null;
   imagesJson: unknown[] | null;
-  status: CreativeFinishedArticleStatus;
+  status: string;
   rawResponseText: string | null;
   createdAt: string;
   updatedAt: string;
@@ -104,7 +104,7 @@ export type EditCreativeFinishedArticleInput = {
 export type ListCreativeFinishedArticlesFilters = {
   page?: number;
   pageSize?: number;
-  status?: CreativeFinishedArticleStatus;
+  status?: string;
   search?: string;
 };
 
@@ -113,17 +113,6 @@ export type ListCreativeFinishedArticlesResult = {
   total: number;
   page: number;
   pageSize: number;
-};
-
-// ── Allowed status transitions ──────────────────────────────────────────────
-
-const VALID_TRANSITIONS: Record<CreativeFinishedArticleStatus, CreativeFinishedArticleStatus[]> = {
-  generated: ["edited", "rejected"],
-  edited: ["approved", "rejected"],
-  approved: ["published", "rejected"],
-  published: ["completed"],
-  rejected: ["edited"],
-  completed: []
 };
 
 // ── Insert ──────────────────────────────────────────────────────────────────
@@ -244,34 +233,6 @@ export function listCreativeFinishedArticles(
     page,
     pageSize
   };
-}
-
-// ── Update status with transition validation ────────────────────────────────
-
-export function updateCreativeFinishedArticleStatus(
-  db: SqliteDatabase,
-  id: number,
-  newStatus: CreativeFinishedArticleStatus
-): { ok: boolean; reason?: string } {
-  const current = findCreativeFinishedArticleById(db, id);
-  if (!current) {
-    return { ok: false, reason: "article not found" };
-  }
-
-  const allowed = VALID_TRANSITIONS[current.status];
-  if (!allowed.includes(newStatus)) {
-    return {
-      ok: false,
-      reason: `transition from '${current.status}' to '${newStatus}' is not allowed`
-    };
-  }
-
-  db.prepare("UPDATE creative_finished_articles SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(
-    newStatus,
-    id
-  );
-
-  return { ok: true };
 }
 
 // ── Edit content fields ────────────────────────────────────────────────────

@@ -86,13 +86,11 @@ export function readCreativeSourceItem(id: number): Promise<CreativeSourceItem> 
 export function readCreativeFinishedArticles(params?: {
   page?: number;
   pageSize?: number;
-  status?: string;
   search?: string;
 }): Promise<FinishedArticleListResponse> {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
   if (params?.pageSize) query.set("pageSize", String(params.pageSize));
-  if (params?.status) query.set("status", params.status);
   if (params?.search) query.set("search", params.search);
   const qs = query.toString();
   return requestJson<FinishedArticleListResponse>(`/api/creative/finished-articles${qs ? `?${qs}` : ""}`);
@@ -111,16 +109,6 @@ export function updateSourceItemWritingStatus(
   return requestJson<{ ok: boolean }>(`/actions/creative/source-items/${id}/writing-status`, {
     method: "POST",
     body: JSON.stringify({ writingStatus })
-  });
-}
-
-export function updateFinishedArticleStatus(
-  id: number,
-  status: string
-): Promise<{ ok: boolean }> {
-  return requestJson<{ ok: boolean }>(`/actions/creative/finished-articles/${id}/status`, {
-    method: "POST",
-    body: JSON.stringify({ status })
   });
 }
 

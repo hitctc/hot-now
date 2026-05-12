@@ -23,6 +23,8 @@ const SELECT_COLUMNS = `
   collector_timestamp,
   writing_status,
   raw_payload_json,
+  trend_score,
+  trend_breakdown,
   linked_article_id,
   created_at,
   updated_at
@@ -48,6 +50,8 @@ type SourceItemRow = {
   collector_timestamp: string | null;
   writing_status: string;
   raw_payload_json: string;
+  trend_score: number | null;
+  trend_breakdown: string | null;
   linked_article_id: number | null;
   created_at: string;
   updated_at: string;
@@ -74,6 +78,8 @@ function mapRow(row: SourceItemRow): CreativeSourceItemRecord {
     collectorTimestamp: row.collector_timestamp,
     writingStatus: row.writing_status as CreativeSourceItemWritingStatus,
     rawPayloadJson: row.raw_payload_json,
+    trendScore: row.trend_score,
+    trendBreakdown: row.trend_breakdown ? JSON.parse(row.trend_breakdown) : null,
     linkedArticleId: row.linked_article_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -81,6 +87,15 @@ function mapRow(row: SourceItemRow): CreativeSourceItemRecord {
 }
 
 // ── Public types ────────────────────────────────────────────────────────────
+
+export type TrendBreakdown = {
+  topicPower: number;
+  emotionResonance: number;
+  infoGap: number;
+  socialCurrency: number;
+  timingWindow: number;
+  audienceBreadth: number;
+};
 
 export type CreativeSourceItemRecord = {
   id: number;
@@ -102,6 +117,8 @@ export type CreativeSourceItemRecord = {
   collectorTimestamp: string | null;
   writingStatus: CreativeSourceItemWritingStatus;
   rawPayloadJson: string;
+  trendScore: number | null;
+  trendBreakdown: TrendBreakdown | null;
   linkedArticleId: number | null;
   createdAt: string;
   updatedAt: string;
@@ -125,6 +142,8 @@ export type InsertCreativeSourceItemInput = {
   publishedAt?: string | null;
   collectorTimestamp?: string | null;
   writingStatus?: CreativeSourceItemWritingStatus;
+  trendScore?: number | null;
+  trendBreakdown?: TrendBreakdown | null;
 };
 
 export type ListCreativeSourceItemsFilters = {
@@ -133,6 +152,7 @@ export type ListCreativeSourceItemsFilters = {
   writingStatus?: CreativeSourceItemWritingStatus;
   collectorAgent?: string;
   search?: string;
+  trendScoreMin?: number;
 };
 
 export type ListCreativeSourceItemsResult = {
@@ -168,6 +188,8 @@ export function insertCreativeSourceItem(
       { input: input.score, col: "score" },
       { input: input.publishedAt, col: "published_at" },
       { input: input.collectorTimestamp, col: "collector_timestamp" },
+      { input: input.trendScore, col: "trend_score" },
+      { input: input.trendBreakdown ? JSON.stringify(input.trendBreakdown) : undefined, col: "trend_breakdown" },
     ];
     for (const f of fields) {
       if (f.input != null && (existing[f.col] === null || existing[f.col] === undefined)) {
@@ -206,9 +228,11 @@ export function insertCreativeSourceItem(
         published_at,
         collector_timestamp,
         writing_status,
-        raw_payload_json
+        raw_payload_json,
+        trend_score,
+        trend_breakdown
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
   ).run(
     input.externalId,
@@ -228,7 +252,9 @@ export function insertCreativeSourceItem(
     input.publishedAt ?? null,
     input.collectorTimestamp ?? null,
     input.writingStatus ?? "ready",
-    rawPayloadJson
+    rawPayloadJson,
+    input.trendScore ?? null,
+    input.trendBreakdown ? JSON.stringify(input.trendBreakdown) : null
   );
 
   const row = db
@@ -294,6 +320,11 @@ export function listCreativeSourceItems(
     params.push(term, term);
   }
 
+  if (filters.trendScoreMin != null) {
+    whereClauses.push("trend_score >= ?");
+    params.push(filters.trendScoreMin);
+  }
+
   const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
   const countRow = db
@@ -326,6 +357,22 @@ export function updateCreativeSourceItemWritingStatus(
     .prepare("UPDATE creative_source_items SET writing_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
     .run(status, id);
 
+  return result.changes > 0;
+}
+
+// ── Update trend score ──────────────────────────────────────────────────────
+
+export function updateCreativeSourceItemTrendScore(
+  db: SqliteDatabase,
+  id: number,
+  trendScore: number,
+  trendBreakdown: TrendBreakdown
+): boolean {
+  const result = db
+    .prepare(
+      "UPDATE creative_source_items SET trend_score = ?, trend_breakdown = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+    )
+    .run(trendScore, JSON.stringify(trendBreakdown), id);
   return result.changes > 0;
 }
 

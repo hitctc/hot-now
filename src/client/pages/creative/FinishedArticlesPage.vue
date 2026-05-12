@@ -186,6 +186,7 @@ async function copyMarkdownAsPlainText(md: string): Promise<void> {
 const columns = [
   { title: "标题", key: "title", ellipsis: true },
   { title: "来源素材", key: "sourceItem", width: 110 },
+  { title: "传播趋势", key: "trend", width: 130 },
   { title: "模式", key: "mode", width: 72 },
   { title: "创建时间", key: "createdAt", width: 140 }
 ];
@@ -240,6 +241,23 @@ const pagination = computed(() => ({
               class="cursor-pointer text-xs text-editorial-link-active hover:underline"
               @click.prevent="goToSourceItem(record.sourceItemId)"
             >素材 #{{ record.sourceItemId }}</a>
+          </template>
+
+          <!-- 传播趋势列 -->
+          <template v-else-if="column.key === 'trend'">
+            <template v-if="record.trendScore != null">
+              <a-tooltip :mouse-enter-delay="0.3">
+                <template #title>
+                  <div class="text-xs leading-5">
+                    话题{{ record.trendBreakdown?.topicPower ?? '-' }} | 情绪{{ record.trendBreakdown?.emotionResonance ?? '-' }} | 信息差{{ record.trendBreakdown?.infoGap ?? '-' }} | 社交{{ record.trendBreakdown?.socialCurrency ?? '-' }} | 时效{{ record.trendBreakdown?.timingWindow ?? '-' }} | 受众{{ record.trendBreakdown?.audienceBreadth ?? '-' }}
+                  </div>
+                </template>
+                <span class="inline-flex items-center rounded-editorial-pill border border-orange-300 bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-orange-700">
+                  {{ record.trendScore }}
+                </span>
+              </a-tooltip>
+            </template>
+            <span v-else class="text-xs text-editorial-text-muted">未评分</span>
           </template>
 
           <!-- 模式列 -->

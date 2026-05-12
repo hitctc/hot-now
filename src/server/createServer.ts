@@ -79,7 +79,8 @@ import {
   listCreativeSourceItems,
   findCreativeSourceItemById,
   updateCreativeSourceItemWritingStatus,
-  updateCreativeSourceItemLinkedArticle
+  updateCreativeSourceItemLinkedArticle,
+  updateCreativeSourceItemTrendScore
 } from "../core/creative/creativeSourceItemRepository.js";
 import {
   insertCreativeFinishedArticle,
@@ -688,7 +689,9 @@ export function createServer(deps: ServerDeps = {}) {
       score: typeof body?.score === "number" ? body.score : undefined,
       publishedAt: typeof body?.publishedAt === "string" ? body.publishedAt : undefined,
       collectorTimestamp: typeof body?.collectorTimestamp === "string" ? body.collectorTimestamp : undefined,
-      writingStatus: typeof body?.writingStatus === "string" && ["ready", "writing", "done", "skipped"].includes(body.writingStatus) ? body.writingStatus as "ready" | "writing" | "done" | "skipped" : undefined
+      writingStatus: typeof body?.writingStatus === "string" && ["ready", "writing", "done", "skipped"].includes(body.writingStatus) ? body.writingStatus as "ready" | "writing" | "done" | "skipped" : undefined,
+      trendScore: typeof body?.trendScore === "number" ? body.trendScore : undefined,
+      trendBreakdown: typeof body?.trendBreakdown === "object" && body.trendBreakdown !== null ? body.trendBreakdown as any : undefined
     });
 
     return reply.code(result.created ? 201 : 200).send({
@@ -824,7 +827,8 @@ export function createServer(deps: ServerDeps = {}) {
       pageSize: query.pageSize ? parseInt(query.pageSize, 10) : undefined,
       writingStatus: query.writingStatus as "ready" | "writing" | "done" | "skipped" | undefined,
       collectorAgent: query.collectorAgent,
-      search: query.search
+      search: query.search,
+      trendScoreMin: query.trendScore_min ? parseInt(query.trendScore_min, 10) : undefined
     });
     return reply.send(result);
   });
@@ -864,6 +868,21 @@ export function createServer(deps: ServerDeps = {}) {
       pageSize: query.pageSize ? parseInt(query.pageSize, 10) : undefined,
       search: query.search
     });
+
+    // 批量查询关联素材的 trendScore/trendBreakdown
+    if (result.items.length > 0) {
+      const sourceItemIds = result.items.map(a => a.sourceItemId);
+      const idPlaceholders = sourceItemIds.map(() => "?").join(",");
+      const sourceRows = db.prepare(
+        `SELECT id, trend_score, trend_breakdown FROM creative_source_items WHERE id IN (${idPlaceholders})`
+      ).all(...sourceItemIds) as Array<{ id: number; trend_score: number | null; trend_breakdown: string | null }>;
+      const sourceMap = new Map(sourceRows.map(r => [r.id, r]));
+      for (const article of result.items) {
+        const source = sourceMap.get(article.sourceItemId);
+        (article as any).trendScore = source?.trend_score ?? null;
+        (article as any).trendBreakdown = source?.trend_breakdown ? JSON.parse(source.trend_breakdown) : null;
+      }
+    }
     return reply.send(result);
   });
 
@@ -906,6 +925,32 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.code(400).send({ ok: false, reason: "invalid-status" });
     }
     const updated = updateCreativeSourceItemWritingStatus(db, id, status as "ready" | "writing" | "done" | "skipped");
+    if (!updated) {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+    return reply.send({ ok: true });
+  });
+
+  app.post("/actions/creative/source-items/:id/trend-score", async (request, reply) => {
+    if (!validateCreativeApiToken(request, reply, creativeApiToken)) {
+      return;
+    }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const params = request.params as { id: string };
+    const body = request.body as Record<string, unknown> | undefined;
+    const id = parseInt(params.id, 10);
+    const trendScore = typeof body?.trendScore === "number" ? body.trendScore : undefined;
+    const trendBreakdown = typeof body?.trendBreakdown === "object" && body?.trendBreakdown !== null ? body.trendBreakdown as Record<string, number> : undefined;
+
+    if (trendScore == null || !trendBreakdown) {
+      return reply.code(400).send({ ok: false, reason: "missing-trend-score-or-breakdown" });
+    }
+
+    const updated = updateCreativeSourceItemTrendScore(db, id, trendScore, trendBreakdown as any);
     if (!updated) {
       return reply.code(404).send({ ok: false, reason: "not-found" });
     }

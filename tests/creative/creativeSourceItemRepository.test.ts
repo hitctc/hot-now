@@ -4,8 +4,9 @@ import {
   findCreativeSourceItemById,
   findCreativeSourceItemByExternalId,
   listCreativeSourceItems,
-  updateCreativeSourceItemQualityStatus,
-  updateCreativeSourceItemLinkedArticle
+  updateCreativeSourceItemWritingStatus,
+  updateCreativeSourceItemLinkedArticle,
+  updateCreativeSourceItemTrendScore
 } from "../../src/core/creative/creativeSourceItemRepository.js";
 import { type TestDatabaseHandle, createTestDatabase } from "../helpers/testDatabase.js";
 
@@ -147,16 +148,16 @@ describe("listCreativeSourceItems", () => {
     expect(result.page).toBe(2);
   });
 
-  it("filters by qualityStatus", async () => {
+  it("filters by writingStatus", async () => {
     const handle = await makeHandle();
     handles.push(handle);
 
     const a = insertCreativeSourceItem(handle.db, { ...baseInput, externalId: "q1" });
     insertCreativeSourceItem(handle.db, { ...baseInput, externalId: "q2" });
 
-    updateCreativeSourceItemQualityStatus(handle.db, a.id, "accepted");
+    updateCreativeSourceItemWritingStatus(handle.db, a.id, "done");
 
-    const result = listCreativeSourceItems(handle.db, { qualityStatus: "accepted" });
+    const result = listCreativeSourceItems(handle.db, { writingStatus: "done" });
 
     expect(result.total).toBe(1);
     expect(result.items[0].id).toBe(a.id);
@@ -193,25 +194,25 @@ describe("listCreativeSourceItems", () => {
   });
 });
 
-describe("updateCreativeSourceItemQualityStatus", () => {
+describe("updateCreativeSourceItemWritingStatus", () => {
   it("updates status and returns true for existing record", async () => {
     const handle = await makeHandle();
     handles.push(handle);
 
     const inserted = insertCreativeSourceItem(handle.db, baseInput);
-    const updated = updateCreativeSourceItemQualityStatus(handle.db, inserted.id, "accepted");
+    const updated = updateCreativeSourceItemWritingStatus(handle.db, inserted.id, "done");
 
     expect(updated).toBe(true);
 
     const record = findCreativeSourceItemById(handle.db, inserted.id);
-    expect(record!.qualityStatus).toBe("accepted");
+    expect(record!.writingStatus).toBe("done");
   });
 
   it("returns false for non-existent id", async () => {
     const handle = await makeHandle();
     handles.push(handle);
 
-    const updated = updateCreativeSourceItemQualityStatus(handle.db, 99999, "rejected");
+    const updated = updateCreativeSourceItemWritingStatus(handle.db, 99999, "skipped");
     expect(updated).toBe(false);
   });
 });
@@ -262,5 +263,80 @@ describe("findCreativeSourceItemByExternalId", () => {
 
     const found = findCreativeSourceItemByExternalId(handle.db, "no-such-id", "no-agent");
     expect(found).toBeNull();
+  });
+});
+
+describe("trendScore", () => {
+  it("insert with trendScore and trendBreakdown", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+
+    const breakdown = { topicPower: 15, emotionResonance: 20, infoGap: 12, socialCurrency: 18, timingWindow: 10, audienceBreadth: 15 };
+    const item = insertCreativeSourceItem(handle.db, {
+      externalId: "trend-1",
+      collectorAgent: "scorer",
+      title: "Trend test",
+      url: "https://example.com/trend-1",
+      trendScore: 90,
+      trendBreakdown: breakdown
+    });
+
+    const found = findCreativeSourceItemById(handle.db, item.id)!;
+    expect(found.trendScore).toBe(90);
+    expect(found.trendBreakdown).toEqual(breakdown);
+  });
+
+  it("updateCreativeSourceItemTrendScore writes score", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+
+    const item = insertCreativeSourceItem(handle.db, {
+      externalId: "trend-2",
+      collectorAgent: "scorer",
+      title: "Update trend",
+      url: "https://example.com/trend-2"
+    });
+
+    expect(findCreativeSourceItemById(handle.db, item.id)!.trendScore).toBeNull();
+
+    const breakdown = { topicPower: 10, emotionResonance: 15, infoGap: 10, socialCurrency: 10, timingWindow: 10, audienceBreadth: 15 };
+    const updated = updateCreativeSourceItemTrendScore(handle.db, item.id, 70, breakdown);
+    expect(updated).toBe(true);
+
+    const found = findCreativeSourceItemById(handle.db, item.id)!;
+    expect(found.trendScore).toBe(70);
+    expect(found.trendBreakdown).toEqual(breakdown);
+  });
+
+  it("listCreativeSourceItems filters by trendScoreMin", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+
+    const a = insertCreativeSourceItem(handle.db, {
+      externalId: "high",
+      collectorAgent: "scorer",
+      title: "High",
+      url: "https://example.com/high",
+      trendScore: 80
+    });
+    insertCreativeSourceItem(handle.db, {
+      externalId: "low",
+      collectorAgent: "scorer",
+      title: "Low",
+      url: "https://example.com/low",
+      trendScore: 30
+    });
+
+    const result = listCreativeSourceItems(handle.db, { trendScoreMin: 60 });
+    expect(result.total).toBe(1);
+    expect(result.items[0].id).toBe(a.id);
+  });
+
+  it("updateCreativeSourceItemTrendScore returns false for non-existent", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+
+    const breakdown = { topicPower: 10, emotionResonance: 10, infoGap: 10, socialCurrency: 10, timingWindow: 10, audienceBreadth: 10 };
+    expect(updateCreativeSourceItemTrendScore(handle.db, 99999, 60, breakdown)).toBe(false);
   });
 });

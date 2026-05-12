@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 19;
+const schemaVersion = 20;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -20,6 +20,7 @@ const aiTimelineReliabilityWorkspaceMigrationName = "016_ai_timeline_reliability
 const aiTimelineEventNotificationsMigrationName = "017_ai_timeline_event_notifications";
 const creativeContentWorkflowMigrationName = "018_creative_content_workflow";
 const writingStatusMigrationName = "019_writing_status";
+const trendScoreMigrationName = "020_trend_score";
 
 const migrationStatements = [
   `
@@ -950,6 +951,8 @@ export function runMigrations(db: SqliteDatabase): void {
         collector_timestamp TEXT,
         quality_status TEXT NOT NULL DEFAULT 'pending',
         raw_payload_json TEXT NOT NULL,
+        trend_score INTEGER DEFAULT NULL,
+        trend_breakdown TEXT DEFAULT NULL,
         linked_article_id INTEGER,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1033,6 +1036,20 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(19, writingStatusMigrationName);
+
+    // 020: 素材表新增传播趋势评分字段
+    if (!hasColumn(db, "creative_source_items", "trend_score")) {
+      db.exec(`ALTER TABLE creative_source_items ADD COLUMN trend_score INTEGER DEFAULT NULL`);
+      db.exec(`ALTER TABLE creative_source_items ADD COLUMN trend_breakdown TEXT DEFAULT NULL`);
+    }
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(20, trendScoreMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

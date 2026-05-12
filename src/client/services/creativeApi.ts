@@ -2,6 +2,15 @@ import { requestJson } from "./http.js";
 
 // ─── Types ───
 
+export type TrendBreakdown = {
+  topicPower: number;
+  emotionResonance: number;
+  infoGap: number;
+  socialCurrency: number;
+  timingWindow: number;
+  audienceBreadth: number;
+};
+
 export type CreativeSourceItem = {
   id: number;
   externalId: string;
@@ -22,6 +31,8 @@ export type CreativeSourceItem = {
   collectorTimestamp: string | null;
   writingStatus: string;
   rawPayloadJson: string;
+  trendScore: number | null;
+  trendBreakdown: TrendBreakdown | null;
   linkedArticleId: number | null;
   createdAt: string;
   updatedAt: string;
@@ -40,6 +51,8 @@ export type CreativeFinishedArticle = {
   imagesJson: string | null;
   status: string;
   rawResponseText: string | null;
+  trendScore: number | null;
+  trendBreakdown: TrendBreakdown | null;
   createdAt: string;
   updatedAt: string;
 };

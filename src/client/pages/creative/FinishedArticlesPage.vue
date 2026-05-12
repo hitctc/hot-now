@@ -6,7 +6,8 @@ import { useRoute } from "vue-router";
 import {
   editFinishedArticle,
   readCreativeFinishedArticles,
-  type CreativeFinishedArticle
+  type CreativeFinishedArticle,
+  type TrendBreakdown
 } from "../../services/creativeApi.js";
 
 const route = useRoute();
@@ -140,6 +141,22 @@ async function handleEditSubmit(): Promise<void> {
 
 // ─── 格式化辅助 ───
 
+const breakdownLabels: Record<keyof TrendBreakdown, string> = {
+  topicPower: "话题",
+  emotionResonance: "情绪",
+  infoGap: "信息差",
+  socialCurrency: "社交",
+  timingWindow: "时效",
+  audienceBreadth: "受众"
+};
+
+function formatBreakdown(b: TrendBreakdown): string {
+  return (Object.entries(b) as [keyof TrendBreakdown, number][])
+    .sort((a, b) => b[1] - a[1])
+    .map(([key, val]) => `${breakdownLabels[key]}${val}`)
+    .join(" | ");
+}
+
 function formatCreatedAt(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
@@ -246,7 +263,7 @@ const pagination = computed(() => ({
 
           <!-- 传播分列 -->
           <template v-else-if="column.key === 'trendScore'">
-            <span v-if="record.trendScore != null" class="inline-flex items-center rounded-editorial-pill border border-orange-300 bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-orange-700">{{ record.trendScore }}</span>
+            <span v-if="record.trendScore != null" class="inline-flex items-center rounded-editorial-pill border px-2 py-0.5 text-[11px] font-bold" :class="record.trendScore >= 90 ? 'border-red-500 bg-red-500 text-white shadow-sm' : 'border-orange-300 bg-orange-50 text-orange-700'">{{ record.trendScore }}</span>
             <span v-else class="text-xs text-editorial-text-muted">未评分</span>
           </template>
 
@@ -256,11 +273,11 @@ const pagination = computed(() => ({
               <a-tooltip :mouse-enter-delay="0.3">
                 <template #title>
                   <div class="text-xs leading-5">
-                    话题 {{ record.trendBreakdown.topicPower }} | 情绪 {{ record.trendBreakdown.emotionResonance }} | 信息差 {{ record.trendBreakdown.infoGap }} | 社交 {{ record.trendBreakdown.socialCurrency }} | 时效 {{ record.trendBreakdown.timingWindow }} | 受众 {{ record.trendBreakdown.audienceBreadth }}
+                    {{ formatBreakdown(record.trendBreakdown) }}
                   </div>
                 </template>
                 <span class="block truncate text-[11px] leading-5 text-editorial-text-body">
-                  话题{{ record.trendBreakdown.topicPower }} | 情绪{{ record.trendBreakdown.emotionResonance }} | 信息差{{ record.trendBreakdown.infoGap }} | 社交{{ record.trendBreakdown.socialCurrency }} | 时效{{ record.trendBreakdown.timingWindow }} | 受众{{ record.trendBreakdown.audienceBreadth }}
+                  {{ formatBreakdown(record.trendBreakdown) }}
                 </span>
               </a-tooltip>
             </template>
@@ -439,6 +456,7 @@ const pagination = computed(() => ({
   padding: 0 !important;
   margin: 0 !important;
   max-width: 100vw !important;
+  width: 100vw !important;
 }
 .article-detail-fullscreen .ant-modal-content {
   background: #ffffff !important;
@@ -446,6 +464,7 @@ const pagination = computed(() => ({
   display: flex;
   flex-direction: column;
   border-radius: 0 !important;
+  padding: 0 !important;
 }
 .article-detail-fullscreen .ant-modal-header {
   background: #ffffff !important;

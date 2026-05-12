@@ -5,7 +5,8 @@ import { useRoute, useRouter } from "vue-router";
 import {
   readCreativeSourceItems,
   updateSourceItemWritingStatus,
-  type CreativeSourceItem
+  type CreativeSourceItem,
+  type TrendBreakdown
 } from "../../services/creativeApi.js";
 
 const route = useRoute();
@@ -118,6 +119,22 @@ async function handleWritingAction(
 
 // ─── 格式化辅助 ───
 
+const breakdownLabels: Record<keyof TrendBreakdown, string> = {
+  topicPower: "话题",
+  emotionResonance: "情绪",
+  infoGap: "信息差",
+  socialCurrency: "社交",
+  timingWindow: "时效",
+  audienceBreadth: "受众"
+};
+
+function formatBreakdown(b: TrendBreakdown): string {
+  return (Object.entries(b) as [keyof TrendBreakdown, number][])
+    .sort((a, b) => b[1] - a[1])
+    .map(([key, val]) => `${breakdownLabels[key]}${val}`)
+    .join(" | ");
+}
+
 function formatPublishedAt(value: string | null): string {
   if (!value) return "-";
   const date = new Date(value);
@@ -165,14 +182,14 @@ function writingStatusLabel(status: string): string {
 
 const columns = [
   { title: "标题", dataIndex: "title", key: "title", width: 200, ellipsis: true },
+  { title: "成品", key: "linkedArticle", width: 80, align: "center" as const, ellipsis: true },
   { title: "来源", dataIndex: "sourceName", key: "sourceName", width: 100, ellipsis: true },
   { title: "评分", dataIndex: "score", key: "score", width: 72, ellipsis: true },
   { title: "爆文分", key: "trendScore", width: 72, ellipsis: true },
   { title: "爆文维度", key: "trendBreakdown", width: 240, ellipsis: true },
   { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 120, ellipsis: true },
   { title: "发布时间", dataIndex: "publishedAt", key: "publishedAt", width: 130, ellipsis: true },
-  { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: 90, ellipsis: true },
-  { title: "成品", key: "linkedArticle", width: 80, align: "center" as const, ellipsis: true }
+  { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: 90, ellipsis: true }
 ];
 
 const pagination = computed(() => ({
@@ -264,7 +281,7 @@ const pagination = computed(() => ({
 
           <!-- 传播分列 -->
           <template v-else-if="column.key === 'trendScore'">
-            <span v-if="record.trendScore != null" class="inline-flex items-center rounded-editorial-pill border border-orange-300 bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-orange-700">{{ record.trendScore }}</span>
+            <span v-if="record.trendScore != null" class="inline-flex items-center rounded-editorial-pill border px-2 py-0.5 text-[11px] font-bold" :class="record.trendScore >= 90 ? 'border-red-500 bg-red-500 text-white shadow-sm' : 'border-orange-300 bg-orange-50 text-orange-700'">{{ record.trendScore }}</span>
             <span v-else class="text-xs text-editorial-text-muted">未评分</span>
           </template>
 
@@ -274,11 +291,11 @@ const pagination = computed(() => ({
               <a-tooltip :mouse-enter-delay="0.3">
                 <template #title>
                   <div class="text-xs leading-5">
-                    话题 {{ record.trendBreakdown.topicPower}} | 情绪 {{ record.trendBreakdown.emotionResonance }} | 信息差 {{ record.trendBreakdown.infoGap }} | 社交 {{ record.trendBreakdown.socialCurrency }} | 时效 {{ record.trendBreakdown.timingWindow }} | 受众 {{ record.trendBreakdown.audienceBreadth }}
+                    {{ formatBreakdown(record.trendBreakdown) }}
                   </div>
                 </template>
                 <span class="block truncate text-[11px] leading-5 text-editorial-text-body">
-                  话题{{ record.trendBreakdown.topicPower }} | 情绪{{ record.trendBreakdown.emotionResonance }} | 信息差{{ record.trendBreakdown.infoGap }} | 社交{{ record.trendBreakdown.socialCurrency }} | 时效{{ record.trendBreakdown.timingWindow }} | 受众{{ record.trendBreakdown.audienceBreadth }}
+                  {{ formatBreakdown(record.trendBreakdown) }}
                 </span>
               </a-tooltip>
             </template>

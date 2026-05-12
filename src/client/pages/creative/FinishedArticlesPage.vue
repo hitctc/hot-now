@@ -15,8 +15,9 @@ const router = useRouter();
 
 // ─── JSON 解析辅助 ───
 
-function parseJsonArray(raw: string | null): string[] {
+function parseJsonArray(raw: string | string[] | null): string[] {
   if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
   try {
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];

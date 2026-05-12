@@ -184,12 +184,12 @@ async function copyMarkdownAsPlainText(md: string): Promise<void> {
 // ─── 表格列 ───
 
 const columns = [
-  { title: "标题", key: "title", width: 260 },
-  { title: "来源素材", key: "sourceItem", width: 110 },
-  { title: "传播分", key: "trendScore", width: 72 },
-  { title: "评分维度", key: "trendBreakdown", width: 240 },
-  { title: "模式", key: "mode", width: 72 },
-  { title: "创建时间", key: "createdAt", width: 140 }
+  { title: "标题", key: "title", width: 200, ellipsis: true },
+  { title: "来源素材", key: "sourceItem", width: 110, ellipsis: true },
+  { title: "传播分", key: "trendScore", width: 72, ellipsis: true },
+  { title: "评分维度", key: "trendBreakdown", width: 240, ellipsis: true },
+  { title: "模式", key: "mode", width: 72, ellipsis: true },
+  { title: "创建时间", key: "createdAt", width: 140, ellipsis: true }
 ];
 
 const pagination = computed(() => ({

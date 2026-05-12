@@ -164,15 +164,15 @@ function writingStatusLabel(status: string): string {
 // ─── 表格列 ───
 
 const columns = [
-  { title: "标题", dataIndex: "title", key: "title", width: 260 },
-  { title: "来源", dataIndex: "sourceName", key: "sourceName", width: 120 },
-  { title: "评分", dataIndex: "score", key: "score", width: 72 },
-  { title: "传播分", key: "trendScore", width: 72 },
-  { title: "评分维度", key: "trendBreakdown", width: 240 },
-  { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 120 },
-  { title: "发布时间", dataIndex: "publishedAt", key: "publishedAt", width: 130 },
-  { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: 90 },
-  { title: "成品", key: "linkedArticle", width: 80, align: "center" as const }
+  { title: "标题", dataIndex: "title", key: "title", width: 200, ellipsis: true },
+  { title: "来源", dataIndex: "sourceName", key: "sourceName", width: 100, ellipsis: true },
+  { title: "评分", dataIndex: "score", key: "score", width: 72, ellipsis: true },
+  { title: "传播分", key: "trendScore", width: 72, ellipsis: true },
+  { title: "评分维度", key: "trendBreakdown", width: 240, ellipsis: true },
+  { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 120, ellipsis: true },
+  { title: "发布时间", dataIndex: "publishedAt", key: "publishedAt", width: 130, ellipsis: true },
+  { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: 90, ellipsis: true },
+  { title: "成品", key: "linkedArticle", width: 80, align: "center" as const, ellipsis: true }
 ];
 
 const pagination = computed(() => ({

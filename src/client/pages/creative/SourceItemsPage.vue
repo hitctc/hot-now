@@ -98,7 +98,7 @@ function toggleExpand(id: number): void {
 }
 
 function goToFinishedArticle(articleId: number): void {
-  router.push({ path: "/creative/finished-articles", query: { expand: String(articleId) } });
+  window.open(`/creative/finished-articles?expand=${articleId}`, "_blank");
 }
 
 // ─── 质量状态操作 ───

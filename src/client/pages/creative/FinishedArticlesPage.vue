@@ -122,6 +122,10 @@ function closeDetail(): void {
   detailArticle.value = null;
 }
 
+function goToSourceItem(sourceItemId: number): void {
+  window.open(`/creative/source-items?expand=${sourceItemId}`, "_blank");
+}
+
 // ─── 状态操作 ───
 
 async function handleStatusAction(article: CreativeFinishedArticle, nextStatus: string): Promise<void> {
@@ -332,7 +336,7 @@ const pagination = computed(() => ({
           <template v-else-if="column.key === 'sourceItem'">
             <a
               class="cursor-pointer text-xs text-editorial-link-active hover:underline"
-              @click.prevent="router.push({ path: '/creative/source-items', query: { expand: String(record.sourceItemId) } })"
+              @click.prevent="goToSourceItem(record.sourceItemId)"
             >素材 #{{ record.sourceItemId }}</a>
           </template>
 
@@ -378,7 +382,7 @@ const pagination = computed(() => ({
             <span class="text-xs text-editorial-text-muted">{{ formatCreatedAt(detailArticle.createdAt) }}</span>
             <a
               class="cursor-pointer text-xs text-editorial-link-active hover:underline"
-              @click.prevent="closeDetail(); router.push({ path: '/creative/source-items', query: { expand: String(detailArticle.sourceItemId) } })"
+              @click.prevent="closeDetail(); goToSourceItem(detailArticle.sourceItemId)"
             >素材 #{{ detailArticle.sourceItemId }}</a>
           </div>
 

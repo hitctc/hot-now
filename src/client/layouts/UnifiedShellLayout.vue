@@ -223,9 +223,9 @@ onBeforeUnmount(() => {
       data-workspace-sidebar
       data-shell-nav-rail
     >
-      <div class="flex min-h-0 flex-1 flex-col gap-5">
+      <div class="flex min-h-0 flex-1 flex-col gap-3">
         <section
-          class="editorial-spotlight-card shrink-0 overflow-hidden px-4 py-4"
+          class="editorial-spotlight-card shrink-0 overflow-hidden px-3 py-3"
           data-workspace-brand
           data-shell-brand-stage
         >
@@ -240,7 +240,7 @@ onBeforeUnmount(() => {
             <img
               :src="shellLogoSrc"
               alt="HotNow logo"
-              class="h-11 w-11 shrink-0 rounded-[16px] object-cover"
+              class="h-11 w-11 shrink-0 rounded-[8px] object-cover"
               data-workspace-brand-logo
             />
             <div class="min-w-0">
@@ -248,7 +248,7 @@ onBeforeUnmount(() => {
               <p class="mt-1 text-sm font-medium text-editorial-text-body">热讯</p>
             </div>
           </div>
-          <p class="relative z-[1] mt-4 mb-0 text-[13px] leading-6 text-editorial-text-body">
+          <p class="relative z-[1] mt-3 mb-0 text-[13px] leading-6 text-editorial-text-body">
             AI 热点与新讯的聚光舞台，把公开内容浏览和系统操作收在同一层级里。
           </p>
         </section>
@@ -416,14 +416,14 @@ onBeforeUnmount(() => {
     </aside>
 
     <main class="min-w-0 flex-1">
-      <div class="flex w-full flex-1 flex-col px-4 pb-10 pt-2 min-[901px]:px-6 min-[901px]:pt-5">
+      <div class="flex w-full flex-1 flex-col px-4 pb-6 pt-2 min-[901px]:px-5 min-[901px]:pt-4">
         <EditorialPageIntro
           :title="String(currentPageTitle)"
           :description="String(currentPageDescription)"
           tracking-prefix="page-header"
         />
 
-        <div class="w-full pt-6">
+        <div class="w-full pt-4">
           <RouterView v-slot="{ Component }">
             <component :is="Component" />
           </RouterView>

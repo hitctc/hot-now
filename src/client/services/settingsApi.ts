@@ -592,7 +592,7 @@ export type ManualSendLatestEmailResponse = {
   reason?: string;
 };
 
-// 读取当前登录用户摘要，401 代表匿名访问或会话失效，调用方可以把它当作“未登录”。
+// 读取当前登录用户摘要，401 代表匿名访问或会话失效，调用方可以把它当作"未登录"。
 export async function readSettingsProfile(): Promise<SettingsProfile | null> {
   try {
     const response = await requestJson<SettingsProfileResponse>("/api/settings/profile");
@@ -604,6 +604,16 @@ export async function readSettingsProfile(): Promise<SettingsProfile | null> {
 
     throw error;
   }
+}
+
+export function updatePassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<{ ok: boolean }> {
+  return requestJson<{ ok: boolean }>("/api/settings/profile/password", {
+    method: "PUT",
+    body: JSON.stringify({ currentPassword, newPassword })
+  });
 }
 
 // 预留给后续系统页工作区的数据读取接口，当前只做最小签名，不提前绑定业务视图。
@@ -641,7 +651,7 @@ export function saveProviderSettings(
   return postSettingsAction<SaveProviderSettingsResponse>("/actions/view-rules/provider-settings", payload);
 }
 
-// 启用动作单独拆开，避免“更新 key”与“切换当前启用厂商”耦在一起。
+// 启用动作单独拆开，避免"更新 key"与"切换当前启用厂商"耦在一起。
 export function updateProviderSettingsActivation(
   payload: UpdateProviderSettingsActivationPayload
 ): Promise<UpdateProviderSettingsActivationResponse> {
@@ -671,7 +681,7 @@ export function clearFeedbackPool(): Promise<ClearFeedbackPoolResponse> {
   return postSettingsAction<ClearFeedbackPoolResponse>("/actions/feedback-pool/clear", {});
 }
 
-// source 切换使用显式 enable 布尔值，避免前端和后端对“下一状态”产生歧义。
+// source 切换使用显式 enable 布尔值，避免前端和后端对"下一状态"产生歧义。
 export function toggleSource(kind: string, enable: boolean): Promise<ToggleSourceResponse> {
   return postSettingsAction<ToggleSourceResponse>("/actions/sources/toggle", { kind, enable });
 }

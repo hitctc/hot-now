@@ -2,7 +2,7 @@ import path from "node:path";
 import { existsSync } from "node:fs";
 import { loadRootEnvFile } from "./core/config/loadRootEnvFile.js";
 import { loadRuntimeConfig } from "./core/config/loadRuntimeConfig.js";
-import { verifyPassword } from "./core/auth/passwords.js";
+import { hashPassword, verifyPassword } from "./core/auth/passwords.js";
 import { buildContentPageModel } from "./core/content/buildContentPageModel.js";
 import { listContentView as listContentCards } from "./core/content/listContentView.js";
 import { createRuntimeDatabase } from "./core/db/createRuntimeDatabase.js";
@@ -657,6 +657,10 @@ const app = createServer({
   triggerManualWechatRssCollect,
   triggerManualWeiboTrendingCollect,
   getCurrentUserProfile: async () => getCurrentUserProfile(),
+  updatePassword: async (newPassword: string) => {
+    const newHash = hashPassword(newPassword);
+    db.prepare("UPDATE user_profile SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1").run(newHash);
+  },
   listReportSummaries: listStoredReportSummaries,
   latestReportDate: async () => (await listReportDates(config.report.dataDir))[0] ?? null,
   readReportHtml: async (date: string) => await readTextFile(config.report.dataDir, date, "report.html"),

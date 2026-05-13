@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import { message } from "ant-design-vue";
 
 import EditorialEmptyState from "../../components/content/EditorialEmptyState.vue";
 import {
@@ -7,7 +8,7 @@ import {
   editorialContentPageClass
 } from "../../components/content/contentCardShared";
 import { HttpError } from "../../services/http";
-import { readSettingsProfile, type SettingsProfile } from "../../services/settingsApi";
+import { readSettingsProfile, updatePassword, type SettingsProfile } from "../../services/settingsApi";
 
 const isLoading = ref(true);
 const loadError = ref<string | null>(null);
@@ -34,6 +35,54 @@ async function loadProfile(): Promise<void> {
 onMounted(() => {
   void loadProfile();
 });
+
+// ─── 修改密码 ───
+
+const passwordFormOpen = ref(false);
+const passwordPending = ref(false);
+const currentPassword = ref("");
+const newPassword = ref("");
+const confirmPassword = ref("");
+
+function openPasswordForm(): void {
+  passwordFormOpen.value = true;
+}
+
+function closePasswordForm(): void {
+  passwordFormOpen.value = false;
+  currentPassword.value = "";
+  newPassword.value = "";
+  confirmPassword.value = "";
+}
+
+async function handlePasswordSubmit(): Promise<void> {
+  if (!newPassword.value || newPassword.value.length < 6) {
+    message.warning("新密码至少 6 位");
+    return;
+  }
+
+  if (newPassword.value !== confirmPassword.value) {
+    message.warning("两次输入的新密码不一致");
+    return;
+  }
+
+  passwordPending.value = true;
+  try {
+    await updatePassword(currentPassword.value, newPassword.value);
+    message.success("密码修改成功");
+    closePasswordForm();
+  } catch (error) {
+    if (error instanceof HttpError && error.status === 401) {
+      message.error("当前密码不正确");
+    } else if (error instanceof HttpError && error.status === 400) {
+      message.error("请求参数有误，请检查输入");
+    } else {
+      message.error("密码修改失败，请稍后重试");
+    }
+  } finally {
+    passwordPending.value = false;
+  }
+}
 </script>
 
 <template>
@@ -131,6 +180,58 @@ onMounted(() => {
                 {{ profile.loggedIn ? "已登录（当前会话有效）" : "未登录（公开访问模式）" }}
               </p>
             </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- 修改密码 -->
+      <section class="rounded-editorial-md border border-editorial-border bg-editorial-panel/84 px-4 py-4 shadow-editorial-card backdrop-blur-xl" data-profile-section="password">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">安全设置</p>
+            <p class="mt-1 mb-0 text-sm text-editorial-text-body">修改当前账号的登录密码。</p>
+          </div>
+          <a-button
+            v-if="!passwordFormOpen"
+            type="primary"
+            size="small"
+            @click="openPasswordForm"
+          >修改密码</a-button>
+        </div>
+
+        <div v-if="passwordFormOpen" class="mt-4 flex flex-col gap-3">
+          <div>
+            <label class="mb-1 block text-xs font-medium text-editorial-text-muted">当前密码</label>
+            <a-input-password
+              v-model:value="currentPassword"
+              placeholder="输入当前密码"
+              size="small"
+            />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-medium text-editorial-text-muted">新密码</label>
+            <a-input-password
+              v-model:value="newPassword"
+              placeholder="至少 6 位"
+              size="small"
+            />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-medium text-editorial-text-muted">确认新密码</label>
+            <a-input-password
+              v-model:value="confirmPassword"
+              placeholder="再次输入新密码"
+              size="small"
+            />
+          </div>
+          <div class="flex gap-2">
+            <a-button
+              type="primary"
+              size="small"
+              :loading="passwordPending"
+              @click="handlePasswordSubmit"
+            >确认修改</a-button>
+            <a-button size="small" @click="closePasswordForm">取消</a-button>
           </div>
         </div>
       </section>

@@ -432,6 +432,7 @@ type ServerDeps = {
   triggerManualWechatRssCollect?: () => Promise<ManualWechatRssCollectResult>;
   triggerManualWeiboTrendingCollect?: () => Promise<ManualWeiboTrendingCollectResult>;
   getCurrentUserProfile?: () => Promise<CurrentUserProfile | null> | CurrentUserProfile | null;
+  updatePassword?: (newPassword: string) => Promise<void>;
   getContentPageModel?: (
     pageKey: ContentPageKey,
     options?: Pick<
@@ -608,6 +609,43 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     return reply.send({ profile: await readSettingsProfileApiData(deps, session) });
+  });
+
+  app.put("/api/settings/profile/password", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+
+    if (session === undefined) {
+      return;
+    }
+
+    const body = request.body as Record<string, unknown> | undefined;
+    const currentPassword = typeof body?.currentPassword === "string" ? body.currentPassword : "";
+    const newPassword = typeof body?.newPassword === "string" ? body.newPassword : "";
+
+    if (!currentPassword || !newPassword) {
+      return reply.status(400).send({ ok: false, error: "当前密码和新密码不能为空" });
+    }
+
+    if (newPassword.length < 6) {
+      return reply.status(400).send({ ok: false, error: "新密码至少 6 位" });
+    }
+
+    if (!authConfig?.verifyLogin) {
+      return reply.status(503).send({ ok: false, error: "服务未配置登录验证" });
+    }
+
+    const user = await authConfig.verifyLogin(session!.username, currentPassword);
+
+    if (!user) {
+      return reply.status(401).send({ ok: false, error: "当前密码不正确" });
+    }
+
+    if (!deps.updatePassword) {
+      return reply.status(503).send({ ok: false, error: "服务未配置密码更新" });
+    }
+
+    await deps.updatePassword(newPassword);
+    return reply.send({ ok: true });
   });
 
   app.get("/api/settings/ai-timeline", async (request, reply) => {

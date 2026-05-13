@@ -141,3 +141,23 @@ export function editFinishedArticle(
     body: JSON.stringify(fields)
   });
 }
+
+// ─── WeChat Format ───
+
+export type WechatThemeId = "pure-white" | "warm-oat" | "dark-pro";
+
+export const wechatThemeOptions: { value: WechatThemeId; label: string }[] = [
+  { value: "pure-white", label: "纯净白" },
+  { value: "warm-oat", label: "燕麦暖色" },
+  { value: "dark-pro", label: "暗夜 Pro" }
+];
+
+export function renderWechatFormat(
+  id: number,
+  theme: WechatThemeId
+): Promise<{ ok: boolean; html?: string }> {
+  return requestJson<{ ok: boolean; html?: string }>(
+    `/api/creative/finished-articles/${id}/wechat-format`,
+    { method: "POST", body: JSON.stringify({ theme }) }
+  );
+}

@@ -6,8 +6,11 @@ import { useRoute } from "vue-router";
 import {
   editFinishedArticle,
   readCreativeFinishedArticles,
+  renderWechatFormat,
+  wechatThemeOptions,
   type CreativeFinishedArticle,
-  type TrendBreakdown
+  type TrendBreakdown,
+  type WechatThemeId
 } from "../../services/creativeApi.js";
 
 const route = useRoute();
@@ -48,6 +51,10 @@ const editForm = ref<{ id: number; contentMarkdown: string; thesis: string; summ
   thesis: "",
   summary100: ""
 });
+
+// 微信公众号格式复制
+const wechatTheme = ref<WechatThemeId>("pure-white");
+const wechatCopying = ref(false);
 
 // ─── 数据加载 ───
 
@@ -196,6 +203,33 @@ async function copyMarkdownAsPlainText(md: string): Promise<void> {
     .trim();
   await navigator.clipboard.writeText(text);
   message.success("已复制纯文本到剪贴板");
+}
+
+// ─── 微信公众号格式复制 ───
+
+async function copyAsWechatFormat(): Promise<void> {
+  if (!detailArticle.value?.contentMarkdown) {
+    message.warning("文章无正文内容");
+    return;
+  }
+  wechatCopying.value = true;
+  try {
+    const res = await renderWechatFormat(detailArticle.value.id, wechatTheme.value);
+    if (!res.ok || !res.html) {
+      message.error("渲染失败，请重试");
+      return;
+    }
+    const htmlBlob = new Blob([res.html], { type: "text/html" });
+    const textBlob = new Blob([detailArticle.value.contentMarkdown], { type: "text/plain" });
+    await navigator.clipboard.write([
+      new ClipboardItem({ "text/html": htmlBlob, "text/plain": textBlob })
+    ]);
+    message.success("已复制公众号格式，可直接粘贴到编辑器");
+  } catch {
+    message.error("复制失败，请检查浏览器剪贴板权限");
+  } finally {
+    wechatCopying.value = false;
+  }
 }
 
 // ─── 表格列 ───
@@ -410,12 +444,25 @@ const pagination = computed(() => ({
             </ul>
           </section>
 
-          <!-- 编辑按钮：悬浮固定右下角 -->
-          <a-button
-            type="primary"
-            class="!fixed !bottom-6 !right-6 !z-50 !shadow-lg"
-            @click="openEditModal(detailArticle)"
-          >编辑内容</a-button>
+          <!-- 底部悬浮操作栏 -->
+          <div class="!fixed !bottom-6 !right-6 !z-50 flex items-center gap-2">
+            <a-select
+              v-model:value="wechatTheme"
+              :options="wechatThemeOptions"
+              size="small"
+              class="!w-[120px]"
+            />
+            <a-button
+              :loading="wechatCopying"
+              class="!shadow-lg"
+              @click="copyAsWechatFormat"
+            >复制公众号格式</a-button>
+            <a-button
+              type="primary"
+              class="!shadow-lg"
+              @click="openEditModal(detailArticle)"
+            >编辑内容</a-button>
+          </div>
         </div>
       </template>
     </a-modal>

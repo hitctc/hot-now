@@ -192,6 +192,18 @@ onBeforeUnmount(() => {
             >
               {{ page.navLabel }}
             </RouterLink>
+            <template v-if="shouldShowCreativeMenu">
+              <RouterLink
+                v-for="page in creativeNavPages"
+                :key="page.path"
+                :to="page.path"
+                :class="getMobileTabClasses(route.path === page.path)"
+                :data-mobile-content-tab="page.path"
+                @click="closeMobileSystemDrawer"
+              >
+                {{ page.navLabel }}
+              </RouterLink>
+            </template>
           </nav>
         </div>
 

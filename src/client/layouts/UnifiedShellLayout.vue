@@ -204,6 +204,18 @@ onBeforeUnmount(() => {
                 {{ page.navLabel }}
               </RouterLink>
             </template>
+            <template v-if="loggedInProfile">
+              <RouterLink
+                v-for="page in systemNavPages"
+                :key="page.key"
+                :to="page.path"
+                :class="getMobileTabClasses(route.path === page.path)"
+                :data-mobile-content-tab="page.path"
+                @click="closeMobileSystemDrawer"
+              >
+                {{ page.navLabel }}
+              </RouterLink>
+            </template>
           </nav>
         </div>
 

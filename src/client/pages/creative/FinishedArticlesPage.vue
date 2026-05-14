@@ -1,19 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { message } from "ant-design-vue";
-import { useRoute } from "vue-router";
 
 import {
   editFinishedArticle,
   readCreativeFinishedArticles,
+  readCreativeSourceItem,
   renderWechatFormat,
   wechatThemeOptions,
   type CreativeFinishedArticle,
+  type CreativeSourceItem,
   type TrendBreakdown,
   type WechatThemeId
 } from "../../services/creativeApi.js";
-
-const route = useRoute();
 
 // ─── JSON 解析辅助 ───
 
@@ -42,6 +41,11 @@ const searchText = ref("");
 // 文章详情全屏弹窗
 const detailArticle = ref<CreativeFinishedArticle | null>(null);
 
+// 素材详情弹窗
+const sourceItemModalOpen = ref(false);
+const sourceItemModalLoading = ref(false);
+const sourceItemModalData = ref<CreativeSourceItem | null>(null);
+
 // 编辑弹窗
 const editModalOpen = ref(false);
 const editPending = ref(false);
@@ -68,15 +72,6 @@ async function loadItems(): Promise<void> {
     });
     items.value = res.items;
     total.value = res.total;
-
-    // 处理 ?expand=文章ID query param，自动打开详情弹窗
-    const expandId = route.query.expand;
-    if (expandId) {
-      const id = Number(expandId);
-      const found = res.items.find(item => item.id === id);
-      if (found) detailArticle.value = found;
-      history.replaceState(null, "", location.pathname);
-    }
   } finally {
     isLoading.value = false;
   }
@@ -98,7 +93,7 @@ function handleTableChange(pagination: { current?: number; pageSize?: number }):
   void loadItems();
 }
 
-// ─── 详情弹窗 ───
+// ─── 文章详情弹窗 ───
 
 function openDetail(article: CreativeFinishedArticle): void {
   detailArticle.value = article;
@@ -108,8 +103,22 @@ function closeDetail(): void {
   detailArticle.value = null;
 }
 
-function goToSourceItem(sourceItemId: number): void {
-  window.open(`/creative/source-items?expand=${sourceItemId}`, "_blank");
+// ─── 素材详情弹窗 ───
+
+async function openSourceItemModal(sourceItemId: number): Promise<void> {
+  sourceItemModalLoading.value = true;
+  sourceItemModalOpen.value = true;
+  try {
+    const item = await readCreativeSourceItem(sourceItemId);
+    sourceItemModalData.value = item;
+  } finally {
+    sourceItemModalLoading.value = false;
+  }
+}
+
+function closeSourceItemModal(): void {
+  sourceItemModalOpen.value = false;
+  sourceItemModalData.value = null;
 }
 
 // ─── 编辑弹窗 ───
@@ -180,6 +189,19 @@ function formatCreatedAt(value: string): string {
 function getFirstTitle(titles: string | null): string {
   const parsed = parseJsonArray(titles);
   return parsed.length > 0 ? parsed[0] : "无标题";
+}
+
+function formatPublishedAt(value: string | null): string {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 // ─── 纯文本复制 ───
@@ -291,7 +313,7 @@ const pagination = computed(() => ({
           <template v-else-if="column.key === 'sourceItem'">
             <a
               class="cursor-pointer text-xs text-editorial-link-active hover:underline"
-              @click.prevent="goToSourceItem(record.sourceItemId)"
+              @click.prevent="openSourceItemModal(record.sourceItemId)"
             >素材 #{{ record.sourceItemId }}</a>
           </template>
 
@@ -352,7 +374,7 @@ const pagination = computed(() => ({
             <span class="text-xs text-editorial-text-muted">{{ formatCreatedAt(detailArticle.createdAt) }}</span>
             <a
               class="cursor-pointer text-xs text-editorial-link-active hover:underline"
-              @click.prevent="goToSourceItem(detailArticle.sourceItemId); closeDetail()"
+              @click.prevent="openSourceItemModal(detailArticle.sourceItemId)"
             >素材 #{{ detailArticle.sourceItemId }}</a>
           </div>
 
@@ -467,6 +489,104 @@ const pagination = computed(() => ({
       </template>
     </a-modal>
 
+    <!-- 素材详情弹窗 -->
+    <a-modal
+      :open="sourceItemModalOpen"
+      :footer="null"
+      :closable="true"
+      :mask-closable="true"
+      width="860px"
+      centered
+      wrap-class-name="source-item-detail-modal"
+      destroy-on-close
+      @cancel="closeSourceItemModal"
+    >
+      <a-spin :spinning="sourceItemModalLoading">
+        <template v-if="sourceItemModalData">
+          <div class="flex flex-col gap-5 py-2">
+            <!-- 标题 -->
+            <h2 class="m-0 text-base font-semibold text-editorial-text-main">{{ sourceItemModalData.title }}</h2>
+
+            <!-- 元信息 -->
+            <a-descriptions :column="{ xs: 1, sm: 2, md: 3 }" size="small" bordered>
+              <a-descriptions-item label="来源">
+                {{ sourceItemModalData.sourceName || "-" }}
+              </a-descriptions-item>
+              <a-descriptions-item label="作者">
+                {{ sourceItemModalData.author || "-" }}
+              </a-descriptions-item>
+              <a-descriptions-item label="Agent">
+                {{ sourceItemModalData.collectorAgent }}
+              </a-descriptions-item>
+              <a-descriptions-item label="评分">
+                <span v-if="sourceItemModalData.score != null" class="font-semibold">{{ sourceItemModalData.score }}</span>
+                <span v-else class="text-editorial-text-muted">-</span>
+              </a-descriptions-item>
+              <a-descriptions-item label="爆文分">
+                <span v-if="sourceItemModalData.trendScore != null" class="font-semibold" :class="sourceItemModalData.trendScore >= 90 ? 'text-red-500' : 'text-orange-600'">{{ sourceItemModalData.trendScore }}</span>
+                <span v-else class="text-editorial-text-muted">未评分</span>
+              </a-descriptions-item>
+              <a-descriptions-item label="爆文维度">
+                <template v-if="sourceItemModalData.trendBreakdown">
+                  <span class="text-xs">{{ formatBreakdown(sourceItemModalData.trendBreakdown) }}</span>
+                </template>
+                <span v-else class="text-editorial-text-muted">-</span>
+              </a-descriptions-item>
+              <a-descriptions-item label="字数">
+                {{ sourceItemModalData.wordCount ?? "-" }}
+              </a-descriptions-item>
+              <a-descriptions-item label="语言">
+                {{ sourceItemModalData.language }}
+              </a-descriptions-item>
+              <a-descriptions-item label="发布时间">
+                {{ formatPublishedAt(sourceItemModalData.publishedAt) }}
+              </a-descriptions-item>
+              <a-descriptions-item label="采集时间">
+                {{ formatPublishedAt(sourceItemModalData.collectorTimestamp) }}
+              </a-descriptions-item>
+              <a-descriptions-item label="写作状态">
+                {{ sourceItemModalData.writingStatus }}
+              </a-descriptions-item>
+              <a-descriptions-item label="标签">
+                <template v-if="sourceItemModalData.tags">
+                  <a-tag v-for="tag in sourceItemModalData.tags.split(',').map((t: string) => t.trim()).filter(Boolean)" :key="tag" size="small">{{ tag }}</a-tag>
+                </template>
+                <span v-else class="text-editorial-text-muted">-</span>
+              </a-descriptions-item>
+              <a-descriptions-item label="原文链接" :span="3">
+                <a
+                  v-if="sourceItemModalData.url"
+                  :href="sourceItemModalData.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-editorial-link-active underline"
+                >{{ sourceItemModalData.url }}</a>
+                <span v-else class="text-editorial-text-muted">无</span>
+              </a-descriptions-item>
+            </a-descriptions>
+
+            <!-- 摘要 -->
+            <section v-if="sourceItemModalData.summary">
+              <h3 class="m-0 mb-2 text-sm font-semibold text-editorial-text-muted">摘要</h3>
+              <p class="m-0 text-sm leading-6 text-editorial-text-body">{{ sourceItemModalData.summary }}</p>
+            </section>
+
+            <!-- 原文内容 -->
+            <section>
+              <h3 class="m-0 mb-2 text-sm font-semibold text-editorial-text-muted">原文内容</h3>
+              <div
+                v-if="sourceItemModalData.fullContent"
+                class="whitespace-pre-wrap rounded-editorial-md border border-editorial-border bg-editorial-page px-4 py-3 text-sm leading-6 text-editorial-text-body"
+              >
+                {{ sourceItemModalData.fullContent }}
+              </div>
+              <p v-else class="m-0 text-sm italic text-editorial-text-muted">采集未提供原文</p>
+            </section>
+          </div>
+        </template>
+      </a-spin>
+    </a-modal>
+
     <!-- 编辑弹窗 -->
     <a-modal
       v-model:open="editModalOpen"
@@ -528,5 +648,26 @@ const pagination = computed(() => ({
 }
 .article-detail-fullscreen .ant-modal-close {
   top: 8px !important;
+}
+.source-item-detail-modal .ant-modal {
+  top: 0;
+  padding-bottom: 0;
+}
+.source-item-detail-modal .ant-modal-content {
+  background: #ffffff !important;
+  max-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.source-item-detail-modal .ant-modal-header {
+  flex-shrink: 0;
+  padding: 16px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.source-item-detail-modal .ant-modal-body {
+  background: #ffffff !important;
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
 }
 </style>

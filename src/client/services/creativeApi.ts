@@ -38,6 +38,13 @@ export type CreativeSourceItem = {
   updatedAt: string;
 };
 
+// images 字段支持两种格式：纯 URL 字符串 或 带元数据的对象
+export type ArticleImageEntry = string | {
+  url: string;
+  purpose?: string;
+  alt?: string;
+};
+
 export type CreativeFinishedArticle = {
   id: number;
   sourceItemId: number;
@@ -69,6 +76,25 @@ export type FinishedArticleListResponse = {
   total: number;
   page: number;
   pageSize: number;
+};
+
+// 图片转存接口类型
+export type ImageUploadInput = {
+  url: string;
+  purpose?: string;
+  alt?: string;
+};
+
+export type ImageUploadResult = {
+  originalUrl: string;
+  storedUrl: string;
+  purpose: string;
+  alt: string;
+};
+
+export type ImageUploadResponse = {
+  images: ImageUploadResult[];
+  failed?: Array<{ url: string; reason: string }>;
 };
 
 // ─── Source Items ───
@@ -160,4 +186,31 @@ export function renderWechatFormat(
     `/api/creative/finished-articles/${id}/wechat-format`,
     { method: "POST", body: JSON.stringify({ theme }) }
   );
+}
+
+// ─── Image Upload ───
+
+export function uploadImagesByUrl(images: ImageUploadInput[]): Promise<ImageUploadResponse> {
+  return requestJson<ImageUploadResponse>("/api/creative/images/upload-by-url", {
+    method: "POST",
+    body: JSON.stringify({ images })
+  });
+}
+
+// ─── Images 辅助函数 ───
+
+/** 从 imagesJson 字段解析出标准化的图片条目列表 */
+export function parseArticleImages(imagesJson: string | null): ArticleImageEntry[] {
+  if (!imagesJson) return [];
+  try {
+    const parsed = JSON.parse(imagesJson);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 从任意格式的图片条目中提取 URL */
+export function extractImageUrl(entry: ArticleImageEntry): string {
+  return typeof entry === "string" ? entry : entry.url;
 }

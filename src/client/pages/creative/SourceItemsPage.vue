@@ -1,15 +1,30 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { message } from "ant-design-vue";
+import MarkdownIt from "markdown-it";
 
 import {
   readCreativeSourceItems,
   readCreativeFinishedArticle,
   updateSourceItemWritingStatus,
+  parseArticleImages,
+  extractImageUrl,
   type CreativeSourceItem,
   type CreativeFinishedArticle,
   type TrendBreakdown
 } from "../../services/creativeApi.js";
+
+// ─── Markdown 渲染器 ───
+
+const md = new MarkdownIt({
+  html: false,
+  linkify: true,
+  breaks: true
+});
+
+function renderMarkdown(text: string): string {
+  return md.render(text);
+}
 
 // ─── 状态 ───
 
@@ -551,7 +566,7 @@ const pagination = computed(() => ({
               </ul>
             </section>
 
-            <!-- 正文 -->
+            <!-- 正文（Markdown 渲染） -->
             <section v-if="articleModalData.contentMarkdown">
               <div class="mb-2 flex items-center justify-between">
                 <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文</h3>
@@ -560,17 +575,32 @@ const pagination = computed(() => ({
                   <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyMarkdownAsPlainText(articleModalData.contentMarkdown)">复制纯文本</a-button>
                 </div>
               </div>
-              <div class="whitespace-pre-wrap rounded-editorial-md border border-editorial-border bg-editorial-page px-4 py-3 text-sm leading-7 text-editorial-text-body">
-                {{ articleModalData.contentMarkdown }}
-              </div>
+              <div
+                class="article-markdown-body rounded-editorial-md border border-editorial-border bg-editorial-page px-4 py-3"
+                v-html="renderMarkdown(articleModalData.contentMarkdown)"
+              ></div>
             </section>
 
             <!-- 图片列表 -->
-            <section v-if="parseJsonArray(articleModalData.imagesJson).length > 0">
+            <section v-if="parseArticleImages(articleModalData.imagesJson).length > 0">
               <h3 class="m-0 mb-2 text-sm font-semibold text-editorial-text-muted">图片列表</h3>
-              <ul class="m-0 list-inside list-disc pl-1">
-                <li v-for="(img, idx) in parseJsonArray(articleModalData.imagesJson)" :key="idx" class="truncate text-xs leading-5 text-editorial-text-muted">{{ img }}</li>
-              </ul>
+              <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div
+                  v-for="(img, idx) in parseArticleImages(articleModalData.imagesJson)"
+                  :key="idx"
+                  class="group relative overflow-hidden rounded-editorial-md border border-editorial-border"
+                >
+                  <img
+                    :src="extractImageUrl(img)"
+                    :alt="typeof img === 'object' && img.alt ? img.alt : `图片 ${idx + 1}`"
+                    class="block w-full object-cover"
+                    loading="lazy"
+                  />
+                  <div v-if="typeof img === 'object' && img.purpose" class="absolute right-1 top-1 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
+                    {{ img.purpose }}
+                  </div>
+                </div>
+              </div>
             </section>
           </div>
         </template>
@@ -613,5 +643,60 @@ const pagination = computed(() => ({
 }
 .article-detail-fullscreen .ant-modal-close {
   top: 8px !important;
+}
+
+/* Markdown 渲染样式 */
+.article-markdown-body {
+  font-size: 14px;
+  line-height: 1.75;
+  color: #374151;
+}
+.article-markdown-body h1,
+.article-markdown-body h2,
+.article-markdown-body h3,
+.article-markdown-body h4 {
+  margin: 1em 0 0.5em;
+  font-weight: 600;
+  color: #111827;
+}
+.article-markdown-body h1 { font-size: 1.25em; }
+.article-markdown-body h2 { font-size: 1.15em; }
+.article-markdown-body h3 { font-size: 1.05em; }
+.article-markdown-body p { margin: 0.5em 0; }
+.article-markdown-body ul,
+.article-markdown-body ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+.article-markdown-body li { margin: 0.25em 0; }
+.article-markdown-body blockquote {
+  margin: 0.75em 0;
+  padding: 0.5em 1em;
+  border-left: 3px solid #d1d5db;
+  color: #6b7280;
+  background: #f9fafb;
+  border-radius: 0 4px 4px 0;
+}
+.article-markdown-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 0.75em 0;
+}
+.article-markdown-body a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+.article-markdown-body strong { font-weight: 600; }
+.article-markdown-body code {
+  background: #f3f4f6;
+  padding: 0.15em 0.35em;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+.article-markdown-body hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 1em 0;
 }
 </style>

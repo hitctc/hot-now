@@ -90,6 +90,7 @@ import {
   editCreativeFinishedArticle
 } from "../core/creative/creativeFinishedArticleRepository.js";
 import { formatForWechat, type WechatThemeId } from "../core/creative/wechatFormat/index.js";
+import { downloadAndStoreImage, readStoredImage } from "../core/storage/imageStore.js";
 import { readNextCollectionRunAt } from "../core/scheduler/readNextCollectionRunAt.js";
 import {
   createSessionToken,
@@ -317,6 +318,7 @@ type ServerDeps = {
   config?: Partial<RuntimeConfig>;
   db?: SqliteDatabase;
   creativeApiToken?: string;
+  creativeImageDir?: string;
   listReportSummaries?: () => Promise<ReportSummary[]>;
   latestReportDate?: () => Promise<string | null>;
   readReportHtml?: (date: string) => Promise<string>;
@@ -468,6 +470,7 @@ export function createServer(deps: ServerDeps = {}) {
   const authEnabled = authConfig?.requireLogin === true;
   const db = deps.db;
   const creativeApiToken = deps.creativeApiToken;
+  const creativeImageDir = deps.creativeImageDir;
   const hasUnifiedShellDeps = Boolean(
     deps.listContentView || deps.getViewRulesWorkbenchData || deps.listSources || deps.getCurrentUserProfile
   );
@@ -1055,6 +1058,103 @@ export function createServer(deps: ServerDeps = {}) {
       request.log.error(err, "WeChat format rendering failed");
       return reply.code(500).send({ ok: false, reason: "rendering-failed" });
     }
+  });
+
+  // ─── Creative: 图片转存接口（token 鉴权） ───
+
+  app.post("/api/creative/images/upload-by-url", async (request, reply) => {
+    if (!validateCreativeApiToken(request, reply, creativeApiToken)) {
+      return;
+    }
+
+    if (!creativeImageDir) {
+      return reply.code(503).send({ ok: false, reason: "image-dir-not-configured" });
+    }
+
+    const body = request.body as { images?: unknown[] } | undefined;
+    const images = Array.isArray(body?.images) ? body.images : [];
+
+    if (images.length === 0) {
+      return reply.code(400).send({ ok: false, reason: "missing-images" });
+    }
+
+    if (images.length > 9) {
+      return reply.code(400).send({ ok: false, reason: "too-many-images" });
+    }
+
+    const publicBaseUrl = (deps.config?.publicBaseUrl ?? "").replace(/\/+$/, "");
+    const results: Array<{
+      originalUrl: string;
+      storedUrl: string;
+      purpose: string;
+      alt: string;
+    }> = [];
+    const failed: Array<{ url: string; reason: string }> = [];
+
+    for (const img of images) {
+      // 兼容 string 和 object 两种格式
+      const url = typeof img === "string" ? img : (img as Record<string, unknown>)?.url;
+      const purpose = typeof img === "object" && img !== null
+        ? String((img as Record<string, unknown>).purpose ?? "cover")
+        : "cover";
+      const alt = typeof img === "object" && img !== null
+        ? String((img as Record<string, unknown>).alt ?? "")
+        : "";
+
+      if (typeof url !== "string" || !url.trim()) {
+        failed.push({ url: String(url), reason: "invalid-url" });
+        continue;
+      }
+
+      try {
+        const stored = await downloadAndStoreImage(creativeImageDir, url.trim());
+        results.push({
+          originalUrl: url.trim(),
+          storedUrl: publicBaseUrl ? `${publicBaseUrl}${stored.urlPath}` : stored.urlPath,
+          purpose,
+          alt
+        });
+      } catch (err) {
+        request.log.warn({ err, url }, "Image download/store failed");
+        failed.push({ url: url.trim(), reason: "download_failed" });
+      }
+    }
+
+    if (results.length === 0) {
+      return reply.code(500).send({ error: "all_uploads_failed", details: failed });
+    }
+
+    const response: Record<string, unknown> = { images: results };
+    if (failed.length > 0) {
+      response.failed = failed;
+    }
+    return reply.send(response);
+  });
+
+  // ─── Creative: 图片文件服务（公开访问，无需鉴权） ───
+
+  app.get("/api/creative/images/:date/:file", async (request, reply) => {
+    if (!creativeImageDir) {
+      return reply.code(404).type("text/plain").send("Not Found");
+    }
+
+    const params = request.params as { date: string; file: string };
+    const dateDir = params.date;
+    const fileName = params.file;
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateDir)) {
+      return reply.code(400).type("text/plain").send("Invalid date");
+    }
+
+    const result = await readStoredImage(creativeImageDir, dateDir, fileName);
+    if (!result) {
+      return reply.code(404).type("text/plain").send("Not Found");
+    }
+
+    return reply
+      .type(result.contentType)
+      .header("cache-control", "public, max-age=31536000, immutable")
+      .send(result.buffer);
   });
 
   if (authEnabled) {

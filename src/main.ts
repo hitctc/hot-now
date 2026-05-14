@@ -564,9 +564,13 @@ async function saveAndHydrateSource(input: Parameters<typeof persistSource>[1]) 
   return result;
 }
 
+// 创作模块图片存储目录：与数据库同级的 creative-images 子目录
+const creativeImageDir = path.join(path.dirname(config.database.file), "creative-images");
+
 const app = createServer({
   db,
   creativeApiToken: process.env.CREATIVE_API_TOKEN,
+  creativeImageDir,
   config,
   clientDevOrigin: process.env.HOT_NOW_CLIENT_DEV_ORIGIN?.trim() || undefined,
   auth: {

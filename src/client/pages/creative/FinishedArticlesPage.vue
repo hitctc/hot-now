@@ -189,8 +189,12 @@ function formatBreakdown(b: TrendBreakdown): string {
     .join(" | ");
 }
 
-function formatCreatedAt(value: string): string {
-  const date = new Date(value);
+// SQLite CURRENT_TIMESTAMP 输出 UTC 但不带后缀，补 Z 让 JS 正确解析
+function formatLocalTime(value: string): string {
+  const fixed = /^[0-9]{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(value) && !/[Zz+\-]\d{0,4}$/.test(value)
+    ? value.replace(" ", "T") + "Z"
+    : value;
+  const date = new Date(fixed);
   if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleString("zh-CN", {
     timeZone: "Asia/Shanghai",
@@ -278,6 +282,8 @@ const columns = [
   { title: "爆文分", key: "trendScore", width: 72, ellipsis: true },
   { title: "爆文维度", key: "trendBreakdown", width: 240, ellipsis: true },
   { title: "模式", key: "mode", width: 72, ellipsis: true },
+  { title: "发布时间", key: "publishedAt", width: 130, ellipsis: true },
+  { title: "图片", key: "hasImage", width: 80, ellipsis: true },
   { title: "创建时间", key: "createdAt", width: 140, ellipsis: true }
 ];
 
@@ -361,9 +367,46 @@ const pagination = computed(() => ({
             <span class="text-xs text-editorial-text-body">{{ record.mode || "-" }}</span>
           </template>
 
+          <!-- 发布时间列 -->
+          <template v-else-if="column.key === 'publishedAt'">
+            <span class="text-xs text-editorial-text-muted">{{ formatLocalTime(record.publishedAt) }}</span>
+          </template>
+
+          <!-- 图片列 -->
+          <template v-else-if="column.key === 'hasImage'">
+            <div v-if="parseArticleImages(record.imagesJson).length > 0" class="relative inline-flex items-end" style="width:44px;height:44px;">
+              <!-- 多图叠加底层（仅 2 张以上时显示） -->
+              <template v-if="parseArticleImages(record.imagesJson).length > 1">
+                <div class="absolute rounded border border-editorial-border bg-editorial-panel" style="top:6px;left:6px;width:36px;height:36px;"></div>
+                <div class="absolute rounded border border-editorial-border bg-editorial-panel" style="top:3px;left:3px;width:36px;height:36px;"></div>
+              </template>
+              <a-image
+                :src="extractImageUrl(parseArticleImages(record.imagesJson)[0])"
+                :preview-group="String(record.id)"
+                :width="36"
+                :height="36"
+                class="!absolute left-0 top-0 !rounded !border !border-editorial-border"
+                style="object-fit:cover;"
+              />
+              <!-- 隐藏的后续图片，用于预览翻页 -->
+              <template v-for="(img, idx) in parseArticleImages(record.imagesJson).slice(1)" :key="idx">
+                <a-image
+                  :src="extractImageUrl(img)"
+                  :preview-group="String(record.id)"
+                  style="display:none;"
+                />
+              </template>
+              <!-- 多图数量标记 -->
+              <span v-if="parseArticleImages(record.imagesJson).length > 1" class="absolute -right-1 -top-1 z-10 flex h-4 min-w-4 items-center justify-center rounded-full bg-editorial-text-main px-1 text-[10px] font-medium leading-none text-white">
+                {{ parseArticleImages(record.imagesJson).length }}
+              </span>
+            </div>
+            <span v-else class="text-xs text-editorial-text-muted">无</span>
+          </template>
+
           <!-- 创建时间列 -->
           <template v-else-if="column.key === 'createdAt'">
-            <span class="text-xs text-editorial-text-muted">{{ formatCreatedAt(record.createdAt) }}</span>
+            <span class="text-xs text-editorial-text-muted">{{ formatLocalTime(record.createdAt) }}</span>
           </template>
         </template>
       </a-table>
@@ -387,7 +430,7 @@ const pagination = computed(() => ({
           <!-- 顶部元信息 -->
           <div class="flex items-center gap-3">
             <span class="text-xs text-editorial-text-muted">模式 {{ detailArticle.mode || "-" }}</span>
-            <span class="text-xs text-editorial-text-muted">{{ formatCreatedAt(detailArticle.createdAt) }}</span>
+            <span class="text-xs text-editorial-text-muted">{{ formatLocalTime(detailArticle.createdAt) }}</span>
             <a
               class="cursor-pointer text-xs text-editorial-link-active hover:underline"
               @click.prevent="openSourceItemModal(detailArticle.sourceItemId)"
@@ -478,23 +521,25 @@ const pagination = computed(() => ({
           <!-- 图片列表 -->
           <section v-if="parseArticleImages(detailArticle.imagesJson).length > 0">
             <h3 class="m-0 mb-2 text-sm font-semibold text-editorial-text-muted">图片列表</h3>
-            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <div
-                v-for="(img, idx) in parseArticleImages(detailArticle.imagesJson)"
-                :key="idx"
-                class="group relative overflow-hidden rounded-editorial-md border border-editorial-border"
-              >
-                <img
-                  :src="extractImageUrl(img)"
-                  :alt="typeof img === 'object' && img.alt ? img.alt : `图片 ${idx + 1}`"
-                  class="block w-full object-cover"
-                  loading="lazy"
-                />
-                <div v-if="typeof img === 'object' && img.purpose" class="absolute right-1 top-1 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
-                  {{ img.purpose }}
+            <a-image-preview-group>
+              <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div
+                  v-for="(img, idx) in parseArticleImages(detailArticle.imagesJson)"
+                  :key="idx"
+                  class="group relative overflow-hidden rounded-editorial-md border border-editorial-border"
+                >
+                  <a-image
+                    :src="extractImageUrl(img)"
+                    :alt="typeof img === 'object' && img.alt ? img.alt : `图片 ${idx + 1}`"
+                    class="block w-full object-cover"
+                    loading="lazy"
+                  />
+                  <div v-if="typeof img === 'object' && img.purpose" class="absolute right-1 top-1 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
+                    {{ img.purpose }}
+                  </div>
                 </div>
               </div>
-            </div>
+            </a-image-preview-group>
           </section>
 
           <!-- 底部悬浮操作栏 -->

@@ -55,7 +55,7 @@ export type CreativeFinishedArticle = {
   hooks: string | null;
   quotes: string | null;
   summary100: string | null;
-  imagesJson: string | null;
+  imagesJson: string | ArticleImageEntry[] | null;
   status: string;
   rawResponseText: string | null;
   trendScore: number | null;
@@ -199,9 +199,10 @@ export function uploadImagesByUrl(images: ImageUploadInput[]): Promise<ImageUplo
 
 // ─── Images 辅助函数 ───
 
-/** 从 imagesJson 字段解析出标准化的图片条目列表 */
-export function parseArticleImages(imagesJson: string | null): ArticleImageEntry[] {
+/** 从 imagesJson 字段解析出标准化的图片条目列表，兼容已解析的数组和原始字符串 */
+export function parseArticleImages(imagesJson: string | ArticleImageEntry[] | null): ArticleImageEntry[] {
   if (!imagesJson) return [];
+  if (Array.isArray(imagesJson)) return imagesJson;
   try {
     const parsed = JSON.parse(imagesJson);
     return Array.isArray(parsed) ? parsed : [];

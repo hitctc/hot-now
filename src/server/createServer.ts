@@ -872,6 +872,22 @@ export function createServer(deps: ServerDeps = {}) {
       search: query.search,
       trendScoreMin: query.trendScore_min ? parseInt(query.trendScore_min, 10) : undefined
     });
+
+    // 批量查询关联成品文章的创建时间
+    const linkedIds = result.items.filter(i => i.linkedArticleId != null).map(i => i.linkedArticleId!);
+    if (linkedIds.length > 0) {
+      const placeholders = linkedIds.map(() => "?").join(",");
+      const articleRows = db.prepare(
+        `SELECT id, created_at FROM creative_finished_articles WHERE id IN (${placeholders})`
+      ).all(...linkedIds) as Array<{ id: number; created_at: string }>;
+      const articleMap = new Map(articleRows.map(r => [r.id, r.created_at]));
+      for (const item of result.items) {
+        if (item.linkedArticleId != null) {
+          (item as any).linkedArticleCreatedAt = articleMap.get(item.linkedArticleId) ?? null;
+        }
+      }
+    }
+
     return reply.send(result);
   });
 
@@ -897,8 +913,12 @@ export function createServer(deps: ServerDeps = {}) {
   });
 
   app.get("/api/creative/finished-articles", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-    if (session === undefined) { return; }
+    // 支持两种认证：token（外部 Agent）或 session（管理 UI）
+    const hasToken = creativeApiToken && request.headers["x-creative-token"] === creativeApiToken;
+    if (!hasToken) {
+      const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+      if (session === undefined) { return; }
+    }
 
     if (!db) {
       return reply.code(503).send({ ok: false, reason: "database-not-available" });
@@ -911,26 +931,31 @@ export function createServer(deps: ServerDeps = {}) {
       search: query.search
     });
 
-    // 批量查询关联素材的 trendScore/trendBreakdown
+    // 批量查询关联素材的 trendScore/trendBreakdown/publishedAt
     if (result.items.length > 0) {
       const sourceItemIds = result.items.map(a => a.sourceItemId);
       const idPlaceholders = sourceItemIds.map(() => "?").join(",");
       const sourceRows = db.prepare(
-        `SELECT id, trend_score, trend_breakdown FROM creative_source_items WHERE id IN (${idPlaceholders})`
-      ).all(...sourceItemIds) as Array<{ id: number; trend_score: number | null; trend_breakdown: string | null }>;
+        `SELECT id, trend_score, trend_breakdown, published_at FROM creative_source_items WHERE id IN (${idPlaceholders})`
+      ).all(...sourceItemIds) as Array<{ id: number; trend_score: number | null; trend_breakdown: string | null; published_at: string | null }>;
       const sourceMap = new Map(sourceRows.map(r => [r.id, r]));
       for (const article of result.items) {
         const source = sourceMap.get(article.sourceItemId);
         (article as any).trendScore = source?.trend_score ?? null;
         (article as any).trendBreakdown = source?.trend_breakdown ? JSON.parse(source.trend_breakdown) : null;
+        (article as any).publishedAt = source?.published_at ?? null;
       }
     }
     return reply.send(result);
   });
 
   app.get("/api/creative/finished-articles/:id", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-    if (session === undefined) { return; }
+    // 支持两种认证：token（外部 Agent）或 session（管理 UI）
+    const hasToken = creativeApiToken && request.headers["x-creative-token"] === creativeApiToken;
+    if (!hasToken) {
+      const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+      if (session === undefined) { return; }
+    }
 
     if (!db) {
       return reply.code(503).send({ ok: false, reason: "database-not-available" });
@@ -943,6 +968,62 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.code(404).send({ ok: false, reason: "not-found" });
     }
     return reply.send(article);
+  });
+
+  // 成品文章局部更新：评分重跑、补图等场景
+  app.patch("/api/creative/finished-articles/:id", async (request, reply) => {
+    const hasToken = creativeApiToken && request.headers["x-creative-token"] === creativeApiToken;
+    if (!hasToken) {
+      const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+      if (session === undefined) { return; }
+    }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const params = request.params as { id: string };
+    const id = parseInt(params.id, 10);
+    const body = request.body as Record<string, unknown> | undefined;
+    const article = findCreativeFinishedArticleById(db, id);
+    if (!article) {
+      return reply.code(404).send({ message: "Finished article not found", statusCode: 404 });
+    }
+
+    const updatedFields: string[] = [];
+
+    // finished_articles 表字段
+    const editInput: Record<string, unknown> = {};
+    if (body?.contentMarkdown !== undefined) { editInput.contentMarkdown = body.contentMarkdown; updatedFields.push("contentMarkdown"); }
+    if (body?.images !== undefined) { editInput.images = body.images; updatedFields.push("images"); }
+    if (body?.titles !== undefined) { editInput.titles = body.titles; updatedFields.push("titles"); }
+    if (body?.thesis !== undefined) { editInput.thesis = body.thesis; updatedFields.push("thesis"); }
+    if (body?.summary100 !== undefined) { editInput.summary100 = body.summary100; updatedFields.push("summary100"); }
+    if (body?.status !== undefined) { editInput.status = body.status; updatedFields.push("status"); }
+
+    if (Object.keys(editInput).length > 0) {
+      editCreativeFinishedArticle(db, id, editInput as any);
+    }
+
+    // trendScore / trendBreakdown 存在 source_items 表，需关联更新
+    if (body?.trendScore !== undefined || body?.trendBreakdown !== undefined) {
+      if (body?.trendScore !== undefined) updatedFields.push("trendScore");
+      if (body?.trendBreakdown !== undefined) updatedFields.push("trendBreakdown");
+      const trendScore = typeof body.trendScore === "number" ? body.trendScore : 0;
+      const trendBreakdown = (body.trendBreakdown && typeof body.trendBreakdown === "object") ? body.trendBreakdown : {};
+      updateCreativeSourceItemTrendScore(db, article.sourceItemId, trendScore, trendBreakdown as any);
+    }
+
+    if (updatedFields.length === 0) {
+      return reply.code(400).send({ message: "No fields to update", statusCode: 400 });
+    }
+
+    const updated = findCreativeFinishedArticleById(db, id);
+    return reply.send({
+      id,
+      updatedFields,
+      updatedAt: updated?.updatedAt ?? new Date().toISOString()
+    });
   });
 
   // ─── Creative: Actions (session-authenticated) ───

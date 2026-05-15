@@ -184,7 +184,11 @@ function formatBreakdown(b: TrendBreakdown): string {
 
 function formatPublishedAt(value: string | null): string {
   if (!value) return "-";
-  const date = new Date(value);
+  // SQLite CURRENT_TIMESTAMP 输出 UTC 但不带后缀，补 Z 让 JS 正确解析
+  const fixed = /^[0-9]{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(value) && !/[Zz+\-]\d{0,4}$/.test(value)
+    ? value.replace(" ", "T") + "Z"
+    : value;
+  const date = new Date(fixed);
   if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleString("zh-CN", {
     timeZone: "Asia/Shanghai",
@@ -259,6 +263,7 @@ const columns = [
   { title: "爆文维度", key: "trendBreakdown", width: 240, ellipsis: true },
   { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 120, ellipsis: true },
   { title: "发布时间", dataIndex: "publishedAt", key: "publishedAt", width: 130, ellipsis: true },
+  { title: "成品创建时间", key: "linkedArticleCreatedAt", width: 140, ellipsis: true },
   { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: 90, ellipsis: true }
 ];
 
@@ -380,6 +385,12 @@ const pagination = computed(() => ({
           <!-- 发布时间列 -->
           <template v-else-if="column.key === 'publishedAt'">
             <span class="text-xs text-editorial-text-muted">{{ formatPublishedAt(record.publishedAt) }}</span>
+          </template>
+
+          <!-- 成品创建时间列 -->
+          <template v-else-if="column.key === 'linkedArticleCreatedAt'">
+            <span v-if="record.linkedArticleCreatedAt" class="text-xs text-editorial-text-muted">{{ formatPublishedAt(record.linkedArticleCreatedAt) }}</span>
+            <span v-else class="text-xs text-editorial-text-muted">-</span>
           </template>
 
           <!-- 写作状态列 -->

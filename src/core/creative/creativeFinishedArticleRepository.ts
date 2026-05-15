@@ -99,6 +99,7 @@ export type EditCreativeFinishedArticleInput = {
   summary100?: string;
   images?: unknown[];
   rawResponseText?: string;
+  status?: string;
 };
 
 export type ListCreativeFinishedArticlesFilters = {
@@ -286,6 +287,10 @@ export function editCreativeFinishedArticle(
   if (input.rawResponseText !== undefined) {
     setClauses.push("raw_response_text = ?");
     params.push(input.rawResponseText);
+  }
+  if (input.status !== undefined) {
+    setClauses.push("status = ?");
+    params.push(input.status);
   }
 
   if (setClauses.length === 0) {

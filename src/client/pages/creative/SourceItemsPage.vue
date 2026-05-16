@@ -315,7 +315,7 @@ const columns = [
   { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 60, align: "center" as const, ellipsis: true },
   { title: "发布时间", dataIndex: "publishedAt", key: "publishedAt", width: 130, ellipsis: true },
   { title: "成品创建时间", key: "linkedArticleCreatedAt", width: 140, ellipsis: true },
-  { title: "复制重写文章", key: "quickCopy", width: 110, ellipsis: true }
+  { title: "重写文章", key: "quickCopy", width: 64, ellipsis: true }
 ];
 
 const pagination = computed(() => ({

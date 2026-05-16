@@ -346,7 +346,7 @@ const columns = [
   { title: "发布时间", key: "publishedAt", width: 130, ellipsis: true },
   { title: "创建时间", key: "createdAt", width: 140, ellipsis: true },
   { title: "异常说明", key: "anomalyReason", width: 150, ellipsis: true },
-  { title: "复制重写文章", key: "quickCopy", width: 110, ellipsis: true }
+  { title: "重写文章", key: "quickCopy", width: 64, ellipsis: true }
 ];
 
 const pagination = computed(() => ({

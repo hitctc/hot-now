@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 20;
+const schemaVersion = 21;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -21,6 +21,7 @@ const aiTimelineEventNotificationsMigrationName = "017_ai_timeline_event_notific
 const creativeContentWorkflowMigrationName = "018_creative_content_workflow";
 const writingStatusMigrationName = "019_writing_status";
 const trendScoreMigrationName = "020_trend_score";
+const coverImageAndAnomalyMigrationName = "021_cover_image_and_anomaly";
 
 const migrationStatements = [
   `
@@ -1050,6 +1051,22 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(20, trendScoreMigrationName);
+
+    // 021: 成品文章新增封面图和异常说明字段
+    if (!hasColumn(db, "creative_finished_articles", "cover_image_url")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN cover_image_url TEXT DEFAULT NULL`);
+    }
+    if (!hasColumn(db, "creative_finished_articles", "anomaly_reason")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN anomaly_reason TEXT DEFAULT NULL`);
+    }
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(21, coverImageAndAnomalyMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

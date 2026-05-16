@@ -731,7 +731,7 @@ export function createServer(deps: ServerDeps = {}) {
       score: typeof body?.score === "number" ? body.score : undefined,
       publishedAt: typeof body?.publishedAt === "string" ? body.publishedAt : undefined,
       collectorTimestamp: typeof body?.collectorTimestamp === "string" ? body.collectorTimestamp : undefined,
-      writingStatus: typeof body?.writingStatus === "string" && ["ready", "writing", "done", "skipped"].includes(body.writingStatus) ? body.writingStatus as "ready" | "writing" | "done" | "skipped" : undefined,
+      writingStatus: typeof body?.writingStatus === "string" && ["ready", "writing", "done", "skipped", "excluded"].includes(body.writingStatus) ? body.writingStatus as "ready" | "writing" | "done" | "skipped" | "excluded" : undefined,
       trendScore: typeof body?.trendScore === "number" ? body.trendScore : undefined,
       trendBreakdown: typeof body?.trendBreakdown === "object" && body.trendBreakdown !== null ? body.trendBreakdown as any : undefined
     });
@@ -781,6 +781,7 @@ export function createServer(deps: ServerDeps = {}) {
       quotes: Array.isArray(body?.quotes) ? body.quotes as string[] : undefined,
       summary100: typeof body?.summary100 === "string" ? body.summary100 : undefined,
       images: Array.isArray(body?.images) ? body.images as any[] : undefined,
+      coverImage: typeof body?.coverImage === "string" ? body.coverImage : undefined,
       rawResponseText: typeof body?.rawResponseText === "string" ? body.rawResponseText : undefined
     });
 
@@ -867,7 +868,7 @@ export function createServer(deps: ServerDeps = {}) {
     const result = listCreativeSourceItems(db, {
       page: query.page ? parseInt(query.page, 10) : undefined,
       pageSize: query.pageSize ? parseInt(query.pageSize, 10) : undefined,
-      writingStatus: query.writingStatus as "ready" | "writing" | "done" | "skipped" | undefined,
+      writingStatus: query.writingStatus as "ready" | "writing" | "done" | "skipped" | "excluded" | undefined,
       collectorAgent: query.collectorAgent,
       search: query.search,
       trendScoreMin: query.trendScore_min ? parseInt(query.trendScore_min, 10) : undefined
@@ -936,14 +937,15 @@ export function createServer(deps: ServerDeps = {}) {
       const sourceItemIds = result.items.map(a => a.sourceItemId);
       const idPlaceholders = sourceItemIds.map(() => "?").join(",");
       const sourceRows = db.prepare(
-        `SELECT id, trend_score, trend_breakdown, published_at FROM creative_source_items WHERE id IN (${idPlaceholders})`
-      ).all(...sourceItemIds) as Array<{ id: number; trend_score: number | null; trend_breakdown: string | null; published_at: string | null }>;
+        `SELECT id, trend_score, trend_breakdown, published_at, title FROM creative_source_items WHERE id IN (${idPlaceholders})`
+      ).all(...sourceItemIds) as Array<{ id: number; trend_score: number | null; trend_breakdown: string | null; published_at: string | null; title: string | null }>;
       const sourceMap = new Map(sourceRows.map(r => [r.id, r]));
       for (const article of result.items) {
         const source = sourceMap.get(article.sourceItemId);
         (article as any).trendScore = source?.trend_score ?? null;
         (article as any).trendBreakdown = source?.trend_breakdown ? JSON.parse(source.trend_breakdown) : null;
         (article as any).publishedAt = source?.published_at ?? null;
+        (article as any).sourceTitle = source?.title ?? null;
       }
     }
     return reply.send(result);
@@ -967,6 +969,18 @@ export function createServer(deps: ServerDeps = {}) {
     if (!article) {
       return reply.code(404).send({ ok: false, reason: "not-found" });
     }
+
+    // 关联查询 source item 的 trendScore/trendBreakdown/publishedAt/title
+    const sourceRow = db.prepare(
+      "SELECT trend_score, trend_breakdown, published_at, title FROM creative_source_items WHERE id = ?"
+    ).get(article.sourceItemId) as { trend_score: number | null; trend_breakdown: string | null; published_at: string | null; title: string } | undefined;
+    if (sourceRow) {
+      (article as any).trendScore = sourceRow.trend_score ?? null;
+      (article as any).trendBreakdown = sourceRow.trend_breakdown ? JSON.parse(sourceRow.trend_breakdown) : null;
+      (article as any).publishedAt = sourceRow.published_at ?? null;
+      (article as any).sourceTitle = sourceRow.title ?? null;
+    }
+
     return reply.send(article);
   });
 
@@ -996,10 +1010,12 @@ export function createServer(deps: ServerDeps = {}) {
     const editInput: Record<string, unknown> = {};
     if (body?.contentMarkdown !== undefined) { editInput.contentMarkdown = body.contentMarkdown; updatedFields.push("contentMarkdown"); }
     if (body?.images !== undefined) { editInput.images = body.images; updatedFields.push("images"); }
+    if (body?.coverImage !== undefined) { editInput.coverImage = body.coverImage; updatedFields.push("coverImage"); }
     if (body?.titles !== undefined) { editInput.titles = body.titles; updatedFields.push("titles"); }
     if (body?.thesis !== undefined) { editInput.thesis = body.thesis; updatedFields.push("thesis"); }
     if (body?.summary100 !== undefined) { editInput.summary100 = body.summary100; updatedFields.push("summary100"); }
     if (body?.status !== undefined) { editInput.status = body.status; updatedFields.push("status"); }
+    if (body?.anomalyReason !== undefined) { editInput.anomalyReason = body.anomalyReason; updatedFields.push("anomalyReason"); }
 
     if (Object.keys(editInput).length > 0) {
       editCreativeFinishedArticle(db, id, editInput as any);
@@ -1044,10 +1060,10 @@ export function createServer(deps: ServerDeps = {}) {
     const body = request.body as { writingStatus?: unknown } | undefined;
     const id = parseInt(params.id, 10);
     const status = typeof body?.writingStatus === "string" ? body.writingStatus : "";
-    if (!["ready", "writing", "done", "skipped"].includes(status)) {
+    if (!["ready", "writing", "done", "skipped", "excluded"].includes(status)) {
       return reply.code(400).send({ ok: false, reason: "invalid-status" });
     }
-    const updated = updateCreativeSourceItemWritingStatus(db, id, status as "ready" | "writing" | "done" | "skipped");
+    const updated = updateCreativeSourceItemWritingStatus(db, id, status as "ready" | "writing" | "done" | "skipped" | "excluded");
     if (!updated) {
       return reply.code(404).send({ ok: false, reason: "not-found" });
     }

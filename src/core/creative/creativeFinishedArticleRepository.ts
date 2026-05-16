@@ -15,7 +15,9 @@ const SELECT_COLUMNS = `
   quotes,
   summary_100,
   images_json,
+  cover_image_url,
   status,
+  anomaly_reason,
   raw_response_text,
   created_at,
   updated_at
@@ -32,7 +34,9 @@ type ArticleRow = {
   quotes: string | null;
   summary_100: string | null;
   images_json: string | null;
+  cover_image_url: string | null;
   status: string;
+  anomaly_reason: string | null;
   raw_response_text: string | null;
   created_at: string;
   updated_at: string;
@@ -50,7 +54,10 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     quotes: row.quotes ? JSON.parse(row.quotes) : null,
     summary100: row.summary_100,
     imagesJson: row.images_json ? JSON.parse(row.images_json) : null,
+    images: row.images_json ? JSON.parse(row.images_json) : null,
+    coverImage: row.cover_image_url,
     status: row.status,
+    anomalyReason: row.anomaly_reason,
     rawResponseText: row.raw_response_text,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -70,7 +77,10 @@ export type CreativeFinishedArticleRecord = {
   quotes: string[] | null;
   summary100: string | null;
   imagesJson: unknown[] | null;
+  images: unknown[] | null;
+  coverImage: string | null;
   status: string;
+  anomalyReason: string | null;
   rawResponseText: string | null;
   createdAt: string;
   updatedAt: string;
@@ -86,6 +96,7 @@ export type InsertCreativeFinishedArticleInput = {
   quotes?: string[];
   summary100?: string;
   images?: unknown[];
+  coverImage?: string;
   rawResponseText?: string;
 };
 
@@ -98,8 +109,10 @@ export type EditCreativeFinishedArticleInput = {
   quotes?: string[];
   summary100?: string;
   images?: unknown[];
+  coverImage?: string;
   rawResponseText?: string;
   status?: string;
+  anomalyReason?: string;
 };
 
 export type ListCreativeFinishedArticlesFilters = {
@@ -134,10 +147,11 @@ export function insertCreativeFinishedArticle(
         quotes,
         summary_100,
         images_json,
+        cover_image_url,
         status,
         raw_response_text
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'generated', ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'generated', ?)
     `
   ).run(
     input.sourceItemId,
@@ -149,6 +163,7 @@ export function insertCreativeFinishedArticle(
     input.quotes ? JSON.stringify(input.quotes) : null,
     input.summary100 ?? null,
     input.images ? JSON.stringify(input.images) : null,
+    input.coverImage ?? null,
     input.rawResponseText ?? null
   );
 
@@ -284,6 +299,10 @@ export function editCreativeFinishedArticle(
     setClauses.push("images_json = ?");
     params.push(JSON.stringify(input.images));
   }
+  if (input.coverImage !== undefined) {
+    setClauses.push("cover_image_url = ?");
+    params.push(input.coverImage);
+  }
   if (input.rawResponseText !== undefined) {
     setClauses.push("raw_response_text = ?");
     params.push(input.rawResponseText);
@@ -291,6 +310,10 @@ export function editCreativeFinishedArticle(
   if (input.status !== undefined) {
     setClauses.push("status = ?");
     params.push(input.status);
+  }
+  if (input.anomalyReason !== undefined) {
+    setClauses.push("anomaly_reason = ?");
+    params.push(input.anomalyReason);
   }
 
   if (setClauses.length === 0) {

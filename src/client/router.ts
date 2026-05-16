@@ -111,17 +111,17 @@ const profilePageMeta = {
 export const shellPageMetas = [
   aiNewPageMeta,
   aiHotPageMeta,
-  aiTimelinePageMeta,
+  // aiTimelinePageMeta, // 暂时下架 AI 时间线（2026-05-17）
   creativeSourceItemsPageMeta,
   creativeFinishedArticlesPageMeta,
   sourcesPageMeta,
-  aiTimelineAdminPageMeta,
+  // aiTimelineAdminPageMeta, // 暂时下架 AI 时间线 feed 管理（2026-05-17）
   viewRulesPageMeta,
   profilePageMeta
 ] as const satisfies readonly ShellPageMeta[];
 export const systemShellPageMetas = [
   sourcesPageMeta,
-  aiTimelineAdminPageMeta,
+  // aiTimelineAdminPageMeta, // 暂时下架 AI 时间线 feed 管理（2026-05-17）
   viewRulesPageMeta,
   profilePageMeta
 ] as const satisfies readonly ShellPageMeta[];
@@ -176,12 +176,12 @@ const routes: RouteRecordRaw[] = [
   createShellRoute(aiNewRootPageMeta, aiNewPage),
   createShellRoute(aiNewPageMeta, aiNewPage),
   createShellRoute(aiHotPageMeta, aiHotPage),
-  createShellRoute(aiTimelinePageMeta, aiTimelinePage),
+  // createShellRoute(aiTimelinePageMeta, aiTimelinePage), // 暂时下架 AI 时间线（2026-05-17）
   createShellRoute(creativeSourceItemsPageMeta, creativeSourceItemsPage),
   createShellRoute(creativeFinishedArticlesPageMeta, creativeFinishedArticlesPage),
   createShellRoute(viewRulesPageMeta, viewRulesPage),
   createShellRoute(sourcesPageMeta, sourcesPage),
-  createShellRoute(aiTimelineAdminPageMeta, aiTimelineAdminPage),
+  // createShellRoute(aiTimelineAdminPageMeta, aiTimelineAdminPage), // 暂时下架 AI 时间线 feed 管理（2026-05-17）
   createShellRoute(profilePageMeta, profilePage)
 ];
 

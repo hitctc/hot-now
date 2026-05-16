@@ -121,11 +121,12 @@ describe("AiTimelineAdminPage", () => {
     mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount());
   });
 
-  it("registers the AI timeline feed entry in the system menu metadata", () => {
-    expect(systemShellPageMetas.map((meta) => meta.navLabel)).toContain("AI 时间线 feed");
-    expect(systemShellPageMetas.find((meta) => meta.navLabel === "AI 时间线 feed")?.path).toBe(
-      "/settings/ai-timeline"
-    );
+  // AI 时间线 feed 页面已暂时下架（2026-05-17），跳过菜单注册断言
+  it.skip("registers the AI timeline feed entry in the system menu metadata", () => {
+    const labels = systemShellPageMetas.map((meta) => meta.navLabel) as string[];
+    expect(labels).toContain("AI 时间线 feed");
+    const found = systemShellPageMetas.find((meta) => (meta as any).navLabel === "AI 时间线 feed");
+    expect(found?.path).toBe("/settings/ai-timeline");
   });
 
   it("renders the read-only feed workbench sections", async () => {

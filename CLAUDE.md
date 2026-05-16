@@ -8,6 +8,8 @@
 
 AI 时间线是独立功能：它读取外部 Markdown feed 中的 `json ai-timeline-feed` 数据块，渲染官方事件流，不与 AI 新讯 / AI 热点 的普通内容流混合。S 级 AI 时间线事件由服务端独立轮询 feed，按 `eventKey` 去重后推送飞书主通道和邮件备份通道。
 
+**注意：AI 时间线页面（`/ai-timeline`）和 feed 管理页（`/settings/ai-timeline`）已于 2026-05-17 暂时下架，菜单入口和路由已注释。** 后端 API 和 feed 轮询仍保留运行，恢复时取消 `router.ts` 中的注释即可。
+
 ## 技术栈
 
 - **后端**：Node.js、Fastify、TypeScript（ES2022 / NodeNext）、better-sqlite3

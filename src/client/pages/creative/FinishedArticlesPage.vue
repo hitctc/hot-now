@@ -189,6 +189,38 @@ function formatBreakdown(b: TrendBreakdown): string {
     .join(" | ");
 }
 
+// 爆文维度柱状图配色
+const breakdownColors: Record<keyof TrendBreakdown, string> = {
+  topicPower: "#3b82f6",
+  emotionResonance: "#ef4444",
+  infoGap: "#f59e0b",
+  socialCurrency: "#10b981",
+  timingWindow: "#8b5cf6",
+  audienceBreadth: "#6366f1"
+};
+
+// 返回排序后的柱状图段数据
+// 固定维度顺序，柱状图每段颜色位置一致便于横向对比
+const breakdownDimensionOrder: Array<keyof TrendBreakdown> = [
+  "topicPower", "infoGap", "emotionResonance", "socialCurrency", "timingWindow", "audienceBreadth"
+];
+
+function getBreakdownBars(b: TrendBreakdown): Array<{ label: string; value: number; color: string; width: string }> {
+  const total = Object.values(b).reduce((s, v) => s + v, 0);
+  if (total === 0) return [];
+  return breakdownDimensionOrder
+    .filter(key => (b[key] ?? 0) > 0)
+    .map(key => {
+      const val = b[key];
+      return {
+        label: `${breakdownLabels[key]}${val}`,
+        value: val,
+        color: breakdownColors[key],
+        width: `${Math.round((val / total) * 100)}%`
+      };
+    });
+}
+
 // SQLite CURRENT_TIMESTAMP 输出 UTC 但不带后缀，补 Z 让 JS 正确解析
 function formatLocalTime(value: string): string {
   const fixed = /^[0-9]{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(value) && !/[Zz+\-]\d{0,4}$/.test(value)
@@ -229,6 +261,21 @@ function formatPublishedAt(value: string | null): string {
 async function copyText(text: string): Promise<void> {
   await navigator.clipboard.writeText(text);
   message.success("已复制到剪贴板");
+}
+
+// 成品文章 prompt：指示爱马仕智能体对指定成品文章执行完整的单条写文章工作流（重写）
+function buildFinishedArticlePrompt(article: CreativeFinishedArticle): string {
+  const title = getFirstTitle(article.titles);
+  return [
+    "请使用「单条写文章」工作流重写以下成品文章，生成一篇新文章（不覆盖原文）并推送至公众号草稿箱：",
+    "",
+    `- 原文 ID：${article.id}`,
+    `- 原文标题：${title}`
+  ].join("\n");
+}
+
+async function copyFinishedArticlePrompt(article: CreativeFinishedArticle): Promise<void> {
+  await copyText(buildFinishedArticlePrompt(article));
 }
 
 async function copyMarkdownAsPlainText(md: string): Promise<void> {
@@ -291,16 +338,15 @@ function getStatusInfo(status: string): { label: string; color: string } {
 const columns = [
   { title: "标题", key: "title", width: 200, ellipsis: true },
   { title: "封面图", key: "coverImage", width: 80, ellipsis: true },
-  { title: "正文图片", key: "hasImage", width: 80, ellipsis: true },
   { title: "状态", key: "status", width: 100, ellipsis: true },
   { title: "来源素材", key: "sourceItem", width: 110, ellipsis: true },
   { title: "爆文分", key: "trendScore", width: 72, ellipsis: true },
-  { title: "爆文维度", key: "trendBreakdown", width: 240, ellipsis: true },
+  { title: "爆文维度", key: "trendBreakdown", width: 160, ellipsis: true },
   { title: "模式", key: "mode", width: 72, ellipsis: true },
   { title: "发布时间", key: "publishedAt", width: 130, ellipsis: true },
   { title: "创建时间", key: "createdAt", width: 140, ellipsis: true },
   { title: "异常说明", key: "anomalyReason", width: 150, ellipsis: true },
-  { title: "复制", key: "quickCopy", width: 72, ellipsis: true }
+  { title: "复制重写文章", key: "quickCopy", width: 110, ellipsis: true }
 ];
 
 const pagination = computed(() => ({
@@ -313,7 +359,7 @@ const pagination = computed(() => ({
 </script>
 
 <template>
-  <div class="flex w-full flex-col gap-5" data-page="creative-finished-articles">
+  <div class="flex w-full flex-col gap-2" data-page="creative-finished-articles">
     <!-- 筛选栏 -->
     <div class="flex flex-wrap items-center gap-3">
       <a-input-search
@@ -333,7 +379,7 @@ const pagination = computed(() => ({
         :scroll="{ x: 900 }"
         row-key="id"
         data-article-table
-        size="middle"
+        size="small"
         @change="handleTableChange"
       >
         <template #bodyCell="{ column, record }">
@@ -360,33 +406,6 @@ const pagination = computed(() => ({
             <span v-else class="text-xs text-editorial-text-muted">无</span>
           </template>
 
-          <!-- 正文图片列 -->
-          <template v-else-if="column.key === 'hasImage'">
-            <a-image-preview-group v-if="parseArticleImages(record.imagesJson).length > 0">
-              <div class="relative inline-flex items-end" style="width:44px;height:44px;">
-                <template v-if="parseArticleImages(record.imagesJson).length > 1">
-                  <div class="absolute rounded border border-editorial-border bg-editorial-panel" style="top:6px;left:6px;width:36px;height:36px;"></div>
-                  <div class="absolute rounded border border-editorial-border bg-editorial-panel" style="top:3px;left:3px;width:36px;height:36px;"></div>
-                </template>
-                <a-image
-                  :src="extractImageUrl(parseArticleImages(record.imagesJson)[0])"
-                  :width="36"
-                  :height="36"
-                  class="!absolute left-0 top-0 !rounded !border !border-editorial-border"
-                  style="object-fit:cover;"
-                />
-                <span v-if="parseArticleImages(record.imagesJson).length > 1" class="absolute -right-1 -top-1 z-10 flex h-4 min-w-4 items-center justify-center rounded-full bg-editorial-text-main px-1 text-[10px] font-medium leading-none text-white">
-                  {{ parseArticleImages(record.imagesJson).length }}
-                </span>
-              </div>
-              <!-- 隐藏图片用于预览翻页 -->
-              <template v-for="(img, idx) in parseArticleImages(record.imagesJson).slice(1)" :key="idx">
-                <a-image :src="extractImageUrl(img)" style="display:none;" />
-              </template>
-            </a-image-preview-group>
-            <span v-else class="text-xs text-editorial-text-muted">无</span>
-          </template>
-
           <!-- 状态列 -->
           <template v-else-if="column.key === 'status'">
             <a-tag :color="getStatusInfo(record.status).color" class="!m-0">{{ getStatusInfo(record.status).label }}</a-tag>
@@ -403,12 +422,12 @@ const pagination = computed(() => ({
             <span v-else class="text-xs text-editorial-text-muted">-</span>
           </template>
 
-          <!-- 快捷复制列 -->
+          <!-- 快捷复制列：生成重写文章 prompt -->
           <template v-else-if="column.key === 'quickCopy'">
             <a
               class="cursor-pointer text-xs text-editorial-link-active hover:underline"
-              @click.prevent="copyText(JSON.stringify({ id: record.id, title: getFirstTitle(record.titles) }))"
-            >复制</a>
+              @click.prevent="copyFinishedArticlePrompt(record)"
+            >重写</a>
           </template>
 
           <!-- 来源素材列 -->
@@ -427,16 +446,19 @@ const pagination = computed(() => ({
 
           <!-- 评分维度列 -->
           <template v-else-if="column.key === 'trendBreakdown'">
-            <template v-if="record.trendBreakdown">
+            <template v-if="record.trendBreakdown && getBreakdownBars(record.trendBreakdown).length > 0">
               <a-tooltip :mouse-enter-delay="0.3">
                 <template #title>
-                  <div class="text-xs leading-5">
-                    {{ formatBreakdown(record.trendBreakdown) }}
-                  </div>
+                  <div class="text-xs leading-5">{{ formatBreakdown(record.trendBreakdown) }}</div>
                 </template>
-                <span class="block truncate text-[11px] leading-5 text-editorial-text-body">
-                  {{ formatBreakdown(record.trendBreakdown) }}
-                </span>
+                <div class="flex h-3 w-full min-w-[80px] overflow-hidden rounded-sm">
+                  <div
+                    v-for="(bar, idx) in getBreakdownBars(record.trendBreakdown)"
+                    :key="idx"
+                    :style="{ width: bar.width, backgroundColor: bar.color }"
+                    :title="bar.label"
+                  />
+                </div>
               </a-tooltip>
             </template>
             <span v-else class="text-xs text-editorial-text-muted">-</span>

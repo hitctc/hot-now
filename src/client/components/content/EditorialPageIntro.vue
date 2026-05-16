@@ -18,13 +18,13 @@ const props = withDefaults(
 const rootClass = computed(() =>
   props.compact
     ? "flex flex-col gap-1.5"
-    : "flex w-full flex-col gap-2 border-b border-editorial-border pb-4 pt-2"
+    : "flex w-full flex-col gap-2 border-b border-editorial-border pb-2 pt-1"
 );
 
 const titleClass = computed(() =>
   props.compact
     ? "m-0 text-lg font-semibold leading-tight text-editorial-text-main"
-    : "m-0 text-[32px] font-semibold tracking-[-0.03em] text-editorial-text-main"
+    : "m-0 text-[22px] font-semibold tracking-[-0.03em] text-editorial-text-main"
 );
 
 const descriptionClass = computed(() =>
@@ -53,8 +53,5 @@ function buildTrackingAttributes(suffix?: string): Record<string, string> {
     <h2 :class="titleClass" v-bind="buildTrackingAttributes('title')">
       {{ title }}
     </h2>
-    <p :class="descriptionClass" v-bind="buildTrackingAttributes('description')">
-      {{ description }}
-    </p>
   </header>
 </template>

@@ -183,6 +183,37 @@ function formatBreakdown(b: TrendBreakdown): string {
     .join(" | ");
 }
 
+// 爆文维度柱状图配色
+const breakdownColors: Record<keyof TrendBreakdown, string> = {
+  topicPower: "#3b82f6",
+  emotionResonance: "#ef4444",
+  infoGap: "#f59e0b",
+  socialCurrency: "#10b981",
+  timingWindow: "#8b5cf6",
+  audienceBreadth: "#6366f1"
+};
+
+// 固定维度顺序，柱状图每段颜色位置一致便于横向对比
+const breakdownDimensionOrder: Array<keyof TrendBreakdown> = [
+  "topicPower", "infoGap", "emotionResonance", "socialCurrency", "timingWindow", "audienceBreadth"
+];
+
+function getBreakdownBars(b: TrendBreakdown): Array<{ label: string; value: number; color: string; width: string }> {
+  const total = Object.values(b).reduce((s, v) => s + v, 0);
+  if (total === 0) return [];
+  return breakdownDimensionOrder
+    .filter(key => (b[key] ?? 0) > 0)
+    .map(key => {
+      const val = b[key];
+      return {
+        label: `${breakdownLabels[key]}${val}`,
+        value: val,
+        color: breakdownColors[key],
+        width: `${Math.round((val / total) * 100)}%`
+      };
+    });
+}
+
 function formatPublishedAt(value: string | null): string {
   if (!value) return "-";
   // SQLite CURRENT_TIMESTAMP 输出 UTC 但不带后缀，补 Z 让 JS 正确解析
@@ -241,6 +272,20 @@ async function copyText(text: string): Promise<void> {
   message.success("已复制到剪贴板");
 }
 
+// 素材库 prompt：指示爱马仕智能体对指定素材执行完整的单条写文章工作流
+function buildSourceItemPrompt(item: CreativeSourceItem): string {
+  return [
+    "请使用「单条写文章」工作流处理以下素材，完成从素材读取到推送公众号草稿箱的完整流程：",
+    "",
+    `- 素材 ID：${item.id}`,
+    `- 素材标题：${item.title}`
+  ].join("\n");
+}
+
+async function copySourceItemPrompt(item: CreativeSourceItem): Promise<void> {
+  await copyText(buildSourceItemPrompt(item));
+}
+
 async function copyMarkdownAsPlainText(md: string): Promise<void> {
   const text = md
     .replace(/^#{1,6}\s+/gm, "")
@@ -266,11 +311,11 @@ const columns = [
   { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: 90, ellipsis: true },
   { title: "评分", dataIndex: "score", key: "score", width: 72, ellipsis: true },
   { title: "爆文分", key: "trendScore", width: 72, ellipsis: true },
-  { title: "爆文维度", key: "trendBreakdown", width: 240, ellipsis: true },
-  { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 120, ellipsis: true },
+  { title: "爆文维度", key: "trendBreakdown", width: 120, ellipsis: true },
+  { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 60, align: "center" as const, ellipsis: true },
   { title: "发布时间", dataIndex: "publishedAt", key: "publishedAt", width: 130, ellipsis: true },
   { title: "成品创建时间", key: "linkedArticleCreatedAt", width: 140, ellipsis: true },
-  { title: "复制", key: "quickCopy", width: 72, ellipsis: true }
+  { title: "复制重写文章", key: "quickCopy", width: 110, ellipsis: true }
 ];
 
 const pagination = computed(() => ({
@@ -283,7 +328,7 @@ const pagination = computed(() => ({
 </script>
 
 <template>
-  <div class="flex w-full flex-col gap-5" data-page="creative-source-items">
+  <div class="flex w-full flex-col gap-2" data-page="creative-source-items">
     <!-- 筛选栏 -->
     <div class="flex flex-wrap items-center gap-3">
       <a-select
@@ -310,7 +355,7 @@ const pagination = computed(() => ({
         :expanded-row-keys="expandedRowKeys"
         row-key="id"
         data-source-item-table
-        size="middle"
+        size="small"
         @change="handleTableChange"
         @expand="(expanded: boolean, record: CreativeSourceItem) => toggleExpand(record.id)"
       >
@@ -368,16 +413,19 @@ const pagination = computed(() => ({
 
           <!-- 评分维度列 -->
           <template v-else-if="column.key === 'trendBreakdown'">
-            <template v-if="record.trendBreakdown">
+            <template v-if="record.trendBreakdown && getBreakdownBars(record.trendBreakdown).length > 0">
               <a-tooltip :mouse-enter-delay="0.3">
                 <template #title>
-                  <div class="text-xs leading-5">
-                    {{ formatBreakdown(record.trendBreakdown) }}
-                  </div>
+                  <div class="text-xs leading-5">{{ formatBreakdown(record.trendBreakdown) }}</div>
                 </template>
-                <span class="block truncate text-[11px] leading-5 text-editorial-text-body">
-                  {{ formatBreakdown(record.trendBreakdown) }}
-                </span>
+                <div class="flex h-3 w-full min-w-[80px] overflow-hidden rounded-sm">
+                  <div
+                    v-for="(bar, idx) in getBreakdownBars(record.trendBreakdown)"
+                    :key="idx"
+                    :style="{ width: bar.width, backgroundColor: bar.color }"
+                    :title="bar.label"
+                  />
+                </div>
               </a-tooltip>
             </template>
             <span v-else class="text-xs text-editorial-text-muted">-</span>
@@ -385,7 +433,13 @@ const pagination = computed(() => ({
 
           <!-- Agent 列 -->
           <template v-else-if="column.key === 'collectorAgent'">
-            <span class="text-xs text-editorial-text-body">{{ record.collectorAgent }}</span>
+            <a-tooltip :mouse-enter-delay="0.3" :title="record.collectorAgent">
+              <span class="inline-flex items-center gap-1 text-xs text-editorial-text-body">
+                <template v-if="record.collectorAgent === 'manual'">👤</template>
+                <template v-else>🤖</template>
+                <span class="sr-only">{{ record.collectorAgent }}</span>
+              </span>
+            </a-tooltip>
           </template>
 
           <!-- 发布时间列 -->
@@ -406,12 +460,12 @@ const pagination = computed(() => ({
             </a-tag>
           </template>
 
-          <!-- 快捷复制列 -->
+          <!-- 快捷复制列：生成写文章 prompt -->
           <template v-else-if="column.key === 'quickCopy'">
             <a
               class="cursor-pointer text-xs text-editorial-link-active hover:underline"
-              @click.prevent="copyText(JSON.stringify({ id: record.id, title: record.title }))"
-            >复制</a>
+              @click.prevent="copySourceItemPrompt(record)"
+            >写文章</a>
           </template>
         </template>
 

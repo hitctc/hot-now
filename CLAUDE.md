@@ -166,3 +166,7 @@ scripts/
 ### 部署
 
 生产部署使用 `scripts/deploy-prod.sh`，它会通过 rsync 将代码同步到 `/srv/hot-now/app`，在服务器上执行 `npm ci && npm run build`，然后重启 `hot-now` systemd 服务。部署脚本**不会**触碰数据目录（`/srv/hot-now/shared/data`）和环境文件（`/srv/hot-now/shared/.env`）。
+
+### 开发完成自动提交推送
+
+代码开发完成并部署到服务器后，如果改动无异常、无未处理事项，应自动执行 ship commit push 流程（触发 ship skill 统一提交规范），不需要等待用户明确要求。只有用户明确说"先不提交"或存在未解决的验证失败时，才跳过提交推送。

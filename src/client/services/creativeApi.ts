@@ -56,10 +56,15 @@ export type CreativeFinishedArticle = {
   quotes: string | null;
   summary100: string | null;
   imagesJson: string | ArticleImageEntry[] | null;
+  images: string | ArticleImageEntry[] | null;
+  coverImage: string | null;
   status: string;
+  anomalyReason: string | null;
   rawResponseText: string | null;
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
+  sourceTitle: string | null;
+  publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };

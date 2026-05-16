@@ -52,6 +52,7 @@ const articleModalData = ref<CreativeFinishedArticle | null>(null);
 const writingStatusOptions = [
   { label: "全部", value: "" },
   { label: "待写作", value: "ready" },
+  { label: "不写作", value: "excluded" },
   { label: "写作中", value: "writing" },
   { label: "已完成", value: "done" },
   { label: "跳过不写", value: "skipped" }
@@ -203,6 +204,8 @@ function writingStatusColor(status: string): string {
   switch (status) {
     case "ready":
       return "blue";
+    case "excluded":
+      return "default";
     case "writing":
       return "orange";
     case "done":
@@ -218,6 +221,8 @@ function writingStatusLabel(status: string): string {
   switch (status) {
     case "ready":
       return "待写作";
+    case "excluded":
+      return "不写作";
     case "writing":
       return "写作中";
     case "done":
@@ -258,13 +263,14 @@ const columns = [
   { title: "标题", dataIndex: "title", key: "title", width: 200, ellipsis: true },
   { title: "成品", key: "linkedArticle", width: 80, align: "center" as const, ellipsis: true },
   { title: "来源", dataIndex: "sourceName", key: "sourceName", width: 100, ellipsis: true },
+  { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: 90, ellipsis: true },
   { title: "评分", dataIndex: "score", key: "score", width: 72, ellipsis: true },
   { title: "爆文分", key: "trendScore", width: 72, ellipsis: true },
   { title: "爆文维度", key: "trendBreakdown", width: 240, ellipsis: true },
   { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 120, ellipsis: true },
   { title: "发布时间", dataIndex: "publishedAt", key: "publishedAt", width: 130, ellipsis: true },
   { title: "成品创建时间", key: "linkedArticleCreatedAt", width: 140, ellipsis: true },
-  { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: 90, ellipsis: true }
+  { title: "复制", key: "quickCopy", width: 72, ellipsis: true }
 ];
 
 const pagination = computed(() => ({
@@ -398,6 +404,14 @@ const pagination = computed(() => ({
             <a-tag :color="writingStatusColor(record.writingStatus)">
               {{ writingStatusLabel(record.writingStatus) }}
             </a-tag>
+          </template>
+
+          <!-- 快捷复制列 -->
+          <template v-else-if="column.key === 'quickCopy'">
+            <a
+              class="cursor-pointer text-xs text-editorial-link-active hover:underline"
+              @click.prevent="copyText(JSON.stringify({ id: record.id, title: record.title }))"
+            >复制</a>
           </template>
         </template>
 

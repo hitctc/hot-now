@@ -274,17 +274,33 @@ async function copyAsWechatFormat(): Promise<void> {
   }
 }
 
+// ─── 状态字典 ───
+
+const statusMap: Record<string, { label: string; color: string }> = {
+  generated: { label: "已生成", color: "blue" },
+  wechat_draft: { label: "已推送草稿", color: "green" },
+  anomaly: { label: "异常", color: "red" }
+};
+
+function getStatusInfo(status: string): { label: string; color: string } {
+  return statusMap[status] ?? { label: status, color: "default" };
+}
+
 // ─── 表格列 ───
 
 const columns = [
   { title: "标题", key: "title", width: 200, ellipsis: true },
+  { title: "封面图", key: "coverImage", width: 80, ellipsis: true },
+  { title: "正文图片", key: "hasImage", width: 80, ellipsis: true },
+  { title: "状态", key: "status", width: 100, ellipsis: true },
   { title: "来源素材", key: "sourceItem", width: 110, ellipsis: true },
   { title: "爆文分", key: "trendScore", width: 72, ellipsis: true },
   { title: "爆文维度", key: "trendBreakdown", width: 240, ellipsis: true },
   { title: "模式", key: "mode", width: 72, ellipsis: true },
   { title: "发布时间", key: "publishedAt", width: 130, ellipsis: true },
-  { title: "图片", key: "hasImage", width: 80, ellipsis: true },
-  { title: "创建时间", key: "createdAt", width: 140, ellipsis: true }
+  { title: "创建时间", key: "createdAt", width: 140, ellipsis: true },
+  { title: "异常说明", key: "anomalyReason", width: 150, ellipsis: true },
+  { title: "复制", key: "quickCopy", width: 72, ellipsis: true }
 ];
 
 const pagination = computed(() => ({
@@ -331,6 +347,70 @@ const pagination = computed(() => ({
             </span>
           </template>
 
+          <!-- 封面图列 -->
+          <template v-else-if="column.key === 'coverImage'">
+            <a-image
+              v-if="record.coverImage"
+              :src="record.coverImage"
+              :width="36"
+              :height="36"
+              class="!rounded !border !border-editorial-border"
+              style="object-fit:cover;"
+            />
+            <span v-else class="text-xs text-editorial-text-muted">无</span>
+          </template>
+
+          <!-- 正文图片列 -->
+          <template v-else-if="column.key === 'hasImage'">
+            <a-image-preview-group v-if="parseArticleImages(record.imagesJson).length > 0">
+              <div class="relative inline-flex items-end" style="width:44px;height:44px;">
+                <template v-if="parseArticleImages(record.imagesJson).length > 1">
+                  <div class="absolute rounded border border-editorial-border bg-editorial-panel" style="top:6px;left:6px;width:36px;height:36px;"></div>
+                  <div class="absolute rounded border border-editorial-border bg-editorial-panel" style="top:3px;left:3px;width:36px;height:36px;"></div>
+                </template>
+                <a-image
+                  :src="extractImageUrl(parseArticleImages(record.imagesJson)[0])"
+                  :width="36"
+                  :height="36"
+                  class="!absolute left-0 top-0 !rounded !border !border-editorial-border"
+                  style="object-fit:cover;"
+                />
+                <span v-if="parseArticleImages(record.imagesJson).length > 1" class="absolute -right-1 -top-1 z-10 flex h-4 min-w-4 items-center justify-center rounded-full bg-editorial-text-main px-1 text-[10px] font-medium leading-none text-white">
+                  {{ parseArticleImages(record.imagesJson).length }}
+                </span>
+              </div>
+              <!-- 隐藏图片用于预览翻页 -->
+              <template v-for="(img, idx) in parseArticleImages(record.imagesJson).slice(1)" :key="idx">
+                <a-image :src="extractImageUrl(img)" style="display:none;" />
+              </template>
+            </a-image-preview-group>
+            <span v-else class="text-xs text-editorial-text-muted">无</span>
+          </template>
+
+          <!-- 状态列 -->
+          <template v-else-if="column.key === 'status'">
+            <a-tag :color="getStatusInfo(record.status).color" class="!m-0">{{ getStatusInfo(record.status).label }}</a-tag>
+          </template>
+
+          <!-- 异常说明列 -->
+          <template v-else-if="column.key === 'anomalyReason'">
+            <template v-if="record.anomalyReason">
+              <a-tooltip :mouse-enter-delay="0.3">
+                <template #title>{{ record.anomalyReason }}</template>
+                <span class="block truncate text-xs text-editorial-text-body">{{ record.anomalyReason }}</span>
+              </a-tooltip>
+            </template>
+            <span v-else class="text-xs text-editorial-text-muted">-</span>
+          </template>
+
+          <!-- 快捷复制列 -->
+          <template v-else-if="column.key === 'quickCopy'">
+            <a
+              class="cursor-pointer text-xs text-editorial-link-active hover:underline"
+              @click.prevent="copyText(JSON.stringify({ id: record.id, title: getFirstTitle(record.titles) }))"
+            >复制</a>
+          </template>
+
           <!-- 来源素材列 -->
           <template v-else-if="column.key === 'sourceItem'">
             <a
@@ -370,38 +450,6 @@ const pagination = computed(() => ({
           <!-- 发布时间列 -->
           <template v-else-if="column.key === 'publishedAt'">
             <span class="text-xs text-editorial-text-muted">{{ formatLocalTime(record.publishedAt) }}</span>
-          </template>
-
-          <!-- 图片列 -->
-          <template v-else-if="column.key === 'hasImage'">
-            <div v-if="parseArticleImages(record.imagesJson).length > 0" class="relative inline-flex items-end" style="width:44px;height:44px;">
-              <!-- 多图叠加底层（仅 2 张以上时显示） -->
-              <template v-if="parseArticleImages(record.imagesJson).length > 1">
-                <div class="absolute rounded border border-editorial-border bg-editorial-panel" style="top:6px;left:6px;width:36px;height:36px;"></div>
-                <div class="absolute rounded border border-editorial-border bg-editorial-panel" style="top:3px;left:3px;width:36px;height:36px;"></div>
-              </template>
-              <a-image
-                :src="extractImageUrl(parseArticleImages(record.imagesJson)[0])"
-                :preview-group="String(record.id)"
-                :width="36"
-                :height="36"
-                class="!absolute left-0 top-0 !rounded !border !border-editorial-border"
-                style="object-fit:cover;"
-              />
-              <!-- 隐藏的后续图片，用于预览翻页 -->
-              <template v-for="(img, idx) in parseArticleImages(record.imagesJson).slice(1)" :key="idx">
-                <a-image
-                  :src="extractImageUrl(img)"
-                  :preview-group="String(record.id)"
-                  style="display:none;"
-                />
-              </template>
-              <!-- 多图数量标记 -->
-              <span v-if="parseArticleImages(record.imagesJson).length > 1" class="absolute -right-1 -top-1 z-10 flex h-4 min-w-4 items-center justify-center rounded-full bg-editorial-text-main px-1 text-[10px] font-medium leading-none text-white">
-                {{ parseArticleImages(record.imagesJson).length }}
-              </span>
-            </div>
-            <span v-else class="text-xs text-editorial-text-muted">无</span>
           </template>
 
           <!-- 创建时间列 -->

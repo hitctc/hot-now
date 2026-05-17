@@ -32,6 +32,7 @@ const sourceTypeByKind: Record<string, SourceType> = {
 };
 
 const aiKeywords = [
+  // 英文通用
   "ai",
   "llm",
   "gpt",
@@ -41,11 +42,42 @@ const aiKeywords = [
   "openai",
   "claude",
   "deepseek",
+  "aigc",
+  "rag",
+  "kimi",
+  "copilot",
+  "sora",
+  "r1",
+  "v3",
+  // 中文通用
   "大模型",
-  "智能体"
+  "智能体",
+  "人工智能",
+  "多模态",
+  "芯片",
+  "自动驾驶",
+  "数字人",
+  "具身智能",
+  "机器学习",
+  "深度学习",
+  "ai搜索",
+  "端侧",
+  "推理模型",
+  "ai编程",
+  // 国产模型品牌
+  "文心一言",
+  "通义千问",
+  "智谱",
+  "星火",
+  "百川",
+  "豆包",
+  "混元",
+  "天工",
+  "阶跃"
 ];
 
 const heatKeywords = [
+  // 英文热度信号
   "breaking",
   "update",
   "launch",
@@ -58,6 +90,7 @@ const heatKeywords = [
   "weekly",
   "hot",
   "trending",
+  // 中文热度信号
   "发布",
   "上线",
   "更新",
@@ -66,7 +99,32 @@ const heatKeywords = [
   "热点",
   "速览",
   "深度",
-  "洞察"
+  "洞察",
+  "重磅",
+  "突发",
+  "独家",
+  "首发",
+  "爆料",
+  "解读",
+  "前瞻",
+  "突破",
+  "盘点",
+  "趋势",
+  "首次",
+  "里程碑",
+  "官宣",
+  "紧急",
+  "首家",
+  "联名",
+  // 情绪类热词
+  "对标",
+  "碾压",
+  "刚刚",
+  "出圈",
+  "封杀",
+  "下架",
+  "涨价",
+  "免费"
 ];
 
 // The scoring module owns all content signals so the list view can stay a thin mapper over DB rows.
@@ -87,11 +145,10 @@ export function scoreContentItem(
   const aiScore = scoreKeywordSignals([title, summary, body], aiKeywords);
   const heatScore = scoreHeatSignals([title, summary, body], freshnessScore);
   const contentScore = clampScore(
-    freshnessScore * 0.32 +
+    freshnessScore * 0.28 +
       sourceScore * 0.2 +
-      completenessScore * 0.18 +
-      aiScore * 0.18 +
-      heatScore * 0.12
+      aiScore * 0.25 +
+      heatScore * 0.27
   );
 
   return {

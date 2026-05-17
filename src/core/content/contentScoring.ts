@@ -145,10 +145,9 @@ export function scoreContentItem(
   const aiScore = scoreKeywordSignals([title, summary, body], aiKeywords);
   const heatScore = scoreHeatSignals([title, summary, body], freshnessScore);
   const contentScore = clampScore(
-    freshnessScore * 0.28 +
-      sourceScore * 0.2 +
-      aiScore * 0.25 +
-      heatScore * 0.27
+    freshnessScore * 0.30 +
+      aiScore * 0.35 +
+      heatScore * 0.35
   );
 
   return {

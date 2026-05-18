@@ -154,6 +154,7 @@ export type ListCreativeSourceItemsFilters = {
   search?: string;
   trendScoreMin?: number;
   last24h?: boolean;
+  sourceFeed?: string;
 };
 
 export type ListCreativeSourceItemsResult = {
@@ -328,6 +329,19 @@ export function listCreativeSourceItems(
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     whereClauses.push("created_at >= ?");
     params.push(cutoff);
+  }
+
+  // sourceFeed：按 sourceName 前缀匹配筛选数据源
+  if (filters.sourceFeed) {
+    const sourceFeedNameMap: Record<string, string> = {
+      "juya-ai-daily": "Juya AI Daily",
+      "wechat-rss": "微信公众号："
+    };
+    const namePattern = sourceFeedNameMap[filters.sourceFeed];
+    if (namePattern) {
+      whereClauses.push("source_name LIKE ?");
+      params.push(`${namePattern}%`);
+    }
   }
 
   const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";

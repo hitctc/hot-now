@@ -869,23 +869,14 @@ export function createServer(deps: ServerDeps = {}) {
 
     const query = request.query as Record<string, string | undefined>;
 
-    // sourceFeed 是面向调用方的语义化过滤参数，内部映射到 collectorAgent
-    let collectorAgentFilter = query.collectorAgent;
-    if (query.sourceFeed) {
-      const sourceFeedAgentMap: Record<string, string> = {
-        "juya-ai-daily": "juya-ai-daily",
-        "wechat-rss": "hotnow-feed"
-      };
-      collectorAgentFilter = sourceFeedAgentMap[query.sourceFeed] ?? query.sourceFeed;
-    }
-
     const result = listCreativeSourceItems(db, {
       page: query.page ? parseInt(query.page, 10) : undefined,
       pageSize: query.pageSize ? parseInt(query.pageSize, 10) : undefined,
       writingStatus: query.writingStatus as "ready" | "writing" | "done" | "skipped" | "excluded" | undefined,
-      collectorAgent: collectorAgentFilter,
+      collectorAgent: query.collectorAgent,
       search: query.search,
       trendScoreMin: query.trendScore_min ? parseInt(query.trendScore_min, 10) : undefined,
+      sourceFeed: query.sourceFeed || undefined,
       last24h: query.sourceFeed ? true : undefined
     });
 

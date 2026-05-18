@@ -11,6 +11,7 @@ import { clusterTopics } from "../topics/clusterTopics.js";
 import type { ArticleResult } from "../fetch/extractArticle.js";
 import type { LoadedIssue } from "../source/types.js";
 import type { RuntimeConfig } from "../types/appConfig.js";
+import { insertCreativeSourceItem } from "../creative/creativeSourceItemRepository.js";
 
 const collectionMailStatus = "not-sent-by-collection";
 
@@ -232,6 +233,22 @@ function persistCollectedItems(db: SqliteDatabase, issue: LoadedIssue, items: En
       metadataJson: item.metadataJson
     }))
   });
+
+  // 同步写入 creative_source_items，供创作模块素材接口查询
+  for (const item of items) {
+    const fullContent = item.article.ok ? item.article.text : null;
+    insertCreativeSourceItem(db, {
+      externalId: item.externalId,
+      collectorAgent: "hotnow-feed",
+      title: pickPersistedTitle(issue.sourceKind, item.title, item.article),
+      url: item.sourceUrl,
+      sourceName: item.sourceName ?? source.name,
+      summary: item.summary ?? null,
+      fullContent,
+      publishedAt: item.publishedAt ?? null,
+      collectorTimestamp: fetchedAt
+    });
+  }
 
   const readContentId = db.prepare(
     `

@@ -19,6 +19,9 @@ const SELECT_COLUMNS = `
   status,
   anomaly_reason,
   raw_response_text,
+  content_html_bauhaus,
+  content_html_sunset_film,
+  content_html_receipt,
   created_at,
   updated_at
 ` as const;
@@ -38,6 +41,9 @@ type ArticleRow = {
   status: string;
   anomaly_reason: string | null;
   raw_response_text: string | null;
+  content_html_bauhaus: string | null;
+  content_html_sunset_film: string | null;
+  content_html_receipt: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -59,6 +65,9 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     status: row.status,
     anomalyReason: row.anomaly_reason,
     rawResponseText: row.raw_response_text,
+    contentHtmlBauhaus: row.content_html_bauhaus,
+    contentHtmlSunsetFilm: row.content_html_sunset_film,
+    contentHtmlReceipt: row.content_html_receipt,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -82,6 +91,9 @@ export type CreativeFinishedArticleRecord = {
   status: string;
   anomalyReason: string | null;
   rawResponseText: string | null;
+  contentHtmlBauhaus: string | null;
+  contentHtmlSunsetFilm: string | null;
+  contentHtmlReceipt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -98,6 +110,9 @@ export type InsertCreativeFinishedArticleInput = {
   images?: unknown[];
   coverImage?: string;
   rawResponseText?: string;
+  contentHtmlBauhaus?: string;
+  contentHtmlSunsetFilm?: string;
+  contentHtmlReceipt?: string;
 };
 
 export type EditCreativeFinishedArticleInput = {
@@ -113,6 +128,9 @@ export type EditCreativeFinishedArticleInput = {
   rawResponseText?: string;
   status?: string;
   anomalyReason?: string;
+  contentHtmlBauhaus?: string;
+  contentHtmlSunsetFilm?: string;
+  contentHtmlReceipt?: string;
 };
 
 export type ListCreativeFinishedArticlesFilters = {
@@ -149,9 +167,12 @@ export function insertCreativeFinishedArticle(
         images_json,
         cover_image_url,
         status,
-        raw_response_text
+        raw_response_text,
+        content_html_bauhaus,
+        content_html_sunset_film,
+        content_html_receipt
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'generated', ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'generated', ?, ?, ?, ?)
     `
   ).run(
     input.sourceItemId,
@@ -164,7 +185,10 @@ export function insertCreativeFinishedArticle(
     input.summary100 ?? null,
     input.images ? JSON.stringify(input.images) : null,
     input.coverImage ?? null,
-    input.rawResponseText ?? null
+    input.rawResponseText ?? null,
+    input.contentHtmlBauhaus ?? null,
+    input.contentHtmlSunsetFilm ?? null,
+    input.contentHtmlReceipt ?? null
   );
 
   const row = db
@@ -314,6 +338,18 @@ export function editCreativeFinishedArticle(
   if (input.anomalyReason !== undefined) {
     setClauses.push("anomaly_reason = ?");
     params.push(input.anomalyReason);
+  }
+  if (input.contentHtmlBauhaus !== undefined) {
+    setClauses.push("content_html_bauhaus = ?");
+    params.push(input.contentHtmlBauhaus);
+  }
+  if (input.contentHtmlSunsetFilm !== undefined) {
+    setClauses.push("content_html_sunset_film = ?");
+    params.push(input.contentHtmlSunsetFilm);
+  }
+  if (input.contentHtmlReceipt !== undefined) {
+    setClauses.push("content_html_receipt = ?");
+    params.push(input.contentHtmlReceipt);
   }
 
   if (setClauses.length === 0) {

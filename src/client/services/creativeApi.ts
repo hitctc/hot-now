@@ -61,6 +61,9 @@ export type CreativeFinishedArticle = {
   status: string;
   anomalyReason: string | null;
   rawResponseText: string | null;
+  contentHtmlBauhaus: string | null;
+  contentHtmlSunsetFilm: string | null;
+  contentHtmlReceipt: string | null;
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
   sourceTitle: string | null;

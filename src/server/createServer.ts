@@ -782,7 +782,10 @@ export function createServer(deps: ServerDeps = {}) {
       summary100: typeof body?.summary100 === "string" ? body.summary100 : undefined,
       images: Array.isArray(body?.images) ? body.images as any[] : undefined,
       coverImage: typeof body?.coverImage === "string" ? body.coverImage : undefined,
-      rawResponseText: typeof body?.rawResponseText === "string" ? body.rawResponseText : undefined
+      rawResponseText: typeof body?.rawResponseText === "string" ? body.rawResponseText : undefined,
+      contentHtmlBauhaus: typeof body?.contentHtmlBauhaus === "string" ? body.contentHtmlBauhaus : undefined,
+      contentHtmlSunsetFilm: typeof body?.contentHtmlSunsetFilm === "string" ? body.contentHtmlSunsetFilm : undefined,
+      contentHtmlReceipt: typeof body?.contentHtmlReceipt === "string" ? body.contentHtmlReceipt : undefined
     });
 
     // 推送成品文章后，自动将素材写作状态标为 done
@@ -1016,6 +1019,9 @@ export function createServer(deps: ServerDeps = {}) {
     if (body?.summary100 !== undefined) { editInput.summary100 = body.summary100; updatedFields.push("summary100"); }
     if (body?.status !== undefined) { editInput.status = body.status; updatedFields.push("status"); }
     if (body?.anomalyReason !== undefined) { editInput.anomalyReason = body.anomalyReason; updatedFields.push("anomalyReason"); }
+    if (body?.contentHtmlBauhaus !== undefined) { editInput.contentHtmlBauhaus = body.contentHtmlBauhaus; updatedFields.push("contentHtmlBauhaus"); }
+    if (body?.contentHtmlSunsetFilm !== undefined) { editInput.contentHtmlSunsetFilm = body.contentHtmlSunsetFilm; updatedFields.push("contentHtmlSunsetFilm"); }
+    if (body?.contentHtmlReceipt !== undefined) { editInput.contentHtmlReceipt = body.contentHtmlReceipt; updatedFields.push("contentHtmlReceipt"); }
 
     if (Object.keys(editInput).length > 0) {
       editCreativeFinishedArticle(db, id, editInput as any);

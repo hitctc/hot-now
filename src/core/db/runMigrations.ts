@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 21;
+const schemaVersion = 22;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -22,6 +22,7 @@ const creativeContentWorkflowMigrationName = "018_creative_content_workflow";
 const writingStatusMigrationName = "019_writing_status";
 const trendScoreMigrationName = "020_trend_score";
 const coverImageAndAnomalyMigrationName = "021_cover_image_and_anomaly";
+const themeHtmlColumnsMigrationName = "022_theme_html_columns";
 
 const migrationStatements = [
   `
@@ -1067,6 +1068,21 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(21, coverImageAndAnomalyMigrationName);
+
+    // 022: 成品文章新增三个主题渲染 HTML 列
+    if (!hasColumn(db, "creative_finished_articles", "content_html_bauhaus")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN content_html_bauhaus TEXT DEFAULT NULL`);
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN content_html_sunset_film TEXT DEFAULT NULL`);
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN content_html_receipt TEXT DEFAULT NULL`);
+    }
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(22, themeHtmlColumnsMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

@@ -76,6 +76,26 @@ const editForm = ref<{ id: number; contentMarkdown: string; thesis: string; summ
 const wechatTheme = ref<WechatThemeId>("pure-white");
 const wechatCopying = ref(false);
 
+// 主题渲染切换（包豪斯 / 落日胶片 / 购物小票）
+type ThemeHtmlKey = "bauhaus" | "sunsetFilm" | "receipt";
+const themeOptions: { key: ThemeHtmlKey; label: string }[] = [
+  { key: "bauhaus", label: "包豪斯" },
+  { key: "sunsetFilm", label: "落日胶片" },
+  { key: "receipt", label: "购物小票" }
+];
+const activeTheme = ref<ThemeHtmlKey>("bauhaus");
+
+// 根据当前选中的主题返回渲染 HTML，为空则返回 null
+function getThemeHtml(article: CreativeFinishedArticle | null): string | null {
+  if (!article) return null;
+  const map: Record<ThemeHtmlKey, string | null> = {
+    bauhaus: article.contentHtmlBauhaus,
+    sunsetFilm: article.contentHtmlSunsetFilm,
+    receipt: article.contentHtmlReceipt
+  };
+  return map[activeTheme.value] ?? null;
+}
+
 // ─── 数据加载 ───
 
 async function loadItems(): Promise<void> {
@@ -573,16 +593,33 @@ const pagination = computed(() => ({
             </ul>
           </section>
 
-          <!-- 正文（Markdown 渲染） -->
+          <!-- 正文（主题渲染 / Markdown 降级） -->
           <section v-if="detailArticle.contentMarkdown">
             <div class="mb-2 flex items-center justify-between">
               <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文</h3>
-              <div class="flex gap-2">
+              <div class="flex items-center gap-2">
+                <div v-if="getThemeHtml(detailArticle)" class="flex gap-1">
+                  <a-button
+                    v-for="opt in themeOptions"
+                    :key="opt.key"
+                    :type="activeTheme === opt.key ? 'primary' : 'default'"
+                    size="small"
+                    class="!text-[11px] !px-2 !py-0.5"
+                    @click="activeTheme = opt.key"
+                  >{{ opt.label }}</a-button>
+                </div>
                 <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(detailArticle.contentMarkdown)">复制原文</a-button>
                 <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyMarkdownAsPlainText(detailArticle.contentMarkdown)">复制纯文本</a-button>
               </div>
             </div>
+            <!-- 有主题 HTML 时渲染主题，否则降级到 Markdown -->
             <div
+              v-if="getThemeHtml(detailArticle)"
+              class="rounded-editorial-md border border-editorial-border overflow-hidden"
+              v-html="getThemeHtml(detailArticle)"
+            ></div>
+            <div
+              v-else
               class="article-markdown-body rounded-editorial-md border border-editorial-border bg-editorial-panel/30 px-4 py-3"
               v-html="renderMarkdown(detailArticle.contentMarkdown)"
             ></div>

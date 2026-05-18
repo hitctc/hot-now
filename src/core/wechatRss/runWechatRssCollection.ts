@@ -8,6 +8,7 @@ import {
   type CollectWechatRssIssuesOptions
 } from "./wechatRssCollector.js";
 import { listWechatRssSources } from "./wechatRssSourceRepository.js";
+import { insertCreativeSourceItem } from "../creative/creativeSourceItemRepository.js";
 
 type EnrichedWechatRssItem = LoadedIssue["items"][number] & {
   article: ArticleResult;
@@ -114,6 +115,24 @@ function persistWechatRssItems(
       metadataJson: item.metadataJson
     }))
   });
+
+  // 同步写入 creative_source_items，供创作模块素材接口查询
+  const firstSourceName = items[0]?.sourceName ?? "微信公众号 RSS";
+  const wechatSourceName = `微信公众号：${firstSourceName}`;
+  for (const item of items) {
+    const fullContent = item.article.ok ? item.article.text : null;
+    insertCreativeSourceItem(db, {
+      externalId: item.externalId,
+      collectorAgent: "hotnow-feed",
+      title: pickPersistedTitle(item.title, item.article),
+      url: item.sourceUrl,
+      sourceName: wechatSourceName,
+      summary: item.summary ?? null,
+      fullContent,
+      publishedAt: item.publishedAt ?? null,
+      collectorTimestamp: fetchedAt
+    });
+  }
 
   const readContentId = db.prepare(
     `

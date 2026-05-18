@@ -153,6 +153,7 @@ export type ListCreativeSourceItemsFilters = {
   collectorAgent?: string;
   search?: string;
   trendScoreMin?: number;
+  last24h?: boolean;
 };
 
 export type ListCreativeSourceItemsResult = {
@@ -298,9 +299,6 @@ export function listCreativeSourceItems(
   db: SqliteDatabase,
   filters: ListCreativeSourceItemsFilters = {}
 ): ListCreativeSourceItemsResult {
-  const page = Math.max(1, filters.page ?? 1);
-  const pageSize = Math.max(1, filters.pageSize ?? 20);
-
   const whereClauses: string[] = [];
   const params: unknown[] = [];
 
@@ -325,24 +323,47 @@ export function listCreativeSourceItems(
     params.push(filters.trendScoreMin);
   }
 
+  // last24h 模式：只返回最近 24 小时内的素材，不分页
+  if (filters.last24h) {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    whereClauses.push("created_at >= ?");
+    params.push(cutoff);
+  }
+
   const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
   const countRow = db
     .prepare(`SELECT COUNT(*) AS total FROM creative_source_items ${whereClause}`)
     .get(...params) as { total: number };
 
-  const offset = (page - 1) * pageSize;
-  const items = db
-    .prepare(
-      `SELECT ${SELECT_COLUMNS} FROM creative_source_items ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-    )
-    .all(...params, pageSize, offset) as SourceItemRow[];
+  let items: SourceItemRow[];
+  if (filters.last24h) {
+    // 不分页，一次返回全部
+    items = db
+      .prepare(`SELECT ${SELECT_COLUMNS} FROM creative_source_items ${whereClause} ORDER BY created_at DESC`)
+      .all(...params) as SourceItemRow[];
+  } else {
+    const page = Math.max(1, filters.page ?? 1);
+    const pageSize = Math.max(1, filters.pageSize ?? 20);
+    const offset = (page - 1) * pageSize;
+    items = db
+      .prepare(
+        `SELECT ${SELECT_COLUMNS} FROM creative_source_items ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+      )
+      .all(...params, pageSize, offset) as SourceItemRow[];
+    return {
+      items: items.map(mapRow),
+      total: countRow.total,
+      page,
+      pageSize
+    };
+  }
 
   return {
     items: items.map(mapRow),
     total: countRow.total,
-    page,
-    pageSize
+    page: 1,
+    pageSize: countRow.total
   };
 }
 

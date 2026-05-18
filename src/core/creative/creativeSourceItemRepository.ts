@@ -324,12 +324,12 @@ export function listCreativeSourceItems(
     params.push(filters.trendScoreMin);
   }
 
-  // last24h 模式：只返回最近 24 小时内的素材，不分页
-  // SQLite CURRENT_TIMESTAMP 格式为 'YYYY-MM-DD HH:MM:SS'，不能用 ISO 格式比较
+  // last24h 模式：只返回最近 24 小时内发布的素材，不分页
+  // 按发布时间（published_at）过滤，published_at 为空时回退到入库时间（created_at）
   if (filters.last24h) {
     const d = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const cutoff = d.toISOString().replace("T", " ").substring(0, 19);
-    whereClauses.push("created_at >= ?");
+    whereClauses.push("COALESCE(published_at, created_at) >= ?");
     params.push(cutoff);
   }
 

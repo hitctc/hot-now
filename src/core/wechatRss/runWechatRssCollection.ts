@@ -117,9 +117,17 @@ function persistWechatRssItems(
   });
 
   // 同步写入 creative_source_items，供创作模块素材接口查询
+  // 只写入 24 小时内发布的文章，超过 24h 的跳过
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const firstSourceName = items[0]?.sourceName ?? "微信公众号 RSS";
   const wechatSourceName = `微信公众号：${firstSourceName}`;
   for (const item of items) {
+    if (item.publishedAt) {
+      const pubDate = new Date(item.publishedAt);
+      if (Number.isNaN(pubDate.getTime()) || pubDate < cutoff) {
+        continue;
+      }
+    }
     const fullContent = item.article.ok ? item.article.text : null;
     insertCreativeSourceItem(db, {
       externalId: item.externalId,

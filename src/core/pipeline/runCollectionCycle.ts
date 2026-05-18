@@ -234,20 +234,29 @@ function persistCollectedItems(db: SqliteDatabase, issue: LoadedIssue, items: En
     }))
   });
 
-  // 同步写入 creative_source_items，供创作模块素材接口查询
-  for (const item of items) {
-    const fullContent = item.article.ok ? item.article.text : null;
-    insertCreativeSourceItem(db, {
-      externalId: item.externalId,
-      collectorAgent: "hotnow-feed",
-      title: pickPersistedTitle(issue.sourceKind, item.title, item.article),
-      url: item.sourceUrl,
-      sourceName: item.sourceName ?? source.name,
-      summary: item.summary ?? null,
-      fullContent,
-      publishedAt: item.publishedAt ?? null,
-      collectorTimestamp: fetchedAt
-    });
+  // 只对 Juya 且 24h 内发布的文章同步写入素材库
+  if (issue.sourceKind === "juya") {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    for (const item of items) {
+      if (item.publishedAt) {
+        const pubDate = new Date(item.publishedAt);
+        if (Number.isNaN(pubDate.getTime()) || pubDate < cutoff) {
+          continue;
+        }
+      }
+      const fullContent = item.article.ok ? item.article.text : null;
+      insertCreativeSourceItem(db, {
+        externalId: item.externalId,
+        collectorAgent: "hotnow-feed",
+        title: pickPersistedTitle(issue.sourceKind, item.title, item.article),
+        url: item.sourceUrl,
+        sourceName: item.sourceName ?? source.name,
+        summary: item.summary ?? null,
+        fullContent,
+        publishedAt: item.publishedAt ?? null,
+        collectorTimestamp: fetchedAt
+      });
+    }
   }
 
   const readContentId = db.prepare(

@@ -30,7 +30,7 @@ import { listRatingDimensions, saveRatings } from "./core/ratings/ratingReposito
 import type { DailyReportTrigger } from "./core/report/buildDailyReport.js";
 import { createRunLock } from "./core/runtime/runLock.js";
 import { installGracefulShutdown } from "./core/runtime/installGracefulShutdown.js";
-import { startAiTimelineAlertScheduler, startCollectionScheduler, startMailScheduler } from "./core/scheduler/startScheduler.js";
+import { startAiTimelineAlertScheduler, startCollectionScheduler, startMailScheduler, startWechatRssScheduler } from "./core/scheduler/startScheduler.js";
 import { listContentSources } from "./core/source/listContentSources.js";
 import { listSourceWorkbench } from "./core/source/listSourceWorkbench.js";
 import { readSourcesOperationSummary } from "./core/source/readSourcesOperationSummary.js";
@@ -715,6 +715,15 @@ const aiTimelineAlertScheduler = startAiTimelineAlertScheduler(config, async () 
   }
 });
 
+// 公众号 RSS 与主采集共用 10 分钟间隔，独立运行锁避免互相阻塞
+const wechatRssScheduler = startWechatRssScheduler(config, async () => {
+  try {
+    await lock.runExclusive(async () => await runWechatRssCollectionTask());
+  } catch (error) {
+    app.log.error(error);
+  }
+});
+
 await app.listen({ host: "127.0.0.1", port: resolveListenPort(process.env.PORT, config.server.port) });
 installGracefulShutdown({
   process,
@@ -723,7 +732,7 @@ installGracefulShutdown({
     info: (context, message) => app.log.info(context, message),
     error: (context, message) => app.log.error(context, message)
   },
-  scheduledTasks: [collectionScheduler, mailScheduler, aiTimelineAlertScheduler],
+  scheduledTasks: [collectionScheduler, mailScheduler, aiTimelineAlertScheduler, wechatRssScheduler],
   waitForIdle: async () => {
     // 当前版本只需要等采集、发信和 S 级提醒任务收口，LLM 相关运行时已经不再参与主链路。
     while (lock.isRunning() || aiTimelineAlertLock.isRunning()) {

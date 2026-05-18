@@ -37,6 +37,15 @@ export function startAiTimelineAlertScheduler(config: RuntimeConfig, run: () => 
   return cron.schedule(`*/${config.aiTimelineAlerts.intervalMinutes} * * * *`, run);
 }
 
+// 公众号 RSS 采集与主采集共用间隔配置，但独立调度，方便单独开关。
+export function startWechatRssScheduler(config: RuntimeConfig, run: () => Promise<void>): ScheduledTask | null {
+  if (!config.collectionSchedule.enabled) {
+    return null;
+  }
+
+  return cron.schedule(`*/${config.collectionSchedule.intervalMinutes} * * * *`, run);
+}
+
 // The scheduler only accepts a strict HH:MM value so startup fails fast on malformed config.
 function parseDailyTime(dailyTime: string) {
   const match = dailyTime.match(/^([01]\d|2[0-3]):([0-5]\d)$/);

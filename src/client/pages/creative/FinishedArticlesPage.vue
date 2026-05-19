@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { message } from "ant-design-vue";
 import MarkdownIt from "markdown-it";
 
@@ -51,8 +51,35 @@ const total = ref(0);
 const currentPage = ref(1);
 const pageSize = ref(50);
 
-// 筛选条件
-const searchText = ref("");
+// 筛选条件缓存 key
+const FINISHED_FILTERS_KEY = "creative-finished-filters";
+
+// 筛选条件（从 localStorage 恢复）
+const savedFinished = (() => {
+  try {
+    const raw = localStorage.getItem(FINISHED_FILTERS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+})();
+const searchText = ref(savedFinished.search || "");
+const statusFilter = ref<string | undefined>(savedFinished.status || undefined);
+
+// 筛选条件变更时持久化
+function saveFinishedFilters(): void {
+  try {
+    localStorage.setItem(FINISHED_FILTERS_KEY, JSON.stringify({
+      search: searchText.value,
+      status: statusFilter.value || ""
+    }));
+  } catch { /* quota 超限等忽略 */ }
+}
+
+const statusOptions = [
+  { label: "全部状态", value: "" },
+  { label: "已生成", value: "generated" },
+  { label: "已推送草稿", value: "wechat_draft" },
+  { label: "异常", value: "anomaly" }
+];
 
 // 文章详情全屏弹窗
 const detailArticle = ref<CreativeFinishedArticle | null>(null);
@@ -104,6 +131,7 @@ async function loadItems(): Promise<void> {
     const res = await readCreativeFinishedArticles({
       page: currentPage.value,
       pageSize: pageSize.value,
+      status: statusFilter.value || undefined,
       search: searchText.value || undefined
     });
     items.value = res.items;
@@ -117,9 +145,16 @@ onMounted(() => {
   void loadItems();
 });
 
+watch(statusFilter, () => {
+  currentPage.value = 1;
+  saveFinishedFilters();
+  void loadItems();
+});
+
 function handleSearch(value: string): void {
   searchText.value = value;
   currentPage.value = 1;
+  saveFinishedFilters();
   void loadItems();
 }
 
@@ -382,11 +417,19 @@ const pagination = computed(() => ({
   <div class="flex w-full flex-col gap-2" data-page="creative-finished-articles">
     <!-- 筛选栏 -->
     <div class="flex flex-wrap items-center gap-3">
+      <a-select
+        v-model:value="statusFilter"
+        :options="statusOptions"
+        placeholder="文章状态"
+        class="!w-[140px]"
+      />
       <a-input-search
+        v-model:value="searchText"
         placeholder="搜索标题"
         class="!w-[240px]"
         allow-clear
         @search="handleSearch"
+        @change="(val: string) => { if (!val) handleSearch(''); }"
       />
     </div>
 

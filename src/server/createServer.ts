@@ -936,6 +936,7 @@ export function createServer(deps: ServerDeps = {}) {
     const result = listCreativeFinishedArticles(db, {
       page: query.page ? parseInt(query.page, 10) : undefined,
       pageSize: query.pageSize ? parseInt(query.pageSize, 10) : undefined,
+      status: query.status,
       search: query.search
     });
 

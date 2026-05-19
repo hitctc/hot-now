@@ -34,9 +34,28 @@ const total = ref(0);
 const currentPage = ref(1);
 const pageSize = ref(50);
 
-// 筛选条件
-const writingStatusFilter = ref<string | undefined>(undefined);
-const searchText = ref("");
+// 筛选条件缓存 key
+const SOURCE_FILTERS_KEY = "creative-source-filters";
+
+// 筛选条件（从 localStorage 恢复）
+const saved = (() => {
+  try {
+    const raw = localStorage.getItem(SOURCE_FILTERS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+})();
+const writingStatusFilter = ref<string | undefined>(saved.writingStatus || undefined);
+const searchText = ref(saved.search || "");
+
+// 筛选条件变更时持久化
+function saveSourceFilters(): void {
+  try {
+    localStorage.setItem(SOURCE_FILTERS_KEY, JSON.stringify({
+      writingStatus: writingStatusFilter.value || "",
+      search: searchText.value
+    }));
+  } catch { /* quota 超限等忽略 */ }
+}
 
 // 操作锁
 const actionPendingId = ref<number | null>(null);
@@ -82,12 +101,14 @@ onMounted(() => {
 
 watch(writingStatusFilter, () => {
   currentPage.value = 1;
+  saveSourceFilters();
   void loadItems();
 });
 
 function handleSearch(value: string): void {
   searchText.value = value;
   currentPage.value = 1;
+  saveSourceFilters();
   void loadItems();
 }
 
@@ -338,10 +359,12 @@ const pagination = computed(() => ({
         class="!w-[140px]"
       />
       <a-input-search
+        v-model:value="searchText"
         placeholder="搜索标题"
         class="!w-[240px]"
         allow-clear
         @search="handleSearch"
+        @change="(val: string) => { if (!val) handleSearch(''); }"
       />
     </div>
 
@@ -474,13 +497,13 @@ const pagination = computed(() => ({
           <div class="flex flex-col gap-4 rounded-editorial-md border border-editorial-border bg-editorial-panel/60 p-4">
             <!-- 摘要 -->
             <div v-if="record.summary">
-              <p class="m-0 mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">摘要</p>
+              <p class="m-0 mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">摘要 <span class="font-normal opacity-70">{{ record.summary.length }} 字</span></p>
               <p class="m-0 text-sm leading-6 text-editorial-text-body">{{ record.summary }}</p>
             </div>
 
             <!-- 原文内容 -->
             <div>
-              <p class="m-0 mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">原文内容</p>
+              <p class="m-0 mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">原文内容 <span v-if="record.fullContent" class="font-normal opacity-70">{{ record.fullContent.length }} 字</span></p>
               <div
                 v-if="record.fullContent"
                 class="max-h-60 overflow-y-auto whitespace-pre-wrap rounded-editorial-md bg-editorial-page p-3 text-sm leading-6 text-editorial-text-body"

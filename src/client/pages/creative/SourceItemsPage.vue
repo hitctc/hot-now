@@ -73,7 +73,7 @@ const writingStatusOptions = [
   { label: "待写作", value: "ready" },
   { label: "不写作", value: "excluded" },
   { label: "写作中", value: "writing" },
-  { label: "已完成", value: "done" },
+  { label: "已写作", value: "done" },
   { label: "跳过不写", value: "skipped" }
 ];
 
@@ -278,7 +278,7 @@ function writingStatusLabel(status: string): string {
     case "writing":
       return "写作中";
     case "done":
-      return "已完成";
+      return "已写作";
     case "skipped":
       return "跳过不写";
     default:

@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { message } from "ant-design-vue";
 import MarkdownIt from "markdown-it";
+
+import { useSearchHistory } from "../../composables/useSearchHistory.js";
 
 import {
   readCreativeSourceItems,
@@ -46,6 +48,20 @@ const saved = (() => {
 })();
 const writingStatusFilter = ref<string | undefined>(saved.writingStatus || undefined);
 const searchText = ref(saved.search || "");
+
+// 搜索历史
+const { history: searchHistory, addToHistory, removeFromHistory } = useSearchHistory("creative-source-search-history");
+const searchDropdownRef = ref<HTMLElement | null>(null);
+const showSearchDropdown = ref(false);
+
+// 点击下拉区域外关闭
+function onDocClick(e: MouseEvent): void {
+  if (searchDropdownRef.value && !searchDropdownRef.value.contains(e.target as Node)) {
+    showSearchDropdown.value = false;
+  }
+}
+onMounted(() => document.addEventListener("click", onDocClick));
+onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 
 // 筛选条件变更时持久化
 function saveSourceFilters(): void {
@@ -109,6 +125,8 @@ function handleSearch(value: string): void {
   searchText.value = value;
   currentPage.value = 1;
   saveSourceFilters();
+  if (value.trim()) addToHistory(value.trim());
+  showSearchDropdown.value = false;
   void loadItems();
 }
 
@@ -358,14 +376,34 @@ const pagination = computed(() => ({
         placeholder="写作状态"
         class="!w-[140px]"
       />
-      <a-input-search
-        v-model:value="searchText"
-        placeholder="搜索标题"
-        class="!w-[240px]"
-        allow-clear
-        @search="handleSearch"
-        @change="(val: string) => { if (!val) handleSearch(''); }"
-      />
+      <div ref="searchDropdownRef" class="relative">
+        <a-input-search
+          v-model:value="searchText"
+          placeholder="搜索标题"
+          class="!w-[360px]"
+          allow-clear
+          @search="handleSearch"
+          @change="(val: string) => { if (!val) handleSearch(''); }"
+          @focus="showSearchDropdown = searchHistory.length > 0"
+        />
+        <div
+          v-if="showSearchDropdown && searchHistory.length > 0"
+          class="absolute left-0 top-full z-50 mt-1 min-w-[280px] rounded-md border border-editorial-border bg-white shadow-lg"
+        >
+          <div
+            v-for="item in searchHistory"
+            :key="item"
+            class="group flex cursor-pointer items-center justify-between px-3 py-2 text-sm hover:bg-gray-50"
+            @click="handleSearch(item)"
+          >
+            <span class="truncate text-editorial-text-body">{{ item }}</span>
+            <span
+              class="ml-2 flex-shrink-0 text-xs text-editorial-text-muted opacity-0 hover:text-red-500 group-hover:opacity-100"
+              @click.stop="removeFromHistory(item)"
+            >✕</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 表格 -->

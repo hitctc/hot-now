@@ -80,7 +80,8 @@ import {
   findCreativeSourceItemById,
   updateCreativeSourceItemWritingStatus,
   updateCreativeSourceItemLinkedArticle,
-  updateCreativeSourceItemTrendScore
+  updateCreativeSourceItemTrendScore,
+  updateCreativeSourceItemFields
 } from "../core/creative/creativeSourceItemRepository.js";
 import {
   insertCreativeFinishedArticle,
@@ -1073,6 +1074,40 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.code(400).send({ ok: false, reason: "invalid-status" });
     }
     const updated = updateCreativeSourceItemWritingStatus(db, id, status as "ready" | "writing" | "done" | "skipped" | "excluded");
+    if (!updated) {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+    return reply.send({ ok: true });
+  });
+
+  app.post("/actions/creative/source-items/:id/update", async (request, reply) => {
+    const hasToken = creativeApiToken && request.headers["x-creative-token"] === creativeApiToken;
+    if (!hasToken) {
+      if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+        return;
+      }
+    }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const params = request.params as { id: string };
+    const body = request.body as Record<string, unknown> | undefined;
+    const id = parseInt(params.id, 10);
+
+    const score = typeof body?.score === "number" ? body.score : undefined;
+    const fullContent = typeof body?.fullContent === "string" ? body.fullContent : undefined;
+
+    if (score === undefined && fullContent === undefined) {
+      return reply.code(400).send({ ok: false, reason: "no-fields-to-update" });
+    }
+
+    if (score !== undefined && (score < 0 || score > 100)) {
+      return reply.code(400).send({ ok: false, reason: "score-out-of-range" });
+    }
+
+    const updated = updateCreativeSourceItemFields(db, id, { score, fullContent });
     if (!updated) {
       return reply.code(404).send({ ok: false, reason: "not-found" });
     }

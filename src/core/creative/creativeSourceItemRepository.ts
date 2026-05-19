@@ -413,6 +413,35 @@ export function updateCreativeSourceItemTrendScore(
   return result.changes > 0;
 }
 
+// ── Update mutable fields (score, fullContent) ──────────────────────────────
+
+export function updateCreativeSourceItemFields(
+  db: SqliteDatabase,
+  id: number,
+  fields: { score?: number; fullContent?: string }
+): boolean {
+  const updates: string[] = [];
+  const values: (string | number)[] = [];
+
+  if (fields.score !== undefined) {
+    updates.push("score = ?");
+    values.push(fields.score);
+  }
+  if (fields.fullContent !== undefined) {
+    updates.push("full_content = ?");
+    values.push(fields.fullContent);
+  }
+  if (updates.length === 0) return false;
+
+  updates.push("updated_at = CURRENT_TIMESTAMP");
+  values.push(id);
+
+  const result = db
+    .prepare(`UPDATE creative_source_items SET ${updates.join(", ")} WHERE id = ?`)
+    .run(...values);
+  return result.changes > 0;
+}
+
 // ── Update linked article ───────────────────────────────────────────────────
 
 export function updateCreativeSourceItemLinkedArticle(

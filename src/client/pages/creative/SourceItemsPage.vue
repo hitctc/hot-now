@@ -305,9 +305,9 @@ async function copyMarkdownAsPlainText(md: string): Promise<void> {
 // ─── 表格列 ───
 
 const columns = [
-  { title: "标题", dataIndex: "title", key: "title", width: 200, ellipsis: true },
+  { title: "标题", dataIndex: "title", key: "title", width: 280, ellipsis: true },
   { title: "成品", key: "linkedArticle", width: 80, align: "center" as const, ellipsis: true },
-  { title: "来源", dataIndex: "sourceName", key: "sourceName", width: 100, ellipsis: true },
+  { title: "来源", dataIndex: "sourceName", key: "sourceName", width: 170, ellipsis: true },
   { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: 90, ellipsis: true },
   { title: "评分", dataIndex: "score", key: "score", width: 72, ellipsis: true },
   { title: "爆文分", key: "trendScore", width: 72, ellipsis: true },
@@ -389,8 +389,8 @@ const pagination = computed(() => ({
 
           <!-- 来源列 -->
           <template v-else-if="column.key === 'sourceName'">
-            <a-tooltip :title="record.sourceName || ''" placement="topLeft" :mouse-enter-delay="0.3">
-              <span class="block truncate text-editorial-text-body">{{ record.sourceName || "-" }}</span>
+            <a-tooltip :title="(record.sourceName || '').replace('微信公众号', 'WX')" placement="topLeft" :mouse-enter-delay="0.3">
+              <span class="block truncate text-editorial-text-body">{{ (record.sourceName || "-").replace("微信公众号", "WX") }}</span>
             </a-tooltip>
           </template>
 

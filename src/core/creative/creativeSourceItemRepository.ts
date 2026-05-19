@@ -170,10 +170,16 @@ export function insertCreativeSourceItem(
   db: SqliteDatabase,
   input: InsertCreativeSourceItemInput
 ): { id: number; created: boolean } {
-  // 幂等插入：相同 externalId + collectorAgent 已存在时，补充空字段但不覆盖
-  const existing = db
+  // 幂等插入：先按 externalId + collectorAgent 查，再按 url + collectorAgent 兜底
+  let existing = db
     .prepare("SELECT id, full_content, summary, source_name, author, cover_image_url, tags, word_count, content_type, score, published_at, collector_timestamp FROM creative_source_items WHERE external_id = ? AND collector_agent = ?")
     .get(input.externalId, input.collectorAgent) as Record<string, unknown> | undefined;
+
+  if (!existing && input.url) {
+    existing = db
+      .prepare("SELECT id, full_content, summary, source_name, author, cover_image_url, tags, word_count, content_type, score, published_at, collector_timestamp FROM creative_source_items WHERE url = ? AND collector_agent = ?")
+      .get(input.url, input.collectorAgent) as Record<string, unknown> | undefined;
+  }
 
   if (existing) {
     const patches: { col: string; val: unknown }[] = [];

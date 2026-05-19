@@ -565,7 +565,7 @@ const pagination = computed(() => ({
 
           <!-- 传播分列 -->
           <template v-else-if="column.key === 'trendScore'">
-            <span v-if="record.trendScore != null" class="inline-flex items-center rounded-editorial-pill border px-2 py-0.5 text-[11px] font-bold" :class="record.trendScore >= 90 ? 'border-red-500 bg-red-500 text-white shadow-sm' : 'border-orange-300 bg-orange-50 text-orange-700'">{{ record.trendScore }}</span>
+            <span v-if="record.trendScore != null" class="inline-flex items-center rounded-editorial-pill border px-2 py-0.5 text-[11px] font-bold" :class="record.trendScore >= 80 ? 'border-red-500 bg-red-500 text-white shadow-sm' : 'border-orange-300 bg-orange-50 text-orange-700'">{{ record.trendScore }}</span>
             <span v-else class="text-xs text-editorial-text-muted">未评分</span>
           </template>
 
@@ -811,7 +811,7 @@ const pagination = computed(() => ({
                 <span v-else class="text-editorial-text-muted">-</span>
               </a-descriptions-item>
               <a-descriptions-item label="爆文分">
-                <span v-if="sourceItemModalData.trendScore != null" class="font-semibold" :class="sourceItemModalData.trendScore >= 90 ? 'text-red-500' : 'text-orange-600'">{{ sourceItemModalData.trendScore }}</span>
+                <span v-if="sourceItemModalData.trendScore != null" class="font-semibold" :class="sourceItemModalData.trendScore >= 80 ? 'text-red-500' : 'text-orange-600'">{{ sourceItemModalData.trendScore }}</span>
                 <span v-else class="text-editorial-text-muted">未评分</span>
               </a-descriptions-item>
               <a-descriptions-item label="爆文维度">

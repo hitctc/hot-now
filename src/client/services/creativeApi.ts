@@ -64,6 +64,7 @@ export type CreativeFinishedArticle = {
   contentHtmlBauhaus: string | null;
   contentHtmlSunsetFilm: string | null;
   contentHtmlReceipt: string | null;
+  wechatPublished: boolean;
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
   sourceTitle: string | null;
@@ -147,6 +148,13 @@ export function readCreativeFinishedArticles(params?: {
 
 export function readCreativeFinishedArticle(id: number): Promise<CreativeFinishedArticle> {
   return requestJson<CreativeFinishedArticle>(`/api/creative/finished-articles/${id}`);
+}
+
+// 切换成品文章的公众号发布状态
+export function toggleFinishedArticlePublished(id: number): Promise<{ ok: boolean; wechatPublished: boolean }> {
+  return requestJson<{ ok: boolean; wechatPublished: boolean }>(`/api/creative/finished-articles/${id}/toggle-published`, {
+    method: "POST"
+  });
 }
 
 // ─── Actions ───

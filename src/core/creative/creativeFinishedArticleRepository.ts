@@ -22,6 +22,7 @@ const SELECT_COLUMNS = `
   content_html_bauhaus,
   content_html_sunset_film,
   content_html_receipt,
+  wechat_published,
   created_at,
   updated_at
 ` as const;
@@ -44,6 +45,7 @@ type ArticleRow = {
   content_html_bauhaus: string | null;
   content_html_sunset_film: string | null;
   content_html_receipt: string | null;
+  wechat_published: number;
   created_at: string;
   updated_at: string;
 };
@@ -68,6 +70,7 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     contentHtmlBauhaus: row.content_html_bauhaus,
     contentHtmlSunsetFilm: row.content_html_sunset_film,
     contentHtmlReceipt: row.content_html_receipt,
+    wechatPublished: row.wechat_published === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -94,6 +97,7 @@ export type CreativeFinishedArticleRecord = {
   contentHtmlBauhaus: string | null;
   contentHtmlSunsetFilm: string | null;
   contentHtmlReceipt: string | null;
+  wechatPublished: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -362,4 +366,18 @@ export function editCreativeFinishedArticle(
   db.prepare(`UPDATE creative_finished_articles SET ${setClauses.join(", ")} WHERE id = ?`).run(...params);
 
   return { ok: true };
+}
+
+// ── Toggle WeChat published status ─────────────────────────────────────────
+
+// 编辑人员手动标记文章是否已在公众号发布，用于辅助记忆
+export function toggleWechatPublished(db: SqliteDatabase, id: number): CreativeFinishedArticleRecord | null {
+  const current = db
+    .prepare("SELECT wechat_published FROM creative_finished_articles WHERE id = ?")
+    .get(id) as { wechat_published: number } | undefined;
+  if (!current) return null;
+  const next = current.wechat_published === 1 ? 0 : 1;
+  db.prepare("UPDATE creative_finished_articles SET wechat_published = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+    .run(next, id);
+  return findCreativeFinishedArticleById(db, id);
 }

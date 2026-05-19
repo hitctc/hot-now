@@ -88,7 +88,8 @@ import {
   findCreativeFinishedArticleBySourceItemId,
   listCreativeFinishedArticles,
   findCreativeFinishedArticleById,
-  editCreativeFinishedArticle
+  editCreativeFinishedArticle,
+  toggleWechatPublished
 } from "../core/creative/creativeFinishedArticleRepository.js";
 import { formatForWechat, type WechatThemeId } from "../core/creative/wechatFormat/index.js";
 import { downloadAndStoreImage, readStoredImage } from "../core/storage/imageStore.js";
@@ -881,17 +882,19 @@ export function createServer(deps: ServerDeps = {}) {
       last24h: query.sourceFeed ? true : undefined
     });
 
-    // 批量查询关联成品文章的创建时间
+    // 批量查询关联成品文章的创建时间和公众号发布状态
     const linkedIds = result.items.filter(i => i.linkedArticleId != null).map(i => i.linkedArticleId!);
     if (linkedIds.length > 0) {
       const placeholders = linkedIds.map(() => "?").join(",");
       const articleRows = db.prepare(
-        `SELECT id, created_at FROM creative_finished_articles WHERE id IN (${placeholders})`
-      ).all(...linkedIds) as Array<{ id: number; created_at: string }>;
-      const articleMap = new Map(articleRows.map(r => [r.id, r.created_at]));
+        `SELECT id, created_at, wechat_published FROM creative_finished_articles WHERE id IN (${placeholders})`
+      ).all(...linkedIds) as Array<{ id: number; created_at: string; wechat_published: number }>;
+      const articleMap = new Map(articleRows.map(r => [r.id, r]));
       for (const item of result.items) {
         if (item.linkedArticleId != null) {
-          (item as any).linkedArticleCreatedAt = articleMap.get(item.linkedArticleId) ?? null;
+          const row = articleMap.get(item.linkedArticleId);
+          (item as any).linkedArticleCreatedAt = row?.created_at ?? null;
+          (item as any).linkedArticlePublished = row?.wechat_published === 1;
         }
       }
     }
@@ -1051,6 +1054,27 @@ export function createServer(deps: ServerDeps = {}) {
       updatedFields,
       updatedAt: updated?.updatedAt ?? new Date().toISOString()
     });
+  });
+
+  // 切换成品文章的公众号发布状态
+  app.post("/api/creative/finished-articles/:id/toggle-published", async (request, reply) => {
+    const hasToken = creativeApiToken && request.headers["x-creative-token"] === creativeApiToken;
+    if (!hasToken) {
+      const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+      if (session === undefined) { return; }
+    }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const params = request.params as { id: string };
+    const id = parseInt(params.id, 10);
+    const updated = toggleWechatPublished(db, id);
+    if (!updated) {
+      return reply.code(404).send({ message: "Finished article not found", statusCode: 404 });
+    }
+    return reply.send({ ok: true, wechatPublished: updated.wechatPublished });
   });
 
   // ─── Creative: Actions (session-authenticated) ───

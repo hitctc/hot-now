@@ -8,6 +8,7 @@ import {
   readCreativeFinishedArticles,
   readCreativeSourceItem,
   renderWechatFormat,
+  toggleFinishedArticlePublished,
   wechatThemeOptions,
   parseArticleImages,
   extractImageUrl,
@@ -80,6 +81,19 @@ const statusOptions = [
   { label: "已推送草稿", value: "wechat_draft" },
   { label: "异常", value: "anomaly" }
 ];
+
+// 发布状态切换操作锁
+const publishPendingId = ref<number | null>(null);
+
+async function handleTogglePublished(article: CreativeFinishedArticle): Promise<void> {
+  publishPendingId.value = article.id;
+  try {
+    const res = await toggleFinishedArticlePublished(article.id);
+    article.wechatPublished = res.wechatPublished;
+  } finally {
+    publishPendingId.value = null;
+  }
+}
 
 // 文章详情全屏弹窗
 const detailArticle = ref<CreativeFinishedArticle | null>(null);
@@ -400,6 +414,7 @@ const columns = [
   { title: "发布时间", key: "publishedAt", width: 130, ellipsis: true },
   { title: "创建时间", key: "createdAt", width: 140, ellipsis: true },
   { title: "异常说明", key: "anomalyReason", width: 150, ellipsis: true },
+  { title: "公众号", key: "wechatPublished", width: 80, ellipsis: true },
   { title: "重写文章", key: "quickCopy", width: 64, ellipsis: true }
 ];
 
@@ -482,6 +497,17 @@ const pagination = computed(() => ({
               </a-tooltip>
             </template>
             <span v-else class="text-xs text-editorial-text-muted">-</span>
+          </template>
+
+          <!-- 公众号发布状态列 -->
+          <template v-else-if="column.key === 'wechatPublished'">
+            <a-button
+              size="small"
+              :type="record.wechatPublished ? 'primary' : 'default'"
+              :loading="publishPendingId === record.id"
+              class="!text-[11px] !px-2 !py-0.5"
+              @click="handleTogglePublished(record)"
+            >{{ record.wechatPublished ? '已发布' : '未发布' }}</a-button>
           </template>
 
           <!-- 快捷复制列：生成重写文章 prompt -->

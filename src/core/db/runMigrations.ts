@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 22;
+const schemaVersion = 23;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -23,6 +23,7 @@ const writingStatusMigrationName = "019_writing_status";
 const trendScoreMigrationName = "020_trend_score";
 const coverImageAndAnomalyMigrationName = "021_cover_image_and_anomaly";
 const themeHtmlColumnsMigrationName = "022_theme_html_columns";
+const wechatPublishedMigrationName = "023_wechat_published";
 
 const migrationStatements = [
   `
@@ -1083,6 +1084,19 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(22, themeHtmlColumnsMigrationName);
+
+    // 023: 成品文章增加公众号手动发布标记
+    if (!hasColumn(db, "creative_finished_articles", "wechat_published")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN wechat_published INTEGER DEFAULT 0`);
+    }
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(23, wechatPublishedMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

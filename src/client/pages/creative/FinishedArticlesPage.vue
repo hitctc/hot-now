@@ -318,14 +318,13 @@ async function copyText(text: string): Promise<void> {
   message.success("已复制到剪贴板");
 }
 
-// 成品文章 prompt：指示爱马仕智能体对指定成品文章执行完整的单条写文章工作流（重写）
+// 重写文章 prompt：使用关联素材的 ID 和标题，与素材库"写文章"按钮内容一致
 function buildFinishedArticlePrompt(article: CreativeFinishedArticle): string {
-  const title = getFirstTitle(article.titles);
   return [
-    "请使用「单条写文章」工作流重写以下成品文章，生成一篇新文章（不覆盖原文）并推送至公众号草稿箱：",
+    "请使用「单条写文章」工作流处理以下素材，完成从素材读取到推送公众号草稿箱的完整流程：",
     "",
-    `- 原文 ID：${article.id}`,
-    `- 原文标题：${title}`
+    `- 素材 ID：${article.sourceItemId}`,
+    `- 素材标题：${(article as any).sourceTitle ?? "无标题"}`
   ].join("\n");
 }
 

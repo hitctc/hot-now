@@ -200,7 +200,6 @@ export function seedInitialData(db: SqliteDatabase, authBootstrap?: AuthBootstra
       VALUES (1, @username, @passwordHash, 'admin', @displayName, @email, '{}', CURRENT_TIMESTAMP)
       ON CONFLICT(id) DO UPDATE SET
         username = excluded.username,
-        password_hash = excluded.password_hash,
         role = excluded.role,
         display_name = excluded.display_name,
         email = excluded.email,

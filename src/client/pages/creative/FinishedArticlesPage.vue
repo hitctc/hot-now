@@ -147,7 +147,8 @@ function getMissingConditions(article: CreativeFinishedArticle | null): string[]
   return missing;
 }
 
-function openPushConfirm(article: CreativeFinishedArticle): void {
+function openPushConfirm(article: CreativeFinishedArticle, themeId?: WechatThemeId): void {
+  if (themeId) wechatTheme.value = themeId;
   pushConfirmArticle.value = article;
   pushConfirmVisible.value = true;
   loadWechatMpAccounts();

@@ -20,12 +20,6 @@
     <template #footer>
       <div v-if="article" class="flex items-center gap-2">
         <div class="flex flex-1 items-center gap-2">
-          <a-select
-            v-model:value="wechatTheme"
-            :options="wechatThemeOptions"
-            size="small"
-            class="!w-[120px]"
-          />
           <a-button
             :loading="wechatCopying"
             @click="copyAsWechatFormat"
@@ -33,7 +27,7 @@
           <a-button
             v-if="canPush(article)"
             type="primary"
-            @click="$emit('openPush', article)"
+            @click="$emit('openPush', article, currentWechatThemeId)"
           >推送到草稿箱</a-button>
           <a-tooltip v-else :mouse-enter-delay="0.3">
             <template #title>{{ getMissingConditions(article).join('；') }}</template>
@@ -190,7 +184,6 @@ import ArticleMarkdownEditor from "./ArticleMarkdownEditor.vue";
 import {
   editFinishedArticle,
   renderWechatFormat,
-  wechatThemeOptions,
   parseArticleImages,
   extractImageUrl,
   type CreativeFinishedArticle,
@@ -206,7 +199,7 @@ const emit = defineEmits<{
   "update:open": [value: boolean];
   saved: [];
   openSourceItem: [sourceItemId: number];
-  openPush: [article: CreativeFinishedArticle];
+  openPush: [article: CreativeFinishedArticle, themeId: WechatThemeId];
 }>();
 
 // ─── 正文编辑 ───
@@ -310,9 +303,20 @@ function formatLocalTime(value: string): string {
   });
 }
 
+// 当前主题对应的 WechatThemeId（用于复制公众号格式和推送）
+const currentWechatThemeId = computed<WechatThemeId>(() => {
+  const map: Record<Exclude<PreviewThemeKey, "live">, WechatThemeId> = {
+    bauhaus: "bauhaus",
+    sunsetFilm: "sunset-film",
+    receipt: "receipt",
+  };
+  return activePreviewTheme.value === "live"
+    ? "bauhaus"
+    : (map[activePreviewTheme.value] ?? "bauhaus");
+});
+
 // ─── 微信公众号格式复制 ───
 
-const wechatTheme = ref<WechatThemeId>("bauhaus");
 const wechatCopying = ref(false);
 
 async function copyAsWechatFormat(): Promise<void> {
@@ -323,7 +327,7 @@ async function copyAsWechatFormat(): Promise<void> {
   if (!props.article) return;
   wechatCopying.value = true;
   try {
-    const res = await renderWechatFormat(props.article.id, wechatTheme.value);
+    const res = await renderWechatFormat(props.article.id, currentWechatThemeId.value);
     if (!res.ok || !res.html) {
       message.error("渲染失败，请重试");
       return;

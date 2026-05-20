@@ -143,7 +143,7 @@ function onDividerMouseDown(e: MouseEvent): void {
 
 .md-editor__preview {
   flex: 1;
-  padding: 12px;
+  padding: 0;
   overflow-y: auto;
   font-size: 14px;
   line-height: 1.7;

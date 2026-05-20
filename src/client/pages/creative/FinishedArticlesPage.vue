@@ -383,7 +383,7 @@ function getStatusInfo(status: string): { label: string; color: string } {
 const columns = [
   { title: "标题", key: "title", width: 200, ellipsis: true },
   { title: "封面图", key: "coverImage", width: 80, ellipsis: true },
-  { title: "状态", key: "status", width: 100, ellipsis: true },
+  { title: "状态", key: "status", width: 140, ellipsis: true },
   { title: "来源素材", key: "sourceItem", width: 110, ellipsis: true },
   { title: "爆文分", key: "trendScore", width: 72, ellipsis: true },
   { title: "爆文维度", key: "trendBreakdown", width: 160, ellipsis: true },
@@ -484,7 +484,7 @@ const pagination = computed(() => ({
           <!-- 状态列 -->
           <template v-else-if="column.key === 'status'">
             <a-tag :color="getStatusInfo(record.status).color" class="!m-0">{{ getStatusInfo(record.status).label }}</a-tag>
-            <a-tag v-if="record.pushCount > 0" color="green" class="!m-0 !ml-1">已推送{{ record.pushCount }}次</a-tag>
+            <a-tag v-if="record.pushCount > 0" color="green" class="!m-0 !ml-1">{{ record.pushCount }}次</a-tag>
           </template>
 
           <!-- 异常说明列 -->

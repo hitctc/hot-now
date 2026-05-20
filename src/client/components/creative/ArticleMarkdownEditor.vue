@@ -1,7 +1,7 @@
 <!-- 左右分屏 Markdown 编辑器：左侧 textarea 编辑，右侧实时预览 -->
 <template>
   <div class="md-editor">
-    <div class="md-editor__pane">
+    <div class="md-editor__pane" :style="{ flex: `0 0 ${leftPercent}%` }">
       <div class="md-editor__label">Markdown</div>
       <textarea
         class="md-editor__textarea"
@@ -13,8 +13,9 @@
     </div>
     <div class="md-editor__divider" @mousedown="onDividerMouseDown" />
     <div class="md-editor__pane" :style="{ flex: `0 0 ${100 - leftPercent}%` }">
-      <div class="md-editor__label">预览</div>
-      <div class="md-editor__preview" v-html="renderedHtml" />
+      <div class="md-editor__label">{{ previewLabel }}</div>
+      <div v-if="previewHtml" class="md-editor__preview" v-html="previewHtml" />
+      <div v-else class="md-editor__preview" v-html="renderedHtml" />
     </div>
   </div>
 </template>
@@ -23,15 +24,20 @@
 import { computed, ref } from "vue";
 import MarkdownIt from "markdown-it";
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   modelValue: string;
-}>();
+  /** 外部传入的 HTML 覆盖右侧预览（如主题渲染），为空则用 Markdown 实时渲染 */
+  previewHtml?: string;
+  previewLabel?: string;
+}>(), {
+  previewHtml: "",
+  previewLabel: "预览",
+});
 
 const emit = defineEmits<{
   "update:modelValue": [value: string];
 }>();
 
-// 基础 Markdown 渲染（仅做编辑预览，不做主题渲染）
 const md = new MarkdownIt({ html: true, linkify: true, breaks: true });
 const renderedHtml = computed(() => md.render(props.modelValue || ""));
 

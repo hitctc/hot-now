@@ -1,21 +1,51 @@
-<!-- 文章详情弹窗：展示标题/立意/摘要 + 正文编辑器（左编辑右预览），底部工具栏 -->
+<!-- 文章详情弹窗：展示标题/立意/摘要 + 正文编辑器（左编辑右预览），底部悬浮工具栏 -->
 <template>
   <a-modal
     :open="open"
-    :footer="null"
     :closable="true"
     :mask-closable="true"
     :destroy-on-close="true"
     width="90%"
     centered
     wrap-class-name="article-detail-modal"
-    :body-style="{ maxHeight: 'calc(100vh - 110px)', overflowY: 'auto', padding: '24px' }"
+    :body-style="{ maxHeight: 'calc(100vh - 60px)', overflowY: 'auto', padding: '24px', paddingBottom: '72px' }"
     @cancel="handleClose"
   >
     <template #title>
       <span v-if="article" class="text-base font-semibold">
         {{ getFirstTitle(article.titles) }}
       </span>
+    </template>
+
+    <template #footer>
+      <div v-if="article" class="flex items-center gap-2">
+        <div class="flex flex-1 items-center gap-2">
+          <a-select
+            v-model:value="wechatTheme"
+            :options="wechatThemeOptions"
+            size="small"
+            class="!w-[120px]"
+          />
+          <a-button
+            :loading="wechatCopying"
+            @click="copyAsWechatFormat"
+          >复制公众号格式</a-button>
+          <a-button
+            v-if="canPush(article)"
+            type="primary"
+            @click="$emit('openPush', article)"
+          >推送到草稿箱</a-button>
+          <a-tooltip v-else :mouse-enter-delay="0.3">
+            <template #title>{{ getMissingConditions(article).join('；') }}</template>
+            <a-button type="primary" disabled>推送到草稿箱</a-button>
+          </a-tooltip>
+        </div>
+        <a-button
+          type="primary"
+          :loading="saving"
+          @click="handleSave"
+        >保存正文</a-button>
+      </div>
     </template>
 
     <template v-if="article">
@@ -96,21 +126,7 @@
           </ul>
         </section>
 
-        <!-- 正文：左右分屏编辑器（左 Markdown 编辑，右实时预览） -->
-        <section>
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文</h3>
-            <div class="flex items-center gap-2">
-              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(editContent)">复制原文</a-button>
-              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyMarkdownAsPlainText(editContent)">复制纯文本</a-button>
-            </div>
-          </div>
-          <div class="article-editor-wrapper">
-            <ArticleMarkdownEditor v-model="editContent" />
-          </div>
-        </section>
-
-        <!-- 图片列表（只读） -->
+        <!-- 图片列表（只读，在正文上方） -->
         <section v-if="parseArticleImages(article.imagesJson).length > 0">
           <h3 class="m-0 mb-2 text-sm font-semibold text-editorial-text-muted">图片列表</h3>
           <a-image-preview-group>
@@ -133,43 +149,41 @@
             </div>
           </a-image-preview-group>
         </section>
+
+        <!-- 正文：左右分屏编辑器 + 主题切换 -->
+        <section>
+          <div class="mb-2 flex items-center justify-between">
+            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文</h3>
+            <div class="flex items-center gap-2">
+              <div v-if="hasThemeHtml" class="flex gap-1">
+                <a-button
+                  v-for="opt in previewThemeOptions"
+                  :key="opt.key"
+                  :type="activePreviewTheme === opt.key ? 'primary' : 'default'"
+                  size="small"
+                  class="!text-[11px] !px-2 !py-0.5"
+                  @click="activePreviewTheme = opt.key"
+                >{{ opt.label }}</a-button>
+              </div>
+              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(editContent)">复制原文</a-button>
+              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyMarkdownAsPlainText(editContent)">复制纯文本</a-button>
+            </div>
+          </div>
+          <div class="article-editor-wrapper">
+            <ArticleMarkdownEditor
+              v-model="editContent"
+              :preview-html="activePreviewHtml"
+              :preview-label="activePreviewLabel"
+            />
+          </div>
+        </section>
       </div>
     </template>
-
-    <!-- 底部操作栏 -->
-    <div v-if="article" class="flex items-center gap-2 border-t border-editorial-border pt-4 mt-6">
-      <div class="flex flex-1 items-center gap-2">
-        <a-select
-          v-model:value="wechatTheme"
-          :options="wechatThemeOptions"
-          size="small"
-          class="!w-[120px]"
-        />
-        <a-button
-          :loading="wechatCopying"
-          @click="copyAsWechatFormat"
-        >复制公众号格式</a-button>
-        <a-button
-          v-if="canPush(article)"
-          type="primary"
-          @click="$emit('openPush', article)"
-        >推送到草稿箱</a-button>
-        <a-tooltip v-else :mouse-enter-delay="0.3">
-          <template #title>{{ getMissingConditions(article).join('；') }}</template>
-          <a-button type="primary" disabled>推送到草稿箱</a-button>
-        </a-tooltip>
-      </div>
-      <a-button
-        type="primary"
-        :loading="saving"
-        @click="handleSave"
-      >保存正文</a-button>
-    </div>
   </a-modal>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import { message } from "ant-design-vue";
 
 import ArticleMarkdownEditor from "./ArticleMarkdownEditor.vue";
@@ -200,10 +214,10 @@ const emit = defineEmits<{
 const editContent = ref("");
 const saving = ref(false);
 
-// 打开时从 article 初始化编辑内容
 watch(() => props.open, (val) => {
   if (val && props.article) {
     editContent.value = props.article.contentMarkdown || "";
+    activePreviewTheme.value = "live";
   }
 });
 
@@ -224,9 +238,43 @@ async function handleSave(): Promise<void> {
 }
 
 function handleClose(): void {
-  // 关闭前如果有未保存的修改不自动保存，直接关闭
   emit("update:open", false);
 }
+
+// ─── 预览主题切换 ───
+
+type PreviewThemeKey = "live" | "bauhaus" | "sunsetFilm" | "receipt";
+
+const previewThemeOptions: { key: PreviewThemeKey; label: string }[] = [
+  { key: "live", label: "实时预览" },
+  { key: "bauhaus", label: "包豪斯" },
+  { key: "sunsetFilm", label: "落日胶片" },
+  { key: "receipt", label: "购物小票" },
+];
+
+const activePreviewTheme = ref<PreviewThemeKey>("live");
+
+// 文章是否有主题渲染 HTML
+const hasThemeHtml = computed(() => {
+  if (!props.article) return false;
+  return !!(props.article.contentHtmlBauhaus || props.article.contentHtmlSunsetFilm || props.article.contentHtmlReceipt);
+});
+
+// 根据当前选中的预览主题返回 HTML
+const activePreviewHtml = computed(() => {
+  if (!props.article || activePreviewTheme.value === "live") return "";
+  const map: Record<Exclude<PreviewThemeKey, "live">, string | null> = {
+    bauhaus: props.article.contentHtmlBauhaus,
+    sunsetFilm: props.article.contentHtmlSunsetFilm,
+    receipt: props.article.contentHtmlReceipt,
+  };
+  return map[activePreviewTheme.value] ?? "";
+});
+
+const activePreviewLabel = computed(() => {
+  const opt = previewThemeOptions.find(o => o.key === activePreviewTheme.value);
+  return opt?.label ?? "预览";
+});
 
 // ─── 辅助函数 ───
 
@@ -344,8 +392,8 @@ function getMissingConditions(article: CreativeFinishedArticle): string[] {
 }
 
 .article-editor-wrapper {
-  height: 480px;
-  min-height: 260px;
+  height: calc(100vh - 380px);
+  min-height: 320px;
 }
 
 .article-markdown-body {

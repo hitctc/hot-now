@@ -45,8 +45,25 @@ function onInput(e: Event): void {
   emit("update:modelValue", (e.target as HTMLTextAreaElement).value);
 }
 
-// 拖拽分割线调整左右比例
-const leftPercent = ref(50);
+// 拖拽分割线调整左右比例，持久化到 localStorage
+const STORAGE_KEY = "md-editor-left-percent";
+
+function loadSavedPercent(): number {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? Number(saved) : 50;
+  } catch {
+    return 50;
+  }
+}
+
+const leftPercent = ref(loadSavedPercent());
+
+function persistLeftPercent(): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, String(leftPercent.value));
+  } catch { /* quota 超限等忽略 */ }
+}
 
 function onDividerMouseDown(e: MouseEvent): void {
   e.preventDefault();
@@ -65,6 +82,7 @@ function onDividerMouseDown(e: MouseEvent): void {
   function onMouseUp(): void {
     document.removeEventListener("mousemove", onMouseMove);
     document.removeEventListener("mouseup", onMouseUp);
+    persistLeftPercent();
   }
 
   document.addEventListener("mousemove", onMouseMove);

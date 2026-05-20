@@ -299,6 +299,7 @@ function closeSourceItemModal(): void {
 function openEditModal(article: CreativeFinishedArticle): void {
   editDrawerArticle.value = article;
   editDrawerOpen.value = true;
+  detailArticle.value = null;
 }
 
 function onEditDrawerSaved(): void {

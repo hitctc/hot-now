@@ -197,13 +197,6 @@ export const wechatThemeOptions: { value: WechatThemeId; label: string }[] = [
   { value: "receipt", label: "购物小票" }
 ];
 
-// 主题 ID 到数据库 HTML 列名的映射
-export const themeHtmlKeyMap: Record<WechatThemeId, "contentHtmlBauhaus" | "contentHtmlSunsetFilm" | "contentHtmlReceipt"> = {
-  bauhaus: "contentHtmlBauhaus",
-  "sunset-film": "contentHtmlSunsetFilm",
-  receipt: "contentHtmlReceipt",
-};
-
 export function renderWechatFormat(
   id: number,
   theme: WechatThemeId

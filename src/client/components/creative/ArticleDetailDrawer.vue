@@ -149,14 +149,15 @@
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文</h3>
             <div class="flex items-center gap-2">
-              <div v-if="hasThemeHtml" class="flex gap-1">
+              <div v-if="article.contentMarkdown" class="flex gap-1">
                 <a-button
                   v-for="opt in previewThemeOptions"
                   :key="opt.key"
                   :type="activePreviewTheme === opt.key ? 'primary' : 'default'"
                   size="small"
                   class="!text-[11px] !px-2 !py-0.5"
-                  @click="activePreviewTheme = opt.key"
+                  :loading="activePreviewTheme === opt.key && themeLoading"
+                  @click="switchPreviewTheme(opt.key)"
                 >{{ opt.label }}</a-button>
               </div>
               <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(editContent)">复制原文</a-button>
@@ -210,7 +211,8 @@ const saving = ref(false);
 watch(() => props.open, (val) => {
   if (val && props.article) {
     editContent.value = props.article.contentMarkdown || "";
-    activePreviewTheme.value = hasThemeHtml.value ? "bauhaus" : "live";
+    activePreviewTheme.value = "live";
+    themeHtmlCache.value = {};
   }
 });
 
@@ -239,29 +241,53 @@ function handleClose(): void {
 type PreviewThemeKey = "live" | "bauhaus" | "sunsetFilm" | "receipt";
 
 const previewThemeOptions: { key: PreviewThemeKey; label: string }[] = [
+  { key: "live", label: "实时预览" },
   { key: "bauhaus", label: "包豪斯" },
   { key: "sunsetFilm", label: "落日胶片" },
   { key: "receipt", label: "购物小票" },
-  { key: "live", label: "实时预览" },
 ];
 
 const activePreviewTheme = ref<PreviewThemeKey>("live");
+const themeLoading = ref(false);
 
-// 文章是否有主题渲染 HTML
-const hasThemeHtml = computed(() => {
-  if (!props.article) return false;
-  return !!(props.article.contentHtmlBauhaus || props.article.contentHtmlSunsetFilm || props.article.contentHtmlReceipt);
-});
+// 缓存已渲染的主题 HTML，避免切换回来时重复请求
+const themeHtmlCache = ref<Record<string, string>>({});
+
+const themeIdMap: Record<Exclude<PreviewThemeKey, "live">, WechatThemeId> = {
+  bauhaus: "bauhaus",
+  sunsetFilm: "sunset-film",
+  receipt: "receipt",
+};
+
+async function switchPreviewTheme(key: PreviewThemeKey): Promise<void> {
+  activePreviewTheme.value = key;
+  if (key === "live") return;
+
+  const themeId = themeIdMap[key];
+  const cached = themeHtmlCache.value[themeId];
+  if (cached) return;
+
+  if (!props.article) return;
+  themeLoading.value = true;
+  try {
+    const res = await renderWechatFormat(props.article.id, themeId);
+    if (res.ok && res.html) {
+      themeHtmlCache.value[themeId] = res.html;
+    } else {
+      message.error("主题渲染失败");
+    }
+  } catch {
+    message.error("主题渲染请求失败");
+  } finally {
+    themeLoading.value = false;
+  }
+}
 
 // 根据当前选中的预览主题返回 HTML
 const activePreviewHtml = computed(() => {
-  if (!props.article || activePreviewTheme.value === "live") return "";
-  const map: Record<Exclude<PreviewThemeKey, "live">, string | null> = {
-    bauhaus: props.article.contentHtmlBauhaus,
-    sunsetFilm: props.article.contentHtmlSunsetFilm,
-    receipt: props.article.contentHtmlReceipt,
-  };
-  return map[activePreviewTheme.value] ?? "";
+  if (activePreviewTheme.value === "live") return "";
+  const themeId = themeIdMap[activePreviewTheme.value];
+  return themeHtmlCache.value[themeId] ?? "";
 });
 
 const activePreviewLabel = computed(() => {
@@ -305,14 +331,8 @@ function formatLocalTime(value: string): string {
 
 // 当前主题对应的 WechatThemeId（用于复制公众号格式和推送）
 const currentWechatThemeId = computed<WechatThemeId>(() => {
-  const map: Record<Exclude<PreviewThemeKey, "live">, WechatThemeId> = {
-    bauhaus: "bauhaus",
-    sunsetFilm: "sunset-film",
-    receipt: "receipt",
-  };
-  return activePreviewTheme.value === "live"
-    ? "bauhaus"
-    : (map[activePreviewTheme.value] ?? "bauhaus");
+  if (activePreviewTheme.value === "live") return "bauhaus";
+  return themeIdMap[activePreviewTheme.value] ?? "bauhaus";
 });
 
 // ─── 微信公众号格式复制 ───

@@ -1,4 +1,4 @@
-<!-- 文章详情弹窗：展示标题/立意/摘要/正文/图片，底部工具栏 -->
+<!-- 文章详情弹窗：展示标题/立意/摘要 + 正文编辑器（左编辑右预览），底部工具栏 -->
 <template>
   <a-modal
     :open="open"
@@ -10,7 +10,7 @@
     centered
     wrap-class-name="article-detail-modal"
     :body-style="{ maxHeight: 'calc(100vh - 110px)', overflowY: 'auto', padding: '24px' }"
-    @cancel="$emit('update:open', false)"
+    @cancel="handleClose"
   >
     <template #title>
       <span v-if="article" class="text-base font-semibold">
@@ -30,7 +30,7 @@
           >素材 #{{ article.sourceItemId }}</a>
         </div>
 
-        <!-- 备选标题 -->
+        <!-- 备选标题（只读） -->
         <section v-if="parseJsonArray(article.titles).length > 0">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">备选标题</h3>
@@ -49,7 +49,7 @@
           </ul>
         </section>
 
-        <!-- 核心立意 -->
+        <!-- 核心立意（只读） -->
         <section v-if="article.thesis">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">核心立意</h3>
@@ -58,7 +58,7 @@
           <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ article.thesis }}</p>
         </section>
 
-        <!-- 百字摘要 -->
+        <!-- 百字摘要（只读） -->
         <section v-if="article.summary100">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">百字摘要</h3>
@@ -67,7 +67,7 @@
           <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ article.summary100 }}</p>
         </section>
 
-        <!-- 开头钩子 -->
+        <!-- 开头钩子（只读） -->
         <section v-if="parseJsonArray(article.hooks).length > 0">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">开头钩子</h3>
@@ -85,7 +85,7 @@
           </ul>
         </section>
 
-        <!-- 可摘句 -->
+        <!-- 可摘句（只读） -->
         <section v-if="parseJsonArray(article.quotes).length > 0">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">可摘句</h3>
@@ -96,38 +96,21 @@
           </ul>
         </section>
 
-        <!-- 正文（主题渲染 / Markdown 降级） -->
-        <section v-if="article.contentMarkdown">
+        <!-- 正文：左右分屏编辑器（左 Markdown 编辑，右实时预览） -->
+        <section>
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文</h3>
             <div class="flex items-center gap-2">
-              <div v-if="getThemeHtml(article)" class="flex gap-1">
-                <a-button
-                  v-for="opt in themeOptions"
-                  :key="opt.key"
-                  :type="activeTheme === opt.key ? 'primary' : 'default'"
-                  size="small"
-                  class="!text-[11px] !px-2 !py-0.5"
-                  @click="activeTheme = opt.key"
-                >{{ opt.label }}</a-button>
-              </div>
-              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(article.contentMarkdown)">复制原文</a-button>
-              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyMarkdownAsPlainText(article.contentMarkdown)">复制纯文本</a-button>
+              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(editContent)">复制原文</a-button>
+              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyMarkdownAsPlainText(editContent)">复制纯文本</a-button>
             </div>
           </div>
-          <div
-            v-if="getThemeHtml(article)"
-            class="rounded-editorial-md border border-editorial-border overflow-hidden"
-            v-html="getThemeHtml(article)"
-          ></div>
-          <div
-            v-else
-            class="article-markdown-body rounded-editorial-md border border-editorial-border bg-editorial-panel/30 px-4 py-3"
-            v-html="renderMarkdown(article.contentMarkdown)"
-          ></div>
+          <div class="article-editor-wrapper">
+            <ArticleMarkdownEditor v-model="editContent" />
+          </div>
         </section>
 
-        <!-- 图片列表 -->
+        <!-- 图片列表（只读） -->
         <section v-if="parseArticleImages(article.imagesJson).length > 0">
           <h3 class="m-0 mb-2 text-sm font-semibold text-editorial-text-muted">图片列表</h3>
           <a-image-preview-group>
@@ -155,29 +138,32 @@
 
     <!-- 底部操作栏 -->
     <div v-if="article" class="flex items-center gap-2 border-t border-editorial-border pt-4 mt-6">
-      <a-select
-        v-model:value="wechatTheme"
-        :options="wechatThemeOptions"
-        size="small"
-        class="!w-[120px]"
-      />
+      <div class="flex flex-1 items-center gap-2">
+        <a-select
+          v-model:value="wechatTheme"
+          :options="wechatThemeOptions"
+          size="small"
+          class="!w-[120px]"
+        />
+        <a-button
+          :loading="wechatCopying"
+          @click="copyAsWechatFormat"
+        >复制公众号格式</a-button>
+        <a-button
+          v-if="canPush(article)"
+          type="primary"
+          @click="$emit('openPush', article)"
+        >推送到草稿箱</a-button>
+        <a-tooltip v-else :mouse-enter-delay="0.3">
+          <template #title>{{ getMissingConditions(article).join('；') }}</template>
+          <a-button type="primary" disabled>推送到草稿箱</a-button>
+        </a-tooltip>
+      </div>
       <a-button
-        :loading="wechatCopying"
-        @click="copyAsWechatFormat"
-      >复制公众号格式</a-button>
-      <a-button
-        v-if="canPush(article)"
         type="primary"
-        @click="$emit('openPush', article)"
-      >推送到草稿箱</a-button>
-      <a-tooltip v-else :mouse-enter-delay="0.3">
-        <template #title>{{ getMissingConditions(article).join('；') }}</template>
-        <a-button type="primary" disabled>推送到草稿箱</a-button>
-      </a-tooltip>
-      <a-button
-        type="primary"
-        @click="$emit('openEdit', article)"
-      >编辑内容</a-button>
+        :loading="saving"
+        @click="handleSave"
+      >保存正文</a-button>
     </div>
   </a-modal>
 </template>
@@ -185,9 +171,10 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import { message } from "ant-design-vue";
-import MarkdownIt from "markdown-it";
 
+import ArticleMarkdownEditor from "./ArticleMarkdownEditor.vue";
 import {
+  editFinishedArticle,
   renderWechatFormat,
   wechatThemeOptions,
   parseArticleImages,
@@ -201,19 +188,44 @@ const props = defineProps<{
   article: CreativeFinishedArticle | null;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   "update:open": [value: boolean];
+  saved: [];
   openSourceItem: [sourceItemId: number];
-  openEdit: [article: CreativeFinishedArticle];
   openPush: [article: CreativeFinishedArticle];
 }>();
 
-// ─── Markdown 渲染 ───
+// ─── 正文编辑 ───
 
-const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
+const editContent = ref("");
+const saving = ref(false);
 
-function renderMarkdown(text: string): string {
-  return md.render(text);
+// 打开时从 article 初始化编辑内容
+watch(() => props.open, (val) => {
+  if (val && props.article) {
+    editContent.value = props.article.contentMarkdown || "";
+  }
+});
+
+async function handleSave(): Promise<void> {
+  if (!props.article) return;
+  saving.value = true;
+  try {
+    await editFinishedArticle(props.article.id, {
+      contentMarkdown: editContent.value,
+    });
+    message.success("保存成功");
+    emit("saved");
+  } catch {
+    message.error("保存失败");
+  } finally {
+    saving.value = false;
+  }
+}
+
+function handleClose(): void {
+  // 关闭前如果有未保存的修改不自动保存，直接关闭
+  emit("update:open", false);
 }
 
 // ─── 辅助函数 ───
@@ -250,40 +262,17 @@ function formatLocalTime(value: string): string {
   });
 }
 
-// ─── 主题切换（包豪斯 / 落日胶片 / 购物小票） ───
-
-type ThemeHtmlKey = "bauhaus" | "sunsetFilm" | "receipt";
-const themeOptions: { key: ThemeHtmlKey; label: string }[] = [
-  { key: "bauhaus", label: "包豪斯" },
-  { key: "sunsetFilm", label: "落日胶片" },
-  { key: "receipt", label: "购物小票" }
-];
-const activeTheme = ref<ThemeHtmlKey>("bauhaus");
-
-function getThemeHtml(article: CreativeFinishedArticle): string | null {
-  const map: Record<ThemeHtmlKey, string | null> = {
-    bauhaus: article.contentHtmlBauhaus,
-    sunsetFilm: article.contentHtmlSunsetFilm,
-    receipt: article.contentHtmlReceipt
-  };
-  return map[activeTheme.value] ?? null;
-}
-
-// 打开时重置主题
-watch(() => props.open, (val) => {
-  if (val) activeTheme.value = "bauhaus";
-});
-
 // ─── 微信公众号格式复制 ───
 
 const wechatTheme = ref<WechatThemeId>("bauhaus");
 const wechatCopying = ref(false);
 
 async function copyAsWechatFormat(): Promise<void> {
-  if (!props.article?.contentMarkdown) {
+  if (!editContent.value) {
     message.warning("文章无正文内容");
     return;
   }
+  if (!props.article) return;
   wechatCopying.value = true;
   try {
     const res = await renderWechatFormat(props.article.id, wechatTheme.value);
@@ -292,7 +281,7 @@ async function copyAsWechatFormat(): Promise<void> {
       return;
     }
     const htmlBlob = new Blob([res.html], { type: "text/html" });
-    const textBlob = new Blob([props.article.contentMarkdown], { type: "text/plain" });
+    const textBlob = new Blob([editContent.value], { type: "text/plain" });
     await navigator.clipboard.write([
       new ClipboardItem({ "text/html": htmlBlob, "text/plain": textBlob })
     ]);
@@ -350,7 +339,15 @@ function getMissingConditions(article: CreativeFinishedArticle): string[] {
 </script>
 
 <style>
-/* Markdown 渲染样式 */
+.article-detail-modal .ant-modal-body {
+  background: #ffffff;
+}
+
+.article-editor-wrapper {
+  height: 480px;
+  min-height: 260px;
+}
+
 .article-markdown-body {
   font-size: 14px;
   line-height: 1.75;

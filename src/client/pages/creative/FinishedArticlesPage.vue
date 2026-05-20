@@ -5,7 +5,6 @@ import { message } from "ant-design-vue";
 import { useSearchHistory } from "../../composables/useSearchHistory.js";
 
 import {
-  editFinishedArticle,
   readCreativeFinishedArticles,
   readCreativeSourceItem,
   toggleFinishedArticlePublished,
@@ -13,8 +12,6 @@ import {
   parseArticleImages,
   extractImageUrl,
   pushArticleToDraft,
-  readArticlePushLog,
-  type ArticleImageEntry,
   type CreativeFinishedArticle,
   type CreativeSourceItem,
   type TrendBreakdown,
@@ -23,7 +20,6 @@ import {
 } from "../../services/creativeApi.js";
 import { readWechatMpAccounts, type WechatMpAccountSummary } from "../../services/settingsApi.js";
 import ArticlePushConfirmModal from "../../components/creative/ArticlePushConfirmModal.vue";
-import ArticleEditDrawer from "../../components/creative/ArticleEditDrawer.vue";
 import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
 
 // ─── JSON 解析辅助 ───
@@ -111,10 +107,6 @@ const detailArticle = ref<CreativeFinishedArticle | null>(null);
 const sourceItemModalOpen = ref(false);
 const sourceItemModalLoading = ref(false);
 const sourceItemModalData = ref<CreativeSourceItem | null>(null);
-
-// 编辑抽屉
-const editDrawerOpen = ref(false);
-const editDrawerArticle = ref<CreativeFinishedArticle | null>(null);
 
 // ─── 推送到草稿箱 ───
 
@@ -258,20 +250,9 @@ function closeSourceItemModal(): void {
   sourceItemModalData.value = null;
 }
 
-// ─── 编辑弹窗 ───
-
-function handleDrawerOpenEdit(article: CreativeFinishedArticle): void {
-  detailArticle.value = null;
-  editDrawerArticle.value = article;
-  editDrawerOpen.value = true;
-}
-
-function onEditDrawerSaved(): void {
+// 详情弹窗保存后刷新列表
+function onDetailSaved(): void {
   loadItems();
-  if (detailArticle.value && editDrawerArticle.value && detailArticle.value.id === editDrawerArticle.value.id) {
-    const updated = items.value.find(item => item.id === editDrawerArticle.value!.id);
-    if (updated) detailArticle.value = updated;
-  }
 }
 
 // ─── 格式化辅助 ───
@@ -598,13 +579,13 @@ const pagination = computed(() => ({
       </a-table>
     </a-spin>
 
-    <!-- 文章详情抽屉 -->
+    <!-- 文章详情弹窗 -->
     <ArticleDetailDrawer
       :open="detailArticle !== null"
       :article="detailArticle"
       @update:open="(val) => { if (!val) closeDetail(); }"
+      @saved="onDetailSaved"
       @open-source-item="openSourceItemModal"
-      @open-edit="handleDrawerOpenEdit"
       @open-push="openPushConfirm"
     />
 
@@ -705,13 +686,6 @@ const pagination = computed(() => ({
         </template>
       </a-spin>
     </a-modal>
-
-    <!-- 编辑抽屉 -->
-    <ArticleEditDrawer
-      v-model:open="editDrawerOpen"
-      :article="editDrawerArticle"
-      @saved="onEditDrawerSaved"
-    />
 
     <!-- 推送确认弹窗 -->
     <ArticlePushConfirmModal

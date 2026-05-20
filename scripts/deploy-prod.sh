@@ -60,7 +60,7 @@ echo "Installing dependencies (prefer offline cache)..."
 ssh "${REMOTE_TARGET}" \
   "set -euo pipefail
   cd '${DEPLOY_APP_DIR}'
-  npm ci --prefer-offline"
+  npm ci --prefer-offline --production"
 
 echo "Restarting service..."
 ssh "${REMOTE_TARGET}" \

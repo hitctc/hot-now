@@ -84,6 +84,7 @@ export interface DraftPushResult {
   errorCode?: string;
   errorMessage?: string;
   hint?: string;
+  pushCount?: number;
 }
 
 // 微信 API 错误

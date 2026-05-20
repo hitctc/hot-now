@@ -5,7 +5,7 @@ import { findDefaultWechatMpAccount } from "./wechatMpAccountRepository.js";
 import { getAccessToken } from "./wechatMpAccessToken.js";
 import { uploadPermanentImage, uploadContentImage, createDraft, WechatApiCallError } from "./wechatMpApiClient.js";
 import { formatForWechat, type WechatThemeId } from "../creative/wechatFormat/index.js";
-import { findCreativeFinishedArticleById } from "../creative/creativeFinishedArticleRepository.js";
+import { findCreativeFinishedArticleById, editCreativeFinishedArticle } from "../creative/creativeFinishedArticleRepository.js";
 import { WECHAT_ERROR_HINTS, type DraftPushResult } from "./types.js";
 import type { SqliteDatabase } from "../db/openDatabase.js";
 
@@ -151,7 +151,13 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
       WHERE id = ?
     `).run(mediaId, logId);
 
-    return { ok: true, mediaId };
+    // 10. 更新文章状态为已推送草稿
+    editCreativeFinishedArticle(db, articleId, { status: "wechat_draft" });
+
+    // 11. 返回推送次数
+    const pushCount = getArticlePushCount(db, articleId);
+
+    return { ok: true, mediaId, pushCount };
   } catch (err) {
     const wechatErr = err instanceof WechatApiCallError
       ? { errorCode: String(err.errcode), errorMessage: `${err.hint}\n\n错误码: ${err.errcode}\n微信原始信息: ${err.errmsg}` }

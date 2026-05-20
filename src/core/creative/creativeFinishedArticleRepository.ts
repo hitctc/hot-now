@@ -24,7 +24,8 @@ const SELECT_COLUMNS = `
   content_html_receipt,
   wechat_published,
   created_at,
-  updated_at
+  updated_at,
+  (SELECT COUNT(*) FROM wechat_draft_push_log WHERE article_id = creative_finished_articles.id AND status = 'success') AS push_count
 ` as const;
 
 type ArticleRow = {
@@ -46,6 +47,7 @@ type ArticleRow = {
   content_html_sunset_film: string | null;
   content_html_receipt: string | null;
   wechat_published: number;
+  push_count: number;
   created_at: string;
   updated_at: string;
 };
@@ -71,6 +73,7 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     contentHtmlSunsetFilm: row.content_html_sunset_film,
     contentHtmlReceipt: row.content_html_receipt,
     wechatPublished: row.wechat_published === 1,
+    pushCount: row.push_count ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -98,6 +101,7 @@ export type CreativeFinishedArticleRecord = {
   contentHtmlSunsetFilm: string | null;
   contentHtmlReceipt: string | null;
   wechatPublished: boolean;
+  pushCount: number;
   createdAt: string;
   updatedAt: string;
 };

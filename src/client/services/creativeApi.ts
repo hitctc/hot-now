@@ -65,6 +65,7 @@ export type CreativeFinishedArticle = {
   contentHtmlSunsetFilm: string | null;
   contentHtmlReceipt: string | null;
   wechatPublished: boolean;
+  pushCount: number;
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
   sourceTitle: string | null;
@@ -248,6 +249,7 @@ export type PushDraftResult = {
   mediaId?: string;
   errorCode?: string;
   errorMessage?: string;
+  pushCount?: number;
 };
 
 export type PushLogEntry = {

@@ -510,17 +510,22 @@ const pagination = computed(() => ({
 
           <!-- 推送到草稿箱列 -->
           <template v-else-if="column.key === 'pushDraft'">
-            <a-button
-              v-if="canPush(record)"
-              size="small"
-              type="primary"
-              class="!text-[11px] !px-2 !py-0.5"
-              @click="openPushConfirm(record)"
-            >推送</a-button>
-            <a-tooltip v-else :mouse-enter-delay="0.3">
-              <template #title>{{ getMissingConditions(record).join('；') }}</template>
-              <a-button size="small" disabled class="!text-[11px] !px-2 !py-0.5">推送</a-button>
-            </a-tooltip>
+            <div class="flex items-center gap-1">
+              <a-button
+                v-if="canPush(record)"
+                size="small"
+                type="primary"
+                class="!text-[11px] !px-2 !py-0.5"
+                @click="openPushConfirm(record)"
+              >推送</a-button>
+              <a-tooltip v-else :mouse-enter-delay="0.3">
+                <template #title>{{ getMissingConditions(record).join('；') }}</template>
+                <a-button size="small" disabled class="!text-[11px] !px-2 !py-0.5">推送</a-button>
+              </a-tooltip>
+              <span v-if="record.pushCount > 0" class="text-[10px] text-green-600 whitespace-nowrap">
+                已推送{{ record.pushCount }}次
+              </span>
+            </div>
           </template>
 
           <!-- 快捷复制列：生成重写文章 prompt -->

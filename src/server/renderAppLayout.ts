@@ -40,6 +40,12 @@ const appShellPages: AppShellPage[] = [
     section: "system",
     description: "这里会配置 AI 新讯与 AI 热点的筛选规则与展示偏好。"
   },
+  {
+    path: "/settings/wechat-mp",
+    title: "公众号配置",
+    section: "system",
+    description: "管理微信公众号 API 凭证，用于推送草稿到公众号草稿箱。"
+  },
   { path: "/settings/profile", title: "当前用户", section: "system", description: "这里会展示当前账号资料、角色和登录状态。" }
 ];
 

@@ -154,7 +154,7 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
     return { ok: true, mediaId };
   } catch (err) {
     const wechatErr = err instanceof WechatApiCallError
-      ? { errorCode: String(err.errcode), errorMessage: err.hint }
+      ? { errorCode: String(err.errcode), errorMessage: `${err.hint}\n\n错误码: ${err.errcode}\n微信原始信息: ${err.errmsg}` }
       : { errorCode: "unknown", errorMessage: (err as Error).message };
 
     // 更新推送记录为失败

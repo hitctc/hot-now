@@ -47,17 +47,30 @@ rsync -az --delete \
   --exclude ".DS_Store" \
   ./ "${REMOTE_TARGET}:${DEPLOY_APP_DIR}/"
 
-echo "Installing production dependencies and restarting service..."
+# 分步执行：先停服务释放内存 → 装 deps → 重启 → health check
+# 每步单独 SSH，避免单条命令超时丢进度
+
+echo "Stopping service to free memory for npm ci..."
 ssh "${REMOTE_TARGET}" \
   "set -euo pipefail
   cd '${DEPLOY_APP_DIR}'
-  npm ci
+  sudo -n systemctl stop '${DEPLOY_SERVICE}' 2>/dev/null || true"
+
+echo "Installing dependencies (prefer offline cache)..."
+ssh "${REMOTE_TARGET}" \
+  "set -euo pipefail
+  cd '${DEPLOY_APP_DIR}'
+  npm ci --prefer-offline"
+
+echo "Restarting service..."
+ssh "${REMOTE_TARGET}" \
+  "set -euo pipefail
+  cd '${DEPLOY_APP_DIR}'
   if ! sudo -n systemctl restart '${DEPLOY_SERVICE}'; then
     echo 'Passwordless sudo for systemctl restart is not configured.' >&2
     echo 'Install the deploy sudoers rule from deploy/sudoers/hot-now-systemctl.' >&2
     exit 1
   fi
-  sudo -n systemctl status '${DEPLOY_SERVICE}' --no-pager
   for attempt in 1 2 3 4 5; do
     if curl -fsS '${DEPLOY_HEALTH_URL}'; then
       exit 0

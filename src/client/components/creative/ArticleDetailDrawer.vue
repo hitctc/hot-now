@@ -1,12 +1,16 @@
-<!-- 文章详情抽屉：从右侧滑入，展示标题/立意/摘要/正文/图片，底部工具栏 -->
+<!-- 文章详情弹窗：展示标题/立意/摘要/正文/图片，底部工具栏 -->
 <template>
-  <a-drawer
+  <a-modal
     :open="open"
-    :width="'80%'"
-    placement="right"
+    :footer="null"
     :closable="true"
+    :mask-closable="true"
     :destroy-on-close="true"
-    @close="$emit('update:open', false)"
+    width="90%"
+    centered
+    wrap-class-name="article-detail-modal"
+    :body-style="{ maxHeight: 'calc(100vh - 110px)', overflowY: 'auto', padding: '24px' }"
+    @cancel="$emit('update:open', false)"
   >
     <template #title>
       <span v-if="article" class="text-base font-semibold">
@@ -149,35 +153,33 @@
       </div>
     </template>
 
-    <!-- 底部操作栏：使用 drawer 内置 footer -->
-    <template #footer>
-      <div v-if="article" class="flex items-center gap-2">
-        <a-select
-          v-model:value="wechatTheme"
-          :options="wechatThemeOptions"
-          size="small"
-          class="!w-[120px]"
-        />
-        <a-button
-          :loading="wechatCopying"
-          @click="copyAsWechatFormat"
-        >复制公众号格式</a-button>
-        <a-button
-          v-if="canPush(article)"
-          type="primary"
-          @click="$emit('openPush', article)"
-        >推送到草稿箱</a-button>
-        <a-tooltip v-else :mouse-enter-delay="0.3">
-          <template #title>{{ getMissingConditions(article).join('；') }}</template>
-          <a-button type="primary" disabled>推送到草稿箱</a-button>
-        </a-tooltip>
-        <a-button
-          type="primary"
-          @click="$emit('openEdit', article)"
-        >编辑内容</a-button>
-      </div>
-    </template>
-  </a-drawer>
+    <!-- 底部操作栏 -->
+    <div v-if="article" class="flex items-center gap-2 border-t border-editorial-border pt-4 mt-6">
+      <a-select
+        v-model:value="wechatTheme"
+        :options="wechatThemeOptions"
+        size="small"
+        class="!w-[120px]"
+      />
+      <a-button
+        :loading="wechatCopying"
+        @click="copyAsWechatFormat"
+      >复制公众号格式</a-button>
+      <a-button
+        v-if="canPush(article)"
+        type="primary"
+        @click="$emit('openPush', article)"
+      >推送到草稿箱</a-button>
+      <a-tooltip v-else :mouse-enter-delay="0.3">
+        <template #title>{{ getMissingConditions(article).join('；') }}</template>
+        <a-button type="primary" disabled>推送到草稿箱</a-button>
+      </a-tooltip>
+      <a-button
+        type="primary"
+        @click="$emit('openEdit', article)"
+      >编辑内容</a-button>
+    </div>
+  </a-modal>
 </template>
 
 <script setup lang="ts">

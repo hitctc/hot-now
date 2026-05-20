@@ -1,61 +1,60 @@
-<!-- 编辑抽屉：左右分屏编辑 + 主题预览 + 保存/复制 -->
+<!-- 编辑弹窗：左右分屏编辑 + 主题预览 + 保存/复制 -->
 <template>
-  <a-drawer
+  <a-modal
     :open="open"
-    :width="'90%'"
     title="编辑文章"
-    placement="right"
+    width="90%"
+    :footer="null"
     :closable="true"
     :mask-closable="false"
-    @close="$emit('update:open', false)"
+    :destroy-on-close="true"
+    @cancel="$emit('update:open', false)"
   >
     <template v-if="article">
       <!-- 顶部元信息 -->
-      <div class="edit-drawer__meta">
-        <span class="edit-drawer__status-tag" :class="`status-${article.status}`">
+      <div class="edit-modal__meta">
+        <span class="edit-modal__status-tag" :class="`status-${article.status}`">
           {{ statusLabel(article.status) }}
         </span>
-        <span class="edit-drawer__time">{{ formatLocalTime(article.createdAt) }}</span>
+        <span class="edit-modal__time">{{ formatLocalTime(article.createdAt) }}</span>
       </div>
 
       <!-- 标题展示 -->
-      <div v-if="firstTitle" class="edit-drawer__title">{{ firstTitle }}</div>
+      <div v-if="firstTitle" class="edit-modal__title">{{ firstTitle }}</div>
 
       <!-- 立意和摘要 -->
-      <div class="edit-drawer__fields">
-        <div class="edit-drawer__field">
+      <div class="edit-modal__fields">
+        <div class="edit-modal__field">
           <label>核心立意</label>
           <a-textarea v-model:value="editForm.thesis" :rows="2" placeholder="核心立意" />
         </div>
-        <div class="edit-drawer__field">
+        <div class="edit-modal__field">
           <label>百字摘要</label>
           <a-textarea v-model:value="editForm.summary100" :rows="3" placeholder="百字摘要" />
         </div>
       </div>
 
       <!-- 正文编辑器 -->
-      <div class="edit-drawer__editor-wrapper">
+      <div class="edit-modal__editor-wrapper">
         <ArticleMarkdownEditor v-model="editForm.contentMarkdown" />
       </div>
 
       <!-- 底部工具栏 -->
-      <div class="edit-drawer__toolbar">
-        <div class="edit-drawer__toolbar-left">
+      <div class="edit-modal__toolbar">
+        <div class="edit-modal__toolbar-left">
           <a-select
             v-model:value="selectedTheme"
             :options="wechatThemeOptions"
             style="width: 140px"
-            data-testid="edit-drawer-theme-select"
           />
           <a-button
             :loading="copyingWechat"
             @click="handleCopyWechat"
-            data-testid="edit-drawer-copy-wechat"
           >
             复制公众号格式
           </a-button>
         </div>
-        <div class="edit-drawer__toolbar-right">
+        <div class="edit-modal__toolbar-right">
           <a-button @click="$emit('update:open', false)">取消</a-button>
           <a-button type="primary" :loading="saving" @click="handleSave">
             保存
@@ -63,7 +62,7 @@
         </div>
       </div>
     </template>
-  </a-drawer>
+  </a-modal>
 </template>
 
 <script setup lang="ts">
@@ -141,6 +140,7 @@ async function handleSave(): Promise<void> {
       summary100: editForm.value.summary100,
     });
     message.success("保存成功");
+    emit("update:open", false);
     emit("saved");
   } catch {
     message.error("保存失败");
@@ -153,7 +153,6 @@ async function handleCopyWechat(): Promise<void> {
   if (!props.article) return;
   copyingWechat.value = true;
   try {
-    // 用编辑中的最新内容生成微信格式
     const res = await renderWechatFormat(props.article.id, selectedTheme.value);
     if (!res.ok || !res.html) {
       message.error("渲染失败");
@@ -174,14 +173,14 @@ async function handleCopyWechat(): Promise<void> {
 </script>
 
 <style scoped>
-.edit-drawer__meta {
+.edit-modal__meta {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
 }
 
-.edit-drawer__status-tag {
+.edit-modal__status-tag {
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 12px;
@@ -189,48 +188,48 @@ async function handleCopyWechat(): Promise<void> {
   color: #666;
 }
 
-.edit-drawer__status-tag.status-ready_for_publish {
+.edit-modal__status-tag.status-ready_for_publish {
   background: #e6fffb;
   color: #13c2c2;
 }
 
-.edit-drawer__status-tag.status-wechat_draft {
+.edit-modal__status-tag.status-wechat_draft {
   background: #f0f5ff;
   color: #2f54eb;
 }
 
-.edit-drawer__time {
+.edit-modal__time {
   color: #999;
   font-size: 13px;
 }
 
-.edit-drawer__title {
+.edit-modal__title {
   font-size: 18px;
   font-weight: 700;
   margin-bottom: 16px;
   color: #1a1a1a;
 }
 
-.edit-drawer__fields {
+.edit-modal__fields {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   margin-bottom: 16px;
 }
 
-.edit-drawer__field label {
+.edit-modal__field label {
   display: block;
   font-size: 13px;
   color: #666;
   margin-bottom: 4px;
 }
 
-.edit-drawer__editor-wrapper {
-  height: calc(100vh - 380px);
+.edit-modal__editor-wrapper {
+  height: calc(100vh - 420px);
   min-height: 300px;
 }
 
-.edit-drawer__toolbar {
+.edit-modal__toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -239,13 +238,13 @@ async function handleCopyWechat(): Promise<void> {
   border-top: 1px solid #f0f0f0;
 }
 
-.edit-drawer__toolbar-left {
+.edit-modal__toolbar-left {
   display: flex;
   gap: 8px;
   align-items: center;
 }
 
-.edit-drawer__toolbar-right {
+.edit-modal__toolbar-right {
   display: flex;
   gap: 8px;
 }

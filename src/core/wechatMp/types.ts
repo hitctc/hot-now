@@ -114,7 +114,7 @@ export const WECHAT_ERROR_HINTS: Record<number, { message: string; hint: string 
   40125: { message: "AppSecret 错误", hint: "请检查 AppSecret 配置是否与公众号后台一致" },
   40130: { message: "封面素材无效", hint: "请重新推送，系统会重新上传封面图" },
   45065: { message: "24小时内重复发布", hint: "该内容在24小时内已发布过，请稍后再试" },
-  61006: { message: "IP不在白名单中", hint: "IP_WHITELIST" },
+  61006: { message: "IP 不在白名单中", hint: "请在微信公众号后台 → 基本配置 → IP 白名单中添加服务器 IP" },
 };
 
 // 推送接口依赖注入参数

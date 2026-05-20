@@ -113,6 +113,7 @@ const sourceItemModalData = ref<CreativeSourceItem | null>(null);
 const pushConfirmVisible = ref(false);
 const pushConfirmArticle = ref<CreativeFinishedArticle | null>(null);
 const pushPending = ref(false);
+const pushError = ref("");
 const wechatTheme = ref<WechatThemeId>("bauhaus");
 const wechatMpAccounts = ref<WechatMpAccountSummary[]>([]);
 const defaultAccountName = computed(() => {
@@ -150,6 +151,7 @@ function getMissingConditions(article: CreativeFinishedArticle | null): string[]
 function openPushConfirm(article: CreativeFinishedArticle, themeId?: WechatThemeId): void {
   if (themeId) wechatTheme.value = themeId;
   pushConfirmArticle.value = article;
+  pushError.value = "";
   pushConfirmVisible.value = true;
   loadWechatMpAccounts();
 }
@@ -164,17 +166,18 @@ async function loadWechatMpAccounts(): Promise<void> {
 async function handlePushConfirm(): Promise<void> {
   if (!pushConfirmArticle.value) return;
   pushPending.value = true;
+  pushError.value = "";
   try {
     const result = await pushArticleToDraft(pushConfirmArticle.value.id, wechatTheme.value);
     if (result.ok) {
-      message.success(`推送成功！草稿已添加到微信公众号`);
+      message.success("推送成功！草稿已添加到微信公众号");
       pushConfirmVisible.value = false;
       loadItems();
     } else {
-      message.error(result.errorMessage || '推送失败');
+      pushError.value = result.errorMessage || "推送失败";
     }
   } catch (err) {
-    message.error(`推送失败: ${(err as Error).message}`);
+    pushError.value = `推送失败: ${(err as Error).message}`;
   } finally {
     pushPending.value = false;
   }
@@ -695,6 +698,7 @@ const pagination = computed(() => ({
       :theme-label="wechatThemeOptions.find(o => o.value === wechatTheme)?.label ?? ''"
       :default-account-name="defaultAccountName"
       :loading="pushPending"
+      :error="pushError"
       @confirm="handlePushConfirm"
     />
   </div>

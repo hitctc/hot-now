@@ -2,7 +2,8 @@
 // 微信 access_token 有效期 7200 秒，全局唯一，需缓存避免频繁获取
 
 import { decryptAccountSecret } from "./wechatMpAccountRepository.js";
-import type { WechatMpAccountRecord, WechatApiError } from "./types.js";
+import { WechatApiCallError } from "./wechatMpApiClient.js";
+import { WECHAT_ERROR_HINTS, type WechatMpAccountRecord, type WechatApiError } from "./types.js";
 
 interface CachedToken {
   token: string;
@@ -32,10 +33,11 @@ export async function getAccessToken(
   const data = await response.json() as { access_token?: string; expires_in?: number } & WechatApiError;
 
   if (data.errcode) {
-    throw Object.assign(
-      new Error(`获取 access_token 失败: ${data.errmsg}`),
-      { errcode: data.errcode, errmsg: data.errmsg }
-    );
+    const hintInfo = WECHAT_ERROR_HINTS[data.errcode] ?? {
+      message: `微信返回错误 (${data.errcode})`,
+      hint: "请稍后重试，如持续失败请联系开发者",
+    };
+    throw new WechatApiCallError(data.errcode, data.errmsg, hintInfo.hint);
   }
 
   const token = data.access_token;

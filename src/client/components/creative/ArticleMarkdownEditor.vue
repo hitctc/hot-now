@@ -1,7 +1,7 @@
 <!-- 左右分屏 Markdown 编辑器：左侧 textarea 编辑，右侧实时预览 -->
 <template>
   <div class="md-editor">
-    <div class="md-editor__pane" :style="{ flex: `0 0 ${leftPercent}%` }">
+    <div class="md-editor__pane" :style="{ width: `${leftPercent}%` }">
       <div class="md-editor__label">Markdown</div>
       <textarea
         class="md-editor__textarea"
@@ -12,7 +12,7 @@
       />
     </div>
     <div class="md-editor__divider" @mousedown="onDividerMouseDown" />
-    <div class="md-editor__pane" :style="{ flex: `0 0 ${100 - leftPercent}%` }">
+    <div class="md-editor__pane" :style="{ width: `${100 - leftPercent}%` }">
       <div class="md-editor__label">{{ previewLabel }}</div>
       <div v-if="previewHtml" class="md-editor__preview" v-html="previewHtml" />
       <div v-else class="md-editor__preview" v-html="renderedHtml" />
@@ -83,10 +83,11 @@ function onDividerMouseDown(e: MouseEvent): void {
 }
 
 .md-editor__pane {
-  flex: 1;
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   min-width: 0;
+  overflow: hidden;
 }
 
 .md-editor__label {
@@ -112,7 +113,8 @@ function onDividerMouseDown(e: MouseEvent): void {
 }
 
 .md-editor__divider {
-  width: 4px;
+  flex-shrink: 0;
+  width: 6px;
   background: #e8e8e8;
   cursor: col-resize;
   transition: background 0.15s;

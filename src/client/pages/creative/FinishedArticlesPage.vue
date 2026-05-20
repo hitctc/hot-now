@@ -124,7 +124,7 @@ const defaultAccountName = computed(() => {
 // 推送前置条件检查：文章必须标题、封面图、配图、Markdown 正文齐全
 function canPush(article: CreativeFinishedArticle | null): boolean {
   if (!article) return false;
-  if (article.status !== 'ready_for_publish') return false;
+  if (article.status !== 'ready_for_publish' && article.status !== 'wechat_draft') return false;
   const parsedTitles = parseJsonArray(article.titles);
   if (parsedTitles.length === 0) return false;
   if (!article.coverImage) return false;
@@ -138,7 +138,7 @@ function canPush(article: CreativeFinishedArticle | null): boolean {
 function getMissingConditions(article: CreativeFinishedArticle | null): string[] {
   if (!article) return ['文章不存在'];
   const missing: string[] = [];
-  if (article.status !== 'ready_for_publish') missing.push('状态不是"可推送"');
+  if (article.status !== 'ready_for_publish' && article.status !== 'wechat_draft') missing.push('状态不允许推送');
   const parsedTitles = parseJsonArray(article.titles);
   if (parsedTitles.length === 0) missing.push('缺少标题');
   if (!article.coverImage) missing.push('缺少封面图');
@@ -484,6 +484,7 @@ const pagination = computed(() => ({
           <!-- 状态列 -->
           <template v-else-if="column.key === 'status'">
             <a-tag :color="getStatusInfo(record.status).color" class="!m-0">{{ getStatusInfo(record.status).label }}</a-tag>
+            <a-tag v-if="record.pushCount > 0" color="green" class="!m-0 !ml-1">已推送{{ record.pushCount }}次</a-tag>
           </template>
 
           <!-- 异常说明列 -->
@@ -510,22 +511,17 @@ const pagination = computed(() => ({
 
           <!-- 推送到草稿箱列 -->
           <template v-else-if="column.key === 'pushDraft'">
-            <div class="flex items-center gap-1">
-              <a-button
-                v-if="canPush(record)"
-                size="small"
-                type="primary"
-                class="!text-[11px] !px-2 !py-0.5"
-                @click="openPushConfirm(record)"
-              >推送</a-button>
-              <a-tooltip v-else :mouse-enter-delay="0.3">
-                <template #title>{{ getMissingConditions(record).join('；') }}</template>
-                <a-button size="small" disabled class="!text-[11px] !px-2 !py-0.5">推送</a-button>
-              </a-tooltip>
-              <span v-if="record.pushCount > 0" class="text-[10px] text-green-600 whitespace-nowrap">
-                已推送{{ record.pushCount }}次
-              </span>
-            </div>
+            <a-button
+              v-if="canPush(record)"
+              size="small"
+              type="primary"
+              class="!text-[11px] !px-2 !py-0.5"
+              @click="openPushConfirm(record)"
+            >推送</a-button>
+            <a-tooltip v-else :mouse-enter-delay="0.3">
+              <template #title>{{ getMissingConditions(record).join('；') }}</template>
+              <a-button size="small" disabled class="!text-[11px] !px-2 !py-0.5">推送</a-button>
+            </a-tooltip>
           </template>
 
           <!-- 快捷复制列：生成重写文章 prompt -->

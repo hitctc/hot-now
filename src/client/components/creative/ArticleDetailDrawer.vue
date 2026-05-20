@@ -371,7 +371,7 @@ async function copyMarkdownAsPlainText(mdText: string): Promise<void> {
 // ─── 推送条件检查 ───
 
 function canPush(article: CreativeFinishedArticle): boolean {
-  if (article.status !== "ready_for_publish") return false;
+  if (article.status !== "ready_for_publish" && article.status !== "wechat_draft") return false;
   if (parseJsonArray(article.titles).length === 0) return false;
   if (!article.coverImage) return false;
   if (parseArticleImages(article.imagesJson).length === 0) return false;
@@ -381,7 +381,7 @@ function canPush(article: CreativeFinishedArticle): boolean {
 
 function getMissingConditions(article: CreativeFinishedArticle): string[] {
   const missing: string[] = [];
-  if (article.status !== "ready_for_publish") missing.push('状态不是"可推送"');
+  if (article.status !== "ready_for_publish" && article.status !== "wechat_draft") missing.push("状态不允许推送");
   if (parseJsonArray(article.titles).length === 0) missing.push("缺少标题");
   if (!article.coverImage) missing.push("缺少封面图");
   if (parseArticleImages(article.imagesJson).length === 0) missing.push("缺少正文配图");

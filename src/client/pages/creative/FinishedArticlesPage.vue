@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { message } from "ant-design-vue";
-import MarkdownIt from "markdown-it";
 
 import { useSearchHistory } from "../../composables/useSearchHistory.js";
 
@@ -9,7 +8,6 @@ import {
   editFinishedArticle,
   readCreativeFinishedArticles,
   readCreativeSourceItem,
-  renderWechatFormat,
   toggleFinishedArticlePublished,
   wechatThemeOptions,
   parseArticleImages,
@@ -26,18 +24,7 @@ import {
 import { readWechatMpAccounts, type WechatMpAccountSummary } from "../../services/settingsApi.js";
 import ArticlePushConfirmModal from "../../components/creative/ArticlePushConfirmModal.vue";
 import ArticleEditDrawer from "../../components/creative/ArticleEditDrawer.vue";
-
-// ─── Markdown 渲染器 ───
-
-const md = new MarkdownIt({
-  html: false,
-  linkify: true,
-  breaks: true
-});
-
-function renderMarkdown(text: string): string {
-  return md.render(text);
-}
+import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
 
 // ─── JSON 解析辅助 ───
 
@@ -129,15 +116,12 @@ const sourceItemModalData = ref<CreativeSourceItem | null>(null);
 const editDrawerOpen = ref(false);
 const editDrawerArticle = ref<CreativeFinishedArticle | null>(null);
 
-// 微信公众号格式复制
-const wechatTheme = ref<WechatThemeId>("bauhaus");
-const wechatCopying = ref(false);
-
 // ─── 推送到草稿箱 ───
 
 const pushConfirmVisible = ref(false);
 const pushConfirmArticle = ref<CreativeFinishedArticle | null>(null);
 const pushPending = ref(false);
+const wechatTheme = ref<WechatThemeId>("bauhaus");
 const wechatMpAccounts = ref<WechatMpAccountSummary[]>([]);
 const defaultAccountName = computed(() => {
   const def = wechatMpAccounts.value.find(a => a.isDefault && a.isEnabled);
@@ -201,26 +185,6 @@ async function handlePushConfirm(): Promise<void> {
   } finally {
     pushPending.value = false;
   }
-}
-
-// 主题渲染切换（包豪斯 / 落日胶片 / 购物小票）
-type ThemeHtmlKey = "bauhaus" | "sunsetFilm" | "receipt";
-const themeOptions: { key: ThemeHtmlKey; label: string }[] = [
-  { key: "bauhaus", label: "包豪斯" },
-  { key: "sunsetFilm", label: "落日胶片" },
-  { key: "receipt", label: "购物小票" }
-];
-const activeTheme = ref<ThemeHtmlKey>("bauhaus");
-
-// 根据当前选中的主题返回渲染 HTML，为空则返回 null
-function getThemeHtml(article: CreativeFinishedArticle | null): string | null {
-  if (!article) return null;
-  const map: Record<ThemeHtmlKey, string | null> = {
-    bauhaus: article.contentHtmlBauhaus,
-    sunsetFilm: article.contentHtmlSunsetFilm,
-    receipt: article.contentHtmlReceipt
-  };
-  return map[activeTheme.value] ?? null;
 }
 
 // ─── 数据加载 ───
@@ -296,10 +260,10 @@ function closeSourceItemModal(): void {
 
 // ─── 编辑弹窗 ───
 
-function openEditModal(article: CreativeFinishedArticle): void {
+function handleDrawerOpenEdit(article: CreativeFinishedArticle): void {
+  detailArticle.value = null;
   editDrawerArticle.value = article;
   editDrawerOpen.value = true;
-  detailArticle.value = null;
 }
 
 function onEditDrawerSaved(): void {
@@ -414,49 +378,6 @@ function buildFinishedArticlePrompt(article: CreativeFinishedArticle): string {
 
 async function copyFinishedArticlePrompt(article: CreativeFinishedArticle): Promise<void> {
   await copyText(buildFinishedArticlePrompt(article));
-}
-
-async function copyMarkdownAsPlainText(md: string): Promise<void> {
-  const text = md
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/\*\*(.*?)\*\*/g, "$1")
-    .replace(/\*(.*?)\*/g, "$1")
-    .replace(/`(.*?)`/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/^[-*]\s+/gm, "")
-    .replace(/^>\s+/gm, "")
-    .replace(/---+/g, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-  await navigator.clipboard.writeText(text);
-  message.success("已复制纯文本到剪贴板");
-}
-
-// ─── 微信公众号格式复制 ───
-
-async function copyAsWechatFormat(): Promise<void> {
-  if (!detailArticle.value?.contentMarkdown) {
-    message.warning("文章无正文内容");
-    return;
-  }
-  wechatCopying.value = true;
-  try {
-    const res = await renderWechatFormat(detailArticle.value.id, wechatTheme.value);
-    if (!res.ok || !res.html) {
-      message.error("渲染失败，请重试");
-      return;
-    }
-    const htmlBlob = new Blob([res.html], { type: "text/html" });
-    const textBlob = new Blob([detailArticle.value.contentMarkdown], { type: "text/plain" });
-    await navigator.clipboard.write([
-      new ClipboardItem({ "text/html": htmlBlob, "text/plain": textBlob })
-    ]);
-    message.success("已复制公众号格式，可直接粘贴到编辑器");
-  } catch {
-    message.error("复制失败，请检查浏览器剪贴板权限");
-  } finally {
-    wechatCopying.value = false;
-  }
 }
 
 // ─── 状态字典 ───
@@ -677,185 +598,15 @@ const pagination = computed(() => ({
       </a-table>
     </a-spin>
 
-    <!-- 文章详情全屏弹窗 -->
-    <a-modal
+    <!-- 文章详情抽屉 -->
+    <ArticleDetailDrawer
       :open="detailArticle !== null"
-      :footer="null"
-      :closable="true"
-      :mask-closable="true"
-      width="100%"
-      wrap-class-name="article-detail-fullscreen"
-      :body-style="{ padding: 0, background: '#ffffff' }"
-      :style="{ top: 0, maxWidth: '100vw', paddingBottom: 0 }"
-      destroy-on-close
-      @cancel="closeDetail"
-    >
-      <template v-if="detailArticle">
-        <div class="mx-auto flex max-w-[860px] flex-col gap-6 px-8 py-6">
-          <!-- 顶部元信息 -->
-          <div class="flex items-center gap-3">
-            <span class="text-xs text-editorial-text-muted">模式 {{ detailArticle.mode || "-" }}</span>
-            <span class="text-xs text-editorial-text-muted">{{ formatLocalTime(detailArticle.createdAt) }}</span>
-            <a
-              class="cursor-pointer text-xs text-editorial-link-active hover:underline"
-              @click.prevent="openSourceItemModal(detailArticle.sourceItemId)"
-            >素材 #{{ detailArticle.sourceItemId }}</a>
-          </div>
-
-          <!-- 备选标题 -->
-          <section v-if="parseJsonArray(detailArticle.titles).length > 0">
-            <div class="mb-2 flex items-center justify-between">
-              <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">备选标题</h3>
-              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(parseJsonArray(detailArticle.titles).join('\n'))">复制全部</a-button>
-            </div>
-            <ul class="m-0 list-none space-y-1 pl-0">
-              <li
-                v-for="(t, idx) in parseJsonArray(detailArticle.titles)"
-                :key="idx"
-                class="group flex items-start gap-3 rounded-editorial-sm border border-editorial-border px-3 py-2 transition-colors hover:border-editorial-link-active/40"
-              >
-                <span class="flex-shrink-0 text-[11px] font-bold tabular-nums text-editorial-text-muted">{{ idx + 1 }}</span>
-                <span class="flex-1 text-sm leading-6 text-editorial-text-main">{{ t }}</span>
-                <a-button type="link" size="small" class="!p-0 !text-[11px] opacity-0 group-hover:opacity-100" @click="copyText(t)">复制</a-button>
-              </li>
-            </ul>
-          </section>
-
-          <!-- 核心立意 -->
-          <section v-if="detailArticle.thesis">
-            <div class="mb-2 flex items-center justify-between">
-              <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">核心立意</h3>
-              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(detailArticle.thesis!)">复制</a-button>
-            </div>
-            <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ detailArticle.thesis }}</p>
-          </section>
-
-          <!-- 百字摘要 -->
-          <section v-if="detailArticle.summary100">
-            <div class="mb-2 flex items-center justify-between">
-              <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">百字摘要</h3>
-              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(detailArticle.summary100!)">复制</a-button>
-            </div>
-            <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ detailArticle.summary100 }}</p>
-          </section>
-
-          <!-- 开头钩子 -->
-          <section v-if="parseJsonArray(detailArticle.hooks).length > 0">
-            <div class="mb-2 flex items-center justify-between">
-              <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">开头钩子</h3>
-              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(parseJsonArray(detailArticle.hooks).join('\n'))">复制全部</a-button>
-            </div>
-            <ul class="m-0 list-none space-y-1 pl-0">
-              <li
-                v-for="(h, idx) in parseJsonArray(detailArticle.hooks)"
-                :key="idx"
-                class="group flex items-start gap-3 rounded-editorial-sm bg-editorial-panel/40 px-3 py-2"
-              >
-                <span class="flex-1 text-sm leading-6 text-editorial-text-body">{{ h }}</span>
-                <a-button type="link" size="small" class="!p-0 !text-[11px] opacity-0 group-hover:opacity-100" @click="copyText(h)">复制</a-button>
-              </li>
-            </ul>
-          </section>
-
-          <!-- 可摘句 -->
-          <section v-if="parseJsonArray(detailArticle.quotes).length > 0">
-            <div class="mb-2 flex items-center justify-between">
-              <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">可摘句</h3>
-              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(parseJsonArray(detailArticle.quotes).join('\n'))">复制全部</a-button>
-            </div>
-            <ul class="m-0 list-inside list-disc pl-1">
-              <li v-for="(q, idx) in parseJsonArray(detailArticle.quotes)" :key="idx" class="text-sm leading-6 text-editorial-text-body">{{ q }}</li>
-            </ul>
-          </section>
-
-          <!-- 正文（主题渲染 / Markdown 降级） -->
-          <section v-if="detailArticle.contentMarkdown">
-            <div class="mb-2 flex items-center justify-between">
-              <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文</h3>
-              <div class="flex items-center gap-2">
-                <div v-if="getThemeHtml(detailArticle)" class="flex gap-1">
-                  <a-button
-                    v-for="opt in themeOptions"
-                    :key="opt.key"
-                    :type="activeTheme === opt.key ? 'primary' : 'default'"
-                    size="small"
-                    class="!text-[11px] !px-2 !py-0.5"
-                    @click="activeTheme = opt.key"
-                  >{{ opt.label }}</a-button>
-                </div>
-                <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(detailArticle.contentMarkdown)">复制原文</a-button>
-                <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyMarkdownAsPlainText(detailArticle.contentMarkdown)">复制纯文本</a-button>
-              </div>
-            </div>
-            <!-- 有主题 HTML 时渲染主题，否则降级到 Markdown -->
-            <div
-              v-if="getThemeHtml(detailArticle)"
-              class="rounded-editorial-md border border-editorial-border overflow-hidden"
-              v-html="getThemeHtml(detailArticle)"
-            ></div>
-            <div
-              v-else
-              class="article-markdown-body rounded-editorial-md border border-editorial-border bg-editorial-panel/30 px-4 py-3"
-              v-html="renderMarkdown(detailArticle.contentMarkdown)"
-            ></div>
-          </section>
-
-          <!-- 图片列表 -->
-          <section v-if="parseArticleImages(detailArticle.imagesJson).length > 0">
-            <h3 class="m-0 mb-2 text-sm font-semibold text-editorial-text-muted">图片列表</h3>
-            <a-image-preview-group>
-              <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div
-                  v-for="(img, idx) in parseArticleImages(detailArticle.imagesJson)"
-                  :key="idx"
-                  class="group relative overflow-hidden rounded-editorial-md border border-editorial-border"
-                >
-                  <a-image
-                    :src="extractImageUrl(img)"
-                    :alt="typeof img === 'object' && img.alt ? img.alt : `图片 ${idx + 1}`"
-                    class="block w-full object-cover"
-                    loading="lazy"
-                  />
-                  <div v-if="typeof img === 'object' && img.purpose" class="absolute right-1 top-1 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
-                    {{ img.purpose }}
-                  </div>
-                </div>
-              </div>
-            </a-image-preview-group>
-          </section>
-
-          <!-- 底部悬浮操作栏 -->
-          <div class="!fixed !bottom-6 !right-6 !z-50 flex items-center gap-2">
-            <a-select
-              v-model:value="wechatTheme"
-              :options="wechatThemeOptions"
-              size="small"
-              class="!w-[120px]"
-            />
-            <a-button
-              :loading="wechatCopying"
-              class="!shadow-lg"
-              @click="copyAsWechatFormat"
-            >复制公众号格式</a-button>
-            <a-button
-              v-if="canPush(detailArticle)"
-              type="primary"
-              class="!shadow-lg"
-              @click="openPushConfirm(detailArticle)"
-            >推送到草稿箱</a-button>
-            <a-tooltip v-else :mouse-enter-delay="0.3">
-              <template #title>{{ getMissingConditions(detailArticle).join('；') }}</template>
-              <a-button type="primary" disabled class="!shadow-lg">推送到草稿箱</a-button>
-            </a-tooltip>
-            <a-button
-              type="primary"
-              class="!shadow-lg"
-              @click="openEditModal(detailArticle)"
-            >编辑内容</a-button>
-          </div>
-        </div>
-      </template>
-    </a-modal>
+      :article="detailArticle"
+      @update:open="(val) => { if (!val) closeDetail(); }"
+      @open-source-item="openSourceItemModal"
+      @open-edit="handleDrawerOpenEdit"
+      @open-push="openPushConfirm"
+    />
 
     <!-- 素材详情弹窗 -->
     <a-modal
@@ -975,41 +726,6 @@ const pagination = computed(() => ({
 </template>
 
 <style>
-.article-detail-fullscreen {
-  /* 弹窗打开时锁定背景滚动 */
-  overflow: hidden !important;
-}
-.article-detail-fullscreen .ant-modal {
-  top: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  max-width: 100vw !important;
-  width: 100vw !important;
-}
-.article-detail-fullscreen .ant-modal-content {
-  background: #ffffff !important;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  border-radius: 0 !important;
-  padding: 0 !important;
-}
-.article-detail-fullscreen .ant-modal-header {
-  background: #ffffff !important;
-  flex-shrink: 0;
-  border-bottom: 1px solid #e5e7eb;
-  border-radius: 0 !important;
-  padding: 12px 24px;
-}
-.article-detail-fullscreen .ant-modal-body {
-  background: #ffffff !important;
-  flex: 1;
-  overflow-y: auto;
-  padding: 0;
-}
-.article-detail-fullscreen .ant-modal-close {
-  top: 8px !important;
-}
 .source-item-detail-modal .ant-modal {
   top: 0;
   padding-bottom: 0;
@@ -1030,60 +746,5 @@ const pagination = computed(() => ({
   flex: 1;
   overflow-y: auto;
   padding: 24px;
-}
-
-/* Markdown 渲染样式 */
-.article-markdown-body {
-  font-size: 14px;
-  line-height: 1.75;
-  color: #374151;
-}
-.article-markdown-body h1,
-.article-markdown-body h2,
-.article-markdown-body h3,
-.article-markdown-body h4 {
-  margin: 1em 0 0.5em;
-  font-weight: 600;
-  color: #111827;
-}
-.article-markdown-body h1 { font-size: 1.25em; }
-.article-markdown-body h2 { font-size: 1.15em; }
-.article-markdown-body h3 { font-size: 1.05em; }
-.article-markdown-body p { margin: 0.5em 0; }
-.article-markdown-body ul,
-.article-markdown-body ol {
-  margin: 0.5em 0;
-  padding-left: 1.5em;
-}
-.article-markdown-body li { margin: 0.25em 0; }
-.article-markdown-body blockquote {
-  margin: 0.75em 0;
-  padding: 0.5em 1em;
-  border-left: 3px solid #d1d5db;
-  color: #6b7280;
-  background: #f9fafb;
-  border-radius: 0 4px 4px 0;
-}
-.article-markdown-body img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 6px;
-  margin: 0.75em 0;
-}
-.article-markdown-body a {
-  color: #2563eb;
-  text-decoration: underline;
-}
-.article-markdown-body strong { font-weight: 600; }
-.article-markdown-body code {
-  background: #f3f4f6;
-  padding: 0.15em 0.35em;
-  border-radius: 3px;
-  font-size: 0.9em;
-}
-.article-markdown-body hr {
-  border: none;
-  border-top: 1px solid #e5e7eb;
-  margin: 1em 0;
 }
 </style>

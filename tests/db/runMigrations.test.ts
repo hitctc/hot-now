@@ -34,6 +34,8 @@ const expectedTables = [
   "twitter_search_keywords",
   "user_profile",
   "view_rule_configs",
+  "wechat_draft_push_log",
+  "wechat_mp_accounts",
   "wechat_rss_sources"
 ];
 
@@ -77,7 +79,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(18);
+    expect(schemaVersion).toBe(24);
 
     const appliedMigrations = db
       .prepare(
@@ -107,7 +109,13 @@ describe("runMigrations", () => {
       { version: 15, name: "015_ai_timeline_event_importance" },
       { version: 16, name: "016_ai_timeline_reliability_workspace" },
       { version: 17, name: "017_ai_timeline_event_notifications" },
-      { version: 18, name: "018_creative_content_workflow" }
+      { version: 18, name: "018_creative_content_workflow" },
+      { version: 19, name: "019_writing_status" },
+      { version: 20, name: "020_trend_score" },
+      { version: 21, name: "021_cover_image_and_anomaly" },
+      { version: 22, name: "022_theme_html_columns" },
+      { version: 23, name: "023_wechat_published" },
+      { version: 24, name: "024_wechat_mp_draft_push" }
     ]);
 
     const hiddenAggregates = db
@@ -508,6 +516,6 @@ describe("runMigrations", () => {
     expect(evidenceTable).toBeTruthy();
     expect(sourceRunsTable).toBeTruthy();
     expect(notificationsTable).toBeTruthy();
-    expect(db.pragma("user_version", { simple: true })).toBe(18);
+    expect(db.pragma("user_version", { simple: true })).toBe(24);
   });
 });

@@ -26,6 +26,9 @@ import { sendDailyEmail } from "./core/mail/sendDailyEmail.js";
 import { LatestReportEmailError, sendLatestReportEmail } from "./core/pipeline/sendLatestReportEmail.js";
 import { runCollectionCycle } from "./core/pipeline/runCollectionCycle.js";
 import { runAiTimelineAlertCycle } from "./core/notifications/runAiTimelineAlertCycle.js";
+import { pushArticleToWechatDraft, getArticlePushLog, getArticlePushCount } from "./core/wechatMp/wechatMpDraftPush.js";
+import { listWechatMpAccounts, saveWechatMpAccount, deleteWechatMpAccount, setDefaultWechatMpAccount } from "./core/wechatMp/wechatMpAccountRepository.js";
+import type { WechatThemeId } from "./core/creative/wechatFormat/themes.js";
 import { listRatingDimensions, saveRatings } from "./core/ratings/ratingRepository.js";
 import type { DailyReportTrigger } from "./core/report/buildDailyReport.js";
 import { createRunLock } from "./core/runtime/runLock.js";
@@ -665,6 +668,20 @@ const app = createServer({
     const newHash = hashPassword(newPassword);
     db.prepare("UPDATE user_profile SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1").run(newHash);
   },
+  pushArticleToWechatDraft: async (articleId: number, themeId: string) =>
+    pushArticleToWechatDraft({
+      db,
+      articleId,
+      themeId: themeId as WechatThemeId,
+      masterKey: config.llm?.settingsMasterKey ?? config.auth.sessionSecret,
+    }),
+  getArticleWechatPushLog: (articleId: number) => getArticlePushLog(db, articleId),
+  getArticlePushCount: (articleId: number) => getArticlePushCount(db, articleId),
+  listWechatMpAccounts: () => listWechatMpAccounts(db),
+  saveWechatMpAccount: async (input) =>
+    saveWechatMpAccount(db, input, config.llm?.settingsMasterKey ?? config.auth.sessionSecret),
+  deleteWechatMpAccount: (id: number) => deleteWechatMpAccount(db, id),
+  setDefaultWechatMpAccount: (id: number) => setDefaultWechatMpAccount(db, id),
   listReportSummaries: listStoredReportSummaries,
   latestReportDate: async () => (await listReportDates(config.report.dataDir))[0] ?? null,
   readReportHtml: async (date: string) => await readTextFile(config.report.dataDir, date, "report.html"),

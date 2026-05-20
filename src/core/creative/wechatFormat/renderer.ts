@@ -87,6 +87,8 @@ function applyTheme(html: string, themeId: WechatThemeId): string {
 
   // 遍历主题样式键，给对应元素注入内联样式
   for (const selector of Object.keys(style)) {
+    // blockquote_p 由下方单独处理
+    if (selector === "blockquote_p") continue;
     if (selector === "pre code") continue;
     const elements = doc.querySelectorAll(selector);
     elements.forEach((el) => {
@@ -95,6 +97,16 @@ function applyTheme(html: string, themeId: WechatThemeId): string {
       if (selector === "code" && element.parentElement?.tagName === "PRE") return;
       const currentStyle = element.getAttribute("style") || "";
       element.setAttribute("style", currentStyle + "; " + style[selector]);
+    });
+  }
+
+  // blockquote 内的 p 元素使用 blockquote_p 样式
+  if (style.blockquote_p) {
+    doc.querySelectorAll("blockquote").forEach((bq) => {
+      bq.querySelectorAll("p").forEach((p) => {
+        const currentStyle = p.getAttribute("style") || "";
+        p.setAttribute("style", currentStyle + "; " + style.blockquote_p);
+      });
     });
   }
 

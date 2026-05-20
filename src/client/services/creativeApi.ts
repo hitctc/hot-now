@@ -188,13 +188,20 @@ export function editFinishedArticle(
 
 // ─── WeChat Format ───
 
-export type WechatThemeId = "pure-white" | "warm-oat" | "dark-pro";
+export type WechatThemeId = "bauhaus" | "sunset-film" | "receipt";
 
 export const wechatThemeOptions: { value: WechatThemeId; label: string }[] = [
-  { value: "pure-white", label: "纯净白" },
-  { value: "warm-oat", label: "燕麦暖色" },
-  { value: "dark-pro", label: "暗夜 Pro" }
+  { value: "bauhaus", label: "包豪斯" },
+  { value: "sunset-film", label: "落日胶片" },
+  { value: "receipt", label: "购物小票" }
 ];
+
+// 主题 ID 到数据库 HTML 列名的映射
+export const themeHtmlKeyMap: Record<WechatThemeId, "contentHtmlBauhaus" | "contentHtmlSunsetFilm" | "contentHtmlReceipt"> = {
+  bauhaus: "contentHtmlBauhaus",
+  "sunset-film": "contentHtmlSunsetFilm",
+  receipt: "contentHtmlReceipt",
+};
 
 export function renderWechatFormat(
   id: number,
@@ -232,4 +239,44 @@ export function parseArticleImages(imagesJson: string | ArticleImageEntry[] | nu
 /** 从任意格式的图片条目中提取 URL */
 export function extractImageUrl(entry: ArticleImageEntry): string {
   return typeof entry === "string" ? entry : entry.url;
+}
+
+// ─── WeChat Draft Push ───
+
+export type PushDraftResult = {
+  ok: boolean;
+  mediaId?: string;
+  errorCode?: string;
+  errorMessage?: string;
+};
+
+export type PushLogEntry = {
+  id: number;
+  article_id: number;
+  account_id: number;
+  theme_id: string;
+  media_id: string | null;
+  status: string;
+  error_code: string | null;
+  error_message: string | null;
+  pushed_at: string;
+  account_name: string;
+};
+
+/** 推送文章到微信公众号草稿箱 */
+export function pushArticleToDraft(
+  id: number,
+  themeId: WechatThemeId
+): Promise<PushDraftResult> {
+  return requestJson<PushDraftResult>(
+    `/api/creative/finished-articles/${id}/push-draft`,
+    { method: "POST", body: JSON.stringify({ themeId }) }
+  );
+}
+
+/** 获取文章推送记录 */
+export function readArticlePushLog(id: number): Promise<{ ok: boolean; log: PushLogEntry[] }> {
+  return requestJson<{ ok: boolean; log: PushLogEntry[] }>(
+    `/api/creative/finished-articles/${id}/push-log`
+  );
 }

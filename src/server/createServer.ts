@@ -437,6 +437,16 @@ type ServerDeps = {
   triggerManualWeiboTrendingCollect?: () => Promise<ManualWeiboTrendingCollectResult>;
   getCurrentUserProfile?: () => Promise<CurrentUserProfile | null> | CurrentUserProfile | null;
   updatePassword?: (newPassword: string) => Promise<void>;
+  pushArticleToWechatDraft?: (
+    articleId: number,
+    themeId: string
+  ) => Promise<{ ok: boolean; mediaId?: string; errorCode?: string; errorMessage?: string; hint?: string }>;
+  getArticleWechatPushLog?: (articleId: number) => unknown[];
+  getArticlePushCount?: (articleId: number) => number;
+  listWechatMpAccounts?: () => unknown[];
+  saveWechatMpAccount?: (input: { id?: number; name: string; appId: string; appSecret?: string; notes?: string; isDefault?: boolean; isEnabled?: boolean }) => Promise<{ ok: boolean; id: number }>;
+  deleteWechatMpAccount?: (id: number) => boolean;
+  setDefaultWechatMpAccount?: (id: number) => boolean;
   getContentPageModel?: (
     pageKey: ContentPageKey,
     options?: Pick<
@@ -1209,8 +1219,8 @@ export function createServer(deps: ServerDeps = {}) {
     const body = request.body as { theme?: string } | undefined;
     const id = parseInt(params.id, 10);
 
-    const validThemes: WechatThemeId[] = ["pure-white", "warm-oat", "dark-pro"];
-    const theme = validThemes.includes(body?.theme as WechatThemeId) ? (body?.theme as WechatThemeId) : "pure-white";
+    const validThemes: WechatThemeId[] = ["bauhaus", "sunset-film", "receipt"];
+    const theme = validThemes.includes(body?.theme as WechatThemeId) ? (body?.theme as WechatThemeId) : "bauhaus";
 
     const article = findCreativeFinishedArticleById(db, id);
     if (!article || !article.contentMarkdown) {
@@ -1224,6 +1234,118 @@ export function createServer(deps: ServerDeps = {}) {
       request.log.error(err, "WeChat format rendering failed");
       return reply.code(500).send({ ok: false, reason: "rendering-failed" });
     }
+  });
+
+  // ─── 微信公众号：推送到草稿箱（session 鉴权） ───
+
+  app.post("/api/creative/finished-articles/:id/push-draft", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+    if (!deps.pushArticleToWechatDraft) {
+      return reply.code(503).send({ ok: false, reason: "wechat-push-not-configured" });
+    }
+
+    const params = request.params as { id: string };
+    const body = request.body as { themeId?: string } | undefined;
+    const id = parseInt(params.id, 10);
+    const themeId = body?.themeId ?? "bauhaus";
+
+    const result = await deps.pushArticleToWechatDraft(id, themeId);
+    return reply.send(result);
+  });
+
+  // 获取文章推送记录
+  app.get("/api/creative/finished-articles/:id/push-log", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) return;
+
+    if (!deps.getArticleWechatPushLog) {
+      return reply.code(503).send({ ok: false, reason: "wechat-push-not-configured" });
+    }
+
+    const params = request.params as { id: string };
+    const id = parseInt(params.id, 10);
+    const log = deps.getArticleWechatPushLog(id);
+    return reply.send({ ok: true, log });
+  });
+
+  // ─── 微信公众号配置管理（session 鉴权） ───
+
+  app.get("/api/settings/wechat-mp", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) return;
+
+    if (!deps.listWechatMpAccounts) {
+      return reply.code(503).send({ ok: false, reason: "wechat-mp-not-configured" });
+    }
+    const accounts = deps.listWechatMpAccounts();
+    return reply.send({ ok: true, accounts });
+  });
+
+  app.post("/actions/wechat-mp/save", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+    if (!deps.saveWechatMpAccount) {
+      return reply.code(503).send({ ok: false, reason: "wechat-mp-not-configured" });
+    }
+
+    const body = request.body as {
+      id?: number;
+      name: string;
+      appId: string;
+      appSecret?: string;
+      notes?: string;
+      isDefault?: boolean;
+      isEnabled?: boolean;
+    };
+
+    if (!body.name || !body.appId) {
+      return reply.code(400).send({ ok: false, reason: "name-and-appid-required" });
+    }
+
+    try {
+      const result = await deps.saveWechatMpAccount(body);
+      return reply.send(result);
+    } catch (err) {
+      request.log.error(err, "Save wechat mp account failed");
+      return reply.code(500).send({ ok: false, reason: "save-failed" });
+    }
+  });
+
+  app.post("/actions/wechat-mp/delete", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+    if (!deps.deleteWechatMpAccount) {
+      return reply.code(503).send({ ok: false, reason: "wechat-mp-not-configured" });
+    }
+
+    const body = request.body as { id: number };
+    if (!body.id) {
+      return reply.code(400).send({ ok: false, reason: "id-required" });
+    }
+
+    const deleted = deps.deleteWechatMpAccount(body.id);
+    return reply.send({ ok: deleted });
+  });
+
+  app.post("/actions/wechat-mp/set-default", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+    if (!deps.setDefaultWechatMpAccount) {
+      return reply.code(503).send({ ok: false, reason: "wechat-mp-not-configured" });
+    }
+
+    const body = request.body as { id: number };
+    if (!body.id) {
+      return reply.code(400).send({ ok: false, reason: "id-required" });
+    }
+
+    const result = deps.setDefaultWechatMpAccount(body.id);
+    return reply.send({ ok: result });
   });
 
   // ─── Creative: 图片转存接口（token 鉴权） ───

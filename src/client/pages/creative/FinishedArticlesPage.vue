@@ -14,12 +14,18 @@ import {
   wechatThemeOptions,
   parseArticleImages,
   extractImageUrl,
+  pushArticleToDraft,
+  readArticlePushLog,
   type ArticleImageEntry,
   type CreativeFinishedArticle,
   type CreativeSourceItem,
   type TrendBreakdown,
-  type WechatThemeId
+  type WechatThemeId,
+  type PushLogEntry
 } from "../../services/creativeApi.js";
+import { readWechatMpAccounts, type WechatMpAccountSummary } from "../../services/settingsApi.js";
+import ArticlePushConfirmModal from "../../components/creative/ArticlePushConfirmModal.vue";
+import ArticleEditDrawer from "../../components/creative/ArticleEditDrawer.vue";
 
 // ─── Markdown 渲染器 ───
 
@@ -93,6 +99,7 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 const statusOptions = [
   { label: "全部状态", value: "" },
   { label: "已生成", value: "generated" },
+  { label: "可推送", value: "ready_for_publish" },
   { label: "已推送草稿", value: "wechat_draft" },
   { label: "异常", value: "anomaly" }
 ];
@@ -118,19 +125,83 @@ const sourceItemModalOpen = ref(false);
 const sourceItemModalLoading = ref(false);
 const sourceItemModalData = ref<CreativeSourceItem | null>(null);
 
-// 编辑弹窗
-const editModalOpen = ref(false);
-const editPending = ref(false);
-const editForm = ref<{ id: number; contentMarkdown: string; thesis: string; summary100: string }>({
-  id: 0,
-  contentMarkdown: "",
-  thesis: "",
-  summary100: ""
-});
+// 编辑抽屉
+const editDrawerOpen = ref(false);
+const editDrawerArticle = ref<CreativeFinishedArticle | null>(null);
 
 // 微信公众号格式复制
-const wechatTheme = ref<WechatThemeId>("pure-white");
+const wechatTheme = ref<WechatThemeId>("bauhaus");
 const wechatCopying = ref(false);
+
+// ─── 推送到草稿箱 ───
+
+const pushConfirmVisible = ref(false);
+const pushConfirmArticle = ref<CreativeFinishedArticle | null>(null);
+const pushPending = ref(false);
+const wechatMpAccounts = ref<WechatMpAccountSummary[]>([]);
+const defaultAccountName = computed(() => {
+  const def = wechatMpAccounts.value.find(a => a.isDefault && a.isEnabled);
+  return def?.name ?? '';
+});
+
+// 推送前置条件检查：文章必须标题、封面图、配图、Markdown 正文齐全
+function canPush(article: CreativeFinishedArticle | null): boolean {
+  if (!article) return false;
+  if (article.status !== 'ready_for_publish') return false;
+  const parsedTitles = parseJsonArray(article.titles);
+  if (parsedTitles.length === 0) return false;
+  if (!article.coverImage) return false;
+  const parsedImages = parseArticleImages(article.imagesJson);
+  if (parsedImages.length === 0) return false;
+  if (!article.contentMarkdown) return false;
+  return true;
+}
+
+// 返回不满足推送条件的原因列表，用于 hover 提示
+function getMissingConditions(article: CreativeFinishedArticle | null): string[] {
+  if (!article) return ['文章不存在'];
+  const missing: string[] = [];
+  if (article.status !== 'ready_for_publish') missing.push('状态不是"可推送"');
+  const parsedTitles = parseJsonArray(article.titles);
+  if (parsedTitles.length === 0) missing.push('缺少标题');
+  if (!article.coverImage) missing.push('缺少封面图');
+  const parsedImages = parseArticleImages(article.imagesJson);
+  if (parsedImages.length === 0) missing.push('缺少正文配图');
+  if (!article.contentMarkdown) missing.push('缺少 Markdown 内容');
+  return missing;
+}
+
+function openPushConfirm(article: CreativeFinishedArticle): void {
+  pushConfirmArticle.value = article;
+  pushConfirmVisible.value = true;
+  loadWechatMpAccounts();
+}
+
+async function loadWechatMpAccounts(): Promise<void> {
+  try {
+    const res = await readWechatMpAccounts();
+    if (res.ok) wechatMpAccounts.value = res.accounts;
+  } catch { /* ignore */ }
+}
+
+async function handlePushConfirm(): Promise<void> {
+  if (!pushConfirmArticle.value) return;
+  pushPending.value = true;
+  try {
+    const result = await pushArticleToDraft(pushConfirmArticle.value.id, wechatTheme.value);
+    if (result.ok) {
+      message.success(`推送成功！草稿已添加到微信公众号`);
+      pushConfirmVisible.value = false;
+      loadItems();
+    } else {
+      message.error(result.errorMessage || '推送失败');
+    }
+  } catch (err) {
+    message.error(`推送失败: ${(err as Error).message}`);
+  } finally {
+    pushPending.value = false;
+  }
+}
 
 // 主题渲染切换（包豪斯 / 落日胶片 / 购物小票）
 type ThemeHtmlKey = "bauhaus" | "sunsetFilm" | "receipt";
@@ -226,34 +297,15 @@ function closeSourceItemModal(): void {
 // ─── 编辑弹窗 ───
 
 function openEditModal(article: CreativeFinishedArticle): void {
-  editForm.value = {
-    id: article.id,
-    contentMarkdown: article.contentMarkdown ?? "",
-    thesis: article.thesis ?? "",
-    summary100: article.summary100 ?? ""
-  };
-  editModalOpen.value = true;
+  editDrawerArticle.value = article;
+  editDrawerOpen.value = true;
 }
 
-async function handleEditSubmit(): Promise<void> {
-  editPending.value = true;
-  try {
-    await editFinishedArticle(editForm.value.id, {
-      contentMarkdown: editForm.value.contentMarkdown,
-      thesis: editForm.value.thesis,
-      summary100: editForm.value.summary100
-    });
-    message.success("保存成功");
-    editModalOpen.value = false;
-    await loadItems();
-    if (detailArticle.value && detailArticle.value.id === editForm.value.id) {
-      const updated = items.value.find(item => item.id === editForm.value.id);
-      if (updated) detailArticle.value = updated;
-    }
-  } catch {
-    message.error("保存失败，请重试");
-  } finally {
-    editPending.value = false;
+function onEditDrawerSaved(): void {
+  loadItems();
+  if (detailArticle.value && editDrawerArticle.value && detailArticle.value.id === editDrawerArticle.value.id) {
+    const updated = items.value.find(item => item.id === editDrawerArticle.value!.id);
+    if (updated) detailArticle.value = updated;
   }
 }
 
@@ -410,6 +462,7 @@ async function copyAsWechatFormat(): Promise<void> {
 
 const statusMap: Record<string, { label: string; color: string }> = {
   generated: { label: "已生成", color: "blue" },
+  ready_for_publish: { label: "可推送", color: "cyan" },
   wechat_draft: { label: "已推送草稿", color: "green" },
   anomaly: { label: "异常", color: "red" }
 };
@@ -432,6 +485,7 @@ const columns = [
   { title: "创建时间", key: "createdAt", width: 140, ellipsis: true },
   { title: "异常说明", key: "anomalyReason", width: 150, ellipsis: true },
   { title: "公众号", key: "wechatPublished", width: 80, ellipsis: true },
+  { title: "推送", key: "pushDraft", width: 72, ellipsis: true },
   { title: "重写文章", key: "quickCopy", width: 64, ellipsis: true }
 ];
 
@@ -545,6 +599,21 @@ const pagination = computed(() => ({
               class="!text-[11px] !px-2 !py-0.5"
               @click="handleTogglePublished(record)"
             >{{ record.wechatPublished ? '已发布' : '未发布' }}</a-button>
+          </template>
+
+          <!-- 推送到草稿箱列 -->
+          <template v-else-if="column.key === 'pushDraft'">
+            <a-button
+              v-if="canPush(record)"
+              size="small"
+              type="primary"
+              class="!text-[11px] !px-2 !py-0.5"
+              @click="openPushConfirm(record)"
+            >推送</a-button>
+            <a-tooltip v-else :mouse-enter-delay="0.3">
+              <template #title>{{ getMissingConditions(record).join('；') }}</template>
+              <a-button size="small" disabled class="!text-[11px] !px-2 !py-0.5">推送</a-button>
+            </a-tooltip>
           </template>
 
           <!-- 快捷复制列：生成重写文章 prompt -->
@@ -768,6 +837,16 @@ const pagination = computed(() => ({
               @click="copyAsWechatFormat"
             >复制公众号格式</a-button>
             <a-button
+              v-if="canPush(detailArticle)"
+              type="primary"
+              class="!shadow-lg"
+              @click="openPushConfirm(detailArticle)"
+            >推送到草稿箱</a-button>
+            <a-tooltip v-else :mouse-enter-delay="0.3">
+              <template #title>{{ getMissingConditions(detailArticle).join('；') }}</template>
+              <a-button type="primary" disabled class="!shadow-lg">推送到草稿箱</a-button>
+            </a-tooltip>
+            <a-button
               type="primary"
               class="!shadow-lg"
               @click="openEditModal(detailArticle)"
@@ -875,29 +954,22 @@ const pagination = computed(() => ({
       </a-spin>
     </a-modal>
 
-    <!-- 编辑弹窗 -->
-    <a-modal
-      v-model:open="editModalOpen"
-      title="编辑成品文章"
-      :confirm-loading="editPending"
-      ok-text="确认"
-      cancel-text="取消"
-      width="900px"
-      centered
-      @ok="handleEditSubmit"
-    >
-      <a-form layout="vertical" class="mt-4">
-        <a-form-item label="核心立意">
-          <a-input v-model:value="editForm.thesis" placeholder="核心立意" />
-        </a-form-item>
-        <a-form-item label="百字摘要">
-          <a-textarea v-model:value="editForm.summary100" :rows="4" placeholder="百字摘要" />
-        </a-form-item>
-        <a-form-item label="正文 Markdown">
-          <a-textarea v-model:value="editForm.contentMarkdown" :rows="25" placeholder="正文内容" />
-        </a-form-item>
-      </a-form>
-    </a-modal>
+    <!-- 编辑抽屉 -->
+    <ArticleEditDrawer
+      v-model:open="editDrawerOpen"
+      :article="editDrawerArticle"
+      @saved="onEditDrawerSaved"
+    />
+
+    <!-- 推送确认弹窗 -->
+    <ArticlePushConfirmModal
+      v-model:visible="pushConfirmVisible"
+      :article="pushConfirmArticle"
+      :theme-label="wechatThemeOptions.find(o => o.value === wechatTheme)?.label ?? ''"
+      :default-account-name="defaultAccountName"
+      :loading="pushPending"
+      @confirm="handlePushConfirm"
+    />
   </div>
 </template>
 

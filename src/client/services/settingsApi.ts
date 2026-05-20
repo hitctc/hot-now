@@ -854,3 +854,50 @@ export function triggerManualWeiboTrendingCollect(): Promise<ManualWeiboTrending
 export function triggerManualSendLatestEmail(): Promise<ManualSendLatestEmailResponse> {
   return postSettingsAction<ManualSendLatestEmailResponse>("/actions/send-latest-email", {});
 }
+
+// ─── WeChat MP Account Management ───
+
+export type WechatMpAccountSummary = {
+  id: number;
+  name: string;
+  appId: string;
+  secretLast4: string;
+  isEnabled: boolean;
+  isDefault: boolean;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WechatMpAccountsResponse = {
+  ok: boolean;
+  accounts: WechatMpAccountSummary[];
+};
+
+/** 获取公众号配置列表 */
+export function readWechatMpAccounts(): Promise<WechatMpAccountsResponse> {
+  return requestJson<WechatMpAccountsResponse>("/api/settings/wechat-mp");
+}
+
+/** 新增或更新公众号配置 */
+export function saveWechatMpAccount(input: {
+  id?: number;
+  name: string;
+  appId: string;
+  appSecret?: string;
+  notes?: string;
+  isDefault?: boolean;
+  isEnabled?: boolean;
+}): Promise<{ ok: boolean; id: number }> {
+  return postSettingsAction<{ ok: boolean; id: number }>("/actions/wechat-mp/save", input);
+}
+
+/** 删除公众号配置 */
+export function deleteWechatMpAccount(id: number): Promise<{ ok: boolean }> {
+  return postSettingsAction<{ ok: boolean }>("/actions/wechat-mp/delete", { id });
+}
+
+/** 设置默认公众号 */
+export function setDefaultWechatMpAccount(id: number): Promise<{ ok: boolean }> {
+  return postSettingsAction<{ ok: boolean }>("/actions/wechat-mp/set-default", { id });
+}

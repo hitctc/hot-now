@@ -11,7 +11,8 @@ export type ShellPageKey =
   | "creative-finished-articles"
   | "view-rules"
   | "sources"
-  | "profile";
+  | "profile"
+  | "wechat-mp";
 
 export type ShellPageMeta = {
   key: ShellPageKey;
@@ -108,6 +109,15 @@ const profilePageMeta = {
   description: "当前登录账号、会话状态和联系信息。"
 } as const satisfies ShellPageMeta;
 
+const wechatMpSettingsPageMeta = {
+  key: "wechat-mp",
+  path: "/settings/wechat-mp",
+  section: "system",
+  navLabel: "公众号配置",
+  title: "公众号配置",
+  description: "管理微信公众号 API 凭证，用于推送草稿到公众号草稿箱。"
+} as const satisfies ShellPageMeta;
+
 export const shellPageMetas = [
   aiNewPageMeta,
   aiHotPageMeta,
@@ -117,12 +127,14 @@ export const shellPageMetas = [
   sourcesPageMeta,
   // aiTimelineAdminPageMeta, // 暂时下架 AI 时间线 feed 管理（2026-05-17）
   viewRulesPageMeta,
+  wechatMpSettingsPageMeta,
   profilePageMeta
 ] as const satisfies readonly ShellPageMeta[];
 export const systemShellPageMetas = [
   sourcesPageMeta,
   // aiTimelineAdminPageMeta, // 暂时下架 AI 时间线 feed 管理（2026-05-17）
   viewRulesPageMeta,
+  wechatMpSettingsPageMeta,
   profilePageMeta
 ] as const satisfies readonly ShellPageMeta[];
 
@@ -166,6 +178,7 @@ const viewRulesPage = () => import("./pages/settings/ViewRulesPage.vue");
 const sourcesPage = () => import("./pages/settings/SourcesPage.vue");
 const aiTimelineAdminPage = () => import("./pages/settings/AiTimelineAdminPage.vue");
 const profilePage = () => import("./pages/settings/ProfilePage.vue");
+const wechatMpSettingsPage = () => import("./pages/settings/WechatMpSettingsPage.vue");
 const aiNewPage = () => import("./pages/content/AiNewPage.vue");
 const aiHotPage = () => import("./pages/content/AiHotPage.vue");
 const aiTimelinePage = () => import("./pages/content/AiTimelinePage.vue");
@@ -182,6 +195,7 @@ const routes: RouteRecordRaw[] = [
   createShellRoute(viewRulesPageMeta, viewRulesPage),
   createShellRoute(sourcesPageMeta, sourcesPage),
   // createShellRoute(aiTimelineAdminPageMeta, aiTimelineAdminPage), // 暂时下架 AI 时间线 feed 管理（2026-05-17）
+  createShellRoute(wechatMpSettingsPageMeta, wechatMpSettingsPage),
   createShellRoute(profilePageMeta, profilePage)
 ];
 

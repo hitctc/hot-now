@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 23;
+const schemaVersion = 24;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -24,6 +24,7 @@ const trendScoreMigrationName = "020_trend_score";
 const coverImageAndAnomalyMigrationName = "021_cover_image_and_anomaly";
 const themeHtmlColumnsMigrationName = "022_theme_html_columns";
 const wechatPublishedMigrationName = "023_wechat_published";
+const wechatMpDraftPushMigrationName = "024_wechat_mp_draft_push";
 
 const migrationStatements = [
   `
@@ -1097,6 +1098,47 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(23, wechatPublishedMigrationName);
+
+    // 024: 公众号草稿推送 — 公众号配置表 + 推送记录表
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS wechat_mp_accounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        app_id TEXT NOT NULL UNIQUE,
+        encrypted_secret TEXT NOT NULL,
+        secret_last4 TEXT NOT NULL,
+        is_enabled INTEGER NOT NULL DEFAULT 1,
+        is_default INTEGER NOT NULL DEFAULT 0,
+        notes TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS wechat_draft_push_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        article_id INTEGER NOT NULL,
+        account_id INTEGER NOT NULL,
+        theme_id TEXT NOT NULL,
+        media_id TEXT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        error_code TEXT,
+        error_message TEXT,
+        pushed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (article_id) REFERENCES creative_finished_articles(id),
+        FOREIGN KEY (account_id) REFERENCES wechat_mp_accounts(id)
+      )
+    `);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_wechat_draft_push_log_article ON wechat_draft_push_log(article_id)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_wechat_draft_push_log_status ON wechat_draft_push_log(status)`);
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(24, wechatMpDraftPushMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

@@ -8,7 +8,7 @@
     width="90%"
     centered
     wrap-class-name="article-detail-modal"
-    :body-style="{ maxHeight: 'calc(100vh - 60px)', overflowY: 'auto', padding: '24px', paddingBottom: '72px' }"
+    :body-style="{ padding: '24px' }"
     @cancel="handleClose"
   >
     <template #title>
@@ -217,7 +217,7 @@ const saving = ref(false);
 watch(() => props.open, (val) => {
   if (val && props.article) {
     editContent.value = props.article.contentMarkdown || "";
-    activePreviewTheme.value = "live";
+    activePreviewTheme.value = hasThemeHtml.value ? "bauhaus" : "live";
   }
 });
 
@@ -246,10 +246,10 @@ function handleClose(): void {
 type PreviewThemeKey = "live" | "bauhaus" | "sunsetFilm" | "receipt";
 
 const previewThemeOptions: { key: PreviewThemeKey; label: string }[] = [
-  { key: "live", label: "实时预览" },
   { key: "bauhaus", label: "包豪斯" },
   { key: "sunsetFilm", label: "落日胶片" },
   { key: "receipt", label: "购物小票" },
+  { key: "live", label: "实时预览" },
 ];
 
 const activePreviewTheme = ref<PreviewThemeKey>("live");

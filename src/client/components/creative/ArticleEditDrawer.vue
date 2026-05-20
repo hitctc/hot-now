@@ -1,14 +1,14 @@
-<!-- 编辑弹窗：左右分屏编辑 + 主题预览 + 保存/复制 -->
+<!-- 编辑抽屉：左右分屏编辑 + 主题预览 + 保存/复制 -->
 <template>
-  <a-modal
+  <a-drawer
     :open="open"
-    title="编辑文章"
     width="90%"
-    :footer="null"
+    title="编辑文章"
+    placement="right"
     :closable="true"
     :mask-closable="false"
     :destroy-on-close="true"
-    @cancel="$emit('update:open', false)"
+    @close="$emit('update:open', false)"
   >
     <template v-if="article">
       <!-- 顶部元信息 -->
@@ -62,7 +62,7 @@
         </div>
       </div>
     </template>
-  </a-modal>
+  </a-drawer>
 </template>
 
 <script setup lang="ts">

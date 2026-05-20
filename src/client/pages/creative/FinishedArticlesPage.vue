@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { message } from "ant-design-vue";
 import MarkdownIt from "markdown-it";
 
@@ -297,8 +297,11 @@ function closeSourceItemModal(): void {
 // ─── 编辑弹窗 ───
 
 function openEditModal(article: CreativeFinishedArticle): void {
-  editDrawerArticle.value = article;
-  editDrawerOpen.value = true;
+  const articleCopy = { ...article };
+  nextTick(() => {
+    editDrawerArticle.value = articleCopy;
+    editDrawerOpen.value = true;
+  });
   detailArticle.value = null;
 }
 

@@ -8,7 +8,7 @@
     width="90%"
     centered
     wrap-class-name="article-detail-modal"
-    :body-style="{ padding: '24px' }"
+    :body-style="{ padding: '24px', overflowY: 'auto' }"
     @cancel="handleClose"
   >
     <template #title>
@@ -387,8 +387,28 @@ function getMissingConditions(article: CreativeFinishedArticle): string[] {
 </script>
 
 <style>
+/* 弹窗打开时禁止蒙层滚动 */
+.article-detail-modal {
+  overflow: hidden !important;
+}
+/* modal content 固定 90vh，body 内部滚动 */
+.article-detail-modal .ant-modal-content {
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+.article-detail-modal .ant-modal-header {
+  flex-shrink: 0;
+}
 .article-detail-modal .ant-modal-body {
   background: #ffffff;
+  flex: 1;
+  overflow-y: auto;
+}
+.article-detail-modal .ant-modal-footer {
+  flex-shrink: 0;
+  border-top: 1px solid #f0f0f0;
+  padding: 12px 24px;
 }
 
 .article-editor-wrapper {

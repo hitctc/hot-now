@@ -1,47 +1,53 @@
-<!-- 编辑弹窗：左右分屏编辑 + 主题预览 + 保存/复制 -->
+<!-- 编辑文章弹窗：标题/立意/摘要 + Markdown 正文编辑器 + 保存/复制 -->
 <template>
   <a-modal
     :open="open"
-    title="编辑文章"
-    width="90%"
     :footer="null"
     :closable="true"
     :mask-closable="false"
     :destroy-on-close="true"
+    width="90%"
+    centered
+    wrap-class-name="article-edit-modal"
+    :body-style="{ maxHeight: 'calc(100vh - 110px)', overflowY: 'auto', padding: '24px' }"
     @cancel="$emit('update:open', false)"
   >
+    <template #title>
+      <span class="text-base font-semibold">编辑文章</span>
+    </template>
+
     <template v-if="article">
       <!-- 顶部元信息 -->
-      <div class="edit-modal__meta">
+      <div class="flex items-center gap-3 mb-4">
         <span class="edit-modal__status-tag" :class="`status-${article.status}`">
           {{ statusLabel(article.status) }}
         </span>
-        <span class="edit-modal__time">{{ formatLocalTime(article.createdAt) }}</span>
+        <span class="text-xs text-editorial-text-muted">{{ formatLocalTime(article.createdAt) }}</span>
       </div>
 
       <!-- 标题展示 -->
-      <div v-if="firstTitle" class="edit-modal__title">{{ firstTitle }}</div>
+      <div v-if="firstTitle" class="text-lg font-bold text-editorial-text-main mb-4">{{ firstTitle }}</div>
 
       <!-- 立意和摘要 -->
-      <div class="edit-modal__fields">
-        <div class="edit-modal__field">
-          <label>核心立意</label>
+      <div class="grid grid-cols-1 gap-3 mb-4 sm:grid-cols-2">
+        <div>
+          <label class="mb-1 block text-[13px] text-editorial-text-muted">核心立意</label>
           <a-textarea v-model:value="editForm.thesis" :rows="2" placeholder="核心立意" />
         </div>
-        <div class="edit-modal__field">
-          <label>百字摘要</label>
+        <div>
+          <label class="mb-1 block text-[13px] text-editorial-text-muted">百字摘要</label>
           <a-textarea v-model:value="editForm.summary100" :rows="3" placeholder="百字摘要" />
         </div>
       </div>
 
       <!-- 正文编辑器 -->
-      <div class="edit-modal__editor-wrapper">
+      <div class="mb-4" style="height: calc(100vh - 460px); min-height: 260px;">
         <ArticleMarkdownEditor v-model="editForm.contentMarkdown" />
       </div>
 
-      <!-- 底部工具栏 -->
-      <div class="edit-modal__toolbar">
-        <div class="edit-modal__toolbar-left">
+      <!-- 底部操作栏 -->
+      <div class="flex items-center justify-between gap-2 border-t border-editorial-border pt-4">
+        <div class="flex items-center gap-2">
           <a-select
             v-model:value="selectedTheme"
             :options="wechatThemeOptions"
@@ -54,7 +60,7 @@
             复制公众号格式
           </a-button>
         </div>
-        <div class="edit-modal__toolbar-right">
+        <div class="flex gap-2">
           <a-button @click="$emit('update:open', false)">取消</a-button>
           <a-button type="primary" :loading="saving" @click="handleSave">
             保存
@@ -172,12 +178,9 @@ async function handleCopyWechat(): Promise<void> {
 }
 </script>
 
-<style scoped>
-.edit-modal__meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
+<style>
+.article-edit-modal .ant-modal-body {
+  background: #ffffff;
 }
 
 .edit-modal__status-tag {
@@ -196,56 +199,5 @@ async function handleCopyWechat(): Promise<void> {
 .edit-modal__status-tag.status-wechat_draft {
   background: #f0f5ff;
   color: #2f54eb;
-}
-
-.edit-modal__time {
-  color: #999;
-  font-size: 13px;
-}
-
-.edit-modal__title {
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 16px;
-  color: #1a1a1a;
-}
-
-.edit-modal__fields {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.edit-modal__field label {
-  display: block;
-  font-size: 13px;
-  color: #666;
-  margin-bottom: 4px;
-}
-
-.edit-modal__editor-wrapper {
-  height: calc(100vh - 420px);
-  min-height: 300px;
-}
-
-.edit-modal__toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid #f0f0f0;
-}
-
-.edit-modal__toolbar-left {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.edit-modal__toolbar-right {
-  display: flex;
-  gap: 8px;
 }
 </style>

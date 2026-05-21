@@ -19,27 +19,23 @@
 
     <template #footer>
       <div v-if="article" class="flex items-center gap-2">
-        <div class="flex flex-1 items-center gap-2">
-          <a-button
-            :loading="wechatCopying"
-            @click="copyAsWechatFormat"
-          >复制公众号格式</a-button>
-          <a-button
-            v-if="canPush(article)"
-            type="primary"
-            :loading="saving"
-            @click="saveAndPush"
-          >推送到草稿箱</a-button>
-          <a-tooltip v-else :mouse-enter-delay="0.3">
-            <template #title>{{ getMissingConditions(article).join('；') }}</template>
-            <a-button type="primary" disabled>推送到草稿箱</a-button>
-          </a-tooltip>
-        </div>
-        <a-button
-          type="primary"
-          :loading="saving"
-          @click="handleSave"
-        >保存正文</a-button>
+        <a-tooltip :mouse-enter-delay="0.5">
+          <template #title>操作顺序：① 复制公众号格式 → ② 保存正文 → ③ 推送到草稿箱</template>
+          <div class="flex items-center gap-2">
+            <a-button :loading="wechatCopying" @click="copyAsWechatFormat">复制公众号格式</a-button>
+            <a-button type="primary" :loading="saving" @click="handleSave">保存正文</a-button>
+            <a-button
+              v-if="canPush(article)"
+              type="primary"
+              :loading="saving"
+              @click="saveAndPush"
+            >推送到草稿箱</a-button>
+            <a-tooltip v-else :mouse-enter-delay="0.3">
+              <template #title>{{ getMissingConditions(article).join('；') }}</template>
+              <a-button type="primary" disabled>推送到草稿箱</a-button>
+            </a-tooltip>
+          </div>
+        </a-tooltip>
       </div>
     </template>
 

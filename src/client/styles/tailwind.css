@@ -399,4 +399,184 @@
       padding: 10px 16px 16px;
     }
   }
+
+  /* ─── 全局 Ant Design 组件主题覆写 ─── */
+  /* 使用 editorial CSS 变量统一所有 AntD 组件的视觉风格 */
+
+  /* Modal：玻璃质感 + editorial 圆角和阴影 */
+  .ant-modal-content {
+    border: 1px solid var(--editorial-border-strong);
+    border-radius: var(--editorial-radius-xl);
+    background: var(--editorial-bg-panel-strong);
+    box-shadow: var(--editorial-shadow-floating);
+    backdrop-filter: blur(24px);
+  }
+
+  .ant-modal-header {
+    border-bottom: 1px solid var(--editorial-border);
+    background: transparent;
+  }
+
+  .ant-modal-title {
+    color: var(--editorial-text-main);
+    font-weight: 600;
+  }
+
+  .ant-modal-close {
+    color: var(--editorial-text-muted);
+  }
+
+  .ant-modal-close:hover {
+    color: var(--editorial-text-main);
+    background: var(--editorial-bg-link);
+  }
+
+  .ant-modal-footer {
+    border-top: 1px solid var(--editorial-border);
+  }
+
+  /* Button：覆写主色按钮和默认按钮 */
+  .ant-btn-default {
+    border-color: var(--editorial-border);
+    background: var(--editorial-bg-control);
+    color: var(--editorial-text-main);
+  }
+
+  .ant-btn-default:hover {
+    border-color: var(--editorial-accent);
+    color: var(--editorial-accent);
+    background: var(--editorial-bg-control-hover);
+  }
+
+  /* Steps：连接线和图标颜色 */
+  .ant-steps .ant-steps-item-finish .ant-steps-item-icon {
+    background: var(--editorial-accent-soft);
+    border-color: var(--editorial-accent);
+  }
+
+  .ant-steps .ant-steps-item-finish .ant-steps-item-icon .ant-steps-icon {
+    color: var(--editorial-accent);
+  }
+
+  .ant-steps .ant-steps-item-wait .ant-steps-item-icon {
+    background: var(--editorial-bg-control);
+    border-color: var(--editorial-border);
+  }
+
+  .ant-steps .ant-steps-item-wait .ant-steps-item-title {
+    color: var(--editorial-text-muted);
+  }
+
+  .ant-steps .ant-steps-item-error .ant-steps-item-icon {
+    background: rgba(223, 95, 124, 0.1);
+    border-color: var(--editorial-danger);
+  }
+
+  .ant-steps .ant-steps-item-error .ant-steps-item-icon .ant-steps-icon {
+    color: var(--editorial-danger);
+  }
+
+  .ant-steps .ant-steps-item-error .ant-steps-item-title {
+    color: var(--editorial-danger);
+  }
+
+  .ant-steps .ant-steps-item-title {
+    color: var(--editorial-text-main);
+  }
+
+  .ant-steps .ant-steps-item-description {
+    color: var(--editorial-text-muted);
+  }
+
+  .ant-steps .ant-steps-item-tail::after {
+    background: var(--editorial-border);
+  }
+
+  .ant-steps .ant-steps-item-finish > .ant-steps-item-container > .ant-steps-item-tail::after {
+    background: var(--editorial-accent);
+  }
+
+  /* Alert：覆写背景和边框 */
+  .ant-alert {
+    border-radius: var(--editorial-radius-md);
+  }
+
+  .ant-alert-success {
+    background: rgba(42, 157, 143, 0.08);
+    border-color: rgba(42, 157, 143, 0.24);
+  }
+
+  .ant-alert-success .ant-alert-message {
+    color: var(--editorial-success);
+  }
+
+  .ant-alert-error {
+    background: rgba(223, 95, 124, 0.06);
+    border-color: rgba(223, 95, 124, 0.22);
+  }
+
+  .ant-alert-error .ant-alert-message {
+    color: var(--editorial-danger);
+    font-weight: 600;
+  }
+
+  .ant-alert-error .ant-alert-description {
+    color: var(--editorial-text-body);
+  }
+
+  /* Tooltip */
+  .ant-tooltip-inner {
+    background: var(--editorial-bg-panel-strong);
+    color: var(--editorial-text-main);
+    border: 1px solid var(--editorial-border);
+    border-radius: var(--editorial-radius-md);
+    box-shadow: var(--editorial-shadow-card);
+    backdrop-filter: blur(16px);
+  }
+
+  .ant-tooltip-arrow::before {
+    background: var(--editorial-bg-panel-strong);
+  }
+
+  /* Image 预览 */
+  .ant-image {
+    border-radius: var(--editorial-radius-md);
+    overflow: hidden;
+  }
+
+  /* dark 模式补丁 */
+  html[data-theme="dark"] .ant-modal-content {
+    background: rgba(18, 27, 49, 0.94);
+  }
+
+  html[data-theme="dark"] .ant-btn-default {
+    background: rgba(17, 25, 44, 0.74);
+    border-color: rgba(109, 132, 196, 0.26);
+    color: var(--editorial-text-main);
+  }
+
+  html[data-theme="dark"] .ant-btn-default:hover {
+    background: rgba(27, 38, 67, 0.9);
+    border-color: var(--editorial-accent);
+    color: var(--editorial-accent);
+  }
+
+  html[data-theme="dark"] .ant-steps .ant-steps-item-wait .ant-steps-item-icon {
+    background: rgba(17, 25, 44, 0.74);
+    border-color: rgba(109, 132, 196, 0.26);
+  }
+
+  html[data-theme="dark"] .ant-alert-success {
+    background: rgba(108, 212, 178, 0.08);
+    border-color: rgba(108, 212, 178, 0.22);
+  }
+
+  html[data-theme="dark"] .ant-alert-error {
+    background: rgba(255, 127, 150, 0.06);
+    border-color: rgba(255, 127, 150, 0.2);
+  }
+
+  html[data-theme="dark"] .ant-tooltip-inner {
+    background: rgba(18, 27, 49, 0.94);
+  }
 }

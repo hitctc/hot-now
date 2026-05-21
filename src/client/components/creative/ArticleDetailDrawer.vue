@@ -252,6 +252,12 @@ async function doSaveContent(content: string): Promise<void> {
     await editFinishedArticle(props.article.id, { contentMarkdown: content });
     lastSavedContent = content;
     emit("saved");
+    // 主题预览模式下，清除旧缓存并重新渲染
+    if (activePreviewTheme.value !== "live") {
+      const themeId = themeIdMap[activePreviewTheme.value as Exclude<PreviewThemeKey, "live">];
+      delete themeHtmlCache.value[themeId];
+      switchPreviewTheme(activePreviewTheme.value);
+    }
   } catch {
     message.error("自动保存失败");
   } finally {
@@ -269,6 +275,12 @@ async function handleSave(): Promise<void> {
     lastSavedContent = editContent.value;
     message.success("保存成功");
     emit("saved");
+    // 主题预览模式下，清除旧缓存并重新渲染
+    if (activePreviewTheme.value !== "live") {
+      const themeId = themeIdMap[activePreviewTheme.value as Exclude<PreviewThemeKey, "live">];
+      delete themeHtmlCache.value[themeId];
+      switchPreviewTheme(activePreviewTheme.value);
+    }
   } catch {
     message.error("保存失败");
   } finally {

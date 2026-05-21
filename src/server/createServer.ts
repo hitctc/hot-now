@@ -440,8 +440,9 @@ type ServerDeps = {
   pushArticleToWechatDraft?: (
     articleId: number,
     themeId: string,
-    wechatHtml?: string
-  ) => Promise<{ ok: boolean; mediaId?: string; errorCode?: string; errorMessage?: string; hint?: string }>;
+    wechatHtml?: string,
+    onProgress?: (step: string, status: "running" | "done" | "error", detail?: string) => void
+  ) => Promise<{ ok: boolean; mediaId?: string; errorCode?: string; errorMessage?: string; hint?: string; pushCount?: number }>;
   getArticleWechatPushLog?: (articleId: number) => unknown[];
   getArticlePushCount?: (articleId: number) => number;
   listWechatMpAccounts?: () => unknown[];
@@ -1220,8 +1221,36 @@ export function createServer(deps: ServerDeps = {}) {
     const themeId = body?.themeId ?? "bauhaus";
     const wechatHtml = body?.wechatHtml;
 
-    const result = await deps.pushArticleToWechatDraft(id, themeId, wechatHtml);
-    return reply.send(result);
+    // 接管响应，用 SSE 流式推送进度
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    });
+
+    const sendEvent = (data: Record<string, unknown>) => {
+      reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    const onProgress = (step: string, status: "running" | "done" | "error", detail?: string) => {
+      const event: Record<string, unknown> = { step, status };
+      if (detail) event.detail = detail;
+      sendEvent(event);
+    };
+
+    try {
+      const result = await deps.pushArticleToWechatDraft(id, themeId, wechatHtml, onProgress);
+      if (result.ok) {
+        sendEvent({ step: "complete", status: "done", mediaId: result.mediaId, pushCount: result.pushCount });
+      } else {
+        sendEvent({ step: "complete", status: "error", errorCode: result.errorCode, errorMessage: result.errorMessage });
+      }
+    } catch (err) {
+      sendEvent({ step: "complete", status: "error", errorMessage: (err as Error).message });
+    } finally {
+      reply.raw.end();
+    }
   });
 
   // 获取文章推送记录

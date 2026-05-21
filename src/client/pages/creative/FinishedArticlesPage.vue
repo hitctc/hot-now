@@ -11,14 +11,12 @@ import {
   wechatThemeOptions,
   parseArticleImages,
   extractImageUrl,
-  pushArticleToDraft,
   type CreativeFinishedArticle,
   type CreativeSourceItem,
   type TrendBreakdown,
   type WechatThemeId,
   type PushLogEntry
 } from "../../services/creativeApi.js";
-import { renderWechatThemePreview } from "../../services/wechatRenderer.js";
 import { readWechatMpAccounts, type WechatMpAccountSummary } from "../../services/settingsApi.js";
 import ArticlePushConfirmModal from "../../components/creative/ArticlePushConfirmModal.vue";
 import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
@@ -113,8 +111,6 @@ const sourceItemModalData = ref<CreativeSourceItem | null>(null);
 
 const pushConfirmVisible = ref(false);
 const pushConfirmArticle = ref<CreativeFinishedArticle | null>(null);
-const pushPending = ref(false);
-const pushError = ref("");
 const wechatTheme = ref<WechatThemeId>("bauhaus");
 const wechatMpAccounts = ref<WechatMpAccountSummary[]>([]);
 const defaultAccountName = computed(() => {
@@ -150,10 +146,8 @@ function getMissingConditions(article: CreativeFinishedArticle | null): string[]
 }
 
 function openPushConfirm(article: CreativeFinishedArticle, themeId?: WechatThemeId): void {
-  // 优先用传入的主题，其次用文章保存的主题偏好，最后默认包豪斯
   wechatTheme.value = themeId ?? (article.wechatThemeId as WechatThemeId) ?? "bauhaus";
   pushConfirmArticle.value = article;
-  pushError.value = "";
   pushConfirmVisible.value = true;
   loadWechatMpAccounts();
 }
@@ -165,26 +159,9 @@ async function loadWechatMpAccounts(): Promise<void> {
   } catch { /* ignore */ }
 }
 
-async function handlePushConfirm(): Promise<void> {
-  if (!pushConfirmArticle.value) return;
-  pushPending.value = true;
-  pushError.value = "";
-  try {
-    const article = pushConfirmArticle.value;
-    const html = article.contentMarkdown ? renderWechatThemePreview(article.contentMarkdown, wechatTheme.value) : undefined;
-    const result = await pushArticleToDraft(article.id, wechatTheme.value, html);
-    if (result.ok) {
-      message.success("推送成功！草稿已添加到微信公众号");
-      pushConfirmVisible.value = false;
-      loadItems();
-    } else {
-      pushError.value = result.errorMessage || "推送失败";
-    }
-  } catch (err) {
-    pushError.value = `推送失败: ${(err as Error).message}`;
-  } finally {
-    pushPending.value = false;
-  }
+// 推送成功回调：刷新列表
+function handlePushSuccess(): void {
+  loadItems();
 }
 
 // ─── 数据加载 ───
@@ -700,11 +677,10 @@ const pagination = computed(() => ({
     <ArticlePushConfirmModal
       v-model:visible="pushConfirmVisible"
       :article="pushConfirmArticle"
+      :theme-id="wechatTheme"
       :theme-label="wechatThemeOptions.find(o => o.value === wechatTheme)?.label ?? ''"
       :default-account-name="defaultAccountName"
-      :loading="pushPending"
-      :error="pushError"
-      @confirm="handlePushConfirm"
+      @success="handlePushSuccess"
     />
   </div>
 </template>

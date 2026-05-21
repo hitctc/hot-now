@@ -6,8 +6,14 @@ import { getAccessToken } from "./wechatMpAccessToken.js";
 import { uploadPermanentImage, uploadContentImage, createDraft, WechatApiCallError } from "./wechatMpApiClient.js";
 import { makeWechatCompatible, type WechatThemeId } from "../creative/wechatFormat/wechatCompat.js";
 import { findCreativeFinishedArticleById, editCreativeFinishedArticle } from "../creative/creativeFinishedArticleRepository.js";
-import { WECHAT_ERROR_HINTS, type DraftPushResult } from "./types.js";
+import { type DraftPushResult } from "./types.js";
 import type { SqliteDatabase } from "../db/openDatabase.js";
+
+// 推送步骤标识，与前端进度展示一一对应
+export type PushStepId = "validate" | "compat" | "token" | "cover" | "images" | "draft" | "status";
+
+// 进度回调：step 标识当前步骤，status 标记状态，detail 用于细化信息（如 "2/5"）
+export type PushProgressCallback = (step: PushStepId, status: "running" | "done" | "error", detail?: string) => void;
 
 interface PushParams {
   db: SqliteDatabase;
@@ -15,6 +21,7 @@ interface PushParams {
   themeId: WechatThemeId;
   wechatHtml?: string;
   masterKey: string;
+  onProgress?: PushProgressCallback;
 }
 
 // 下载远程图片，返回 Buffer
@@ -70,33 +77,41 @@ export function getArticlePushCount(db: SqliteDatabase, articleId: number): numb
 
 /** 推送文章到微信公众号草稿箱 */
 export async function pushArticleToWechatDraft(params: PushParams): Promise<DraftPushResult> {
-  const { db, articleId, themeId, masterKey } = params;
+  const { db, articleId, themeId, masterKey, onProgress } = params;
 
-  // 1. 查找默认公众号
+  // ─── 步骤 1：校验文章数据和公众号配置 ───
+  onProgress?.("validate", "running");
   const account = findDefaultWechatMpAccount(db);
   if (!account) {
+    onProgress?.("validate", "error");
     return { ok: false, errorCode: "no-default-account", errorMessage: "未配置默认公众号" };
   }
 
-  // 2. 读取文章
   const article = findCreativeFinishedArticleById(db, articleId);
   if (!article) {
+    onProgress?.("validate", "error");
     return { ok: false, errorCode: "article-not-found", errorMessage: "文章不存在" };
   }
   if (!article.contentMarkdown) {
+    onProgress?.("validate", "error");
     return { ok: false, errorCode: "no-content", errorMessage: "文章无 Markdown 内容" };
   }
-
-  // 3. 渲染 HTML：使用前端传入的已渲染 HTML，加微信兼容处理
   if (!params.wechatHtml) {
+    onProgress?.("validate", "error");
     return { ok: false, errorCode: "no-html", errorMessage: "缺少渲染 HTML，无法推送" };
   }
+  onProgress?.("validate", "done");
+
+  // ─── 步骤 2：微信兼容处理 ───
+  onProgress?.("compat", "running");
   let html: string;
   try {
     html = await makeWechatCompatible(params.wechatHtml, { skipImageBase64: true });
   } catch (err) {
+    onProgress?.("compat", "error");
     return { ok: false, errorCode: "render-failed", errorMessage: `渲染失败: ${(err as Error).message}` };
   }
+  onProgress?.("compat", "done");
 
   // 插入推送记录（pending 状态）
   const logResult = db.prepare(`
@@ -105,11 +120,19 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
   `).run(articleId, account.id, themeId);
   const logId = Number(logResult.lastInsertRowid);
 
-  try {
-    // 4. 获取 access_token
-    const token = await getAccessToken(account, masterKey);
+  // 用 currentStep 追踪当前步骤，catch 中标记失败
+  let currentStep: PushStepId = "token";
 
-    // 5. 上传封面图，并将正文中的封面图 URL 替换为 CDN 地址
+  try {
+    // ─── 步骤 3：获取 access_token ───
+    currentStep = "token";
+    onProgress?.("token", "running");
+    const token = await getAccessToken(account, masterKey);
+    onProgress?.("token", "done");
+
+    // ─── 步骤 4：上传封面图 ───
+    currentStep = "cover";
+    onProgress?.("cover", "running");
     let thumbMediaId = "";
     if (article.coverImage) {
       const coverBuffer = await downloadImage(article.coverImage);
@@ -120,19 +143,23 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
         html = replaceImageUrls(html, [article.coverImage], [coverResult.url]);
       }
     }
+    onProgress?.("cover", "done");
 
-    // 6. 上传正文图片并替换 URL
+    // ─── 步骤 5：逐张上传正文图片 ───
+    currentStep = "images";
     if (article.images && Array.isArray(article.images) && article.images.length > 0) {
       const imageUrls = extractImageUrls(article.images);
+      onProgress?.("images", "running", `0/${imageUrls.length}`);
       const cdnUrls: string[] = [];
 
       for (let i = 0; i < imageUrls.length; i++) {
+        onProgress?.("images", "running", `${i + 1}/${imageUrls.length}`);
         try {
           const imgBuffer = await downloadImage(imageUrls[i]);
           const ext = imageUrls[i].includes(".png") ? "png" : "jpg";
           const cdnUrl = await uploadContentImage(token, imgBuffer, `image_${i}.${ext}`);
           cdnUrls.push(cdnUrl);
-        } catch (err) {
+        } catch {
           // 单张图片上传失败不阻塞整体流程，保留原始 URL
           cdnUrls.push(imageUrls[i]);
         }
@@ -140,37 +167,40 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
 
       html = replaceImageUrls(html, imageUrls, cdnUrls);
     }
+    onProgress?.("images", "done");
 
-    // 7. 提取标题
+    // ─── 步骤 6：创建草稿 ───
+    currentStep = "draft";
+    onProgress?.("draft", "running");
     const title = article.titles?.[0] ?? "未命名文章";
-
-    // 8. 创建草稿
     const mediaId = await createDraft(
       token,
       { title, thumbMediaId, content: html },
       account.id
     );
+    onProgress?.("draft", "done");
 
-    // 9. 更新推送记录为成功
+    // ─── 步骤 7：更新文章状态 ───
+    currentStep = "status";
+    onProgress?.("status", "running");
     db.prepare(`
       UPDATE wechat_draft_push_log
       SET status = 'success', media_id = ?, pushed_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(mediaId, logId);
-
-    // 10. 更新文章状态为已推送草稿
     editCreativeFinishedArticle(db, articleId, { status: "wechat_draft" });
-
-    // 11. 返回推送次数
     const pushCount = getArticlePushCount(db, articleId);
+    onProgress?.("status", "done");
 
     return { ok: true, mediaId, pushCount };
   } catch (err) {
+    // 标记当前步骤为失败
+    onProgress?.(currentStep, "error");
+
     const wechatErr = err instanceof WechatApiCallError
       ? { errorCode: String(err.errcode), errorMessage: `${err.hint}\n\n错误码: ${err.errcode}\n微信原始信息: ${err.errmsg}` }
       : { errorCode: "unknown", errorMessage: (err as Error).message };
 
-    // 更新推送记录为失败
     db.prepare(`
       UPDATE wechat_draft_push_log
       SET status = 'failed', error_code = ?, error_message = ?, pushed_at = CURRENT_TIMESTAMP

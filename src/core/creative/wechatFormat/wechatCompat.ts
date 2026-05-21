@@ -4,6 +4,8 @@
 
 import { JSDOM } from "jsdom";
 
+export type WechatThemeId = "bauhaus" | "sunset-film" | "receipt";
+
 // 外链图片转 Base64（微信会拦截外链图片）
 async function convertImageToBase64(imgUrl: string): Promise<string> {
   if (imgUrl.startsWith("data:")) return imgUrl;

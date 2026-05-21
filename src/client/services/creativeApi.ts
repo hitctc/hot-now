@@ -198,16 +198,6 @@ export const wechatThemeOptions: { value: WechatThemeId; label: string }[] = [
   { value: "receipt", label: "购物小票" }
 ];
 
-export function renderWechatFormat(
-  id: number,
-  theme: WechatThemeId
-): Promise<{ ok: boolean; html?: string }> {
-  return requestJson<{ ok: boolean; html?: string }>(
-    `/api/creative/finished-articles/${id}/wechat-format`,
-    { method: "POST", body: JSON.stringify({ theme }) }
-  );
-}
-
 // ─── Image Upload ───
 
 export function uploadImagesByUrl(images: ImageUploadInput[]): Promise<ImageUploadResponse> {

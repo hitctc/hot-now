@@ -91,7 +91,7 @@ import {
   editCreativeFinishedArticle,
   toggleWechatPublished
 } from "../core/creative/creativeFinishedArticleRepository.js";
-import { formatForWechat, type WechatThemeId } from "../core/creative/wechatFormat/index.js";
+
 import { downloadAndStoreImage, readStoredImage } from "../core/storage/imageStore.js";
 import { readNextCollectionRunAt } from "../core/scheduler/readNextCollectionRunAt.js";
 import {
@@ -1202,37 +1202,6 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.code(400).send({ ok: false, reason: result.reason });
     }
     return reply.send({ ok: true });
-  });
-
-  // 微信公众号格式化：将成品文章 Markdown 转为带内联样式的 HTML
-  app.post("/api/creative/finished-articles/:id/wechat-format", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!db) {
-      return reply.code(503).send({ ok: false, reason: "database-not-available" });
-    }
-
-    const params = request.params as { id: string };
-    const body = request.body as { theme?: string } | undefined;
-    const id = parseInt(params.id, 10);
-
-    const validThemes: WechatThemeId[] = ["bauhaus", "sunset-film", "receipt"];
-    const theme = validThemes.includes(body?.theme as WechatThemeId) ? (body?.theme as WechatThemeId) : "bauhaus";
-
-    const article = findCreativeFinishedArticleById(db, id);
-    if (!article || !article.contentMarkdown) {
-      return reply.code(404).send({ ok: false, reason: "article-not-found-or-empty" });
-    }
-
-    try {
-      const html = await formatForWechat(article.contentMarkdown, theme);
-      return reply.send({ ok: true, html });
-    } catch (err) {
-      request.log.error(err, "WeChat format rendering failed");
-      return reply.code(500).send({ ok: false, reason: "rendering-failed" });
-    }
   });
 
   // ─── 微信公众号：推送到草稿箱（session 鉴权） ───

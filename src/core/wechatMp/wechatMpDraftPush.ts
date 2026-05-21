@@ -4,8 +4,7 @@
 import { findDefaultWechatMpAccount } from "./wechatMpAccountRepository.js";
 import { getAccessToken } from "./wechatMpAccessToken.js";
 import { uploadPermanentImage, uploadContentImage, createDraft, WechatApiCallError } from "./wechatMpApiClient.js";
-import { formatForWechat, type WechatThemeId } from "../creative/wechatFormat/index.js";
-import { makeWechatCompatible } from "../creative/wechatFormat/wechatCompat.js";
+import { makeWechatCompatible, type WechatThemeId } from "../creative/wechatFormat/wechatCompat.js";
 import { findCreativeFinishedArticleById, editCreativeFinishedArticle } from "../creative/creativeFinishedArticleRepository.js";
 import { WECHAT_ERROR_HINTS, type DraftPushResult } from "./types.js";
 import type { SqliteDatabase } from "../db/openDatabase.js";

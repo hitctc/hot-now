@@ -28,7 +28,7 @@ import { runCollectionCycle } from "./core/pipeline/runCollectionCycle.js";
 import { runAiTimelineAlertCycle } from "./core/notifications/runAiTimelineAlertCycle.js";
 import { pushArticleToWechatDraft, getArticlePushLog, getArticlePushCount } from "./core/wechatMp/wechatMpDraftPush.js";
 import { listWechatMpAccounts, saveWechatMpAccount, deleteWechatMpAccount, setDefaultWechatMpAccount } from "./core/wechatMp/wechatMpAccountRepository.js";
-import type { WechatThemeId } from "./core/creative/wechatFormat/themes.js";
+import type { WechatThemeId } from "./core/creative/wechatFormat/wechatCompat.js";
 import { listRatingDimensions, saveRatings } from "./core/ratings/ratingRepository.js";
 import type { DailyReportTrigger } from "./core/report/buildDailyReport.js";
 import { createRunLock } from "./core/runtime/runLock.js";

@@ -195,9 +195,19 @@ function applyTheme(html: string, themeId: WechatThemeId): string {
 
 export function renderWechatThemePreview(
   markdown: string,
-  themeId: WechatThemeId
+  themeId: WechatThemeId,
+  coverUrl?: string
 ): string {
   const preprocessed = preprocessMarkdown(markdown);
   const rawHtml = md.render(preprocessed);
-  return applyTheme(rawHtml, themeId);
+  const themed = applyTheme(rawHtml, themeId);
+
+  if (!coverUrl) return themed;
+
+  const theme = themes[themeId];
+  const imgStyle = theme?.styles.img ?? "display:block; margin:0 auto 16px; width:100%;";
+  const coverHtml = `<img src="${coverUrl}" alt="封面图" style="${imgStyle}" />`;
+
+  // 在 container div 开头插入封面图
+  return themed.replace(/(<div[^>]*style="[^"]*container[^"]*")>/, `$1>${coverHtml}`);
 }

@@ -266,6 +266,12 @@ const displayCoverImages = computed(() => {
   return src.slice(0, 10);
 });
 
+const selectedCoverUrl = computed(() => {
+  const imgs = displayCoverImages.value;
+  const idx = activeCoverIndex.value;
+  return imgs.length > 0 ? imgs[Math.min(idx, imgs.length - 1)] : "";
+});
+
 async function handleRegenCover(): Promise<void> {
   if (!props.article || regenerating.value) return;
   regenerating.value = true;
@@ -300,7 +306,8 @@ async function selectCoverImage(idx: number): Promise<void> {
     // 重新渲染并保存预览 HTML，确保推送时使用新封面
     if (activePreviewTheme.value !== "live" && editContent.value) {
       const themeId = themeIdMap[activePreviewTheme.value];
-      const html = renderWechatThemePreview(editContent.value, themeId);
+      const coverUrl = displayCoverImages.value[Math.min(idx, displayCoverImages.value.length - 1)];
+      const html = renderWechatThemePreview(editContent.value, themeId, coverUrl);
       props.article.wechatHtml = html;
       editFinishedArticle(props.article.id, { wechatHtml: html }).catch(() => {});
     }
@@ -416,7 +423,7 @@ function switchPreviewTheme(key: PreviewThemeKey): void {
   if (key === "live" || !editContent.value) return;
 
   const themeId = themeIdMap[key];
-  const html = renderWechatThemePreview(editContent.value, themeId);
+  const html = renderWechatThemePreview(editContent.value, themeId, selectedCoverUrl.value);
 
   // 首次选中该主题时保存偏好和渲染结果
   if (props.article && (props.article.wechatThemeId !== themeId || props.article.wechatHtml !== html)) {
@@ -431,7 +438,9 @@ const activePreviewHtml = computed(() => {
   if (activePreviewTheme.value === "live") return "";
   const themeId = themeIdMap[activePreviewTheme.value];
   if (!editContent.value) return "";
-  return renderWechatThemePreview(editContent.value, themeId);
+  // 依赖 activeCoverIndex 使切换封面时触发重渲染
+  void activeCoverIndex.value;
+  return renderWechatThemePreview(editContent.value, themeId, selectedCoverUrl.value);
 });
 
 const activePreviewLabel = computed(() => {
@@ -494,7 +503,7 @@ async function copyAsWechatFormat(): Promise<void> {
   if (!props.article) return;
   wechatCopying.value = true;
   try {
-    const html = renderWechatThemePreview(editContent.value, currentWechatThemeId.value);
+    const html = renderWechatThemePreview(editContent.value, currentWechatThemeId.value, selectedCoverUrl.value);
     const htmlBlob = new Blob([html], { type: "text/html" });
     const textBlob = new Blob([editContent.value], { type: "text/plain" });
     await navigator.clipboard.write([

@@ -125,13 +125,15 @@
         <section v-if="article.coverImage">
           <h3 class="m-0 mb-2 text-sm font-semibold text-editorial-text-muted">封面图</h3>
           <a-image-preview-group>
-            <div class="inline-block overflow-hidden rounded-editorial-md border border-editorial-border">
-              <a-image
-                :src="article.coverImage"
-                alt="封面图"
-                class="block max-w-xs object-cover"
-                loading="lazy"
-              />
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div class="overflow-hidden rounded-editorial-md border border-editorial-border">
+                <a-image
+                  :src="article.coverImage"
+                  alt="封面图"
+                  class="block w-full object-cover"
+                  loading="lazy"
+                />
+              </div>
             </div>
           </a-image-preview-group>
         </section>

@@ -1190,7 +1190,9 @@ export function createServer(deps: ServerDeps = {}) {
       hooks: Array.isArray(body?.hooks) ? body.hooks as string[] : undefined,
       quotes: Array.isArray(body?.quotes) ? body.quotes as string[] : undefined,
       summary100: typeof body?.summary100 === "string" ? body.summary100 : undefined,
-      images: Array.isArray(body?.images) ? body.images as any[] : undefined
+      images: Array.isArray(body?.images) ? body.images as any[] : undefined,
+      wechatThemeId: typeof body?.wechatThemeId === "string" ? body.wechatThemeId : (body?.wechatThemeId === null ? null : undefined),
+      wechatHtml: typeof body?.wechatHtml === "string" ? body.wechatHtml : (body?.wechatHtml === null ? null : undefined),
     });
     if (!result.ok && result.reason === "article not found") {
       return reply.code(404).send({ ok: false, reason: "not-found" });

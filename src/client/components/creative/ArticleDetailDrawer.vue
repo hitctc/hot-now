@@ -159,7 +159,6 @@
                   :type="activePreviewTheme === opt.key ? 'primary' : 'default'"
                   size="small"
                   class="!text-[11px] !px-2 !py-0.5"
-                  :loading="activePreviewTheme === opt.key && themeLoading"
                   @click="switchPreviewTheme(opt.key)"
                 >{{ opt.label }}</a-button>
               </div>
@@ -193,6 +192,7 @@ import {
   type CreativeFinishedArticle,
   type WechatThemeId,
 } from "../../services/creativeApi.js";
+import { renderWechatThemePreview } from "../../services/wechatRenderer.js";
 
 const props = defineProps<{
   open: boolean;
@@ -233,19 +233,10 @@ watch(() => props.open, (val) => {
     editContent.value = md;
     lastSavedContent = md;
     if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
-    themeHtmlCache.value = {};
     // 恢复文章保存的主题偏好，无记录时默认包豪斯
     const saved = props.article.wechatThemeId;
     const previewKey = saved ? reverseThemeIdMap[saved] : undefined;
-    const theme = previewKey ?? "bauhaus";
-    // 已有渲染 HTML 时直接用缓存，跳过 API 调用
-    const themeId = themeIdMap[theme];
-    if (props.article.wechatHtml && themeId) {
-      activePreviewTheme.value = theme;
-      themeHtmlCache.value[themeId] = props.article.wechatHtml;
-    } else {
-      switchPreviewTheme(theme);
-    }
+    activePreviewTheme.value = previewKey ?? "bauhaus";
   }
 });
 
@@ -257,11 +248,6 @@ async function doSaveContent(content: string): Promise<void> {
     lastSavedContent = content;
     lastSavedAt.value = `保存成功(${new Date().toLocaleTimeString("zh-CN", { hour12: false })})`;
     emit("saved");
-    if (activePreviewTheme.value !== "live") {
-      const themeId = themeIdMap[activePreviewTheme.value as Exclude<PreviewThemeKey, "live">];
-      delete themeHtmlCache.value[themeId];
-      switchPreviewTheme(activePreviewTheme.value);
-    }
   } catch {
     message.error("自动保存失败");
   } finally {
@@ -279,11 +265,6 @@ async function handleSave(): Promise<void> {
     lastSavedContent = editContent.value;
     lastSavedAt.value = `保存成功(${new Date().toLocaleTimeString("zh-CN", { hour12: false })})`;
     emit("saved");
-    if (activePreviewTheme.value !== "live") {
-      const themeId = themeIdMap[activePreviewTheme.value as Exclude<PreviewThemeKey, "live">];
-      delete themeHtmlCache.value[themeId];
-      switchPreviewTheme(activePreviewTheme.value);
-    }
   } catch {
     message.error("保存失败");
   } finally {
@@ -307,10 +288,6 @@ const previewThemeOptions: { key: PreviewThemeKey; label: string }[] = [
 ];
 
 const activePreviewTheme = ref<PreviewThemeKey>("live");
-const themeLoading = ref(false);
-
-// 缓存已渲染的主题 HTML，避免切换回来时重复请求
-const themeHtmlCache = ref<Record<string, string>>({});
 
 const themeIdMap: Record<Exclude<PreviewThemeKey, "live">, WechatThemeId> = {
   bauhaus: "bauhaus",
@@ -318,53 +295,34 @@ const themeIdMap: Record<Exclude<PreviewThemeKey, "live">, WechatThemeId> = {
   receipt: "receipt",
 };
 
-// WechatThemeId → PreviewThemeKey 的反向映射，用于从 DB 恢复选中状态
 const reverseThemeIdMap: Record<string, Exclude<PreviewThemeKey, "live">> = {
   bauhaus: "bauhaus",
   "sunset-film": "sunsetFilm",
   receipt: "receipt",
 };
 
-async function switchPreviewTheme(key: PreviewThemeKey): Promise<void> {
+// 切换预览主题：客户端即时渲染
+function switchPreviewTheme(key: PreviewThemeKey): void {
   activePreviewTheme.value = key;
-  if (key === "live") return;
+  if (key === "live" || !editContent.value) return;
 
   const themeId = themeIdMap[key];
-  const cached = themeHtmlCache.value[themeId];
-  if (cached) return;
+  const html = renderWechatThemePreview(editContent.value, themeId);
 
-  if (!props.article) return;
-  themeLoading.value = true;
-  try {
-    const res = await renderWechatFormat(props.article.id, themeId);
-    if (res.ok && res.html) {
-      themeHtmlCache.value[themeId] = res.html;
-      // 保存主题偏好和渲染后的 HTML
-      const themeChanged = props.article.wechatThemeId !== themeId;
-      const htmlChanged = props.article.wechatHtml !== res.html;
-      if (themeChanged || htmlChanged) {
-        props.article.wechatThemeId = themeId;
-        props.article.wechatHtml = res.html;
-        editFinishedArticle(props.article.id, {
-          wechatThemeId: themeId,
-          wechatHtml: res.html,
-        }).catch(() => {});
-      }
-    } else {
-      message.error("主题渲染失败");
-    }
-  } catch {
-    message.error("主题渲染请求失败");
-  } finally {
-    themeLoading.value = false;
+  // 首次选中该主题时保存偏好和渲染结果
+  if (props.article && (props.article.wechatThemeId !== themeId || props.article.wechatHtml !== html)) {
+    props.article.wechatThemeId = themeId;
+    props.article.wechatHtml = html;
+    editFinishedArticle(props.article.id, { wechatThemeId: themeId, wechatHtml: html }).catch(() => {});
   }
 }
 
-// 根据当前选中的预览主题返回 HTML
+// 根据当前选中的预览主题返回 HTML，编辑时即时重新渲染
 const activePreviewHtml = computed(() => {
   if (activePreviewTheme.value === "live") return "";
   const themeId = themeIdMap[activePreviewTheme.value];
-  return themeHtmlCache.value[themeId] ?? "";
+  if (!editContent.value) return "";
+  return renderWechatThemePreview(editContent.value, themeId);
 });
 
 const activePreviewLabel = computed(() => {

@@ -19,11 +19,9 @@ const SELECT_COLUMNS = `
   status,
   anomaly_reason,
   raw_response_text,
-  content_html_bauhaus,
-  content_html_sunset_film,
-  content_html_receipt,
   wechat_published,
   wechat_theme_id,
+  wechat_html,
   created_at,
   updated_at,
   (SELECT COUNT(*) FROM wechat_draft_push_log WHERE article_id = creative_finished_articles.id AND status = 'success') AS push_count
@@ -44,11 +42,9 @@ type ArticleRow = {
   status: string;
   anomaly_reason: string | null;
   raw_response_text: string | null;
-  content_html_bauhaus: string | null;
-  content_html_sunset_film: string | null;
-  content_html_receipt: string | null;
   wechat_published: number;
   wechat_theme_id: string | null;
+  wechat_html: string | null;
   push_count: number;
   created_at: string;
   updated_at: string;
@@ -71,11 +67,9 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     status: row.status,
     anomalyReason: row.anomaly_reason,
     rawResponseText: row.raw_response_text,
-    contentHtmlBauhaus: row.content_html_bauhaus,
-    contentHtmlSunsetFilm: row.content_html_sunset_film,
-    contentHtmlReceipt: row.content_html_receipt,
     wechatPublished: row.wechat_published === 1,
     wechatThemeId: row.wechat_theme_id,
+    wechatHtml: row.wechat_html,
     pushCount: row.push_count ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -100,11 +94,9 @@ export type CreativeFinishedArticleRecord = {
   status: string;
   anomalyReason: string | null;
   rawResponseText: string | null;
-  contentHtmlBauhaus: string | null;
-  contentHtmlSunsetFilm: string | null;
-  contentHtmlReceipt: string | null;
   wechatPublished: boolean;
   wechatThemeId: string | null;
+  wechatHtml: string | null;
   pushCount: number;
   createdAt: string;
   updatedAt: string;
@@ -122,9 +114,6 @@ export type InsertCreativeFinishedArticleInput = {
   images?: unknown[];
   coverImage?: string;
   rawResponseText?: string;
-  contentHtmlBauhaus?: string;
-  contentHtmlSunsetFilm?: string;
-  contentHtmlReceipt?: string;
 };
 
 export type EditCreativeFinishedArticleInput = {
@@ -140,10 +129,8 @@ export type EditCreativeFinishedArticleInput = {
   rawResponseText?: string;
   status?: string;
   anomalyReason?: string;
-  contentHtmlBauhaus?: string;
-  contentHtmlSunsetFilm?: string;
-  contentHtmlReceipt?: string;
   wechatThemeId?: string | null;
+  wechatHtml?: string | null;
 };
 
 export type ListCreativeFinishedArticlesFilters = {
@@ -180,12 +167,9 @@ export function insertCreativeFinishedArticle(
         images_json,
         cover_image_url,
         status,
-        raw_response_text,
-        content_html_bauhaus,
-        content_html_sunset_film,
-        content_html_receipt
+        raw_response_text
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'generated', ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'generated', ?)
     `
   ).run(
     input.sourceItemId,
@@ -198,10 +182,7 @@ export function insertCreativeFinishedArticle(
     input.summary100 ?? null,
     input.images ? JSON.stringify(input.images) : null,
     input.coverImage ?? null,
-    input.rawResponseText ?? null,
-    input.contentHtmlBauhaus ?? null,
-    input.contentHtmlSunsetFilm ?? null,
-    input.contentHtmlReceipt ?? null
+    input.rawResponseText ?? null
   );
 
   const row = db
@@ -352,21 +333,13 @@ export function editCreativeFinishedArticle(
     setClauses.push("anomaly_reason = ?");
     params.push(input.anomalyReason);
   }
-  if (input.contentHtmlBauhaus !== undefined) {
-    setClauses.push("content_html_bauhaus = ?");
-    params.push(input.contentHtmlBauhaus);
-  }
-  if (input.contentHtmlSunsetFilm !== undefined) {
-    setClauses.push("content_html_sunset_film = ?");
-    params.push(input.contentHtmlSunsetFilm);
-  }
-  if (input.contentHtmlReceipt !== undefined) {
-    setClauses.push("content_html_receipt = ?");
-    params.push(input.contentHtmlReceipt);
-  }
   if (input.wechatThemeId !== undefined) {
     setClauses.push("wechat_theme_id = ?");
     params.push(input.wechatThemeId ?? null);
+  }
+  if (input.wechatHtml !== undefined) {
+    setClauses.push("wechat_html = ?");
+    params.push(input.wechatHtml ?? null);
   }
 
   if (setClauses.length === 0) {

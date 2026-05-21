@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 25;
+const schemaVersion = 26;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -1153,6 +1153,20 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(25, themePreferenceMigrationName);
+
+    // 026: 用单一 wechat_html 字段替换三个主题 HTML 冗余列
+    const wechatHtmlMigrationName = "add_wechat_html_drop_old_theme_columns";
+    if (!hasColumn(db, "creative_finished_articles", "wechat_html")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN wechat_html TEXT DEFAULT NULL`);
+    }
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(26, wechatHtmlMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

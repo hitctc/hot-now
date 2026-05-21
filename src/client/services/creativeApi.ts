@@ -61,11 +61,9 @@ export type CreativeFinishedArticle = {
   status: string;
   anomalyReason: string | null;
   rawResponseText: string | null;
-  contentHtmlBauhaus: string | null;
-  contentHtmlSunsetFilm: string | null;
-  contentHtmlReceipt: string | null;
   wechatPublished: boolean;
   wechatThemeId: string | null;
+  wechatHtml: string | null;
   pushCount: number;
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
@@ -181,6 +179,7 @@ export function editFinishedArticle(
     quotes?: string[];
     summary100?: string;
     wechatThemeId?: string | null;
+    wechatHtml?: string | null;
   }
 ): Promise<{ ok: boolean }> {
   return requestJson<{ ok: boolean }>(`/actions/creative/finished-articles/${id}`, {

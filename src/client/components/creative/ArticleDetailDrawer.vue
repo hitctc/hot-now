@@ -283,10 +283,16 @@ async function switchPreviewTheme(key: PreviewThemeKey): Promise<void> {
     const res = await renderWechatFormat(props.article.id, themeId);
     if (res.ok && res.html) {
       themeHtmlCache.value[themeId] = res.html;
-      // 记住该文章选中的主题
-      if (props.article.wechatThemeId !== themeId) {
+      // 保存主题偏好和渲染后的 HTML
+      const themeChanged = props.article.wechatThemeId !== themeId;
+      const htmlChanged = props.article.wechatHtml !== res.html;
+      if (themeChanged || htmlChanged) {
         props.article.wechatThemeId = themeId;
-        editFinishedArticle(props.article.id, { wechatThemeId: themeId }).catch(() => {});
+        props.article.wechatHtml = res.html;
+        editFinishedArticle(props.article.id, {
+          wechatThemeId: themeId,
+          wechatHtml: res.html,
+        }).catch(() => {});
       }
     } else {
       message.error("主题渲染失败");

@@ -109,13 +109,16 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
     // 4. 获取 access_token
     const token = await getAccessToken(account, masterKey);
 
-    // 5. 上传封面图
+    // 5. 上传封面图，并将正文中的封面图 URL 替换为 CDN 地址
     let thumbMediaId = "";
     if (article.coverImage) {
       const coverBuffer = await downloadImage(article.coverImage);
       const ext = article.coverImage.includes(".png") ? "png" : "jpg";
       const coverResult = await uploadPermanentImage(token, coverBuffer, `cover.${ext}`);
       thumbMediaId = coverResult.mediaId;
+      if (coverResult.url) {
+        html = replaceImageUrls(html, [article.coverImage], [coverResult.url]);
+      }
     }
 
     // 6. 上传正文图片并替换 URL

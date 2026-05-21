@@ -21,7 +21,8 @@ async function convertImageToBase64(imgUrl: string): Promise<string> {
 }
 
 // 微信兼容性处理主函数
-export async function makeWechatCompatible(html: string): Promise<string> {
+// skipImageBase64: 推送流程需跳过 base64 转换，保留原始 URL 以便上传到微信 CDN 后替换
+export async function makeWechatCompatible(html: string, options?: { skipImageBase64?: boolean }): Promise<string> {
   const dom = new JSDOM(`<!DOCTYPE html><body>${html}</body>`);
   const doc = dom.window.document;
 
@@ -153,18 +154,20 @@ export async function makeWechatCompatible(html: string): Promise<string> {
     else next.parentNode?.removeChild(next);
   });
 
-  // 6. 外链图片转 Base64
-  const imgs = Array.from(section.querySelectorAll("img"));
-  await Promise.all(
-    imgs.map(async (imgEl) => {
-      const img = imgEl as Element;
-      const src = img.getAttribute("src");
-      if (src && !src.startsWith("data:")) {
-        const base64 = await convertImageToBase64(src);
-        img.setAttribute("src", base64);
-      }
-    })
-  );
+  // 6. 外链图片转 Base64（仅"复制到剪贴板"流程需要，推送流程跳过以保留原始 URL）
+  if (!options?.skipImageBase64) {
+    const imgs = Array.from(section.querySelectorAll("img"));
+    await Promise.all(
+      imgs.map(async (imgEl) => {
+        const img = imgEl as Element;
+        const src = img.getAttribute("src");
+        if (src && !src.startsWith("data:")) {
+          const base64 = await convertImageToBase64(src);
+          img.setAttribute("src", base64);
+        }
+      })
+    );
+  }
 
   // 最终字符串级别的 CJK 标点零宽连接符
   let outputHtml = section.outerHTML;

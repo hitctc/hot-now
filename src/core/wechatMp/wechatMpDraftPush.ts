@@ -93,7 +93,7 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
   }
   let html: string;
   try {
-    html = await makeWechatCompatible(params.wechatHtml);
+    html = await makeWechatCompatible(params.wechatHtml, { skipImageBase64: true });
   } catch (err) {
     return { ok: false, errorCode: "render-failed", errorMessage: `渲染失败: ${(err as Error).message}` };
   }

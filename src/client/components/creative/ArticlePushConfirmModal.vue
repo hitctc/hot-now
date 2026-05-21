@@ -4,6 +4,7 @@ import { CheckCircleFilled, CloseCircleFilled, LoadingOutlined } from "@ant-desi
 import type { CreativeFinishedArticle } from "../../services/creativeApi";
 import {
   streamPushArticleToDraft,
+  readCreativeFinishedArticle,
   type PushDraftResult,
   type PushStepId,
   type PushProgressEvent,
@@ -90,12 +91,18 @@ async function startPush(): Promise<void> {
   pushResult.value = null;
   STEP_DEFS.forEach((s) => { stepStates[s.id] = { status: "pending" }; });
 
-  const html = props.article.contentMarkdown
-    ? renderWechatThemePreview(props.article.contentMarkdown, props.themeId)
+  // 从 DB 拉最新数据，确保推送的是已保存的内容而非内存中的旧版本
+  let latestArticle = props.article;
+  try {
+    latestArticle = await readCreativeFinishedArticle(props.article.id);
+  } catch { /* 拉取失败则回退到内存中的数据 */ }
+
+  const html = latestArticle.contentMarkdown
+    ? renderWechatThemePreview(latestArticle.contentMarkdown, props.themeId)
     : undefined;
 
   try {
-    const result = await streamPushArticleToDraft(props.article.id, props.themeId, html, handleProgressEvent);
+    const result = await streamPushArticleToDraft(latestArticle.id, props.themeId, html, handleProgressEvent);
     pushResult.value = result;
     pushState.value = "done";
     if (result.ok) emit("success");

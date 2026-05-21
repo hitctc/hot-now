@@ -27,7 +27,8 @@
           <a-button
             v-if="canPush(article)"
             type="primary"
-            @click="$emit('openPush', article, currentWechatThemeId)"
+            :loading="saving"
+            @click="saveAndPush"
           >推送到草稿箱</a-button>
           <a-tooltip v-else :mouse-enter-delay="0.3">
             <template #title>{{ getMissingConditions(article).join('；') }}</template>
@@ -269,6 +270,17 @@ async function handleSave(): Promise<void> {
   } finally {
     saving.value = false;
   }
+}
+
+// 推送前先保存正文，确保 DB 中是最新内容
+async function saveAndPush(): Promise<void> {
+  if (!props.article) return;
+  // 取消自动保存定时器，手动触发一次保存
+  if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+  if (editContent.value !== lastSavedContent) {
+    await doSaveContent(editContent.value);
+  }
+  emit("openPush", props.article, currentWechatThemeId.value);
 }
 
 function handleClose(): void {

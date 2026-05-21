@@ -18,7 +18,7 @@
     </template>
 
     <template #footer>
-      <div v-if="article" class="flex items-center gap-2">
+      <div v-if="article" class="flex items-center justify-end gap-2">
         <a-tooltip :mouse-enter-delay="0.5">
           <template #title>操作顺序：① 复制公众号格式 → ② 保存正文 → ③ 推送到草稿箱</template>
           <div class="flex items-center gap-2">

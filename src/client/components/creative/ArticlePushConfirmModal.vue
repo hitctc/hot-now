@@ -146,16 +146,19 @@ const failedStepError = computed(() => pushResult.value?.ok ? "" : (pushResult.v
       class="push-progress"
     >
       <a-step
-        v-for="step in STEP_DEFS"
+        v-for="(step, idx) in STEP_DEFS"
         :key="step.id"
         :title="step.title"
         :status="mapStepStatus(stepStates[step.id].status)"
       >
         <template #icon>
           <LoadingOutlined v-if="stepStates[step.id].status === 'running'" spin />
+          <CheckCircleFilled v-else-if="stepStates[step.id].status === 'done'" style="color: #52c41a" />
+          <CloseCircleFilled v-else-if="stepStates[step.id].status === 'error'" style="color: #ff4d4f" />
+          <span v-else class="push-step-num">{{ idx + 1 }}</span>
         </template>
-        <template #description v-if="stepStates[step.id].detail">
-          <span class="push-detail">{{ stepStates[step.id].detail }}</span>
+        <template #description>
+          <span v-if="stepStates[step.id].detail" class="push-detail">{{ stepStates[step.id].detail }}</span>
         </template>
       </a-step>
     </a-steps>
@@ -201,6 +204,18 @@ const failedStepError = computed(() => pushResult.value?.ok ? "" : (pushResult.v
 }
 .push-progress {
   margin-top: 16px;
+}
+.push-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.45);
 }
 .push-detail {
   color: #1890ff;

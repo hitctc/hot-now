@@ -131,11 +131,10 @@
               <div
                 v-for="(url, idx) in displayCoverImages"
                 :key="idx"
-                class="group/cover relative cursor-pointer overflow-hidden rounded-editorial-md border transition-colors"
+                class="group/cover relative overflow-hidden rounded-editorial-md border transition-colors"
                 :class="idx === activeCoverIndex
                   ? 'border-editorial-accent ring-2 ring-editorial-ring'
                   : 'border-editorial-border hover:border-editorial-link-active/40'"
-                @click="selectCoverImage(idx)"
               >
                 <a-image
                   :src="url"
@@ -148,6 +147,11 @@
                   class="absolute right-1 top-1 rounded bg-editorial-accent px-1.5 py-0.5 text-[10px] font-medium text-white"
                 >发布封面</div>
                 <div v-if="idx === 0 && idx !== activeCoverIndex" class="absolute left-1 top-1 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</div>
+                <button
+                  v-if="idx !== activeCoverIndex"
+                  class="absolute inset-x-1 bottom-1 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/cover:opacity-100 hover:!bg-black/70"
+                  @click.stop="selectCoverImage(idx)"
+                >设为发布封面</button>
               </div>
             </div>
           </a-image-preview-group>

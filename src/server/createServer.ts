@@ -1223,14 +1223,19 @@ export function createServer(deps: ServerDeps = {}) {
 
     // 接管响应，用 SSE 流式推送进度
     reply.hijack();
-    reply.raw.writeHead(200, {
+    const res = reply.raw;
+    res.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
+      "X-Accel-Buffering": "no",
       Connection: "keep-alive",
     });
+    res.flushHeaders();
+    // 禁用 TCP Nagle 算法，确保每次 write 立即发送
+    res.socket?.setNoDelay(true);
 
     const sendEvent = (data: Record<string, unknown>) => {
-      reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
     };
 
     const onProgress = (step: string, status: "running" | "done" | "error", detail?: string) => {
@@ -1249,7 +1254,7 @@ export function createServer(deps: ServerDeps = {}) {
     } catch (err) {
       sendEvent({ step: "complete", status: "error", errorMessage: (err as Error).message });
     } finally {
-      reply.raw.end();
+      res.end();
     }
   });
 

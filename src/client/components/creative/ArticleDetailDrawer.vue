@@ -436,8 +436,8 @@ function getMissingConditions(article: CreativeFinishedArticle): string[] {
 }
 
 .article-editor-wrapper {
-  height: calc(100vh - 380px);
-  min-height: 320px;
+  height: calc(100vh - 280px);
+  min-height: 400px;
 }
 
 .article-markdown-body {

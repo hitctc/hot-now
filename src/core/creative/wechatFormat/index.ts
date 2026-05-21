@@ -8,11 +8,11 @@ import type { WechatThemeId } from "./themes.js";
 export type { WechatThemeId };
 export { themes } from "./themes.js";
 
-// 将 Markdown 转换为微信公众号兼容的 HTML
+// 将 Markdown 转换为微信公众号兼容的 HTML（兼容旧调用方）
 export async function formatForWechat(
   markdown: string,
   themeId: WechatThemeId
 ): Promise<string> {
   const styledHtml = renderMarkdownToWechatHtml(markdown, themeId);
-  return makeWechatCompatible(styledHtml, themeId);
+  return makeWechatCompatible(styledHtml);
 }

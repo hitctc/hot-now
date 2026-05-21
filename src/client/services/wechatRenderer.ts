@@ -52,7 +52,7 @@ const themes: Record<WechatThemeId, WechatTheme> = {
     id: "sunset-film",
     name: "落日胶片",
     styles: {
-      container: `max-width: 100%; margin: 0 auto; padding: 0 6px; word-break: break-word; font-family: "Songti SC", SimSun, STSong, Georgia, serif;`,
+      container: `max-width: 100%; margin: 0 auto; padding: 0 0; word-break: break-word; font-family: "Songti SC", SimSun, STSong, Georgia, serif;`,
       h1: "margin: 20px 0 10px; font-size: 26px; font-weight: 900; color: #B33D25; text-align: center; border-top: 4px double #B33D25; border-bottom: 1px solid #B33D25; padding: 20px 0; letter-spacing: 3px; display: block;",
       h2: "margin: 20px 0 10px; font-size: 19px; font-weight: bold; color: #FFFBF0; background: #B33D25; padding: 8px 16px; display: inline-block; border-radius: 2px; box-shadow: 4px 4px 0px rgba(179, 61, 37, 0.2);",
       h3: "margin: 16px 0 8px; font-size: 18px; font-weight: bold; color: #8D5B4C; display: inline-block; padding-left: 10px; border-left: 4px solid #D98C45;",
@@ -81,7 +81,7 @@ const themes: Record<WechatThemeId, WechatTheme> = {
     id: "receipt",
     name: "购物小票",
     styles: {
-      container: `max-width: 100%; margin: 0 auto; padding: 0 6px; word-break: break-word; font-family: Courier New, SimSun, Songti SC, monospace; border-top: 5px dashed #111; border-bottom: 5px dashed #111;`,
+      container: `max-width: 100%; margin: 0 auto; padding: 0 0; word-break: break-word; font-family: Courier New, SimSun, Songti SC, monospace; border-top: 5px dashed #111; border-bottom: 5px dashed #111;`,
       h1: "margin: 20px 0 10px; font-size: 26px; font-weight: 900; color: #000; text-align: center; border-top: 2px dashed #000; border-bottom: 2px dashed #000; padding: 15px 0; letter-spacing: 2px; display: block;",
       h2: "margin: 20px 0 10px; font-size: 18px; font-weight: bold; color: #fff; background: #000; padding: 8px; text-align: center; display: block;",
       h3: "margin: 16px 0 8px; font-size: 16px; font-weight: bold; color: #000; border-bottom: 2px solid #000; display: inline-block; padding-bottom: 2px;",

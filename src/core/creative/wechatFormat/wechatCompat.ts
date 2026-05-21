@@ -1,8 +1,8 @@
 // 微信公众号兼容处理
 // 修复微信编辑器不支持 flex、字体继承丢失、标点断行等问题
+// 完全从前端渲染的 HTML 中提取容器样式，不依赖后端主题定义
 
 import { JSDOM } from "jsdom";
-import { themes, type WechatThemeId } from "./themes.js";
 
 // 外链图片转 Base64（微信会拦截外链图片）
 async function convertImageToBase64(imgUrl: string): Promise<string> {
@@ -19,30 +19,26 @@ async function convertImageToBase64(imgUrl: string): Promise<string> {
 }
 
 // 微信兼容性处理主函数
-export async function makeWechatCompatible(
-  html: string,
-  themeId: WechatThemeId
-): Promise<string> {
-  const theme = themes[themeId];
-  const containerStyle = theme.styles.container;
-
+export async function makeWechatCompatible(html: string): Promise<string> {
   const dom = new JSDOM(`<!DOCTYPE html><body>${html}</body>`);
   const doc = dom.window.document;
 
-  // 1. div → section：微信偏好 section 作为根容器
+  // 1. 从 HTML 中提取已有的容器 div 样式，转为 section
+  const existingDiv = doc.querySelector("body > div");
+  let containerStyle = existingDiv?.getAttribute("style") || "";
+
   const section = doc.createElement("section");
-  section.setAttribute("style", containerStyle);
-  const rootNodes = Array.from(doc.body.childNodes);
-  rootNodes.forEach((node: Node) => {
-    if (node.nodeType === 1 && (node as Element).tagName === "DIV") {
-      const div = node as Element;
-      Array.from(div.childNodes).forEach((child) => section.appendChild(child));
-    } else {
-      section.appendChild(node);
-    }
-  });
-  doc.body.innerHTML = "";
-  doc.body.appendChild(section);
+  if (containerStyle) section.setAttribute("style", containerStyle);
+
+  if (existingDiv) {
+    Array.from(existingDiv.childNodes).forEach((child) => section.appendChild(child));
+    existingDiv.replaceWith(section);
+  } else {
+    const rootNodes = Array.from(doc.body.childNodes);
+    rootNodes.forEach((node) => section.appendChild(node));
+    doc.body.innerHTML = "";
+    doc.body.appendChild(section);
+  }
 
   // 2. flex → table：微信不支持 display: flex
   const allElements = doc.querySelectorAll("*");
@@ -57,7 +53,6 @@ export async function makeWechatCompatible(
     );
 
     if (hasImages && children.length >= 2) {
-      // 图片网格布局 → table
       const table = doc.createElement("table");
       table.setAttribute(
         "style",
@@ -91,7 +86,6 @@ export async function makeWechatCompatible(
       table.appendChild(tr);
       el.parentNode?.replaceChild(table, el);
     } else {
-      // 非图片 flex → 改为 block
       el.setAttribute(
         "style",
         style.replace(/display:\s*flex;?/g, "display: block;")
@@ -115,7 +109,7 @@ export async function makeWechatCompatible(
     });
   });
 
-  // 4. 字体继承强制：微信会覆盖继承的字体，需给每个文本节点显式设置
+  // 4. 字体继承强制：从容器样式中提取，给每个文本节点显式设置
   const fontMatch = containerStyle.match(/font-family:\s*([^;]+);/);
   const sizeMatch = containerStyle.match(/font-size:\s*([^;]+);/);
   const colorMatch = containerStyle.match(/(?<!-background-)color:\s*([^;]+);/);
@@ -125,7 +119,6 @@ export async function makeWechatCompatible(
     "p, li, h1, h2, h3, h4, h5, h6, blockquote, span"
   );
   textNodes.forEach((node: Element) => {
-    // 保留代码块内的 span 高亮样式
     if (node.tagName === "SPAN" && node.closest("pre, code")) return;
     let currentStyle = node.getAttribute("style") || "";
     if (fontMatch && !currentStyle.includes("font-family:"))
@@ -147,7 +140,7 @@ export async function makeWechatCompatible(
   const inlineNodes = section.querySelectorAll("strong, b, em, span, a, code");
   inlineNodes.forEach((node: Element) => {
     const next = node.nextSibling;
-    if (!next || next.nodeType !== 3) return; // TEXT_NODE = 3
+    if (!next || next.nodeType !== 3) return;
     const text = next.textContent || "";
     const match = text.match(/^\s*([：；，。！？、:])(.*)$/s);
     if (!match) return;

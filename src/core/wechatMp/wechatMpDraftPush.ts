@@ -88,14 +88,13 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
     return { ok: false, errorCode: "no-content", errorMessage: "文章无 Markdown 内容" };
   }
 
-  // 3. 渲染 HTML：优先用前端传入的已渲染 HTML（只加微信兼容），否则服务端完整渲染
+  // 3. 渲染 HTML：使用前端传入的已渲染 HTML，加微信兼容处理
+  if (!params.wechatHtml) {
+    return { ok: false, errorCode: "no-html", errorMessage: "缺少渲染 HTML，无法推送" };
+  }
   let html: string;
   try {
-    if (params.wechatHtml) {
-      html = await makeWechatCompatible(params.wechatHtml, themeId);
-    } else {
-      html = await formatForWechat(article.contentMarkdown, themeId);
-    }
+    html = await makeWechatCompatible(params.wechatHtml, themeId);
   } catch (err) {
     return { ok: false, errorCode: "render-failed", errorMessage: `渲染失败: ${(err as Error).message}` };
   }

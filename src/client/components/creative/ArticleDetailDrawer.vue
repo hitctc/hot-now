@@ -207,10 +207,28 @@ const emit = defineEmits<{
 
 const editContent = ref("");
 const saving = ref(false);
+// 记住打开时的原始内容，用于判断是否真正发生变化
+let lastSavedContent = "";
+
+// 10 秒防抖自动保存正文
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+watch(editContent, (val) => {
+  if (!props.open || val === lastSavedContent) return;
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => {
+    if (val !== lastSavedContent && props.article) {
+      doSaveContent(val);
+    }
+  }, 10_000);
+});
 
 watch(() => props.open, (val) => {
   if (val && props.article) {
-    editContent.value = props.article.contentMarkdown || "";
+    const md = props.article.contentMarkdown || "";
+    editContent.value = md;
+    lastSavedContent = md;
+    if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
     themeHtmlCache.value = {};
     // 恢复文章保存的主题偏好，无记录时默认包豪斯
     const saved = props.article.wechatThemeId;
@@ -227,6 +245,20 @@ watch(() => props.open, (val) => {
   }
 });
 
+async function doSaveContent(content: string): Promise<void> {
+  if (!props.article) return;
+  saving.value = true;
+  try {
+    await editFinishedArticle(props.article.id, { contentMarkdown: content });
+    lastSavedContent = content;
+    emit("saved");
+  } catch {
+    message.error("自动保存失败");
+  } finally {
+    saving.value = false;
+  }
+}
+
 async function handleSave(): Promise<void> {
   if (!props.article) return;
   saving.value = true;
@@ -234,6 +266,7 @@ async function handleSave(): Promise<void> {
     await editFinishedArticle(props.article.id, {
       contentMarkdown: editContent.value,
     });
+    lastSavedContent = editContent.value;
     message.success("保存成功");
     emit("saved");
   } catch {

@@ -131,10 +131,10 @@
               <div
                 v-for="(url, idx) in displayCoverImages"
                 :key="idx"
-                class="group/cover relative overflow-hidden rounded-editorial-md border transition-colors"
+                class="group/cover relative overflow-hidden rounded-editorial-md border transition-all"
                 :class="idx === activeCoverIndex
                   ? 'border-editorial-accent ring-2 ring-editorial-ring'
-                  : 'border-editorial-border hover:border-editorial-link-active/40'"
+                  : 'border-editorial-border opacity-60 hover:opacity-100 hover:border-editorial-link-active/40'"
               >
                 <a-image
                   :src="url"
@@ -142,10 +142,13 @@
                   class="block w-full object-cover"
                   loading="lazy"
                 />
+                <!-- 选中标记：对勾 + "发布封面" -->
                 <div
                   v-if="idx === activeCoverIndex"
-                  class="absolute right-1 top-1 rounded bg-editorial-accent px-1.5 py-0.5 text-[10px] font-medium text-white"
-                >发布封面</div>
+                  class="absolute right-1 top-1 flex items-center gap-0.5 rounded bg-editorial-accent px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm"
+                >
+                  <span class="inline-block h-3 w-3 leading-none text-center">✓</span> 发布封面
+                </div>
                 <div v-if="idx === 0 && idx !== activeCoverIndex" class="absolute left-1 top-1 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</div>
                 <button
                   v-if="idx !== activeCoverIndex"
@@ -288,9 +291,21 @@ async function handleRegenCover(): Promise<void> {
 async function selectCoverImage(idx: number): Promise<void> {
   if (!props.article || idx === activeCoverIndex.value) return;
   activeCoverIndex.value = idx;
+
   try {
+    // 持久化选中的封面索引
     await editFinishedArticle(props.article.id, { coverImageIndex: idx });
     props.article.coverImageIndex = idx;
+
+    // 重新渲染并保存预览 HTML，确保推送时使用新封面
+    if (activePreviewTheme.value !== "live" && editContent.value) {
+      const themeId = themeIdMap[activePreviewTheme.value];
+      const html = renderWechatThemePreview(editContent.value, themeId);
+      props.article.wechatHtml = html;
+      editFinishedArticle(props.article.id, { wechatHtml: html }).catch(() => {});
+    }
+
+    emit("saved");
   } catch { /* 静默失败，本地状态已更新 */ }
 }
 

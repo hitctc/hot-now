@@ -6,17 +6,16 @@ type ProviderThemeConfig = NonNullable<ConfigProviderProps["theme"]>;
 
 export type { EditorialThemeMode } from "./editorialTokens";
 
-// Vue 壳和内容页都通过这个薄封装读取 token，避免再维护一份独立 palette。
 export function readEditorialThemePalette(mode: EditorialThemeMode) {
   return editorialTokens[mode];
 }
 
-// AntD 的圆角 token 需要 number，这里统一从字符串 token 解析，避免再写死像素值。
 function readRadiusTokenValue(radiusToken: string): number {
   return Number.parseFloat(radiusToken);
 }
 
-// ConfigProvider 只接收稳定的一层全局 token，组件细节再交给 CSS 变量和 scoped style 做收口。
+// ConfigProvider 全局主题：Seed Token → Map Token → Alias Token 三层派生
+// 编辑器主题色、背景、边框、圆角等通过 token 统一注入，不需要 CSS 覆写
 export function createEditorialProviderTheme(mode: EditorialThemeMode): ProviderThemeConfig {
   const palette = readEditorialThemePalette(mode);
   const borderRadiusSM = readRadiusTokenValue(palette.radiusSm);
@@ -26,29 +25,80 @@ export function createEditorialProviderTheme(mode: EditorialThemeMode): Provider
   return {
     algorithm: mode === "dark" ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
     token: {
+      // Seed Token
       colorPrimary: palette.accent,
       colorInfo: palette.accent,
       colorSuccess: palette.success,
       colorWarning: palette.warning,
       colorError: palette.danger,
+      colorTextBase: mode === "dark" ? "#ffffff" : "#10182a",
+      colorBgBase: mode === "dark" ? "#0a1020" : "#ffffff",
+      fontFamily: palette.fontUi,
+      fontSize: 14,
+      borderRadius,
+      controlHeight: 36,
+      lineWidth: 1,
+      wireframe: false,
+
+      // Map Token — 背景梯度
       colorBgLayout: palette.bgPage,
       colorBgContainer: palette.bgPanelStrong,
       colorBgElevated: palette.bgPanel,
-      colorFillAlter: palette.bgLinkActiveStrong,
+      colorBgMask: mode === "dark" ? "rgba(0, 0, 0, 0.6)" : "rgba(0, 0, 0, 0.3)",
+
+      // Map Token — 边框
+      colorBorder: palette.border,
+      colorBorderSecondary: palette.borderStrong,
+
+      // Map Token — 文本色梯度
       colorText: palette.textMain,
       colorTextSecondary: palette.textBody,
       colorTextTertiary: palette.textMuted,
-      colorBorder: palette.border,
-      colorBorderSecondary: palette.borderStrong,
+      colorTextQuaternary: mode === "dark" ? "rgba(255, 255, 255, 0.18)" : "rgba(0, 0, 0, 0.18)",
+
+      // Alias Token — 圆角
       borderRadiusSM,
-      borderRadius,
       borderRadiusLG,
-      fontFamily: palette.fontUi,
-      fontSize: 14,
-      controlHeight: 36,
+
+      // Alias Token — 阴影
       boxShadow: palette.shadowCard,
       boxShadowSecondary: palette.shadowFloating,
-      controlOutline: palette.ring
-    }
+
+      // Alias Token — 填充色
+      colorFillAlter: palette.bgLinkActiveStrong,
+      colorFill: mode === "dark" ? "rgba(255, 255, 255, 0.10)" : "rgba(0, 0, 0, 0.08)",
+      colorFillSecondary: mode === "dark" ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)",
+      colorFillTertiary: mode === "dark" ? "rgba(255, 255, 255, 0.04)" : "rgba(0, 0, 0, 0.03)",
+
+      // Alias Token — 交互态
+      controlOutline: palette.ring,
+      controlItemBgHover: mode === "dark" ? "rgba(122, 162, 255, 0.10)" : "rgba(77, 125, 255, 0.06)",
+      controlItemBgActive: mode === "dark" ? "rgba(122, 162, 255, 0.16)" : "rgba(77, 125, 255, 0.10)",
+
+      // Alias Token — 链接
+      colorLink: palette.accent,
+      colorLinkHover: mode === "dark" ? "#9dc4ff" : "#6b9aff",
+      colorLinkActive: mode === "dark" ? "#5a80ff" : "#3d6ae6",
+    },
+    components: {
+      Modal: {
+        contentBg: palette.bgPanelStrong,
+        headerBg: "transparent",
+        titleColor: palette.textMain,
+      } as Record<string, unknown>,
+      Steps: {
+        colorPrimary: palette.accent,
+      } as Record<string, unknown>,
+      Alert: {
+        colorSuccess: palette.success,
+        colorError: palette.danger,
+        colorWarning: palette.warning,
+        colorInfo: palette.accent,
+      } as Record<string, unknown>,
+      Tooltip: {
+        colorBgSpotlight: mode === "dark" ? "rgba(18, 27, 49, 0.94)" : "rgba(255, 255, 255, 0.94)",
+        colorTextLightSolid: palette.textMain,
+      } as Record<string, unknown>,
+    },
   };
 }

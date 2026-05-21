@@ -121,7 +121,22 @@
           </ul>
         </section>
 
-        <!-- 图片列表（只读，在正文上方） -->
+        <!-- 封面图 -->
+        <section v-if="article.coverImage">
+          <h3 class="m-0 mb-2 text-sm font-semibold text-editorial-text-muted">封面图</h3>
+          <a-image-preview-group>
+            <div class="inline-block overflow-hidden rounded-editorial-md border border-editorial-border">
+              <a-image
+                :src="article.coverImage"
+                alt="封面图"
+                class="block max-w-xs object-cover"
+                loading="lazy"
+              />
+            </div>
+          </a-image-preview-group>
+        </section>
+
+        <!-- 图片列表（只读，在封面图下方） -->
         <section v-if="parseArticleImages(article.imagesJson).length > 0">
           <h3 class="m-0 mb-2 text-sm font-semibold text-editorial-text-muted">图片列表</h3>
           <a-image-preview-group>

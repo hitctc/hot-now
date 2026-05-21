@@ -441,7 +441,7 @@ type ServerDeps = {
     articleId: number,
     themeId: string,
     wechatHtml?: string,
-    onProgress?: (step: string, status: "running" | "done" | "error", detail?: string) => void
+    onProgress?: (step: string, status: "running" | "done" | "error", detail?: string) => void | Promise<void>
   ) => Promise<{ ok: boolean; mediaId?: string; errorCode?: string; errorMessage?: string; hint?: string; pushCount?: number }>;
   getArticleWechatPushLog?: (articleId: number) => unknown[];
   getArticlePushCount?: (articleId: number) => number;
@@ -1238,10 +1238,14 @@ export function createServer(deps: ServerDeps = {}) {
       res.write(`data: ${JSON.stringify(data)}\n\n`);
     };
 
-    const onProgress = (step: string, status: "running" | "done" | "error", detail?: string) => {
+    const onProgress = async (step: string, status: "running" | "done" | "error", detail?: string) => {
       const event: Record<string, unknown> = { step, status };
       if (detail) event.detail = detail;
       sendEvent(event);
+      // 每个状态变化后短暂停顿，让前端用户能看到步骤过渡
+      if (status === "done" || status === "running") {
+        await new Promise(r => setTimeout(r, 300));
+      }
     };
 
     try {

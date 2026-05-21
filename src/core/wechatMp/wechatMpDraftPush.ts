@@ -13,7 +13,8 @@ import type { SqliteDatabase } from "../db/openDatabase.js";
 export type PushStepId = "validate" | "compat" | "token" | "cover" | "images" | "draft" | "status";
 
 // 进度回调：step 标识当前步骤，status 标记状态，detail 用于细化信息（如 "2/5"）
-export type PushProgressCallback = (step: PushStepId, status: "running" | "done" | "error", detail?: string) => void;
+// 支持 async，路由层可在回调中插入视觉延迟
+export type PushProgressCallback = (step: PushStepId, status: "running" | "done" | "error", detail?: string) => void | Promise<void>;
 
 interface PushParams {
   db: SqliteDatabase;
@@ -80,38 +81,38 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
   const { db, articleId, themeId, masterKey, onProgress } = params;
 
   // ─── 步骤 1：校验文章数据和公众号配置 ───
-  onProgress?.("validate", "running");
+  await onProgress?.("validate", "running");
   const account = findDefaultWechatMpAccount(db);
   if (!account) {
-    onProgress?.("validate", "error");
+    await onProgress?.("validate", "error");
     return { ok: false, errorCode: "no-default-account", errorMessage: "未配置默认公众号" };
   }
 
   const article = findCreativeFinishedArticleById(db, articleId);
   if (!article) {
-    onProgress?.("validate", "error");
+    await onProgress?.("validate", "error");
     return { ok: false, errorCode: "article-not-found", errorMessage: "文章不存在" };
   }
   if (!article.contentMarkdown) {
-    onProgress?.("validate", "error");
+    await onProgress?.("validate", "error");
     return { ok: false, errorCode: "no-content", errorMessage: "文章无 Markdown 内容" };
   }
   if (!params.wechatHtml) {
-    onProgress?.("validate", "error");
+    await onProgress?.("validate", "error");
     return { ok: false, errorCode: "no-html", errorMessage: "缺少渲染 HTML，无法推送" };
   }
-  onProgress?.("validate", "done");
+  await onProgress?.("validate", "done");
 
   // ─── 步骤 2：微信兼容处理 ───
-  onProgress?.("compat", "running");
+  await onProgress?.("compat", "running");
   let html: string;
   try {
     html = await makeWechatCompatible(params.wechatHtml, { skipImageBase64: true });
   } catch (err) {
-    onProgress?.("compat", "error");
+    await onProgress?.("compat", "error");
     return { ok: false, errorCode: "render-failed", errorMessage: `渲染失败: ${(err as Error).message}` };
   }
-  onProgress?.("compat", "done");
+  await onProgress?.("compat", "done");
 
   // 插入推送记录（pending 状态）
   const logResult = db.prepare(`
@@ -126,13 +127,13 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
   try {
     // ─── 步骤 3：获取 access_token ───
     currentStep = "token";
-    onProgress?.("token", "running");
+    await onProgress?.("token", "running");
     const token = await getAccessToken(account, masterKey);
-    onProgress?.("token", "done");
+    await onProgress?.("token", "done");
 
     // ─── 步骤 4：上传封面图 ───
     currentStep = "cover";
-    onProgress?.("cover", "running");
+    await onProgress?.("cover", "running");
     let thumbMediaId = "";
     if (article.coverImage) {
       const coverBuffer = await downloadImage(article.coverImage);
@@ -143,17 +144,17 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
         html = replaceImageUrls(html, [article.coverImage], [coverResult.url]);
       }
     }
-    onProgress?.("cover", "done");
+    await onProgress?.("cover", "done");
 
     // ─── 步骤 5：逐张上传正文图片 ───
     currentStep = "images";
     if (article.images && Array.isArray(article.images) && article.images.length > 0) {
       const imageUrls = extractImageUrls(article.images);
-      onProgress?.("images", "running", `0/${imageUrls.length}`);
+      await onProgress?.("images", "running", `0/${imageUrls.length}`);
       const cdnUrls: string[] = [];
 
       for (let i = 0; i < imageUrls.length; i++) {
-        onProgress?.("images", "running", `${i + 1}/${imageUrls.length}`);
+        await onProgress?.("images", "running", `${i + 1}/${imageUrls.length}`);
         try {
           const imgBuffer = await downloadImage(imageUrls[i]);
           const ext = imageUrls[i].includes(".png") ? "png" : "jpg";
@@ -167,22 +168,22 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
 
       html = replaceImageUrls(html, imageUrls, cdnUrls);
     }
-    onProgress?.("images", "done");
+    await onProgress?.("images", "done");
 
     // ─── 步骤 6：创建草稿 ───
     currentStep = "draft";
-    onProgress?.("draft", "running");
+    await onProgress?.("draft", "running");
     const title = article.titles?.[0] ?? "未命名文章";
     const mediaId = await createDraft(
       token,
       { title, thumbMediaId, content: html },
       account.id
     );
-    onProgress?.("draft", "done");
+    await onProgress?.("draft", "done");
 
     // ─── 步骤 7：更新文章状态 ───
     currentStep = "status";
-    onProgress?.("status", "running");
+    await onProgress?.("status", "running");
     db.prepare(`
       UPDATE wechat_draft_push_log
       SET status = 'success', media_id = ?, pushed_at = CURRENT_TIMESTAMP
@@ -190,12 +191,12 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
     `).run(mediaId, logId);
     editCreativeFinishedArticle(db, articleId, { status: "wechat_draft" });
     const pushCount = getArticlePushCount(db, articleId);
-    onProgress?.("status", "done");
+    await onProgress?.("status", "done");
 
     return { ok: true, mediaId, pushCount };
   } catch (err) {
     // 标记当前步骤为失败
-    onProgress?.(currentStep, "error");
+    await onProgress?.(currentStep, "error");
 
     const wechatErr = err instanceof WechatApiCallError
       ? { errorCode: String(err.errcode), errorMessage: `${err.hint}\n\n错误码: ${err.errcode}\n微信原始信息: ${err.errmsg}` }

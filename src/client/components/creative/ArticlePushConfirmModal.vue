@@ -225,7 +225,7 @@ const failedStepError = computed(() => pushResult.value?.ok ? "" : (pushResult.v
   color: rgba(0, 0, 0, 0.45);
 }
 .push-detail {
-  color: #a6559d;
+  color: #b88ef5;
   font-size: 12px;
 }
 .push-result {

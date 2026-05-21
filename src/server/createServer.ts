@@ -1040,6 +1040,7 @@ export function createServer(deps: ServerDeps = {}) {
     if (body?.contentHtmlBauhaus !== undefined) { editInput.contentHtmlBauhaus = body.contentHtmlBauhaus; updatedFields.push("contentHtmlBauhaus"); }
     if (body?.contentHtmlSunsetFilm !== undefined) { editInput.contentHtmlSunsetFilm = body.contentHtmlSunsetFilm; updatedFields.push("contentHtmlSunsetFilm"); }
     if (body?.contentHtmlReceipt !== undefined) { editInput.contentHtmlReceipt = body.contentHtmlReceipt; updatedFields.push("contentHtmlReceipt"); }
+    if (body?.wechatThemeId !== undefined) { editInput.wechatThemeId = body.wechatThemeId; updatedFields.push("wechatThemeId"); }
 
     if (Object.keys(editInput).length > 0) {
       editCreativeFinishedArticle(db, id, editInput as any);

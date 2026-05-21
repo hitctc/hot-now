@@ -211,7 +211,10 @@ const saving = ref(false);
 watch(() => props.open, (val) => {
   if (val && props.article) {
     editContent.value = props.article.contentMarkdown || "";
-    activePreviewTheme.value = "live";
+    // 恢复文章保存的主题偏好，无记录时默认包豪斯
+    const saved = props.article.wechatThemeId;
+    const previewKey = saved ? reverseThemeIdMap[saved] : undefined;
+    activePreviewTheme.value = previewKey ?? "bauhaus";
     themeHtmlCache.value = {};
   }
 });
@@ -241,10 +244,10 @@ function handleClose(): void {
 type PreviewThemeKey = "live" | "bauhaus" | "sunsetFilm" | "receipt";
 
 const previewThemeOptions: { key: PreviewThemeKey; label: string }[] = [
-  { key: "live", label: "实时预览" },
   { key: "bauhaus", label: "包豪斯" },
   { key: "sunsetFilm", label: "落日胶片" },
   { key: "receipt", label: "购物小票" },
+  { key: "live", label: "实时预览" },
 ];
 
 const activePreviewTheme = ref<PreviewThemeKey>("live");
@@ -256,6 +259,13 @@ const themeHtmlCache = ref<Record<string, string>>({});
 const themeIdMap: Record<Exclude<PreviewThemeKey, "live">, WechatThemeId> = {
   bauhaus: "bauhaus",
   sunsetFilm: "sunset-film",
+  receipt: "receipt",
+};
+
+// WechatThemeId → PreviewThemeKey 的反向映射，用于从 DB 恢复选中状态
+const reverseThemeIdMap: Record<string, Exclude<PreviewThemeKey, "live">> = {
+  bauhaus: "bauhaus",
+  "sunset-film": "sunsetFilm",
   receipt: "receipt",
 };
 
@@ -273,6 +283,11 @@ async function switchPreviewTheme(key: PreviewThemeKey): Promise<void> {
     const res = await renderWechatFormat(props.article.id, themeId);
     if (res.ok && res.html) {
       themeHtmlCache.value[themeId] = res.html;
+      // 记住该文章选中的主题
+      if (props.article.wechatThemeId !== themeId) {
+        props.article.wechatThemeId = themeId;
+        editFinishedArticle(props.article.id, { wechatThemeId: themeId }).catch(() => {});
+      }
     } else {
       message.error("主题渲染失败");
     }
@@ -331,8 +346,11 @@ function formatLocalTime(value: string): string {
 
 // 当前主题对应的 WechatThemeId（用于复制公众号格式和推送）
 const currentWechatThemeId = computed<WechatThemeId>(() => {
-  if (activePreviewTheme.value === "live") return "bauhaus";
-  return themeIdMap[activePreviewTheme.value] ?? "bauhaus";
+  if (activePreviewTheme.value !== "live") {
+    return themeIdMap[activePreviewTheme.value as Exclude<PreviewThemeKey, "live">];
+  }
+  // 实时预览模式下回退到文章保存的主题
+  return (props.article?.wechatThemeId as WechatThemeId) ?? "bauhaus";
 });
 
 // ─── 微信公众号格式复制 ───

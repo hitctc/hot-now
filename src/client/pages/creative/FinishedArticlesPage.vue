@@ -149,7 +149,8 @@ function getMissingConditions(article: CreativeFinishedArticle | null): string[]
 }
 
 function openPushConfirm(article: CreativeFinishedArticle, themeId?: WechatThemeId): void {
-  if (themeId) wechatTheme.value = themeId;
+  // 优先用传入的主题，其次用文章保存的主题偏好，最后默认包豪斯
+  wechatTheme.value = themeId ?? (article.wechatThemeId as WechatThemeId) ?? "bauhaus";
   pushConfirmArticle.value = article;
   pushError.value = "";
   pushConfirmVisible.value = true;

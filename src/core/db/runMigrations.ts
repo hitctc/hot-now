@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 24;
+const schemaVersion = 25;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -1139,6 +1139,20 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(24, wechatMpDraftPushMigrationName);
+
+    // 025: 成品文章增加微信主题偏好字段，用于记住每篇文章选用的排版主题
+    const themePreferenceMigrationName = "add_wechat_theme_id_to_finished_articles";
+    if (!hasColumn(db, "creative_finished_articles", "wechat_theme_id")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN wechat_theme_id TEXT DEFAULT NULL`);
+    }
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(25, themePreferenceMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

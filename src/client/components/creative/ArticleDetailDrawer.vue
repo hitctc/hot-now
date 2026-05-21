@@ -212,10 +212,18 @@ watch(() => props.open, (val) => {
   if (val && props.article) {
     editContent.value = props.article.contentMarkdown || "";
     themeHtmlCache.value = {};
-    // 恢复文章保存的主题偏好，无记录时默认包豪斯；同时触发渲染获取 HTML
+    // 恢复文章保存的主题偏好，无记录时默认包豪斯
     const saved = props.article.wechatThemeId;
     const previewKey = saved ? reverseThemeIdMap[saved] : undefined;
-    switchPreviewTheme(previewKey ?? "bauhaus");
+    const theme = previewKey ?? "bauhaus";
+    // 已有渲染 HTML 时直接用缓存，跳过 API 调用
+    const themeId = themeIdMap[theme];
+    if (props.article.wechatHtml && themeId) {
+      activePreviewTheme.value = theme;
+      themeHtmlCache.value[themeId] = props.article.wechatHtml;
+    } else {
+      switchPreviewTheme(theme);
+    }
   }
 });
 

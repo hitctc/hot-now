@@ -211,11 +211,11 @@ const saving = ref(false);
 watch(() => props.open, (val) => {
   if (val && props.article) {
     editContent.value = props.article.contentMarkdown || "";
-    // 恢复文章保存的主题偏好，无记录时默认包豪斯
+    themeHtmlCache.value = {};
+    // 恢复文章保存的主题偏好，无记录时默认包豪斯；同时触发渲染获取 HTML
     const saved = props.article.wechatThemeId;
     const previewKey = saved ? reverseThemeIdMap[saved] : undefined;
-    activePreviewTheme.value = previewKey ?? "bauhaus";
-    themeHtmlCache.value = {};
+    switchPreviewTheme(previewKey ?? "bauhaus");
   }
 });
 

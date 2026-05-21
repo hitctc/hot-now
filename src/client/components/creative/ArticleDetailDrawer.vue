@@ -147,7 +147,10 @@
         <!-- 正文：左右分屏编辑器 + 主题切换 -->
         <section>
           <div class="mb-2 flex items-center justify-between">
-            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文</h3>
+            <div class="flex items-center gap-2">
+              <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文</h3>
+              <span v-if="lastSavedAt" class="text-[11px] text-editorial-text-muted">{{ lastSavedAt }}</span>
+            </div>
             <div class="flex items-center gap-2">
               <div v-if="article.contentMarkdown" class="flex gap-1">
                 <a-button
@@ -207,6 +210,7 @@ const emit = defineEmits<{
 
 const editContent = ref("");
 const saving = ref(false);
+const lastSavedAt = ref("");
 // 记住打开时的原始内容，用于判断是否真正发生变化
 let lastSavedContent = "";
 
@@ -251,8 +255,8 @@ async function doSaveContent(content: string): Promise<void> {
   try {
     await editFinishedArticle(props.article.id, { contentMarkdown: content });
     lastSavedContent = content;
+    lastSavedAt.value = `保存成功(${new Date().toLocaleTimeString("zh-CN", { hour12: false })})`;
     emit("saved");
-    // 主题预览模式下，清除旧缓存并重新渲染
     if (activePreviewTheme.value !== "live") {
       const themeId = themeIdMap[activePreviewTheme.value as Exclude<PreviewThemeKey, "live">];
       delete themeHtmlCache.value[themeId];
@@ -273,9 +277,8 @@ async function handleSave(): Promise<void> {
       contentMarkdown: editContent.value,
     });
     lastSavedContent = editContent.value;
-    message.success("保存成功");
+    lastSavedAt.value = `保存成功(${new Date().toLocaleTimeString("zh-CN", { hour12: false })})`;
     emit("saved");
-    // 主题预览模式下，清除旧缓存并重新渲染
     if (activePreviewTheme.value !== "live") {
       const themeId = themeIdMap[activePreviewTheme.value as Exclude<PreviewThemeKey, "live">];
       delete themeHtmlCache.value[themeId];

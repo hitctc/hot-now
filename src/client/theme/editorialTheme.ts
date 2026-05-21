@@ -32,7 +32,7 @@ export function createEditorialProviderTheme(mode: EditorialThemeMode): Provider
       colorWarning: palette.warning,
       colorError: palette.danger,
       colorTextBase: mode === "dark" ? "#ffffff" : "#10182a",
-      colorBgBase: mode === "dark" ? "#0a1020" : "#ffffff",
+      colorBgBase: mode === "dark" ? "#0d0b1a" : "#ffffff",
       fontFamily: palette.fontUi,
       fontSize: 14,
       borderRadius,
@@ -72,13 +72,13 @@ export function createEditorialProviderTheme(mode: EditorialThemeMode): Provider
 
       // Alias Token — 交互态
       controlOutline: palette.ring,
-      controlItemBgHover: mode === "dark" ? "rgba(122, 162, 255, 0.10)" : "rgba(77, 125, 255, 0.06)",
-      controlItemBgActive: mode === "dark" ? "rgba(122, 162, 255, 0.16)" : "rgba(77, 125, 255, 0.10)",
+      controlItemBgHover: mode === "dark" ? "rgba(167, 139, 250, 0.10)" : "rgba(124, 92, 252, 0.06)",
+      controlItemBgActive: mode === "dark" ? "rgba(167, 139, 250, 0.16)" : "rgba(124, 92, 252, 0.10)",
 
       // Alias Token — 链接
       colorLink: palette.accent,
-      colorLinkHover: mode === "dark" ? "#9dc4ff" : "#6b9aff",
-      colorLinkActive: mode === "dark" ? "#5a80ff" : "#3d6ae6",
+      colorLinkHover: mode === "dark" ? "#c4b5fd" : "#9f8ffb",
+      colorLinkActive: mode === "dark" ? "#8b5cf6" : "#6d28d9",
     },
     components: {
       Modal: {

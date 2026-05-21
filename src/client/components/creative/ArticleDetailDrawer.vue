@@ -532,7 +532,7 @@ function getMissingConditions(article: CreativeFinishedArticle): string[] {
   margin: 0.75em 0;
 }
 .article-markdown-body a {
-  color: #2563eb;
+  color: #7c5cfc;
   text-decoration: underline;
 }
 .article-markdown-body strong { font-weight: 600; }

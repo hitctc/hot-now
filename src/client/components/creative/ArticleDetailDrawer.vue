@@ -114,17 +114,40 @@
         </section>
 
         <!-- 封面图 -->
-        <section v-if="article.coverImage">
-          <h3 class="m-0 mb-2 text-sm font-semibold text-editorial-text-muted">封面图</h3>
+        <section v-if="article.coverImage && article.coverImage.length > 0">
+          <div class="mb-2 flex items-center justify-between">
+            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">封面图</h3>
+            <a-button
+              type="link"
+              size="small"
+              class="!p-0 !text-[11px]"
+              :loading="regenerating"
+              :disabled="regenerating"
+              @click="handleRegenCover"
+            >{{ regenerating ? '生成中...' : '重新生成封面图' }}</a-button>
+          </div>
           <a-image-preview-group>
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <div class="overflow-hidden rounded-editorial-md border border-editorial-border">
+              <div
+                v-for="(url, idx) in displayCoverImages"
+                :key="idx"
+                class="group/cover relative cursor-pointer overflow-hidden rounded-editorial-md border transition-colors"
+                :class="idx === activeCoverIndex
+                  ? 'border-editorial-accent ring-2 ring-editorial-ring'
+                  : 'border-editorial-border hover:border-editorial-link-active/40'"
+                @click="selectCoverImage(idx)"
+              >
                 <a-image
-                  :src="article.coverImage"
-                  alt="封面图"
+                  :src="url"
+                  :alt="`封面图 ${idx + 1}`"
                   class="block w-full object-cover"
                   loading="lazy"
                 />
+                <div
+                  v-if="idx === activeCoverIndex"
+                  class="absolute right-1 top-1 rounded bg-editorial-accent px-1.5 py-0.5 text-[10px] font-medium text-white"
+                >发布封面</div>
+                <div v-if="idx === 0 && idx !== activeCoverIndex" class="absolute left-1 top-1 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</div>
               </div>
             </div>
           </a-image-preview-group>
@@ -196,6 +219,7 @@ import { message } from "ant-design-vue";
 import ArticleMarkdownEditor from "./ArticleMarkdownEditor.vue";
 import {
   editFinishedArticle,
+  regenCover,
   parseArticleImages,
   extractImageUrl,
   type CreativeFinishedArticle,
@@ -223,6 +247,49 @@ const lastSavedAt = ref("");
 // 记住打开时的原始内容，用于判断是否真正发生变化
 let lastSavedContent = "";
 
+// ─── 封面图选择 & 重新生成 ───
+
+const activeCoverIndex = ref(0);
+const regenerating = ref(false);
+// 本地缓存最新的 coverImage 数组，regen 后不依赖父组件刷新
+const localCoverImages = ref<string[]>([]);
+
+const displayCoverImages = computed(() => {
+  const src = localCoverImages.value.length > 0 ? localCoverImages.value : (props.article?.coverImage ?? []);
+  return src.slice(0, 10);
+});
+
+async function handleRegenCover(): Promise<void> {
+  if (!props.article || regenerating.value) return;
+  regenerating.value = true;
+  try {
+    const result = await regenCover(props.article.id);
+    if (result.ok && result.coverImage) {
+      localCoverImages.value = result.coverImage;
+      activeCoverIndex.value = 0;
+      // 同步到 article 对象，确保推送时读到最新数据
+      props.article.coverImage = result.coverImage;
+      props.article.coverImageIndex = 0;
+      message.success("封面图已重新生成");
+    } else {
+      message.error(result.reason ?? "封面图生成失败");
+    }
+  } catch {
+    message.error("封面图生成请求失败");
+  } finally {
+    regenerating.value = false;
+  }
+}
+
+async function selectCoverImage(idx: number): Promise<void> {
+  if (!props.article || idx === activeCoverIndex.value) return;
+  activeCoverIndex.value = idx;
+  try {
+    await editFinishedArticle(props.article.id, { coverImageIndex: idx });
+    props.article.coverImageIndex = idx;
+  } catch { /* 静默失败，本地状态已更新 */ }
+}
+
 // 10 秒防抖自动保存正文
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -241,6 +308,9 @@ watch(() => props.open, (val) => {
     const md = props.article.contentMarkdown || "";
     editContent.value = md;
     lastSavedContent = md;
+    // 重置封面状态
+    localCoverImages.value = [];
+    activeCoverIndex.value = props.article.coverImageIndex ?? 0;
     if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
     // 恢复文章保存的主题偏好，无记录时默认包豪斯
     const saved = props.article.wechatThemeId;
@@ -447,7 +517,7 @@ async function copyMarkdownAsPlainText(mdText: string): Promise<void> {
 function canPush(article: CreativeFinishedArticle): boolean {
   if (article.status !== "ready_for_publish" && article.status !== "wechat_draft") return false;
   if (parseJsonArray(article.titles).length === 0) return false;
-  if (!article.coverImage) return false;
+  if (article.coverImage.length === 0) return false;
   if (parseArticleImages(article.imagesJson).length === 0) return false;
   if (!article.contentMarkdown) return false;
   return true;
@@ -457,7 +527,7 @@ function getMissingConditions(article: CreativeFinishedArticle): string[] {
   const missing: string[] = [];
   if (article.status !== "ready_for_publish" && article.status !== "wechat_draft") missing.push("状态不允许推送");
   if (parseJsonArray(article.titles).length === 0) missing.push("缺少标题");
-  if (!article.coverImage) missing.push("缺少封面图");
+  if (article.coverImage.length === 0) missing.push("缺少封面图");
   if (parseArticleImages(article.imagesJson).length === 0) missing.push("缺少正文配图");
   if (!article.contentMarkdown) missing.push("缺少 Markdown 内容");
   return missing;

@@ -57,7 +57,8 @@ export type CreativeFinishedArticle = {
   summary100: string | null;
   imagesJson: string | ArticleImageEntry[] | null;
   images: string | ArticleImageEntry[] | null;
-  coverImage: string | null;
+  coverImage: string[];
+  coverImageIndex: number;
   status: string;
   anomalyReason: string | null;
   rawResponseText: string | null;
@@ -180,6 +181,7 @@ export function editFinishedArticle(
     summary100?: string;
     wechatThemeId?: string | null;
     wechatHtml?: string | null;
+    coverImageIndex?: number;
   }
 ): Promise<{ ok: boolean }> {
   return requestJson<{ ok: boolean }>(`/actions/creative/finished-articles/${id}`, {
@@ -319,4 +321,19 @@ export function readArticlePushLog(id: number): Promise<{ ok: boolean; log: Push
   return requestJson<{ ok: boolean; log: PushLogEntry[] }>(
     `/api/creative/finished-articles/${id}/push-log`
   );
+}
+
+// ─── Cover Image Regen ───
+
+export type RegenCoverResult = {
+  ok: boolean;
+  coverImage?: string[];
+  reason?: string;
+};
+
+/** 调用后端代理重新生成封面图，返回更新后的 coverImage 数组 */
+export function regenCover(id: number): Promise<RegenCoverResult> {
+  return requestJson<RegenCoverResult>(`/api/creative/finished-articles/${id}/regen-cover`, {
+    method: "POST",
+  });
 }

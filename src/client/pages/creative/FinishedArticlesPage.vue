@@ -124,7 +124,7 @@ function canPush(article: CreativeFinishedArticle | null): boolean {
   if (article.status !== 'ready_for_publish' && article.status !== 'wechat_draft') return false;
   const parsedTitles = parseJsonArray(article.titles);
   if (parsedTitles.length === 0) return false;
-  if (!article.coverImage) return false;
+  if (article.coverImage.length === 0) return false;
   const parsedImages = parseArticleImages(article.imagesJson);
   if (parsedImages.length === 0) return false;
   if (!article.contentMarkdown) return false;
@@ -138,7 +138,7 @@ function getMissingConditions(article: CreativeFinishedArticle | null): string[]
   if (article.status !== 'ready_for_publish' && article.status !== 'wechat_draft') missing.push('状态不允许推送');
   const parsedTitles = parseJsonArray(article.titles);
   if (parsedTitles.length === 0) missing.push('缺少标题');
-  if (!article.coverImage) missing.push('缺少封面图');
+  if (article.coverImage.length === 0) missing.push('缺少封面图');
   const parsedImages = parseArticleImages(article.imagesJson);
   if (parsedImages.length === 0) missing.push('缺少正文配图');
   if (!article.contentMarkdown) missing.push('缺少 Markdown 内容');
@@ -452,8 +452,8 @@ const pagination = computed(() => ({
           <!-- 封面图列 -->
           <template v-else-if="column.key === 'coverImage'">
             <a-image
-              v-if="record.coverImage"
-              :src="record.coverImage"
+              v-if="record.coverImage && record.coverImage.length > 0"
+              :src="record.coverImage[0]"
               :width="36"
               :height="36"
               class="!rounded !border !border-editorial-border"

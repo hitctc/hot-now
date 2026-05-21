@@ -135,13 +135,16 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
     currentStep = "cover";
     await onProgress?.("cover", "running");
     let thumbMediaId = "";
-    if (article.coverImage) {
-      const coverBuffer = await downloadImage(article.coverImage);
-      const ext = article.coverImage.includes(".png") ? "png" : "jpg";
+    // 从 coverImage 数组中取用户选中的封面（coverImageIndex），回退到第 0 张
+    const selectedCoverIdx = Math.min(article.coverImageIndex ?? 0, article.coverImage.length - 1);
+    const coverUrl = article.coverImage.length > 0 ? article.coverImage[selectedCoverIdx >= 0 ? selectedCoverIdx : 0] : null;
+    if (coverUrl) {
+      const coverBuffer = await downloadImage(coverUrl);
+      const ext = coverUrl.includes(".png") ? "png" : "jpg";
       const coverResult = await uploadPermanentImage(token, coverBuffer, `cover.${ext}`);
       thumbMediaId = coverResult.mediaId;
       if (coverResult.url) {
-        html = replaceImageUrls(html, [article.coverImage], [coverResult.url]);
+        html = replaceImageUrls(html, [coverUrl], [coverResult.url]);
       }
     }
     await onProgress?.("cover", "done");

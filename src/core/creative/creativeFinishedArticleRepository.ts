@@ -16,6 +16,7 @@ const SELECT_COLUMNS = `
   summary_100,
   images_json,
   cover_image_url,
+  cover_image_index,
   status,
   anomaly_reason,
   raw_response_text,
@@ -39,6 +40,7 @@ type ArticleRow = {
   summary_100: string | null;
   images_json: string | null;
   cover_image_url: string | null;
+  cover_image_index: number;
   status: string;
   anomaly_reason: string | null;
   raw_response_text: string | null;
@@ -49,6 +51,17 @@ type ArticleRow = {
   created_at: string;
   updated_at: string;
 };
+
+function parseCoverImages(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.map(String);
+    return [String(parsed)];
+  } catch {
+    return [raw];
+  }
+}
 
 function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
   return {
@@ -63,7 +76,8 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     summary100: row.summary_100,
     imagesJson: row.images_json ? JSON.parse(row.images_json) : null,
     images: row.images_json ? JSON.parse(row.images_json) : null,
-    coverImage: row.cover_image_url,
+    coverImage: parseCoverImages(row.cover_image_url),
+    coverImageIndex: row.cover_image_index ?? 0,
     status: row.status,
     anomalyReason: row.anomaly_reason,
     rawResponseText: row.raw_response_text,
@@ -90,7 +104,8 @@ export type CreativeFinishedArticleRecord = {
   summary100: string | null;
   imagesJson: unknown[] | null;
   images: unknown[] | null;
-  coverImage: string | null;
+  coverImage: string[];
+  coverImageIndex: number;
   status: string;
   anomalyReason: string | null;
   rawResponseText: string | null;
@@ -112,7 +127,7 @@ export type InsertCreativeFinishedArticleInput = {
   quotes?: string[];
   summary100?: string;
   images?: unknown[];
-  coverImage?: string;
+  coverImage?: string[];
   rawResponseText?: string;
 };
 
@@ -125,7 +140,8 @@ export type EditCreativeFinishedArticleInput = {
   quotes?: string[];
   summary100?: string;
   images?: unknown[];
-  coverImage?: string;
+  coverImage?: string[];
+  coverImageIndex?: number;
   rawResponseText?: string;
   status?: string;
   anomalyReason?: string;
@@ -181,7 +197,7 @@ export function insertCreativeFinishedArticle(
     input.quotes ? JSON.stringify(input.quotes) : null,
     input.summary100 ?? null,
     input.images ? JSON.stringify(input.images) : null,
-    input.coverImage ?? null,
+    input.coverImage ? JSON.stringify(input.coverImage) : null,
     input.rawResponseText ?? null
   );
 
@@ -319,7 +335,11 @@ export function editCreativeFinishedArticle(
   }
   if (input.coverImage !== undefined) {
     setClauses.push("cover_image_url = ?");
-    params.push(input.coverImage);
+    params.push(JSON.stringify(input.coverImage));
+  }
+  if (input.coverImageIndex !== undefined) {
+    setClauses.push("cover_image_index = ?");
+    params.push(input.coverImageIndex);
   }
   if (input.rawResponseText !== undefined) {
     setClauses.push("raw_response_text = ?");

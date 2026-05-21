@@ -795,7 +795,7 @@ export function createServer(deps: ServerDeps = {}) {
       quotes: Array.isArray(body?.quotes) ? body.quotes as string[] : undefined,
       summary100: typeof body?.summary100 === "string" ? body.summary100 : undefined,
       images: Array.isArray(body?.images) ? body.images as any[] : undefined,
-      coverImage: typeof body?.coverImage === "string" ? body.coverImage : undefined,
+      coverImage: Array.isArray(body?.coverImage) ? body.coverImage as string[] : (typeof body?.coverImage === "string" ? [body.coverImage] : undefined),
       rawResponseText: typeof body?.rawResponseText === "string" ? body.rawResponseText : undefined,
     });
 
@@ -1030,7 +1030,17 @@ export function createServer(deps: ServerDeps = {}) {
     const editInput: Record<string, unknown> = {};
     if (body?.contentMarkdown !== undefined) { editInput.contentMarkdown = body.contentMarkdown; updatedFields.push("contentMarkdown"); }
     if (body?.images !== undefined) { editInput.images = body.images; updatedFields.push("images"); }
-    if (body?.coverImage !== undefined) { editInput.coverImage = body.coverImage; updatedFields.push("coverImage"); }
+    if (body?.coverImage !== undefined) {
+      // 兼容字符串和数组两种格式
+      editInput.coverImage = Array.isArray(body.coverImage)
+        ? body.coverImage as string[]
+        : typeof body.coverImage === "string" ? [body.coverImage] : [];
+      updatedFields.push("coverImage");
+    }
+    if (body?.coverImageIndex !== undefined && typeof body.coverImageIndex === "number") {
+      editInput.coverImageIndex = body.coverImageIndex;
+      updatedFields.push("coverImageIndex");
+    }
     if (body?.titles !== undefined) { editInput.titles = body.titles; updatedFields.push("titles"); }
     if (body?.thesis !== undefined) { editInput.thesis = body.thesis; updatedFields.push("thesis"); }
     if (body?.summary100 !== undefined) { editInput.summary100 = body.summary100; updatedFields.push("summary100"); }
@@ -1083,6 +1093,71 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.code(404).send({ message: "Finished article not found", statusCode: 404 });
     }
     return reply.send({ ok: true, wechatPublished: updated.wechatPublished });
+  });
+
+  // 重新生成封面图：后端代理 Hermes API
+  app.post("/api/creative/finished-articles/:id/regen-cover", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const params = request.params as { id: string };
+    const id = parseInt(params.id, 10);
+    const article = findCreativeFinishedArticleById(db, id);
+    if (!article) {
+      return reply.code(404).send({ ok: false, reason: "article-not-found" });
+    }
+
+    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+    const hermesApiToken = process.env.HERMES_API_TOKEN;
+    if (!hermesApiUrl || !hermesApiToken) {
+      return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" });
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 90_000);
+
+      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/regen-cover`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${hermesApiToken}`,
+        },
+        body: JSON.stringify({ articleId: id }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const errorBody = await res.json().catch(() => ({ error: `Hermes HTTP ${res.status}` }));
+        return reply.code(res.status >= 500 ? 502 : res.status).send({
+          ok: false,
+          reason: errorBody.error ?? `Hermes HTTP ${res.status}`,
+        });
+      }
+
+      const data = await res.json() as { success: boolean; coverUrl?: string; error?: string };
+      if (!data.success || !data.coverUrl) {
+        return reply.code(502).send({ ok: false, reason: data.error ?? "封面图生成失败" });
+      }
+
+      // 将新封面图 prepend 到数组开头
+      const updatedCovers = [data.coverUrl, ...article.coverImage];
+      editCreativeFinishedArticle(db, id, { coverImage: updatedCovers });
+
+      const updated = findCreativeFinishedArticleById(db, id);
+      return reply.send({ ok: true, coverImage: updated?.coverImage ?? updatedCovers });
+    } catch (err) {
+      if ((err as Error).name === "AbortError") {
+        return reply.code(504).send({ ok: false, reason: "生成超时，请稍后刷新页面查看" });
+      }
+      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
+    }
   });
 
   // ─── Creative: Actions (session-authenticated) ───

@@ -5,6 +5,7 @@ import { findDefaultWechatMpAccount } from "./wechatMpAccountRepository.js";
 import { getAccessToken } from "./wechatMpAccessToken.js";
 import { uploadPermanentImage, uploadContentImage, createDraft, WechatApiCallError } from "./wechatMpApiClient.js";
 import { formatForWechat, type WechatThemeId } from "../creative/wechatFormat/index.js";
+import { makeWechatCompatible } from "../creative/wechatFormat/wechatCompat.js";
 import { findCreativeFinishedArticleById, editCreativeFinishedArticle } from "../creative/creativeFinishedArticleRepository.js";
 import { WECHAT_ERROR_HINTS, type DraftPushResult } from "./types.js";
 import type { SqliteDatabase } from "../db/openDatabase.js";
@@ -13,6 +14,7 @@ interface PushParams {
   db: SqliteDatabase;
   articleId: number;
   themeId: WechatThemeId;
+  wechatHtml?: string;
   masterKey: string;
 }
 
@@ -86,10 +88,14 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
     return { ok: false, errorCode: "no-content", errorMessage: "文章无 Markdown 内容" };
   }
 
-  // 3. 渲染 HTML
+  // 3. 渲染 HTML：优先用前端传入的已渲染 HTML（只加微信兼容），否则服务端完整渲染
   let html: string;
   try {
-    html = await formatForWechat(article.contentMarkdown, themeId);
+    if (params.wechatHtml) {
+      html = await makeWechatCompatible(params.wechatHtml, themeId);
+    } else {
+      html = await formatForWechat(article.contentMarkdown, themeId);
+    }
   } catch (err) {
     return { ok: false, errorCode: "render-failed", errorMessage: `渲染失败: ${(err as Error).message}` };
   }

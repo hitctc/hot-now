@@ -186,7 +186,6 @@ import { message } from "ant-design-vue";
 import ArticleMarkdownEditor from "./ArticleMarkdownEditor.vue";
 import {
   editFinishedArticle,
-  renderWechatFormat,
   parseArticleImages,
   extractImageUrl,
   type CreativeFinishedArticle,
@@ -385,12 +384,8 @@ async function copyAsWechatFormat(): Promise<void> {
   if (!props.article) return;
   wechatCopying.value = true;
   try {
-    const res = await renderWechatFormat(props.article.id, currentWechatThemeId.value);
-    if (!res.ok || !res.html) {
-      message.error("渲染失败，请重试");
-      return;
-    }
-    const htmlBlob = new Blob([res.html], { type: "text/html" });
+    const html = renderWechatThemePreview(editContent.value, currentWechatThemeId.value);
+    const htmlBlob = new Blob([html], { type: "text/html" });
     const textBlob = new Blob([editContent.value], { type: "text/plain" });
     await navigator.clipboard.write([
       new ClipboardItem({ "text/html": htmlBlob, "text/plain": textBlob })

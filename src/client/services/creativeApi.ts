@@ -262,11 +262,12 @@ export type PushLogEntry = {
 /** 推送文章到微信公众号草稿箱 */
 export function pushArticleToDraft(
   id: number,
-  themeId: WechatThemeId
+  themeId: WechatThemeId,
+  wechatHtml?: string
 ): Promise<PushDraftResult> {
   return requestJson<PushDraftResult>(
     `/api/creative/finished-articles/${id}/push-draft`,
-    { method: "POST", body: JSON.stringify({ themeId }) }
+    { method: "POST", body: JSON.stringify({ themeId, wechatHtml }) }
   );
 }
 

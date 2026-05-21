@@ -668,11 +668,12 @@ const app = createServer({
     const newHash = hashPassword(newPassword);
     db.prepare("UPDATE user_profile SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1").run(newHash);
   },
-  pushArticleToWechatDraft: async (articleId: number, themeId: string) =>
+  pushArticleToWechatDraft: async (articleId: number, themeId: string, wechatHtml?: string) =>
     pushArticleToWechatDraft({
       db,
       articleId,
       themeId: themeId as WechatThemeId,
+      wechatHtml,
       masterKey: config.llm?.settingsMasterKey ?? config.auth.sessionSecret,
     }),
   getArticleWechatPushLog: (articleId: number) => getArticlePushLog(db, articleId),

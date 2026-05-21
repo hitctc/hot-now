@@ -439,7 +439,8 @@ type ServerDeps = {
   updatePassword?: (newPassword: string) => Promise<void>;
   pushArticleToWechatDraft?: (
     articleId: number,
-    themeId: string
+    themeId: string,
+    wechatHtml?: string
   ) => Promise<{ ok: boolean; mediaId?: string; errorCode?: string; errorMessage?: string; hint?: string }>;
   getArticleWechatPushLog?: (articleId: number) => unknown[];
   getArticlePushCount?: (articleId: number) => number;
@@ -1245,11 +1246,12 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     const params = request.params as { id: string };
-    const body = request.body as { themeId?: string } | undefined;
+    const body = request.body as { themeId?: string; wechatHtml?: string } | undefined;
     const id = parseInt(params.id, 10);
     const themeId = body?.themeId ?? "bauhaus";
+    const wechatHtml = body?.wechatHtml;
 
-    const result = await deps.pushArticleToWechatDraft(id, themeId);
+    const result = await deps.pushArticleToWechatDraft(id, themeId, wechatHtml);
     return reply.send(result);
   });
 

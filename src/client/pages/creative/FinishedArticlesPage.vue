@@ -18,6 +18,7 @@ import {
   type WechatThemeId,
   type PushLogEntry
 } from "../../services/creativeApi.js";
+import { renderWechatThemePreview } from "../../services/wechatRenderer.js";
 import { readWechatMpAccounts, type WechatMpAccountSummary } from "../../services/settingsApi.js";
 import ArticlePushConfirmModal from "../../components/creative/ArticlePushConfirmModal.vue";
 import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
@@ -169,7 +170,9 @@ async function handlePushConfirm(): Promise<void> {
   pushPending.value = true;
   pushError.value = "";
   try {
-    const result = await pushArticleToDraft(pushConfirmArticle.value.id, wechatTheme.value);
+    const article = pushConfirmArticle.value;
+    const html = article.contentMarkdown ? renderWechatThemePreview(article.contentMarkdown, wechatTheme.value) : undefined;
+    const result = await pushArticleToDraft(article.id, wechatTheme.value, html);
     if (result.ok) {
       message.success("推送成功！草稿已添加到微信公众号");
       pushConfirmVisible.value = false;

@@ -1198,8 +1198,8 @@ export function runMigrations(db: SqliteDatabase): void {
 
     // 029: 导语字段 + 导语选择索引
     const introMigrationName = "add_intro_fields";
-    if (!hasColumn(db, "creative_finished_articles", "intro")) {
-      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN intro TEXT DEFAULT NULL`);
+    if (!hasColumn(db, "creative_finished_articles", "intros")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN intros TEXT DEFAULT NULL`);
     }
     if (!hasColumn(db, "creative_finished_articles", "intro_index")) {
       db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN intro_index INTEGER NOT NULL DEFAULT 0`);

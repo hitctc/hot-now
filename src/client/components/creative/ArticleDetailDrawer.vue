@@ -421,7 +421,7 @@ const activeIntroIndex = ref(0);
 const localIntros = ref<string[]>([]);
 
 const displayIntros = computed(() => {
-  return localIntros.value.length > 0 ? localIntros.value : (props.article?.intro ?? []);
+  return localIntros.value.length > 0 ? localIntros.value : (props.article?.intros ?? []);
 });
 
 async function handleRegenIntro(): Promise<void> {
@@ -429,10 +429,10 @@ async function handleRegenIntro(): Promise<void> {
   regenIntroLoading.value = true;
   try {
     const result = await regenIntro(props.article.id);
-    if (result.ok && result.intro) {
-      localIntros.value = result.intro;
+    if (result.ok && result.intros) {
+      localIntros.value = result.intros;
       activeIntroIndex.value = 0;
-      props.article.intro = result.intro;
+      props.article.intros = result.intros;
       props.article.introIndex = 0;
       message.success("导语已重新生成");
     } else {

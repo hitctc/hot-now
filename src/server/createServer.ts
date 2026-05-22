@@ -790,7 +790,7 @@ export function createServer(deps: ServerDeps = {}) {
       sourceItemId: sourceItem.id,
       mode: typeof body?.mode === "string" ? (body.mode as "A" | "B") : undefined,
       thesis: typeof body?.thesis === "string" ? body.thesis : undefined,
-      intro: Array.isArray(body?.intros) ? body.intros as string[] : (Array.isArray(body?.intro) ? body.intro as string[] : (typeof body?.intro === "string" ? [body.intro] : undefined)),
+      intros: Array.isArray(body?.intros) ? body.intros as string[] : undefined,
       contentMarkdown,
       titles: Array.isArray(body?.titles) ? body.titles as string[] : undefined,
       hooks: Array.isArray(body?.hooks) ? body.hooks as string[] : undefined,
@@ -1047,9 +1047,9 @@ export function createServer(deps: ServerDeps = {}) {
       editInput.titleIndex = body.titleIndex;
       updatedFields.push("titleIndex");
     }
-    if (body?.intro !== undefined) {
-      editInput.intro = Array.isArray(body.intro) ? body.intro as string[] : (typeof body.intro === "string" ? [body.intro] : []);
-      updatedFields.push("intro");
+    if (body?.intros !== undefined) {
+      editInput.intros = Array.isArray(body.intros) ? body.intros as string[] : [];
+      updatedFields.push("intros");
     }
     if (body?.introIndex !== undefined && typeof body.introIndex === "number") {
       editInput.introIndex = body.introIndex;
@@ -1274,12 +1274,12 @@ export function createServer(deps: ServerDeps = {}) {
         return reply.code(502).send({ ok: false, reason: data.error ?? "导语生成失败" });
       }
 
-      const existingIntros = article.intro ?? [];
+      const existingIntros = article.intros ?? [];
       const updatedIntros = [data.intro, ...existingIntros];
-      editCreativeFinishedArticle(db, id, { intro: updatedIntros });
+      editCreativeFinishedArticle(db, id, { intros: updatedIntros });
 
       const updated = findCreativeFinishedArticleById(db, id);
-      return reply.send({ ok: true, intro: updated?.intro ?? updatedIntros });
+      return reply.send({ ok: true, intros: updated?.intros ?? updatedIntros });
     } catch (err) {
       if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "生成超时" }); }
       return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
@@ -1484,7 +1484,7 @@ export function createServer(deps: ServerDeps = {}) {
       wechatHtml: typeof body?.wechatHtml === "string" ? body.wechatHtml : (body?.wechatHtml === null ? null : undefined),
       coverImageIndex: typeof body?.coverImageIndex === "number" ? body.coverImageIndex : undefined,
       titleIndex: typeof body?.titleIndex === "number" ? body.titleIndex : undefined,
-      intro: Array.isArray(body?.intro) ? body.intro as string[] : undefined,
+      intros: Array.isArray(body?.intros) ? body.intros as string[] : undefined,
       introIndex: typeof body?.introIndex === "number" ? body.introIndex : undefined,
     });
     if (!result.ok && result.reason === "article not found") {

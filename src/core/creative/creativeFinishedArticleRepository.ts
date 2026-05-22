@@ -9,7 +9,7 @@ const SELECT_COLUMNS = `
   source_item_id,
   mode,
   thesis,
-  intro,
+  intros,
   content_markdown,
   titles,
   hooks,
@@ -36,7 +36,7 @@ type ArticleRow = {
   source_item_id: number;
   mode: string | null;
   thesis: string | null;
-  intro: string | null;
+  intros: string | null;
   content_markdown: string;
   titles: string | null;
   hooks: string | null;
@@ -75,7 +75,7 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     sourceItemId: row.source_item_id,
     mode: (row.mode as CreativeFinishedArticleMode) || null,
     thesis: row.thesis,
-    intro: row.intro ? JSON.parse(row.intro) : null,
+    intros: row.intros ? JSON.parse(row.intros) : null,
     contentMarkdown: row.content_markdown,
     titles: row.titles ? JSON.parse(row.titles) : null,
     hooks: row.hooks ? JSON.parse(row.hooks) : null,
@@ -106,7 +106,7 @@ export type CreativeFinishedArticleRecord = {
   sourceItemId: number;
   mode: CreativeFinishedArticleMode | null;
   thesis: string | null;
-  intro: string[] | null;
+  intros: string[] | null;
   contentMarkdown: string;
   titles: string[] | null;
   hooks: string[] | null;
@@ -133,7 +133,7 @@ export type InsertCreativeFinishedArticleInput = {
   sourceItemId: number;
   mode?: CreativeFinishedArticleMode;
   thesis?: string;
-  intro?: string[];
+  intros?: string[];
   contentMarkdown: string;
   titles?: string[];
   hooks?: string[];
@@ -147,7 +147,7 @@ export type InsertCreativeFinishedArticleInput = {
 export type EditCreativeFinishedArticleInput = {
   mode?: CreativeFinishedArticleMode;
   thesis?: string;
-  intro?: string[];
+  intros?: string[];
   introIndex?: number;
   contentMarkdown?: string;
   titles?: string[];
@@ -191,7 +191,7 @@ export function insertCreativeFinishedArticle(
         source_item_id,
         mode,
         thesis,
-        intro,
+        intros,
         content_markdown,
         titles,
         hooks,
@@ -208,7 +208,7 @@ export function insertCreativeFinishedArticle(
     input.sourceItemId,
     input.mode ?? null,
     input.thesis ?? null,
-    input.intro ? JSON.stringify(input.intro) : null,
+    input.intros ? JSON.stringify(input.intros) : null,
     input.contentMarkdown,
     input.titles ? JSON.stringify(input.titles) : null,
     input.hooks ? JSON.stringify(input.hooks) : null,
@@ -327,9 +327,9 @@ export function editCreativeFinishedArticle(
     setClauses.push("thesis = ?");
     params.push(input.thesis);
   }
-  if (input.intro !== undefined) {
-    setClauses.push("intro = ?");
-    params.push(JSON.stringify(input.intro));
+  if (input.intros !== undefined) {
+    setClauses.push("intros = ?");
+    params.push(JSON.stringify(input.intros));
   }
   if (input.contentMarkdown !== undefined) {
     setClauses.push("content_markdown = ?");

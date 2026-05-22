@@ -50,7 +50,7 @@ export type CreativeFinishedArticle = {
   sourceItemId: number;
   mode: string | null;
   thesis: string | null;
-  intro: string[] | null;
+  intros: string[] | null;
   contentMarkdown: string;
   titles: string | null;
   hooks: string | null;
@@ -186,7 +186,7 @@ export function editFinishedArticle(
     wechatHtml?: string | null;
     coverImageIndex?: number;
     titleIndex?: number;
-    intro?: string[];
+    intros?: string[];
     introIndex?: number;
   }
 ): Promise<{ ok: boolean }> {
@@ -359,7 +359,7 @@ export function regenTitle(id: number): Promise<RegenTitleResult> {
 
 export type RegenIntroResult = {
   ok: boolean;
-  intro?: string[];
+  intros?: string[];
   reason?: string;
 };
 

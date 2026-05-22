@@ -360,6 +360,8 @@ async function handleRegenTitle(): Promise<void> {
       activeTitleIndex.value = 0;
       props.article.titles = JSON.stringify(result.titles);
       props.article.titleIndex = 0;
+      // 持久化新 titles 数组
+      editFinishedArticle(props.article.id, { titles: result.titles, titleIndex: 0 }).catch(() => {});
       message.success("新标题已生成");
     } else {
       message.error(result.reason ?? "标题生成失败");
@@ -432,6 +434,8 @@ async function handleRegenIntro(): Promise<void> {
       activeIntroIndex.value = 0;
       props.article.intros = result.intros;
       props.article.introIndex = 0;
+      // 持久化新 intros 数组
+      editFinishedArticle(props.article.id, { intros: result.intros, introIndex: 0 }).catch(() => {});
       message.success("新导语已生成");
     } else {
       message.error(result.reason ?? "导语生成失败");
@@ -641,6 +645,8 @@ async function handleRegenCover(): Promise<void> {
       // 同步到 article 对象，确保推送时读到最新数据
       props.article.coverImage = result.coverImage;
       props.article.coverImageIndex = 0;
+      // 持久化新 coverImage 数组
+      editFinishedArticle(props.article.id, { coverImageIndex: 0 }).catch(() => {});
       message.success("新封面图已生成");
     } else {
       message.error(result.reason ?? "封面图生成失败");

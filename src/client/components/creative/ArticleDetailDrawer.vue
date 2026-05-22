@@ -996,8 +996,8 @@ function parseJsonArray(raw: string | string[] | null): string[] {
 }
 
 const modeMap: Record<string, string> = {
-  A: "模式A：深度分析",
-  B: "模式B：快讯简报",
+  A: "模式A · 短篇观点文",
+  B: "模式B · 短篇观察随笔",
 };
 
 function modeLabel(mode: string | null): string {

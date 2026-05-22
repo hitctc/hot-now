@@ -588,11 +588,21 @@ async function handleRegenInlineImage(imageIndex: number): Promise<void> {
   try {
     const result = await regenInlineImage(props.article.id, imageIndex);
     if (result.ok) {
-      // Hermes 已回写 contentMarkdown 和 images，更新本地状态
+      // Hermes 已回写 contentMarkdown 和 images，更新本地状态并同步保存 wechatHtml
       if (result.contentMarkdown) {
         editContent.value = result.contentMarkdown;
         props.article.contentMarkdown = result.contentMarkdown;
         lastSavedContent = result.contentMarkdown;
+
+        // 同步渲染并保存公众号预览 HTML
+        const saveFields: Record<string, unknown> = { contentMarkdown: result.contentMarkdown };
+        if (activePreviewTheme.value !== "live" && result.contentMarkdown) {
+          const themeId = themeIdMap[activePreviewTheme.value];
+          const html = renderWechatThemePreview(result.contentMarkdown, themeId);
+          props.article.wechatHtml = html;
+          saveFields.wechatHtml = html;
+        }
+        editFinishedArticle(props.article.id, saveFields).catch(() => {});
       }
       if (result.images) {
         props.article.imagesJson = result.images as typeof props.article.imagesJson;

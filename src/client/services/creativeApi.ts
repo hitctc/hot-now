@@ -410,3 +410,18 @@ export function regenArticle(id: number): Promise<RegenArticleResult> {
     method: "POST",
   });
 }
+
+// ─── 素材库写文章 ───
+
+export type WriteArticleResult = {
+  ok: boolean;
+  title?: string;
+  reason?: string;
+};
+
+/** 对素材执行完整写作流程（Hermes 写作→推送成品文章） */
+export function writeSourceItemArticle(id: number): Promise<WriteArticleResult> {
+  return requestJson<WriteArticleResult>(`/api/creative/source-items/${id}/write-article`, {
+    method: "POST",
+  });
+}

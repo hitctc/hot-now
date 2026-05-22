@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
-import { message } from "ant-design-vue";
+import { message, Modal } from "ant-design-vue";
 import MarkdownIt from "markdown-it";
 
 import { useSearchHistory } from "../../composables/useSearchHistory.js";
@@ -9,6 +9,7 @@ import {
   readCreativeSourceItems,
   readCreativeFinishedArticle,
   updateSourceItemWritingStatus,
+  writeSourceItemArticle,
   parseArticleImages,
   extractImageUrl,
   type CreativeSourceItem,
@@ -311,18 +312,33 @@ async function copyText(text: string): Promise<void> {
   message.success("已复制到剪贴板");
 }
 
-// 素材库 prompt：指示爱马仕智能体对指定素材执行完整的单条写文章工作流
-function buildSourceItemPrompt(item: CreativeSourceItem): string {
-  return [
-    "请使用「单条写文章」工作流处理以下素材，完成从素材读取到推送公众号草稿箱的完整流程：",
-    "",
-    `- 素材 ID：${item.id}`,
-    `- 素材标题：${item.title}`
-  ].join("\n");
-}
+// ─── 素材库写文章 ───
+const writeArticleLoadingId = ref<number | null>(null);
 
-async function copySourceItemPrompt(item: CreativeSourceItem): Promise<void> {
-  await copyText(buildSourceItemPrompt(item));
+async function handleWriteArticle(item: CreativeSourceItem): Promise<void> {
+  if (writeArticleLoadingId.value !== null) return;
+  Modal.confirm({
+    title: "写文章",
+    content: `确定对「${item.title.slice(0, 40)}${item.title.length > 40 ? "..." : ""}」生成文章？预计需要 2~3 分钟`,
+    okText: "开始生成",
+    cancelText: "取消",
+    onOk: async () => {
+      writeArticleLoadingId.value = item.id;
+      try {
+        const result = await writeSourceItemArticle(item.id);
+        if (result.ok) {
+          message.success(`文章生成成功：${result.title ?? "已生成"}`);
+          loadItems();
+        } else {
+          message.error(result.reason ?? "文章生成失败");
+        }
+      } catch {
+        message.error("写文章请求失败");
+      } finally {
+        writeArticleLoadingId.value = null;
+      }
+    },
+  });
 }
 
 async function copyMarkdownAsPlainText(md: string): Promise<void> {
@@ -354,7 +370,7 @@ const columns = [
   { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 60, align: "center" as const, ellipsis: true },
   { title: "发布时间", dataIndex: "publishedAt", key: "publishedAt", width: 130, ellipsis: true },
   { title: "成品创建时间", key: "linkedArticleCreatedAt", width: 140, ellipsis: true },
-  { title: "重写文章", key: "quickCopy", width: 64, ellipsis: true }
+  { title: "写文章", key: "quickCopy", width: 80, ellipsis: true }
 ];
 
 const pagination = computed(() => ({
@@ -526,12 +542,16 @@ const pagination = computed(() => ({
             </a-tag>
           </template>
 
-          <!-- 快捷复制列：生成写文章 prompt -->
+          <!-- 写文章列 -->
           <template v-else-if="column.key === 'quickCopy'">
-            <a
-              class="cursor-pointer text-xs text-editorial-link-active hover:underline"
-              @click.prevent="copySourceItemPrompt(record)"
-            >写文章</a>
+            <a-button
+              type="link"
+              size="small"
+              class="!p-0 !text-[11px]"
+              :loading="writeArticleLoadingId === record.id"
+              :disabled="writeArticleLoadingId !== null"
+              @click="handleWriteArticle(record)"
+            >{{ writeArticleLoadingId === record.id ? '生成中...' : '写文章' }}</a-button>
           </template>
         </template>
 

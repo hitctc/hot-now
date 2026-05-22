@@ -1435,6 +1435,48 @@ export function createServer(deps: ServerDeps = {}) {
     }
   });
 
+  // ─── 素材库写文章：对素材执行完整写作流程 ───
+  app.post("/api/creative/source-items/:id/write-article", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+    if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
+
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const item = findCreativeSourceItemById(db, id);
+    if (!item) { return reply.code(404).send({ ok: false, reason: "source-item-not-found" }); }
+
+    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+    const hermesApiToken = process.env.HERMES_API_TOKEN;
+    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 200_000);
+      const res = await fetch(`${hermesApiUrl.replace(/\/+\$/, "")}/api/regen-article`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
+        body: JSON.stringify({ sourceItemId: id }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const errorBody = await res.json().catch(() => ({ error: `Hermes HTTP ${res.status}` }));
+        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: errorBody.error ?? `Hermes HTTP ${res.status}` });
+      }
+
+      const data = await res.json() as { success: boolean; title?: string; error?: string };
+      if (!data.success) {
+        return reply.code(502).send({ ok: false, reason: data.error ?? "写文章失败" });
+      }
+
+      return reply.send({ ok: true, title: data.title });
+    } catch (err) {
+      if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "生成超时（>200s），请稍后在成品列表中查看是否有新文章" }); }
+      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
+    }
+  });
+
   // ─── Creative: Actions (session-authenticated) ───
 
   app.post("/actions/creative/source-items/:id/writing-status", async (request, reply) => {

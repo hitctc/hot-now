@@ -332,19 +332,7 @@ async function copyText(text: string): Promise<void> {
   message.success("已复制到剪贴板");
 }
 
-// 重写文章 prompt：使用关联素材的 ID 和标题，与素材库"写文章"按钮内容一致
-function buildFinishedArticlePrompt(article: CreativeFinishedArticle): string {
-  return [
-    "请使用「单条写文章」工作流处理以下素材，完成从素材读取到推送公众号草稿箱的完整流程：",
-    "",
-    `- 素材 ID：${article.sourceItemId}`,
-    `- 素材标题：${(article as any).sourceTitle ?? "无标题"}`
-  ].join("\n");
-}
 
-async function copyFinishedArticlePrompt(article: CreativeFinishedArticle): Promise<void> {
-  await copyText(buildFinishedArticlePrompt(article));
-}
 
 // ─── 状态字典 ───
 
@@ -374,7 +362,7 @@ const columns = [
   { title: "异常说明", key: "anomalyReason", width: 150, ellipsis: true },
   { title: "公众号", key: "wechatPublished", width: 80, ellipsis: true },
   { title: "推送", key: "pushDraft", width: 72, ellipsis: true },
-  { title: "重写文章", key: "quickCopy", width: 64, ellipsis: true }
+
 ];
 
 const pagination = computed(() => ({
@@ -505,13 +493,7 @@ const pagination = computed(() => ({
             </a-tooltip>
           </template>
 
-          <!-- 快捷复制列：生成重写文章 prompt -->
-          <template v-else-if="column.key === 'quickCopy'">
-            <a
-              class="cursor-pointer text-xs text-editorial-link-active hover:underline"
-              @click.prevent="copyFinishedArticlePrompt(record)"
-            >重写</a>
-          </template>
+
 
           <!-- 来源素材列 -->
           <template v-else-if="column.key === 'sourceItem'">

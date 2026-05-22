@@ -49,13 +49,13 @@
     <template v-if="article">
       <div class="flex flex-col gap-6">
         <!-- 顶部元信息 -->
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span class="text-xs text-editorial-text-muted">{{ modeLabel(article.mode) }}</span>
           <span class="text-xs text-editorial-text-muted">{{ formatLocalTime(article.createdAt) }}</span>
           <a
-            class="cursor-pointer text-xs text-editorial-link-active hover:underline"
+            class="inline-block max-w-[260px] truncate align-bottom cursor-pointer text-xs text-editorial-link-active hover:underline"
             @click.prevent="$emit('openSourceItem', article.sourceItemId)"
-          >素材 #{{ article.sourceItemId }}{{ (article as any).sourceTitle ? ' · ' + (article as any).sourceTitle : '' }}{{ (article as any).sourceName ? ' · ' + (article as any).sourceName : '' }}</a>
+            >素材 #{{ article.sourceItemId }}{{ (article as any).sourceTitle ? ' · ' + (article as any).sourceTitle : '' }}{{ (article as any).sourceName ? ' · ' + (article as any).sourceName : '' }}</a>
         </div>
 
         <!-- 备选标题 -->
@@ -287,8 +287,8 @@
               <span class="text-[11px] text-editorial-text-muted">{{ countWords(editContent) }}字</span>
               <span v-if="lastSavedAt" class="text-[11px] text-editorial-text-muted">{{ lastSavedAt }}</span>
             </div>
-            <div class="flex items-center gap-2">
-              <div v-if="article.contentMarkdown" class="flex gap-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <div v-if="article.contentMarkdown" class="flex flex-wrap gap-1">
                 <a-button
                   v-for="opt in previewThemeOptions"
                   :key="opt.key"
@@ -1139,6 +1139,41 @@ function getMissingConditions(article: CreativeFinishedArticle): string[] {
   flex-shrink: 0;
   border-top: 1px solid #f0f0f0;
   padding: 12px 24px;
+}
+
+/* ─── 移动端适配 ─── */
+@media (max-width: 768px) {
+  .article-detail-modal .ant-modal {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    top: 0 !important;
+  }
+  .article-detail-modal .ant-modal-content {
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  .article-detail-modal .ant-modal-body {
+    padding: 12px !important;
+  }
+  .article-detail-modal .ant-modal-header {
+    padding: 12px 16px !important;
+  }
+  .article-detail-modal .ant-modal-footer {
+    padding: 8px 12px !important;
+  }
+  .article-detail-modal .ant-modal-footer > .flex {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .article-detail-modal .ant-modal-footer .ant-btn {
+    font-size: 12px !important;
+    padding: 0 8px !important;
+  }
+  .article-editor-wrapper {
+    height: calc(100vh - 600px);
+    min-height: 200px;
+  }
 }
 
 .article-editor-wrapper {

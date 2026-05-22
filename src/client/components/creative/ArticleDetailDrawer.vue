@@ -50,12 +50,12 @@
       <div class="flex flex-col gap-6">
         <!-- 顶部元信息 -->
         <div class="flex items-center gap-3">
-          <span class="text-xs text-editorial-text-muted">模式 {{ article.mode || "-" }}</span>
+          <span class="text-xs text-editorial-text-muted">{{ modeLabel(article.mode) }}</span>
           <span class="text-xs text-editorial-text-muted">{{ formatLocalTime(article.createdAt) }}</span>
           <a
             class="cursor-pointer text-xs text-editorial-link-active hover:underline"
             @click.prevent="$emit('openSourceItem', article.sourceItemId)"
-          >素材 #{{ article.sourceItemId }}</a>
+          >素材 #{{ article.sourceItemId }} {{ (article as any).sourceTitle ? '· ' + (article as any).sourceTitle : ''  }}</a>
         </div>
 
         <!-- 备选标题 -->
@@ -993,6 +993,16 @@ function parseJsonArray(raw: string | string[] | null): string[] {
   } catch {
     return [];
   }
+}
+
+const modeMap: Record<string, string> = {
+  A: "模式A：深度分析",
+  B: "模式B：快讯简报",
+};
+
+function modeLabel(mode: string | null): string {
+  if (!mode) return "模式 -";
+  return modeMap[mode] ?? `模式${mode}`;
 }
 
 /** 计算中文字数：中文按字数计，英文按单词计 */

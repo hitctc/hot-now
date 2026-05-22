@@ -336,6 +336,7 @@ export function readArticlePushLog(id: number): Promise<{ ok: boolean; log: Push
 export type RegenCoverResult = {
   ok: boolean;
   coverImage?: string[];
+  prompt?: string;
   reason?: string;
 };
 
@@ -349,6 +350,7 @@ export function regenCover(id: number): Promise<RegenCoverResult> {
 export type RegenTitleResult = {
   ok: boolean;
   titles?: string[];
+  prompt?: string;
   reason?: string;
 };
 
@@ -362,6 +364,7 @@ export function regenTitle(id: number): Promise<RegenTitleResult> {
 export type RegenIntroResult = {
   ok: boolean;
   intros?: string[];
+  prompt?: string;
   reason?: string;
 };
 
@@ -374,6 +377,7 @@ export function regenIntro(id: number): Promise<RegenIntroResult> {
 export type RegenSummaryResult = {
   ok: boolean;
   summary100?: string[];
+  prompt?: string;
   reason?: string;
 };
 
@@ -389,6 +393,7 @@ export type RegenInlineImageResult = {
   imageIndex?: number;
   contentMarkdown?: string;
   images?: unknown[];
+  prompt?: string;
   reason?: string;
 };
 
@@ -402,6 +407,7 @@ export function regenInlineImage(id: number, imageIndex: number): Promise<RegenI
 export type RegenArticleResult = {
   ok: boolean;
   title?: string;
+  prompts?: Record<string, unknown>;
   reason?: string;
 };
 

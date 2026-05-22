@@ -1162,7 +1162,7 @@ export function createServer(deps: ServerDeps = {}) {
         });
       }
 
-      const data = await res.json() as { success: boolean; coverUrl?: string; error?: string };
+      const data = await res.json() as { success: boolean; coverUrl?: string; prompt?: string; error?: string };
       if (!data.success || !data.coverUrl) {
         return reply.code(502).send({ ok: false, reason: data.error ?? "封面图生成失败" });
       }
@@ -1172,7 +1172,7 @@ export function createServer(deps: ServerDeps = {}) {
       editCreativeFinishedArticle(db, id, { coverImage: updatedCovers });
 
       const updated = findCreativeFinishedArticleById(db, id);
-      return reply.send({ ok: true, coverImage: updated?.coverImage ?? updatedCovers });
+      return reply.send({ ok: true, coverImage: updated?.coverImage ?? updatedCovers, prompt: data.prompt });
     } catch (err) {
       if ((err as Error).name === "AbortError") {
         return reply.code(504).send({ ok: false, reason: "生成超时，请稍后刷新页面查看" });
@@ -1226,7 +1226,7 @@ export function createServer(deps: ServerDeps = {}) {
         });
       }
 
-      const data = await res.json() as { success: boolean; title?: string; error?: string };
+      const data = await res.json() as { success: boolean; title?: string; prompt?: string; error?: string };
       if (!data.success || !data.title) {
         return reply.code(502).send({ ok: false, reason: data.error ?? "标题生成失败" });
       }
@@ -1237,7 +1237,7 @@ export function createServer(deps: ServerDeps = {}) {
       editCreativeFinishedArticle(db, id, { titles: updatedTitles });
 
       const updated = findCreativeFinishedArticleById(db, id);
-      return reply.send({ ok: true, titles: updated?.titles ?? updatedTitles });
+      return reply.send({ ok: true, titles: updated?.titles ?? updatedTitles, prompt: data.prompt });
     } catch (err) {
       if ((err as Error).name === "AbortError") {
         return reply.code(504).send({ ok: false, reason: "生成超时，请稍后刷新页面查看" });
@@ -1276,7 +1276,7 @@ export function createServer(deps: ServerDeps = {}) {
         return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: errorBody.error ?? `Hermes HTTP ${res.status}` });
       }
 
-      const data = await res.json() as { success: boolean; intro?: string; error?: string };
+      const data = await res.json() as { success: boolean; intro?: string; prompt?: string; error?: string };
       if (!data.success || !data.intro) {
         return reply.code(502).send({ ok: false, reason: data.error ?? "导语生成失败" });
       }
@@ -1286,7 +1286,7 @@ export function createServer(deps: ServerDeps = {}) {
       editCreativeFinishedArticle(db, id, { intros: updatedIntros });
 
       const updated = findCreativeFinishedArticleById(db, id);
-      return reply.send({ ok: true, intros: updated?.intros ?? updatedIntros });
+      return reply.send({ ok: true, intros: updated?.intros ?? updatedIntros, prompt: data.prompt });
     } catch (err) {
       if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "生成超时" }); }
       return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
@@ -1323,7 +1323,7 @@ export function createServer(deps: ServerDeps = {}) {
         return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: errorBody.error ?? `Hermes HTTP ${res.status}` });
       }
 
-      const data = await res.json() as { success: boolean; summary100?: string; error?: string };
+      const data = await res.json() as { success: boolean; summary100?: string; prompt?: string; error?: string };
       if (!data.success || !data.summary100) {
         return reply.code(502).send({ ok: false, reason: data.error ?? "摘要生成失败" });
       }
@@ -1332,7 +1332,7 @@ export function createServer(deps: ServerDeps = {}) {
       const updated = [data.summary100, ...existing];
       editCreativeFinishedArticle(db, id, { summary100: updated });
 
-      return reply.send({ ok: true, summary100: updated });
+      return reply.send({ ok: true, summary100: updated, prompt: data.prompt });
     } catch (err) {
       if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "生成超时" }); }
       return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
@@ -1373,7 +1373,7 @@ export function createServer(deps: ServerDeps = {}) {
         return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: errorBody.error ?? `Hermes HTTP ${res.status}` });
       }
 
-      const data = await res.json() as { success: boolean; imageUrl?: string; imageIndex?: number; error?: string };
+      const data = await res.json() as { success: boolean; imageUrl?: string; imageIndex?: number; prompt?: string; error?: string };
       if (!data.success) {
         return reply.code(502).send({ ok: false, reason: data.error ?? "配图生成失败" });
       }
@@ -1386,6 +1386,7 @@ export function createServer(deps: ServerDeps = {}) {
         imageIndex: data.imageIndex,
         contentMarkdown: updated?.contentMarkdown ?? article.contentMarkdown,
         images: updated?.images ?? article.images,
+        prompt: data.prompt,
       });
     } catch (err) {
       if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "生成超时" }); }
@@ -1423,12 +1424,12 @@ export function createServer(deps: ServerDeps = {}) {
         return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: errorBody.error ?? `Hermes HTTP ${res.status}` });
       }
 
-      const data = await res.json() as { success: boolean; title?: string; error?: string };
+      const data = await res.json() as { success: boolean; title?: string; prompts?: Record<string, unknown>; error?: string };
       if (!data.success) {
         return reply.code(502).send({ ok: false, reason: data.error ?? "整篇重写失败" });
       }
 
-      return reply.send({ ok: true, title: data.title });
+      return reply.send({ ok: true, title: data.title, prompts: data.prompts });
     } catch (err) {
       if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "生成超时（>200s），请稍后在列表中查看是否有新文章" }); }
       return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });

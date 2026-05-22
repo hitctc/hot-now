@@ -85,6 +85,7 @@
             >
               <span class="flex-shrink-0 text-[11px] font-bold tabular-nums text-editorial-text-muted">{{ idx + 1 }}</span>
               <span class="flex-1 text-sm leading-6 text-editorial-text-main">{{ t }}</span>
+              <span class="flex-shrink-0 text-[10px] text-editorial-text-muted">{{ countWords(t) }}字</span>
               <!-- 选中标记 -->
               <span
                 v-if="idx === activeTitleIndex"
@@ -138,6 +139,7 @@
             >
               <span class="flex-shrink-0 text-[11px] font-bold tabular-nums text-editorial-text-muted">{{ idx + 1 }}</span>
               <span class="flex-1 text-sm leading-6 text-editorial-text-main">{{ text }}</span>
+              <span class="flex-shrink-0 text-[10px] text-editorial-text-muted">{{ countWords(text) }}字</span>
               <span
                 v-if="idx === activeIntroIndex"
                 class="flex-shrink-0 rounded bg-editorial-accent px-1.5 py-0.5 text-[10px] font-semibold text-white"
@@ -282,6 +284,7 @@
           <div class="mb-2 flex items-center justify-between">
             <div class="flex items-center gap-2">
               <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文</h3>
+              <span class="text-[11px] text-editorial-text-muted">{{ countWords(editContent) }}字</span>
               <span v-if="lastSavedAt" class="text-[11px] text-editorial-text-muted">{{ lastSavedAt }}</span>
             </div>
             <div class="flex items-center gap-2">
@@ -856,6 +859,16 @@ function parseJsonArray(raw: string | string[] | null): string[] {
   } catch {
     return [];
   }
+}
+
+/** 计算中文字数：中文按字数计，英文按单词计 */
+function countWords(text: string): number {
+  const chinese = text.match(/[一-鿿㐀-䶿]/g);
+  const chineseCount = chinese ? chinese.length : 0;
+  const withoutChinese = text.replace(/[一-鿿㐀-䶿]/g, " ");
+  const englishWords = withoutChinese.match(/[a-zA-Z0-9]+/g);
+  const englishCount = englishWords ? englishWords.length : 0;
+  return chineseCount + englishCount;
 }
 
 function getFirstTitle(titles: string | null): string {

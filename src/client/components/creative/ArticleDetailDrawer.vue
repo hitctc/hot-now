@@ -208,7 +208,7 @@
               <div
                 v-for="(url, idx) in displayCoverImages"
                 :key="idx"
-                class="group/cover relative overflow-hidden rounded-editorial-md border transition-all"
+                class="relative overflow-hidden rounded-editorial-md border transition-all"
                 :class="idx === activeCoverIndex
                   ? 'border-editorial-accent ring-2 ring-editorial-ring'
                   : 'border-editorial-border opacity-60 hover:opacity-100 hover:border-editorial-link-active/40'"
@@ -219,7 +219,7 @@
                   class="block w-full object-cover"
                   loading="lazy"
                 />
-                <!-- 选中标记：对勾 + "发布封面" -->
+                <!-- 选中标记 / 最新标记 -->
                 <div
                   v-if="idx === activeCoverIndex"
                   class="absolute right-1 top-1 flex items-center gap-0.5 rounded bg-editorial-accent px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm"
@@ -227,9 +227,10 @@
                   <span class="inline-block h-3 w-3 leading-none text-center">✓</span> 发布封面
                 </div>
                 <div v-if="idx === 0 && idx !== activeCoverIndex" class="absolute left-1 top-1 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</div>
+                <!-- 设为发布：始终可见，不遮挡图片 -->
                 <button
                   v-if="idx !== activeCoverIndex"
-                  class="absolute inset-x-1 bottom-1 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/cover:opacity-100 hover:!bg-black/70"
+                  class="absolute right-1 bottom-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white hover:bg-black/80"
                   @click.stop="selectCoverImage(idx)"
                 >设为发布封面</button>
               </div>
@@ -239,13 +240,28 @@
 
         <!-- 正文配图 -->
         <section v-if="articleImages.length > 0">
-          <h3 class="m-0 mb-2 text-sm font-semibold text-editorial-text-muted">正文配图</h3>
+          <div class="mb-2 flex items-center justify-between">
+            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文配图</h3>
+            <div class="flex items-center gap-1">
+              <span v-for="(img, idx) in articleImages" :key="idx" class="inline-flex items-center gap-1">
+                <a-button
+                  type="link"
+                  size="small"
+                  class="!p-0 !text-[11px]"
+                  :loading="regenInlineImageLoading === idx + 1"
+                  :disabled="regenInlineImageLoading !== null"
+                  @click="handleRegenInlineImage(idx + 1)"
+                >{{ regenInlineImageLoading === idx + 1 ? `配图${idx + 1} 生成中...` : `生成新配图${idx + 1}` }}</a-button>
+                <span v-if="idx < articleImages.length - 1" class="text-editorial-text-muted/40">|</span>
+              </span>
+            </div>
+          </div>
           <a-image-preview-group>
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <div
                 v-for="(img, idx) in articleImages"
                 :key="idx"
-                class="group/inline-img relative overflow-hidden rounded-editorial-md border border-editorial-border"
+                class="relative overflow-hidden rounded-editorial-md border border-editorial-border"
               >
                 <a-image
                   :src="extractImageUrl(img)"
@@ -256,11 +272,6 @@
                 <div v-if="typeof img === 'object' && img.purpose" class="absolute right-1 top-1 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
                   {{ img.purpose }}
                 </div>
-                <button
-                  class="absolute inset-x-1 bottom-1 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/inline-img:opacity-100 hover:!bg-black/70"
-                  :disabled="regenInlineImageLoading === idx + 1"
-                  @click.stop="handleRegenInlineImage(idx + 1)"
-                >{{ regenInlineImageLoading === idx + 1 ? '生成中...' : '生成新配图' }}</button>
               </div>
             </div>
           </a-image-preview-group>

@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 27;
+const schemaVersion = 28;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -1181,6 +1181,20 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(27, coverImageIndexMigrationName);
+
+    // 028: 标题选择支持 — 增加 title_index 字段记录用户选中的发布标题索引
+    const titleIndexMigrationName = "add_title_index";
+    if (!hasColumn(db, "creative_finished_articles", "title_index")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN title_index INTEGER NOT NULL DEFAULT 0`);
+    }
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(28, titleIndexMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

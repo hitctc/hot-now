@@ -47,7 +47,7 @@
           >素材 #{{ article.sourceItemId }}</a>
         </div>
 
-        <!-- 备选标题（只读） -->
+        <!-- 备选标题 -->
         <section v-if="displayTitles.length > 0 || regenTitleLoading">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">备选标题</h3>
@@ -67,11 +67,25 @@
             <li
               v-for="(t, idx) in displayTitles"
               :key="idx"
-              class="group flex items-start gap-3 rounded-editorial-sm border border-editorial-border px-3 py-2 transition-colors hover:border-editorial-link-active/40"
+              class="group/title relative flex items-start gap-3 rounded-editorial-sm border px-3 py-2 transition-colors"
+              :class="idx === activeTitleIndex
+                ? 'border-editorial-accent ring-2 ring-editorial-ring'
+                : 'border-editorial-border hover:border-editorial-link-active/40'"
             >
               <span class="flex-shrink-0 text-[11px] font-bold tabular-nums text-editorial-text-muted">{{ idx + 1 }}</span>
               <span class="flex-1 text-sm leading-6 text-editorial-text-main">{{ t }}</span>
-              <a-button type="link" size="small" class="!p-0 !text-[11px] opacity-0 group-hover:opacity-100" @click="copyText(t)">复制</a-button>
+              <!-- 选中标记 -->
+              <span
+                v-if="idx === activeTitleIndex"
+                class="flex-shrink-0 rounded bg-editorial-accent px-1.5 py-0.5 text-[10px] font-semibold text-white"
+              >✓ 发布标题</span>
+              <span v-if="idx === 0 && idx !== activeTitleIndex" class="flex-shrink-0 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</span>
+              <button
+                v-if="idx !== activeTitleIndex"
+                class="flex-shrink-0 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/title:opacity-100 hover:!bg-black/70"
+                @click.stop="selectTitle(idx)"
+              >设为发布标题</button>
+              <a-button type="link" size="small" class="!p-0 !text-[11px] opacity-0 group-hover/title:opacity-100" @click="copyText(t)">复制</a-button>
             </li>
           </ul>
         </section>
@@ -265,9 +279,10 @@ const lastSavedAt = ref("");
 // 记住打开时的原始内容，用于判断是否真正发生变化
 let lastSavedContent = "";
 
-// ─── 标题重新生成 ───
+// ─── 标题选择 & 重新生成 ───
 
 const regenTitleLoading = ref(false);
+const activeTitleIndex = ref(0);
 const localTitles = ref<string[]>([]);
 
 const displayTitles = computed(() => {
@@ -281,7 +296,9 @@ async function handleRegenTitle(): Promise<void> {
     const result = await regenTitle(props.article.id);
     if (result.ok && result.titles) {
       localTitles.value = result.titles;
+      activeTitleIndex.value = 0;
       props.article.titles = JSON.stringify(result.titles);
+      props.article.titleIndex = 0;
       message.success("标题已重新生成");
     } else {
       message.error(result.reason ?? "标题生成失败");
@@ -291,6 +308,45 @@ async function handleRegenTitle(): Promise<void> {
   } finally {
     regenTitleLoading.value = false;
   }
+}
+
+// 选择发布标题：替换 markdown 中的 H1，保存 titleIndex + contentMarkdown
+async function selectTitle(idx: number): Promise<void> {
+  if (!props.article || idx === activeTitleIndex.value) return;
+
+  const titles = displayTitles.value;
+  const oldTitle = titles[activeTitleIndex.value];
+  const newTitle = titles[idx];
+
+  // 替换 markdown 中的 H1 标题行
+  let content = editContent.value;
+  if (oldTitle && content.includes(oldTitle)) {
+    content = content.replaceAll(oldTitle, newTitle);
+  } else if (/^# .+/m.test(content)) {
+    content = content.replace(/^# .+/m, `# ${newTitle}`);
+  }
+
+  activeTitleIndex.value = idx;
+  editContent.value = content;
+
+  try {
+    await editFinishedArticle(props.article.id, {
+      titleIndex: idx,
+      contentMarkdown: content,
+    });
+    props.article.titleIndex = idx;
+    props.article.contentMarkdown = content;
+    lastSavedContent = content;
+
+    if (activePreviewTheme.value !== "live" && content) {
+      const themeId = themeIdMap[activePreviewTheme.value];
+      const html = renderWechatThemePreview(content, themeId);
+      props.article.wechatHtml = html;
+      editFinishedArticle(props.article.id, { wechatHtml: html }).catch(() => {});
+    }
+
+    emit("saved");
+  } catch { /* 静默失败，本地状态已更新 */ }
 }
 
 // ─── 封面图选择 & 重新生成 ───
@@ -384,10 +440,11 @@ watch(() => props.open, (val) => {
     const md = props.article.contentMarkdown || "";
     editContent.value = md;
     lastSavedContent = md;
-    // 重置封面状态
+    // 重置封面和标题状态
     localCoverImages.value = [];
     localTitles.value = [];
     activeCoverIndex.value = props.article.coverImageIndex ?? 0;
+    activeTitleIndex.value = props.article.titleIndex ?? 0;
     if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
     // 恢复文章保存的主题偏好，无记录时默认包豪斯
     const saved = props.article.wechatThemeId;

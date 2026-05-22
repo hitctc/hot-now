@@ -176,7 +176,8 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
     // ─── 步骤 6：创建草稿 ───
     currentStep = "draft";
     await onProgress?.("draft", "running");
-    const title = article.titles?.[0] ?? "未命名文章";
+    const titleIdx = Math.min(article.titleIndex ?? 0, (article.titles?.length ?? 1) - 1);
+    const title = article.titles?.[titleIdx >= 0 ? titleIdx : 0] ?? "未命名文章";
     const mediaId = await createDraft(
       token,
       { title, thumbMediaId, content: html },

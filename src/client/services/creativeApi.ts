@@ -59,6 +59,7 @@ export type CreativeFinishedArticle = {
   images: string | ArticleImageEntry[] | null;
   coverImage: string[];
   coverImageIndex: number;
+  titleIndex: number;
   status: string;
   anomalyReason: string | null;
   rawResponseText: string | null;
@@ -182,6 +183,7 @@ export function editFinishedArticle(
     wechatThemeId?: string | null;
     wechatHtml?: string | null;
     coverImageIndex?: number;
+    titleIndex?: number;
   }
 ): Promise<{ ok: boolean }> {
   return requestJson<{ ok: boolean }>(`/actions/creative/finished-articles/${id}`, {

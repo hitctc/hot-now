@@ -1041,6 +1041,10 @@ export function createServer(deps: ServerDeps = {}) {
       editInput.coverImageIndex = body.coverImageIndex;
       updatedFields.push("coverImageIndex");
     }
+    if (body?.titleIndex !== undefined && typeof body.titleIndex === "number") {
+      editInput.titleIndex = body.titleIndex;
+      updatedFields.push("titleIndex");
+    }
     if (body?.titles !== undefined) { editInput.titles = body.titles; updatedFields.push("titles"); }
     if (body?.thesis !== undefined) { editInput.thesis = body.thesis; updatedFields.push("thesis"); }
     if (body?.summary100 !== undefined) { editInput.summary100 = body.summary100; updatedFields.push("summary100"); }
@@ -1336,6 +1340,7 @@ export function createServer(deps: ServerDeps = {}) {
       wechatThemeId: typeof body?.wechatThemeId === "string" ? body.wechatThemeId : (body?.wechatThemeId === null ? null : undefined),
       wechatHtml: typeof body?.wechatHtml === "string" ? body.wechatHtml : (body?.wechatHtml === null ? null : undefined),
       coverImageIndex: typeof body?.coverImageIndex === "number" ? body.coverImageIndex : undefined,
+      titleIndex: typeof body?.titleIndex === "number" ? body.titleIndex : undefined,
     });
     if (!result.ok && result.reason === "article not found") {
       return reply.code(404).send({ ok: false, reason: "not-found" });

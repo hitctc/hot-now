@@ -58,14 +58,16 @@ watch(
   }
 );
 
-function getFirstTitle(article: CreativeFinishedArticle): string {
+function getPublishTitle(article: CreativeFinishedArticle): string {
   if (!article.titles) return "未命名文章";
   let titles: string[] = [];
   if (Array.isArray(article.titles)) titles = article.titles;
   else if (typeof article.titles === "string") {
     try { const p = JSON.parse(article.titles); if (Array.isArray(p)) titles = p; } catch { /* */ }
   }
-  return titles.length > 0 ? titles[0] : "未命名文章";
+  if (titles.length === 0) return "未命名文章";
+  const idx = Math.min(article.titleIndex ?? 0, titles.length - 1);
+  return titles[idx >= 0 ? idx : 0];
 }
 
 // 将自定义状态映射为 Ant Steps 的 status
@@ -129,7 +131,7 @@ const failedStepError = computed(() => pushResult.value?.ok ? "" : (pushResult.v
   >
     <!-- 文章信息 -->
     <div v-if="article" class="push-info">
-      <div class="push-info-row"><strong>文章：</strong>{{ getFirstTitle(article) }}</div>
+      <div class="push-info-row"><strong>文章：</strong>{{ getPublishTitle(article) }}</div>
       <div class="push-info-row"><strong>目标公众号：</strong>{{ defaultAccountName || '未配置' }}</div>
       <div class="push-info-row"><strong>使用主题：</strong>{{ themeLabel }}</div>
     </div>

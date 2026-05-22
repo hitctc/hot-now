@@ -790,7 +790,7 @@ export function createServer(deps: ServerDeps = {}) {
       sourceItemId: sourceItem.id,
       mode: typeof body?.mode === "string" ? (body.mode as "A" | "B") : undefined,
       thesis: typeof body?.thesis === "string" ? body.thesis : undefined,
-      intro: Array.isArray(body?.intro) ? body.intro as string[] : (typeof body?.intro === "string" ? [body.intro] : undefined),
+      intro: Array.isArray(body?.intros) ? body.intros as string[] : (Array.isArray(body?.intro) ? body.intro as string[] : (typeof body?.intro === "string" ? [body.intro] : undefined)),
       contentMarkdown,
       titles: Array.isArray(body?.titles) ? body.titles as string[] : undefined,
       hooks: Array.isArray(body?.hooks) ? body.hooks as string[] : undefined,

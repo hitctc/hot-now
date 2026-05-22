@@ -447,13 +447,48 @@ async function handleRegenIntro(): Promise<void> {
 
 async function selectIntro(idx: number): Promise<void> {
   if (!props.article || idx === activeIntroIndex.value) return;
+
+  const intros = displayIntros.value;
+  const selectedIntro = intros[idx];
+
+  // 在 markdown 中替换/插入导语 blockquote
+  let content = editContent.value;
+  const blockquoteRegex = /^(>.+?)(\n\n|\n(?=[^>]))/s;
+  if (blockquoteRegex.test(content)) {
+    // 替换已有的 blockquote（标题后、正文前的 > 段落）
+    content = content.replace(blockquoteRegex, `> ${selectedIntro}\n\n`);
+  } else {
+    // 没有找到 blockquote，在 H1 标题后插入
+    const h1Regex = /^(#[^\n]+)\n/;
+    if (h1Regex.test(content)) {
+      content = content.replace(h1Regex, `$1\n\n> ${selectedIntro}\n\n`);
+    } else {
+      // 没有 H1，直接在开头插入
+      content = `> ${selectedIntro}\n\n${content}`;
+    }
+  }
+
   activeIntroIndex.value = idx;
+  editContent.value = content;
 
   try {
-    await editFinishedArticle(props.article.id, { introIndex: idx });
+    await editFinishedArticle(props.article.id, {
+      introIndex: idx,
+      contentMarkdown: content,
+    });
     props.article.introIndex = idx;
+    props.article.contentMarkdown = content;
+    lastSavedContent = content;
+
+    if (activePreviewTheme.value !== "live" && content) {
+      const themeId = themeIdMap[activePreviewTheme.value];
+      const html = renderWechatThemePreview(content, themeId);
+      props.article.wechatHtml = html;
+      editFinishedArticle(props.article.id, { wechatHtml: html }).catch(() => {});
+    }
+
     emit("saved");
-  } catch { /* 静默失败 */ }
+  } catch { /* 静默失败，本地状态已更新 */ }
 }
 
 // ─── 百字摘要重新生成 ───

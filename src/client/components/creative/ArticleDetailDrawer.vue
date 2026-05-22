@@ -321,14 +321,14 @@
         class="fixed inset-0 z-[9999] flex flex-col"
         style="background: var(--editorial-bg-page);"
       >
-        <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2" style="border-color: var(--editorial-border);">
+        <div class="fullscreen-toolbar flex flex-col gap-2 border-b px-3 py-2 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-x-4 md:gap-y-2 md:px-4" style="border-color: var(--editorial-border);">
           <div class="flex flex-wrap items-center gap-2">
             <h3 class="m-0 text-sm font-semibold" style="color: var(--editorial-text-main);">正文编辑（全屏）</h3>
             <span class="text-[11px]" style="color: var(--editorial-text-muted);">{{ countWords(editContent) }}字</span>
             <span v-if="lastSavedAt" class="text-[11px]" style="color: var(--editorial-text-muted);">{{ lastSavedAt }}</span>
           </div>
-          <div class="flex items-center gap-2">
-            <div class="flex gap-1">
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <div class="flex flex-wrap gap-1">
               <a-button
                 v-for="opt in previewThemeOptions"
                 :key="opt.key"
@@ -341,7 +341,7 @@
             <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(editContent)">复制原文</a-button>
             <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyMarkdownAsPlainText(editContent)">复制纯文本</a-button>
             <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="handleSave" :loading="saving">保存</a-button>
-            <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="toggleEditorFullscreen">退出全屏 (Esc)</a-button>
+            <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="toggleEditorFullscreen">退出全屏</a-button>
           </div>
         </div>
         <div class="flex-1 overflow-hidden p-2 md:p-4">
@@ -1178,6 +1178,16 @@ function getMissingConditions(article: CreativeFinishedArticle): string[] {
   .article-editor-wrapper {
     height: calc(100vh - 600px);
     min-height: 200px;
+  }
+  /* 全屏编辑器工具栏：移动端紧凑布局 */
+  .fullscreen-toolbar {
+    overflow: visible;
+  }
+  .fullscreen-toolbar .ant-btn {
+    font-size: 11px !important;
+    padding: 0 6px !important;
+    height: 24px !important;
+    line-height: 24px !important;
   }
 }
 

@@ -1140,7 +1140,7 @@ export function createServer(deps: ServerDeps = {}) {
 
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 90_000);
+      const timeout = setTimeout(() => controller.abort(), 180_000);
 
       const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/regen-cover`, {
         method: "POST",
@@ -1359,7 +1359,7 @@ export function createServer(deps: ServerDeps = {}) {
 
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 90_000);
+      const timeout = setTimeout(() => controller.abort(), 180_000);
       const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/regen-inline-image`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },

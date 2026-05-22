@@ -321,8 +321,8 @@
         class="fixed inset-0 z-[9999] flex flex-col"
         style="background: var(--editorial-bg-page);"
       >
-        <div class="flex items-center justify-between border-b px-4 py-2" style="border-color: var(--editorial-border);">
-          <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2" style="border-color: var(--editorial-border);">
+          <div class="flex flex-wrap items-center gap-2">
             <h3 class="m-0 text-sm font-semibold" style="color: var(--editorial-text-main);">正文编辑（全屏）</h3>
             <span class="text-[11px]" style="color: var(--editorial-text-muted);">{{ countWords(editContent) }}字</span>
             <span v-if="lastSavedAt" class="text-[11px]" style="color: var(--editorial-text-muted);">{{ lastSavedAt }}</span>
@@ -344,7 +344,7 @@
             <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="toggleEditorFullscreen">退出全屏 (Esc)</a-button>
           </div>
         </div>
-        <div class="flex-1 overflow-hidden p-4">
+        <div class="flex-1 overflow-hidden p-2 md:p-4">
           <ArticleMarkdownEditor
             v-model="editContent"
             :preview-html="activePreviewHtml"

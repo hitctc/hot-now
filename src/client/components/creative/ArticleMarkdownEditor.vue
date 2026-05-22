@@ -141,6 +141,21 @@ function onDividerMouseDown(e: MouseEvent): void {
   background: #1890ff;
 }
 
+/* 移动端上下分屏 */
+@media (max-width: 768px) {
+  .md-editor {
+    flex-direction: column;
+    min-height: 300px;
+  }
+  .md-editor__pane:first-child {
+    flex: 0 0 50% !important;
+  }
+  .md-editor__divider {
+    flex: 0 0 4px;
+    cursor: row-resize;
+  }
+}
+
 .md-editor__preview {
   flex: 1;
   padding: 0;

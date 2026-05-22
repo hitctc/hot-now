@@ -50,6 +50,7 @@ export type CreativeFinishedArticle = {
   sourceItemId: number;
   mode: string | null;
   thesis: string | null;
+  intro: string[] | null;
   contentMarkdown: string;
   titles: string | null;
   hooks: string | null;
@@ -60,6 +61,7 @@ export type CreativeFinishedArticle = {
   coverImage: string[];
   coverImageIndex: number;
   titleIndex: number;
+  introIndex: number;
   status: string;
   anomalyReason: string | null;
   rawResponseText: string | null;
@@ -184,6 +186,8 @@ export function editFinishedArticle(
     wechatHtml?: string | null;
     coverImageIndex?: number;
     titleIndex?: number;
+    intro?: string[];
+    introIndex?: number;
   }
 ): Promise<{ ok: boolean }> {
   return requestJson<{ ok: boolean }>(`/actions/creative/finished-articles/${id}`, {
@@ -349,6 +353,42 @@ export type RegenTitleResult = {
 /** 调用后端代理重新生成标题，返回更新后的 titles 数组 */
 export function regenTitle(id: number): Promise<RegenTitleResult> {
   return requestJson<RegenTitleResult>(`/api/creative/finished-articles/${id}/regen-title`, {
+    method: "POST",
+  });
+}
+
+export type RegenIntroResult = {
+  ok: boolean;
+  intro?: string[];
+  reason?: string;
+};
+
+export function regenIntro(id: number): Promise<RegenIntroResult> {
+  return requestJson<RegenIntroResult>(`/api/creative/finished-articles/${id}/regen-intro`, {
+    method: "POST",
+  });
+}
+
+export type RegenSummaryResult = {
+  ok: boolean;
+  summary100?: string;
+  reason?: string;
+};
+
+export function regenSummary(id: number): Promise<RegenSummaryResult> {
+  return requestJson<RegenSummaryResult>(`/api/creative/finished-articles/${id}/regen-summary`, {
+    method: "POST",
+  });
+}
+
+export type RegenArticleResult = {
+  ok: boolean;
+  title?: string;
+  reason?: string;
+};
+
+export function regenArticle(id: number): Promise<RegenArticleResult> {
+  return requestJson<RegenArticleResult>(`/api/creative/finished-articles/${id}/regen-article`, {
     method: "POST",
   });
 }

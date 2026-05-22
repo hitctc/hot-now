@@ -18,20 +18,31 @@
     </template>
 
     <template #footer>
-      <div v-if="article" class="flex items-center justify-end gap-2">
-        <a-tooltip :mouse-enter-delay="0.5" title="将当前正文按选定主题渲染后复制到剪贴板，可粘贴到公众号编辑器">
-          <a-button :loading="wechatCopying" @click="copyAsWechatFormat">复制公众号格式</a-button>
-        </a-tooltip>
-        <a-tooltip :mouse-enter-delay="0.5" title="保存正文内容到数据库">
-          <a-button type="primary" :loading="saving" @click="handleSave">保存正文</a-button>
-        </a-tooltip>
-        <a-tooltip v-if="canPush(article)" :mouse-enter-delay="0.5" title="自动保存正文后推送到微信公众号草稿箱">
-          <a-button type="primary" :loading="saving" @click="saveAndPush">推送到草稿箱</a-button>
-        </a-tooltip>
-        <a-tooltip v-else :mouse-enter-delay="0.3">
-          <template #title>{{ getMissingConditions(article).join('；') }}</template>
-          <a-button type="primary" disabled>推送到草稿箱</a-button>
-        </a-tooltip>
+      <div v-if="article" class="flex items-center justify-between">
+        <a-button
+          danger
+          :loading="regenArticleLoading"
+          :disabled="regenArticleLoading"
+          @click="handleRegenArticle"
+        >
+          <template v-if="regenArticleLoading">正在重写（预计 2~3 分钟）...</template>
+          <template v-else>整篇重写</template>
+        </a-button>
+        <div class="flex items-center gap-2">
+          <a-tooltip :mouse-enter-delay="0.5" title="将当前正文按选定主题渲染后复制到剪贴板，可粘贴到公众号编辑器">
+            <a-button :loading="wechatCopying" @click="copyAsWechatFormat">复制公众号格式</a-button>
+          </a-tooltip>
+          <a-tooltip :mouse-enter-delay="0.5" title="保存正文内容到数据库">
+            <a-button type="primary" :loading="saving" @click="handleSave">保存正文</a-button>
+          </a-tooltip>
+          <a-tooltip v-if="canPush(article)" :mouse-enter-delay="0.5" title="自动保存正文后推送到微信公众号草稿箱">
+            <a-button type="primary" :loading="saving" @click="saveAndPush">推送到草稿箱</a-button>
+          </a-tooltip>
+          <a-tooltip v-else :mouse-enter-delay="0.3">
+            <template #title>{{ getMissingConditions(article).join('；') }}</template>
+            <a-button type="primary" disabled>推送到草稿箱</a-button>
+          </a-tooltip>
+        </div>
       </div>
     </template>
 
@@ -99,13 +110,64 @@
           <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ article.thesis }}</p>
         </section>
 
-        <!-- 百字摘要（只读） -->
-        <section v-if="article.summary100">
+        <!-- 导语（可选择切换） -->
+        <section v-if="displayIntros.length > 0 || regenIntroLoading">
+          <div class="mb-2 flex items-center justify-between">
+            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">导语</h3>
+            <div class="flex items-center gap-3">
+              <a-button
+                type="link"
+                size="small"
+                class="!p-0 !text-[11px]"
+                :loading="regenIntroLoading"
+                :disabled="regenIntroLoading"
+                @click="handleRegenIntro"
+              >{{ regenIntroLoading ? '生成中...' : '重新生成导语' }}</a-button>
+              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(displayIntros[activeIntroIndex] ?? '')">复制</a-button>
+            </div>
+          </div>
+          <ul class="m-0 list-none space-y-1 pl-0">
+            <li
+              v-for="(text, idx) in displayIntros"
+              :key="idx"
+              class="group/intro relative flex items-start gap-3 rounded-editorial-sm border px-3 py-2 transition-colors"
+              :class="idx === activeIntroIndex
+                ? 'border-editorial-accent ring-2 ring-editorial-ring'
+                : 'border-editorial-border hover:border-editorial-link-active/40'"
+            >
+              <span class="flex-shrink-0 text-[11px] font-bold tabular-nums text-editorial-text-muted">{{ idx + 1 }}</span>
+              <span class="flex-1 text-sm leading-6 text-editorial-text-main">{{ text }}</span>
+              <span
+                v-if="idx === activeIntroIndex"
+                class="flex-shrink-0 rounded bg-editorial-accent px-1.5 py-0.5 text-[10px] font-semibold text-white"
+              >✓ 发布</span>
+              <span v-if="idx === 0 && idx !== activeIntroIndex" class="flex-shrink-0 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</span>
+              <button
+                v-if="idx !== activeIntroIndex"
+                class="flex-shrink-0 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/intro:opacity-100 hover:!bg-black/70"
+                @click.stop="selectIntro(idx)"
+              >设为发布</button>
+            </li>
+          </ul>
+        </section>
+
+        <!-- 百字摘要 -->
+        <section v-if="localSummary100 || article.summary100">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">百字摘要</h3>
-            <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(article.summary100!)">复制</a-button>
+            <div class="flex items-center gap-3">
+              <a-button
+                type="link"
+                size="small"
+                class="!p-0 !text-[11px]"
+                :loading="regenSummaryLoading"
+                :disabled="regenSummaryLoading"
+                @click="handleRegenSummary"
+              >{{ regenSummaryLoading ? '生成中...' : '重新生成摘要' }}</a-button>
+              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(localSummary100 || article.summary100!)">复制</a-button>
+            </div>
           </div>
-          <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ article.summary100 }}</p>
+          <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ localSummary100 || article.summary100 }}</p>
         </section>
 
         <!-- 开头钩子（只读） -->
@@ -245,13 +307,16 @@
 
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
-import { message } from "ant-design-vue";
+import { message, Modal } from "ant-design-vue";
 
 import ArticleMarkdownEditor from "./ArticleMarkdownEditor.vue";
 import {
   editFinishedArticle,
   regenCover,
   regenTitle,
+  regenIntro,
+  regenSummary,
+  regenArticle,
   parseArticleImages,
   extractImageUrl,
   type CreativeFinishedArticle,
@@ -349,6 +414,142 @@ async function selectTitle(idx: number): Promise<void> {
   } catch { /* 静默失败，本地状态已更新 */ }
 }
 
+// ─── 导语选择 & 重新生成 ───
+
+const regenIntroLoading = ref(false);
+const activeIntroIndex = ref(0);
+const localIntros = ref<string[]>([]);
+
+const displayIntros = computed(() => {
+  return localIntros.value.length > 0 ? localIntros.value : (props.article?.intro ?? []);
+});
+
+async function handleRegenIntro(): Promise<void> {
+  if (!props.article || regenIntroLoading.value) return;
+  regenIntroLoading.value = true;
+  try {
+    const result = await regenIntro(props.article.id);
+    if (result.ok && result.intro) {
+      localIntros.value = result.intro;
+      activeIntroIndex.value = 0;
+      props.article.intro = result.intro;
+      props.article.introIndex = 0;
+      message.success("导语已重新生成");
+    } else {
+      message.error(result.reason ?? "导语生成失败");
+    }
+  } catch {
+    message.error("导语生成请求失败");
+  } finally {
+    regenIntroLoading.value = false;
+  }
+}
+
+async function selectIntro(idx: number): Promise<void> {
+  if (!props.article || idx === activeIntroIndex.value) return;
+  activeIntroIndex.value = idx;
+
+  try {
+    await editFinishedArticle(props.article.id, { introIndex: idx });
+    props.article.introIndex = idx;
+    emit("saved");
+  } catch { /* 静默失败 */ }
+}
+
+// ─── 百字摘要重新生成 ───
+
+const regenSummaryLoading = ref(false);
+const localSummary100 = ref("");
+
+async function handleRegenSummary(): Promise<void> {
+  if (!props.article || regenSummaryLoading.value) return;
+  regenSummaryLoading.value = true;
+  try {
+    const result = await regenSummary(props.article.id);
+    if (result.ok && result.summary100) {
+      localSummary100.value = result.summary100;
+      props.article.summary100 = result.summary100;
+      message.success("摘要已重新生成");
+    } else {
+      message.error(result.reason ?? "摘要生成失败");
+    }
+  } catch {
+    message.error("摘要生成请求失败");
+  } finally {
+    regenSummaryLoading.value = false;
+  }
+}
+
+// ─── 整篇重写 ───
+
+const regenArticleLoading = ref(false);
+const REGEN_ARTICLE_KEY = "hot-now-regen-article";
+
+function getRegenArticleStatus(): { articleId: number; startedAt: number } | null {
+  try {
+    const raw = localStorage.getItem(REGEN_ARTICLE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+async function handleRegenArticle(): Promise<void> {
+  if (!props.article || regenArticleLoading.value) return;
+
+  // 二次确认
+  const confirmed = await new Promise<boolean>((resolve) => {
+    Modal.confirm({
+      title: "确认整篇重写？",
+      content: "将基于同一素材重新生成一篇完整文章，耗时约 2~3 分钟。新文章生成后请在列表中查看。",
+      okText: "确认重写",
+      cancelText: "取消",
+      onOk: () => resolve(true),
+      onCancel: () => resolve(false),
+    });
+  });
+  if (!confirmed) return;
+
+  regenArticleLoading.value = true;
+  // 记录重写状态到 localStorage，关闭弹窗后重开可恢复提示
+  localStorage.setItem(REGEN_ARTICLE_KEY, JSON.stringify({
+    articleId: props.article.id,
+    startedAt: Date.now(),
+  }));
+
+  try {
+    const result = await regenArticle(props.article.id);
+    if (result.ok) {
+      localStorage.removeItem(REGEN_ARTICLE_KEY);
+      message.success(`新文章已生成${result.title ? `：${result.title}` : ""}，请关闭弹窗刷新列表查看`);
+      emit("saved");
+    } else {
+      localStorage.removeItem(REGEN_ARTICLE_KEY);
+      message.error(result.reason ?? "整篇重写失败");
+    }
+  } catch {
+    // 不清除 localStorage，可能仍在生成中
+    message.error("整篇重写请求失败，新文章可能仍在生成中，请稍后刷新列表查看");
+  } finally {
+    regenArticleLoading.value = false;
+  }
+}
+
+// 打开弹窗时检查是否有未完成的重写
+function checkRegenArticleStatus(): void {
+  const status = getRegenArticleStatus();
+  if (!status || !props.article) return;
+  if (status.articleId === props.article.id) {
+    const elapsed = Date.now() - status.startedAt;
+    if (elapsed < 5 * 60 * 1000) {
+      // 5 分钟内认为仍在生成
+      message.info("该文章正在整篇重写中，请稍后刷新列表查看新文章");
+    } else {
+      // 超过 5 分钟，清除状态
+      localStorage.removeItem(REGEN_ARTICLE_KEY);
+      message.info("整篇重写已完成或超时，请刷新列表查看");
+    }
+  }
+}
+
 // ─── 封面图选择 & 重新生成 ───
 
 const activeCoverIndex = ref(0);
@@ -440,12 +641,16 @@ watch(() => props.open, (val) => {
     const md = props.article.contentMarkdown || "";
     editContent.value = md;
     lastSavedContent = md;
-    // 重置封面和标题状态
+    // 重置本地缓存状态
     localCoverImages.value = [];
     localTitles.value = [];
+    localIntros.value = [];
+    localSummary100.value = "";
     activeCoverIndex.value = props.article.coverImageIndex ?? 0;
     activeTitleIndex.value = props.article.titleIndex ?? 0;
+    activeIntroIndex.value = props.article.introIndex ?? 0;
     if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+    checkRegenArticleStatus();
     // 恢复文章保存的主题偏好，无记录时默认包豪斯
     const saved = props.article.wechatThemeId;
     const previewKey = saved ? reverseThemeIdMap[saved] : undefined;

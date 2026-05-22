@@ -781,7 +781,8 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     const existing = findCreativeFinishedArticleBySourceItemId(db, sourceItem.id);
-    if (existing) {
+    const allowDuplicate = body?.allowDuplicate === true;
+    if (existing && !allowDuplicate) {
       return reply.code(409).send({ ok: false, reason: "article-already-exists" });
     }
 
@@ -789,6 +790,7 @@ export function createServer(deps: ServerDeps = {}) {
       sourceItemId: sourceItem.id,
       mode: typeof body?.mode === "string" ? (body.mode as "A" | "B") : undefined,
       thesis: typeof body?.thesis === "string" ? body.thesis : undefined,
+      intro: Array.isArray(body?.intro) ? body.intro as string[] : (typeof body?.intro === "string" ? [body.intro] : undefined),
       contentMarkdown,
       titles: Array.isArray(body?.titles) ? body.titles as string[] : undefined,
       hooks: Array.isArray(body?.hooks) ? body.hooks as string[] : undefined,
@@ -1045,6 +1047,14 @@ export function createServer(deps: ServerDeps = {}) {
       editInput.titleIndex = body.titleIndex;
       updatedFields.push("titleIndex");
     }
+    if (body?.intro !== undefined) {
+      editInput.intro = Array.isArray(body.intro) ? body.intro as string[] : (typeof body.intro === "string" ? [body.intro] : []);
+      updatedFields.push("intro");
+    }
+    if (body?.introIndex !== undefined && typeof body.introIndex === "number") {
+      editInput.introIndex = body.introIndex;
+      updatedFields.push("introIndex");
+    }
     if (body?.titles !== undefined) { editInput.titles = body.titles; updatedFields.push("titles"); }
     if (body?.thesis !== undefined) { editInput.thesis = body.thesis; updatedFields.push("thesis"); }
     if (body?.summary100 !== undefined) { editInput.summary100 = body.summary100; updatedFields.push("summary100"); }
@@ -1229,6 +1239,139 @@ export function createServer(deps: ServerDeps = {}) {
     }
   });
 
+  // ─── regen-intro：重新生成导语 ───
+  app.post("/api/creative/finished-articles/:id/regen-intro", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+    if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
+
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const article = findCreativeFinishedArticleById(db, id);
+    if (!article) { return reply.code(404).send({ ok: false, reason: "article-not-found" }); }
+
+    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+    const hermesApiToken = process.env.HERMES_API_TOKEN;
+    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15_000);
+      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/regen-intro`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
+        body: JSON.stringify({ articleId: id }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const errorBody = await res.json().catch(() => ({ error: `Hermes HTTP ${res.status}` }));
+        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: errorBody.error ?? `Hermes HTTP ${res.status}` });
+      }
+
+      const data = await res.json() as { success: boolean; intro?: string; error?: string };
+      if (!data.success || !data.intro) {
+        return reply.code(502).send({ ok: false, reason: data.error ?? "导语生成失败" });
+      }
+
+      const existingIntros = article.intro ?? [];
+      const updatedIntros = [data.intro, ...existingIntros];
+      editCreativeFinishedArticle(db, id, { intro: updatedIntros });
+
+      const updated = findCreativeFinishedArticleById(db, id);
+      return reply.send({ ok: true, intro: updated?.intro ?? updatedIntros });
+    } catch (err) {
+      if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "生成超时" }); }
+      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
+    }
+  });
+
+  // ─── regen-summary：重新生成百字摘要 ───
+  app.post("/api/creative/finished-articles/:id/regen-summary", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+    if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
+
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const article = findCreativeFinishedArticleById(db, id);
+    if (!article) { return reply.code(404).send({ ok: false, reason: "article-not-found" }); }
+
+    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+    const hermesApiToken = process.env.HERMES_API_TOKEN;
+    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15_000);
+      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/regen-summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
+        body: JSON.stringify({ articleId: id }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const errorBody = await res.json().catch(() => ({ error: `Hermes HTTP ${res.status}` }));
+        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: errorBody.error ?? `Hermes HTTP ${res.status}` });
+      }
+
+      const data = await res.json() as { success: boolean; summary100?: string; error?: string };
+      if (!data.success || !data.summary100) {
+        return reply.code(502).send({ ok: false, reason: data.error ?? "摘要生成失败" });
+      }
+
+      editCreativeFinishedArticle(db, id, { summary100: data.summary100 });
+
+      return reply.send({ ok: true, summary100: data.summary100 });
+    } catch (err) {
+      if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "生成超时" }); }
+      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
+    }
+  });
+
+  // ─── regen-article：整篇重新写作 ───
+  app.post("/api/creative/finished-articles/:id/regen-article", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+    if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
+
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const article = findCreativeFinishedArticleById(db, id);
+    if (!article) { return reply.code(404).send({ ok: false, reason: "article-not-found" }); }
+
+    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+    const hermesApiToken = process.env.HERMES_API_TOKEN;
+    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 200_000);
+      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/regen-article`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
+        body: JSON.stringify({ articleId: id }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const errorBody = await res.json().catch(() => ({ error: `Hermes HTTP ${res.status}` }));
+        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: errorBody.error ?? `Hermes HTTP ${res.status}` });
+      }
+
+      const data = await res.json() as { success: boolean; title?: string; error?: string };
+      if (!data.success) {
+        return reply.code(502).send({ ok: false, reason: data.error ?? "整篇重写失败" });
+      }
+
+      return reply.send({ ok: true, title: data.title });
+    } catch (err) {
+      if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "生成超时（>200s），请稍后在列表中查看是否有新文章" }); }
+      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
+    }
+  });
+
   // ─── Creative: Actions (session-authenticated) ───
 
   app.post("/actions/creative/source-items/:id/writing-status", async (request, reply) => {
@@ -1341,6 +1484,8 @@ export function createServer(deps: ServerDeps = {}) {
       wechatHtml: typeof body?.wechatHtml === "string" ? body.wechatHtml : (body?.wechatHtml === null ? null : undefined),
       coverImageIndex: typeof body?.coverImageIndex === "number" ? body.coverImageIndex : undefined,
       titleIndex: typeof body?.titleIndex === "number" ? body.titleIndex : undefined,
+      intro: Array.isArray(body?.intro) ? body.intro as string[] : undefined,
+      introIndex: typeof body?.introIndex === "number" ? body.introIndex : undefined,
     });
     if (!result.ok && result.reason === "article not found") {
       return reply.code(404).send({ ok: false, reason: "not-found" });

@@ -9,6 +9,7 @@ const SELECT_COLUMNS = `
   source_item_id,
   mode,
   thesis,
+  intro,
   content_markdown,
   titles,
   hooks,
@@ -18,6 +19,7 @@ const SELECT_COLUMNS = `
   cover_image_url,
   cover_image_index,
   title_index,
+  intro_index,
   status,
   anomaly_reason,
   raw_response_text,
@@ -34,6 +36,7 @@ type ArticleRow = {
   source_item_id: number;
   mode: string | null;
   thesis: string | null;
+  intro: string | null;
   content_markdown: string;
   titles: string | null;
   hooks: string | null;
@@ -43,6 +46,7 @@ type ArticleRow = {
   cover_image_url: string | null;
   cover_image_index: number;
   title_index: number;
+  intro_index: number;
   status: string;
   anomaly_reason: string | null;
   raw_response_text: string | null;
@@ -71,6 +75,7 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     sourceItemId: row.source_item_id,
     mode: (row.mode as CreativeFinishedArticleMode) || null,
     thesis: row.thesis,
+    intro: row.intro ? JSON.parse(row.intro) : null,
     contentMarkdown: row.content_markdown,
     titles: row.titles ? JSON.parse(row.titles) : null,
     hooks: row.hooks ? JSON.parse(row.hooks) : null,
@@ -81,6 +86,7 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     coverImage: parseCoverImages(row.cover_image_url),
     coverImageIndex: row.cover_image_index ?? 0,
     titleIndex: row.title_index ?? 0,
+    introIndex: row.intro_index ?? 0,
     status: row.status,
     anomalyReason: row.anomaly_reason,
     rawResponseText: row.raw_response_text,
@@ -100,6 +106,7 @@ export type CreativeFinishedArticleRecord = {
   sourceItemId: number;
   mode: CreativeFinishedArticleMode | null;
   thesis: string | null;
+  intro: string[] | null;
   contentMarkdown: string;
   titles: string[] | null;
   hooks: string[] | null;
@@ -110,6 +117,7 @@ export type CreativeFinishedArticleRecord = {
   coverImage: string[];
   coverImageIndex: number;
   titleIndex: number;
+  introIndex: number;
   status: string;
   anomalyReason: string | null;
   rawResponseText: string | null;
@@ -125,6 +133,7 @@ export type InsertCreativeFinishedArticleInput = {
   sourceItemId: number;
   mode?: CreativeFinishedArticleMode;
   thesis?: string;
+  intro?: string[];
   contentMarkdown: string;
   titles?: string[];
   hooks?: string[];
@@ -138,6 +147,8 @@ export type InsertCreativeFinishedArticleInput = {
 export type EditCreativeFinishedArticleInput = {
   mode?: CreativeFinishedArticleMode;
   thesis?: string;
+  intro?: string[];
+  introIndex?: number;
   contentMarkdown?: string;
   titles?: string[];
   hooks?: string[];
@@ -180,6 +191,7 @@ export function insertCreativeFinishedArticle(
         source_item_id,
         mode,
         thesis,
+        intro,
         content_markdown,
         titles,
         hooks,
@@ -190,12 +202,13 @@ export function insertCreativeFinishedArticle(
         status,
         raw_response_text
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'generated', ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'generated', ?)
     `
   ).run(
     input.sourceItemId,
     input.mode ?? null,
     input.thesis ?? null,
+    input.intro ? JSON.stringify(input.intro) : null,
     input.contentMarkdown,
     input.titles ? JSON.stringify(input.titles) : null,
     input.hooks ? JSON.stringify(input.hooks) : null,
@@ -314,6 +327,10 @@ export function editCreativeFinishedArticle(
     setClauses.push("thesis = ?");
     params.push(input.thesis);
   }
+  if (input.intro !== undefined) {
+    setClauses.push("intro = ?");
+    params.push(JSON.stringify(input.intro));
+  }
   if (input.contentMarkdown !== undefined) {
     setClauses.push("content_markdown = ?");
     params.push(input.contentMarkdown);
@@ -349,6 +366,10 @@ export function editCreativeFinishedArticle(
   if (input.titleIndex !== undefined) {
     setClauses.push("title_index = ?");
     params.push(input.titleIndex);
+  }
+  if (input.introIndex !== undefined) {
+    setClauses.push("intro_index = ?");
+    params.push(input.introIndex);
   }
   if (input.rawResponseText !== undefined) {
     setClauses.push("raw_response_text = ?");

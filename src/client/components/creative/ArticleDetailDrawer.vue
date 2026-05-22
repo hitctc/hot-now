@@ -419,20 +419,22 @@ async function selectTitle(idx: number): Promise<void> {
   editContent.value = content;
 
   try {
-    await editFinishedArticle(props.article.id, {
+    const saveFields: Record<string, unknown> = {
       titleIndex: idx,
       contentMarkdown: content,
-    });
-    props.article.titleIndex = idx;
-    props.article.contentMarkdown = content;
-    lastSavedContent = content;
+    };
 
     if (activePreviewTheme.value !== "live" && content) {
       const themeId = themeIdMap[activePreviewTheme.value];
       const html = renderWechatThemePreview(content, themeId);
       props.article.wechatHtml = html;
-      editFinishedArticle(props.article.id, { wechatHtml: html }).catch(() => {});
+      saveFields.wechatHtml = html;
     }
+
+    await editFinishedArticle(props.article.id, saveFields);
+    props.article.titleIndex = idx;
+    props.article.contentMarkdown = content;
+    lastSavedContent = content;
 
     emit("saved");
   } catch { /* 静默失败，本地状态已更新 */ }
@@ -496,20 +498,22 @@ async function selectIntro(idx: number): Promise<void> {
   editContent.value = content;
 
   try {
-    await editFinishedArticle(props.article.id, {
+    const saveFields: Record<string, unknown> = {
       introIndex: idx,
       contentMarkdown: content,
-    });
-    props.article.introIndex = idx;
-    props.article.contentMarkdown = content;
-    lastSavedContent = content;
+    };
 
     if (activePreviewTheme.value !== "live" && content) {
       const themeId = themeIdMap[activePreviewTheme.value];
       const html = renderWechatThemePreview(content, themeId);
       props.article.wechatHtml = html;
-      editFinishedArticle(props.article.id, { wechatHtml: html }).catch(() => {});
+      saveFields.wechatHtml = html;
     }
+
+    await editFinishedArticle(props.article.id, saveFields);
+    props.article.introIndex = idx;
+    props.article.contentMarkdown = content;
+    lastSavedContent = content;
 
     emit("saved");
   } catch { /* 静默失败，本地状态已更新 */ }
@@ -679,21 +683,22 @@ async function selectCoverImage(idx: number): Promise<void> {
   editContent.value = content;
 
   try {
-    await editFinishedArticle(props.article.id, {
+    const saveFields: Record<string, unknown> = {
       coverImageIndex: idx,
       contentMarkdown: content,
-    });
-    props.article.coverImageIndex = idx;
-    props.article.contentMarkdown = content;
-    lastSavedContent = content;
+    };
 
-    // 重新渲染并保存预览 HTML，确保推送时使用新封面
     if (activePreviewTheme.value !== "live" && content) {
       const themeId = themeIdMap[activePreviewTheme.value];
       const html = renderWechatThemePreview(content, themeId);
       props.article.wechatHtml = html;
-      editFinishedArticle(props.article.id, { wechatHtml: html }).catch(() => {});
+      saveFields.wechatHtml = html;
     }
+
+    await editFinishedArticle(props.article.id, saveFields);
+    props.article.coverImageIndex = idx;
+    props.article.contentMarkdown = content;
+    lastSavedContent = content;
 
     emit("saved");
   } catch { /* 静默失败，本地状态已更新 */ }

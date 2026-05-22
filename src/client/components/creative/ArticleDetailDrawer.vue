@@ -152,46 +152,13 @@
           </ul>
         </section>
 
-        <!-- 百字摘要（可选择切换） -->
-        <section>
+        <!-- 百字摘要（只读展示） -->
+        <section v-if="displaySummaries.length > 0">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">百字摘要</h3>
-            <div class="flex items-center gap-3">
-              <a-button
-                type="link"
-                size="small"
-                class="!p-0 !text-[11px]"
-                :loading="regenSummaryLoading"
-                :disabled="regenSummaryLoading"
-                @click="handleRegenSummary"
-              >{{ regenSummaryLoading ? '生成中...' : '生成新摘要' }}</a-button>
-              <a-button v-if="displaySummaries.length > 0" type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(displaySummaries[activeSummaryIndex] ?? '')">复制</a-button>
-            </div>
+            <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(displaySummaries[0] ?? '')">复制</a-button>
           </div>
-          <p v-if="displaySummaries.length === 0" class="m-0 text-sm text-editorial-text-muted">暂无摘要，点击上方按钮生成</p>
-          <ul v-else class="m-0 list-none space-y-1 pl-0">
-            <li
-              v-for="(text, idx) in displaySummaries"
-              :key="idx"
-              class="group/summary relative flex items-start gap-3 rounded-editorial-sm border px-3 py-2 transition-colors"
-              :class="idx === activeSummaryIndex
-                ? 'border-editorial-accent ring-2 ring-editorial-ring'
-                : 'border-editorial-border hover:border-editorial-link-active/40'"
-            >
-              <span class="flex-shrink-0 text-[11px] font-bold tabular-nums text-editorial-text-muted">{{ idx + 1 }}</span>
-              <span class="flex-1 text-sm leading-6 text-editorial-text-main">{{ text }}</span>
-              <span
-                v-if="idx === activeSummaryIndex"
-                class="flex-shrink-0 rounded bg-editorial-accent px-1.5 py-0.5 text-[10px] font-semibold text-white"
-              >✓ 选中</span>
-              <span v-if="idx === 0 && idx !== activeSummaryIndex" class="flex-shrink-0 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</span>
-              <button
-                v-if="idx !== activeSummaryIndex"
-                class="flex-shrink-0 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/summary:opacity-100 hover:!bg-black/70"
-                @click.stop="selectSummary(idx)"
-              >选择</button>
-            </li>
-          </ul>
+          <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ displaySummaries[0] }}</p>
         </section>
 
         <!-- 开头钩子（只读） -->
@@ -344,7 +311,6 @@ import {
   regenCover,
   regenTitle,
   regenIntro,
-  regenSummary,
   regenArticle,
   regenInlineImage,
   parseArticleImages,
@@ -485,18 +451,25 @@ async function selectIntro(idx: number): Promise<void> {
 
   // 在 markdown 中替换/插入导语 blockquote
   let content = editContent.value;
-  const blockquoteRegex = /^(>.+?)(\n\n|\n(?=[^>]))/s;
-  if (blockquoteRegex.test(content)) {
-    // 替换已有的 blockquote（标题后、正文前的 > 段落）
-    content = content.replace(blockquoteRegex, `> ${selectedIntro}\n\n`);
+
+  // 查找已有 blockquote（> 开头的连续段落，通常在标题之后、### 之前）
+  const existingBqMatch = content.match(/\n\n(> [^\n]+(?:\n> [^\n]+)*)\n\n/);
+  if (existingBqMatch) {
+    content = content.replace(existingBqMatch[1], `> ${selectedIntro}`);
   } else {
-    // 没有找到 blockquote，在 H1 标题后插入
-    const h1Regex = /^(#[^\n]+)\n/;
-    if (h1Regex.test(content)) {
-      content = content.replace(h1Regex, `$1\n\n> ${selectedIntro}\n\n`);
+    // 没有已有 blockquote，在 H1 标题后或封面图后插入
+    const h1Match = /^(#[^\n]+)\n/.exec(content);
+    if (h1Match) {
+      content = content.replace(h1Match[0], `${h1Match[1]}\n\n> ${selectedIntro}\n\n`);
     } else {
-      // 没有 H1，直接在开头插入
-      content = `> ${selectedIntro}\n\n${content}`;
+      // 没有标题，在封面图后插入（封面图是 ![...](...) 格式）
+      const coverMatch = /^!\[[^\]]*\]\([^)]+\)\n*/.exec(content);
+      if (coverMatch) {
+        content = content.slice(coverMatch[0].length);
+        content = `${coverMatch[0]}\n> ${selectedIntro}\n\n${content}`;
+      } else {
+        content = `> ${selectedIntro}\n\n${content}`;
+      }
     }
   }
 
@@ -525,46 +498,11 @@ async function selectIntro(idx: number): Promise<void> {
   } catch { /* 静默失败，本地状态已更新 */ }
 }
 
-// ─── 百字摘要选择 & 重新生成 ───
-
-const regenSummaryLoading = ref(false);
-const activeSummaryIndex = ref(0);
-const localSummaries = ref<string[]>([]);
+// ─── 百字摘要（只读展示） ───
 
 const displaySummaries = computed(() => {
-  return localSummaries.value.length > 0 ? localSummaries.value : (props.article?.summary100 ?? []);
+  return props.article?.summary100 ?? [];
 });
-
-async function handleRegenSummary(): Promise<void> {
-  if (!props.article || regenSummaryLoading.value) return;
-  regenSummaryLoading.value = true;
-  try {
-    const result = await regenSummary(props.article.id);
-    if (result.ok && result.summary100) {
-      localSummaries.value = result.summary100;
-      activeSummaryIndex.value = 0;
-      props.article.summary100 = result.summary100;
-      props.article.summaryIndex = 0;
-      message.success("新摘要已生成");
-    } else {
-      message.error(result.reason ?? "摘要生成失败");
-    }
-  } catch {
-    message.error("摘要生成请求失败");
-  } finally {
-    regenSummaryLoading.value = false;
-  }
-}
-
-async function selectSummary(idx: number): Promise<void> {
-  if (!props.article || idx === activeSummaryIndex.value) return;
-  activeSummaryIndex.value = idx;
-  try {
-    await editFinishedArticle(props.article.id, { summaryIndex: idx });
-    props.article.summaryIndex = idx;
-    emit("saved");
-  } catch { /* 静默失败 */ }
-}
 
 // ─── 整篇重写 ───
 
@@ -766,11 +704,9 @@ watch(() => props.open, (val) => {
     localCoverImages.value = [];
     localTitles.value = [];
     localIntros.value = [];
-    localSummaries.value = [];
     activeCoverIndex.value = props.article.coverImageIndex ?? 0;
     activeTitleIndex.value = props.article.titleIndex ?? 0;
     activeIntroIndex.value = props.article.introIndex ?? 0;
-    activeSummaryIndex.value = props.article.summaryIndex ?? 0;
     if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
     checkRegenArticleStatus();
     // 恢复文章保存的主题偏好，无记录时默认包豪斯

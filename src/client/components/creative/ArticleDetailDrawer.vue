@@ -300,9 +300,10 @@
               </div>
               <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(editContent)">复制原文</a-button>
               <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyMarkdownAsPlainText(editContent)">复制纯文本</a-button>
+              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="toggleEditorFullscreen">{{ editorFullscreen ? '退出全屏' : '全屏' }}</a-button>
             </div>
           </div>
-          <div class="article-editor-wrapper">
+          <div v-if="!editorFullscreen" class="article-editor-wrapper">
             <ArticleMarkdownEditor
               v-model="editContent"
               :preview-html="activePreviewHtml"
@@ -312,6 +313,46 @@
         </section>
       </div>
     </template>
+
+    <!-- 全屏编辑器覆盖层 -->
+    <Teleport to="body">
+      <div
+        v-if="editorFullscreen && article"
+        class="fixed inset-0 z-[9999] flex flex-col"
+        style="background: var(--editorial-bg-page);"
+      >
+        <div class="flex items-center justify-between border-b px-4 py-2" style="border-color: var(--editorial-border);">
+          <div class="flex items-center gap-2">
+            <h3 class="m-0 text-sm font-semibold" style="color: var(--editorial-text-main);">正文编辑（全屏）</h3>
+            <span class="text-[11px]" style="color: var(--editorial-text-muted);">{{ countWords(editContent) }}字</span>
+            <span v-if="lastSavedAt" class="text-[11px]" style="color: var(--editorial-text-muted);">{{ lastSavedAt }}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="flex gap-1">
+              <a-button
+                v-for="opt in previewThemeOptions"
+                :key="opt.key"
+                :type="activePreviewTheme === opt.key ? 'primary' : 'default'"
+                size="small"
+                class="!text-[11px] !px-2 !py-0.5"
+                @click="switchPreviewTheme(opt.key)"
+              >{{ opt.label }}</a-button>
+            </div>
+            <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(editContent)">复制原文</a-button>
+            <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyMarkdownAsPlainText(editContent)">复制纯文本</a-button>
+            <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="handleSave" :loading="saving">保存</a-button>
+            <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="toggleEditorFullscreen">退出全屏 (Esc)</a-button>
+          </div>
+        </div>
+        <div class="flex-1 overflow-hidden p-4">
+          <ArticleMarkdownEditor
+            v-model="editContent"
+            :preview-html="activePreviewHtml"
+            :preview-label="activePreviewLabel"
+          />
+        </div>
+      </div>
+    </Teleport>
   </a-modal>
 </template>
 
@@ -345,6 +386,26 @@ const emit = defineEmits<{
   openSourceItem: [sourceItemId: number];
   openPush: [article: CreativeFinishedArticle, themeId: WechatThemeId];
 }>();
+
+// ─── 正文全屏编辑 ───
+const editorFullscreen = ref(false);
+
+function toggleEditorFullscreen(): void {
+  editorFullscreen.value = !editorFullscreen.value;
+  if (editorFullscreen.value) {
+    document.body.style.overflow = "hidden";
+  } else {
+    document.body.style.overflow = "";
+  }
+}
+
+// ESC 退出全屏
+function handleFullscreenEsc(e: KeyboardEvent): void {
+  if (e.key === "Escape" && editorFullscreen.value) {
+    editorFullscreen.value = false;
+    document.body.style.overflow = "";
+  }
+}
 
 // ─── 正文编辑 ───
 
@@ -739,6 +800,9 @@ watch(() => props.open, (val) => {
     activeTitleIndex.value = props.article.titleIndex ?? 0;
     activeIntroIndex.value = props.article.introIndex ?? 0;
     if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+    editorFullscreen.value = false;
+    document.body.style.overflow = "";
+    document.addEventListener("keydown", handleFullscreenEsc);
     checkRegenArticleStatus();
     // 恢复文章保存的主题偏好，无记录时默认包豪斯
     const saved = props.article.wechatThemeId;
@@ -791,6 +855,11 @@ async function saveAndPush(): Promise<void> {
 }
 
 function handleClose(): void {
+  if (editorFullscreen.value) {
+    editorFullscreen.value = false;
+    document.body.style.overflow = "";
+  }
+  document.removeEventListener("keydown", handleFullscreenEsc);
   emit("update:open", false);
 }
 

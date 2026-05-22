@@ -435,8 +435,29 @@ async function handleRegenTitle(): Promise<void> {
       activeTitleIndex.value = 0;
       props.article.titles = JSON.stringify(result.titles);
       props.article.titleIndex = 0;
-      // 持久化新 titles 数组
-      editFinishedArticle(props.article.id, { titles: result.titles, titleIndex: 0 }).catch(() => {});
+
+      // 联动：替换 markdown 中的 H1，渲染并保存 wechatHtml
+      const newTitle = result.titles[0] ?? "";
+      let md = editContent.value;
+      if (/^# .+/m.test(md)) {
+        md = md.replace(/^# .+/m, `# ${newTitle}`);
+      }
+      editContent.value = md;
+      props.article.contentMarkdown = md;
+      lastSavedContent = md;
+
+      const saveFields: Record<string, unknown> = {
+        titles: result.titles,
+        titleIndex: 0,
+        contentMarkdown: md,
+      };
+      if (activePreviewTheme.value !== "live" && md) {
+        const html = renderWechatThemePreview(md, themeIdMap[activePreviewTheme.value]);
+        props.article.wechatHtml = html;
+        saveFields.wechatHtml = html;
+      }
+      editFinishedArticle(props.article.id, saveFields).catch(() => {});
+
       message.success("新标题已生成");
     } else {
       message.error(result.reason ?? "标题生成失败");
@@ -509,8 +530,30 @@ async function handleRegenIntro(): Promise<void> {
       activeIntroIndex.value = 0;
       props.article.intros = result.intros;
       props.article.introIndex = 0;
-      // 持久化新 intros 数组
-      editFinishedArticle(props.article.id, { intros: result.intros, introIndex: 0 }).catch(() => {});
+
+      // 联动：替换 markdown 中的 blockquote，渲染并保存 wechatHtml
+      const newIntro = result.intros[0] ?? "";
+      let md = editContent.value;
+      const bqMatch = md.match(/\n\n(> [^\n]+(?:\n> [^\n]+)*)\n\n/);
+      if (bqMatch) {
+        md = md.replace(bqMatch[1], `> ${newIntro}`);
+      }
+      editContent.value = md;
+      props.article.contentMarkdown = md;
+      lastSavedContent = md;
+
+      const saveFields: Record<string, unknown> = {
+        intros: result.intros,
+        introIndex: 0,
+        contentMarkdown: md,
+      };
+      if (activePreviewTheme.value !== "live" && md) {
+        const html = renderWechatThemePreview(md, themeIdMap[activePreviewTheme.value]);
+        props.article.wechatHtml = html;
+        saveFields.wechatHtml = html;
+      }
+      editFinishedArticle(props.article.id, saveFields).catch(() => {});
+
       message.success("新导语已生成");
     } else {
       message.error(result.reason ?? "导语生成失败");
@@ -673,14 +716,14 @@ async function handleRegenInlineImage(imageIndex: number): Promise<void> {
         props.article.contentMarkdown = result.contentMarkdown;
         lastSavedContent = result.contentMarkdown;
 
-        // 同步渲染并保存公众号预览 HTML
+        // 同步渲染并保存公众号预览 HTML（总是更新，live 模式用 bauhaus 兜底）
         const saveFields: Record<string, unknown> = { contentMarkdown: result.contentMarkdown };
-        if (activePreviewTheme.value !== "live" && result.contentMarkdown) {
-          const themeId = themeIdMap[activePreviewTheme.value];
-          const html = renderWechatThemePreview(result.contentMarkdown, themeId);
-          props.article.wechatHtml = html;
-          saveFields.wechatHtml = html;
-        }
+        const themeId = activePreviewTheme.value !== "live"
+          ? themeIdMap[activePreviewTheme.value]
+          : "bauhaus" as WechatThemeId;
+        const html = renderWechatThemePreview(result.contentMarkdown, themeId);
+        props.article.wechatHtml = html;
+        saveFields.wechatHtml = html;
         editFinishedArticle(props.article.id, saveFields).catch(() => {});
       }
       if (result.images) {
@@ -717,11 +760,33 @@ async function handleRegenCover(): Promise<void> {
     if (result.ok && result.coverImage) {
       localCoverImages.value = result.coverImage;
       activeCoverIndex.value = 0;
-      // 同步到 article 对象，确保推送时读到最新数据
       props.article.coverImage = result.coverImage;
       props.article.coverImageIndex = 0;
-      // 持久化新 coverImage 数组
-      editFinishedArticle(props.article.id, { coverImageIndex: 0 }).catch(() => {});
+
+      // 联动：替换 markdown 中的封面图行，渲染并保存 wechatHtml
+      const newUrl = result.coverImage[0] ?? "";
+      let md = editContent.value;
+      const coverRegex = /^!\[封面图[^\]]*\]\([^)]+\)/m;
+      if (newUrl && coverRegex.test(md)) {
+        md = md.replace(coverRegex, `![封面图](${newUrl})`);
+      } else if (newUrl) {
+        md = `![封面图](${newUrl})\n\n${md}`;
+      }
+      editContent.value = md;
+      props.article.contentMarkdown = md;
+      lastSavedContent = md;
+
+      const saveFields: Record<string, unknown> = {
+        coverImageIndex: 0,
+        contentMarkdown: md,
+      };
+      if (activePreviewTheme.value !== "live" && md) {
+        const html = renderWechatThemePreview(md, themeIdMap[activePreviewTheme.value]);
+        props.article.wechatHtml = html;
+        saveFields.wechatHtml = html;
+      }
+      editFinishedArticle(props.article.id, saveFields).catch(() => {});
+
       message.success("新封面图已生成");
     } else {
       message.error(result.reason ?? "封面图生成失败");

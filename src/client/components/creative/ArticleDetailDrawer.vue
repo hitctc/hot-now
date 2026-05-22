@@ -70,7 +70,7 @@
                 :loading="regenTitleLoading"
                 :disabled="regenTitleLoading"
                 @click="handleRegenTitle"
-              >{{ regenTitleLoading ? '生成中...' : '重新生成标题' }}</a-button>
+              >{{ regenTitleLoading ? '生成中...' : '生成新标题' }}</a-button>
               <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(displayTitles.join('\n'))">复制全部</a-button>
             </div>
           </div>
@@ -122,7 +122,7 @@
                 :loading="regenIntroLoading"
                 :disabled="regenIntroLoading"
                 @click="handleRegenIntro"
-              >{{ regenIntroLoading ? '生成中...' : (displayIntros.length > 0 ? '重新生成导语' : '生成导语') }}</a-button>
+              >{{ regenIntroLoading ? '生成中...' : '生成新导语' }}</a-button>
               <a-button v-if="displayIntros.length > 0" type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(displayIntros[activeIntroIndex] ?? '')">复制</a-button>
             </div>
           </div>
@@ -164,7 +164,7 @@
                 :loading="regenSummaryLoading"
                 :disabled="regenSummaryLoading"
                 @click="handleRegenSummary"
-              >{{ regenSummaryLoading ? '生成中...' : (displaySummaries.length > 0 ? '重新生成摘要' : '生成摘要') }}</a-button>
+              >{{ regenSummaryLoading ? '生成中...' : '生成新摘要' }}</a-button>
               <a-button v-if="displaySummaries.length > 0" type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(displaySummaries[activeSummaryIndex] ?? '')">复制</a-button>
             </div>
           </div>
@@ -234,7 +234,7 @@
               :loading="regenerating"
               :disabled="regenerating"
               @click="handleRegenCover"
-            >{{ regenerating ? '生成中...' : '重新生成封面图' }}</a-button>
+            >{{ regenerating ? '生成中...' : '生成新封面图' }}</a-button>
           </div>
           <a-image-preview-group>
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -388,7 +388,7 @@ async function handleRegenTitle(): Promise<void> {
       activeTitleIndex.value = 0;
       props.article.titles = JSON.stringify(result.titles);
       props.article.titleIndex = 0;
-      message.success("标题已重新生成");
+      message.success("新标题已生成");
     } else {
       message.error(result.reason ?? "标题生成失败");
     }
@@ -458,7 +458,7 @@ async function handleRegenIntro(): Promise<void> {
       activeIntroIndex.value = 0;
       props.article.intros = result.intros;
       props.article.introIndex = 0;
-      message.success("导语已重新生成");
+      message.success("新导语已生成");
     } else {
       message.error(result.reason ?? "导语生成失败");
     }
@@ -535,7 +535,7 @@ async function handleRegenSummary(): Promise<void> {
       activeSummaryIndex.value = 0;
       props.article.summary100 = result.summary100;
       props.article.summaryIndex = 0;
-      message.success("摘要已重新生成");
+      message.success("新摘要已生成");
     } else {
       message.error(result.reason ?? "摘要生成失败");
     }
@@ -649,7 +649,7 @@ async function handleRegenCover(): Promise<void> {
       // 同步到 article 对象，确保推送时读到最新数据
       props.article.coverImage = result.coverImage;
       props.article.coverImageIndex = 0;
-      message.success("封面图已重新生成");
+      message.success("新封面图已生成");
     } else {
       message.error(result.reason ?? "封面图生成失败");
     }

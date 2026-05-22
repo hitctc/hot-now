@@ -20,6 +20,7 @@ const SELECT_COLUMNS = `
   cover_image_index,
   title_index,
   intro_index,
+  summary_index,
   status,
   anomaly_reason,
   raw_response_text,
@@ -42,6 +43,7 @@ type ArticleRow = {
   hooks: string | null;
   quotes: string | null;
   summary_100: string | null;
+  summary_index: number;
   images_json: string | null;
   cover_image_url: string | null;
   cover_image_index: number;
@@ -69,6 +71,17 @@ function parseCoverImages(raw: string | null): string[] {
   }
 }
 
+function parseSummary100(raw: string | null): string[] | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.map(String);
+    return [String(parsed)];
+  } catch {
+    return [raw];
+  }
+}
+
 function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
   return {
     id: row.id,
@@ -80,13 +93,14 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     titles: row.titles ? JSON.parse(row.titles) : null,
     hooks: row.hooks ? JSON.parse(row.hooks) : null,
     quotes: row.quotes ? JSON.parse(row.quotes) : null,
-    summary100: row.summary_100,
+    summary100: parseSummary100(row.summary_100),
     imagesJson: row.images_json ? JSON.parse(row.images_json) : null,
     images: row.images_json ? JSON.parse(row.images_json) : null,
     coverImage: parseCoverImages(row.cover_image_url),
     coverImageIndex: row.cover_image_index ?? 0,
     titleIndex: row.title_index ?? 0,
     introIndex: row.intro_index ?? 0,
+    summaryIndex: row.summary_index ?? 0,
     status: row.status,
     anomalyReason: row.anomaly_reason,
     rawResponseText: row.raw_response_text,
@@ -111,13 +125,14 @@ export type CreativeFinishedArticleRecord = {
   titles: string[] | null;
   hooks: string[] | null;
   quotes: string[] | null;
-  summary100: string | null;
+  summary100: string[] | null;
   imagesJson: unknown[] | null;
   images: unknown[] | null;
   coverImage: string[];
   coverImageIndex: number;
   titleIndex: number;
   introIndex: number;
+  summaryIndex: number;
   status: string;
   anomalyReason: string | null;
   rawResponseText: string | null;
@@ -138,7 +153,7 @@ export type InsertCreativeFinishedArticleInput = {
   titles?: string[];
   hooks?: string[];
   quotes?: string[];
-  summary100?: string;
+  summary100?: string[];
   images?: unknown[];
   coverImage?: string[];
   rawResponseText?: string;
@@ -153,7 +168,8 @@ export type EditCreativeFinishedArticleInput = {
   titles?: string[];
   hooks?: string[];
   quotes?: string[];
-  summary100?: string;
+  summary100?: string[];
+  summaryIndex?: number;
   images?: unknown[];
   coverImage?: string[];
   coverImageIndex?: number;
@@ -213,7 +229,7 @@ export function insertCreativeFinishedArticle(
     input.titles ? JSON.stringify(input.titles) : null,
     input.hooks ? JSON.stringify(input.hooks) : null,
     input.quotes ? JSON.stringify(input.quotes) : null,
-    input.summary100 ?? null,
+    input.summary100 ? JSON.stringify(input.summary100) : null,
     input.images ? JSON.stringify(input.images) : null,
     input.coverImage ? JSON.stringify(input.coverImage) : null,
     input.rawResponseText ?? null
@@ -349,7 +365,7 @@ export function editCreativeFinishedArticle(
   }
   if (input.summary100 !== undefined) {
     setClauses.push("summary_100 = ?");
-    params.push(input.summary100);
+    params.push(JSON.stringify(input.summary100));
   }
   if (input.images !== undefined) {
     setClauses.push("images_json = ?");
@@ -370,6 +386,10 @@ export function editCreativeFinishedArticle(
   if (input.introIndex !== undefined) {
     setClauses.push("intro_index = ?");
     params.push(input.introIndex);
+  }
+  if (input.summaryIndex !== undefined) {
+    setClauses.push("summary_index = ?");
+    params.push(input.summaryIndex);
   }
   if (input.rawResponseText !== undefined) {
     setClauses.push("raw_response_text = ?");

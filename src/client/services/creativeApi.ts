@@ -55,13 +55,14 @@ export type CreativeFinishedArticle = {
   titles: string | null;
   hooks: string | null;
   quotes: string | null;
-  summary100: string | null;
+  summary100: string[] | null;
   imagesJson: string | ArticleImageEntry[] | null;
   images: string | ArticleImageEntry[] | null;
   coverImage: string[];
   coverImageIndex: number;
   titleIndex: number;
   introIndex: number;
+  summaryIndex: number;
   status: string;
   anomalyReason: string | null;
   rawResponseText: string | null;
@@ -181,13 +182,14 @@ export function editFinishedArticle(
     titles?: string[];
     hooks?: string[];
     quotes?: string[];
-    summary100?: string;
     wechatThemeId?: string | null;
     wechatHtml?: string | null;
     coverImageIndex?: number;
     titleIndex?: number;
     intros?: string[];
     introIndex?: number;
+    summary100?: string[];
+    summaryIndex?: number;
   }
 ): Promise<{ ok: boolean }> {
   return requestJson<{ ok: boolean }>(`/actions/creative/finished-articles/${id}`, {
@@ -371,7 +373,7 @@ export function regenIntro(id: number): Promise<RegenIntroResult> {
 
 export type RegenSummaryResult = {
   ok: boolean;
-  summary100?: string;
+  summary100?: string[];
   reason?: string;
 };
 

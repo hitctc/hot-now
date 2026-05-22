@@ -152,8 +152,8 @@
           </ul>
         </section>
 
-        <!-- 百字摘要 -->
-        <section v-if="localSummary100 || article.summary100">
+        <!-- 百字摘要（可选择切换） -->
+        <section>
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">百字摘要</h3>
             <div class="flex items-center gap-3">
@@ -164,11 +164,34 @@
                 :loading="regenSummaryLoading"
                 :disabled="regenSummaryLoading"
                 @click="handleRegenSummary"
-              >{{ regenSummaryLoading ? '生成中...' : '重新生成摘要' }}</a-button>
-              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(localSummary100 || article.summary100!)">复制</a-button>
+              >{{ regenSummaryLoading ? '生成中...' : (displaySummaries.length > 0 ? '重新生成摘要' : '生成摘要') }}</a-button>
+              <a-button v-if="displaySummaries.length > 0" type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(displaySummaries[activeSummaryIndex] ?? '')">复制</a-button>
             </div>
           </div>
-          <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ localSummary100 || article.summary100 }}</p>
+          <p v-if="displaySummaries.length === 0" class="m-0 text-sm text-editorial-text-muted">暂无摘要，点击上方按钮生成</p>
+          <ul v-else class="m-0 list-none space-y-1 pl-0">
+            <li
+              v-for="(text, idx) in displaySummaries"
+              :key="idx"
+              class="group/summary relative flex items-start gap-3 rounded-editorial-sm border px-3 py-2 transition-colors"
+              :class="idx === activeSummaryIndex
+                ? 'border-editorial-accent ring-2 ring-editorial-ring'
+                : 'border-editorial-border hover:border-editorial-link-active/40'"
+            >
+              <span class="flex-shrink-0 text-[11px] font-bold tabular-nums text-editorial-text-muted">{{ idx + 1 }}</span>
+              <span class="flex-1 text-sm leading-6 text-editorial-text-main">{{ text }}</span>
+              <span
+                v-if="idx === activeSummaryIndex"
+                class="flex-shrink-0 rounded bg-editorial-accent px-1.5 py-0.5 text-[10px] font-semibold text-white"
+              >✓ 选中</span>
+              <span v-if="idx === 0 && idx !== activeSummaryIndex" class="flex-shrink-0 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</span>
+              <button
+                v-if="idx !== activeSummaryIndex"
+                class="flex-shrink-0 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/summary:opacity-100 hover:!bg-black/70"
+                @click.stop="selectSummary(idx)"
+              >选择</button>
+            </li>
+          </ul>
         </section>
 
         <!-- 开头钩子（只读） -->
@@ -492,10 +515,15 @@ async function selectIntro(idx: number): Promise<void> {
   } catch { /* 静默失败，本地状态已更新 */ }
 }
 
-// ─── 百字摘要重新生成 ───
+// ─── 百字摘要选择 & 重新生成 ───
 
 const regenSummaryLoading = ref(false);
-const localSummary100 = ref("");
+const activeSummaryIndex = ref(0);
+const localSummaries = ref<string[]>([]);
+
+const displaySummaries = computed(() => {
+  return localSummaries.value.length > 0 ? localSummaries.value : (props.article?.summary100 ?? []);
+});
 
 async function handleRegenSummary(): Promise<void> {
   if (!props.article || regenSummaryLoading.value) return;
@@ -503,8 +531,10 @@ async function handleRegenSummary(): Promise<void> {
   try {
     const result = await regenSummary(props.article.id);
     if (result.ok && result.summary100) {
-      localSummary100.value = result.summary100;
+      localSummaries.value = result.summary100;
+      activeSummaryIndex.value = 0;
       props.article.summary100 = result.summary100;
+      props.article.summaryIndex = 0;
       message.success("摘要已重新生成");
     } else {
       message.error(result.reason ?? "摘要生成失败");
@@ -514,6 +544,16 @@ async function handleRegenSummary(): Promise<void> {
   } finally {
     regenSummaryLoading.value = false;
   }
+}
+
+async function selectSummary(idx: number): Promise<void> {
+  if (!props.article || idx === activeSummaryIndex.value) return;
+  activeSummaryIndex.value = idx;
+  try {
+    await editFinishedArticle(props.article.id, { summaryIndex: idx });
+    props.article.summaryIndex = idx;
+    emit("saved");
+  } catch { /* 静默失败 */ }
 }
 
 // ─── 整篇重写 ───
@@ -681,10 +721,11 @@ watch(() => props.open, (val) => {
     localCoverImages.value = [];
     localTitles.value = [];
     localIntros.value = [];
-    localSummary100.value = "";
+    localSummaries.value = [];
     activeCoverIndex.value = props.article.coverImageIndex ?? 0;
     activeTitleIndex.value = props.article.titleIndex ?? 0;
     activeIntroIndex.value = props.article.introIndex ?? 0;
+    activeSummaryIndex.value = props.article.summaryIndex ?? 0;
     if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
     checkRegenArticleStatus();
     // 恢复文章保存的主题偏好，无记录时默认包豪斯

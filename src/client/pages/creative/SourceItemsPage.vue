@@ -674,12 +674,12 @@ const pagination = computed(() => ({
             </section>
 
             <!-- 百字摘要 -->
-            <section v-if="articleModalData.summary100">
+            <section v-if="articleModalData.summary100 && articleModalData.summary100.length > 0">
               <div class="mb-2 flex items-center justify-between">
                 <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">百字摘要</h3>
-                <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(articleModalData.summary100!)">复制</a-button>
+                <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(articleModalData.summary100![0])">复制</a-button>
               </div>
-              <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ articleModalData.summary100 }}</p>
+              <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ articleModalData.summary100![0] }}</p>
             </section>
 
             <!-- 开头钩子 -->

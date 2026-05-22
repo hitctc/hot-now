@@ -795,7 +795,7 @@ export function createServer(deps: ServerDeps = {}) {
       titles: Array.isArray(body?.titles) ? body.titles as string[] : undefined,
       hooks: Array.isArray(body?.hooks) ? body.hooks as string[] : undefined,
       quotes: Array.isArray(body?.quotes) ? body.quotes as string[] : undefined,
-      summary100: typeof body?.summary100 === "string" ? body.summary100 : undefined,
+      summary100: Array.isArray(body?.summary100) ? body.summary100 as string[] : (typeof body?.summary100 === "string" ? [body.summary100] : undefined),
       images: Array.isArray(body?.images) ? body.images as any[] : undefined,
       coverImage: Array.isArray(body?.coverImage) ? body.coverImage as string[] : (typeof body?.coverImage === "string" ? [body.coverImage] : undefined),
       rawResponseText: typeof body?.rawResponseText === "string" ? body.rawResponseText : undefined,
@@ -1057,7 +1057,14 @@ export function createServer(deps: ServerDeps = {}) {
     }
     if (body?.titles !== undefined) { editInput.titles = body.titles; updatedFields.push("titles"); }
     if (body?.thesis !== undefined) { editInput.thesis = body.thesis; updatedFields.push("thesis"); }
-    if (body?.summary100 !== undefined) { editInput.summary100 = body.summary100; updatedFields.push("summary100"); }
+    if (body?.summary100 !== undefined) {
+      editInput.summary100 = Array.isArray(body.summary100) ? body.summary100 as string[] : (typeof body.summary100 === "string" ? [body.summary100] : []);
+      updatedFields.push("summary100");
+    }
+    if (body?.summaryIndex !== undefined && typeof body.summaryIndex === "number") {
+      editInput.summaryIndex = body.summaryIndex;
+      updatedFields.push("summaryIndex");
+    }
     if (body?.status !== undefined) { editInput.status = body.status; updatedFields.push("status"); }
     if (body?.anomalyReason !== undefined) { editInput.anomalyReason = body.anomalyReason; updatedFields.push("anomalyReason"); }
     if (body?.wechatThemeId !== undefined) { editInput.wechatThemeId = body.wechatThemeId; updatedFields.push("wechatThemeId"); }
@@ -1321,9 +1328,11 @@ export function createServer(deps: ServerDeps = {}) {
         return reply.code(502).send({ ok: false, reason: data.error ?? "摘要生成失败" });
       }
 
-      editCreativeFinishedArticle(db, id, { summary100: data.summary100 });
+      const existing = article.summary100 ?? [];
+      const updated = [data.summary100, ...existing];
+      editCreativeFinishedArticle(db, id, { summary100: updated });
 
-      return reply.send({ ok: true, summary100: data.summary100 });
+      return reply.send({ ok: true, summary100: updated });
     } catch (err) {
       if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "生成超时" }); }
       return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
@@ -1478,7 +1487,7 @@ export function createServer(deps: ServerDeps = {}) {
       titles: Array.isArray(body?.titles) ? body.titles as string[] : undefined,
       hooks: Array.isArray(body?.hooks) ? body.hooks as string[] : undefined,
       quotes: Array.isArray(body?.quotes) ? body.quotes as string[] : undefined,
-      summary100: typeof body?.summary100 === "string" ? body.summary100 : undefined,
+      summary100: Array.isArray(body?.summary100) ? body.summary100 as string[] : (typeof body?.summary100 === "string" ? [body.summary100] : undefined),
       images: Array.isArray(body?.images) ? body.images as any[] : undefined,
       wechatThemeId: typeof body?.wechatThemeId === "string" ? body.wechatThemeId : (body?.wechatThemeId === null ? null : undefined),
       wechatHtml: typeof body?.wechatHtml === "string" ? body.wechatHtml : (body?.wechatHtml === null ? null : undefined),

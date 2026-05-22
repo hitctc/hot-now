@@ -959,8 +959,8 @@ export function createServer(deps: ServerDeps = {}) {
       const sourceItemIds = result.items.map(a => a.sourceItemId);
       const idPlaceholders = sourceItemIds.map(() => "?").join(",");
       const sourceRows = db.prepare(
-        `SELECT id, trend_score, trend_breakdown, published_at, title FROM creative_source_items WHERE id IN (${idPlaceholders})`
-      ).all(...sourceItemIds) as Array<{ id: number; trend_score: number | null; trend_breakdown: string | null; published_at: string | null; title: string | null }>;
+        `SELECT id, trend_score, trend_breakdown, published_at, title, source_name FROM creative_source_items WHERE id IN (${idPlaceholders})`
+      ).all(...sourceItemIds) as Array<{ id: number; trend_score: number | null; trend_breakdown: string | null; published_at: string | null; title: string | null; source_name: string | null }>;
       const sourceMap = new Map(sourceRows.map(r => [r.id, r]));
       for (const article of result.items) {
         const source = sourceMap.get(article.sourceItemId);
@@ -968,6 +968,7 @@ export function createServer(deps: ServerDeps = {}) {
         (article as any).trendBreakdown = source?.trend_breakdown ? JSON.parse(source.trend_breakdown) : null;
         (article as any).publishedAt = source?.published_at ?? null;
         (article as any).sourceTitle = source?.title ?? null;
+        (article as any).sourceName = source?.source_name ?? null;
       }
     }
     return reply.send(result);

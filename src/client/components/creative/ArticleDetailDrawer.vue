@@ -55,7 +55,7 @@
           <a
             class="cursor-pointer text-xs text-editorial-link-active hover:underline"
             @click.prevent="$emit('openSourceItem', article.sourceItemId)"
-          >素材 #{{ article.sourceItemId }} {{ (article as any).sourceTitle ? '· ' + (article as any).sourceTitle : ''  }}</a>
+          >素材 #{{ article.sourceItemId }}{{ (article as any).sourceTitle ? ' · ' + (article as any).sourceTitle : '' }}{{ (article as any).sourceName ? ' · ' + (article as any).sourceName : '' }}</a>
         </div>
 
         <!-- 备选标题 -->

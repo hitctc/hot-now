@@ -298,7 +298,7 @@ async function selectCoverImage(idx: number): Promise<void> {
   // 在 markdown 中替换封面图 URL
   let content = editContent.value;
   if (oldUrl && content.includes(oldUrl)) {
-    content = content.replace(oldUrl, newUrl);
+    content = content.replaceAll(oldUrl, newUrl);
   } else if (newUrl) {
     content = `![封面图](${newUrl})\n\n${content}`;
   }

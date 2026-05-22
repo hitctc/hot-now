@@ -676,10 +676,11 @@ async function selectCoverImage(idx: number): Promise<void> {
   const oldUrl = imgs[activeCoverIndex.value];
   const newUrl = imgs[idx];
 
-  // 在 markdown 中替换封面图 URL
+  // 精确替换 markdown 中的封面图行，避免 URL 重复导致误替换或额外插入
   let content = editContent.value;
-  if (oldUrl && content.includes(oldUrl)) {
-    content = content.replaceAll(oldUrl, newUrl);
+  const coverLineRegex = /^!\[封面图[^\]]*\]\([^)]+\)/m;
+  if (coverLineRegex.test(content)) {
+    content = content.replace(coverLineRegex, `![封面图](${newUrl})`);
   } else if (newUrl) {
     content = `![封面图](${newUrl})\n\n${content}`;
   }

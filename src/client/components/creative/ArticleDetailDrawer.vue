@@ -1143,6 +1143,11 @@ function getMissingConditions(article: CreativeFinishedArticle): string[] {
 
 /* ─── 移动端适配 ─── */
 @media (max-width: 768px) {
+  /* wrap 容器改为顶部对齐，覆盖 centered 的垂直居中 */
+  .article-detail-modal .ant-modal-wrap {
+    align-items: flex-start !important;
+    padding: 0 !important;
+  }
   .article-detail-modal .ant-modal {
     max-width: 100% !important;
     margin: 0 !important;

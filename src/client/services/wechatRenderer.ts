@@ -208,6 +208,6 @@ export function renderWechatThemePreview(
   const imgStyle = theme?.styles.img ?? "display:block; margin:0 auto 16px; width:100%;";
   const coverHtml = `<img src="${coverUrl}" alt="封面图" style="${imgStyle}" />`;
 
-  // 在 container div 开头插入封面图
-  return themed.replace(/(<div[^>]*style="[^"]*container[^"]*")>/, `$1>${coverHtml}`);
+  // 在 container div 开头插入封面图（applyTheme 的输出以 <div style="..." 开头）
+  return themed.replace(/^(<div[^>]*>)/, `$1${coverHtml}`);
 }

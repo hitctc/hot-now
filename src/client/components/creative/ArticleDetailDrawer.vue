@@ -152,13 +152,23 @@
           </ul>
         </section>
 
-        <!-- 百字摘要（只读） -->
-        <section v-if="article.summary100">
+        <!-- 百字摘要 -->
+        <section v-if="localSummary100 || article.summary100">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">百字摘要</h3>
-            <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(article.summary100!)">复制</a-button>
+            <div class="flex items-center gap-3">
+              <a-button
+                type="link"
+                size="small"
+                class="!p-0 !text-[11px]"
+                :loading="regenSummaryLoading"
+                :disabled="regenSummaryLoading"
+                @click="handleRegenSummary"
+              >{{ regenSummaryLoading ? '生成中...' : '重新生成摘要' }}</a-button>
+              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(localSummary100 || article.summary100!)">复制</a-button>
+            </div>
           </div>
-          <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ article.summary100 }}</p>
+          <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ localSummary100 || article.summary100 }}</p>
         </section>
 
         <!-- 开头钩子（只读） -->
@@ -306,6 +316,7 @@ import {
   regenCover,
   regenTitle,
   regenIntro,
+  regenSummary,
   regenArticle,
   parseArticleImages,
   extractImageUrl,
@@ -481,6 +492,30 @@ async function selectIntro(idx: number): Promise<void> {
   } catch { /* 静默失败，本地状态已更新 */ }
 }
 
+// ─── 百字摘要重新生成 ───
+
+const regenSummaryLoading = ref(false);
+const localSummary100 = ref("");
+
+async function handleRegenSummary(): Promise<void> {
+  if (!props.article || regenSummaryLoading.value) return;
+  regenSummaryLoading.value = true;
+  try {
+    const result = await regenSummary(props.article.id);
+    if (result.ok && result.summary100) {
+      localSummary100.value = result.summary100;
+      props.article.summary100 = result.summary100;
+      message.success("摘要已重新生成");
+    } else {
+      message.error(result.reason ?? "摘要生成失败");
+    }
+  } catch {
+    message.error("摘要生成请求失败");
+  } finally {
+    regenSummaryLoading.value = false;
+  }
+}
+
 // ─── 整篇重写 ───
 
 const regenArticleLoading = ref(false);
@@ -646,6 +681,7 @@ watch(() => props.open, (val) => {
     localCoverImages.value = [];
     localTitles.value = [];
     localIntros.value = [];
+    localSummary100.value = "";
     activeCoverIndex.value = props.article.coverImageIndex ?? 0;
     activeTitleIndex.value = props.article.titleIndex ?? 0;
     activeIntroIndex.value = props.article.introIndex ?? 0;

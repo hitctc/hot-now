@@ -337,3 +337,16 @@ export function regenCover(id: number): Promise<RegenCoverResult> {
     method: "POST",
   });
 }
+
+export type RegenTitleResult = {
+  ok: boolean;
+  titles?: string[];
+  reason?: string;
+};
+
+/** 调用后端代理重新生成标题，返回更新后的 titles 数组 */
+export function regenTitle(id: number): Promise<RegenTitleResult> {
+  return requestJson<RegenTitleResult>(`/api/creative/finished-articles/${id}/regen-title`, {
+    method: "POST",
+  });
+}

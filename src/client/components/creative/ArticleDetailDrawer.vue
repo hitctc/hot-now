@@ -48,14 +48,24 @@
         </div>
 
         <!-- 备选标题（只读） -->
-        <section v-if="parseJsonArray(article.titles).length > 0">
+        <section v-if="displayTitles.length > 0 || regenTitleLoading">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">备选标题</h3>
-            <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(parseJsonArray(article.titles).join('\n'))">复制全部</a-button>
+            <div class="flex items-center gap-3">
+              <a-button
+                type="link"
+                size="small"
+                class="!p-0 !text-[11px]"
+                :loading="regenTitleLoading"
+                :disabled="regenTitleLoading"
+                @click="handleRegenTitle"
+              >{{ regenTitleLoading ? '生成中...' : '重新生成标题' }}</a-button>
+              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(displayTitles.join('\n'))">复制全部</a-button>
+            </div>
           </div>
           <ul class="m-0 list-none space-y-1 pl-0">
             <li
-              v-for="(t, idx) in parseJsonArray(article.titles)"
+              v-for="(t, idx) in displayTitles"
               :key="idx"
               class="group flex items-start gap-3 rounded-editorial-sm border border-editorial-border px-3 py-2 transition-colors hover:border-editorial-link-active/40"
             >
@@ -227,6 +237,7 @@ import ArticleMarkdownEditor from "./ArticleMarkdownEditor.vue";
 import {
   editFinishedArticle,
   regenCover,
+  regenTitle,
   parseArticleImages,
   extractImageUrl,
   type CreativeFinishedArticle,
@@ -253,6 +264,34 @@ const saving = ref(false);
 const lastSavedAt = ref("");
 // 记住打开时的原始内容，用于判断是否真正发生变化
 let lastSavedContent = "";
+
+// ─── 标题重新生成 ───
+
+const regenTitleLoading = ref(false);
+const localTitles = ref<string[]>([]);
+
+const displayTitles = computed(() => {
+  return localTitles.value.length > 0 ? localTitles.value : parseJsonArray(props.article?.titles ?? null);
+});
+
+async function handleRegenTitle(): Promise<void> {
+  if (!props.article || regenTitleLoading.value) return;
+  regenTitleLoading.value = true;
+  try {
+    const result = await regenTitle(props.article.id);
+    if (result.ok && result.titles) {
+      localTitles.value = result.titles;
+      props.article.titles = JSON.stringify(result.titles);
+      message.success("标题已重新生成");
+    } else {
+      message.error(result.reason ?? "标题生成失败");
+    }
+  } catch {
+    message.error("标题生成请求失败");
+  } finally {
+    regenTitleLoading.value = false;
+  }
+}
 
 // ─── 封面图选择 & 重新生成 ───
 
@@ -347,6 +386,7 @@ watch(() => props.open, (val) => {
     lastSavedContent = md;
     // 重置封面状态
     localCoverImages.value = [];
+    localTitles.value = [];
     activeCoverIndex.value = props.article.coverImageIndex ?? 0;
     if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
     // 恢复文章保存的主题偏好，无记录时默认包豪斯

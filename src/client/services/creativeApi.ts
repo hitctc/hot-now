@@ -383,6 +383,22 @@ export function regenSummary(id: number): Promise<RegenSummaryResult> {
   });
 }
 
+export type RegenInlineImageResult = {
+  ok: boolean;
+  imageUrl?: string;
+  imageIndex?: number;
+  contentMarkdown?: string;
+  images?: unknown[];
+  reason?: string;
+};
+
+export function regenInlineImage(id: number, imageIndex: number): Promise<RegenInlineImageResult> {
+  return requestJson<RegenInlineImageResult>(`/api/creative/finished-articles/${id}/regen-inline-image`, {
+    method: "POST",
+    body: JSON.stringify({ imageIndex }),
+  });
+}
+
 export type RegenArticleResult = {
   ok: boolean;
   title?: string;

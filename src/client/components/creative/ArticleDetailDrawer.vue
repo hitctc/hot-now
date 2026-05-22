@@ -270,25 +270,30 @@
           </a-image-preview-group>
         </section>
 
-        <!-- 图片列表（只读，在封面图下方） -->
-        <section v-if="parseArticleImages(article.imagesJson).length > 0">
-          <h3 class="m-0 mb-2 text-sm font-semibold text-editorial-text-muted">图片列表</h3>
+        <!-- 正文配图 -->
+        <section v-if="articleImages.length > 0">
+          <h3 class="m-0 mb-2 text-sm font-semibold text-editorial-text-muted">正文配图</h3>
           <a-image-preview-group>
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <div
-                v-for="(img, idx) in parseArticleImages(article.imagesJson)"
+                v-for="(img, idx) in articleImages"
                 :key="idx"
-                class="group relative overflow-hidden rounded-editorial-md border border-editorial-border"
+                class="group/inline-img relative overflow-hidden rounded-editorial-md border border-editorial-border"
               >
                 <a-image
                   :src="extractImageUrl(img)"
-                  :alt="typeof img === 'object' && img.alt ? img.alt : `图片 ${idx + 1}`"
+                  :alt="typeof img === 'object' && img.alt ? img.alt : `配图 ${idx + 1}`"
                   class="block w-full object-cover"
                   loading="lazy"
                 />
                 <div v-if="typeof img === 'object' && img.purpose" class="absolute right-1 top-1 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
                   {{ img.purpose }}
                 </div>
+                <button
+                  class="absolute inset-x-1 bottom-1 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/inline-img:opacity-100 hover:!bg-black/70"
+                  :disabled="regenInlineImageLoading === idx + 1"
+                  @click.stop="handleRegenInlineImage(idx + 1)"
+                >{{ regenInlineImageLoading === idx + 1 ? '生成中...' : '生成新配图' }}</button>
               </div>
             </div>
           </a-image-preview-group>
@@ -341,6 +346,7 @@ import {
   regenIntro,
   regenSummary,
   regenArticle,
+  regenInlineImage,
   parseArticleImages,
   extractImageUrl,
   type CreativeFinishedArticle,
@@ -627,6 +633,40 @@ function checkRegenArticleStatus(): void {
       localStorage.removeItem(REGEN_ARTICLE_KEY);
       message.info("整篇重写已完成或超时，请刷新列表查看");
     }
+  }
+}
+
+// ─── 正文配图重新生成 ───
+
+const regenInlineImageLoading = ref<number | null>(null);
+
+const articleImages = computed(() => {
+  return parseArticleImages(props.article?.imagesJson ?? null);
+});
+
+async function handleRegenInlineImage(imageIndex: number): Promise<void> {
+  if (!props.article || regenInlineImageLoading.value !== null) return;
+  regenInlineImageLoading.value = imageIndex;
+  try {
+    const result = await regenInlineImage(props.article.id, imageIndex);
+    if (result.ok) {
+      // Hermes 已回写 contentMarkdown 和 images，更新本地状态
+      if (result.contentMarkdown) {
+        editContent.value = result.contentMarkdown;
+        props.article.contentMarkdown = result.contentMarkdown;
+        lastSavedContent = result.contentMarkdown;
+      }
+      if (result.images) {
+        props.article.imagesJson = result.images as typeof props.article.imagesJson;
+      }
+      message.success(`配图 ${imageIndex} 已重新生成`);
+    } else {
+      message.error(result.reason ?? "配图生成失败");
+    }
+  } catch {
+    message.error("配图生成请求失败");
+  } finally {
+    regenInlineImageLoading.value = null;
   }
 }
 

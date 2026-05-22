@@ -1339,6 +1339,60 @@ export function createServer(deps: ServerDeps = {}) {
     }
   });
 
+  // ─── regen-inline-image：重新生成单张正文配图 ───
+  app.post("/api/creative/finished-articles/:id/regen-inline-image", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+    if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
+
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const body = request.body as Record<string, unknown> | undefined;
+    const imageIndex = typeof body?.imageIndex === "number" ? body.imageIndex : undefined;
+    if (!imageIndex) { return reply.code(400).send({ ok: false, reason: "imageIndex is required" }); }
+
+    const article = findCreativeFinishedArticleById(db, id);
+    if (!article) { return reply.code(404).send({ ok: false, reason: "article-not-found" }); }
+
+    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+    const hermesApiToken = process.env.HERMES_API_TOKEN;
+    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 90_000);
+      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/regen-inline-image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
+        body: JSON.stringify({ articleId: id, imageIndex }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const errorBody = await res.json().catch(() => ({ error: `Hermes HTTP ${res.status}` }));
+        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: errorBody.error ?? `Hermes HTTP ${res.status}` });
+      }
+
+      const data = await res.json() as { success: boolean; imageUrl?: string; imageIndex?: number; error?: string };
+      if (!data.success) {
+        return reply.code(502).send({ ok: false, reason: data.error ?? "配图生成失败" });
+      }
+
+      // Hermes 已回写 contentMarkdown 和 images，重新读取最新数据返回
+      const updated = findCreativeFinishedArticleById(db, id);
+      return reply.send({
+        ok: true,
+        imageUrl: data.imageUrl,
+        imageIndex: data.imageIndex,
+        contentMarkdown: updated?.contentMarkdown ?? article.contentMarkdown,
+        images: updated?.images ?? article.images,
+      });
+    } catch (err) {
+      if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "生成超时" }); }
+      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
+    }
+  });
+
   // ─── regen-article：整篇重新写作 ───
   app.post("/api/creative/finished-articles/:id/regen-article", async (request, reply) => {
     const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");

@@ -352,7 +352,7 @@ function getStatusInfo(status: string): { label: string; color: string } {
 const columns = [
   { title: "标题", key: "title", width: 280 },
   { title: "封面图", key: "coverImage", width: 80, ellipsis: true },
-  { title: "状态", key: "status", width: 140, ellipsis: true },
+  { title: "状态", key: "status", width: 140 },
   { title: "来源素材", key: "sourceItem", width: 110, ellipsis: true },
   { title: "爆文分", key: "trendScore", width: 72, ellipsis: true },
   { title: "爆文维度", key: "trendBreakdown", width: 160, ellipsis: true },
@@ -451,8 +451,10 @@ const pagination = computed(() => ({
 
           <!-- 状态列 -->
           <template v-else-if="column.key === 'status'">
-            <a-tag :color="getStatusInfo(record.status).color" class="!m-0">{{ getStatusInfo(record.status).label }}</a-tag>
-            <a-tag v-if="record.pushCount > 0" color="green" class="!m-0 !ml-1">{{ record.pushCount }}次</a-tag>
+            <div class="flex flex-col gap-0.5 leading-tight">
+              <a-tag :color="getStatusInfo(record.status).color" class="!m-0 !text-[11px] !py-0">{{ getStatusInfo(record.status).label }}</a-tag>
+              <a-tag v-if="record.pushCount > 0" color="green" class="!m-0 !text-[11px] !py-0">{{ record.pushCount }}次</a-tag>
+            </div>
           </template>
 
           <!-- 公众号发布状态列 -->

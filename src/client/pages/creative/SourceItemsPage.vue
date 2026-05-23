@@ -453,17 +453,16 @@ const pagination = computed(() => ({
 
           <!-- 成品列 -->
           <template v-else-if="column.key === 'linkedArticle'">
-            <div v-if="record.linkedArticleId != null" class="flex flex-wrap items-center justify-center gap-1.5">
+            <div v-if="record.linkedArticleId != null" class="flex flex-wrap items-center justify-center gap-1 leading-tight">
               <a
-                class="inline-flex cursor-pointer items-center gap-1 rounded-editorial-pill bg-editorial-link-active/30 px-2.5 py-1 text-[11px] font-semibold text-editorial-link-active hover:bg-editorial-link-active/50"
+                class="inline-flex cursor-pointer items-center gap-1 rounded-editorial-pill bg-editorial-link-active/30 px-2 py-0.5 text-[11px] font-semibold text-editorial-link-active hover:bg-editorial-link-active/50"
                 @click.prevent="openArticleModal(record.linkedArticleId!)"
               >
                 #{{ record.linkedArticleId }}
-                <span class="text-[10px] opacity-70">→</span>
               </a>
               <span
                 v-if="(record as any).linkedArticlePublished"
-                class="inline-flex items-center rounded-editorial-pill bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700"
+                class="inline-flex items-center rounded-editorial-pill bg-green-100 px-1.5 py-0.5 text-[10px] leading-none text-green-700"
               >已发布</span>
             </div>
             <span v-else class="text-xs text-editorial-text-muted">-</span>

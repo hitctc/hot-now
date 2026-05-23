@@ -193,7 +193,7 @@
         </section>
 
         <!-- 封面图 -->
-        <section v-if="article.coverImage && article.coverImage.length > 0">
+        <section>
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">封面图</h3>
             <a-button
@@ -203,80 +203,107 @@
               :loading="regenerating"
               :disabled="regenerating"
               @click="handleRegenCover"
-            >{{ regenerating ? '生成中...' : '生成新封面图' }}</a-button>
+            >{{ regenerating ? '生成中...' : (displayCoverImages.length > 0 ? '生成新封面图' : '生成封面图') }}</a-button>
           </div>
-          <a-image-preview-group>
-            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <div
-                v-for="(url, idx) in displayCoverImages"
-                :key="idx"
-                class="relative overflow-hidden rounded-editorial-md border transition-all"
-                :class="idx === activeCoverIndex
-                  ? 'border-editorial-accent ring-2 ring-editorial-ring'
-                  : 'border-editorial-border opacity-60 hover:opacity-100 hover:border-editorial-link-active/40'"
-              >
-                <a-image
-                  :src="url"
-                  :alt="`封面图 ${idx + 1}`"
-                  class="block w-full object-cover"
-                  loading="lazy"
-                />
-                <!-- 选中标记 / 最新标记 -->
+          <template v-if="displayCoverImages.length > 0">
+            <a-image-preview-group>
+              <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <div
-                  v-if="idx === activeCoverIndex"
-                  class="absolute right-1 top-1 flex items-center gap-0.5 rounded bg-editorial-accent px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm"
+                  v-for="(url, idx) in displayCoverImages"
+                  :key="idx"
+                  class="relative overflow-hidden rounded-editorial-md border transition-all"
+                  :class="idx === activeCoverIndex
+                    ? 'border-editorial-accent ring-2 ring-editorial-ring'
+                    : 'border-editorial-border opacity-60 hover:opacity-100 hover:border-editorial-link-active/40'"
                 >
-                  <span class="inline-block h-3 w-3 leading-none text-center">✓</span> 发布封面
+                  <a-image
+                    :src="url"
+                    :alt="`封面图 ${idx + 1}`"
+                    class="block w-full object-cover"
+                    loading="lazy"
+                  />
+                  <!-- 选中标记 / 最新标记 -->
+                  <div
+                    v-if="idx === activeCoverIndex"
+                    class="absolute right-1 top-1 flex items-center gap-0.5 rounded bg-editorial-accent px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm"
+                  >
+                    <span class="inline-block h-3 w-3 leading-none text-center">✓</span> 发布封面
+                  </div>
+                  <div v-if="idx === 0 && idx !== activeCoverIndex" class="absolute left-1 top-1 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</div>
+                  <!-- 设为发布：始终可见，不遮挡图片 -->
+                  <button
+                    v-if="idx !== activeCoverIndex"
+                    class="absolute right-1 bottom-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white hover:bg-black/80"
+                    @click.stop="selectCoverImage(idx)"
+                  >设为发布封面</button>
                 </div>
-                <div v-if="idx === 0 && idx !== activeCoverIndex" class="absolute left-1 top-1 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</div>
-                <!-- 设为发布：始终可见，不遮挡图片 -->
-                <button
-                  v-if="idx !== activeCoverIndex"
-                  class="absolute right-1 bottom-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white hover:bg-black/80"
-                  @click.stop="selectCoverImage(idx)"
-                >设为发布封面</button>
               </div>
-            </div>
-          </a-image-preview-group>
+            </a-image-preview-group>
+          </template>
+          <div v-else class="flex items-center justify-center rounded-editorial-md border border-dashed border-editorial-border bg-editorial-bg-page px-4 py-6 text-xs text-editorial-text-muted">
+            暂无封面图，点击上方按钮生成
+          </div>
         </section>
 
         <!-- 正文配图 -->
-        <section v-if="articleImages.length > 0">
+        <section v-if="articleImages.length > 0 || inlineImageSlotCount > 0">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文配图</h3>
             <div class="flex items-center gap-1">
-              <span v-for="(img, idx) in articleImages" :key="idx" class="inline-flex items-center gap-1">
-                <a-button
-                  type="link"
-                  size="small"
-                  class="!p-0 !text-[11px]"
-                  :loading="regenInlineImageLoading === idx + 1"
-                  :disabled="regenInlineImageLoading !== null"
-                  @click="handleRegenInlineImage(idx + 1)"
-                >{{ regenInlineImageLoading === idx + 1 ? `配图${idx + 1} 生成中...` : `生成新配图${idx + 1}` }}</a-button>
-                <span v-if="idx < articleImages.length - 1" class="text-editorial-text-muted/40">|</span>
-              </span>
+              <!-- 有占位符时，按占位符数量显示逐张生成按钮 -->
+              <template v-if="inlineImageSlotCount > 0">
+                <span v-for="slotIdx in inlineImageSlotCount" :key="slotIdx" class="inline-flex items-center gap-1">
+                  <a-button
+                    type="link"
+                    size="small"
+                    class="!p-0 !text-[11px]"
+                    :loading="regenInlineImageLoading === slotIdx"
+                    :disabled="regenInlineImageLoading !== null"
+                    @click="handleRegenInlineImage(slotIdx)"
+                  >{{ regenInlineImageLoading === slotIdx ? `配图${slotIdx} 生成中...` : `生成配图${slotIdx}` }}</a-button>
+                  <span v-if="slotIdx < inlineImageSlotCount" class="text-editorial-text-muted/40">|</span>
+                </span>
+              </template>
+              <!-- 配图完整时显示"重新生成" -->
+              <template v-else>
+                <span v-for="(img, idx) in articleImages" :key="idx" class="inline-flex items-center gap-1">
+                  <a-button
+                    type="link"
+                    size="small"
+                    class="!p-0 !text-[11px]"
+                    :loading="regenInlineImageLoading === idx + 1"
+                    :disabled="regenInlineImageLoading !== null"
+                    @click="handleRegenInlineImage(idx + 1)"
+                  >{{ regenInlineImageLoading === idx + 1 ? `配图${idx + 1} 生成中...` : `生成新配图${idx + 1}` }}</a-button>
+                  <span v-if="idx < articleImages.length - 1" class="text-editorial-text-muted/40">|</span>
+                </span>
+              </template>
             </div>
           </div>
-          <a-image-preview-group>
-            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <div
-                v-for="(img, idx) in articleImages"
-                :key="idx"
-                class="relative overflow-hidden rounded-editorial-md border border-editorial-border"
-              >
-                <a-image
-                  :src="extractImageUrl(img)"
-                  :alt="typeof img === 'object' && img.alt ? img.alt : `配图 ${idx + 1}`"
-                  class="block w-full object-cover"
-                  loading="lazy"
-                />
-                <div v-if="typeof img === 'object' && img.purpose" class="absolute right-1 top-1 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
-                  {{ img.purpose }}
+          <template v-if="articleImages.length > 0">
+            <a-image-preview-group>
+              <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div
+                  v-for="(img, idx) in articleImages"
+                  :key="idx"
+                  class="relative overflow-hidden rounded-editorial-md border border-editorial-border"
+                >
+                  <a-image
+                    :src="extractImageUrl(img)"
+                    :alt="typeof img === 'object' && img.alt ? img.alt : `配图 ${idx + 1}`"
+                    class="block w-full object-cover"
+                    loading="lazy"
+                  />
+                  <div v-if="typeof img === 'object' && img.purpose" class="absolute right-1 top-1 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
+                    {{ img.purpose }}
+                  </div>
                 </div>
               </div>
-            </div>
-          </a-image-preview-group>
+            </a-image-preview-group>
+          </template>
+          <div v-else class="flex items-center justify-center rounded-editorial-md border border-dashed border-editorial-border bg-editorial-bg-page px-4 py-6 text-xs text-editorial-text-muted">
+            正文含 {{ inlineImageSlotCount }} 张配图占位符未生成，点击上方按钮逐张补图
+          </div>
         </section>
 
         <!-- 正文：左右分屏编辑器 + 主题切换 -->
@@ -704,6 +731,17 @@ const articleImages = computed(() => {
   return parseArticleImages(props.article?.imagesJson ?? null);
 });
 
+// 检测正文中的 [IMAGE1]/[IMAGE2] 占位符，用于缺图时显示补图入口
+const inlineImageSlotCount = computed(() => {
+  const matches = editContent.value?.match(/\[IMAGE\d+\]/gi);
+  return matches ? matches.length : 0;
+});
+
+// 正文配图是否完整（占位符已全部替换为实际图片）
+const inlineImagesComplete = computed(() => {
+  return articleImages.value.length > 0 && inlineImageSlotCount.value === 0;
+});
+
 async function handleRegenInlineImage(imageIndex: number): Promise<void> {
   if (!props.article || regenInlineImageLoading.value !== null) return;
   regenInlineImageLoading.value = imageIndex;
@@ -1101,6 +1139,7 @@ function canPush(article: CreativeFinishedArticle): boolean {
   if (parseJsonArray(article.titles).length === 0) return false;
   if (article.coverImage.length === 0) return false;
   if (parseArticleImages(article.imagesJson).length === 0) return false;
+  if (inlineImageSlotCount.value > 0) return false;
   if (!article.contentMarkdown) return false;
   return true;
 }
@@ -1111,6 +1150,7 @@ function getMissingConditions(article: CreativeFinishedArticle): string[] {
   if (parseJsonArray(article.titles).length === 0) missing.push("缺少标题");
   if (article.coverImage.length === 0) missing.push("缺少封面图");
   if (parseArticleImages(article.imagesJson).length === 0) missing.push("缺少正文配图");
+  else if (inlineImageSlotCount.value > 0) missing.push(`${inlineImageSlotCount.value} 张配图占位符未替换`);
   if (!article.contentMarkdown) missing.push("缺少 Markdown 内容");
   return missing;
 }

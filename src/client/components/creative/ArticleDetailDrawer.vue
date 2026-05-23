@@ -1198,7 +1198,7 @@ function getMissingConditions(article: CreativeFinishedArticle): string[] {
     top: 0 !important;
   }
   .article-detail-modal .ant-modal-content {
-    max-height: 100vh;
+    max-height: 100dvh;
     border-radius: 0;
   }
   .article-detail-modal .ant-modal-body {
@@ -1224,7 +1224,7 @@ function getMissingConditions(article: CreativeFinishedArticle): string[] {
     height: 28px !important;
   }
   .article-editor-wrapper {
-    height: calc(100vh - 600px);
+    height: calc(100dvh - 600px);
     min-height: 200px;
   }
   /* 全屏编辑器工具栏：移动端紧凑布局 */

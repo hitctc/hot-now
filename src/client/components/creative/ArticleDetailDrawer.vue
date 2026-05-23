@@ -55,7 +55,7 @@
           <span class="text-xs text-editorial-text-muted">{{ modeLabel(article.mode) }}</span>
           <span class="text-xs text-editorial-text-muted">{{ formatLocalTime(article.createdAt) }}</span>
           <a
-            class="inline-block max-w-[260px] truncate align-bottom cursor-pointer text-xs text-editorial-link-active hover:underline"
+            class="inline-block max-w-[260px] truncate md:max-w-none md:whitespace-nowrap align-bottom cursor-pointer text-xs text-editorial-link-active hover:underline"
             @click.prevent="$emit('openSourceItem', article.sourceItemId)"
             >素材 #{{ article.sourceItemId }}{{ (article as any).sourceTitle ? ' · ' + (article as any).sourceTitle : '' }}{{ (article as any).sourceName ? ' · ' + (article as any).sourceName : '' }}</a>
         </div>

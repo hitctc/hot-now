@@ -18,17 +18,19 @@
     </template>
 
     <template #footer>
-      <div v-if="article" class="flex items-center justify-between">
-        <a-button
-          danger
-          :loading="regenArticleLoading"
-          :disabled="regenArticleLoading"
-          @click="handleRegenArticle"
-        >
-          <template v-if="regenArticleLoading">正在重写（预计 2~3 分钟）...</template>
-          <template v-else>整篇重写</template>
-        </a-button>
-        <div class="flex items-center gap-2">
+      <div v-if="article" class="article-detail-footer">
+        <div class="article-detail-footer__left">
+          <a-button
+            danger
+            :loading="regenArticleLoading"
+            :disabled="regenArticleLoading"
+            @click="handleRegenArticle"
+          >
+            <template v-if="regenArticleLoading">正在重写（预计 2~3 分钟）...</template>
+            <template v-else>整篇重写</template>
+          </a-button>
+        </div>
+        <div class="article-detail-footer__right">
           <a-tooltip :mouse-enter-delay="0.5" title="将当前正文按选定主题渲染后复制到剪贴板，可粘贴到公众号编辑器">
             <a-button :loading="wechatCopying" @click="copyAsWechatFormat">复制公众号格式</a-button>
           </a-tooltip>
@@ -1208,13 +1210,18 @@ function getMissingConditions(article: CreativeFinishedArticle): string[] {
   .article-detail-modal .ant-modal-footer {
     padding: 8px 12px !important;
   }
-  .article-detail-modal .ant-modal-footer > .flex {
-    flex-wrap: wrap;
-    gap: 6px;
+  .article-detail-footer {
+    flex-direction: column !important;
+    gap: 8px;
   }
-  .article-detail-modal .ant-modal-footer .ant-btn {
+  .article-detail-footer__right {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .article-detail-footer .ant-btn {
     font-size: 12px !important;
     padding: 0 8px !important;
+    height: 28px !important;
   }
   .article-editor-wrapper {
     height: calc(100vh - 600px);
@@ -1230,6 +1237,17 @@ function getMissingConditions(article: CreativeFinishedArticle): string[] {
     height: 24px !important;
     line-height: 24px !important;
   }
+}
+
+.article-detail-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.article-detail-footer__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .article-editor-wrapper {

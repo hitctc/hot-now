@@ -350,7 +350,7 @@ function getStatusInfo(status: string): { label: string; color: string } {
 // ─── 表格列 ───
 
 const columns = [
-  { title: "标题", key: "title", width: 200, ellipsis: true },
+  { title: "标题", key: "title", width: 280, ellipsis: true },
   { title: "封面图", key: "coverImage", width: 80, ellipsis: true },
   { title: "状态", key: "status", width: 140, ellipsis: true },
   { title: "来源素材", key: "sourceItem", width: 110, ellipsis: true },
@@ -429,7 +429,7 @@ const pagination = computed(() => ({
           <!-- 标题列：点击打开详情弹窗 -->
           <template v-if="column.key === 'title'">
             <span
-              class="cursor-pointer font-medium text-editorial-text-main transition-colors hover:text-editorial-link-active"
+              class="cursor-pointer text-[13px] font-medium text-editorial-text-main transition-colors hover:text-editorial-link-active"
               @click="openDetail(record)"
             >
               {{ getFirstTitle(record.titles) }}

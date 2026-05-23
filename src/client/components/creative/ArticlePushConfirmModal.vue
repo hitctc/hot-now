@@ -127,6 +127,8 @@ const failedStepError = computed(() => pushResult.value?.ok ? "" : (pushResult.v
     :closable="!isPushing"
     :maskClosable="false"
     width="520px"
+    centered
+    wrap-class-name="push-confirm-modal"
     @cancel="$emit('update:visible', false)"
   >
     <!-- 文章信息 -->
@@ -237,5 +239,12 @@ const failedStepError = computed(() => pushResult.value?.ok ? "" : (pushResult.v
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+</style>
+
+<style>
+/* 层级高于文章详情弹窗，确保推送确认弹窗显示在最顶层 */
+.push-confirm-modal {
+  z-index: 2000 !important;
 }
 </style>

@@ -361,7 +361,7 @@ async function copyMarkdownAsPlainText(md: string): Promise<void> {
 
 const columns = [
   { title: "标题", dataIndex: "title", key: "title", width: 280 },
-  { title: "成品", key: "linkedArticle", width: 100, align: "center" as const, ellipsis: true },
+  { title: "成品", key: "linkedArticle", width: 100, align: "center" as const },
   { title: "来源", dataIndex: "sourceName", key: "sourceName", width: 170 },
   { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: 90, ellipsis: true },
   { title: "评分", dataIndex: "score", key: "score", width: 72, ellipsis: true },
@@ -453,7 +453,7 @@ const pagination = computed(() => ({
 
           <!-- 成品列 -->
           <template v-else-if="column.key === 'linkedArticle'">
-            <div v-if="record.linkedArticleId != null" class="flex items-center gap-1.5">
+            <div v-if="record.linkedArticleId != null" class="flex flex-wrap items-center justify-center gap-1.5">
               <a
                 class="inline-flex cursor-pointer items-center gap-1 rounded-editorial-pill bg-editorial-link-active/30 px-2.5 py-1 text-[11px] font-semibold text-editorial-link-active hover:bg-editorial-link-active/50"
                 @click.prevent="openArticleModal(record.linkedArticleId!)"

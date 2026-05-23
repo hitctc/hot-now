@@ -350,7 +350,7 @@ function getStatusInfo(status: string): { label: string; color: string } {
 // ─── 表格列 ───
 
 const columns = [
-  { title: "标题", key: "title", width: 280, ellipsis: true },
+  { title: "标题", key: "title", width: 280 },
   { title: "封面图", key: "coverImage", width: 80, ellipsis: true },
   { title: "状态", key: "status", width: 140, ellipsis: true },
   { title: "来源素材", key: "sourceItem", width: 110, ellipsis: true },

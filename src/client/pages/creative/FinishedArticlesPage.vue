@@ -359,7 +359,6 @@ const columns = [
   { title: "模式", key: "mode", width: 72, ellipsis: true },
   { title: "发布时间", key: "publishedAt", width: 130, ellipsis: true },
   { title: "创建时间", key: "createdAt", width: 140, ellipsis: true },
-  { title: "异常说明", key: "anomalyReason", width: 150, ellipsis: true },
   { title: "公众号", key: "wechatPublished", width: 80, ellipsis: true },
   { title: "推送", key: "pushDraft", width: 72, ellipsis: true },
 
@@ -454,17 +453,6 @@ const pagination = computed(() => ({
           <template v-else-if="column.key === 'status'">
             <a-tag :color="getStatusInfo(record.status).color" class="!m-0">{{ getStatusInfo(record.status).label }}</a-tag>
             <a-tag v-if="record.pushCount > 0" color="green" class="!m-0 !ml-1">{{ record.pushCount }}次</a-tag>
-          </template>
-
-          <!-- 异常说明列 -->
-          <template v-else-if="column.key === 'anomalyReason'">
-            <template v-if="record.anomalyReason">
-              <a-tooltip :mouse-enter-delay="0.3">
-                <template #title>{{ record.anomalyReason }}</template>
-                <span class="block truncate text-xs text-editorial-text-body">{{ record.anomalyReason }}</span>
-              </a-tooltip>
-            </template>
-            <span v-else class="text-xs text-editorial-text-muted">-</span>
           </template>
 
           <!-- 公众号发布状态列 -->

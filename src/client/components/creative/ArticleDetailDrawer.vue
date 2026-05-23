@@ -1190,6 +1190,7 @@ function getMissingConditions(article: CreativeFinishedArticle): string[] {
   }
   .article-detail-modal .ant-modal {
     max-width: 100% !important;
+    width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
     top: 0 !important;

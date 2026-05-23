@@ -442,7 +442,7 @@ const pagination = computed(() => ({
             <div class="flex items-center gap-2 min-w-0">
               <a-tooltip :title="record.title" placement="topLeft" :mouse-enter-delay="0.3">
                 <span
-                  class="cursor-pointer truncate font-medium text-editorial-text-main hover:text-editorial-link-active"
+                  class="line-clamp-2 cursor-pointer text-[13px] leading-tight font-medium text-editorial-text-main hover:text-editorial-link-active"
                   @click="toggleExpand(record.id)"
                 >
                   {{ record.title }}

@@ -429,7 +429,7 @@ const pagination = computed(() => ({
           <!-- 标题列：点击打开详情弹窗 -->
           <template v-if="column.key === 'title'">
             <span
-              class="cursor-pointer text-[13px] font-medium text-editorial-text-main transition-colors hover:text-editorial-link-active"
+              class="line-clamp-2 cursor-pointer text-[13px] leading-tight font-medium text-editorial-text-main transition-colors hover:text-editorial-link-active"
               @click="openDetail(record)"
             >
               {{ getFirstTitle(record.titles) }}

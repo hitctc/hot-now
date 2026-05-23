@@ -451,9 +451,9 @@ const pagination = computed(() => ({
 
           <!-- 状态列 -->
           <template v-else-if="column.key === 'status'">
-            <div class="flex flex-col gap-0.5 leading-tight">
-              <a-tag :color="getStatusInfo(record.status).color" class="!m-0 !text-[11px] !py-0 !inline">{{ getStatusInfo(record.status).label }}</a-tag>
-              <a-tag v-if="record.pushCount > 0" color="green" class="!m-0 !text-[11px] !py-0 !inline">{{ record.pushCount }}次</a-tag>
+            <div class="flex flex-col items-start gap-0.5 leading-tight">
+              <a-tag :color="getStatusInfo(record.status).color" class="!m-0 !text-[11px] !py-0">{{ getStatusInfo(record.status).label }}</a-tag>
+              <a-tag v-if="record.pushCount > 0" color="green" class="!m-0 !text-[11px] !py-0">{{ record.pushCount }}次</a-tag>
             </div>
           </template>
 

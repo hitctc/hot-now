@@ -111,7 +111,8 @@ import {
 import {
   renderControlPage,
   renderHistoryPage,
-  renderNoticePage
+  renderNoticePage,
+  renderNotFoundPage
 } from "./renderPages.js";
 import { findAppShellPage, getAppShellPages, renderAppLayout } from "./renderAppLayout.js";
 import { renderContentPage } from "./renderContentPages.js";
@@ -3119,6 +3120,18 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     return reply.send({ ok: true, id: result.id });
+  });
+
+  // ─── 404 fallback ───
+
+  app.setNotFoundHandler((request, reply) => {
+    // API 请求返回 JSON
+    if (request.headers.accept?.includes("application/json") || request.url.startsWith("/api/")) {
+      return reply.code(404).send({ ok: false, reason: "not-found", path: request.url });
+    }
+
+    // 浏览器请求返回 HTML 404 页面
+    return reply.code(404).type("text/html; charset=utf-8").send(renderNotFoundPage(request.url));
   });
 
   return app;

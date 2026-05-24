@@ -177,3 +177,141 @@ function escapeHtml(value: string) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+
+// ── 404 页面 ──
+
+export function renderNotFoundPage(requestPath: string) {
+  return `<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>页面不存在 - HotNow 热讯</title>
+    <link rel="icon" type="image/png" href="/brand/hotnow-favicon.png" />
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        background: #f8f9fa;
+        color: #1a1a2e;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-font-smoothing: antialiased;
+      }
+      [data-theme="dark"] body, body.dark { background: #0f0f1a; color: #e0e0e0; }
+      .not-found {
+        text-align: center;
+        padding: 3rem 2rem;
+        max-width: 520px;
+        width: 100%;
+      }
+      .not-found__code {
+        font-size: 120px;
+        font-weight: 900;
+        line-height: 1;
+        letter-spacing: -4px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 1rem;
+        user-select: none;
+      }
+      .not-found__title {
+        font-size: 22px;
+        font-weight: 700;
+        margin-bottom: 0.75rem;
+      }
+      .not-found__detail {
+        font-size: 14px;
+        line-height: 1.7;
+        color: #6b7280;
+        margin-bottom: 0.75rem;
+      }
+      .not-found__path {
+        display: inline-block;
+        font-family: "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+        font-size: 13px;
+        background: rgba(102, 126, 234, 0.08);
+        border: 1px solid rgba(102, 126, 234, 0.15);
+        border-radius: 6px;
+        padding: 6px 14px;
+        margin-bottom: 2rem;
+        color: #764ba2;
+        word-break: break-all;
+      }
+      .not-found__actions {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .not-found__btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 24px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.15s ease;
+        cursor: pointer;
+        border: none;
+      }
+      .not-found__btn--primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #fff;
+      }
+      .not-found__btn--primary:hover { opacity: 0.9; transform: translateY(-1px); }
+      .not-found__btn--secondary {
+        background: #fff;
+        color: #374151;
+        border: 1px solid #e5e7eb;
+      }
+      .not-found__btn--secondary:hover { background: #f3f4f6; }
+      .not-found__brand {
+        margin-top: 3rem;
+        font-size: 12px;
+        color: #9ca3af;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      .not-found__brand img { width: 18px; height: 18px; border-radius: 4px; }
+      @media (prefers-color-scheme: dark) {
+        body { background: #0f0f1a; color: #e0e0e0; }
+        .not-found__title { color: #f3f4f6; }
+        .not-found__detail { color: #9ca3af; }
+        .not-found__path {
+          background: rgba(102, 126, 234, 0.12);
+          border-color: rgba(102, 126, 234, 0.25);
+          color: #a78bfa;
+        }
+        .not-found__btn--secondary { background: #1f2937; color: #e5e7eb; border-color: #374151; }
+        .not-found__btn--secondary:hover { background: #374151; }
+        .not-found__brand { color: #6b7280; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="not-found">
+      <div class="not-found__code">404</div>
+      <h1 class="not-found__title">页面不存在</h1>
+      <p class="not-found__detail">你访问的页面可能已被移动、删除，或者地址输入有误。</p>
+      <p class="not-found__path">${escapeHtml(requestPath)}</p>
+      <div class="not-found__actions">
+        <a href="/" class="not-found__btn not-found__btn--primary">返回首页</a>
+        <button onclick="history.back()" class="not-found__btn not-found__btn--secondary">返回上页</button>
+      </div>
+      <div class="not-found__brand">
+        <img src="/brand/hotnow-logo-mark.png" alt="" />
+        HotNow 热讯
+      </div>
+    </div>
+  </body>
+</html>`;
+}

@@ -9,6 +9,7 @@ export type ShellPageKey =
   | "ai-timeline-admin"
   | "creative-source-items"
   | "creative-finished-articles"
+  | "daily-digest"
   | "view-rules"
   | "sources"
   | "profile"
@@ -73,6 +74,15 @@ const creativeFinishedArticlesPageMeta = {
   description: "查看、编辑和管理 AI 写作的成品文章。"
 } as const satisfies ShellPageMeta;
 
+const dailyDigestPageMeta = {
+  key: "daily-digest",
+  path: "/daily-digest",
+  section: "creative",
+  navLabel: "AI日报",
+  title: "AI日报",
+  description: "每日自动生成的 AI 动态信息合集，按天查看和管理。"
+} as const satisfies ShellPageMeta;
+
 const viewRulesPageMeta = {
   key: "view-rules",
   path: "/settings/view-rules",
@@ -124,6 +134,7 @@ export const shellPageMetas = [
   // aiTimelinePageMeta, // 暂时下架 AI 时间线（2026-05-17）
   creativeSourceItemsPageMeta,
   creativeFinishedArticlesPageMeta,
+  dailyDigestPageMeta,
   sourcesPageMeta,
   // aiTimelineAdminPageMeta, // 暂时下架 AI 时间线 feed 管理（2026-05-17）
   viewRulesPageMeta,
@@ -184,6 +195,7 @@ const aiHotPage = () => import("./pages/content/AiHotPage.vue");
 const aiTimelinePage = () => import("./pages/content/AiTimelinePage.vue");
 const creativeSourceItemsPage = () => import("./pages/creative/SourceItemsPage.vue");
 const creativeFinishedArticlesPage = () => import("./pages/creative/FinishedArticlesPage.vue");
+const dailyDigestPage = () => import("./pages/creative/DailyDigestPage.vue");
 
 const routes: RouteRecordRaw[] = [
   createShellRoute(aiNewRootPageMeta, aiNewPage),
@@ -192,6 +204,7 @@ const routes: RouteRecordRaw[] = [
   // createShellRoute(aiTimelinePageMeta, aiTimelinePage), // 暂时下架 AI 时间线（2026-05-17）
   createShellRoute(creativeSourceItemsPageMeta, creativeSourceItemsPage),
   createShellRoute(creativeFinishedArticlesPageMeta, creativeFinishedArticlesPage),
+  createShellRoute(dailyDigestPageMeta, dailyDigestPage),
   createShellRoute(viewRulesPageMeta, viewRulesPage),
   createShellRoute(sourcesPageMeta, sourcesPage),
   // createShellRoute(aiTimelineAdminPageMeta, aiTimelineAdminPage), // 暂时下架 AI 时间线 feed 管理（2026-05-17）

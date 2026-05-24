@@ -91,6 +91,13 @@ import {
   editCreativeFinishedArticle,
   toggleWechatPublished
 } from "../core/creative/creativeFinishedArticleRepository.js";
+import {
+  insertDailyDigest,
+  findDailyDigestById,
+  listDailyDigests,
+  updateDailyDigestStatus,
+  findDailyDigestByDate
+} from "../core/dailyDigest/dailyDigestRepository.js";
 
 import { downloadAndStoreImage, readStoredImage } from "../core/storage/imageStore.js";
 import { readNextCollectionRunAt } from "../core/scheduler/readNextCollectionRunAt.js";
@@ -1475,6 +1482,170 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.send({ ok: true, title: data.title });
     } catch (err) {
       if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "生成超时（>200s），请稍后在成品列表中查看是否有新文章" }); }
+      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
+    }
+  });
+
+  // ─── Daily Digest: Hermes 推送日报（token 鉴权） ───
+
+  app.post("/api/daily-digests", async (request, reply) => {
+    if (!validateCreativeApiToken(request, reply, creativeApiToken)) {
+      return;
+    }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const body = request.body as Record<string, unknown> | undefined;
+    const date = typeof body?.date === "string" ? body.date.trim() : "";
+    const title = typeof body?.title === "string" ? body.title.trim() : "";
+    const contentMarkdown = typeof body?.contentMarkdown === "string" ? body.contentMarkdown : "";
+    const totalItems = typeof body?.totalItems === "number" ? body.totalItems : 0;
+    const categories = Array.isArray(body?.categories) ? body.categories as string[] : [];
+    const collectorAgent = typeof body?.collectorAgent === "string" ? body.collectorAgent.trim() : "";
+    const coverImage = typeof body?.coverImage === "string" ? body.coverImage : undefined;
+
+    if (!date || !title || !contentMarkdown || !collectorAgent) {
+      return reply.code(400).send({ ok: false, reason: "missing-required-fields" });
+    }
+
+    // 同一天幂等：已存在则返回 409
+    const existing = findDailyDigestByDate(db, date);
+    if (existing) {
+      return reply.code(409).send({ ok: false, reason: "already-exists", id: existing.id });
+    }
+
+    const record = insertDailyDigest(db, {
+      date,
+      title,
+      contentMarkdown,
+      coverImage,
+      totalItems,
+      categories,
+      collectorAgent
+    });
+
+    return reply.code(201).send(record);
+  });
+
+  // ─── Daily Digest: 前端查询列表（session 鉴权） ───
+
+  app.get("/api/daily-digests", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const query = request.query as Record<string, string | undefined>;
+    const result = listDailyDigests(db, {
+      page: query.page ? parseInt(query.page, 10) : undefined,
+      pageSize: query.pageSize ? parseInt(query.pageSize, 10) : undefined,
+      status: query.status,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo
+    });
+
+    return reply.send(result);
+  });
+
+  // ─── Daily Digest: 前端查询详情（session 鉴权） ───
+
+  app.get("/api/daily-digests/:id", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const params = request.params as { id: string };
+    const id = parseInt(params.id, 10);
+    const record = findDailyDigestById(db, id);
+    if (!record) {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+
+    return reply.send(record);
+  });
+
+  // ─── Daily Digest: 更新状态（session 鉴权） ───
+
+  app.patch("/api/daily-digests/:id", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const params = request.params as { id: string };
+    const id = parseInt(params.id, 10);
+    const body = request.body as { status?: unknown } | undefined;
+    const status = typeof body?.status === "string" ? body.status : "";
+
+    if (!["generated", "publishing", "published", "failed"].includes(status)) {
+      return reply.code(400).send({ ok: false, reason: "invalid-status" });
+    }
+
+    const updated = updateDailyDigestStatus(db, id, status as "generated" | "publishing" | "published" | "failed");
+    if (!updated) {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+
+    return reply.send(updated);
+  });
+
+  // ─── Daily Digest: 手动触发生成（代理调用 Hermes） ───
+
+  app.post("/api/daily-digests/generate", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+
+    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+    const hermesApiToken = process.env.HERMES_API_TOKEN;
+    if (!hermesApiUrl || !hermesApiToken) {
+      return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" });
+    }
+
+    const body = request.body as { date?: unknown } | undefined;
+    const requestBody: Record<string, string> = {};
+    if (typeof body?.date === "string" && body.date) {
+      requestBody.date = body.date;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 300_000);
+
+      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/generate-digest`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${hermesApiToken}`,
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const errorBody = await res.json().catch(() => ({ error: `Hermes HTTP ${res.status}` }));
+        return reply.code(res.status >= 500 ? 502 : res.status).send({
+          ok: false,
+          reason: errorBody.error ?? `Hermes HTTP ${res.status}`,
+        });
+      }
+
+      const data = await res.json() as { success?: boolean; detail?: string; error?: string };
+      return reply.send({ ok: true, detail: data.detail ?? "生成请求已发送" });
+    } catch (err) {
+      if ((err as Error).name === "AbortError") {
+        return reply.code(504).send({ ok: false, reason: "生成超时（>300s），请稍后刷新查看" });
+      }
       return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
     }
   });

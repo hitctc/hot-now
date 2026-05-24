@@ -16,6 +16,7 @@ const expectedTables = [
   "content_sources",
   "creative_finished_articles",
   "creative_source_items",
+  "daily_digests",
   "digest_reports",
   "feedback_pool",
   "ai_timeline_event_evidence",
@@ -79,7 +80,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(24);
+    expect(schemaVersion).toBe(31);
 
     const appliedMigrations = db
       .prepare(
@@ -115,7 +116,14 @@ describe("runMigrations", () => {
       { version: 21, name: "021_cover_image_and_anomaly" },
       { version: 22, name: "022_theme_html_columns" },
       { version: 23, name: "023_wechat_published" },
-      { version: 24, name: "024_wechat_mp_draft_push" }
+      { version: 24, name: "024_wechat_mp_draft_push" },
+      { version: 25, name: "add_wechat_theme_id_to_finished_articles" },
+      { version: 26, name: "add_wechat_html_drop_old_theme_columns" },
+      { version: 27, name: "add_cover_image_index" },
+      { version: 28, name: "add_title_index" },
+      { version: 29, name: "add_intro_fields" },
+      { version: 30, name: "add_summary_index" },
+      { version: 31, name: "031_daily_digests" }
     ]);
 
     const hiddenAggregates = db
@@ -516,6 +524,17 @@ describe("runMigrations", () => {
     expect(evidenceTable).toBeTruthy();
     expect(sourceRunsTable).toBeTruthy();
     expect(notificationsTable).toBeTruthy();
-    expect(db.pragma("user_version", { simple: true })).toBe(24);
+    expect(db.pragma("user_version", { simple: true })).toBe(31);
+
+    // daily_digests 表验证
+    const digestTable = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'daily_digests'")
+      .get();
+    expect(digestTable).toBeTruthy();
+
+    const digestColumns = db.prepare("PRAGMA table_info(daily_digests)").all() as Array<{ name: string; notnull: number }>;
+    const dateCol = digestColumns.find((c) => c.name === "date");
+    expect(dateCol).toBeTruthy();
+    expect(dateCol!.notnull).toBe(1);
   });
 });

@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 30;
+const schemaVersion = 31;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -1226,6 +1226,34 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(30, summaryIndexMigrationName);
+
+    // 031: AI 日报 — 独立表存储 Hermes 推送的每日 AI 动态合集
+    const dailyDigestMigrationName = "031_daily_digests";
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS daily_digests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL UNIQUE,
+        title TEXT NOT NULL,
+        content_markdown TEXT NOT NULL,
+        cover_image TEXT,
+        total_items INTEGER NOT NULL,
+        categories TEXT NOT NULL DEFAULT '[]',
+        status TEXT NOT NULL DEFAULT 'generated',
+        collector_agent TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_daily_digests_date ON daily_digests(date DESC)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_daily_digests_status ON daily_digests(status)`);
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(31, dailyDigestMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

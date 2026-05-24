@@ -44,19 +44,19 @@ export function readDailyDigests(params?: {
   if (params?.dateFrom) query.set("dateFrom", params.dateFrom);
   if (params?.dateTo) query.set("dateTo", params.dateTo);
   const qs = query.toString();
-  return requestJson<DailyDigestListResponse>(`/api/daily-digests${qs ? `?${qs}` : ""}`);
+  return requestJson<DailyDigestListResponse>(`/api/creative/daily-digests${qs ? `?${qs}` : ""}`);
 }
 
 // ── Detail ───────────────────────────────────────────────────────────────────
 
 export function readDailyDigest(id: number): Promise<DailyDigestRecord> {
-  return requestJson<DailyDigestRecord>(`/api/daily-digests/${id}`);
+  return requestJson<DailyDigestRecord>(`/api/creative/daily-digests/${id}`);
 }
 
 // ── Update status ────────────────────────────────────────────────────────────
 
 export function updateDailyDigestStatus(id: number, status: DailyDigestStatus): Promise<DailyDigestRecord> {
-  return requestJson<DailyDigestRecord>(`/api/daily-digests/${id}`, {
+  return requestJson<DailyDigestRecord>(`/api/creative/daily-digests/${id}`, {
     method: "PATCH",
     body: JSON.stringify({ status }),
   });
@@ -71,7 +71,7 @@ export type GenerateDigestResult = {
 };
 
 export function triggerGenerateDigest(date?: string): Promise<GenerateDigestResult> {
-  return requestJson<GenerateDigestResult>("/api/daily-digests/generate", {
+  return requestJson<GenerateDigestResult>("/api/creative/daily-digests/generate", {
     method: "POST",
     body: JSON.stringify(date ? { date } : {}),
   });

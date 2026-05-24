@@ -1489,7 +1489,7 @@ export function createServer(deps: ServerDeps = {}) {
 
   // ─── Daily Digest: Hermes 推送日报（token 鉴权） ───
 
-  app.post("/api/daily-digests", async (request, reply) => {
+  app.post("/api/creative/daily-digests", async (request, reply) => {
     if (!validateCreativeApiToken(request, reply, creativeApiToken)) {
       return;
     }
@@ -1532,7 +1532,7 @@ export function createServer(deps: ServerDeps = {}) {
 
   // ─── Daily Digest: 前端查询列表（session 鉴权） ───
 
-  app.get("/api/daily-digests", async (request, reply) => {
+  app.get("/api/creative/daily-digests", async (request, reply) => {
     const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
     if (session === undefined) { return; }
 
@@ -1554,7 +1554,7 @@ export function createServer(deps: ServerDeps = {}) {
 
   // ─── Daily Digest: 前端查询详情（session 鉴权） ───
 
-  app.get("/api/daily-digests/:id", async (request, reply) => {
+  app.get("/api/creative/daily-digests/:id", async (request, reply) => {
     const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
     if (session === undefined) { return; }
 
@@ -1574,7 +1574,7 @@ export function createServer(deps: ServerDeps = {}) {
 
   // ─── Daily Digest: 更新状态（session 鉴权） ───
 
-  app.patch("/api/daily-digests/:id", async (request, reply) => {
+  app.patch("/api/creative/daily-digests/:id", async (request, reply) => {
     const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
     if (session === undefined) { return; }
 
@@ -1601,7 +1601,7 @@ export function createServer(deps: ServerDeps = {}) {
 
   // ─── Daily Digest: 手动触发生成（代理调用 Hermes） ───
 
-  app.post("/api/daily-digests/generate", async (request, reply) => {
+  app.post("/api/creative/daily-digests/generate", async (request, reply) => {
     const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
     if (session === undefined) { return; }
 

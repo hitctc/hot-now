@@ -9,6 +9,7 @@
     centered
     wrap-class-name="article-detail-modal"
     :body-style="{ padding: '24px', overflowY: 'auto' }"
+    :z-index="1000"
     @cancel="handleClose"
   >
     <template #title>

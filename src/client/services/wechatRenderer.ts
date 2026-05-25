@@ -196,6 +196,15 @@ function applyTheme(html: string, themeId: WechatThemeId): string {
     });
   }
 
+  // 参考来源/编辑段落字号缩小 2px，视觉上与正文区分
+  doc.querySelectorAll("p").forEach((p) => {
+    const text = p.textContent?.trimStart() || "";
+    if (!text.startsWith("参考来源") && !text.startsWith("编辑")) return;
+    const currentStyle = p.getAttribute("style") || "";
+    const smaller = currentStyle.replace(/font-size:\s*(\d+)px/, (_, n) => `font-size: ${Number(n) - 2}px`);
+    p.setAttribute("style", smaller);
+  });
+
   // 用 container 样式包裹
   const container = doc.createElement("div");
   container.setAttribute("style", style.container);

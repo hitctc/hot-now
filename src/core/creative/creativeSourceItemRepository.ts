@@ -293,11 +293,17 @@ export function findCreativeSourceItemByExternalId(
   externalId: string,
   collectorAgent: string
 ): CreativeSourceItemRecord | null {
+  // 先精确匹配 external_id + collector_agent
   const row = db
     .prepare(`SELECT ${SELECT_COLUMNS} FROM creative_source_items WHERE external_id = ? AND collector_agent = ?`)
     .get(externalId, collectorAgent) as SourceItemRow | undefined;
+  if (row) return mapRow(row);
 
-  return row ? mapRow(row) : null;
+  // 兜底：只按 external_id 匹配（Hermes 传的 collectorAgent 可能与 DB 不一致）
+  const fallback = db
+    .prepare(`SELECT ${SELECT_COLUMNS} FROM creative_source_items WHERE external_id = ?`)
+    .get(externalId) as SourceItemRow | undefined;
+  return fallback ? mapRow(fallback) : null;
 }
 
 // ── List with pagination and filters ────────────────────────────────────────

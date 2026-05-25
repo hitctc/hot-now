@@ -161,7 +161,7 @@ export async function makeWechatCompatible(html: string, options?: { skipImageBa
   links.forEach((a: Element) => {
     a.removeAttribute("target");
     a.removeAttribute("rel");
-    a.setAttribute("style", "color: #576b95;");
+    a.setAttribute("style", "color: #576b95; overflow-wrap: break-word; word-break: break-all;");
   });
 
   // 7. 外链图片转 Base64（仅"复制到剪贴板"流程需要，推送流程跳过以保留原始 URL）

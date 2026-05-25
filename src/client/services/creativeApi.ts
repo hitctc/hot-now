@@ -421,13 +421,16 @@ export function regenArticle(id: number): Promise<RegenArticleResult> {
 
 export type WriteArticleResult = {
   ok: boolean;
-  title?: string;
+  status?: string;
   reason?: string;
 };
 
-/** 对素材执行完整写作流程（Hermes 写作→推送成品文章） */
-export function writeSourceItemArticle(id: number): Promise<WriteArticleResult> {
+/** 调用 Hermes write-article API（异步），可指定写作模式 */
+export function writeSourceItemArticle(id: number, mode?: string): Promise<WriteArticleResult> {
+  const body: Record<string, unknown> = {};
+  if (mode) body.mode = mode;
   return requestJson<WriteArticleResult>(`/api/creative/source-items/${id}/write-article`, {
     method: "POST",
+    body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined,
   });
 }

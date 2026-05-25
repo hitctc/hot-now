@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
-import { message, Modal } from "ant-design-vue";
+import { message } from "ant-design-vue";
 
 import { useSearchHistory } from "../../composables/useSearchHistory.js";
 import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
 
 import {
   readCreativeSourceItems,
+  readCreativeSourceItem,
   readCreativeFinishedArticle,
   updateSourceItemWritingStatus,
   writeSourceItemArticle,
@@ -264,31 +265,92 @@ function writingStatusLabel(status: string): string {
 
 // ─── 素材库写文章 ───
 const writeArticleLoadingId = ref<number | null>(null);
+const writeModeVisible = ref(false);
+const writeModeTarget = ref<CreativeSourceItem | null>(null);
+const writeModeValue = ref<string | null>(null);
+const writeModeConfirming = ref(false);
 
-async function handleWriteArticle(item: CreativeSourceItem): Promise<void> {
+const writeModeOptions = [
+  { value: null, label: "自动判断（LLM 选择最合适的模式）" },
+  { value: "A", label: "短篇观点文（A）— 600~1500 字" },
+  { value: "B", label: "短篇随笔（B）— 600~1500 字" },
+  { value: "C", label: "长篇观点文（C）— 3000~6000 字" },
+];
+
+function openWriteModeModal(item: CreativeSourceItem): void {
   if (writeArticleLoadingId.value !== null) return;
-  Modal.confirm({
-    title: "写文章",
-    content: `确定对「${item.title.slice(0, 40)}${item.title.length > 40 ? "..." : ""}」生成文章？预计需要 2~3 分钟`,
-    okText: "开始生成",
-    cancelText: "取消",
-    onOk: async () => {
-      writeArticleLoadingId.value = item.id;
-      try {
-        const result = await writeSourceItemArticle(item.id);
-        if (result.ok) {
-          message.success(`文章生成成功：${result.title ?? "已生成"}`);
-          loadItems();
-        } else {
-          message.error(result.reason ?? "文章生成失败");
-        }
-      } catch {
-        message.error("写文章请求失败");
-      } finally {
-        writeArticleLoadingId.value = null;
+  writeModeTarget.value = item;
+  writeModeValue.value = null;
+  writeModeVisible.value = true;
+}
+
+function cancelWriteMode(): void {
+  writeModeVisible.value = false;
+  writeModeTarget.value = null;
+  writeModeConfirming.value = false;
+}
+
+// 写作状态轮询：10 秒间隔，10 分钟超时
+let writingPollTimer: ReturnType<typeof setInterval> | null = null;
+
+function startWritingPoll(item: CreativeSourceItem): void {
+  if (writingPollTimer) return;
+  const startTime = Date.now();
+  const TIMEOUT_MS = 10 * 60 * 1000;
+
+  writingPollTimer = setInterval(async () => {
+    if (Date.now() - startTime > TIMEOUT_MS) {
+      stopWritingPoll();
+      message.info("写作超时（>10分钟），请稍后查看成品列表");
+      return;
+    }
+    try {
+      const updated = await readCreativeSourceItem(item.id);
+      if (updated.writingStatus === "done") {
+        stopWritingPoll();
+        message.success("文章写作完成");
+        loadItems();
+      } else if (updated.writingStatus === "failed") {
+        stopWritingPoll();
+        message.error("写作失败，请重试");
       }
-    },
-  });
+    } catch {
+      // 单次轮询失败不中断
+    }
+  }, 10_000);
+}
+
+function stopWritingPoll(): void {
+  if (writingPollTimer) {
+    clearInterval(writingPollTimer);
+    writingPollTimer = null;
+  }
+  writeArticleLoadingId.value = null;
+}
+
+onBeforeUnmount(() => stopWritingPoll());
+
+async function confirmWriteMode(): Promise<void> {
+  const item = writeModeTarget.value;
+  if (!item) return;
+  writeModeConfirming.value = true;
+  try {
+    const result = await writeSourceItemArticle(item.id, writeModeValue.value ?? undefined);
+    if (result.ok) {
+      writeModeVisible.value = false;
+      writeArticleLoadingId.value = item.id;
+      // 更新本地状态为 writing
+      const local = items.value.find(i => i.id === item.id);
+      if (local) local.writingStatus = "writing";
+      startWritingPoll(item);
+    } else {
+      message.error(result.reason ?? "文章生成失败");
+    }
+  } catch {
+    message.error("写文章请求失败");
+  } finally {
+    writeModeConfirming.value = false;
+  }
 }
 
 // ─── 表格列 ───
@@ -481,10 +543,9 @@ const pagination = computed(() => ({
               type="link"
               size="small"
               class="!p-0 !text-[11px]"
-              :loading="writeArticleLoadingId === record.id"
               :disabled="writeArticleLoadingId !== null"
-              @click="handleWriteArticle(record)"
-            >{{ writeArticleLoadingId === record.id ? '生成中...' : '写文章' }}</a-button>
+              @click="openWriteModeModal(record)"
+            >{{ writeArticleLoadingId === record.id ? '写作中...' : '写文章' }}</a-button>
           </template>
         </template>
 
@@ -583,5 +644,28 @@ const pagination = computed(() => ({
       @update:open="(val) => { if (!val) closeDetailDrawer(); }"
       @saved="loadItems"
     />
+
+    <!-- 写文章模式选择弹窗 -->
+    <a-modal
+      :open="writeModeVisible"
+      title="选择写作模式"
+      :confirm-loading="writeModeConfirming"
+      ok-text="开始写作"
+      cancel-text="取消"
+      :destroy-on-close="true"
+      width="480px"
+      centered
+      @ok="confirmWriteMode"
+      @cancel="cancelWriteMode"
+    >
+      <div v-if="writeModeTarget" class="mb-3 text-sm text-gray-500">
+        素材：{{ writeModeTarget.title.slice(0, 60) }}{{ writeModeTarget.title.length > 60 ? '...' : '' }}
+      </div>
+      <a-radio-group v-model:value="writeModeValue" class="flex flex-col gap-3">
+        <a-radio v-for="opt in writeModeOptions" :key="String(opt.value)" :value="opt.value">
+          {{ opt.label }}
+        </a-radio>
+      </a-radio-group>
+    </a-modal>
   </div>
 </template>

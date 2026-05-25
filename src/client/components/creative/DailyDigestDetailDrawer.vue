@@ -351,7 +351,7 @@ watch(() => props.digest?.contentMarkdown, (val) => {
   overflow: hidden !important;
 }
 .daily-digest-detail-modal .ant-modal-content {
-  max-height: 90vh;
+  max-height: 100vh;
   display: flex;
   flex-direction: column;
 }

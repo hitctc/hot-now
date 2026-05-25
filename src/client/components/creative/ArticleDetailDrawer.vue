@@ -1166,7 +1166,7 @@ function getMissingConditions(article: CreativeFinishedArticle): string[] {
 }
 /* modal content 固定 90vh，body 内部滚动 */
 .article-detail-modal .ant-modal-content {
-  max-height: 90vh;
+  max-height: 100vh;
   display: flex;
   flex-direction: column;
 }

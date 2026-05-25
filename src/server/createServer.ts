@@ -96,7 +96,8 @@ import {
   findDailyDigestById,
   listDailyDigests,
   updateDailyDigestStatus,
-  findDailyDigestByDate
+  findDailyDigestByDate,
+  editDailyDigest
 } from "../core/dailyDigest/dailyDigestRepository.js";
 
 import { downloadAndStoreImage, readStoredImage } from "../core/storage/imageStore.js";
@@ -1584,14 +1585,30 @@ export function createServer(deps: ServerDeps = {}) {
 
     const params = request.params as { id: string };
     const id = parseInt(params.id, 10);
-    const body = request.body as { status?: unknown } | undefined;
-    const status = typeof body?.status === "string" ? body.status : "";
+    const body = request.body as Record<string, unknown> | undefined;
 
-    if (!["generated", "publishing", "published", "failed"].includes(status)) {
-      return reply.code(400).send({ ok: false, reason: "invalid-status" });
+    // 更新状态
+    if (typeof body?.status === "string") {
+      const status = body.status;
+      if (!["generated", "publishing", "published", "failed"].includes(status)) {
+        return reply.code(400).send({ ok: false, reason: "invalid-status" });
+      }
+      const updated = updateDailyDigestStatus(db, id, status as "generated" | "publishing" | "published" | "failed");
+      if (!updated) {
+        return reply.code(404).send({ ok: false, reason: "not-found" });
+      }
+      return reply.send(updated);
     }
 
-    const updated = updateDailyDigestStatus(db, id, status as "generated" | "publishing" | "published" | "failed");
+    // 编辑内容
+    const contentMarkdown = typeof body?.contentMarkdown === "string" ? body.contentMarkdown : undefined;
+    const title = typeof body?.title === "string" ? body.title : undefined;
+
+    if (contentMarkdown === undefined && title === undefined) {
+      return reply.code(400).send({ ok: false, reason: "no-fields-to-update" });
+    }
+
+    const updated = editDailyDigest(db, id, { contentMarkdown, title });
     if (!updated) {
       return reply.code(404).send({ ok: false, reason: "not-found" });
     }

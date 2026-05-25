@@ -11,6 +11,7 @@ import {
   findDailyDigestByDate,
   listDailyDigests,
   updateDailyDigestStatus,
+  editDailyDigest,
   type DailyDigestStatus,
 } from "../../src/core/dailyDigest/dailyDigestRepository.js";
 
@@ -134,5 +135,31 @@ describe("dailyDigestRepository", () => {
     expect(findDailyDigestById(db, 9999)).toBeNull();
     expect(findDailyDigestByDate(db, "2099-01-01")).toBeNull();
     expect(updateDailyDigestStatus(db, 9999, "published" as DailyDigestStatus)).toBeNull();
+    expect(editDailyDigest(db, 9999, { contentMarkdown: "x" })).toBeNull();
+  });
+
+  it("edits content markdown and title", async () => {
+    const db = await createTestDb();
+
+    const record = insertDailyDigest(db, {
+      date: "2026-05-23",
+      title: "旧标题",
+      contentMarkdown: "旧内容",
+      totalItems: 5,
+      categories: ["分类A"],
+      collectorAgent: "hermes",
+    });
+
+    const edited = editDailyDigest(db, record.id, {
+      title: "新标题",
+      contentMarkdown: "# 新内容\n\n测试",
+    });
+    expect(edited!.title).toBe("新标题");
+    expect(edited!.contentMarkdown).toBe("# 新内容\n\n测试");
+    expect(edited!.categories).toEqual(["分类A"]); // 未改动字段保持不变
+
+    // 不传字段返回原记录
+    const noop = editDailyDigest(db, record.id, {});
+    expect(noop!.contentMarkdown).toBe("# 新内容\n\n测试");
   });
 });

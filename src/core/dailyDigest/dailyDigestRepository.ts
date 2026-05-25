@@ -195,3 +195,40 @@ export function updateDailyDigestStatus(
 
   return findDailyDigestById(db, id);
 }
+
+// ── Edit content ─────────────────────────────────────────────────────────────
+
+export type EditDailyDigestInput = {
+  contentMarkdown?: string;
+  title?: string;
+};
+
+export function editDailyDigest(
+  db: SqliteDatabase,
+  id: number,
+  input: EditDailyDigestInput
+): DailyDigestRecord | null {
+  const existing = findDailyDigestById(db, id);
+  if (!existing) return null;
+
+  const setClauses: string[] = [];
+  const params: unknown[] = [];
+
+  if (input.contentMarkdown !== undefined) {
+    setClauses.push("content_markdown = ?");
+    params.push(input.contentMarkdown);
+  }
+  if (input.title !== undefined) {
+    setClauses.push("title = ?");
+    params.push(input.title);
+  }
+
+  if (setClauses.length === 0) return existing;
+
+  setClauses.push("updated_at = CURRENT_TIMESTAMP");
+  params.push(id);
+
+  db.prepare(`UPDATE daily_digests SET ${setClauses.join(", ")} WHERE id = ?`).run(...params);
+
+  return findDailyDigestById(db, id);
+}

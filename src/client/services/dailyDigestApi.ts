@@ -62,6 +62,18 @@ export function updateDailyDigestStatus(id: number, status: DailyDigestStatus): 
   });
 }
 
+// ── Edit content ─────────────────────────────────────────────────────────────
+
+export function editDailyDigest(id: number, fields: {
+  contentMarkdown?: string;
+  title?: string;
+}): Promise<DailyDigestRecord> {
+  return requestJson<DailyDigestRecord>(`/api/creative/daily-digests/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(fields),
+  });
+}
+
 // ── Trigger generation ───────────────────────────────────────────────────────
 
 export type GenerateDigestResult = {

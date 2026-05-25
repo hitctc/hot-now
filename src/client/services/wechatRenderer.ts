@@ -134,6 +134,16 @@ const md = new MarkdownIt({
   typographer: false,
 });
 
+// 所有链接在新标签打开
+md.core.ruler.push("external_links", (state) => {
+  for (const token of state.tokens) {
+    if (token.type === "link_open") {
+      token.attrSet("target", "_blank");
+      token.attrSet("rel", "noopener noreferrer");
+    }
+  }
+});
+
 // ── 主题样式注入 ──
 
 function applyTheme(html: string, themeId: WechatThemeId): string {

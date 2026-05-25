@@ -39,6 +39,17 @@ const emit = defineEmits<{
 }>();
 
 const md = new MarkdownIt({ html: true, linkify: true, breaks: true });
+
+// 所有链接在新标签打开
+md.core.ruler.push("external_links", (state) => {
+  for (const token of state.tokens) {
+    if (token.type === "link_open") {
+      token.attrSet("target", "_blank");
+      token.attrSet("rel", "noopener noreferrer");
+    }
+  }
+});
+
 const renderedHtml = computed(() => md.render(props.modelValue || ""));
 
 function onInput(e: Event): void {

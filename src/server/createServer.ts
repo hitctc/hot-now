@@ -1714,7 +1714,7 @@ export function createServer(deps: ServerDeps = {}) {
       if (detail) event.detail = detail;
       sendEvent(event);
       if (status === "done" || status === "running") {
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 100));
       }
     };
 
@@ -1895,7 +1895,7 @@ export function createServer(deps: ServerDeps = {}) {
       sendEvent(event);
       // 每个状态变化后短暂停顿，让前端用户能看到步骤过渡
       if (status === "done" || status === "running") {
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 100));
       }
     };
 

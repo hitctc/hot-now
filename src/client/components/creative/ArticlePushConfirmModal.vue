@@ -128,6 +128,7 @@ const failedStepError = computed(() => pushResult.value?.ok ? "" : (pushResult.v
     :maskClosable="false"
     width="520px"
     centered
+    :destroy-on-close="true"
     :z-index="2000"
     @cancel="$emit('update:visible', false)"
   >

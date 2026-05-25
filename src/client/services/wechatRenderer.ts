@@ -205,6 +205,20 @@ function applyTheme(html: string, themeId: WechatThemeId): string {
     p.setAttribute("style", smaller);
   });
 
+  // 参考来源段落：<a> 转为 <em>，格式为 "标题：URL"，不可点击，避免长 URL 溢出
+  doc.querySelectorAll("p").forEach((p) => {
+    const text = p.textContent?.trimStart() || "";
+    if (!text.startsWith("参考来源")) return;
+    p.querySelectorAll("a").forEach((a) => {
+      const em = doc.createElement("em");
+      const title = a.textContent || "";
+      const url = a.getAttribute("href") || "";
+      em.textContent = url ? `${title}：${url}` : title;
+      if (style.em) em.setAttribute("style", style.em + "; word-break: break-all;");
+      a.replaceWith(em);
+    });
+  });
+
   // 用 container 样式包裹
   const container = doc.createElement("div");
   container.setAttribute("style", style.container);

@@ -205,19 +205,27 @@ function applyTheme(html: string, themeId: WechatThemeId): string {
     p.setAttribute("style", smaller);
   });
 
-  // 参考来源段落：<a> 转为 <em>，格式为 "标题：URL"，不可点击，避免长 URL 溢出
-  doc.querySelectorAll("p").forEach((p) => {
-    const text = p.textContent?.trimStart() || "";
-    if (!text.startsWith("参考来源")) return;
-    p.querySelectorAll("a").forEach((a) => {
+  // 参考来源来源条目：<a> 转为纯文本，整行用 <em> 包裹
+  // "参考来源："是标题行，后续若干段落是来源条目，遇到"编辑"或非 <p> 内容则结束
+  {
+    const allParas = Array.from(doc.querySelectorAll("p"));
+    let inRefSection = false;
+    for (const p of allParas) {
+      const text = p.textContent?.trimStart() || "";
+      if (text.startsWith("参考来源")) { inRefSection = true; continue; }
+      if (!inRefSection) continue;
+      if (text.startsWith("编辑")) break;
+      // 将段落内 <a> 还原为纯文本，再整体包在 <em> 中
+      p.querySelectorAll("a").forEach((a) => {
+        a.replaceWith(doc.createTextNode(a.textContent || ""));
+      });
       const em = doc.createElement("em");
-      const title = a.textContent || "";
-      const url = a.getAttribute("href") || "";
-      em.textContent = url ? `${title}：${url}` : title;
+      em.textContent = p.textContent || "";
+      p.innerHTML = "";
+      p.appendChild(em);
       if (style.em) em.setAttribute("style", style.em + "; word-break: break-all;");
-      a.replaceWith(em);
-    });
-  });
+    }
+  }
 
   // 用 container 样式包裹
   const container = doc.createElement("div");

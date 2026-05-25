@@ -196,14 +196,22 @@ function applyTheme(html: string, themeId: WechatThemeId): string {
     });
   }
 
-  // 参考来源/编辑段落字号缩小 2px，视觉上与正文区分
-  doc.querySelectorAll("p").forEach((p) => {
-    const text = p.textContent?.trimStart() || "";
-    if (!text.startsWith("参考来源") && !text.startsWith("编辑")) return;
-    const currentStyle = p.getAttribute("style") || "";
-    const smaller = currentStyle.replace(/font-size:\s*(\d+)px/, (_, n) => `font-size: ${Number(n) - 2}px`);
-    p.setAttribute("style", smaller);
-  });
+  // 参考来源标题行、来源条目、编辑段落字号统一为 12px
+  {
+    const allParas = Array.from(doc.querySelectorAll("p"));
+    let inRefSection = false;
+    for (const p of allParas) {
+      const text = p.textContent?.trimStart() || "";
+      const isRefHeading = text.startsWith("参考来源");
+      const isEditorLine = text.startsWith("编辑");
+      if (isRefHeading) inRefSection = true;
+      if (isRefHeading || isEditorLine || inRefSection) {
+        const currentStyle = p.getAttribute("style") || "";
+        p.setAttribute("style", currentStyle.replace(/font-size:\s*(\d+)px/, "font-size: 12px"));
+      }
+      if (isEditorLine) break;
+    }
+  }
 
   // 参考来源来源条目：<a> 转为纯文本，整行用 <em> 包裹
   // "参考来源："是标题行，后续若干段落是来源条目，遇到"编辑"或非 <p> 内容则结束

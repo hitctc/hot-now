@@ -154,7 +154,17 @@ export async function makeWechatCompatible(html: string, options?: { skipImageBa
     else next.parentNode?.removeChild(next);
   });
 
-  // 6. 外链图片转 Base64（仅"复制到剪贴板"流程需要，推送流程跳过以保留原始 URL）
+  // 6. 清理链接样式：移除 text-decoration:none 和 border-bottom
+  // 微信编辑器需要链接有下划线（text-decoration: underline）才能正确渲染为可点击链接
+  // border-bottom 在微信内联元素上不被支持，会被静默移除
+  const links = section.querySelectorAll("a");
+  links.forEach((a: Element) => {
+    a.removeAttribute("target");
+    a.removeAttribute("rel");
+    a.setAttribute("style", "color: #576b95;");
+  });
+
+  // 7. 外链图片转 Base64（仅"复制到剪贴板"流程需要，推送流程跳过以保留原始 URL）
   if (!options?.skipImageBase64) {
     const imgs = Array.from(section.querySelectorAll("img"));
     await Promise.all(

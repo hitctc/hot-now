@@ -43,9 +43,12 @@ const md = new MarkdownIt({ html: true, linkify: true, breaks: true });
 // 所有链接在新标签打开
 md.core.ruler.push("external_links", (state) => {
   for (const token of state.tokens) {
-    if (token.type === "link_open") {
-      token.attrSet("target", "_blank");
-      token.attrSet("rel", "noopener noreferrer");
+    if (!token.children) continue;
+    for (const child of token.children) {
+      if (child.type === "link_open") {
+        child.attrSet("target", "_blank");
+        child.attrSet("rel", "noopener noreferrer");
+      }
     }
   }
 });

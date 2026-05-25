@@ -452,6 +452,12 @@ type ServerDeps = {
     wechatHtml?: string,
     onProgress?: (step: string, status: "running" | "done" | "error", detail?: string) => void | Promise<void>
   ) => Promise<{ ok: boolean; mediaId?: string; errorCode?: string; errorMessage?: string; hint?: string; pushCount?: number }>;
+  pushDailyDigestToWechatDraft?: (
+    digestId: number,
+    themeId: string,
+    wechatHtml: string,
+    onProgress?: (step: string, status: "running" | "done" | "error", detail?: string) => void | Promise<void>
+  ) => Promise<{ ok: boolean; mediaId?: string; errorCode?: string; errorMessage?: string }>;
   getArticleWechatPushLog?: (articleId: number) => unknown[];
   getArticlePushCount?: (articleId: number) => number;
   listWechatMpAccounts?: () => unknown[];
@@ -1665,6 +1671,64 @@ export function createServer(deps: ServerDeps = {}) {
         return reply.code(504).send({ ok: false, reason: "生成超时（>300s），请稍后刷新查看" });
       }
       return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
+    }
+  });
+
+  // ─── Daily Digest: 推送公众号草稿（SSE 流式推送） ───
+
+  app.post("/api/creative/daily-digests/:id/push-draft", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+    if (!deps.pushDailyDigestToWechatDraft) {
+      return reply.code(503).send({ ok: false, reason: "wechat-push-not-configured" });
+    }
+
+    const params = request.params as { id: string };
+    const body = request.body as { themeId?: string; wechatHtml?: string } | undefined;
+    const id = parseInt(params.id, 10);
+    const themeId = body?.themeId ?? "bauhaus";
+    const wechatHtml = body?.wechatHtml ?? "";
+
+    if (!wechatHtml) {
+      return reply.code(400).send({ ok: false, reason: "missing-wechat-html" });
+    }
+
+    reply.hijack();
+    const res = reply.raw;
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "X-Accel-Buffering": "no",
+      Connection: "keep-alive",
+    });
+    res.flushHeaders();
+    res.socket?.setNoDelay(true);
+
+    const sendEvent = (data: Record<string, unknown>) => {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    const onProgress = async (step: string, status: "running" | "done" | "error", detail?: string) => {
+      const event: Record<string, unknown> = { step, status };
+      if (detail) event.detail = detail;
+      sendEvent(event);
+      if (status === "done" || status === "running") {
+        await new Promise(r => setTimeout(r, 300));
+      }
+    };
+
+    try {
+      const result = await deps.pushDailyDigestToWechatDraft(id, themeId, wechatHtml, onProgress);
+      if (result.ok) {
+        sendEvent({ step: "complete", status: "done", mediaId: result.mediaId });
+      } else {
+        sendEvent({ step: "complete", status: "error", errorCode: result.errorCode, errorMessage: result.errorMessage });
+      }
+    } catch (err) {
+      sendEvent({ step: "complete", status: "error", errorMessage: (err as Error).message });
+    } finally {
+      res.end();
     }
   });
 

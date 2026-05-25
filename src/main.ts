@@ -27,6 +27,7 @@ import { LatestReportEmailError, sendLatestReportEmail } from "./core/pipeline/s
 import { runCollectionCycle } from "./core/pipeline/runCollectionCycle.js";
 import { runAiTimelineAlertCycle } from "./core/notifications/runAiTimelineAlertCycle.js";
 import { pushArticleToWechatDraft, getArticlePushLog, getArticlePushCount } from "./core/wechatMp/wechatMpDraftPush.js";
+import { pushDailyDigestToWechatDraft } from "./core/wechatMp/dailyDigestDraftPush.js";
 import { listWechatMpAccounts, saveWechatMpAccount, deleteWechatMpAccount, setDefaultWechatMpAccount } from "./core/wechatMp/wechatMpAccountRepository.js";
 import type { WechatThemeId } from "./core/creative/wechatFormat/wechatCompat.js";
 import { listRatingDimensions, saveRatings } from "./core/ratings/ratingRepository.js";
@@ -672,6 +673,15 @@ const app = createServer({
     pushArticleToWechatDraft({
       db,
       articleId,
+      themeId: themeId as WechatThemeId,
+      wechatHtml,
+      masterKey: config.llm?.settingsMasterKey ?? config.auth.sessionSecret,
+      onProgress,
+    }),
+  pushDailyDigestToWechatDraft: async (digestId: number, themeId: string, wechatHtml: string, onProgress?: (step: string, status: "running" | "done" | "error", detail?: string) => void) =>
+    pushDailyDigestToWechatDraft({
+      db,
+      digestId,
       themeId: themeId as WechatThemeId,
       wechatHtml,
       masterKey: config.llm?.settingsMasterKey ?? config.auth.sessionSecret,

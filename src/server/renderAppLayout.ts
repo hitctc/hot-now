@@ -88,7 +88,7 @@ export function renderAppLayout(view: AppShellView): string {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${escapeHtml(view.page.title)} | HotNow</title>
+    <title>${escapeHtml(view.page.title)} | 热讯平台HotNow</title>
     <link rel="icon" type="image/png" href="/brand/hotnow-favicon.png" />
     <link rel="stylesheet" href="/assets/site.css" />
     <script src="/assets/site.js" defer></script>
@@ -98,7 +98,7 @@ export function renderAppLayout(view: AppShellView): string {
     <div class="shell-root">
       <aside class="shell-sidebar shell-sidebar--editorial">
         <div class="brand-block brand-block--masthead">
-          <p class="brand-kicker">HotNow Editorial Desk</p>
+          <p class="brand-kicker">热讯平台</p>
           <h1 class="brand-title">HotNow</h1>
           <p class="brand-description">多源热点、筛选策略与投递动作在同一编辑台内完成。</p>
         </div>

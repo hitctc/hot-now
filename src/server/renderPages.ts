@@ -186,7 +186,7 @@ export function renderNotFoundPage(requestPath: string) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>页面不存在 - HotNow 热讯</title>
+    <title>页面不存在 - 热讯平台HotNow</title>
     <link rel="icon" type="image/png" href="/brand/hotnow-favicon.png" />
     <style>
       *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -309,7 +309,7 @@ export function renderNotFoundPage(requestPath: string) {
       </div>
       <div class="not-found__brand">
         <img src="/brand/hotnow-logo-mark.png" alt="" />
-        HotNow 热讯
+        热讯平台HotNow
       </div>
     </div>
   </body>

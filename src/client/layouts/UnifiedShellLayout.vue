@@ -266,7 +266,7 @@ onBeforeUnmount(() => {
             />
             <div class="min-w-0">
               <p class="m-0 text-[18px] font-semibold tracking-[-0.03em] text-editorial-text-main">HotNow</p>
-              <p class="mt-0.5 text-xs font-medium text-editorial-text-body">热讯</p>
+              <p class="mt-0.5 text-xs font-medium text-editorial-text-body">热讯平台</p>
             </div>
           </div>
         </section>

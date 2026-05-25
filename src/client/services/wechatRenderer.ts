@@ -209,6 +209,11 @@ function applyTheme(html: string, themeId: WechatThemeId): string {
         const currentStyle = p.getAttribute("style") || "";
         const styled = currentStyle.replace(/font-size:\s*\d+px/, "font-size: 12px").replace(/color:\s*[^;]+;?/, "color: #999;");
         p.setAttribute("style", styled);
+        // 段落内子元素（em、strong 等）也统一灰色
+        p.querySelectorAll("em, strong, span").forEach((el) => {
+          const s = el.getAttribute("style") || "";
+          el.setAttribute("style", s.replace(/color:\s*[^;]+;?/, "color: #999;"));
+        });
       }
       if (isEditorLine) break;
     }

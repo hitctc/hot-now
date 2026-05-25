@@ -538,9 +538,12 @@ const pagination = computed(() => ({
 
           <!-- 写作状态列 -->
           <template v-else-if="column.key === 'writingStatus'">
-            <a-tag :color="writingStatusColor(record.writingStatus)">
-              {{ writingStatusLabel(record.writingStatus) }}
-            </a-tag>
+            <div class="flex flex-col items-start gap-0.5 leading-tight">
+              <a-tag :color="writingStatusColor(record.writingStatus)">
+                {{ writingStatusLabel(record.writingStatus) }}
+              </a-tag>
+              <a-tag v-if="record.writeCount > 0" color="green" class="!m-0 !text-[11px] !py-0">{{ record.writeCount }}次</a-tag>
+            </div>
           </template>
 
           <!-- 写文章列 -->

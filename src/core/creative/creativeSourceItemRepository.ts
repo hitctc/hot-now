@@ -27,7 +27,8 @@ const SELECT_COLUMNS = `
   trend_breakdown,
   linked_article_id,
   created_at,
-  updated_at
+  updated_at,
+  (SELECT COUNT(*) FROM creative_finished_articles WHERE source_item_id = creative_source_items.id) AS write_count
 ` as const;
 
 type SourceItemRow = {
@@ -55,6 +56,7 @@ type SourceItemRow = {
   linked_article_id: number | null;
   created_at: string;
   updated_at: string;
+  write_count: number;
 };
 
 function mapRow(row: SourceItemRow): CreativeSourceItemRecord {
@@ -81,6 +83,7 @@ function mapRow(row: SourceItemRow): CreativeSourceItemRecord {
     trendScore: row.trend_score,
     trendBreakdown: row.trend_breakdown ? JSON.parse(row.trend_breakdown) : null,
     linkedArticleId: row.linked_article_id,
+    writeCount: row.write_count ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -120,6 +123,7 @@ export type CreativeSourceItemRecord = {
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
   linkedArticleId: number | null;
+  writeCount: number;
   createdAt: string;
   updatedAt: string;
 };

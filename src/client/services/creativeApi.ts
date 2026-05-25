@@ -34,6 +34,7 @@ export type CreativeSourceItem = {
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
   linkedArticleId: number | null;
+  writeCount: number;
   createdAt: string;
   updatedAt: string;
 };

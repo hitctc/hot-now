@@ -206,6 +206,7 @@ function applyTheme(html: string, themeId: WechatThemeId): string {
       const isEditorLine = text.startsWith("编辑");
       if (isRefHeading) inRefSection = true;
       if (isRefHeading || isEditorLine || inRefSection) {
+        const currentStyle = p.getAttribute("style") || "";
         const styled = currentStyle.replace(/font-size:\s*\d+px/, "font-size: 12px").replace(/color:\s*[^;]+;?/, "color: #999;");
         p.setAttribute("style", styled);
       }

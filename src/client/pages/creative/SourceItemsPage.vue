@@ -92,6 +92,12 @@ async function loadItems(): Promise<void> {
     });
     items.value = res.items;
     total.value = res.total;
+    // 页面切回时自动恢复处于 writing 状态的轮询
+    const writingItem = res.items.find(i => i.writingStatus === "writing");
+    if (writingItem && !writingPollTimer) {
+      writeArticleLoadingId.value = writingItem.id;
+      startWritingPoll(writingItem);
+    }
   } finally {
     isLoading.value = false;
   }

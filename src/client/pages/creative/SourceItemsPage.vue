@@ -93,10 +93,10 @@ async function loadItems(): Promise<void> {
     items.value = res.items;
     total.value = res.total;
     // 页面切回时自动恢复处于 writing 状态的轮询
-    const writingItem = res.items.find(i => i.writingStatus === "writing");
-    if (writingItem && !writingPollTimer) {
-      writeArticleLoadingId.value = writingItem.id;
-      startWritingPoll(writingItem);
+    const writingItems = res.items.filter(i => i.writingStatus === "writing" && !writingIds.value.has(i.id));
+    if (writingItems.length > 0) {
+      setWritingIds(new Set([...writingIds.value, ...writingItems.map(wi => wi.id)]));
+      for (const wi of writingItems) startWritingPoll(wi);
     }
   } finally {
     isLoading.value = false;
@@ -269,8 +269,19 @@ function writingStatusLabel(status: string): string {
   }
 }
 
-// ─── 素材库写文章 ───
-const writeArticleLoadingId = ref<number | null>(null);
+// ─── 素材库写文章（支持多篇并行） ───
+const writingIds = ref<Set<number>>(new Set());
+
+// Vue 3 ref<Set> 的 delete 不自动触发响应式，需要替换整个 Set
+function removeWritingId(id: number): void {
+  writingIds.value = new Set([...writingIds.value].filter(i => i !== id));
+}
+function addWritingId(id: number): void {
+  writingIds.value = new Set([...writingIds.value, id]);
+}
+function setWritingIds(ids: Set<number>): void {
+  writingIds.value = ids;
+}
 const writeModeVisible = ref(false);
 const writeModeTarget = ref<CreativeSourceItem | null>(null);
 const writeModeValue = ref<string | null>(null);
@@ -284,7 +295,6 @@ const writeModeOptions = [
 ];
 
 function openWriteModeModal(item: CreativeSourceItem): void {
-  if (writeArticleLoadingId.value !== null) return;
   writeModeTarget.value = item;
   writeModeValue.value = null;
   writeModeVisible.value = true;
@@ -298,31 +308,42 @@ function cancelWriteMode(): void {
 
 // 写作状态轮询：10 秒间隔，10 分钟超时
 let writingPollTimer: ReturnType<typeof setInterval> | null = null;
+const writingTimers = new Map<number, number>(); // itemId -> startTime
 
 function startWritingPoll(item: CreativeSourceItem): void {
-  if (writingPollTimer) return;
-  const startTime = Date.now();
+  writingTimers.set(item.id, Date.now());
+  if (writingPollTimer) return; // 已有全局轮询在跑
   const TIMEOUT_MS = 10 * 60 * 1000;
 
   writingPollTimer = setInterval(async () => {
-    if (Date.now() - startTime > TIMEOUT_MS) {
-      stopWritingPoll();
-      message.info("写作超时（>10分钟），请稍后查看成品列表");
-      return;
-    }
-    try {
-      const updated = await readCreativeSourceItem(item.id);
-      if (updated.writingStatus === "done") {
-        stopWritingPoll();
-        message.success("文章写作完成");
-        loadItems();
-      } else if (updated.writingStatus === "failed") {
-        stopWritingPoll();
-        message.error("写作失败，请重试");
+    if (writingTimers.size === 0) { stopWritingPoll(); return; }
+    const now = Date.now();
+    const checkIds = [...writingTimers.entries()];
+    for (const [itemId, startTime] of checkIds) {
+      if (now - startTime > TIMEOUT_MS) {
+        writingTimers.delete(itemId);
+        removeWritingId(itemId);
+        message.info(`素材#${itemId} 写作超时（>10分钟），请稍后查看成品列表`);
+        continue;
       }
-    } catch {
-      // 单次轮询失败不中断
+      try {
+        const updated = await readCreativeSourceItem(itemId);
+        if (updated.writingStatus === "done") {
+          writingTimers.delete(itemId);
+          removeWritingId(itemId);
+          message.success(`素材#${itemId} 文章写作完成`);
+          loadItems();
+        } else if (updated.writingStatus === "failed") {
+          writingTimers.delete(itemId);
+          removeWritingId(itemId);
+          message.error(`素材#${itemId} 写作失败，请重试`);
+        }
+      } catch {
+        // 单次轮询失败不中断
+      }
     }
+    // 全部完成则停止轮询
+    if (writingTimers.size === 0) stopWritingPoll();
   }, 10_000);
 }
 
@@ -331,7 +352,6 @@ function stopWritingPoll(): void {
     clearInterval(writingPollTimer);
     writingPollTimer = null;
   }
-  writeArticleLoadingId.value = null;
 }
 
 onBeforeUnmount(() => stopWritingPoll());
@@ -344,7 +364,7 @@ async function confirmWriteMode(): Promise<void> {
     const result = await writeSourceItemArticle(item.id, writeModeValue.value ?? undefined);
     if (result.ok) {
       writeModeVisible.value = false;
-      writeArticleLoadingId.value = item.id;
+      addWritingId(item.id);
       // 更新本地状态为 writing
       const local = items.value.find(i => i.id === item.id);
       if (local) local.writingStatus = "writing";
@@ -552,9 +572,9 @@ const pagination = computed(() => ({
               type="link"
               size="small"
               class="!p-0 !text-[11px]"
-              :disabled="writeArticleLoadingId !== null"
+              :disabled="writingIds.has(record.id)"
               @click="openWriteModeModal(record)"
-            >{{ writeArticleLoadingId === record.id ? '写作中...' : '写文章' }}</a-button>
+            >{{ writingIds.has(record.id) ? '写作中...' : '写文章' }}</a-button>
           </template>
         </template>
 

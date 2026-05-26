@@ -53,6 +53,7 @@ function toCandidateItem(
   const summary = toSummary(
     item.contentSnippet ?? item.content ?? item.summary ?? readDescription(item)
   );
+  const rawDescription = readDescription(item) ?? (typeof item.content === "string" ? item.content : undefined);
 
   return {
     rank,
@@ -62,7 +63,8 @@ function toCandidateItem(
     sourceName: source.name,
     externalId,
     ...(publishedAt ? { publishedAt } : {}),
-    ...(summary ? { summary } : {})
+    ...(summary ? { summary } : {}),
+    ...(rawDescription ? { contentHtml: rawDescription } : {})
   };
 }
 

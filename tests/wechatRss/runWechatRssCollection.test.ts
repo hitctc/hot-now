@@ -50,16 +50,9 @@ describe("runWechatRssCollection", () => {
     const created = createWechatRssSources(handle.db, { rssUrls: "https://rss.example.com/wechat.xml" });
     const sourceId = created.ok ? created.created[0].id : 0;
     const fetchMock = vi.fn(async () => new Response(feedXml, { status: 200 }));
-    const fetchArticleMock = vi.fn(async (url: string) => ({
-      ok: true as const,
-      url,
-      title: "",
-      text: `正文：${url}`
-    }));
 
     const result = await runWechatRssCollection(handle.db, {
       fetch: fetchMock,
-      fetchArticle: fetchArticleMock,
       now: new Date("2026-04-24T09:00:00.000Z")
     });
 
@@ -75,7 +68,7 @@ describe("runWechatRssCollection", () => {
     const rows = handle.db
       .prepare(
         `
-          SELECT cs.kind AS source_kind, ci.external_id, ci.canonical_url, ci.title, ci.metadata_json
+          SELECT cs.kind AS source_kind, ci.external_id, ci.canonical_url, ci.title, ci.metadata_json, ci.body_markdown
           FROM content_items ci
           JOIN content_sources cs ON cs.id = ci.source_id
           WHERE cs.kind = 'wechat_rss'
@@ -88,6 +81,7 @@ describe("runWechatRssCollection", () => {
       canonical_url: string;
       title: string;
       metadata_json: string | null;
+      body_markdown: string | null;
     }>;
     const statusRow = handle.db
       .prepare("SELECT display_name, last_fetched_at, last_success_at, last_result FROM wechat_rss_sources WHERE id = ?")
@@ -117,6 +111,9 @@ describe("runWechatRssCollection", () => {
         title: "Claude 推出新功能"
       }
     ]);
+    // body_markdown 来自 RSS description HTML 转纯文本
+    expect(rows[0].body_markdown).toBe("OpenAI model update");
+    expect(rows[1].body_markdown).toBe("Anthropic feature update");
     expect(JSON.parse(rows[0].metadata_json ?? "{}")).toMatchObject({
       collector: {
         kind: "wechat_rss",
@@ -131,6 +128,5 @@ describe("runWechatRssCollection", () => {
       last_success_at: "2026-04-24T09:00:00.000Z",
       last_result: "本次 RSS 抓取成功，获得 2 条候选内容。"
     });
-    expect(fetchArticleMock).toHaveBeenCalledTimes(2);
   });
 });

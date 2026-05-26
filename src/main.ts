@@ -183,9 +183,7 @@ async function runBilibiliCollectionTask() {
 
 // 微信公众号 RSS 由后台单独维护，第一版只手动采集，避免混进普通 RSS 定时轮询。
 async function runWechatRssCollectionTask() {
-  return await runWechatRssCollection(db, {
-    fetchArticle: fetchAndExtractArticle
-  });
+  return await runWechatRssCollection(db);
 }
 
 // 微博热搜榜匹配只做热点补充信号，不进默认采集调度。

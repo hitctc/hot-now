@@ -204,7 +204,12 @@ export function insertCreativeSourceItem(
       { input: input.trendBreakdown ? JSON.stringify(input.trendBreakdown) : undefined, col: "trend_breakdown" },
     ];
     for (const f of fields) {
-      if (f.input != null && (existing[f.col] === null || existing[f.col] === undefined)) {
+      if (f.input == null) continue;
+      const existingVal = existing[f.col];
+      // full_content 字段：已有值是反爬垃圾内容时允许覆盖
+      if (f.col === "full_content" && existingVal != null && typeof existingVal === "string" && existingVal.includes("环境异常")) {
+        patches.push({ col: f.col, val: f.input });
+      } else if (existingVal === null || existingVal === undefined) {
         patches.push({ col: f.col, val: f.input });
       }
     }

@@ -400,7 +400,7 @@
     }
   }
 
-  // Tooltip 在编辑主题下确保文字可读
+  /* Tooltip 在编辑主题下确保文字可读 */
   .ant-tooltip-inner {
     color: #fff;
   }

@@ -38,11 +38,11 @@
           <a-tooltip :mouse-enter-delay="0.5" title="保存正文内容到数据库">
             <a-button type="primary" :loading="saving" @click="handleSave">保存正文</a-button>
           </a-tooltip>
-          <a-tooltip v-if="canPush(article)" :mouse-enter-delay="0.5" title="自动保存正文后推送到微信公众号草稿箱">
+          <a-tooltip v-if="canPush" :mouse-enter-delay="0.5" title="自动保存正文后推送到微信公众号草稿箱">
             <a-button type="primary" :loading="saving" @click="saveAndPush">推送到草稿箱</a-button>
           </a-tooltip>
           <a-tooltip v-else :mouse-enter-delay="0.3">
-            <template #title>{{ getMissingConditions(article).join('；') }}</template>
+            <template #title>{{ missingConditions.join('；') }}</template>
             <a-button type="primary" disabled>推送到草稿箱</a-button>
           </a-tooltip>
         </div>
@@ -771,6 +771,7 @@ async function handleRegenInlineImage(imageIndex: number): Promise<void> {
         props.article.imagesJson = result.images as typeof props.article.imagesJson;
       }
       message.success(`配图 ${imageIndex} 已重新生成`);
+      tickArticleChange();
     } else {
       message.error(result.reason ?? "配图生成失败");
     }
@@ -829,6 +830,7 @@ async function handleRegenCover(): Promise<void> {
       editFinishedArticle(props.article.id, saveFields).catch(() => {});
 
       message.success("新封面图已生成");
+      tickArticleChange();
     } else {
       message.error(result.reason ?? "封面图生成失败");
     }
@@ -1136,8 +1138,14 @@ async function copyMarkdownAsPlainText(mdText: string): Promise<void> {
 }
 
 // ─── 推送条件检查 ───
+// props.article 深层属性修改不会触发响应式，用一个计数器手动刷新
+const articleChangeTick = ref(0);
+function tickArticleChange() { articleChangeTick.value++; }
 
-function canPush(article: CreativeFinishedArticle): boolean {
+const canPush = computed(() => {
+  void articleChangeTick.value;
+  const article = props.article;
+  if (!article) return false;
   if (article.status !== "ready_for_publish" && article.status !== "wechat_draft") return false;
   if (parseJsonArray(article.titles).length === 0) return false;
   if (article.coverImage.length === 0) return false;
@@ -1145,9 +1153,12 @@ function canPush(article: CreativeFinishedArticle): boolean {
   if (inlineImageSlotCount.value > 0) return false;
   if (!article.contentMarkdown) return false;
   return true;
-}
+});
 
-function getMissingConditions(article: CreativeFinishedArticle): string[] {
+const missingConditions = computed(() => {
+  void articleChangeTick.value;
+  const article = props.article;
+  if (!article) return [];
   const missing: string[] = [];
   if (article.status !== "ready_for_publish" && article.status !== "wechat_draft") missing.push("状态不允许推送");
   if (parseJsonArray(article.titles).length === 0) missing.push("缺少标题");
@@ -1156,7 +1167,7 @@ function getMissingConditions(article: CreativeFinishedArticle): string[] {
   else if (inlineImageSlotCount.value > 0) missing.push(`${inlineImageSlotCount.value} 张配图占位符未替换`);
   if (!article.contentMarkdown) missing.push("缺少 Markdown 内容");
   return missing;
-}
+});
 </script>
 
 <style>

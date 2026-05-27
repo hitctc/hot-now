@@ -36,15 +36,24 @@ export async function downloadAndStoreImage(
   }
 
   const buffer = Buffer.from(await response.arrayBuffer());
+  const ext = resolveExtension(imageUrl, response.headers.get("content-type"));
+  return storeImageBuffer(imageDir, buffer, ext);
+}
 
+/**
+ * 从 buffer 直接存储图片到本地目录。
+ * 用于 Hermes 下载图片后直接上传文件数据，跳过 hot-now 出境下载。
+ */
+export async function storeImageBuffer(
+  imageDir: string,
+  buffer: Buffer,
+  ext: string | null
+): Promise<StoreImageResult> {
   if (buffer.length > MAX_IMAGE_SIZE) {
     throw new Error(`image too large: ${buffer.length} bytes (max ${MAX_IMAGE_SIZE})`);
   }
-
-  // 从 URL 或 Content-Type 推断扩展名
-  const ext = resolveExtension(imageUrl, response.headers.get("content-type"));
-  if (!ext) {
-    throw new Error("cannot determine image format from URL or content-type");
+  if (!ext || !ALLOWED_EXTENSIONS.has(ext)) {
+    throw new Error("cannot determine image format");
   }
 
   const dateDir = formatDateDir(new Date());

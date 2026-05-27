@@ -100,7 +100,7 @@ import {
   editDailyDigest
 } from "../core/dailyDigest/dailyDigestRepository.js";
 
-import { downloadAndStoreImage, readStoredImage } from "../core/storage/imageStore.js";
+import { downloadAndStoreImage, storeImageBuffer, readStoredImage } from "../core/storage/imageStore.js";
 import { readNextCollectionRunAt } from "../core/scheduler/readNextCollectionRunAt.js";
 import {
   createSessionToken,
@@ -2078,6 +2078,81 @@ export function createServer(deps: ServerDeps = {}) {
       } catch (err) {
         request.log.warn({ err, url }, "Image download/store failed");
         failed.push({ url: url.trim(), reason: "download_failed" });
+      }
+    }
+
+    if (results.length === 0) {
+      return reply.code(500).send({ error: "all_uploads_failed", details: failed });
+    }
+
+    const response: Record<string, unknown> = { images: results };
+    if (failed.length > 0) {
+      response.failed = failed;
+    }
+    return reply.send(response);
+  });
+
+  // ─── Creative: 图片文件上传（Hermes 下载后直传，避免 hot-now 出境下载） ───
+  app.post("/api/creative/images/upload-image", async (request, reply) => {
+    if (!validateCreativeApiToken(request, reply, creativeApiToken)) {
+      return;
+    }
+
+    if (!creativeImageDir) {
+      return reply.code(503).send({ ok: false, reason: "image-dir-not-configured" });
+    }
+
+    const body = request.body as {
+      images?: Array<{
+        data: string;       // base64 编码的图片数据
+        filename?: string;  // 原始文件名，用于推断扩展名
+        contentType?: string;
+        purpose?: string;
+        alt?: string;
+        sourceUrl?: string;
+        model?: string;
+      }>;
+    } | undefined;
+
+    const images = Array.isArray(body?.images) ? body.images : [];
+    if (images.length === 0) {
+      return reply.code(400).send({ ok: false, reason: "missing-images" });
+    }
+    if (images.length > 9) {
+      return reply.code(400).send({ ok: false, reason: "too-many-images" });
+    }
+
+    const publicBaseUrl = (deps.config?.publicBaseUrl ?? "").replace(/\/+$/, "");
+    const results: Array<{
+      storedUrl: string;
+      purpose: string;
+      alt: string;
+      sourceUrl: string;
+      model: string;
+    }> = [];
+    const failed: Array<{ index: number; reason: string }> = [];
+
+    for (let i = 0; i < images.length; i++) {
+      const img = images[i];
+      if (!img.data) {
+        failed.push({ index: i, reason: "missing-data" });
+        continue;
+      }
+
+      try {
+        const buffer = Buffer.from(img.data, "base64");
+        const ext = resolveExtFromFilename(img.filename) ?? resolveExtFromContentType(img.contentType);
+        const stored = await storeImageBuffer(creativeImageDir, buffer, ext);
+        results.push({
+          storedUrl: publicBaseUrl ? `${publicBaseUrl}${stored.urlPath}` : stored.urlPath,
+          purpose: img.purpose ?? "cover",
+          alt: img.alt ?? "",
+          sourceUrl: img.sourceUrl ?? "",
+          model: img.model ?? ""
+        });
+      } catch (err) {
+        request.log.warn({ err, index: i }, "Image upload/store failed");
+        failed.push({ index: i, reason: (err as Error).message ?? "store_failed" });
       }
     }
 
@@ -4756,6 +4831,22 @@ function ensureStateActionAuthorized(
   }
 
   return true;
+}
+
+function resolveExtFromFilename(filename: string | undefined): string | null {
+  if (!filename) return null;
+  const ext = filename.includes(".") ? `.${filename.split(".").pop()!.toLowerCase()}` : null;
+  if (ext && [".png", ".jpg", ".jpeg", ".webp"].includes(ext)) {
+    return ext === ".jpeg" ? ".jpg" : ext;
+  }
+  return null;
+}
+
+function resolveExtFromContentType(contentType: string | undefined): string | null {
+  if (!contentType) return null;
+  const ct = contentType.split(";")[0].trim().toLowerCase();
+  const map: Record<string, string> = { "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp" };
+  return map[ct] ?? null;
 }
 
 function validateCreativeApiToken(

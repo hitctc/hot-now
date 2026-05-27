@@ -399,10 +399,9 @@
       padding: 10px 16px 16px;
     }
   }
+}
 
-  /* Tooltip 在编辑主题下确保文字可读 */
-  .ant-tooltip-inner {
-    color: #fff;
-  }
-
+/* Tooltip 在编辑主题下确保文字可读 —— 必须在 @layer 外才能覆盖 Ant Design 默认样式 */
+.ant-tooltip-inner {
+  color: #fff !important;
 }

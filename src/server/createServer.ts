@@ -1179,7 +1179,7 @@ export function createServer(deps: ServerDeps = {}) {
         });
       }
 
-      const data = await res.json() as { success: boolean; coverUrl?: string; prompt?: string; error?: string };
+      const data = await res.json() as { success: boolean; coverUrl?: string; prompt?: string; sourceUrl?: string; provider?: string; model?: string; error?: string };
       if (!data.success || !data.coverUrl) {
         return reply.code(502).send({ ok: false, reason: data.error ?? "封面图生成失败", hermesResponse: JSON.stringify(data) });
       }
@@ -1189,7 +1189,14 @@ export function createServer(deps: ServerDeps = {}) {
       editCreativeFinishedArticle(db, id, { coverImage: updatedCovers });
 
       const updated = findCreativeFinishedArticleById(db, id);
-      return reply.send({ ok: true, coverImage: updated?.coverImage ?? updatedCovers, prompt: data.prompt });
+      return reply.send({
+        ok: true,
+        coverImage: updated?.coverImage ?? updatedCovers,
+        prompt: data.prompt,
+        sourceUrl: data.sourceUrl ?? "",
+        provider: data.provider ?? "",
+        model: data.model ?? "",
+      });
     } catch (err) {
       const errMessage = (err as Error).message ?? String(err);
       if ((err as Error).name === "AbortError") {
@@ -1395,7 +1402,7 @@ export function createServer(deps: ServerDeps = {}) {
         return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, hermesResponse: errorBody });
       }
 
-      const data = await res.json() as { success: boolean; imageUrl?: string; imageIndex?: number; prompt?: string; error?: string };
+      const data = await res.json() as { success: boolean; imageUrl?: string; imageIndex?: number; prompt?: string; sourceUrl?: string; provider?: string; model?: string; error?: string };
       if (!data.success) {
         return reply.code(502).send({ ok: false, reason: data.error ?? "配图生成失败", hermesResponse: JSON.stringify(data) });
       }
@@ -1409,6 +1416,9 @@ export function createServer(deps: ServerDeps = {}) {
         contentMarkdown: updated?.contentMarkdown ?? article.contentMarkdown,
         images: updated?.images ?? article.images,
         prompt: data.prompt,
+        sourceUrl: data.sourceUrl ?? "",
+        provider: data.provider ?? "",
+        model: data.model ?? "",
       });
     } catch (err) {
       const errMessage = (err as Error).message ?? String(err);

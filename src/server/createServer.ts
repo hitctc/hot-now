@@ -1171,16 +1171,17 @@ export function createServer(deps: ServerDeps = {}) {
       clearTimeout(timeout);
 
       if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({ error: `Hermes HTTP ${res.status}` }));
+        const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
         return reply.code(res.status >= 500 ? 502 : res.status).send({
           ok: false,
-          reason: errorBody.error ?? `Hermes HTTP ${res.status}`,
+          reason: `Hermes HTTP ${res.status}`,
+          hermesResponse: errorBody,
         });
       }
 
       const data = await res.json() as { success: boolean; coverUrl?: string; prompt?: string; error?: string };
       if (!data.success || !data.coverUrl) {
-        return reply.code(502).send({ ok: false, reason: data.error ?? "封面图生成失败" });
+        return reply.code(502).send({ ok: false, reason: data.error ?? "封面图生成失败", hermesResponse: JSON.stringify(data) });
       }
 
       // 将新封面图 prepend 到数组开头
@@ -1190,10 +1191,11 @@ export function createServer(deps: ServerDeps = {}) {
       const updated = findCreativeFinishedArticleById(db, id);
       return reply.send({ ok: true, coverImage: updated?.coverImage ?? updatedCovers, prompt: data.prompt });
     } catch (err) {
+      const errMessage = (err as Error).message ?? String(err);
       if ((err as Error).name === "AbortError") {
-        return reply.code(504).send({ ok: false, reason: "生成超时，请稍后刷新页面查看" });
+        return reply.code(504).send({ ok: false, reason: "封面图生成超时（>180s），Hermes 未响应", detail: errMessage });
       }
-      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
+      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败`, detail: errMessage });
     }
   });
 
@@ -1235,16 +1237,17 @@ export function createServer(deps: ServerDeps = {}) {
       clearTimeout(timeout);
 
       if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({ error: `Hermes HTTP ${res.status}` }));
+        const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
         return reply.code(res.status >= 500 ? 502 : res.status).send({
           ok: false,
-          reason: errorBody.error ?? `Hermes HTTP ${res.status}`,
+          reason: `Hermes HTTP ${res.status}`,
+          hermesResponse: errorBody,
         });
       }
 
       const data = await res.json() as { success: boolean; title?: string; prompt?: string; error?: string };
       if (!data.success || !data.title) {
-        return reply.code(502).send({ ok: false, reason: data.error ?? "标题生成失败" });
+        return reply.code(502).send({ ok: false, reason: data.error ?? "标题生成失败", hermesResponse: JSON.stringify(data) });
       }
 
       // 新标题 prepend 到数组开头
@@ -1255,10 +1258,11 @@ export function createServer(deps: ServerDeps = {}) {
       const updated = findCreativeFinishedArticleById(db, id);
       return reply.send({ ok: true, titles: updated?.titles ?? updatedTitles, prompt: data.prompt });
     } catch (err) {
+      const errMessage = (err as Error).message ?? String(err);
       if ((err as Error).name === "AbortError") {
-        return reply.code(504).send({ ok: false, reason: "生成超时，请稍后刷新页面查看" });
+        return reply.code(504).send({ ok: false, reason: "标题生成超时（>15s），Hermes 未响应", detail: errMessage });
       }
-      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
+      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败`, detail: errMessage });
     }
   });
 
@@ -1288,13 +1292,13 @@ export function createServer(deps: ServerDeps = {}) {
       clearTimeout(timeout);
 
       if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({ error: `Hermes HTTP ${res.status}` }));
-        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: errorBody.error ?? `Hermes HTTP ${res.status}` });
+        const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
+        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, hermesResponse: errorBody });
       }
 
       const data = await res.json() as { success: boolean; intro?: string; prompt?: string; error?: string };
       if (!data.success || !data.intro) {
-        return reply.code(502).send({ ok: false, reason: data.error ?? "导语生成失败" });
+        return reply.code(502).send({ ok: false, reason: data.error ?? "导语生成失败", hermesResponse: JSON.stringify(data) });
       }
 
       const existingIntros = article.intros ?? [];
@@ -1304,8 +1308,9 @@ export function createServer(deps: ServerDeps = {}) {
       const updated = findCreativeFinishedArticleById(db, id);
       return reply.send({ ok: true, intros: updated?.intros ?? updatedIntros, prompt: data.prompt });
     } catch (err) {
-      if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "生成超时" }); }
-      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
+      const errMessage = (err as Error).message ?? String(err);
+      if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "导语生成超时（>15s），Hermes 未响应", detail: errMessage }); }
+      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败`, detail: errMessage });
     }
   });
 
@@ -1335,13 +1340,13 @@ export function createServer(deps: ServerDeps = {}) {
       clearTimeout(timeout);
 
       if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({ error: `Hermes HTTP ${res.status}` }));
-        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: errorBody.error ?? `Hermes HTTP ${res.status}` });
+        const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
+        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, hermesResponse: errorBody });
       }
 
       const data = await res.json() as { success: boolean; summary100?: string; prompt?: string; error?: string };
       if (!data.success || !data.summary100) {
-        return reply.code(502).send({ ok: false, reason: data.error ?? "摘要生成失败" });
+        return reply.code(502).send({ ok: false, reason: data.error ?? "摘要生成失败", hermesResponse: JSON.stringify(data) });
       }
 
       const existing = article.summary100 ?? [];
@@ -1350,8 +1355,9 @@ export function createServer(deps: ServerDeps = {}) {
 
       return reply.send({ ok: true, summary100: updated, prompt: data.prompt });
     } catch (err) {
-      if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "生成超时" }); }
-      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
+      const errMessage = (err as Error).message ?? String(err);
+      if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "摘要生成超时（>15s），Hermes 未响应", detail: errMessage }); }
+      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败`, detail: errMessage });
     }
   });
 
@@ -1385,13 +1391,13 @@ export function createServer(deps: ServerDeps = {}) {
       clearTimeout(timeout);
 
       if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({ error: `Hermes HTTP ${res.status}` }));
-        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: errorBody.error ?? `Hermes HTTP ${res.status}` });
+        const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
+        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, hermesResponse: errorBody });
       }
 
       const data = await res.json() as { success: boolean; imageUrl?: string; imageIndex?: number; prompt?: string; error?: string };
       if (!data.success) {
-        return reply.code(502).send({ ok: false, reason: data.error ?? "配图生成失败" });
+        return reply.code(502).send({ ok: false, reason: data.error ?? "配图生成失败", hermesResponse: JSON.stringify(data) });
       }
 
       // Hermes 已回写 contentMarkdown 和 images，重新读取最新数据返回
@@ -1405,8 +1411,9 @@ export function createServer(deps: ServerDeps = {}) {
         prompt: data.prompt,
       });
     } catch (err) {
-      if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "生成超时" }); }
-      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
+      const errMessage = (err as Error).message ?? String(err);
+      if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "配图生成超时（>180s），Hermes 未响应", detail: errMessage }); }
+      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败`, detail: errMessage });
     }
   });
 
@@ -1436,19 +1443,20 @@ export function createServer(deps: ServerDeps = {}) {
       clearTimeout(timeout);
 
       if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({ error: `Hermes HTTP ${res.status}` }));
-        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: errorBody.error ?? `Hermes HTTP ${res.status}` });
+        const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
+        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, hermesResponse: errorBody });
       }
 
       const data = await res.json() as { success: boolean; title?: string; prompts?: Record<string, unknown>; error?: string };
       if (!data.success) {
-        return reply.code(502).send({ ok: false, reason: data.error ?? "整篇重写失败" });
+        return reply.code(502).send({ ok: false, reason: data.error ?? "整篇重写失败", hermesResponse: JSON.stringify(data) });
       }
 
       return reply.send({ ok: true, title: data.title, prompts: data.prompts });
     } catch (err) {
-      if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "生成超时（>200s），请稍后在列表中查看是否有新文章" }); }
-      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
+      const errMessage = (err as Error).message ?? String(err);
+      if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "整篇重写超时（>200s），Hermes 未响应", detail: errMessage }); }
+      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败`, detail: errMessage });
     }
   });
 
@@ -1481,18 +1489,19 @@ export function createServer(deps: ServerDeps = {}) {
       });
 
       if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({ error: `Hermes HTTP ${res.status}` }));
-        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: errorBody.error ?? `Hermes HTTP ${res.status}` });
+        const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
+        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, hermesResponse: errorBody });
       }
 
       const data = await res.json() as { success: boolean; status?: string; message?: string; error?: string };
       if (!data.success) {
-        return reply.code(502).send({ ok: false, reason: data.error ?? "写文章失败" });
+        return reply.code(502).send({ ok: false, reason: data.error ?? "写文章失败", hermesResponse: JSON.stringify(data) });
       }
 
       return reply.send({ ok: true, status: data.status ?? "writing" });
     } catch (err) {
-      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
+      const errMessage = (err as Error).message ?? String(err);
+      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败`, detail: errMessage });
     }
   });
 

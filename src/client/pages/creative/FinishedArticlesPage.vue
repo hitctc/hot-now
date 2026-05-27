@@ -9,8 +9,6 @@ import {
   readCreativeSourceItem,
   toggleFinishedArticlePublished,
   wechatThemeOptions,
-  parseArticleImages,
-  extractImageUrl,
   type CreativeFinishedArticle,
   type CreativeSourceItem,
   type TrendBreakdown,
@@ -118,15 +116,13 @@ const defaultAccountName = computed(() => {
   return def?.name ?? '';
 });
 
-// 推送前置条件检查：文章必须标题、封面图、配图、Markdown 正文齐全
+// 推送前置条件检查：文章必须标题、封面图、Markdown 正文齐全
 function canPush(article: CreativeFinishedArticle | null): boolean {
   if (!article) return false;
   if (article.status !== 'ready_for_publish' && article.status !== 'wechat_draft') return false;
   const parsedTitles = parseJsonArray(article.titles);
   if (parsedTitles.length === 0) return false;
   if (article.coverImage.length === 0) return false;
-  const parsedImages = parseArticleImages(article.imagesJson);
-  if (parsedImages.length === 0) return false;
   if (!article.contentMarkdown) return false;
   return true;
 }
@@ -139,8 +135,6 @@ function getMissingConditions(article: CreativeFinishedArticle | null): string[]
   const parsedTitles = parseJsonArray(article.titles);
   if (parsedTitles.length === 0) missing.push('缺少标题');
   if (article.coverImage.length === 0) missing.push('缺少封面图');
-  const parsedImages = parseArticleImages(article.imagesJson);
-  if (parsedImages.length === 0) missing.push('缺少正文配图');
   if (!article.contentMarkdown) missing.push('缺少 Markdown 内容');
   return missing;
 }

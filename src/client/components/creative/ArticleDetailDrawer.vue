@@ -267,8 +267,8 @@
                   <span v-if="slotIdx < inlineImageSlotCount" class="text-editorial-text-muted/40">|</span>
                 </span>
               </template>
-              <!-- 配图完整时显示"重新生成" -->
-              <template v-else>
+              <!-- 已有配图时显示"重新生成" -->
+              <template v-if="articleImages.length > 0 && inlineImageSlotCount === 0">
                 <span v-for="(img, idx) in articleImages" :key="idx" class="inline-flex items-center gap-1">
                   <a-button
                     type="link"
@@ -1149,8 +1149,6 @@ const canPush = computed(() => {
   if (article.status !== "ready_for_publish" && article.status !== "wechat_draft") return false;
   if (parseJsonArray(article.titles).length === 0) return false;
   if (article.coverImage.length === 0) return false;
-  if (parseArticleImages(article.imagesJson).length === 0) return false;
-  if (inlineImageSlotCount.value > 0) return false;
   if (!article.contentMarkdown) return false;
   return true;
 });
@@ -1163,8 +1161,6 @@ const missingConditions = computed(() => {
   if (article.status !== "ready_for_publish" && article.status !== "wechat_draft") missing.push("状态不允许推送");
   if (parseJsonArray(article.titles).length === 0) missing.push("缺少标题");
   if (article.coverImage.length === 0) missing.push("缺少封面图");
-  if (parseArticleImages(article.imagesJson).length === 0) missing.push("缺少正文配图");
-  else if (inlineImageSlotCount.value > 0) missing.push(`${inlineImageSlotCount.value} 张配图占位符未替换`);
   if (!article.contentMarkdown) missing.push("缺少 Markdown 内容");
   return missing;
 });

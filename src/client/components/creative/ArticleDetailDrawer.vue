@@ -253,32 +253,17 @@
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文配图</h3>
             <div class="flex items-center gap-1">
-              <!-- 有占位符时，按占位符数量显示逐张生成按钮 -->
-              <template v-if="inlineImageSlotCount > 0">
-                <span v-for="slotIdx in inlineImageSlotCount" :key="slotIdx" class="inline-flex items-center gap-1">
+              <template v-for="idx in totalImageSlotCount" :key="idx">
+                <span class="inline-flex items-center gap-1">
                   <a-button
                     type="link"
                     size="small"
                     class="!p-0 !text-[11px]"
-                    :loading="regenInlineImageLoading === slotIdx"
+                    :loading="regenInlineImageLoading === idx"
                     :disabled="regenInlineImageLoading !== null"
-                    @click="handleRegenInlineImage(slotIdx)"
-                  >{{ regenInlineImageLoading === slotIdx ? `配图${slotIdx} 生成中...` : `生成配图${slotIdx}` }}</a-button>
-                  <span v-if="slotIdx < inlineImageSlotCount" class="text-editorial-text-muted/40">|</span>
-                </span>
-              </template>
-              <!-- 已有配图时显示"重新生成" -->
-              <template v-if="articleImages.length > 0 && inlineImageSlotCount === 0">
-                <span v-for="(img, idx) in articleImages" :key="idx" class="inline-flex items-center gap-1">
-                  <a-button
-                    type="link"
-                    size="small"
-                    class="!p-0 !text-[11px]"
-                    :loading="regenInlineImageLoading === idx + 1"
-                    :disabled="regenInlineImageLoading !== null"
-                    @click="handleRegenInlineImage(idx + 1)"
-                  >{{ regenInlineImageLoading === idx + 1 ? `配图${idx + 1} 生成中...` : `生成新配图${idx + 1}` }}</a-button>
-                  <span v-if="idx < articleImages.length - 1" class="text-editorial-text-muted/40">|</span>
+                    @click="handleRegenInlineImage(idx)"
+                  >{{ regenInlineImageLoading === idx ? `配图${idx} 生成中...` : remainingImageSlots.includes(idx) ? `生成配图${idx}` : `生成新配图${idx}` }}</a-button>
+                  <span v-if="idx < totalImageSlotCount" class="text-editorial-text-muted/40">|</span>
                 </span>
               </template>
             </div>
@@ -734,11 +719,21 @@ const articleImages = computed(() => {
   return parseArticleImages(props.article?.imagesJson ?? null);
 });
 
-// 检测正文中的 [IMAGE1]/[IMAGE2] 占位符，用于缺图时显示补图入口
-const inlineImageSlotCount = computed(() => {
-  const matches = editContent.value?.match(/\[IMAGE\d+\]/gi);
-  return matches ? matches.length : 0;
+// 检测正文中剩余的 [IMAGE1]/[IMAGE2] 占位符索引
+const remainingImageSlots = computed(() => {
+  if (!editContent.value) return [];
+  const matches = editContent.value.match(/\[IMAGE(\d+)\]/gi) ?? [];
+  return matches.map(m => parseInt(m.replace(/\[IMAGE|\]/gi, ""), 10));
 });
+
+// 总配图槽数 = 已生成 + 未替换占位符的最大索引
+const totalImageSlotCount = computed(() => {
+  const fromImages = articleImages.value.length;
+  const fromPlaceholders = remainingImageSlots.value.length > 0 ? Math.max(...remainingImageSlots.value) : 0;
+  return Math.max(fromImages, fromPlaceholders);
+});
+
+const inlineImageSlotCount = computed(() => remainingImageSlots.value.length);
 
 // 正文配图是否完整（占位符已全部替换为实际图片）
 const inlineImagesComplete = computed(() => {

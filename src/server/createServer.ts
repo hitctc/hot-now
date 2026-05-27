@@ -2038,6 +2038,8 @@ export function createServer(deps: ServerDeps = {}) {
       storedUrl: string;
       purpose: string;
       alt: string;
+      sourceUrl: string;
+      model: string;
     }> = [];
     const failed: Array<{ url: string; reason: string }> = [];
 
@@ -2049,6 +2051,13 @@ export function createServer(deps: ServerDeps = {}) {
         : "cover";
       const alt = typeof img === "object" && img !== null
         ? String((img as Record<string, unknown>).alt ?? "")
+        : "";
+      // 透传 Hermes 传入的原始临时地址和生图模型，方便排查
+      const sourceUrl = typeof img === "object" && img !== null
+        ? String((img as Record<string, unknown>).sourceUrl ?? url ?? "")
+        : String(url ?? "");
+      const model = typeof img === "object" && img !== null
+        ? String((img as Record<string, unknown>).model ?? "")
         : "";
 
       if (typeof url !== "string" || !url.trim()) {
@@ -2062,7 +2071,9 @@ export function createServer(deps: ServerDeps = {}) {
           originalUrl: url.trim(),
           storedUrl: publicBaseUrl ? `${publicBaseUrl}${stored.urlPath}` : stored.urlPath,
           purpose,
-          alt
+          alt,
+          sourceUrl: sourceUrl.trim(),
+          model: model.trim()
         });
       } catch (err) {
         request.log.warn({ err, url }, "Image download/store failed");

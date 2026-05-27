@@ -2093,7 +2093,7 @@ export function createServer(deps: ServerDeps = {}) {
   });
 
   // ─── Creative: 图片文件上传（Hermes 下载后直传，避免 hot-now 出境下载） ───
-  app.post("/api/creative/images/upload-image", async (request, reply) => {
+  app.post("/api/creative/images/upload-image", { bodyLimit: 15 * 1024 * 1024 }, async (request, reply) => {
     if (!validateCreativeApiToken(request, reply, creativeApiToken)) {
       return;
     }

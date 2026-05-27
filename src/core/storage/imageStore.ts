@@ -27,7 +27,7 @@ export async function downloadAndStoreImage(
   imageUrl: string
 ): Promise<StoreImageResult> {
   const response = await fetch(imageUrl, {
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(60_000),
     redirect: "follow"
   });
 

@@ -2110,6 +2110,7 @@ export function createServer(deps: ServerDeps = {}) {
         purpose?: string;
         alt?: string;
         sourceUrl?: string;
+        provider?: string;
         model?: string;
       }>;
     } | undefined;
@@ -2128,6 +2129,7 @@ export function createServer(deps: ServerDeps = {}) {
       purpose: string;
       alt: string;
       sourceUrl: string;
+      provider: string;
       model: string;
     }> = [];
     const failed: Array<{ index: number; reason: string }> = [];
@@ -2148,6 +2150,7 @@ export function createServer(deps: ServerDeps = {}) {
           purpose: img.purpose ?? "cover",
           alt: img.alt ?? "",
           sourceUrl: img.sourceUrl ?? "",
+          provider: img.provider ?? "",
           model: img.model ?? ""
         });
       } catch (err) {

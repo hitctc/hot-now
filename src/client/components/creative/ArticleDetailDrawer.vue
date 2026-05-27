@@ -259,10 +259,10 @@
                     type="link"
                     size="small"
                     class="!p-0 !text-[11px]"
-                    :loading="regenInlineImageLoading === idx"
-                    :disabled="regenInlineImageLoading !== null"
+                    :loading="regenInlineImageLoading.has(idx)"
+                    :disabled="regenInlineImageLoading.has(idx)"
                     @click="handleRegenInlineImage(idx)"
-                  >{{ regenInlineImageLoading === idx ? `配图${idx} 生成中...` : remainingImageSlots.includes(idx) ? `生成配图${idx}` : `生成新配图${idx}` }}</a-button>
+                  >{{ regenInlineImageLoading.has(idx) ? `配图${idx} 生成中...` : remainingImageSlots.includes(idx) ? `生成配图${idx}` : `生成新配图${idx}` }}</a-button>
                   <span v-if="idx < totalImageSlotCount" class="text-editorial-text-muted/40">|</span>
                 </span>
               </template>
@@ -713,7 +713,7 @@ function checkRegenArticleStatus(): void {
 
 // ─── 正文配图重新生成 ───
 
-const regenInlineImageLoading = ref<number | null>(null);
+const regenInlineImageLoading = ref<Set<number>>(new Set());
 
 const articleImages = computed(() => {
   return parseArticleImages(props.article?.imagesJson ?? null);
@@ -741,8 +741,8 @@ const inlineImagesComplete = computed(() => {
 });
 
 async function handleRegenInlineImage(imageIndex: number): Promise<void> {
-  if (!props.article || regenInlineImageLoading.value !== null) return;
-  regenInlineImageLoading.value = imageIndex;
+  if (!props.article || regenInlineImageLoading.value.has(imageIndex)) return;
+  regenInlineImageLoading.value = new Set([...regenInlineImageLoading.value, imageIndex]);
   try {
     const result = await regenInlineImage(props.article.id, imageIndex);
     if (result.ok) {
@@ -773,7 +773,7 @@ async function handleRegenInlineImage(imageIndex: number): Promise<void> {
   } catch {
     message.error("配图生成请求失败");
   } finally {
-    regenInlineImageLoading.value = null;
+    regenInlineImageLoading.value = new Set([...regenInlineImageLoading.value].filter(i => i !== imageIndex));
   }
 }
 

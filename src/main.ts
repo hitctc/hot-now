@@ -132,6 +132,7 @@ seedInitialData(db, {
 });
 const lock = createRunLock();
 const aiTimelineAlertLock = createRunLock();
+const wechatRssLock = createRunLock();
 const readAdminProfile = db.prepare(
   `
     SELECT username, password_hash, role, display_name
@@ -742,10 +743,10 @@ const aiTimelineAlertScheduler = startAiTimelineAlertScheduler(config, async () 
   }
 });
 
-// 公众号 RSS 与主采集共用 10 分钟间隔，独立运行锁避免互相阻塞
+// 公众号 RSS 独立调度和锁，不受主采集锁阻塞
 const wechatRssScheduler = startWechatRssScheduler(config, async () => {
   try {
-    await lock.runExclusive(async () => await runWechatRssCollectionTask());
+    await wechatRssLock.runExclusive(async () => await runWechatRssCollectionTask());
   } catch (error) {
     app.log.error(error);
   }

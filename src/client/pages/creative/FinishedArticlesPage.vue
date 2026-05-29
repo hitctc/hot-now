@@ -280,13 +280,24 @@ function getInlineCount(article: CreativeFinishedArticle): number {
   return parseArticleImages(article.imagesJson).length;
 }
 
-function copyImageInstruction(type: "fill" | "cover" | "inline-all" | "inline-n", article: CreativeFinishedArticle, imageIndex?: number): void {
+function copyImageInstruction(type: "all" | "fill" | "cover" | "inline-all" | "inline-n", article: CreativeFinishedArticle, imageIndex?: number): void {
   const id = article.id;
   const title = getFirstTitle(article.titles);
   const inlineCount = getInlineCount(article);
+  const hasCover = article.coverImage && article.coverImage.length > 0;
   let text = "";
 
-  if (type === "fill") {
+  if (type === "all") {
+    text = `对文章 ${id} 执行全部图片${hasCover && inlineCount > 0 ? "重新生成" : "补全"}：\n`;
+    if (!hasCover) {
+      text += `1. 补封面图：生成一张 1920x816 的图片\n   POST https://haapi.achuan.cc:9981/api/articles/cover\n   Body: {"articleId": ${id}, "imageBase64": "...", "mimeType": "image/png"}\n`;
+    } else {
+      text += `1. 换封面图：生成一张 1920x816 的图片（文章主题：${title}）\n   POST https://haapi.achuan.cc:9981/api/articles/cover\n   Body: {"articleId": ${id}, "imageBase64": "...", "mimeType": "image/png"}\n`;
+    }
+    const total = inlineCount > 0 ? inlineCount : 1;
+    text += `2. 正文配图：共 ${total} 张，每张 1792x1024\n   POST https://haapi.achuan.cc:9981/api/articles/inline-image\n   Body: {"articleId": ${id}, "imageBase64": "...", "imageIndex": N, "mimeType": "image/png"}\n   按 imageIndex 从 1 到 ${total} 逐张生成并回写\n`;
+    text += `Authorization: Bearer {你的token}`;
+  } else if (type === "fill") {
     text = `对文章 ${id} 执行图片补全：\n1. GET https://haapi.achuan.cc:9981/api/articles/missing-images?articleId=${id}\n2. 按 missingCover 和 missingInline 返回的 prompt 逐张生图并回写\n封面图尺寸 1920x816，正文配图尺寸 1792x1024\n封面图回写：POST https://haapi.achuan.cc:9981/api/articles/cover\n正文配图回写：POST https://haapi.achuan.cc:9981/api/articles/inline-image\nAuthorization: Bearer {你的token}`;
   } else if (type === "cover") {
     text = `对文章 ${id} 重新生成封面图：\n生成一张 1920x816 的图片（文章主题：${title}）\nPOST https://haapi.achuan.cc:9981/api/articles/cover\nBody: {"articleId": ${id}, "imageBase64": "...", "mimeType": "image/png"}\nAuthorization: Bearer {你的token}`;
@@ -541,6 +552,10 @@ const pagination = computed(() => ({
                 <a-button type="text" size="small" class="!p-0 !text-[14px] leading-none" @mouseenter="cancelHideImageMenu()">🖼</a-button>
                 <template #overlay>
                   <a-menu class="!min-w-[140px]" @mouseenter="cancelHideImageMenu()" @mouseleave="hideImageMenu()">
+                    <a-menu-item key="all" @click="copyImageInstruction('all', record)">
+                      <span class="text-xs font-medium">全部图片（补/换）</span>
+                    </a-menu-item>
+                    <a-menu-divider />
                     <a-menu-item v-if="!record.coverImage || record.coverImage.length === 0 || getInlineCount(record) === 0" key="fill" @click="copyImageInstruction('fill', record)">
                       <span class="text-xs">补图</span>
                     </a-menu-item>

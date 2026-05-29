@@ -541,7 +541,7 @@ const pagination = computed(() => ({
                 <a-button type="text" size="small" class="!p-0 !text-[14px] leading-none" @mouseenter="cancelHideImageMenu()">🖼</a-button>
                 <template #overlay>
                   <a-menu class="!min-w-[140px]" @mouseenter="cancelHideImageMenu()" @mouseleave="hideImageMenu()">
-                    <a-menu-item v-if="imageMenuData?.missingCover || (imageMenuData?.missingInline && imageMenuData.missingInline.length > 0)" key="fill" @click="copyImageInstruction('fill', record)">
+                    <a-menu-item v-if="!record.coverImage || record.coverImage.length === 0 || getInlineCount(record) === 0" key="fill" @click="copyImageInstruction('fill', record)">
                       <span class="text-xs">补图</span>
                     </a-menu-item>
                     <a-menu-item v-if="record.coverImage && record.coverImage.length > 0" key="cover" @click="copyImageInstruction('cover', record)">

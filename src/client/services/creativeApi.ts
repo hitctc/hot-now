@@ -172,6 +172,15 @@ export function toggleFinishedArticlePublishable(id: number): Promise<{ ok: bool
   });
 }
 
+export type MissingImagesResponse = {
+  missingCover?: Array<{ prompt: string }>;
+  missingInline?: Array<{ imageIndex: number; prompt: string }>;
+};
+
+export function fetchMissingImages(id: number): Promise<MissingImagesResponse> {
+  return requestJson<MissingImagesResponse>(`/api/creative/finished-articles/${id}/missing-images`);
+}
+
 // ─── Actions ───
 
 export function updateSourceItemWritingStatus(

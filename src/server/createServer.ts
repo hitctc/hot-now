@@ -1150,6 +1150,32 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.send({ ok: true, publishable: updated.publishable });
   });
 
+  // 查询文章缺失图片状态（代理 Hermes API）
+  app.get("/api/creative/finished-articles/:id/missing-images", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+
+    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+    const hermesApiToken = process.env.HERMES_API_TOKEN;
+    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
+
+    const id = parseInt((request.params as { id: string }).id, 10);
+    try {
+      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/articles/missing-images?articleId=${id}`, {
+        headers: { "Authorization": `Bearer ${hermesApiToken}` },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, detail: body });
+      }
+      const data = await res.json();
+      return reply.send(data);
+    } catch (err) {
+      return reply.code(502).send({ ok: false, reason: "Hermes 调用失败", detail: (err as Error).message });
+    }
+  });
+
   // 重新生成封面图：后端代理 Hermes API
   app.post("/api/creative/finished-articles/:id/regen-cover", async (request, reply) => {
     const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");

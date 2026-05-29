@@ -9,6 +9,8 @@ import {
   readCreativeSourceItem,
   toggleFinishedArticlePublished,
   toggleFinishedArticlePublishable,
+  fetchMissingImages,
+  parseArticleImages,
   wechatThemeOptions,
   type CreativeFinishedArticle,
   type CreativeSourceItem,
@@ -228,6 +230,78 @@ function openDetail(article: CreativeFinishedArticle): void {
 
 function closeDetail(): void {
   detailArticle.value = null;
+}
+
+// ─── 图片操作菜单 ───
+
+const imageMenuVisible = ref<number | null>(null);
+const imageMenuData = ref<{ missingCover: boolean; missingInline: number[]; inlineCount: number } | null>(null);
+const imageMenuLoading = ref(false);
+let imageMenuTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function showImageMenu(article: CreativeFinishedArticle): Promise<void> {
+  if (imageMenuTimer) { clearTimeout(imageMenuTimer); imageMenuTimer = null; }
+  imageMenuVisible.value = article.id;
+  if (imageMenuData.value && imageMenuVisible.value === article.id) return;
+  imageMenuLoading.value = true;
+  try {
+    const images = parseArticleImages(article.imagesJson);
+    const inlineCount = images.length;
+    const res = await fetchMissingImages(article.id);
+    imageMenuData.value = {
+      missingCover: (res.missingCover?.length ?? 0) > 0,
+      missingInline: res.missingInline?.map(m => m.imageIndex) ?? [],
+      inlineCount,
+    };
+  } catch {
+    // fallback：从本地数据推断
+    const images = parseArticleImages(article.imagesJson);
+    imageMenuData.value = {
+      missingCover: !article.coverImage || article.coverImage.length === 0,
+      missingInline: [],
+      inlineCount: images.length,
+    };
+  } finally {
+    imageMenuLoading.value = false;
+  }
+}
+
+function hideImageMenu(): void {
+  imageMenuTimer = setTimeout(() => {
+    imageMenuVisible.value = null;
+  }, 200);
+}
+
+function cancelHideImageMenu(): void {
+  if (imageMenuTimer) { clearTimeout(imageMenuTimer); imageMenuTimer = null; }
+}
+
+function getInlineCount(article: CreativeFinishedArticle): number {
+  return parseArticleImages(article.imagesJson).length;
+}
+
+function copyImageInstruction(type: "fill" | "cover" | "inline-all" | "inline-n", article: CreativeFinishedArticle, imageIndex?: number): void {
+  const id = article.id;
+  const title = getFirstTitle(article.titles);
+  const inlineCount = getInlineCount(article);
+  let text = "";
+
+  if (type === "fill") {
+    text = `对文章 ${id} 执行图片补全：\n1. GET https://haapi.achuan.cc:9981/api/articles/missing-images?articleId=${id}\n2. 按 missingCover 和 missingInline 返回的 prompt 逐张生图并回写\n封面图尺寸 1920x816，正文配图尺寸 1792x1024\n封面图回写：POST https://haapi.achuan.cc:9981/api/articles/cover\n正文配图回写：POST https://haapi.achuan.cc:9981/api/articles/inline-image\nAuthorization: Bearer {你的token}`;
+  } else if (type === "cover") {
+    text = `对文章 ${id} 重新生成封面图：\n生成一张 1920x816 的图片（文章主题：${title}）\nPOST https://haapi.achuan.cc:9981/api/articles/cover\nBody: {"articleId": ${id}, "imageBase64": "...", "mimeType": "image/png"}\nAuthorization: Bearer {你的token}`;
+  } else if (type === "inline-all") {
+    text = `对文章 ${id} 重新生成所有正文配图：\n共 ${inlineCount} 张，每张 1792x1024\nPOST https://haapi.achuan.cc:9981/api/articles/inline-image\nBody: {"articleId": ${id}, "imageBase64": "...", "imageIndex": 1, "mimeType": "image/png"}\n按 imageIndex 从 1 到 ${inlineCount} 逐张生成并回写\nAuthorization: Bearer {你的token}`;
+  } else if (type === "inline-n" && imageIndex) {
+    text = `对文章 ${id} 重新生成第 ${imageIndex} 张正文配图：\n生成一张 1792x1024 的图片（文章主题：${title}）\nPOST https://haapi.achuan.cc:9981/api/articles/inline-image\nBody: {"articleId": ${id}, "imageBase64": "...", "imageIndex": ${imageIndex}, "mimeType": "image/png"}\nAuthorization: Bearer {你的token}`;
+  }
+
+  navigator.clipboard.writeText(text).then(() => {
+    message.success("已复制到剪贴板");
+  }).catch(() => {
+    message.error("复制失败");
+  });
+  imageMenuVisible.value = null;
 }
 
 // ─── 素材详情弹窗 ───
@@ -453,15 +527,39 @@ const pagination = computed(() => ({
 
           <!-- 封面图列 -->
           <template v-else-if="column.key === 'coverImage'">
-            <a-image
-              v-if="record.coverImage && record.coverImage.length > 0"
-              :src="record.coverImage[0]"
-              :width="36"
-              :height="36"
-              class="!rounded !border !border-editorial-border"
-              style="object-fit:cover;"
-            />
-            <span v-else class="text-xs text-editorial-text-muted">无</span>
+            <div class="flex items-center gap-1">
+              <a-image
+                v-if="record.coverImage && record.coverImage.length > 0"
+                :src="record.coverImage[0]"
+                :width="36"
+                :height="36"
+                class="!rounded !border !border-editorial-border"
+                style="object-fit:cover;"
+              />
+              <span v-else class="text-xs text-editorial-text-muted">无</span>
+              <a-dropdown :trigger="['hover']" @openChange="(v: boolean) => v ? showImageMenu(record) : hideImageMenu()">
+                <a-button type="text" size="small" class="!p-0 !text-[14px] leading-none" @mouseenter="cancelHideImageMenu()">🖼</a-button>
+                <template #overlay>
+                  <a-menu class="!min-w-[140px]" @mouseenter="cancelHideImageMenu()" @mouseleave="hideImageMenu()">
+                    <a-menu-item v-if="imageMenuData?.missingCover || (imageMenuData?.missingInline && imageMenuData.missingInline.length > 0)" key="fill" @click="copyImageInstruction('fill', record)">
+                      <span class="text-xs">补图</span>
+                    </a-menu-item>
+                    <a-menu-item v-if="record.coverImage && record.coverImage.length > 0" key="cover" @click="copyImageInstruction('cover', record)">
+                      <span class="text-xs">换封面图</span>
+                    </a-menu-item>
+                    <a-menu-item v-if="getInlineCount(record) > 0" key="inline-all" @click="copyImageInstruction('inline-all', record)">
+                      <span class="text-xs">换正文图（全部）</span>
+                    </a-menu-item>
+                    <a-menu-item v-for="n in getInlineCount(record)" :key="`inline-${n}`" @click="copyImageInstruction('inline-n', record, n)">
+                      <span class="text-xs">换正文图 {{ n }}</span>
+                    </a-menu-item>
+                    <a-menu-item v-if="imageMenuLoading" key="loading" disabled>
+                      <span class="text-xs text-editorial-text-muted">加载中...</span>
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
+            </div>
           </template>
 
           <!-- 状态列 -->

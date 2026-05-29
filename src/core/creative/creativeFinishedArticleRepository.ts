@@ -25,6 +25,7 @@ const SELECT_COLUMNS = `
   anomaly_reason,
   raw_response_text,
   wechat_published,
+  publishable,
   wechat_theme_id,
   wechat_html,
   created_at,
@@ -53,6 +54,7 @@ type ArticleRow = {
   anomaly_reason: string | null;
   raw_response_text: string | null;
   wechat_published: number;
+  publishable: number;
   wechat_theme_id: string | null;
   wechat_html: string | null;
   push_count: number;
@@ -105,6 +107,7 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     anomalyReason: row.anomaly_reason,
     rawResponseText: row.raw_response_text,
     wechatPublished: row.wechat_published === 1,
+    publishable: row.publishable === 1,
     wechatThemeId: row.wechat_theme_id,
     wechatHtml: row.wechat_html,
     pushCount: row.push_count ?? 0,
@@ -137,6 +140,7 @@ export type CreativeFinishedArticleRecord = {
   anomalyReason: string | null;
   rawResponseText: string | null;
   wechatPublished: boolean;
+  publishable: boolean;
   wechatThemeId: string | null;
   wechatHtml: string | null;
   pushCount: number;
@@ -186,6 +190,7 @@ export type ListCreativeFinishedArticlesFilters = {
   pageSize?: number;
   status?: string;
   search?: string;
+  publishable?: boolean;
 };
 
 export type ListCreativeFinishedArticlesResult = {
@@ -296,6 +301,10 @@ export function listCreativeFinishedArticles(
     whereClauses.push("(content_markdown LIKE ? OR thesis LIKE ?)");
     const term = `%${filters.search}%`;
     params.push(term, term);
+  }
+
+  if (filters.publishable === true) {
+    whereClauses.push("publishable = 1");
   }
 
   const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
@@ -434,6 +443,20 @@ export function toggleWechatPublished(db: SqliteDatabase, id: number): CreativeF
   if (!current) return null;
   const next = current.wechat_published === 1 ? 0 : 1;
   db.prepare("UPDATE creative_finished_articles SET wechat_published = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+    .run(next, id);
+  return findCreativeFinishedArticleById(db, id);
+}
+
+// ── Toggle publishable 可发标记 ───────────────────────────────────────────
+
+// 编辑手动标记文章是否"可发"，用于筛选
+export function togglePublishable(db: SqliteDatabase, id: number): CreativeFinishedArticleRecord | null {
+  const current = db
+    .prepare("SELECT publishable FROM creative_finished_articles WHERE id = ?")
+    .get(id) as { publishable: number } | undefined;
+  if (!current) return null;
+  const next = current.publishable === 1 ? 0 : 1;
+  db.prepare("UPDATE creative_finished_articles SET publishable = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
     .run(next, id);
   return findCreativeFinishedArticleById(db, id);
 }

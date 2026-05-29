@@ -89,7 +89,8 @@ import {
   listCreativeFinishedArticles,
   findCreativeFinishedArticleById,
   editCreativeFinishedArticle,
-  toggleWechatPublished
+  toggleWechatPublished,
+  togglePublishable
 } from "../core/creative/creativeFinishedArticleRepository.js";
 import {
   insertDailyDigest,
@@ -966,7 +967,8 @@ export function createServer(deps: ServerDeps = {}) {
       page: query.page ? parseInt(query.page, 10) : undefined,
       pageSize: query.pageSize ? parseInt(query.pageSize, 10) : undefined,
       status: query.status,
-      search: query.search
+      search: query.search,
+      publishable: query.publishable === "1" ? true : undefined
     });
 
     // 批量查询关联素材的 trendScore/trendBreakdown/publishedAt
@@ -1130,6 +1132,22 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.code(404).send({ message: "Finished article not found", statusCode: 404 });
     }
     return reply.send({ ok: true, wechatPublished: updated.wechatPublished });
+  });
+
+  app.post("/api/creative/finished-articles/:id/toggle-publishable", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const updated = togglePublishable(db, id);
+    if (!updated) {
+      return reply.code(404).send({ message: "Finished article not found", statusCode: 404 });
+    }
+    return reply.send({ ok: true, publishable: updated.publishable });
   });
 
   // 重新生成封面图：后端代理 Hermes API

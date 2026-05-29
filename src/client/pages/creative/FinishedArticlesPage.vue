@@ -8,6 +8,7 @@ import {
   readCreativeFinishedArticles,
   readCreativeSourceItem,
   toggleFinishedArticlePublished,
+  toggleFinishedArticlePublishable,
   wechatThemeOptions,
   type CreativeFinishedArticle,
   type CreativeSourceItem,
@@ -52,6 +53,7 @@ const savedFinished = (() => {
 })();
 const searchText = ref(savedFinished.search || "");
 const statusFilter = ref<string | undefined>(savedFinished.status || undefined);
+const publishableOnly = ref(false);
 
 // 筛选条件变更时持久化
 function saveFinishedFilters(): void {
@@ -167,7 +169,8 @@ async function loadItems(): Promise<void> {
       page: currentPage.value,
       pageSize: pageSize.value,
       status: statusFilter.value || undefined,
-      search: searchText.value || undefined
+      search: searchText.value || undefined,
+      publishable: publishableOnly.value ? "1" : undefined
     });
     items.value = res.items;
     total.value = res.total;
@@ -185,6 +188,22 @@ watch(statusFilter, () => {
   saveFinishedFilters();
   void loadItems();
 });
+
+watch(publishableOnly, () => {
+  currentPage.value = 1;
+  void loadItems();
+});
+
+async function handleTogglePublishable(article: CreativeFinishedArticle): Promise<void> {
+  try {
+    const res = await toggleFinishedArticlePublishable(article.id);
+    if (res.ok) {
+      article.publishable = res.publishable;
+    }
+  } catch {
+    // ignore
+  }
+}
 
 function handleSearch(value: string): void {
   searchText.value = value;
@@ -354,6 +373,7 @@ const columns = [
   { title: "发布时间", key: "publishedAt", width: 130, ellipsis: true },
   { title: "创建时间", key: "createdAt", width: 140, ellipsis: true },
   { title: "公众号", key: "wechatPublished", width: 80, ellipsis: true },
+  { title: "可发", key: "publishable", width: 60, ellipsis: true },
   { title: "推送", key: "pushDraft", width: 72, ellipsis: true },
 
 ];
@@ -377,6 +397,7 @@ const pagination = computed(() => ({
         placeholder="文章状态"
         class="!w-[140px]"
       />
+      <a-checkbox v-model:checked="publishableOnly">只看可发</a-checkbox>
       <div ref="searchDropdownRef" class="relative">
         <a-input-search
           v-model:value="searchText"
@@ -460,6 +481,15 @@ const pagination = computed(() => ({
               class="!text-[11px] !px-2 !py-0.5"
               @click="handleTogglePublished(record)"
             >{{ record.wechatPublished ? '已发布' : '未发布' }}</a-button>
+          </template>
+
+          <template v-else-if="column.key === 'publishable'">
+            <a-button
+              size="small"
+              :type="record.publishable ? 'primary' : 'default'"
+              class="!text-[11px] !px-2 !py-0.5"
+              @click="handleTogglePublishable(record)"
+            >{{ record.publishable ? '可发' : '-' }}</a-button>
           </template>
 
           <!-- 推送到草稿箱列 -->

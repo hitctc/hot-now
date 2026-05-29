@@ -68,6 +68,7 @@ export type CreativeFinishedArticle = {
   anomalyReason: string | null;
   rawResponseText: string | null;
   wechatPublished: boolean;
+  publishable: boolean;
   wechatThemeId: string | null;
   wechatHtml: string | null;
   pushCount: number;
@@ -142,12 +143,14 @@ export function readCreativeFinishedArticles(params?: {
   pageSize?: number;
   status?: string;
   search?: string;
+  publishable?: string;
 }): Promise<FinishedArticleListResponse> {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
   if (params?.pageSize) query.set("pageSize", String(params.pageSize));
   if (params?.status) query.set("status", params.status);
   if (params?.search) query.set("search", params.search);
+  if (params?.publishable) query.set("publishable", params.publishable);
   const qs = query.toString();
   return requestJson<FinishedArticleListResponse>(`/api/creative/finished-articles${qs ? `?${qs}` : ""}`);
 }
@@ -159,6 +162,12 @@ export function readCreativeFinishedArticle(id: number): Promise<CreativeFinishe
 // 切换成品文章的公众号发布状态
 export function toggleFinishedArticlePublished(id: number): Promise<{ ok: boolean; wechatPublished: boolean }> {
   return requestJson<{ ok: boolean; wechatPublished: boolean }>(`/api/creative/finished-articles/${id}/toggle-published`, {
+    method: "POST"
+  });
+}
+
+export function toggleFinishedArticlePublishable(id: number): Promise<{ ok: boolean; publishable: boolean }> {
+  return requestJson<{ ok: boolean; publishable: boolean }>(`/api/creative/finished-articles/${id}/toggle-publishable`, {
     method: "POST"
   });
 }

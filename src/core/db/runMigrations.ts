@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 31;
+const schemaVersion = 32;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -1254,6 +1254,20 @@ export function runMigrations(db: SqliteDatabase): void {
         ON CONFLICT(version) DO NOTHING
       `
     ).run(31, dailyDigestMigrationName);
+
+    // 032: 成品文章增加 publishable 可发标记字段
+    const publishableMigrationName = "032_finished_articles_publishable";
+    if (!hasColumn(db, "creative_finished_articles", "publishable")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN publishable INTEGER NOT NULL DEFAULT 0`);
+    }
+
+    db.prepare(
+      `
+        INSERT INTO schema_migrations (version, name)
+        VALUES (?, ?)
+        ON CONFLICT(version) DO NOTHING
+      `
+    ).run(32, publishableMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

@@ -133,6 +133,11 @@ seedInitialData(db, {
 const lock = createRunLock();
 const aiTimelineAlertLock = createRunLock();
 const wechatRssLock = createRunLock();
+const mailLock = createRunLock();
+const twitterLock = createRunLock();
+const hackerNewsLock = createRunLock();
+const bilibiliLock = createRunLock();
+const weiboLock = createRunLock();
 const readAdminProfile = db.prepare(
   `
     SELECT username, password_hash, role, display_name
@@ -489,7 +494,7 @@ const triggerManualCollect = config.manualActions.collectEnabled
 // Manual resend normalizes known pipeline failures into machine-readable reasons for the HTTP layer.
 const triggerManualSendLatestEmail = config.manualActions.sendLatestEmailEnabled
   ? async () => {
-      return await lock.runExclusive(async () => {
+      return await mailLock.runExclusive(async () => {
         try {
           await runLatestEmailTask();
           return { accepted: true as const, action: "send-latest-email" as const };
@@ -507,42 +512,42 @@ const triggerManualSendLatestEmail = config.manualActions.sendLatestEmailEnabled
 // Twitter 手动采集复用同一把运行锁，但不会触发 RSS/公众号采集，也不会生成日报产物。
 const triggerManualTwitterCollect = config.manualActions.collectEnabled
   ? async () => {
-      return await lock.runExclusive(async () => await runTwitterAccountCollectionTask());
+      return await twitterLock.runExclusive(async () => await runTwitterAccountCollectionTask());
     }
   : undefined;
 
 // 关键词搜索和账号采集共用运行锁，但继续保持独立按钮和独立结果摘要。
 const triggerManualTwitterKeywordCollect = config.manualActions.collectEnabled
   ? async () => {
-      return await lock.runExclusive(async () => await runTwitterKeywordCollectionTask());
+      return await twitterLock.runExclusive(async () => await runTwitterKeywordCollectionTask());
     }
   : undefined;
 
 // Hacker News 搜索和其他手动采集共用同一把运行锁，但继续保持独立入口和独立结果摘要。
 const triggerManualHackerNewsCollect = config.manualActions.collectEnabled
   ? async () => {
-      return await lock.runExclusive(async () => await runHackerNewsCollectionTask());
+      return await hackerNewsLock.runExclusive(async () => await runHackerNewsCollectionTask());
     }
   : undefined;
 
 // B 站搜索与 HN 一样先走独立手动入口，避免默认采集节奏无意扩大到视频搜索。
 const triggerManualBilibiliCollect = config.manualActions.collectEnabled
   ? async () => {
-      return await lock.runExclusive(async () => await runBilibiliCollectionTask());
+      return await bilibiliLock.runExclusive(async () => await runBilibiliCollectionTask());
     }
   : undefined;
 
 // 公众号 RSS 和其他扩展来源一样只走手动入口，避免新增链接后立刻进入默认调度。
 const triggerManualWechatRssCollect = config.manualActions.collectEnabled
   ? async () => {
-      return await lock.runExclusive(async () => await runWechatRssCollectionTask());
+      return await wechatRssLock.runExclusive(async () => await runWechatRssCollectionTask());
     }
   : undefined;
 
 // 微博热搜榜匹配和其他搜索来源共用运行锁，但继续保持单独入口和单独结果摘要。
 const triggerManualWeiboTrendingCollect = config.manualActions.collectEnabled
   ? async () => {
-      return await lock.runExclusive(async () => await runWeiboTrendingCollectionTask());
+      return await weiboLock.runExclusive(async () => await runWeiboTrendingCollectionTask());
     }
   : undefined;
 
@@ -723,7 +728,7 @@ const collectionScheduler = startCollectionScheduler(config, async () => {
 
 const mailScheduler = startMailScheduler(config, async () => {
   try {
-    await lock.runExclusive(async () => {
+    await mailLock.runExclusive(async () => {
       await runLatestEmailTask();
     });
   } catch (error) {

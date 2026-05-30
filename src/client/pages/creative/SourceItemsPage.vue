@@ -381,6 +381,12 @@ async function confirmWriteMode(): Promise<void> {
 
 // ─── 表格列 ───
 
+function copyId(id: number): void {
+  navigator.clipboard.writeText(`【素材id: ${id}】`).then(() => {
+    message.success("已复制");
+  });
+}
+
 const columns = [
   { title: "ID", dataIndex: "id", key: "id", width: 60 },
   { title: "标题", dataIndex: "title", key: "title", width: 280 },
@@ -461,6 +467,9 @@ const pagination = computed(() => ({
       >
         <!-- 标题列：点击展开/折叠 -->
         <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'id'">
+            <span class="cursor-pointer text-editorial-link-active hover:underline" @click="copyId(record.id)"> {{ record.id }} </span>
+          </template>
           <template v-if="column.key === 'title'">
             <div class="flex items-center gap-2 min-w-0">
               <a-tooltip :title="record.title" placement="topLeft" :mouse-enter-delay="0.3">

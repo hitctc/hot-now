@@ -426,6 +426,12 @@ function getStatusInfo(status: string): { label: string; color: string } {
 
 // ─── 表格列 ───
 
+function copyId(id: number): void {
+  navigator.clipboard.writeText(`【成品文章id: ${id}】`).then(() => {
+    message.success("已复制");
+  });
+}
+
 const columns = [
   { title: "ID", dataIndex: "id", key: "id", width: 60 },
   { title: "标题", key: "title", width: 280 },
@@ -506,6 +512,10 @@ const pagination = computed(() => ({
         @change="handleTableChange"
       >
         <template #bodyCell="{ column, record }">
+          <!-- ID 列：点击复制 -->
+          <template v-if="column.key === 'id'">
+            <span class="cursor-pointer text-editorial-link-active hover:underline" @click="copyId(record.id)"> {{ record.id }} </span>
+          </template>
           <!-- 标题列：点击打开详情弹窗 -->
           <template v-if="column.key === 'title'">
             <span

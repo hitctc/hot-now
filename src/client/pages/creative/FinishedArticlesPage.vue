@@ -18,7 +18,7 @@ import {
   type PushLogEntry
 } from "../../services/creativeApi.js";
 import { readWechatMpAccounts, type WechatMpAccountSummary } from "../../services/settingsApi.js";
-import ArticlePushConfirmModal from "../../components/creative/ArticlePushConfirmModal.vue";
+import ArticlePushFloatWidget from "../../components/creative/ArticlePushFloatWidget.vue";
 import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
 
 // ─── JSON 解析辅助 ───
@@ -756,8 +756,8 @@ const pagination = computed(() => ({
       </a-spin>
     </a-modal>
 
-    <!-- 推送确认弹窗 -->
-    <ArticlePushConfirmModal
+    <!-- 推送悬浮组件 -->
+    <ArticlePushFloatWidget
       v-model:visible="pushConfirmVisible"
       :article="pushConfirmArticle"
       :theme-id="wechatTheme"

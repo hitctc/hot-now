@@ -438,6 +438,7 @@ const columns = [
   { title: "封面图", key: "coverImage", width: 80, ellipsis: true },
   { title: "可发", key: "publishable", width: 60, ellipsis: true },
   { title: "状态", key: "status", width: 100 },
+  { title: "来源", key: "sourceName", width: 170 },
   { title: "来源素材", key: "sourceItem", width: 110, ellipsis: true },
   { title: "爆文分", key: "trendScore", width: 72, ellipsis: true },
   { title: "爆文维度", key: "trendBreakdown", width: 160, ellipsis: true },
@@ -606,6 +607,13 @@ const pagination = computed(() => ({
           </template>
 
 
+
+          <!-- 来源列 -->
+          <template v-else-if="column.key === 'sourceName'">
+            <a-tooltip :title="(record.sourceName || '').replace('微信公众号', 'WX')" placement="topLeft" :mouse-enter-delay="0.3">
+              <span class="line-clamp-2 text-[13px] leading-tight text-editorial-text-body">{{ (record.sourceName || "-").replace("微信公众号", "WX") }}</span>
+            </a-tooltip>
+          </template>
 
           <!-- 来源素材列 -->
           <template v-else-if="column.key === 'sourceItem'">

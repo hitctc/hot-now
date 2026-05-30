@@ -77,6 +77,7 @@ export type CreativeFinishedArticle = {
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
   sourceTitle: string | null;
+  sourceName: string | null;
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;

@@ -246,6 +246,9 @@
           <div v-else class="flex items-center justify-center rounded-editorial-md border border-dashed border-editorial-border bg-editorial-bg-page px-4 py-6 text-xs text-editorial-text-muted">
             暂无封面图，点击上方按钮生成
           </div>
+          <div v-if="article?.coverImagePrompt" class="mt-1.5 rounded border border-editorial-border bg-editorial-bg-page px-2 py-1 text-[11px] leading-relaxed text-editorial-text-muted">
+            Prompt：{{ article.coverImagePrompt }}
+          </div>
         </section>
 
         <!-- 正文配图 -->
@@ -292,6 +295,13 @@
           <div v-else class="flex items-center justify-center rounded-editorial-md border border-dashed border-editorial-border bg-editorial-bg-page px-4 py-6 text-xs text-editorial-text-muted">
             正文含 {{ inlineImageSlotCount }} 张配图占位符未生成，点击上方按钮逐张补图
           </div>
+          <template v-if="article?.inlineImagePrompts && Object.keys(article.inlineImagePrompts).length > 0">
+            <div class="mt-1.5 space-y-1">
+              <div v-for="(prompt, idx) in article.inlineImagePrompts" :key="idx" class="rounded border border-editorial-border bg-editorial-bg-page px-2 py-1 text-[11px] leading-relaxed text-editorial-text-muted">
+                配图{{ idx }} Prompt：{{ prompt }}
+              </div>
+            </div>
+          </template>
         </section>
 
         <!-- 正文：左右分屏编辑器 + 主题切换 -->

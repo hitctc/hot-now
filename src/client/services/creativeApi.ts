@@ -69,6 +69,8 @@ export type CreativeFinishedArticle = {
   rawResponseText: string | null;
   wechatPublished: boolean;
   publishable: boolean;
+  coverImagePrompt: string | null;
+  inlineImagePrompts: Record<string, string> | null;
   wechatThemeId: string | null;
   wechatHtml: string | null;
   pushCount: number;
@@ -209,6 +211,8 @@ export function editFinishedArticle(
     introIndex?: number;
     summary100?: string[];
     summaryIndex?: number;
+    coverImagePrompt?: string;
+    inlineImagePrompts?: Record<string, string>;
   }
 ): Promise<{ ok: boolean }> {
   return requestJson<{ ok: boolean }>(`/actions/creative/finished-articles/${id}`, {

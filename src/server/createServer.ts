@@ -1087,6 +1087,8 @@ export function createServer(deps: ServerDeps = {}) {
     if (body?.anomalyReason !== undefined) { editInput.anomalyReason = body.anomalyReason; updatedFields.push("anomalyReason"); }
     if (body?.wechatThemeId !== undefined) { editInput.wechatThemeId = body.wechatThemeId; updatedFields.push("wechatThemeId"); }
     if (body?.wechatHtml !== undefined) { editInput.wechatHtml = body.wechatHtml; updatedFields.push("wechatHtml"); }
+    if (body?.coverImagePrompt !== undefined) { editInput.coverImagePrompt = body.coverImagePrompt; updatedFields.push("coverImagePrompt"); }
+    if (body?.inlineImagePrompts !== undefined) { editInput.inlineImagePrompts = body.inlineImagePrompts; updatedFields.push("inlineImagePrompts"); }
 
     if (Object.keys(editInput).length > 0) {
       editCreativeFinishedArticle(db, id, editInput as any);

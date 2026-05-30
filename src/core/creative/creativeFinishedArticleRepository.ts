@@ -26,6 +26,8 @@ const SELECT_COLUMNS = `
   raw_response_text,
   wechat_published,
   publishable,
+  cover_image_prompt,
+  inline_image_prompts,
   wechat_theme_id,
   wechat_html,
   created_at,
@@ -55,6 +57,8 @@ type ArticleRow = {
   raw_response_text: string | null;
   wechat_published: number;
   publishable: number;
+  cover_image_prompt: string | null;
+  inline_image_prompts: string | null;
   wechat_theme_id: string | null;
   wechat_html: string | null;
   push_count: number;
@@ -108,6 +112,8 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     rawResponseText: row.raw_response_text,
     wechatPublished: row.wechat_published === 1,
     publishable: row.publishable === 1,
+    coverImagePrompt: row.cover_image_prompt ?? null,
+    inlineImagePrompts: row.inline_image_prompts ? JSON.parse(row.inline_image_prompts) : null,
     wechatThemeId: row.wechat_theme_id,
     wechatHtml: row.wechat_html,
     pushCount: row.push_count ?? 0,
@@ -141,6 +147,8 @@ export type CreativeFinishedArticleRecord = {
   rawResponseText: string | null;
   wechatPublished: boolean;
   publishable: boolean;
+  coverImagePrompt: string | null;
+  inlineImagePrompts: Record<string, string> | null;
   wechatThemeId: string | null;
   wechatHtml: string | null;
   pushCount: number;
@@ -161,6 +169,8 @@ export type InsertCreativeFinishedArticleInput = {
   images?: unknown[];
   coverImage?: string[];
   rawResponseText?: string;
+  coverImagePrompt?: string;
+  inlineImagePrompts?: Record<string, string>;
 };
 
 export type EditCreativeFinishedArticleInput = {
@@ -183,6 +193,8 @@ export type EditCreativeFinishedArticleInput = {
   anomalyReason?: string;
   wechatThemeId?: string | null;
   wechatHtml?: string | null;
+  coverImagePrompt?: string;
+  inlineImagePrompts?: Record<string, string>;
 };
 
 export type ListCreativeFinishedArticlesFilters = {
@@ -220,10 +232,12 @@ export function insertCreativeFinishedArticle(
         summary_100,
         images_json,
         cover_image_url,
+        cover_image_prompt,
+        inline_image_prompts,
         status,
         raw_response_text
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'generated', ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'generated', ?)
     `
   ).run(
     input.sourceItemId,
@@ -237,6 +251,8 @@ export function insertCreativeFinishedArticle(
     input.summary100 ? JSON.stringify(input.summary100) : null,
     input.images ? JSON.stringify(input.images) : null,
     input.coverImage ? JSON.stringify(input.coverImage) : null,
+    input.coverImagePrompt ?? null,
+    input.inlineImagePrompts ? JSON.stringify(input.inlineImagePrompts) : null,
     input.rawResponseText ?? null
   );
 
@@ -419,6 +435,14 @@ export function editCreativeFinishedArticle(
   if (input.wechatHtml !== undefined) {
     setClauses.push("wechat_html = ?");
     params.push(input.wechatHtml ?? null);
+  }
+  if (input.coverImagePrompt !== undefined) {
+    setClauses.push("cover_image_prompt = ?");
+    params.push(input.coverImagePrompt);
+  }
+  if (input.inlineImagePrompts !== undefined) {
+    setClauses.push("inline_image_prompts = ?");
+    params.push(JSON.stringify(input.inlineImagePrompts));
   }
 
   if (setClauses.length === 0) {

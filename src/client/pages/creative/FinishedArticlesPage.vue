@@ -539,14 +539,15 @@ const pagination = computed(() => ({
           <!-- 封面图列 -->
           <template v-else-if="column.key === 'coverImage'">
             <div class="flex items-center gap-1">
-              <a-image
-                v-if="record.coverImage && record.coverImage.length > 0"
-                :src="record.coverImage[0]"
-                :width="36"
-                :height="36"
-                class="!rounded !border !border-editorial-border"
-                style="object-fit:cover;"
-              />
+              <a-tooltip v-if="record.coverImage && record.coverImage.length > 0" :title="record.coverImagePrompt ? `Prompt: ${record.coverImagePrompt}` : '无 Prompt'" placement="topLeft">
+                <a-image
+                  :src="record.coverImage[0]"
+                  :width="36"
+                  :height="36"
+                  class="!rounded !border !border-editorial-border"
+                  style="object-fit:cover;"
+                />
+              </a-tooltip>
               <span v-else class="text-xs text-editorial-text-muted">无</span>
               <a-dropdown :trigger="['hover']" @openChange="(v: boolean) => v ? showImageMenu(record) : hideImageMenu()">
                 <a-button type="text" size="small" class="!p-0 !text-[14px] leading-none" @mouseenter="cancelHideImageMenu()">🖼</a-button>

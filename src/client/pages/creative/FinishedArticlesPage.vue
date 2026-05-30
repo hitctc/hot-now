@@ -427,7 +427,7 @@ function getStatusInfo(status: string): { label: string; color: string } {
 // ─── 表格列 ───
 
 const columns = [
-  { title: "ID", key: "id", width: 60 },
+  { title: "ID", dataIndex: "id", key: "id", width: 60 },
   { title: "标题", key: "title", width: 280 },
   { title: "封面图", key: "coverImage", width: 80, ellipsis: true },
   { title: "可发", key: "publishable", width: 60, ellipsis: true },

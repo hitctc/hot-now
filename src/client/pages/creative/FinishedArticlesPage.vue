@@ -756,15 +756,17 @@ const pagination = computed(() => ({
       </a-spin>
     </a-modal>
 
-    <!-- 推送悬浮组件 -->
-    <ArticlePushFloatWidget
-      v-model:visible="pushConfirmVisible"
-      :article="pushConfirmArticle"
-      :theme-id="wechatTheme"
-      :theme-label="wechatThemeOptions.find(o => o.value === wechatTheme)?.label ?? ''"
-      :default-account-name="defaultAccountName"
-      @success="handlePushSuccess"
-    />
+    <!-- 推送悬浮组件（teleport 到 body，避免被 modal 层叠上下文遮挡） -->
+    <Teleport to="body">
+      <ArticlePushFloatWidget
+        v-model:visible="pushConfirmVisible"
+        :article="pushConfirmArticle"
+        :theme-id="wechatTheme"
+        :theme-label="wechatThemeOptions.find(o => o.value === wechatTheme)?.label ?? ''"
+        :default-account-name="defaultAccountName"
+        @success="handlePushSuccess"
+      />
+    </Teleport>
   </div>
 </template>
 

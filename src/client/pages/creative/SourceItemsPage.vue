@@ -382,6 +382,7 @@ async function confirmWriteMode(): Promise<void> {
 // ─── 表格列 ───
 
 const columns = [
+  { title: "ID", dataIndex: "id", key: "id", width: 60 },
   { title: "标题", dataIndex: "title", key: "title", width: 280 },
   { title: "成品", key: "linkedArticle", width: 100, align: "center" as const },
   { title: "来源", dataIndex: "sourceName", key: "sourceName", width: 170 },

@@ -246,8 +246,9 @@
           <div v-else class="flex items-center justify-center rounded-editorial-md border border-dashed border-editorial-border bg-editorial-bg-page px-4 py-6 text-xs text-editorial-text-muted">
             暂无封面图，点击上方按钮生成
           </div>
-          <div v-if="article?.coverImagePrompt" class="mt-1.5 rounded border border-editorial-border bg-editorial-bg-page px-2 py-1 text-[11px] leading-relaxed text-editorial-text-muted">
-            Prompt：{{ article.coverImagePrompt }}
+          <div v-if="article?.coverImagePrompt" class="mt-1.5 flex items-start gap-1.5 rounded border border-editorial-border bg-editorial-bg-page px-2 py-1">
+            <span class="flex-1 text-[11px] leading-relaxed text-editorial-text-muted">Prompt：{{ article.coverImagePrompt }}</span>
+            <button class="shrink-0 text-[11px] text-editorial-link-active hover:underline" @click="copyPrompt(article.coverImagePrompt!)">复制</button>
           </div>
         </section>
 
@@ -297,8 +298,9 @@
           </div>
           <template v-if="article?.inlineImagePrompts && Object.keys(article.inlineImagePrompts).length > 0">
             <div class="mt-1.5 space-y-1">
-              <div v-for="(prompt, idx) in article.inlineImagePrompts" :key="idx" class="rounded border border-editorial-border bg-editorial-bg-page px-2 py-1 text-[11px] leading-relaxed text-editorial-text-muted">
-                配图{{ idx }} Prompt：{{ prompt }}
+              <div v-for="(prompt, idx) in article.inlineImagePrompts" :key="idx" class="flex items-start gap-1.5 rounded border border-editorial-border bg-editorial-bg-page px-2 py-1">
+                <span class="flex-1 text-[11px] leading-relaxed text-editorial-text-muted">配图{{ idx }} Prompt：{{ prompt }}</span>
+                <button class="shrink-0 text-[11px] text-editorial-link-active hover:underline" @click="copyPrompt(String(prompt))">复制</button>
               </div>
             </div>
           </template>
@@ -414,6 +416,12 @@ const emit = defineEmits<{
 
 // ─── 正文全屏编辑 ───
 const editorFullscreen = ref(false);
+
+function copyPrompt(text: string): void {
+  navigator.clipboard.writeText(text).then(() => {
+    message.success("已复制");
+  });
+}
 
 function toggleEditorFullscreen(): void {
   editorFullscreen.value = !editorFullscreen.value;

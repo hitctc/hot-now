@@ -160,7 +160,7 @@
         <!-- 百字摘要（只读展示） -->
         <section v-if="displaySummaries.length > 0">
           <div class="mb-2 flex items-center justify-between">
-            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">百字摘要</h3>
+            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">百字摘要 <span class="font-normal text-[11px] text-editorial-text-muted/60">{{ charCount(displaySummaries[0]) }}字</span></h3>
             <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(displaySummaries[0] ?? '')">复制</a-button>
           </div>
           <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ displaySummaries[0] }}</p>
@@ -247,7 +247,7 @@
             暂无封面图，点击上方按钮生成
           </div>
           <div v-if="article?.coverImagePrompt" class="mt-1.5 flex items-start gap-1.5 rounded border border-editorial-border bg-editorial-bg-page px-2 py-1">
-            <span class="flex-1 text-[11px] leading-relaxed text-editorial-text-muted">Prompt：{{ article.coverImagePrompt }}</span>
+            <span class="flex-1 text-[11px] leading-relaxed text-editorial-text-muted">Prompt（{{ charCount(article.coverImagePrompt) }}字）：{{ article.coverImagePrompt }}</span>
             <button class="shrink-0 text-[11px] text-editorial-link-active hover:underline" @click="copyPrompt(article.coverImagePrompt!)">复制</button>
           </div>
         </section>
@@ -299,7 +299,7 @@
           <template v-if="article?.inlineImagePrompts && Object.keys(article.inlineImagePrompts).length > 0">
             <div class="mt-1.5 space-y-1">
               <div v-for="(prompt, idx) in article.inlineImagePrompts" :key="idx" class="flex items-start gap-1.5 rounded border border-editorial-border bg-editorial-bg-page px-2 py-1">
-                <span class="flex-1 text-[11px] leading-relaxed text-editorial-text-muted">配图{{ idx }} Prompt：{{ prompt }}</span>
+                <span class="flex-1 text-[11px] leading-relaxed text-editorial-text-muted">配图{{ idx }} Prompt（{{ charCount(String(prompt)) }}字）：{{ prompt }}</span>
                 <button class="shrink-0 text-[11px] text-editorial-link-active hover:underline" @click="copyPrompt(String(prompt))">复制</button>
               </div>
             </div>
@@ -421,6 +421,12 @@ function copyPrompt(text: string): void {
   navigator.clipboard.writeText(text).then(() => {
     message.success("已复制");
   });
+}
+
+// 统计中文字符数（去掉空格、标点后的纯文字长度）
+function charCount(text: string | null | undefined): number {
+  if (!text) return 0;
+  return text.replace(/[\s\n]/g, "").length;
 }
 
 function toggleEditorFullscreen(): void {

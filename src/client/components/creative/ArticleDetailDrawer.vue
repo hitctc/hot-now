@@ -166,6 +166,52 @@
           <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ displaySummaries[0] }}</p>
         </section>
 
+        <!-- 相似度检测 -->
+        <section v-if="article?.similarityCheck">
+          <div class="mb-2">
+            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">相似度检测</h3>
+          </div>
+          <!-- 人工审核提示 -->
+          <div v-if="article.needsManualReview" class="mb-2 rounded border border-yellow-400 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+            ⚠ 需要人工审核{{ article.manualReviewReason ? `：${article.manualReviewReason === 'similarity_high' ? '相似度过高' : article.manualReviewReason}` : '' }}
+          </div>
+          <div class="grid grid-cols-2 gap-x-4 gap-y-1 rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs">
+            <template v-if="sc">
+              <div class="text-editorial-text-muted">风险等级</div>
+              <div class="font-medium" :class="sc.risk_level === 'high' ? 'text-red-500' : sc.risk_level === 'medium' ? 'text-yellow-600' : 'text-green-600'">{{ riskLevelLabel }}</div>
+              <div class="text-editorial-text-muted">整体相似度</div>
+              <div>{{ Math.round((sc.overall_similarity ?? 0) * 100) }}%</div>
+              <div class="text-editorial-text-muted">文本相似度</div>
+              <div>{{ Math.round(((sc.source_content_similarity ?? 0) * 100)) }}%</div>
+              <div class="text-editorial-text-muted">结构相似度</div>
+              <div>{{ Math.round(((sc.structure_similarity ?? 0) * 100)) }}%</div>
+              <div class="text-editorial-text-muted">最长连续重叠</div>
+              <div>{{ sc.max_continuous_overlap_chars ?? 0 }} 字</div>
+            </template>
+          </div>
+          <!-- 高风险片段 -->
+          <template v-if="sc && (sc.high_risk_segments?.length ?? 0) > 0">
+            <div class="mt-1.5">
+              <button class="text-[11px] text-editorial-link-active hover:underline" @click="showRiskSegments = !showRiskSegments">
+                高风险片段 {{ sc.high_risk_segments!.length }} 条 {{ showRiskSegments ? '收起' : '展开' }}
+              </button>
+              <div v-if="showRiskSegments" class="mt-1 space-y-1">
+                <div v-for="(seg, i) in sc.high_risk_segments" :key="i" class="rounded border border-editorial-border bg-editorial-bg-page px-2 py-1.5 text-[11px] leading-relaxed">
+                  <div class="text-editorial-text-muted">文章片段：{{ seg.article_segment }}</div>
+                  <div class="text-editorial-text-muted">原文片段：{{ seg.source_segment }}</div>
+                  <div>相似度：{{ Math.round((seg.similarity ?? 0) * 100) }}%</div>
+                </div>
+              </div>
+            </div>
+          </template>
+        </section>
+        <section v-else-if="article?.similarityCheck === null && article?.id">
+          <div class="mb-2">
+            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">相似度检测</h3>
+          </div>
+          <div class="text-xs text-editorial-text-muted">未检测</div>
+        </section>
+
         <!-- 开头钩子（只读） -->
         <section v-if="parseJsonArray(article.hooks).length > 0">
           <div class="mb-2 flex items-center justify-between">
@@ -664,6 +710,30 @@ async function selectIntro(idx: number): Promise<void> {
 const displaySummaries = computed(() => {
   return props.article?.summary100 ?? [];
 });
+
+// 相似度检测数据
+const sc = computed(() => {
+  const raw = props.article?.similarityCheck;
+  if (!raw || typeof raw !== "object") return null;
+  return raw as {
+    overall_similarity?: number;
+    source_content_similarity?: number;
+    structure_similarity?: number;
+    max_continuous_overlap_chars?: number;
+    high_risk_segments?: Array<{ article_segment: string; source_segment: string; similarity: number }>;
+    risk_level?: string;
+  };
+});
+
+const riskLevelLabel = computed(() => {
+  const level = sc.value?.risk_level;
+  if (level === "low") return "低";
+  if (level === "medium") return "中";
+  if (level === "high") return "高";
+  return "未知";
+});
+
+const showRiskSegments = ref(false);
 
 // ─── 整篇重写 ───
 

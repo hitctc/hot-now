@@ -28,6 +28,9 @@ const SELECT_COLUMNS = `
   publishable,
   cover_image_prompt,
   inline_image_prompts,
+  similarity_check,
+  needs_manual_review,
+  manual_review_reason,
   wechat_theme_id,
   wechat_html,
   created_at,
@@ -59,6 +62,9 @@ type ArticleRow = {
   publishable: number;
   cover_image_prompt: string | null;
   inline_image_prompts: string | null;
+  similarity_check: string | null;
+  needs_manual_review: number;
+  manual_review_reason: string | null;
   wechat_theme_id: string | null;
   wechat_html: string | null;
   push_count: number;
@@ -114,6 +120,9 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     publishable: row.publishable === 1,
     coverImagePrompt: row.cover_image_prompt ?? null,
     inlineImagePrompts: row.inline_image_prompts ? JSON.parse(row.inline_image_prompts) : null,
+    similarityCheck: row.similarity_check ? JSON.parse(row.similarity_check) : null,
+    needsManualReview: row.needs_manual_review === 1,
+    manualReviewReason: row.manual_review_reason ?? null,
     wechatThemeId: row.wechat_theme_id,
     wechatHtml: row.wechat_html,
     pushCount: row.push_count ?? 0,
@@ -149,6 +158,9 @@ export type CreativeFinishedArticleRecord = {
   publishable: boolean;
   coverImagePrompt: string | null;
   inlineImagePrompts: Record<string, string> | null;
+  similarityCheck: Record<string, unknown> | null;
+  needsManualReview: boolean;
+  manualReviewReason: string | null;
   wechatThemeId: string | null;
   wechatHtml: string | null;
   pushCount: number;
@@ -171,6 +183,9 @@ export type InsertCreativeFinishedArticleInput = {
   rawResponseText?: string;
   coverImagePrompt?: string;
   inlineImagePrompts?: Record<string, string>;
+  similarityCheck?: Record<string, unknown>;
+  needsManualReview?: boolean;
+  manualReviewReason?: string;
 };
 
 export type EditCreativeFinishedArticleInput = {
@@ -195,6 +210,9 @@ export type EditCreativeFinishedArticleInput = {
   wechatHtml?: string | null;
   coverImagePrompt?: string;
   inlineImagePrompts?: Record<string, string>;
+  similarityCheck?: Record<string, unknown>;
+  needsManualReview?: boolean;
+  manualReviewReason?: string;
 };
 
 export type ListCreativeFinishedArticlesFilters = {
@@ -234,10 +252,13 @@ export function insertCreativeFinishedArticle(
         cover_image_url,
         cover_image_prompt,
         inline_image_prompts,
+        similarity_check,
+        needs_manual_review,
+        manual_review_reason,
         status,
         raw_response_text
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'generated', ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'generated', ?)
     `
   ).run(
     input.sourceItemId,
@@ -253,6 +274,9 @@ export function insertCreativeFinishedArticle(
     input.coverImage ? JSON.stringify(input.coverImage) : null,
     input.coverImagePrompt ?? null,
     input.inlineImagePrompts ? JSON.stringify(input.inlineImagePrompts) : null,
+    input.similarityCheck ? JSON.stringify(input.similarityCheck) : null,
+    input.needsManualReview ? 1 : 0,
+    input.manualReviewReason ?? null,
     input.rawResponseText ?? null
   );
 
@@ -443,6 +467,18 @@ export function editCreativeFinishedArticle(
   if (input.inlineImagePrompts !== undefined) {
     setClauses.push("inline_image_prompts = ?");
     params.push(JSON.stringify(input.inlineImagePrompts));
+  }
+  if (input.similarityCheck !== undefined) {
+    setClauses.push("similarity_check = ?");
+    params.push(JSON.stringify(input.similarityCheck));
+  }
+  if (input.needsManualReview !== undefined) {
+    setClauses.push("needs_manual_review = ?");
+    params.push(input.needsManualReview ? 1 : 0);
+  }
+  if (input.manualReviewReason !== undefined) {
+    setClauses.push("manual_review_reason = ?");
+    params.push(input.manualReviewReason);
   }
 
   if (setClauses.length === 0) {

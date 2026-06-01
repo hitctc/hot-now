@@ -442,6 +442,7 @@ const columns = [
   { title: "来源素材", key: "sourceItem", width: 110, ellipsis: true },
   { title: "爆文分", key: "trendScore", width: 72, ellipsis: true },
   { title: "爆文维度", key: "trendBreakdown", width: 160, ellipsis: true },
+  { title: "相似度", key: "similarity", width: 72, ellipsis: true },
   { title: "模式", key: "mode", width: 72, ellipsis: true },
   { title: "发布时间", key: "publishedAt", width: 130, ellipsis: true },
   { title: "创建时间", key: "createdAt", width: 140, ellipsis: true },
@@ -647,6 +648,29 @@ const pagination = computed(() => ({
               </a-tooltip>
             </template>
             <span v-else class="text-xs text-editorial-text-muted">-</span>
+          </template>
+
+          <!-- 相似度列 -->
+          <template v-else-if="column.key === 'similarity'">
+            <template v-if="record.similarityCheck && (record.similarityCheck as any).overall_similarity != null">
+              <a-tooltip placement="topLeft">
+                <template #title>
+                  <div class="text-xs leading-5">
+                    <div>风险等级：{{ (record.similarityCheck as any).risk_level ?? '未知' }}</div>
+                    <div>整体相似度：{{ Math.round((record.similarityCheck as any).overall_similarity * 100) }}%</div>
+                    <div>文本相似度：{{ Math.round(((record.similarityCheck as any).source_content_similarity ?? 0) * 100) }}%</div>
+                    <div>结构相似度：{{ Math.round(((record.similarityCheck as any).structure_similarity ?? 0) * 100) }}%</div>
+                    <div>最长重叠：{{ (record.similarityCheck as any).max_continuous_overlap_chars ?? 0 }} 字</div>
+                    <div v-if="((record.similarityCheck as any).high_risk_segments?.length ?? 0) > 0">高风险片段：{{ (record.similarityCheck as any).high_risk_segments.length }} 条</div>
+                  </div>
+                </template>
+                <span
+                  class="inline-flex items-center rounded-editorial-pill border px-2 py-0.5 text-[11px] font-bold"
+                  :class="(record.similarityCheck as any).risk_level === 'high' ? 'border-red-500 bg-red-500 text-white' : (record.similarityCheck as any).risk_level === 'medium' ? 'border-yellow-500 bg-yellow-50 text-yellow-700' : 'border-green-500 bg-green-50 text-green-700'"
+                >{{ Math.round((record.similarityCheck as any).overall_similarity * 100) }}%</span>
+              </a-tooltip>
+            </template>
+            <span v-else class="text-xs text-editorial-text-muted">未检测</span>
           </template>
 
           <!-- 模式列 -->

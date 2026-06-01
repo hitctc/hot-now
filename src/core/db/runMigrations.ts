@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 33;
+const schemaVersion = 34;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -1278,6 +1278,19 @@ export function runMigrations(db: SqliteDatabase): void {
       db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN inline_image_prompts TEXT`);
     }
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(33, imagePromptMigrationName);
+
+    // 034: 成品文章增加相似度检测字段
+    const similarityMigrationName = "034_finished_articles_similarity";
+    if (!hasColumn(db, "creative_finished_articles", "similarity_check")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN similarity_check TEXT`);
+    }
+    if (!hasColumn(db, "creative_finished_articles", "needs_manual_review")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN needs_manual_review INTEGER NOT NULL DEFAULT 0`);
+    }
+    if (!hasColumn(db, "creative_finished_articles", "manual_review_reason")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN manual_review_reason TEXT`);
+    }
+    db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(34, similarityMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

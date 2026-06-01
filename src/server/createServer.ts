@@ -815,6 +815,13 @@ export function createServer(deps: ServerDeps = {}) {
       images: Array.isArray(body?.images) ? body.images as any[] : undefined,
       coverImage: Array.isArray(body?.coverImage) ? body.coverImage as string[] : (typeof body?.coverImage === "string" ? [body.coverImage] : undefined),
       rawResponseText: typeof body?.rawResponseText === "string" ? body.rawResponseText : undefined,
+      coverImagePrompt: typeof body?.coverImagePrompt === "string" ? body.coverImagePrompt : undefined,
+      inlineImagePrompts: body?.inlineImagePrompts && typeof body.inlineImagePrompts === "object" ? body.inlineImagePrompts as Record<string, string> : undefined,
+      similarityCheck: body?.similarityCheck && typeof body.similarityCheck === "object" ? body.similarityCheck as Record<string, unknown> : undefined,
+      needsManualReview: typeof body?.needsManualReview === "boolean" ? body.needsManualReview : undefined,
+      manualReviewReason: typeof body?.manualReviewReason === "string" ? body.manualReviewReason : undefined,
+      manualReviewReasons: Array.isArray(body?.manualReviewReasons) ? body.manualReviewReasons as string[] : undefined,
+      status: typeof body?.status === "string" ? body.status : undefined,
     });
 
     // 推送成品文章后，自动将素材写作状态标为 done
@@ -1092,6 +1099,7 @@ export function createServer(deps: ServerDeps = {}) {
     if (body?.similarityCheck !== undefined) { editInput.similarityCheck = body.similarityCheck; updatedFields.push("similarityCheck"); }
     if (body?.needsManualReview !== undefined) { editInput.needsManualReview = body.needsManualReview; updatedFields.push("needsManualReview"); }
     if (body?.manualReviewReason !== undefined) { editInput.manualReviewReason = body.manualReviewReason; updatedFields.push("manualReviewReason"); }
+    if (body?.manualReviewReasons !== undefined) { editInput.manualReviewReasons = body.manualReviewReasons; updatedFields.push("manualReviewReasons"); }
 
     if (Object.keys(editInput).length > 0) {
       editCreativeFinishedArticle(db, id, editInput as any);

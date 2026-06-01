@@ -1290,6 +1290,9 @@ export function runMigrations(db: SqliteDatabase): void {
     if (!hasColumn(db, "creative_finished_articles", "manual_review_reason")) {
       db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN manual_review_reason TEXT`);
     }
+    if (!hasColumn(db, "creative_finished_articles", "manual_review_reasons")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN manual_review_reasons TEXT`);
+    }
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(34, similarityMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);

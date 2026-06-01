@@ -31,6 +31,7 @@ const SELECT_COLUMNS = `
   similarity_check,
   needs_manual_review,
   manual_review_reason,
+  manual_review_reasons,
   wechat_theme_id,
   wechat_html,
   created_at,
@@ -65,6 +66,7 @@ type ArticleRow = {
   similarity_check: string | null;
   needs_manual_review: number;
   manual_review_reason: string | null;
+  manual_review_reasons: string | null;
   wechat_theme_id: string | null;
   wechat_html: string | null;
   push_count: number;
@@ -123,6 +125,7 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     similarityCheck: row.similarity_check ? JSON.parse(row.similarity_check) : null,
     needsManualReview: row.needs_manual_review === 1,
     manualReviewReason: row.manual_review_reason ?? null,
+    manualReviewReasons: row.manual_review_reasons ? JSON.parse(row.manual_review_reasons) : null,
     wechatThemeId: row.wechat_theme_id,
     wechatHtml: row.wechat_html,
     pushCount: row.push_count ?? 0,
@@ -161,6 +164,7 @@ export type CreativeFinishedArticleRecord = {
   similarityCheck: Record<string, unknown> | null;
   needsManualReview: boolean;
   manualReviewReason: string | null;
+  manualReviewReasons: string[] | null;
   wechatThemeId: string | null;
   wechatHtml: string | null;
   pushCount: number;
@@ -186,6 +190,8 @@ export type InsertCreativeFinishedArticleInput = {
   similarityCheck?: Record<string, unknown>;
   needsManualReview?: boolean;
   manualReviewReason?: string;
+  manualReviewReasons?: string[];
+  status?: string;
 };
 
 export type EditCreativeFinishedArticleInput = {
@@ -213,6 +219,7 @@ export type EditCreativeFinishedArticleInput = {
   similarityCheck?: Record<string, unknown>;
   needsManualReview?: boolean;
   manualReviewReason?: string;
+  manualReviewReasons?: string[];
 };
 
 export type ListCreativeFinishedArticlesFilters = {
@@ -255,10 +262,11 @@ export function insertCreativeFinishedArticle(
         similarity_check,
         needs_manual_review,
         manual_review_reason,
+        manual_review_reasons,
         status,
         raw_response_text
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'generated', ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
   ).run(
     input.sourceItemId,
@@ -277,6 +285,8 @@ export function insertCreativeFinishedArticle(
     input.similarityCheck ? JSON.stringify(input.similarityCheck) : null,
     input.needsManualReview ? 1 : 0,
     input.manualReviewReason ?? null,
+    input.manualReviewReasons ? JSON.stringify(input.manualReviewReasons) : null,
+    input.status ?? "generated",
     input.rawResponseText ?? null
   );
 
@@ -479,6 +489,10 @@ export function editCreativeFinishedArticle(
   if (input.manualReviewReason !== undefined) {
     setClauses.push("manual_review_reason = ?");
     params.push(input.manualReviewReason);
+  }
+  if (input.manualReviewReasons !== undefined) {
+    setClauses.push("manual_review_reasons = ?");
+    params.push(JSON.stringify(input.manualReviewReasons));
   }
 
   if (setClauses.length === 0) {

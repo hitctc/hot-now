@@ -74,6 +74,7 @@ export type CreativeFinishedArticle = {
   similarityCheck: Record<string, unknown> | null;
   needsManualReview: boolean;
   manualReviewReason: string | null;
+  manualReviewReasons: string[] | null;
   wechatThemeId: string | null;
   wechatHtml: string | null;
   pushCount: number;
@@ -220,6 +221,7 @@ export function editFinishedArticle(
     similarityCheck?: Record<string, unknown>;
     needsManualReview?: boolean;
     manualReviewReason?: string;
+    manualReviewReasons?: string[];
   }
 ): Promise<{ ok: boolean }> {
   return requestJson<{ ok: boolean }>(`/actions/creative/finished-articles/${id}`, {

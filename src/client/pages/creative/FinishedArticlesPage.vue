@@ -652,22 +652,27 @@ const pagination = computed(() => ({
 
           <!-- 相似度列 -->
           <template v-else-if="column.key === 'similarity'">
-            <template v-if="record.similarityCheck && (record.similarityCheck as any).overall_similarity != null">
+            <template v-if="record.similarityCheck && (record.similarityCheck as any).literal_similarity != null">
               <a-tooltip placement="topLeft">
                 <template #title>
                   <div class="text-xs leading-5">
                     <div>风险等级：{{ (record.similarityCheck as any).risk_level ?? '未知' }}</div>
-                    <div>整体相似度：{{ Math.round((record.similarityCheck as any).overall_similarity * 100) }}%</div>
-                    <div>文本相似度：{{ Math.round(((record.similarityCheck as any).source_content_similarity ?? 0) * 100) }}%</div>
-                    <div>结构相似度：{{ Math.round(((record.similarityCheck as any).structure_similarity ?? 0) * 100) }}%</div>
-                    <div>最长重叠：{{ (record.similarityCheck as any).max_continuous_overlap_chars ?? 0 }} 字</div>
-                    <div v-if="((record.similarityCheck as any).high_risk_segments?.length ?? 0) > 0">高风险片段：{{ (record.similarityCheck as any).high_risk_segments.length }} 条</div>
+                    <div>字面重复率：{{ Math.round((record.similarityCheck as any).literal_similarity * 100) }}%</div>
+                    <template v-if="(record.similarityCheck as any).rule_based">
+                      <div>结构相似度：{{ Math.round(((record.similarityCheck as any).rule_based.literal_structure_similarity ?? 0) * 100) }}%</div>
+                      <div>最长重叠：{{ (record.similarityCheck as any).rule_based.max_continuous_overlap_chars ?? 0 }} 字</div>
+                    </template>
+                    <template v-if="(record.similarityCheck as any).llm_review?.status === 'success'">
+                      <div>LLM 综合风险：{{ (record.similarityCheck as any).llm_review.overall_risk }}</div>
+                      <div>建议操作：{{ (record.similarityCheck as any).llm_review.suggested_action }}</div>
+                    </template>
+                    <div v-if="(record.similarityCheck as any).llm_review?.status === 'failed'">LLM 审查失败</div>
                   </div>
                 </template>
                 <span
                   class="inline-flex items-center rounded-editorial-pill border px-2 py-0.5 text-[11px] font-bold"
                   :class="(record.similarityCheck as any).risk_level === 'high' ? 'border-red-500 bg-red-500 text-white' : (record.similarityCheck as any).risk_level === 'medium' ? 'border-yellow-500 bg-yellow-50 text-yellow-700' : 'border-green-500 bg-green-50 text-green-700'"
-                >{{ Math.round((record.similarityCheck as any).overall_similarity * 100) }}%</span>
+                >{{ Math.round((record.similarityCheck as any).literal_similarity * 100) }}%</span>
               </a-tooltip>
             </template>
             <span v-else class="text-xs text-editorial-text-muted">未检测</span>

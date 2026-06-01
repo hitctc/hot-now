@@ -14,11 +14,11 @@
   >
     <template #title>
       <span v-if="article" class="flex items-center gap-2">
-        <span class="text-base font-semibold">{{ getFirstTitle(article.titles) }}</span>
         <span
           class="cursor-pointer text-xs text-editorial-link-active hover:underline"
           @click="copyArticleId(article.id)"
         >#{{ article.id }}</span>
+        <span class="text-base font-semibold">{{ getFirstTitle(article.titles) }}</span>
       </span>
     </template>
 

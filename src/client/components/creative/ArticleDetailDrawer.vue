@@ -13,8 +13,12 @@
     @cancel="handleClose"
   >
     <template #title>
-      <span v-if="article" class="text-base font-semibold">
-        {{ getFirstTitle(article.titles) }}
+      <span v-if="article" class="flex items-center gap-2">
+        <span class="text-base font-semibold">{{ getFirstTitle(article.titles) }}</span>
+        <span
+          class="cursor-pointer text-xs text-editorial-link-active hover:underline"
+          @click="copyArticleId(article.id)"
+        >#{{ article.id }}</span>
       </span>
     </template>
 
@@ -462,6 +466,12 @@ const emit = defineEmits<{
 
 // ─── 正文全屏编辑 ───
 const editorFullscreen = ref(false);
+
+function copyArticleId(id: number): void {
+  navigator.clipboard.writeText(`【成品文章id: ${id}】`).then(() => {
+    message.success("已复制");
+  });
+}
 
 function copyPrompt(text: string): void {
   navigator.clipboard.writeText(text).then(() => {

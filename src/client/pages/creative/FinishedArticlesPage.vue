@@ -7,6 +7,7 @@ import { useSearchHistory } from "../../composables/useSearchHistory.js";
 import {
   readCreativeFinishedArticles,
   readCreativeSourceItem,
+  editFinishedArticle,
   toggleFinishedArticlePublished,
   toggleFinishedArticlePublishable,
   parseArticleImages,
@@ -82,6 +83,7 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 const statusOptions = [
   { label: "全部状态", value: "" },
   { label: "已生成", value: "generated" },
+  { label: "待审核", value: "needs_review" },
   { label: "可推送", value: "ready_for_publish" },
   { label: "已推送草稿", value: "wechat_draft" },
   { label: "异常", value: "anomaly" }
@@ -203,6 +205,19 @@ async function handleTogglePublishable(article: CreativeFinishedArticle): Promis
     }
   } catch {
     // ignore
+  }
+}
+
+// 审核通过：把 needs_review 改为 ready_for_publish
+async function handleApproveArticle(article: CreativeFinishedArticle): Promise<void> {
+  try {
+    const res = await editFinishedArticle(article.id, { status: "ready_for_publish" });
+    if (res.ok) {
+      message.success("已通过审核");
+      loadItems();
+    }
+  } catch {
+    message.error("操作失败");
   }
 }
 
@@ -415,6 +430,7 @@ async function copyText(text: string): Promise<void> {
 
 const statusMap: Record<string, { label: string; color: string }> = {
   generated: { label: "已生成", color: "blue" },
+  needs_review: { label: "待审核", color: "orange" },
   ready_for_publish: { label: "可推送", color: "cyan" },
   wechat_draft: { label: "已推送草稿", color: "green" },
   anomaly: { label: "异常", color: "red" }
@@ -569,6 +585,14 @@ const pagination = computed(() => ({
             <div class="flex flex-col items-start gap-0.5 leading-tight">
               <a-tag :color="getStatusInfo(record.status).color" class="!m-0 !text-[11px] !py-0">{{ getStatusInfo(record.status).label }}</a-tag>
               <a-tag v-if="record.pushCount > 0" color="green" class="!m-0 !text-[11px] !py-0">{{ record.pushCount }}次</a-tag>
+              <button
+                v-if="record.status === 'needs_review'"
+                class="text-[10px] text-editorial-link-active hover:underline"
+                @click="handleApproveArticle(record)"
+              >审核通过</button>
+              <div v-if="record.status === 'needs_review' && record.anomalyReason" class="text-[10px] text-orange-600 line-clamp-1 max-w-[80px]">
+                <a-tooltip :title="record.anomalyReason" placement="topLeft">{{ record.anomalyReason }}</a-tooltip>
+              </div>
             </div>
           </template>
 

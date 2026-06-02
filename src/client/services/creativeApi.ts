@@ -222,6 +222,8 @@ export function editFinishedArticle(
     needsManualReview?: boolean;
     manualReviewReason?: string;
     manualReviewReasons?: string[];
+    status?: string;
+    anomalyReason?: string;
   }
 ): Promise<{ ok: boolean }> {
   return requestJson<{ ok: boolean }>(`/actions/creative/finished-articles/${id}`, {

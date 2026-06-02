@@ -42,6 +42,7 @@
           <a-tooltip :mouse-enter-delay="0.5" title="保存正文内容到数据库">
             <a-button type="primary" :loading="saving" @click="handleSave">保存正文</a-button>
           </a-tooltip>
+          <a-button v-if="article.status === 'needs_review'" type="primary" @click="handleApproveReview">审核通过</a-button>
           <a-tooltip v-if="canPush" :mouse-enter-delay="0.5" title="自动保存正文后推送到微信公众号草稿箱">
             <a-button type="primary" :loading="saving" @click="saveAndPush">推送到草稿箱</a-button>
           </a-tooltip>
@@ -176,8 +177,8 @@
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">相似度检测</h3>
           </div>
           <!-- 人工审核提示 -->
-          <div v-if="article.needsManualReview" class="mb-2 rounded border border-yellow-400 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
-            ⚠ 需要人工审核{{ article.manualReviewReason ? `：${manualReviewReasonText}` : '' }}
+          <div v-if="article.needsManualReview || article.status === 'needs_review'" class="mb-2 rounded border border-yellow-400 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+            ⚠ 需要人工审核{{ article.manualReviewReason ? `：${manualReviewReasonText}` : '' }}{{ article.anomalyReason ? `（${article.anomalyReason}）` : '' }}
           </div>
           <template v-if="sc">
             <!-- 外层结论 -->
@@ -1136,6 +1137,19 @@ async function doSaveContent(content: string): Promise<void> {
     message.error("自动保存失败");
   } finally {
     saving.value = false;
+  }
+}
+
+async function handleApproveReview(): Promise<void> {
+  if (!props.article) return;
+  try {
+    const res = await editFinishedArticle(props.article.id, { status: "ready_for_publish" });
+    if (res.ok) {
+      message.success("已通过审核");
+      emit("saved");
+    }
+  } catch {
+    message.error("操作失败");
   }
 }
 

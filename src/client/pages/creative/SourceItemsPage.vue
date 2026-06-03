@@ -2,6 +2,7 @@
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { message } from "ant-design-vue";
 
+import { HttpError } from "../../services/http.js";
 import { useSearchHistory } from "../../composables/useSearchHistory.js";
 import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
 
@@ -372,8 +373,14 @@ async function confirmWriteMode(): Promise<void> {
     } else {
       message.error(result.reason ?? "文章生成失败");
     }
-  } catch {
-    message.error("写文章请求失败");
+  } catch (err) {
+    if (err instanceof HttpError && err.status === 409) {
+      const detail = (err.body as { error?: string })?.error ?? "该素材正在写作中";
+      message.warning(detail);
+      writeModeVisible.value = false;
+    } else {
+      message.error("写文章请求失败");
+    }
   } finally {
     writeModeConfirming.value = false;
   }

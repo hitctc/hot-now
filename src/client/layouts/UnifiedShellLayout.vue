@@ -4,6 +4,7 @@ import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 
 import EditorialEmptyState from "../components/content/EditorialEmptyState.vue";
 import EditorialPageIntro from "../components/content/EditorialPageIntro.vue";
+import WriteQueueStatus from "../components/creative/WriteQueueStatus.vue";
 import { useTheme, type ThemeMode } from "../composables/useTheme";
 import { HttpError, requestJson } from "../services/http";
 import { readSettingsProfile, type SettingsProfile } from "../services/settingsApi";
@@ -559,6 +560,9 @@ onBeforeUnmount(() => {
         </section>
       </div>
     </transition>
+
+    <!-- 全局写作队列状态浮标（仅登录用户可见） -->
+    <WriteQueueStatus v-if="loggedInProfile" />
   </div>
 </template>
 

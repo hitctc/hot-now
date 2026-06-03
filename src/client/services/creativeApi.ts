@@ -466,19 +466,6 @@ export function regenInlineImage(id: number, imageIndex: number): Promise<RegenI
   });
 }
 
-export type RegenArticleResult = {
-  ok: boolean;
-  title?: string;
-  prompts?: Record<string, unknown>;
-  reason?: string;
-};
-
-export function regenArticle(id: number): Promise<RegenArticleResult> {
-  return requestJson<RegenArticleResult>(`/api/creative/finished-articles/${id}/regen-article`, {
-    method: "POST",
-  });
-}
-
 // ─── 素材库写文章 ───
 
 export type WriteArticleResult = {
@@ -495,4 +482,34 @@ export function writeSourceItemArticle(id: number, mode?: string): Promise<Write
     method: "POST",
     body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined,
   });
+}
+
+// ─── 写作队列状态 ───
+
+export type WriteQueueTask = {
+  task_id: string;
+  label: string;
+  priority: "high" | "normal";
+  source_item_id: number;
+  status: "writing" | "queued";
+  submitted_at: string;
+  started_at: string | null;
+};
+
+export type WriteQueueStats = {
+  total_submitted: number;
+  total_completed: number;
+  total_failed: number;
+};
+
+export type WriteQueueStatus = {
+  current: WriteQueueTask | null;
+  queue_length: number;
+  queue: WriteQueueTask[];
+  stats: WriteQueueStats;
+};
+
+/** 查询 Hermes 写作队列状态 */
+export function fetchWriteQueueStatus(): Promise<WriteQueueStatus> {
+  return requestJson<WriteQueueStatus>("/api/creative/write-queue/status");
 }

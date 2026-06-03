@@ -1514,46 +1514,30 @@ export function createServer(deps: ServerDeps = {}) {
     }
   });
 
-  // ─── regen-article：整篇重新写作 ───
-  app.post("/api/creative/finished-articles/:id/regen-article", async (request, reply) => {
+  // ─── 写作队列状态：代理 Hermes GET /api/write-queue/status ───
+  app.get("/api/creative/write-queue/status", async (request, reply) => {
     const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
     if (session === undefined) { return; }
-    if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
-
-    const id = parseInt((request.params as { id: string }).id, 10);
-    const article = findCreativeFinishedArticleById(db, id);
-    if (!article) { return reply.code(404).send({ ok: false, reason: "article-not-found" }); }
 
     const hermesApiUrl = process.env.HERMES_API_BASE_URL;
     const hermesApiToken = process.env.HERMES_API_TOKEN;
     if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
 
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 200_000);
-      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/regen-article`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
-        body: JSON.stringify({ articleId: id }),
-        signal: controller.signal,
+      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/write-queue/status`, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${hermesApiToken}` },
+        signal: AbortSignal.timeout(10_000),
       });
-      clearTimeout(timeout);
-
       if (!res.ok) {
         const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
-        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, hermesResponse: errorBody });
+        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, detail: errorBody });
       }
-
-      const data = await res.json() as { success: boolean; title?: string; prompts?: Record<string, unknown>; error?: string };
-      if (!data.success) {
-        return reply.code(502).send({ ok: false, reason: data.error ?? "整篇重写失败", hermesResponse: JSON.stringify(data) });
-      }
-
-      return reply.send({ ok: true, title: data.title, prompts: data.prompts });
+      const data = await res.json();
+      return reply.send(data);
     } catch (err) {
       const errMessage = (err as Error).message ?? String(err);
-      if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "整篇重写超时（>200s），Hermes 未响应", detail: errMessage }); }
-      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败`, detail: errMessage });
+      return reply.code(502).send({ ok: false, reason: "Hermes 调用失败", detail: errMessage });
     }
   });
 

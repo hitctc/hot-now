@@ -25,15 +25,17 @@
     <template #footer>
       <div v-if="article" class="article-detail-footer">
         <div class="article-detail-footer__left">
-          <a-button
-            danger
-            :loading="regenArticleLoading"
-            :disabled="regenArticleLoading"
-            @click="handleRegenArticle"
-          >
-            <template v-if="regenArticleLoading">正在重写（预计 2~3 分钟）...</template>
-            <template v-else>整篇重写</template>
-          </a-button>
+          <a-dropdown v-if="article.sourceItemId">
+            <a-button>写文章</a-button>
+            <template #overlay>
+              <a-menu @click="handleWriteMenuClick">
+                <a-menu-item key="auto">自动判断</a-menu-item>
+                <a-menu-item key="A">短篇观点文（A）</a-menu-item>
+                <a-menu-item key="B">短篇随笔（B）</a-menu-item>
+                <a-menu-item key="C">长篇观点文（C）</a-menu-item>
+              </a-menu>
+            </template>
+          </a-dropdown>
         </div>
         <div class="article-detail-footer__right">
           <a-tooltip :mouse-enter-delay="0.5" title="将当前正文按选定主题渲染后复制到剪贴板，可粘贴到公众号编辑器">
@@ -514,7 +516,7 @@
 
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
-import { message, Modal } from "ant-design-vue";
+import { message } from "ant-design-vue";
 
 import ArticleMarkdownEditor from "./ArticleMarkdownEditor.vue";
 import StepTraceTimeline from "./StepTraceTimeline.vue";
@@ -524,13 +526,14 @@ import {
   regenCover,
   regenTitle,
   regenIntro,
-  regenArticle,
   regenInlineImage,
+  writeSourceItemArticle,
   parseArticleImages,
   extractImageUrl,
   type CreativeFinishedArticle,
   type WechatThemeId,
 } from "../../services/creativeApi.js";
+import { HttpError } from "../../services/http.js";
 import { renderWechatThemePreview } from "../../services/wechatRenderer.js";
 
 const props = defineProps<{
@@ -877,73 +880,34 @@ function handleReviewDone(): void {
   emit("saved");
 }
 
-// ─── 整篇重写 ───
+// ─── 写文章（统一走 write-article 异步接口） ───
 
-const regenArticleLoading = ref(false);
-const REGEN_ARTICLE_KEY = "hot-now-regen-article";
+const writeArticleSubmitting = ref(false);
 
-function getRegenArticleStatus(): { articleId: number; startedAt: number } | null {
-  try {
-    const raw = localStorage.getItem(REGEN_ARTICLE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+function handleWriteMenuClick({ key }: { key: string }): void {
+  void handleWriteArticle(key === "auto" ? undefined : key);
 }
 
-async function handleRegenArticle(): Promise<void> {
-  if (!props.article || regenArticleLoading.value) return;
-
-  // 二次确认
-  const confirmed = await new Promise<boolean>((resolve) => {
-    Modal.confirm({
-      title: "确认整篇重写？",
-      content: "将基于同一素材重新生成一篇完整文章，耗时约 2~3 分钟。新文章生成后请在列表中查看。",
-      okText: "确认重写",
-      cancelText: "取消",
-      onOk: () => resolve(true),
-      onCancel: () => resolve(false),
-    });
-  });
-  if (!confirmed) return;
-
-  regenArticleLoading.value = true;
-  // 记录重写状态到 localStorage，关闭弹窗后重开可恢复提示
-  localStorage.setItem(REGEN_ARTICLE_KEY, JSON.stringify({
-    articleId: props.article.id,
-    startedAt: Date.now(),
-  }));
-
+async function handleWriteArticle(mode?: string): Promise<void> {
+  if (!props.article || writeArticleSubmitting.value) return;
+  writeArticleSubmitting.value = true;
   try {
-    const result = await regenArticle(props.article.id);
+    const result = await writeSourceItemArticle(props.article.sourceItemId, mode);
     if (result.ok) {
-      localStorage.removeItem(REGEN_ARTICLE_KEY);
-      message.success(`新文章已生成${result.title ? `：${result.title}` : ""}，请关闭弹窗刷新列表查看`);
-      emit("saved");
+      message.success(`写作任务已提交${result.status === "queued" ? "（排队中）" : ""}，完成后可在成品文章列表查看`);
     } else {
-      localStorage.removeItem(REGEN_ARTICLE_KEY);
-      message.error(result.reason ?? "整篇重写失败");
+      message.error(result.reason ?? "写文章失败");
     }
-  } catch {
-    // 不清除 localStorage，可能仍在生成中
-    message.error("整篇重写请求失败，新文章可能仍在生成中，请稍后刷新列表查看");
+  } catch (err) {
+    // 409 = 素材已在写作中或已排队
+    if (err instanceof HttpError && err.status === 409) {
+      const detail = (err.body as { error?: string })?.error ?? "该素材正在写作中";
+      message.warning(detail);
+    } else {
+      message.error("写文章请求失败");
+    }
   } finally {
-    regenArticleLoading.value = false;
-  }
-}
-
-// 打开弹窗时检查是否有未完成的重写
-function checkRegenArticleStatus(): void {
-  const status = getRegenArticleStatus();
-  if (!status || !props.article) return;
-  if (status.articleId === props.article.id) {
-    const elapsed = Date.now() - status.startedAt;
-    if (elapsed < 5 * 60 * 1000) {
-      // 5 分钟内认为仍在生成
-      message.info("该文章正在整篇重写中，请稍后刷新列表查看新文章");
-    } else {
-      // 超过 5 分钟，清除状态
-      localStorage.removeItem(REGEN_ARTICLE_KEY);
-      message.info("整篇重写已完成或超时，请刷新列表查看");
-    }
+    writeArticleSubmitting.value = false;
   }
 }
 
@@ -1142,7 +1106,6 @@ watch(() => props.open, (val) => {
     editorFullscreen.value = false;
     document.body.style.overflow = "";
     document.addEventListener("keydown", handleFullscreenEsc);
-    checkRegenArticleStatus();
     // 恢复文章保存的主题偏好，无记录时默认包豪斯
     const saved = props.article.wechatThemeId;
     const previewKey = saved ? reverseThemeIdMap[saved] : undefined;

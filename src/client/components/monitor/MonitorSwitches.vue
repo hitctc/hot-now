@@ -151,17 +151,12 @@ onMounted(() => refresh());
               :disabled="saving === def.key"
               @change="(val: number) => onNumberInput(def.key, val)"
             />
-            <template v-if="hasDraft(def.key)">
-              <button
-                class="shrink-0 rounded bg-blue-500 px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-blue-600 disabled:opacity-50"
-                :disabled="saving === def.key"
-                @click="confirmNumber(def.key)"
-              >确认</button>
-              <button
-                class="shrink-0 rounded border border-gray-300 bg-white px-1.5 py-0.5 text-[10px] text-gray-500 hover:bg-gray-50"
-                @click="cancelNumber(def.key)"
-              >取消</button>
-            </template>
+            <button
+              class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium disabled:opacity-50"
+              :class="hasDraft(def.key) ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-gray-100 text-gray-400 cursor-default'"
+              :disabled="saving === def.key || !hasDraft(def.key)"
+              @click="confirmNumber(def.key)"
+            >确认</button>
           </template>
 
           <a-select

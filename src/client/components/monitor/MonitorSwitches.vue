@@ -28,6 +28,38 @@ const switchDefs: SwitchDef[] = [
 const switches = ref<Record<string, string>>({});
 const loading = ref(false);
 const saving = ref<string | null>(null);
+// 数值类输入的草稿值：改了但还没确认提交
+const draftNumbers = ref<Record<string, number>>({});
+
+// 某个数值开关是否有未保存的草稿
+function hasDraft(key: string): boolean {
+  if (switches.value[key] == null) return false;
+  return draftNumbers.value[key] != null && draftNumbers.value[key] !== Number(switches.value[key]);
+}
+
+// 编辑数值时只写入草稿，不立即提交
+function onNumberInput(key: string, val: number | null): void {
+  if (val == null) return;
+  draftNumbers.value = { ...draftNumbers.value, [key]: val };
+}
+
+// 确认提交数值草稿
+async function confirmNumber(key: string): Promise<void> {
+  const val = draftNumbers.value[key];
+  if (val == null) return;
+  await saveSwitch(key, String(val));
+  // 清除草稿（saveSwitch 成功后会 refresh 重建 switches）
+  const next = { ...draftNumbers.value };
+  delete next[key];
+  draftNumbers.value = next;
+}
+
+// 取消数值草稿
+function cancelNumber(key: string): void {
+  const next = { ...draftNumbers.value };
+  delete next[key];
+  draftNumbers.value = next;
+}
 
 async function refresh(): Promise<void> {
   loading.value = true;
@@ -108,17 +140,29 @@ onMounted(() => refresh());
             @change="(checked: boolean) => saveSwitch(def.key, checked ? 'on' : 'off')"
           />
 
-          <a-input-number
-            v-else-if="def.type === 'number'"
-            :value="Number(switches[def.key] ?? 0)"
-            :min="0"
-            :step="1"
-            size="small"
-            class="!w-20"
-            :disabled="saving === def.key"
-            @press-enter="(val: number) => saveSwitch(def.key, String(val))"
-            @blur="(val: number) => { if (String(val) !== switches[def.key]) saveSwitch(def.key, String(val)); }"
-          />
+          <!-- 数值输入：有草稿时显示确认/取消按钮 -->
+          <template v-else-if="def.type === 'number'">
+            <a-input-number
+              :value="hasDraft(def.key) ? draftNumbers[def.key] : Number(switches[def.key] ?? 0)"
+              :min="0"
+              :step="1"
+              size="small"
+              class="!w-20"
+              :disabled="saving === def.key"
+              @change="(val: number) => onNumberInput(def.key, val)"
+            />
+            <template v-if="hasDraft(def.key)">
+              <button
+                class="shrink-0 rounded bg-blue-500 px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-blue-600 disabled:opacity-50"
+                :disabled="saving === def.key"
+                @click="confirmNumber(def.key)"
+              >确认</button>
+              <button
+                class="shrink-0 rounded border border-gray-300 bg-white px-1.5 py-0.5 text-[10px] text-gray-500 hover:bg-gray-50"
+                @click="cancelNumber(def.key)"
+              >取消</button>
+            </template>
+          </template>
 
           <a-select
             v-else-if="def.type === 'select'"

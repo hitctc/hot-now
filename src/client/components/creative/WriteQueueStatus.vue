@@ -1,7 +1,8 @@
 <!--
   WriteQueueStatus.vue — 全局写作队列状态浮标
-  固定在页面右侧中间位置，显示当前写作任务和排队情况。
-  30 秒自动刷新 + 手动刷新按钮。
+  折叠态：仅显示呼吸圆点（蓝色=有任务，灰色=空闲）
+  展开态：当前任务 + 排队列表 + 统计，素材 ID 可点击弹出详情
+  15 秒自动刷新 + 手动刷新
 -->
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed } from "vue";
@@ -9,119 +10,84 @@ import {
   fetchWriteQueueStatus,
   type WriteQueueStatus as WriteQueueStatusType,
 } from "../../services/creativeApi.js";
+import SourceItemDetailModal from "./SourceItemDetailModal.vue";
 
 const data = ref<WriteQueueStatusType | null>(null);
 const loading = ref(false);
 const expanded = ref(false);
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
+// 素材详情弹窗
+const modalVisible = ref(false);
+const modalSourceItemId = ref<number | null>(null);
+
 const hasActiveWork = computed(() => {
   if (!data.value) return false;
   return data.value.current !== null || data.value.queue_length > 0;
 });
 
-// 队列状态摘要文案
-const summaryText = computed(() => {
-  if (!data.value) return "队列状态未知";
-  const d = data.value;
-  if (!d.current && d.queue_length === 0) return "写作队列空闲";
-  const parts: string[] = [];
-  if (d.current) {
-    const label = d.current.label || `素材#${d.current.source_item_id}`;
-    parts.push(`正在写：${label.length > 20 ? label.slice(0, 20) + "…" : label}`);
-  }
-  if (d.queue_length > 0) {
-    parts.push(`${d.queue_length} 篇排队`);
-  }
-  return parts.join(" · ");
-});
-
 async function refresh(): Promise<void> {
   loading.value = true;
-  try {
-    data.value = await fetchWriteQueueStatus();
-  } catch {
-    // 静默失败，保留上次数据
-  } finally {
-    loading.value = false;
-  }
-}
-
-function startPoll(): void {
-  if (pollTimer) return;
-  refresh();
-  pollTimer = setInterval(() => refresh(), 30_000);
-}
-
-function stopPoll(): void {
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
-  }
+  try { data.value = await fetchWriteQueueStatus(); }
+  catch { /* 静默 */ }
+  finally { loading.value = false; }
 }
 
 function toggleExpand(): void {
   expanded.value = !expanded.value;
 }
 
-onMounted(() => startPoll());
-onBeforeUnmount(() => stopPoll());
+function openSourceItem(id: number): void {
+  modalSourceItemId.value = id;
+  modalVisible.value = true;
+}
+
+onMounted(() => { refresh(); pollTimer = setInterval(refresh, 15_000); });
+onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer); });
 </script>
 
 <template>
   <Teleport to="body">
-    <div
-      v-if="data"
-      class="write-queue-float"
-      :class="{ 'write-queue-float--active': hasActiveWork, 'write-queue-float--expanded': expanded }"
-    >
-      <!-- 折叠态：状态摘要 -->
-      <button class="write-queue-header" @click="toggleExpand">
-        <span v-if="hasActiveWork" class="write-queue-dot write-queue-dot--active" />
-        <span v-else class="write-queue-dot write-queue-dot--idle" />
-        <span class="write-queue-summary">{{ summaryText }}</span>
-        <span class="write-queue-arrow">{{ expanded ? "▶" : "◀" }}</span>
+    <div v-if="data" class="write-queue-float">
+      <!-- 折叠态：呼吸圆点 -->
+      <button v-if="!expanded" class="write-queue-dot-btn" @click="toggleExpand">
+        <span class="write-queue-dot" :class="hasActiveWork ? 'write-queue-dot--active' : 'write-queue-dot--idle'" />
       </button>
 
-      <!-- 展开态：详细信息 -->
-      <div v-if="expanded" class="write-queue-detail">
-        <!-- 当前任务 -->
-        <div v-if="data.current" class="write-queue-section">
-          <div class="write-queue-label">正在写作</div>
-          <div class="write-queue-task">
-            <span class="write-queue-task-id">{{ data.current.task_id }}</span>
-            <span class="write-queue-task-label">{{ data.current.label }}</span>
-            <span class="write-queue-task-badge write-queue-task-badge--writing">writing</span>
-          </div>
+      <!-- 展开态 -->
+      <template v-else>
+        <div class="write-queue-header">
+          <span class="text-xs font-semibold text-editorial-text-body">写作队列</span>
+          <button class="write-queue-close" @click="toggleExpand">✕</button>
         </div>
 
-        <!-- 排队任务 -->
-        <div v-if="data.queue.length > 0" class="write-queue-section">
-          <div class="write-queue-label">排队中（{{ data.queue.length }}）</div>
+        <!-- 当前任务 -->
+        <div v-if="data.current" class="write-queue-current">
+          <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500 shrink-0" />
+          <span class="truncate text-[11px] text-blue-800">{{ data.current.label }}</span>
+        </div>
+
+        <!-- 排队列表 -->
+        <div v-if="data.queue.length > 0" class="write-queue-list">
           <div v-for="task in data.queue" :key="task.task_id" class="write-queue-task">
-            <span class="write-queue-task-id">{{ task.task_id }}</span>
-            <span class="write-queue-task-label">{{ task.label }}</span>
-            <span class="write-queue-task-badge" :class="task.priority === 'high' ? 'write-queue-task-badge--high' : 'write-queue-task-badge--normal'">
-              {{ task.priority }}
-            </span>
+            <span v-if="task.source_item_id" class="write-queue-id" @click.stop="openSourceItem(task.source_item_id)">#{{ task.source_item_id }}</span>
+            <span class="flex-1 truncate text-[11px] text-editorial-text-body">{{ task.label }}</span>
+            <span class="text-[10px]" :class="task.priority === 'high' ? 'text-yellow-600' : 'text-gray-400'">{{ task.priority }}</span>
           </div>
         </div>
 
         <!-- 空闲 -->
-        <div v-if="!data.current && data.queue.length === 0" class="write-queue-section">
-          <div class="write-queue-idle">队列空闲，暂无写作任务</div>
-        </div>
+        <div v-if="!data.current && data.queue.length === 0" class="write-queue-idle">队列空闲</div>
 
         <!-- 统计 + 刷新 -->
         <div class="write-queue-footer">
-          <span class="write-queue-stats">
-            已完成 {{ data.stats.total_completed }} · 失败 {{ data.stats.total_failed }}
-          </span>
-          <button class="write-queue-refresh" :disabled="loading" @click.stop="refresh">
-            {{ loading ? "…" : "↻" }}
-          </button>
+          <span class="text-[10px] text-editorial-text-muted">完成 {{ data.stats.total_completed }} · 失败 {{ data.stats.total_failed }}</span>
+          <button class="write-queue-refresh" :disabled="loading" @click.stop="refresh">{{ loading ? "…" : "↻" }}</button>
         </div>
-      </div>
+      </template>
+
+      <!-- 素材详情弹窗 -->
+      <SourceItemDetailModal v-model:visible="modalVisible" :source-item-id="modalSourceItemId" />
     </div>
   </Teleport>
 </template>
@@ -133,155 +99,112 @@ onBeforeUnmount(() => stopPoll());
   top: 50%;
   transform: translateY(-50%);
   z-index: 1900;
-  min-width: 120px;
-  max-width: 320px;
+  min-width: 32px;
+  max-width: 280px;
   border-radius: 8px;
   border: 1px solid #e5e7eb;
   background: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  font-size: 12px;
-  transition: box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
-.write-queue-float--active {
-  border-color: #91caff;
-  box-shadow: 0 2px 12px rgba(24, 144, 255, 0.15);
-}
-.write-queue-header {
+.write-queue-dot-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 8px 10px;
-  background: none;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   border: none;
+  background: none;
   cursor: pointer;
-  text-align: left;
-  font-size: 12px;
-  color: #374151;
-}
-.write-queue-header:hover {
-  background: #f9fafb;
   border-radius: 8px;
 }
+.write-queue-dot-btn:hover {
+  background: #f3f4f6;
+}
 .write-queue-dot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  flex-shrink: 0;
 }
 .write-queue-dot--active {
   background: #1677ff;
-  animation: write-queue-pulse 2s infinite;
+  animation: wq-pulse 2s infinite;
 }
 .write-queue-dot--idle {
   background: #d1d5db;
 }
-@keyframes write-queue-pulse {
+@keyframes wq-pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  50% { opacity: 0.3; }
 }
-.write-queue-summary {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  line-height: 1.4;
+.write-queue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 4px;
+  border-bottom: 1px solid #f0f0f0;
 }
-.write-queue-arrow {
-  flex-shrink: 0;
-  font-size: 10px;
-  color: #9ca3af;
-}
-.write-queue-detail {
-  border-top: 1px solid #f0f0f0;
-  padding: 8px 10px;
-}
-.write-queue-section {
-  margin-bottom: 8px;
-}
-.write-queue-section:last-of-type {
-  margin-bottom: 0;
-}
-.write-queue-label {
-  font-weight: 600;
+.write-queue-close {
+  border: none;
+  background: none;
   font-size: 11px;
-  color: #6b7280;
-  margin-bottom: 4px;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+.write-queue-close:hover { color: #374151; }
+.write-queue-current {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 4px 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: #eff6ff;
+}
+.write-queue-list {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 2px 8px;
 }
 .write-queue-task {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   padding: 3px 0;
-  line-height: 1.4;
 }
-.write-queue-task-id {
+.write-queue-id {
   flex-shrink: 0;
+  font-size: 10px;
   font-weight: 600;
-  color: #9ca3af;
-  font-size: 10px;
-  min-width: 20px;
-}
-.write-queue-task-label {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #374151;
-}
-.write-queue-task-badge {
-  flex-shrink: 0;
-  font-size: 10px;
-  padding: 1px 5px;
-  border-radius: 3px;
-  font-weight: 500;
-}
-.write-queue-task-badge--writing {
-  background: #e6f4ff;
   color: #1677ff;
+  cursor: pointer;
 }
-.write-queue-task-badge--high {
-  background: #fff7e6;
-  color: #d48806;
-}
-.write-queue-task-badge--normal {
-  background: #f0f0f0;
-  color: #8c8c8c;
-}
+.write-queue-id:hover { text-decoration: underline; }
 .write-queue-idle {
-  color: #9ca3af;
-  padding: 4px 0;
   text-align: center;
+  font-size: 11px;
+  color: #9ca3af;
+  padding: 8px 0;
 }
 .write-queue-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 8px;
-  padding-top: 6px;
+  padding: 4px 8px 6px;
   border-top: 1px solid #f5f5f5;
 }
-.write-queue-stats {
-  font-size: 10px;
-  color: #9ca3af;
-}
 .write-queue-refresh {
-  background: none;
   border: 1px solid #e5e7eb;
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-size: 12px;
+  background: none;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 11px;
   cursor: pointer;
   color: #6b7280;
   line-height: 1;
 }
-.write-queue-refresh:hover:not(:disabled) {
-  background: #f3f4f6;
-}
-.write-queue-refresh:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+.write-queue-refresh:hover:not(:disabled) { background: #f3f4f6; }
+.write-queue-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>

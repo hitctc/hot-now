@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 34;
+const schemaVersion = 35;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -1294,6 +1294,28 @@ export function runMigrations(db: SqliteDatabase): void {
       db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN manual_review_reasons TEXT`);
     }
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(34, similarityMigrationName);
+
+    // 035: 成品文章增加写作流程追踪和软删除字段
+    const stepTraceMigrationName = "035_finished_articles_step_trace";
+    if (!hasColumn(db, "creative_finished_articles", "step_trace")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN step_trace TEXT`);
+    }
+    if (!hasColumn(db, "creative_finished_articles", "current_step")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN current_step INTEGER`);
+    }
+    if (!hasColumn(db, "creative_finished_articles", "stop_step")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN stop_step INTEGER`);
+    }
+    if (!hasColumn(db, "creative_finished_articles", "reason_code")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN reason_code TEXT`);
+    }
+    if (!hasColumn(db, "creative_finished_articles", "reason_text")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN reason_text TEXT`);
+    }
+    if (!hasColumn(db, "creative_finished_articles", "deleted_at")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN deleted_at TEXT`);
+    }
+    db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(35, stepTraceMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

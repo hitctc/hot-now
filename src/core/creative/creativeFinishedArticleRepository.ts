@@ -32,6 +32,12 @@ const SELECT_COLUMNS = `
   needs_manual_review,
   manual_review_reason,
   manual_review_reasons,
+  step_trace,
+  current_step,
+  stop_step,
+  reason_code,
+  reason_text,
+  deleted_at,
   wechat_theme_id,
   wechat_html,
   created_at,
@@ -67,6 +73,12 @@ type ArticleRow = {
   needs_manual_review: number;
   manual_review_reason: string | null;
   manual_review_reasons: string | null;
+  step_trace: string | null;
+  current_step: number | null;
+  stop_step: number | null;
+  reason_code: string | null;
+  reason_text: string | null;
+  deleted_at: string | null;
   wechat_theme_id: string | null;
   wechat_html: string | null;
   push_count: number;
@@ -126,6 +138,12 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     needsManualReview: row.needs_manual_review === 1,
     manualReviewReason: row.manual_review_reason ?? null,
     manualReviewReasons: row.manual_review_reasons ? JSON.parse(row.manual_review_reasons) : null,
+    stepTrace: row.step_trace ? JSON.parse(row.step_trace) : null,
+    currentStep: row.current_step ?? null,
+    stopStep: row.stop_step ?? null,
+    reasonCode: row.reason_code ?? null,
+    reasonText: row.reason_text ?? null,
+    deletedAt: row.deleted_at ?? null,
     wechatThemeId: row.wechat_theme_id,
     wechatHtml: row.wechat_html,
     pushCount: row.push_count ?? 0,
@@ -135,6 +153,19 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
 }
 
 // ── Public types ────────────────────────────────────────────────────────────
+
+// 写作流程单步追踪记录
+export type StepTraceEntry = {
+  step: number;
+  stepName: string;
+  status: string;
+  startedAt?: string;
+  finishedAt?: string;
+  durationMs?: number;
+  summary?: string;
+  error?: string;
+  meta?: Record<string, unknown>;
+};
 
 export type CreativeFinishedArticleRecord = {
   id: number;
@@ -165,6 +196,12 @@ export type CreativeFinishedArticleRecord = {
   needsManualReview: boolean;
   manualReviewReason: string | null;
   manualReviewReasons: string[] | null;
+  stepTrace: StepTraceEntry[] | null;
+  currentStep: number | null;
+  stopStep: number | null;
+  reasonCode: string | null;
+  reasonText: string | null;
+  deletedAt: string | null;
   wechatThemeId: string | null;
   wechatHtml: string | null;
   pushCount: number;
@@ -192,6 +229,11 @@ export type InsertCreativeFinishedArticleInput = {
   manualReviewReason?: string;
   manualReviewReasons?: string[];
   status?: string;
+  stepTrace?: StepTraceEntry[];
+  currentStep?: number;
+  stopStep?: number;
+  reasonCode?: string;
+  reasonText?: string;
 };
 
 export type EditCreativeFinishedArticleInput = {
@@ -220,6 +262,11 @@ export type EditCreativeFinishedArticleInput = {
   needsManualReview?: boolean;
   manualReviewReason?: string;
   manualReviewReasons?: string[];
+  stepTrace?: StepTraceEntry[];
+  currentStep?: number;
+  stopStep?: number;
+  reasonCode?: string;
+  reasonText?: string;
 };
 
 export type ListCreativeFinishedArticlesFilters = {
@@ -228,6 +275,7 @@ export type ListCreativeFinishedArticlesFilters = {
   status?: string;
   search?: string;
   publishable?: boolean;
+  includeDeleted?: boolean;
 };
 
 export type ListCreativeFinishedArticlesResult = {
@@ -263,10 +311,15 @@ export function insertCreativeFinishedArticle(
         needs_manual_review,
         manual_review_reason,
         manual_review_reasons,
+        step_trace,
+        current_step,
+        stop_step,
+        reason_code,
+        reason_text,
         status,
         raw_response_text
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
   ).run(
     input.sourceItemId,
@@ -286,6 +339,11 @@ export function insertCreativeFinishedArticle(
     input.needsManualReview ? 1 : 0,
     input.manualReviewReason ?? null,
     input.manualReviewReasons ? JSON.stringify(input.manualReviewReasons) : null,
+    input.stepTrace ? JSON.stringify(input.stepTrace) : null,
+    input.currentStep ?? null,
+    input.stopStep ?? null,
+    input.reasonCode ?? null,
+    input.reasonText ?? null,
     input.status ?? "generated",
     input.rawResponseText ?? null
   );
@@ -355,6 +413,11 @@ export function listCreativeFinishedArticles(
 
   if (filters.publishable === true) {
     whereClauses.push("publishable = 1");
+  }
+
+  // 默认排除已软删除的文章
+  if (filters.includeDeleted !== true) {
+    whereClauses.push("deleted_at IS NULL");
   }
 
   const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
@@ -494,6 +557,26 @@ export function editCreativeFinishedArticle(
     setClauses.push("manual_review_reasons = ?");
     params.push(JSON.stringify(input.manualReviewReasons));
   }
+  if (input.stepTrace !== undefined) {
+    setClauses.push("step_trace = ?");
+    params.push(JSON.stringify(input.stepTrace));
+  }
+  if (input.currentStep !== undefined) {
+    setClauses.push("current_step = ?");
+    params.push(input.currentStep);
+  }
+  if (input.stopStep !== undefined) {
+    setClauses.push("stop_step = ?");
+    params.push(input.stopStep);
+  }
+  if (input.reasonCode !== undefined) {
+    setClauses.push("reason_code = ?");
+    params.push(input.reasonCode);
+  }
+  if (input.reasonText !== undefined) {
+    setClauses.push("reason_text = ?");
+    params.push(input.reasonText);
+  }
 
   if (setClauses.length === 0) {
     return { ok: true };
@@ -533,4 +616,12 @@ export function togglePublishable(db: SqliteDatabase, id: number): CreativeFinis
   db.prepare("UPDATE creative_finished_articles SET publishable = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
     .run(next, id);
   return findCreativeFinishedArticleById(db, id);
+}
+
+// 软删除成品文章
+export function softDeleteFinishedArticle(db: SqliteDatabase, id: number): boolean {
+  const result = db.prepare(
+    "UPDATE creative_finished_articles SET deleted_at = datetime('now'), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL"
+  ).run(id);
+  return result.changes > 0;
 }

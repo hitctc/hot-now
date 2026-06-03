@@ -46,6 +46,19 @@ export type ArticleImageEntry = string | {
   alt?: string;
 };
 
+// 写作流程单步追踪
+export type StepTraceEntry = {
+  step: number;
+  stepName: string;
+  status: string;
+  startedAt?: string;
+  finishedAt?: string;
+  durationMs?: number;
+  summary?: string;
+  error?: string;
+  meta?: Record<string, unknown>;
+};
+
 export type CreativeFinishedArticle = {
   id: number;
   sourceItemId: number;
@@ -75,6 +88,12 @@ export type CreativeFinishedArticle = {
   needsManualReview: boolean;
   manualReviewReason: string | null;
   manualReviewReasons: string[] | null;
+  stepTrace: StepTraceEntry[] | null;
+  currentStep: number | null;
+  stopStep: number | null;
+  reasonCode: string | null;
+  reasonText: string | null;
+  deletedAt: string | null;
   wechatThemeId: string | null;
   wechatHtml: string | null;
   pushCount: number;
@@ -151,6 +170,7 @@ export function readCreativeFinishedArticles(params?: {
   status?: string;
   search?: string;
   publishable?: string;
+  includeDeleted?: string;
 }): Promise<FinishedArticleListResponse> {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
@@ -158,6 +178,7 @@ export function readCreativeFinishedArticles(params?: {
   if (params?.status) query.set("status", params.status);
   if (params?.search) query.set("search", params.search);
   if (params?.publishable) query.set("publishable", params.publishable);
+  if (params?.includeDeleted) query.set("includeDeleted", params.includeDeleted);
   const qs = query.toString();
   return requestJson<FinishedArticleListResponse>(`/api/creative/finished-articles${qs ? `?${qs}` : ""}`);
 }
@@ -183,6 +204,13 @@ export type MissingImagesResponse = {
   missingCover?: Array<{ prompt: string }>;
   missingInline?: Array<{ imageIndex: number; prompt: string }>;
 };
+
+// 软删除成品文章
+export function deleteFinishedArticle(id: number): Promise<{ ok: boolean }> {
+  return requestJson<{ ok: boolean }>(`/api/creative/finished-articles/${id}`, {
+    method: "DELETE"
+  });
+}
 
 export function fetchMissingImages(id: number): Promise<MissingImagesResponse> {
   return requestJson<MissingImagesResponse>(`/api/creative/finished-articles/${id}/missing-images`);

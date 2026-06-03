@@ -82,11 +82,16 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 
 const statusOptions = [
   { label: "全部状态", value: "" },
+  { label: "队列中", value: "queued" },
+  { label: "写作中", value: "writing" },
   { label: "已生成", value: "generated" },
   { label: "待审核", value: "needs_review" },
   { label: "可推送", value: "ready_for_publish" },
   { label: "已推送草稿", value: "wechat_draft" },
-  { label: "异常", value: "anomaly" }
+  { label: "审核不通过", value: "review_rejected" },
+  { label: "异常", value: "anomaly" },
+  { label: "已中止", value: "stopped" },
+  { label: "已失败", value: "failed" },
 ];
 
 // 发布状态切换操作锁
@@ -429,11 +434,16 @@ async function copyText(text: string): Promise<void> {
 // ─── 状态字典 ───
 
 const statusMap: Record<string, { label: string; color: string }> = {
+  queued: { label: "队列中", color: "default" },
+  writing: { label: "写作中", color: "processing" },
   generated: { label: "已生成", color: "blue" },
   needs_review: { label: "待审核", color: "orange" },
   ready_for_publish: { label: "可推送", color: "cyan" },
   wechat_draft: { label: "已推送草稿", color: "green" },
-  anomaly: { label: "异常", color: "red" }
+  review_rejected: { label: "审核不通过", color: "#666" },
+  anomaly: { label: "异常", color: "red" },
+  stopped: { label: "已中止", color: "default" },
+  failed: { label: "已失败", color: "red" },
 };
 
 function getStatusInfo(status: string): { label: string; color: string } {
@@ -527,6 +537,7 @@ const pagination = computed(() => ({
         row-key="id"
         data-article-table
         size="small"
+        :row-class-name="(record: CreativeFinishedArticle) => record.status === 'needs_review' ? 'review-highlight' : ''"
         @change="handleTableChange"
       >
         <template #bodyCell="{ column, record }">
@@ -588,8 +599,8 @@ const pagination = computed(() => ({
               <button
                 v-if="record.status === 'needs_review'"
                 class="text-[10px] text-editorial-link-active hover:underline"
-                @click="handleApproveArticle(record)"
-              >审核通过</button>
+                @click="openDetail(record)"
+              >去审核</button>
               <div v-if="record.status === 'needs_review' && record.anomalyReason" class="text-[10px] text-orange-600 line-clamp-1 max-w-[80px]">
                 <a-tooltip :title="record.anomalyReason" placement="topLeft">{{ record.anomalyReason }}</a-tooltip>
               </div>
@@ -843,6 +854,10 @@ const pagination = computed(() => ({
 </template>
 
 <style>
+/* needs_review 行高亮 */
+.review-highlight td {
+  background-color: #fffbe6 !important;
+}
 .source-item-detail-modal .ant-modal {
   top: 0;
   padding-bottom: 0;

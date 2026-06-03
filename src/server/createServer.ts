@@ -90,7 +90,8 @@ import {
   findCreativeFinishedArticleById,
   editCreativeFinishedArticle,
   toggleWechatPublished,
-  togglePublishable
+  togglePublishable,
+  softDeleteFinishedArticle
 } from "../core/creative/creativeFinishedArticleRepository.js";
 import {
   insertDailyDigest,
@@ -822,6 +823,11 @@ export function createServer(deps: ServerDeps = {}) {
       manualReviewReason: typeof body?.manualReviewReason === "string" ? body.manualReviewReason : undefined,
       manualReviewReasons: Array.isArray(body?.manualReviewReasons) ? body.manualReviewReasons as string[] : undefined,
       status: typeof body?.status === "string" ? body.status : undefined,
+      stepTrace: Array.isArray(body?.stepTrace) ? body.stepTrace as any[] : undefined,
+      currentStep: typeof body?.currentStep === "number" ? body.currentStep : undefined,
+      stopStep: typeof body?.stopStep === "number" ? body.stopStep : undefined,
+      reasonCode: typeof body?.reasonCode === "string" ? body.reasonCode : undefined,
+      reasonText: typeof body?.reasonText === "string" ? body.reasonText : undefined,
     });
 
     // 推送成品文章后，自动将素材写作状态标为 done
@@ -975,7 +981,8 @@ export function createServer(deps: ServerDeps = {}) {
       pageSize: query.pageSize ? parseInt(query.pageSize, 10) : undefined,
       status: query.status,
       search: query.search,
-      publishable: query.publishable === "1" ? true : undefined
+      publishable: query.publishable === "1" ? true : undefined,
+      includeDeleted: query.includeDeleted === "1" ? true : undefined
     });
 
     // 批量查询关联素材的 trendScore/trendBreakdown/publishedAt
@@ -1100,6 +1107,11 @@ export function createServer(deps: ServerDeps = {}) {
     if (body?.needsManualReview !== undefined) { editInput.needsManualReview = body.needsManualReview; updatedFields.push("needsManualReview"); }
     if (body?.manualReviewReason !== undefined) { editInput.manualReviewReason = body.manualReviewReason; updatedFields.push("manualReviewReason"); }
     if (body?.manualReviewReasons !== undefined) { editInput.manualReviewReasons = body.manualReviewReasons; updatedFields.push("manualReviewReasons"); }
+    if (body?.stepTrace !== undefined) { editInput.stepTrace = body.stepTrace; updatedFields.push("stepTrace"); }
+    if (body?.currentStep !== undefined) { editInput.currentStep = body.currentStep; updatedFields.push("currentStep"); }
+    if (body?.stopStep !== undefined) { editInput.stopStep = body.stopStep; updatedFields.push("stopStep"); }
+    if (body?.reasonCode !== undefined) { editInput.reasonCode = body.reasonCode; updatedFields.push("reasonCode"); }
+    if (body?.reasonText !== undefined) { editInput.reasonText = body.reasonText; updatedFields.push("reasonText"); }
 
     if (Object.keys(editInput).length > 0) {
       editCreativeFinishedArticle(db, id, editInput as any);
@@ -1161,6 +1173,24 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.code(404).send({ message: "Finished article not found", statusCode: 404 });
     }
     return reply.send({ ok: true, publishable: updated.publishable });
+  });
+
+  // 软删除成品文章
+  app.delete("/api/creative/finished-articles/:id", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const params = request.params as { id: string };
+    const id = parseInt(params.id, 10);
+    const deleted = softDeleteFinishedArticle(db, id);
+    if (!deleted) {
+      return reply.code(404).send({ ok: false, reason: "not-found-or-already-deleted" });
+    }
+    return reply.send({ ok: true });
   });
 
   // 查询文章缺失图片状态（代理 Hermes API）
@@ -1926,6 +1956,8 @@ export function createServer(deps: ServerDeps = {}) {
       titleIndex: typeof body?.titleIndex === "number" ? body.titleIndex : undefined,
       intros: Array.isArray(body?.intros) ? body.intros as string[] : undefined,
       introIndex: typeof body?.introIndex === "number" ? body.introIndex : undefined,
+      status: typeof body?.status === "string" ? body.status : undefined,
+      anomalyReason: typeof body?.anomalyReason === "string" ? body.anomalyReason : undefined,
     });
     if (!result.ok && result.reason === "article not found") {
       return reply.code(404).send({ ok: false, reason: "not-found" });

@@ -42,7 +42,7 @@
           <a-tooltip :mouse-enter-delay="0.5" title="保存正文内容到数据库">
             <a-button type="primary" :loading="saving" @click="handleSave">保存正文</a-button>
           </a-tooltip>
-          <a-button v-if="article.status === 'needs_review'" type="primary" @click="handleApproveReview">审核通过</a-button>
+          <a-button v-if="article.status === 'needs_review'" type="primary" @click="reviewModalVisible = true">审核</a-button>
           <a-tooltip v-if="canPush" :mouse-enter-delay="0.5" title="自动保存正文后推送到微信公众号草稿箱">
             <a-button type="primary" :loading="saving" @click="saveAndPush">推送到草稿箱</a-button>
           </a-tooltip>
@@ -279,6 +279,13 @@
           <div class="text-xs text-editorial-text-muted">未检测</div>
         </section>
 
+        <!-- 写作流程时间线 -->
+        <StepTraceTimeline
+          :step-trace="article?.stepTrace ?? null"
+          :stop-step="article?.stopStep"
+          :reason-text="article?.reasonText"
+        />
+
         <!-- 开头钩子（只读） -->
         <section v-if="parseJsonArray(article.hooks).length > 0">
           <div class="mb-2 flex items-center justify-between">
@@ -494,6 +501,15 @@
       </div>
     </Teleport>
   </a-modal>
+
+  <!-- 审核弹窗（独立于详情弹窗，z-index 更高） -->
+  <Teleport to="body">
+    <ArticleReviewModal
+      v-model:visible="reviewModalVisible"
+      :article="article"
+      @reviewed="handleReviewDone"
+    />
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -501,6 +517,8 @@ import { ref, watch, computed } from "vue";
 import { message, Modal } from "ant-design-vue";
 
 import ArticleMarkdownEditor from "./ArticleMarkdownEditor.vue";
+import StepTraceTimeline from "./StepTraceTimeline.vue";
+import ArticleReviewModal from "./ArticleReviewModal.vue";
 import {
   editFinishedArticle,
   regenCover,
@@ -852,6 +870,13 @@ function riskDimClass(level: string | undefined): string {
 const showRuleSegments = ref(false);
 const showLlmRiskPoints = ref(false);
 
+// 审核弹窗
+const reviewModalVisible = ref(false);
+
+function handleReviewDone(): void {
+  emit("saved");
+}
+
 // ─── 整篇重写 ───
 
 const regenArticleLoading = ref(false);
@@ -1137,19 +1162,6 @@ async function doSaveContent(content: string): Promise<void> {
     message.error("自动保存失败");
   } finally {
     saving.value = false;
-  }
-}
-
-async function handleApproveReview(): Promise<void> {
-  if (!props.article) return;
-  try {
-    const res = await editFinishedArticle(props.article.id, { status: "ready_for_publish" });
-    if (res.ok) {
-      message.success("已通过审核");
-      emit("saved");
-    }
-  } catch {
-    message.error("操作失败");
   }
 }
 

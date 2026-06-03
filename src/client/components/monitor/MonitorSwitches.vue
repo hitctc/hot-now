@@ -85,15 +85,21 @@ onMounted(() => refresh());
     </div>
 
     <a-spin :spinning="loading && Object.keys(switches).length === 0">
-      <div class="space-y-2">
+      <div class="space-y-1.5">
         <div
           v-for="def in switchDefs"
           :key="def.key"
-          class="flex items-center gap-3 rounded border border-editorial-border px-3 py-2"
+          class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5"
         >
-          <span class="w-36 text-xs font-medium text-editorial-text-body">{{ def.label }}</span>
+          <!-- 左侧：标题 + 说明 -->
+          <div class="min-w-0 flex-1">
+            <span class="text-xs font-medium text-editorial-text-body">{{ def.label }}</span>
+            <span class="ml-1.5 text-[10px] text-editorial-text-muted/70 truncate">{{ def.description }}</span>
+          </div>
 
-          <!-- on/off 开关 -->
+          <!-- 右侧：当前值 + 控件 -->
+          <span class="shrink-0 text-[10px] font-mono text-editorial-text-muted/60">{{ switches[def.key] ?? '-' }}</span>
+
           <a-switch
             v-if="def.type === 'onoff'"
             :checked="isOn(def.key)"
@@ -102,32 +108,27 @@ onMounted(() => refresh());
             @change="(checked: boolean) => saveSwitch(def.key, checked ? 'on' : 'off')"
           />
 
-          <!-- 数字输入 -->
           <a-input-number
             v-else-if="def.type === 'number'"
             :value="Number(switches[def.key] ?? 0)"
             :min="0"
             :step="1"
             size="small"
-            class="!w-24"
+            class="!w-20"
             :disabled="saving === def.key"
             @press-enter="(val: number) => saveSwitch(def.key, String(val))"
             @blur="(val: number) => { if (String(val) !== switches[def.key]) saveSwitch(def.key, String(val)); }"
           />
 
-          <!-- 下拉选择 -->
           <a-select
             v-else-if="def.type === 'select'"
             :value="switches[def.key] ?? ''"
             :options="def.options?.map(o => ({ value: o, label: o }))"
             size="small"
-            class="!w-36"
+            class="!w-28"
             :loading="saving === def.key"
             @change="(val: string) => saveSwitch(def.key, val)"
           />
-
-          <span class="flex-1 text-[11px] text-editorial-text-muted">{{ def.description }}</span>
-          <span class="shrink-0 text-[11px] font-mono text-editorial-text-muted">{{ switches[def.key] ?? '-' }}</span>
         </div>
       </div>
     </a-spin>

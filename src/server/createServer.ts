@@ -1541,6 +1541,44 @@ export function createServer(deps: ServerDeps = {}) {
     }
   });
 
+  // ─── Hermes 监控 API 代理 ───
+  // 统一鉴权 + 转发到 Hermes /api/monitor/*
+  const hermesMonitorProxy = async (request: any, reply: any, hermesPath: string, method: string = "GET") => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+    const hermesApiToken = process.env.HERMES_API_TOKEN;
+    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
+    try {
+      const fetchOpts: RequestInit = {
+        method,
+        headers: { "Authorization": `Bearer ${hermesApiToken}`, "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(15_000),
+      };
+      // GET 请求把 query string 原样传递
+      const qs = request.url.split("?")[1] || "";
+      const fullPath = `${hermesApiUrl.replace(/\/+$/, "")}${hermesPath}${qs ? `?${qs}` : ""}`;
+      if (method === "POST" && request.body) {
+        fetchOpts.body = JSON.stringify(request.body);
+      }
+      const res = await fetch(fullPath, fetchOpts);
+      const body = await res.text();
+      return reply.code(res.status).header("Content-Type", "application/json; charset=utf-8").send(body);
+    } catch (err) {
+      const errMessage = (err as Error).message ?? String(err);
+      return reply.code(502).send({ ok: false, reason: "Hermes 调用失败", detail: errMessage });
+    }
+  };
+
+  app.get("/api/monitor/stats", async (req, reply) => hermesMonitorProxy(req, reply, "/api/monitor/stats"));
+  app.get("/api/monitor/platform-stats", async (req, reply) => hermesMonitorProxy(req, reply, "/api/monitor/platform-stats"));
+  app.get("/api/monitor/runs-with-steps", async (req, reply) => hermesMonitorProxy(req, reply, "/api/monitor/runs-with-steps"));
+  app.get("/api/monitor/runs", async (req, reply) => hermesMonitorProxy(req, reply, "/api/monitor/runs"));
+  app.get("/api/monitor/runs/:id", async (req, reply) => hermesMonitorProxy(req, reply, `/api/monitor/runs/${(req.params as { id: string }).id}`));
+  app.get("/api/monitor/items", async (req, reply) => hermesMonitorProxy(req, reply, "/api/monitor/items"));
+  app.get("/api/monitor/switch/:key", async (req, reply) => hermesMonitorProxy(req, reply, `/api/monitor/switch/${(req.params as { key: string }).key}`));
+  app.post("/api/monitor/switch/:key", async (req, reply) => hermesMonitorProxy(req, reply, `/api/monitor/switch/${(req.params as { key: string }).key}`, "POST"));
+
   // ─── 素材库写文章：调用 Hermes write-article API，异步执行 ───
   app.post("/api/creative/source-items/:id/write-article", async (request, reply) => {
     const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");

@@ -47,7 +47,8 @@ const appShellPages: AppShellPage[] = [
     section: "system",
     description: "管理微信公众号 API 凭证，用于推送草稿到公众号草稿箱。"
   },
-  { path: "/settings/profile", title: "当前用户", section: "system", description: "这里会展示当前账号资料、角色和登录状态。" }
+  { path: "/settings/profile", title: "当前用户", section: "system", description: "这里会展示当前账号资料、角色和登录状态。" },
+  { path: "/monitor", title: "监控面板", section: "creative", description: "Hermes 管线运行状态、素材统计、写作队列和开关配置。" }
 ];
 
 // The server resolves shell pages from one canonical list so route registration and navigation stay in sync.

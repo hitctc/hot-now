@@ -132,7 +132,7 @@ const wechatMpSettingsPageMeta = {
 const monitorPageMeta = {
   key: "monitor",
   path: "/monitor",
-  section: "system",
+  section: "creative",
   navLabel: "监控面板",
   title: "监控面板",
   description: "Hermes 管线运行状态、素材统计、写作队列和开关配置。"
@@ -156,7 +156,6 @@ export const systemShellPageMetas = [
   sourcesPageMeta,
   // aiTimelineAdminPageMeta, // 暂时下架 AI 时间线 feed 管理（2026-05-17）
   viewRulesPageMeta,
-  monitorPageMeta,
   wechatMpSettingsPageMeta,
   profilePageMeta
 ] as const satisfies readonly ShellPageMeta[];

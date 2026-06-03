@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from "vue";
 import MonitorStatsCards from "../../components/monitor/MonitorStatsCards.vue";
-import MonitorPlatformStats from "../../components/monitor/MonitorPlatformStats.vue";
 import MonitorRunsTable from "../../components/monitor/MonitorRunsTable.vue";
 import MonitorItemsTable from "../../components/monitor/MonitorItemsTable.vue";
 import MonitorSwitches from "../../components/monitor/MonitorSwitches.vue";
@@ -38,10 +37,9 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="flex flex-col gap-6" data-page="monitor">
-    <!-- 顶部三列：今日统计 + 平台待处理 + 开关配置 -->
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+    <!-- 顶部两栏：左侧统计 + 右侧开关 -->
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <MonitorStatsCards />
-      <MonitorPlatformStats />
       <MonitorSwitches />
     </div>
 

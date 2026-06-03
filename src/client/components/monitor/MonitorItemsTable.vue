@@ -60,14 +60,14 @@ onMounted(() => load());
 
     <a-table
       :columns="[
-        { title: 'ID', dataIndex: 'id', width: 60 },
+        { title: 'ID', dataIndex: 'id', width: 50 },
         { title: '标题', dataIndex: 'title', ellipsis: true },
-        { title: '来源', dataIndex: 'source_name', width: 140, ellipsis: true },
-        { title: 'Agent', dataIndex: 'collector_agent', width: 70 },
-        { title: '评分', dataIndex: 'score', width: 56 },
-        { title: '趋势分', dataIndex: 'trend_score', width: 64 },
-        { title: '写作', dataIndex: 'writing_status', width: 64 },
-        { title: '采集时间', dataIndex: 'collected_at', width: 130 },
+        { title: '来源', dataIndex: 'source_name', width: 100, ellipsis: true },
+        { title: 'Agent', dataIndex: 'collector_agent', width: 60 },
+        { title: '评分', dataIndex: 'score', width: 48 },
+        { title: '趋势分', dataIndex: 'trend_score', width: 56 },
+        { title: '写作', dataIndex: 'writing_status', width: 56 },
+        { title: '采集时间', dataIndex: 'collected_at', width: 110 },
       ]"
       :data-source="items"
       :loading="loading"

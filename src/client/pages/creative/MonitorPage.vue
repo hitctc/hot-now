@@ -28,10 +28,11 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="flex flex-col gap-6" data-page="monitor">
-    <!-- 3.1 + 3.2 统计卡片 -->
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <!-- 顶部三列：今日统计 + 平台待处理 + 开关配置 -->
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <MonitorStatsCards />
       <MonitorPlatformStats />
+      <MonitorSwitches />
     </div>
 
     <!-- 3.7 写作队列状态 -->
@@ -65,8 +66,5 @@ onBeforeUnmount(() => {
 
     <!-- 3.5 素材列表 -->
     <MonitorItemsTable />
-
-    <!-- 3.6 开关配置 -->
-    <MonitorSwitches />
   </div>
 </template>

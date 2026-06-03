@@ -25,7 +25,12 @@
     <template #footer>
       <div v-if="article" class="article-detail-footer">
         <div class="article-detail-footer__left">
-          <a-dropdown v-if="article.sourceItemId">
+          <a-tooltip v-if="!pipelineOn" title="管线已紧急制动，请先恢复管线">
+            <a-dropdown disabled>
+              <a-button disabled>写文章</a-button>
+            </a-dropdown>
+          </a-tooltip>
+          <a-dropdown v-else-if="article.sourceItemId">
             <a-button>写文章</a-button>
             <template #overlay>
               <a-menu @click="handleWriteMenuClick">
@@ -521,6 +526,7 @@ import { message } from "ant-design-vue";
 import ArticleMarkdownEditor from "./ArticleMarkdownEditor.vue";
 import StepTraceTimeline from "./StepTraceTimeline.vue";
 import ArticleReviewModal from "./ArticleReviewModal.vue";
+import { usePipelineStatus } from "../../composables/usePipelineStatus.js";
 import {
   editFinishedArticle,
   regenCover,
@@ -547,6 +553,8 @@ const emit = defineEmits<{
   openSourceItem: [sourceItemId: number];
   openPush: [article: CreativeFinishedArticle, themeId: WechatThemeId];
 }>();
+
+const { pipelineOn } = usePipelineStatus();
 
 // ─── 正文全屏编辑 ───
 const editorFullscreen = ref(false);

@@ -1,61 +1,77 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { Modal, message } from "ant-design-vue";
-import { fetchMonitorStats } from "../../services/monitorApi.js";
-import { updateSwitch } from "../../services/monitorApi.js";
+import { fetchMonitorStats, updateSwitch } from "../../services/monitorApi.js";
+import { usePipelineStatus } from "../../composables/usePipelineStatus.js";
 
-type SwitchDef = {
-  key: string;
-  label: string;
-  type: "onoff" | "number" | "select";
-  options?: string[]; // select 类型的可选值
-  description: string;
-  confirmChange?: boolean; // 是否需要二次确认
-};
-
-const switchDefs: SwitchDef[] = [
-  { key: "pipeline", label: "管线总开关", type: "onoff", description: "控制自动管线是否按间隔运行", confirmChange: true },
-  { key: "draft_push", label: "草稿推送", type: "onoff", description: "控制成品文章是否自动推送草稿" },
-  { key: "auto_generate_images", label: "自动生图", type: "onoff", description: "控制是否自动生成封面/正文配图" },
-  { key: "image_provider", label: "图片服务商", type: "select", options: ["aitechflux", "packy", "nebula"], description: "切换图片生成服务商", confirmChange: true },
-  { key: "codex_image_task", label: "Codex 图片任务", type: "onoff", description: "控制 Codex 图片补全任务" },
-  { key: "trend_score_threshold", label: "趋势分阈值", type: "number", description: "趋势分 ≥ 此值才进入待写作队列" },
-  { key: "interval_pipeline", label: "管线间隔（分钟）", type: "number", description: "自动管线运行间隔" },
-  { key: "interval_codex_generate", label: "Codex 生成间隔（分钟）", type: "number", description: "Codex 任务生成间隔" },
-  { key: "interval_codex_consume", label: "Codex 消费间隔（分钟）", type: "number", description: "Codex 结果消费间隔" },
-];
+const { pipelineOn, writeOn, refresh: refreshGlobal } = usePipelineStatus();
 
 const switches = ref<Record<string, string>>({});
 const loading = ref(false);
 const saving = ref<string | null>(null);
-// 数值类输入的草稿值：改了但还没确认提交
-const draftNumbers = ref<Record<string, number>>({});
 
-// 某个数值开关是否有未保存的草稿
+// 三组开关定义
+const pipelineGroup = [
+  {
+    key: "pipeline",
+    label: "管线紧急制动",
+    type: "onoff" as const,
+    description: "关闭后采集、评分、写作全部停止",
+    confirmMessages: {
+      onToOff: { title: "紧急制动", content: "关闭管线后，采集、评分、写作将全部停止。正在写作的文章会被中止并回退。确认关闭？" },
+      offToOn: { title: "恢复管线", content: "管线将恢复运行，下一轮调度到来时正常执行。确认恢复？" },
+    },
+  },
+  {
+    key: "write",
+    label: "自动写作",
+    type: "onoff" as const,
+    description: "关闭后只暂停自动写作，采集评分照常；手动写作不受影响",
+    confirmMessages: {
+      onToOff: { title: "关闭自动写作", content: "自动写作将暂停，但采集和评分继续运行。手动写作不受影响。确认关闭？" },
+      offToOn: { title: "开启自动写作", content: "下一轮管线执行时将正常提交写作任务。确认开启？" },
+    },
+  },
+];
+
+const businessGroup = [
+  { key: "draft_push", label: "草稿推送", type: "onoff" as const, description: "控制成品文章是否标记为可推送" },
+  { key: "auto_generate_images", label: "自动生图", type: "onoff" as const, description: "当前关闭，需手动触发" },
+  { key: "codex_image_task", label: "Codex 图片任务", type: "onoff" as const, description: "控制 Codex 是否生成图片任务" },
+];
+
+const paramGroup = [
+  { key: "image_provider", label: "图片服务商", type: "select" as const, options: ["aitechflux", "packy", "nebula"], description: "图片生成服务商切换", confirmChange: true },
+  { key: "trend_score_threshold", label: "趋势分阈值", type: "number" as const, description: "≥ 此值的素材进入待写作队列" },
+  { key: "interval_pipeline", label: "管线间隔（分钟）", type: "number" as const, description: "自动运行间隔" },
+  { key: "interval_codex_generate", label: "Codex 生成间隔（分钟）", type: "number" as const, description: "Codex 任务生成间隔" },
+  { key: "interval_codex_consume", label: "Codex 消费间隔（分钟）", type: "number" as const, description: "Codex 结果消费间隔" },
+];
+
+type SwitchDef = { key: string; confirmChange?: boolean; confirmMessages?: Record<string, { title: string; content: string }> };
+const allDefs = [...pipelineGroup, ...businessGroup, ...paramGroup] as SwitchDef[];
+
+// 状态摘要
+const statusSummary = computed(() => {
+  if (!pipelineOn.value) return { text: "⚠️ 管线已紧急制动，所有流程已停止", type: "warning" as const };
+  if (!writeOn.value) return { text: "自动写作已暂停，采集评分正常运行", type: "info" as const };
+  return { text: "管线正常运行中", type: "success" as const };
+});
+
+// 数值草稿
+const draftNumbers = ref<Record<string, number>>({});
 function hasDraft(key: string): boolean {
   if (switches.value[key] == null) return false;
   return draftNumbers.value[key] != null && draftNumbers.value[key] !== Number(switches.value[key]);
 }
-
-// 编辑数值时只写入草稿，不立即提交
 function onNumberInput(key: string, val: number | null): void {
   if (val == null) return;
   draftNumbers.value = { ...draftNumbers.value, [key]: val };
 }
-
-// 确认提交数值草稿
 async function confirmNumber(key: string): Promise<void> {
   const val = draftNumbers.value[key];
   if (val == null) return;
   await saveSwitch(key, String(val));
-  // 清除草稿（saveSwitch 成功后会 refresh 重建 switches）
-  const next = { ...draftNumbers.value };
-  delete next[key];
-  draftNumbers.value = next;
-}
-
-// 取消数值草稿
-function cancelNumber(key: string): void {
   const next = { ...draftNumbers.value };
   delete next[key];
   draftNumbers.value = next;
@@ -66,21 +82,40 @@ async function refresh(): Promise<void> {
   try {
     const stats = await fetchMonitorStats();
     switches.value = stats.switches;
+    pipelineOn.value = stats.switches.pipeline === "on";
+    writeOn.value = stats.switches.write === "on";
   } catch { /* 静默 */ }
   finally { loading.value = false; }
 }
 
 async function saveSwitch(key: string, value: string): Promise<void> {
-  const def = switchDefs.find(d => d.key === key);
-  if (!def) return;
+  const def = allDefs.find(d => d.key === key);
+  saving.value = key;
+  try {
+    await updateSwitch(key, value);
+    message.success("已更新");
+    await refresh();
+    refreshGlobal();
+  } catch (err: unknown) {
+    const errMsg = (err as { body?: { error?: string } })?.body?.error ?? "修改失败";
+    message.error(errMsg);
+  } finally {
+    saving.value = null;
+  }
+}
 
-  // 需要二次确认的开关
-  if (def.confirmChange) {
+// onoff 开关切换：带条件二次确认
+async function handleSwitchChange(key: string, checked: boolean): Promise<void> {
+  const value = checked ? "on" : "off";
+  const def = allDefs.find(d => d.key === key) as SwitchDef & { confirmMessages?: Record<string, { title: string; content: string }> };
+
+  if (def?.confirmMessages) {
+    const msgKey = checked ? "offToOn" : "onToOff";
     const confirmed = await new Promise<boolean>(resolve => {
       Modal.confirm({
-        title: `确认修改「${def.label}」？`,
-        content: `将 ${key} 从 ${switches.value[key] ?? '-'} 改为 ${value}。${def.description}`,
-        okText: "确认修改",
+        title: def.confirmMessages![msgKey]?.title ?? "确认操作",
+        content: def.confirmMessages![msgKey]?.content ?? `确认修改？`,
+        okText: "确认",
         cancelText: "取消",
         onOk: () => resolve(true),
         onCancel: () => resolve(false),
@@ -89,17 +124,30 @@ async function saveSwitch(key: string, value: string): Promise<void> {
     if (!confirmed) return;
   }
 
-  saving.value = key;
-  try {
-    await updateSwitch(key, value);
-    message.success(`${def.label} 已更新为 ${value}`);
-    await refresh();
-  } catch (err: unknown) {
-    const errMsg = (err as { body?: { error?: string } })?.body?.error ?? "修改失败";
-    message.error(errMsg);
-  } finally {
-    saving.value = null;
+  if (key === "image_provider" && def?.confirmChange) {
+    // image_provider 的 confirmChange 由 select 的 @change 触发，走另一条路径
   }
+
+  await saveSwitch(key, value);
+}
+
+// select 切换（image_provider 单独处理）
+async function handleSelectChange(key: string, value: string): Promise<void> {
+  const def = allDefs.find(d => d.key === key);
+  if (def?.confirmChange) {
+    const confirmed = await new Promise<boolean>(resolve => {
+      Modal.confirm({
+        title: "切换图片服务商",
+        content: `图片生成将切换为 ${value}，可能影响图片风格。确认切换？`,
+        okText: "确认切换",
+        cancelText: "取消",
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      });
+    });
+    if (!confirmed) return;
+  }
+  await saveSwitch(key, value);
 }
 
 function isOn(key: string): boolean {
@@ -117,30 +165,70 @@ onMounted(() => refresh());
     </div>
 
     <a-spin :spinning="loading && Object.keys(switches).length === 0">
-      <div class="space-y-1.5">
-        <div
-          v-for="def in switchDefs"
-          :key="def.key"
-          class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5"
-        >
-          <!-- 左侧：标题 + 说明 -->
+      <!-- 状态摘要 -->
+      <a-alert :type="statusSummary.type" :message="statusSummary.text" show-icon class="!mb-3 !py-1.5 !text-xs" />
+
+      <!-- 第一组：管线控制 -->
+      <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">管线控制</div>
+      <div class="mb-3 space-y-1.5">
+        <div v-for="def in pipelineGroup" :key="def.key" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5">
           <div class="min-w-0 flex-1">
             <span class="text-xs font-medium text-editorial-text-body">{{ def.label }}</span>
-            <span class="ml-1.5 text-[10px] text-editorial-text-muted/70 truncate">{{ def.description }}</span>
+            <span class="ml-1 text-[10px] text-editorial-text-muted/70">{{ def.description }}</span>
           </div>
-
-          <!-- 右侧：当前值 + 控件 -->
           <span class="shrink-0 text-[10px] font-mono text-editorial-text-muted/60">{{ switches[def.key] ?? '-' }}</span>
-
           <a-switch
             v-if="def.type === 'onoff'"
             :checked="isOn(def.key)"
             :loading="saving === def.key"
+            :disabled="def.key === 'write' && !pipelineOn"
             size="small"
-            @change="(checked: boolean) => saveSwitch(def.key, checked ? 'on' : 'off')"
+            @change="(checked: boolean) => handleSwitchChange(def.key, checked)"
+          />
+        </div>
+        <div v-if="!pipelineOn" class="pl-2 text-[10px] text-orange-500">管线已紧急制动，write 开关不可操作。请先恢复管线。</div>
+      </div>
+
+      <!-- 第二组：业务开关 -->
+      <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">业务开关</div>
+      <div class="mb-3 space-y-1.5">
+        <div v-for="def in businessGroup" :key="def.key" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5">
+          <div class="min-w-0 flex-1">
+            <span class="text-xs font-medium text-editorial-text-body">{{ def.label }}</span>
+            <span class="ml-1 text-[10px] text-editorial-text-muted/70">{{ def.description }}</span>
+          </div>
+          <span class="shrink-0 text-[10px] font-mono text-editorial-text-muted/60">{{ switches[def.key] ?? '-' }}</span>
+          <a-switch
+            :checked="isOn(def.key)"
+            :loading="saving === def.key"
+            size="small"
+            @change="(checked: boolean) => handleSwitchChange(def.key, checked)"
+          />
+        </div>
+      </div>
+
+      <!-- 第三组：参数配置 -->
+      <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">参数配置</div>
+      <div class="space-y-1.5">
+        <div v-for="def in paramGroup" :key="def.key" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5">
+          <div class="min-w-0 flex-1">
+            <span class="text-xs font-medium text-editorial-text-body">{{ def.label }}</span>
+            <span class="ml-1 text-[10px] text-editorial-text-muted/70">{{ def.description }}</span>
+          </div>
+          <span class="shrink-0 text-[10px] font-mono text-editorial-text-muted/60">{{ switches[def.key] ?? '-' }}</span>
+
+          <!-- select -->
+          <a-select
+            v-if="def.type === 'select'"
+            :value="switches[def.key] ?? ''"
+            :options="def.options?.map(o => ({ value: o, label: o }))"
+            size="small"
+            class="!w-28"
+            :loading="saving === def.key"
+            @change="(val: string) => handleSelectChange(def.key, val)"
           />
 
-          <!-- 数值输入：有草稿时显示确认/取消按钮 -->
+          <!-- number -->
           <template v-else-if="def.type === 'number'">
             <a-input-number
               :value="hasDraft(def.key) ? draftNumbers[def.key] : Number(switches[def.key] ?? 0)"
@@ -158,16 +246,6 @@ onMounted(() => refresh());
               @click="confirmNumber(def.key)"
             >确认</button>
           </template>
-
-          <a-select
-            v-else-if="def.type === 'select'"
-            :value="switches[def.key] ?? ''"
-            :options="def.options?.map(o => ({ value: o, label: o }))"
-            size="small"
-            class="!w-28"
-            :loading="saving === def.key"
-            @change="(val: string) => saveSwitch(def.key, val)"
-          />
         </div>
       </div>
     </a-spin>

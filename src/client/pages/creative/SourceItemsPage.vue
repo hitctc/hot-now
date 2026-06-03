@@ -3,6 +3,7 @@ import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { message } from "ant-design-vue";
 
 import { HttpError } from "../../services/http.js";
+import { usePipelineStatus } from "../../composables/usePipelineStatus.js";
 import { useSearchHistory } from "../../composables/useSearchHistory.js";
 import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
 
@@ -40,6 +41,7 @@ const searchText = ref(saved.search || "");
 
 // 搜索历史
 const { history: searchHistory, addToHistory, removeFromHistory } = useSearchHistory("creative-source-search-history");
+const { pipelineOn } = usePipelineStatus();
 const searchDropdownRef = ref<HTMLElement | null>(null);
 const showSearchDropdown = ref(false);
 
@@ -585,7 +587,11 @@ const pagination = computed(() => ({
 
           <!-- 写文章列 -->
           <template v-else-if="column.key === 'quickCopy'">
+            <a-tooltip v-if="!pipelineOn" title="管线已紧急制动，请先恢复管线">
+              <a-button type="link" size="small" class="!p-0 !text-[11px]" disabled>写文章</a-button>
+            </a-tooltip>
             <a-button
+              v-else
               type="link"
               size="small"
               class="!p-0 !text-[11px]"

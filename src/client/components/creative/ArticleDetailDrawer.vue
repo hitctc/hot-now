@@ -27,7 +27,7 @@
         <!-- 第一组：编辑操作（直接生效） -->
         <div class="article-detail-footer__group footer-group--edit">
           <a-tooltip :mouse-enter-delay="0.5" title="保存正文内容到数据库">
-            <a-button type="primary" :loading="saving" @click="handleSave">保存</a-button>
+            <a-button :loading="saving" @click="handleSave">保存</a-button>
           </a-tooltip>
           <a-tooltip :mouse-enter-delay="0.5" title="按选定主题渲染后复制到剪贴板，可粘贴到公众号编辑器">
             <a-button :loading="wechatCopying" @click="copyAsWechatFormat">复制格式</a-button>
@@ -36,7 +36,7 @@
 
         <div class="article-detail-footer__divider" />
 
-        <!-- 第二组：内容生成（触发生成流程） -->
+        <!-- 第二组：内容生成（触发写作管线） -->
         <div class="article-detail-footer__group footer-group--generate">
           <a-tooltip v-if="!pipelineOn" title="管线已紧急制动，请先恢复管线">
             <a-dropdown disabled>
@@ -54,26 +54,26 @@
               </a-menu>
             </template>
           </a-dropdown>
-          <a-button @click="imageActionVisible = true">手动生图</a-button>
-          <a-button v-if="canRepairImagePrompts" :loading="repairingPrompts" @click="handleRepairImagePrompts">修复提示词</a-button>
         </div>
 
         <div class="article-detail-footer__divider" />
 
-        <!-- 第三组：状态流转（二次确认） -->
+        <!-- 第三组：弹窗确认（二次操作） -->
         <div class="article-detail-footer__group footer-group--flow">
-          <a-button v-if="article.status === 'needs_review'" type="primary" @click="reviewModalVisible = true">审核</a-button>
+          <a-button @click="imageActionVisible = true">手动生图</a-button>
+          <a-button v-if="canRepairImagePrompts" :loading="repairingPrompts" @click="handleRepairImagePrompts">修复提示词</a-button>
+          <a-button v-if="article.status === 'needs_review'" @click="reviewModalVisible = true">审核</a-button>
           <a-button v-if="getAvailableActions(article).some(a => a.type === 'mark_publishable')" @click="handleDetailMarkPublishable">标记可推送</a-button>
           <a-tooltip v-else-if="getAvailableActions(article).some(a => a.type === 'mark_publishable_disabled')" :title="getAvailableActions(article).find(a => a.type === 'mark_publishable_disabled')!.missing.join('、')">
             <a-button disabled>不可推送</a-button>
           </a-tooltip>
           <a-button v-if="getAvailableActions(article).some(a => a.type === 'cancel_publishable')" @click="handleDetailCancelPublishable">取消推送</a-button>
           <a-tooltip v-if="canPush" :mouse-enter-delay="0.5" title="自动保存正文后推送到微信公众号草稿箱">
-            <a-button type="primary" :loading="saving" @click="saveAndPush">推送草稿箱</a-button>
+            <a-button :loading="saving" @click="saveAndPush">推送草稿箱</a-button>
           </a-tooltip>
           <a-tooltip v-else-if="article.status !== 'needs_review'" :mouse-enter-delay="0.3">
             <template #title>{{ missingConditions.join('；') }}</template>
-            <a-button type="primary" disabled>推送草稿箱</a-button>
+            <a-button disabled>推送草稿箱</a-button>
           </a-tooltip>
         </div>
       </div>
@@ -1638,40 +1638,34 @@ async function handleDetailCancelPublishable(): Promise<void> {
   flex-shrink: 0;
 }
 
-/* 第一组：编辑操作 — 蓝色系（保持 AntD primary 默认） */
-.footer-group--edit .ant-btn-primary {
-  /* 保持默认蓝色 */
+/* 第一组：编辑操作 — 蓝色线框 */
+.footer-group--edit .ant-btn:not(:disabled) {
+  color: #1677ff;
+  border-color: #1677ff;
+}
+.footer-group--edit .ant-btn:not(:disabled):hover {
+  color: #4096ff;
+  border-color: #4096ff;
 }
 
-/* 第二组：内容生成 — 紫色系 */
-.footer-group--generate .ant-btn:not(:disabled):not(.ant-btn-primary) {
+/* 第二组：内容生成 — 紫色线框 */
+.footer-group--generate .ant-btn:not(:disabled) {
   color: #722ed1;
-  border-color: #d3adf7;
-}
-.footer-group--generate .ant-btn:not(:disabled):not(.ant-btn-primary):hover {
-  color: #531dab;
-  border-color: #b37feb;
-}
-.footer-group--generate .ant-btn.ant-btn-primary {
-  background: #722ed1;
   border-color: #722ed1;
 }
+.footer-group--generate .ant-btn:not(:disabled):hover {
+  color: #9254de;
+  border-color: #9254de;
+}
 
-/* 第三组：状态流转 — 绿色系 */
-.footer-group--flow .ant-btn:not(:disabled):not(.ant-btn-primary) {
+/* 第三组：弹窗确认 — 绿色线框 */
+.footer-group--flow .ant-btn:not(:disabled) {
   color: #389e0d;
-  border-color: #b7eb8f;
-}
-.footer-group--flow .ant-btn:not(:disabled):not(.ant-btn-primary):hover {
-  color: #237804;
-  border-color: #95de64;
-}
-.footer-group--flow .ant-btn.ant-btn-primary {
-  background: #389e0d;
   border-color: #389e0d;
 }
-.footer-group--flow .ant-btn.ant-btn-primary:hover {
-  background: #237804;
+.footer-group--flow .ant-btn:not(:disabled):hover {
+  color: #52c41a;
+  border-color: #52c41a;
 }
 
 .article-editor-wrapper {

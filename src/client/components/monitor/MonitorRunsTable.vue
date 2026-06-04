@@ -72,6 +72,27 @@ function parseDetail(raw: string): string {
   }
 }
 
+// 从 detail JSON 提取步骤处理条数
+// 各步骤的计数字段不同：采集→created, RSS采集→created, 去重→total_new, 评分→scored, 写作→submitted, 标记可推送→marked
+// 回退逻辑：如果有 items 数组，取 items.length
+function getStepCount(detailRaw: string): number | null {
+  if (!detailRaw) return null;
+  try {
+    const obj = JSON.parse(detailRaw);
+    if (typeof obj !== "object" || Array.isArray(obj)) return null;
+    // 有 items 数组时优先用 items.length
+    if (Array.isArray(obj.items)) return obj.items.length;
+    // 按常见字段名取值
+    const countKeys = ["created", "scored", "submitted", "marked", "total_new"];
+    for (const key of countKeys) {
+      if (typeof obj[key] === "number") return obj[key];
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 const statusColorMap: Record<string, string> = {
   done: "green",
   error: "red",
@@ -126,6 +147,7 @@ onMounted(() => load());
               <span class="shrink-0 text-xs text-editorial-text-body w-20">{{ step.step_name }}</span>
               <a-tag :color="statusColorMap[step.status] ?? 'default'" class="!m-0 !text-[11px] !py-0 shrink-0">{{ step.status }}</a-tag>
               <span class="shrink-0 text-[11px] text-editorial-text-muted w-12">{{ stepDuration(step.started_at, step.finished_at) }}</span>
+              <span v-if="getStepCount(step.detail) != null" class="shrink-0 text-[11px] font-medium text-editorial-text-body">{{ getStepCount(step.detail) }}条</span>
               <div v-if="step.detail" class="min-w-0 flex-1">
                 <details>
                   <summary class="cursor-pointer text-[11px] text-editorial-link-active">详情</summary>

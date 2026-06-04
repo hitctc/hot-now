@@ -22,6 +22,18 @@ const emit = defineEmits<{
   done: [];
 }>();
 
+// 安全解析 titles 字段（可能是 JSON 字符串、已解析数组或 null）
+function parseFirstTitle(raw: string | null): string {
+  if (!raw) return "";
+  if (Array.isArray(raw)) return raw[0] ?? "";
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed[0] ?? "" : "";
+  } catch { return ""; }
+}
+
+const firstTitle = computed(() => parseFirstTitle(props.article?.titles ?? null));
+
 // ─── 流程选择 ───
 
 type Flow = "provider" | "codex";
@@ -163,7 +175,7 @@ const flowOptions = [
       <!-- 文章信息 -->
       <div class="text-xs text-editorial-text-muted">
         文章 #{{ article.id }}
-        <span v-if="article.titles" class="ml-1">{{ JSON.parse(article.titles)[0] ?? '' }}</span>
+        <span v-if="firstTitle" class="ml-1">{{ firstTitle }}</span>
       </div>
 
       <!-- 缺图提示 -->

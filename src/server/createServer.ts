@@ -823,6 +823,7 @@ export function createServer(deps: ServerDeps = {}) {
       manualReviewReason: typeof body?.manualReviewReason === "string" ? body.manualReviewReason : undefined,
       manualReviewReasons: Array.isArray(body?.manualReviewReasons) ? body.manualReviewReasons as string[] : undefined,
       status: typeof body?.status === "string" ? body.status : undefined,
+      anomalyReason: typeof body?.anomalyReason === "string" ? body.anomalyReason : undefined,
       stepTrace: Array.isArray(body?.stepTrace) ? body.stepTrace as any[] : undefined,
       currentStep: typeof body?.currentStep === "number" ? body.currentStep : undefined,
       stopStep: typeof body?.stopStep === "number" ? body.stopStep : undefined,

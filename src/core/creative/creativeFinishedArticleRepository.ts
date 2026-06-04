@@ -229,6 +229,7 @@ export type InsertCreativeFinishedArticleInput = {
   manualReviewReason?: string;
   manualReviewReasons?: string[];
   status?: string;
+  anomalyReason?: string;
   stepTrace?: StepTraceEntry[];
   currentStep?: number;
   stopStep?: number;
@@ -317,9 +318,10 @@ export function insertCreativeFinishedArticle(
         reason_code,
         reason_text,
         status,
+        anomaly_reason,
         raw_response_text
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
   ).run(
     input.sourceItemId,
@@ -345,6 +347,7 @@ export function insertCreativeFinishedArticle(
     input.reasonCode ?? null,
     input.reasonText ?? null,
     input.status ?? "generated",
+    input.anomalyReason ?? null,
     input.rawResponseText ?? null
   );
 

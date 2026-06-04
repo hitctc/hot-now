@@ -151,7 +151,7 @@ onMounted(() => load());
               <div v-if="step.detail" class="min-w-0 flex-1">
                 <details>
                   <summary class="cursor-pointer text-[11px] text-editorial-link-active">详情</summary>
-                  <pre class="mt-1 max-h-32 overflow-auto whitespace-pre-wrap text-[11px] text-editorial-text-muted">{{ parseDetail(step.detail) }}</pre>
+                  <pre class="mt-1 max-h-40 overflow-y-scroll whitespace-pre-wrap monitor-runs-detail-pre text-[11px] text-editorial-text-muted">{{ parseDetail(step.detail) }}</pre>
                 </details>
               </div>
             </div>
@@ -166,3 +166,18 @@ onMounted(() => load());
     </div>
   </section>
 </template>
+
+<style>
+/* 强制显示滚动条，让用户感知内容可滚动 */
+.monitor-runs-detail-pre::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.monitor-runs-detail-pre::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 2px;
+}
+.monitor-runs-detail-pre::-webkit-scrollbar-track {
+  background: #f0f0f0;
+}
+</style>

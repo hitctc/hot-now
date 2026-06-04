@@ -77,7 +77,7 @@ export function getAvailableActions(article: CreativeFinishedArticle): ArticleAc
   const status = article.status;
   const actions: ArticleAction[] = [];
 
-  if (status === "queued" || status === "anomaly") {
+  if (status === "queued" || status === "generated" || status === "anomaly") {
     const { qualified } = checkPublishConditions(article);
     if (qualified) {
       actions.push({ type: "mark_publishable", label: "标记可推送" });

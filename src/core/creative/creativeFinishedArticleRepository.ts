@@ -449,6 +449,7 @@ export function listCreativeFinishedArticles(
 /** 合法状态转换表：[fromStatus, toStatus] → 前置条件 key */
 const STATUS_TRANSITIONS: Record<string, Record<string, "publish_conditions" | "none">> = {
   queued:            { ready_for_publish: "publish_conditions" },
+  generated:         { ready_for_publish: "publish_conditions" },
   ready_for_publish: { generated: "none", wechat_draft: "none" },
   needs_review:      { ready_for_publish: "none", soft_deleted: "none" },
   anomaly:           { ready_for_publish: "publish_conditions" },

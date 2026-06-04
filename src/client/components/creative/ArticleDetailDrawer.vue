@@ -42,6 +42,7 @@
             </template>
           </a-dropdown>
           <a-button @click="imageActionVisible = true">手动生图</a-button>
+          <a-button v-if="canRepairImagePrompts" :loading="repairingPrompts" @click="handleRepairImagePrompts">重试生成图片提示词</a-button>
         </div>
         <div class="article-detail-footer__right">
           <a-tooltip :mouse-enter-delay="0.5" title="将当前正文按选定主题渲染后复制到剪贴板，可粘贴到公众号编辑器">
@@ -546,6 +547,7 @@ import {
   regenIntro,
   regenInlineImage,
   writeSourceItemArticle,
+  repairImagePrompts,
   parseArticleImages,
   extractImageUrl,
   type CreativeFinishedArticle,
@@ -567,6 +569,40 @@ const emit = defineEmits<{
 }>();
 
 const { pipelineOn } = usePipelineStatus();
+
+// ─── 重试生成图片提示词 ───
+
+const IMAGE_PROMPT_ANOMALY_PREFIXES = [
+  "image_prompt_missing",
+  "image_prompt_count_mismatch",
+  "image_prompt_parse_failed",
+];
+
+/** 判断当前文章是否为图片提示词异常，可以重试 */
+const canRepairImagePrompts = computed(() => {
+  if (!props.article?.anomalyReason) return false;
+  return IMAGE_PROMPT_ANOMALY_PREFIXES.some(p => props.article!.anomalyReason!.startsWith(p));
+});
+
+const repairingPrompts = ref(false);
+
+async function handleRepairImagePrompts(): Promise<void> {
+  if (!props.article) return;
+  repairingPrompts.value = true;
+  try {
+    const res = await repairImagePrompts(props.article.id);
+    if (res.ok) {
+      message.success("图片提示词修复成功");
+      emit("saved");
+    } else {
+      message.error(res.error ?? "修复失败");
+    }
+  } catch {
+    message.error("修复请求失败");
+  } finally {
+    repairingPrompts.value = false;
+  }
+}
 
 // ─── 正文全屏编辑 ───
 const editorFullscreen = ref(false);

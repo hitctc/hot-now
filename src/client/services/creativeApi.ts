@@ -532,6 +532,13 @@ export function writeSourceItemArticle(id: number, mode?: string): Promise<Write
   });
 }
 
+/** 修复图片提示词（代理 Hermes repair-image-prompts） */
+export function repairImagePrompts(articleId: number): Promise<{ ok: boolean; error?: string }> {
+  return requestJson(`/api/creative/finished-articles/${articleId}/repair-image-prompts`, {
+    method: "POST",
+  });
+}
+
 // ─── 写作队列状态 ───
 
 export type WriteQueueTask = {

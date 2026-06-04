@@ -636,6 +636,7 @@ const REVIEW_REASON_MAP: Record<string, string> = {
   originality_risk_high: "原创风险过高（originality_risk_high）",
   similarity_high: "相似度过高（similarity_high）",
   first_person_risk: "第一人称风险（first_person_risk）",
+  c_mode_word_count_insufficient: "C 模式字数不足（c_mode_word_count_insufficient）",
 };
 
 /** 异常原因中文翻译 + 英文原文 */
@@ -967,6 +968,7 @@ const manualReviewReasonText = computed(() => {
   if (reason === "originality_risk_high") return "原创风险过高";
   if (reason === "similarity_high") return "相似度过高";
   if (reason === "first_person_risk") return "第一人称风险";
+  if (reason === "c_mode_word_count_insufficient") return "C 模式字数不足";
   return reason ?? "";
 });
 

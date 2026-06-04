@@ -10,7 +10,21 @@ const switches = ref<Record<string, string>>({});
 const loading = ref(false);
 const saving = ref<string | null>(null);
 
-// 三组开关定义
+// 当前图片生成模式
+const imageMode = computed(() => switches.value.image_gen_mode ?? "codex-auto");
+const isProviderMode = computed(() => imageMode.value.startsWith("provider"));
+// 只读生效时间
+const providerAutoSince = computed(() => switches.value.provider_auto_since ?? "");
+const codexAutoSince = computed(() => switches.value.codex_auto_since ?? "");
+
+const imageModeOptions = [
+  { value: "provider-auto", label: "服务商自动" },
+  { value: "provider-manual", label: "服务商手动" },
+  { value: "codex-auto", label: "Codex 自动" },
+  { value: "codex-manual", label: "Codex 手动" },
+];
+
+// 第一组：管线控制
 const pipelineGroup = [
   {
     key: "pipeline",
@@ -34,14 +48,15 @@ const pipelineGroup = [
   },
 ];
 
+// 第二组：业务开关（隐藏旧开关 auto_generate_images / codex_image_task）
 const businessGroup = [
   { key: "draft_push", label: "草稿推送", type: "onoff" as const, description: "控制成品文章是否标记为可推送" },
-  { key: "auto_generate_images", label: "自动生图", type: "onoff" as const, description: "当前关闭，需手动触发" },
-  { key: "codex_image_task", label: "Codex 图片任务", type: "onoff" as const, description: "控制 Codex 是否生成图片任务" },
 ];
 
+// 第三组：参数配置（image_gen_mode + image_provider 联动 + 只读时间戳）
 const paramGroup = [
-  { key: "image_provider", label: "图片服务商", type: "select" as const, options: ["aitechflux", "packy", "nebula"], description: "图片生成服务商切换", confirmChange: true },
+  { key: "image_gen_mode", label: "图片生成模式", type: "select" as const, options: imageModeOptions, description: "控制图片由谁生成、何时生成", confirmChange: true },
+  { key: "image_provider", label: "图片服务商", type: "select" as const, options: ["aitechflux", "packy", "nebula"], description: "仅在 provider 模式下生效", confirmChange: true },
   { key: "trend_score_threshold", label: "趋势分阈值", type: "number" as const, description: "≥ 此值的素材进入待写作队列" },
   { key: "interval_pipeline", label: "管线间隔（分钟）", type: "number" as const, description: "自动运行间隔" },
   { key: "interval_codex_generate", label: "Codex 生成间隔（分钟）", type: "number" as const, description: "Codex 任务生成间隔" },
@@ -89,7 +104,6 @@ async function refresh(): Promise<void> {
 }
 
 async function saveSwitch(key: string, value: string): Promise<void> {
-  const def = allDefs.find(d => d.key === key);
   saving.value = key;
   try {
     await updateSwitch(key, value);
@@ -104,45 +118,45 @@ async function saveSwitch(key: string, value: string): Promise<void> {
   }
 }
 
-// onoff 开关切换：带条件二次确认
+// onoff 切换
 async function handleSwitchChange(key: string, checked: boolean): Promise<void> {
   const value = checked ? "on" : "off";
   const def = allDefs.find(d => d.key === key) as SwitchDef & { confirmMessages?: Record<string, { title: string; content: string }> };
-
   if (def?.confirmMessages) {
     const msgKey = checked ? "offToOn" : "onToOff";
     const confirmed = await new Promise<boolean>(resolve => {
       Modal.confirm({
         title: def.confirmMessages![msgKey]?.title ?? "确认操作",
-        content: def.confirmMessages![msgKey]?.content ?? `确认修改？`,
-        okText: "确认",
-        cancelText: "取消",
-        onOk: () => resolve(true),
-        onCancel: () => resolve(false),
+        content: def.confirmMessages![msgKey]?.content ?? "确认修改？",
+        okText: "确认", cancelText: "取消",
+        onOk: () => resolve(true), onCancel: () => resolve(false),
       });
     });
     if (!confirmed) return;
   }
-
-  if (key === "image_provider" && def?.confirmChange) {
-    // image_provider 的 confirmChange 由 select 的 @change 触发，走另一条路径
-  }
-
   await saveSwitch(key, value);
 }
 
-// select 切换（image_provider 单独处理）
+// select 切换（image_gen_mode / image_provider）
 async function handleSelectChange(key: string, value: string): Promise<void> {
   const def = allDefs.find(d => d.key === key);
-  if (def?.confirmChange) {
+  if (key === "image_gen_mode") {
+    const confirmed = await new Promise<boolean>(resolve => {
+      Modal.confirm({
+        title: "切换图片生成模式",
+        content: `将图片生成模式从「${imageMode.value}」切换为「${value}」。确认？`,
+        okText: "确认切换", cancelText: "取消",
+        onOk: () => resolve(true), onCancel: () => resolve(false),
+      });
+    });
+    if (!confirmed) return;
+  } else if (key === "image_provider" && def?.confirmChange) {
     const confirmed = await new Promise<boolean>(resolve => {
       Modal.confirm({
         title: "切换图片服务商",
         content: `图片生成将切换为 ${value}，可能影响图片风格。确认切换？`,
-        okText: "确认切换",
-        cancelText: "取消",
-        onOk: () => resolve(true),
-        onCancel: () => resolve(false),
+        okText: "确认切换", cancelText: "取消",
+        onOk: () => resolve(true), onCancel: () => resolve(false),
       });
     });
     if (!confirmed) return;
@@ -152,6 +166,14 @@ async function handleSelectChange(key: string, value: string): Promise<void> {
 
 function isOn(key: string): boolean {
   return switches.value[key] === "on";
+}
+
+// 格式化 ISO 时间戳为本地时间
+function formatSince(raw: string): string {
+  if (!raw) return "";
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return raw;
+  return d.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
 onMounted(() => refresh());
@@ -177,16 +199,9 @@ onMounted(() => refresh());
             <span class="ml-1 text-[10px] text-editorial-text-muted/70">{{ def.description }}</span>
           </div>
           <span class="shrink-0 text-[10px] font-mono text-editorial-text-muted/60">{{ switches[def.key] ?? '-' }}</span>
-          <a-switch
-            v-if="def.type === 'onoff'"
-            :checked="isOn(def.key)"
-            :loading="saving === def.key"
-            :disabled="def.key === 'write' && !pipelineOn"
-            size="small"
-            @change="(checked: boolean) => handleSwitchChange(def.key, checked)"
-          />
+          <a-switch :checked="isOn(def.key)" :loading="saving === def.key" :disabled="def.key === 'write' && !pipelineOn" size="small" @change="(checked: boolean) => handleSwitchChange(def.key, checked)" />
         </div>
-        <div v-if="!pipelineOn" class="pl-2 text-[10px] text-orange-500">管线已紧急制动，write 开关不可操作。请先恢复管线。</div>
+        <div v-if="!pipelineOn" class="pl-2 text-[10px] text-orange-500">管线已紧急制动，write 开关不可操作</div>
       </div>
 
       <!-- 第二组：业务开关 -->
@@ -198,19 +213,14 @@ onMounted(() => refresh());
             <span class="ml-1 text-[10px] text-editorial-text-muted/70">{{ def.description }}</span>
           </div>
           <span class="shrink-0 text-[10px] font-mono text-editorial-text-muted/60">{{ switches[def.key] ?? '-' }}</span>
-          <a-switch
-            :checked="isOn(def.key)"
-            :loading="saving === def.key"
-            size="small"
-            @change="(checked: boolean) => handleSwitchChange(def.key, checked)"
-          />
+          <a-switch :checked="isOn(def.key)" :loading="saving === def.key" size="small" @change="(checked: boolean) => handleSwitchChange(def.key, checked)" />
         </div>
       </div>
 
       <!-- 第三组：参数配置 -->
       <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">参数配置</div>
       <div class="space-y-1.5">
-        <div v-for="def in paramGroup" :key="def.key" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5">
+        <div v-for="def in paramGroup" :key="def.key" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5" :class="{ 'opacity-50': def.key === 'image_provider' && !isProviderMode }">
           <div class="min-w-0 flex-1">
             <span class="text-xs font-medium text-editorial-text-body">{{ def.label }}</span>
             <span class="ml-1 text-[10px] text-editorial-text-muted/70">{{ def.description }}</span>
@@ -221,10 +231,11 @@ onMounted(() => refresh());
           <a-select
             v-if="def.type === 'select'"
             :value="switches[def.key] ?? ''"
-            :options="def.options?.map(o => ({ value: o, label: o }))"
+            :options="def.options?.map((o: any) => ({ value: o.value ?? o, label: o.label ?? o }))"
             size="small"
-            class="!w-28"
+            :class="def.key === 'image_gen_mode' ? '!w-[120px]' : '!w-28'"
             :loading="saving === def.key"
+            :disabled="def.key === 'image_provider' && !isProviderMode"
             @change="(val: string) => handleSelectChange(def.key, val)"
           />
 
@@ -232,10 +243,7 @@ onMounted(() => refresh());
           <template v-else-if="def.type === 'number'">
             <a-input-number
               :value="hasDraft(def.key) ? draftNumbers[def.key] : Number(switches[def.key] ?? 0)"
-              :min="0"
-              :step="1"
-              size="small"
-              class="!w-20"
+              :min="0" :step="1" size="small" class="!w-20"
               :disabled="saving === def.key"
               @change="(val: number) => onNumberInput(def.key, val)"
             />
@@ -246,6 +254,12 @@ onMounted(() => refresh());
               @click="confirmNumber(def.key)"
             >确认</button>
           </template>
+        </div>
+
+        <!-- 只读：自动生图生效时间 -->
+        <div v-if="providerAutoSince || codexAutoSince" class="mt-2 rounded border border-editorial-border bg-editorial-bg-page px-2.5 py-1.5 space-y-0.5">
+          <div v-if="providerAutoSince" class="text-[10px] text-editorial-text-muted">服务商自动生效于 {{ formatSince(providerAutoSince) }}</div>
+          <div v-if="codexAutoSince" class="text-[10px] text-editorial-text-muted">Codex 自动生效于 {{ formatSince(codexAutoSince) }}</div>
         </div>
       </div>
     </a-spin>

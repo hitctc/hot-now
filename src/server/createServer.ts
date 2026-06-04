@@ -1579,6 +1579,47 @@ export function createServer(deps: ServerDeps = {}) {
   app.get("/api/monitor/switch/:key", async (req, reply) => hermesMonitorProxy(req, reply, `/api/monitor/switch/${(req.params as { key: string }).key}`));
   app.post("/api/monitor/switch/:key", async (req, reply) => hermesMonitorProxy(req, reply, `/api/monitor/switch/${(req.params as { key: string }).key}`, "POST"));
 
+  // ─── 手动生图 API 代理（provider-manual / codex-manual） ───
+  app.post("/api/provider/generate-image", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+    const hermesApiToken = process.env.HERMES_API_TOKEN;
+    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
+    try {
+      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/provider/generate-image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
+        body: JSON.stringify(request.body),
+        signal: AbortSignal.timeout(120_000),
+      });
+      const body = await res.text();
+      return reply.code(res.status).header("Content-Type", "application/json; charset=utf-8").send(body);
+    } catch (err) {
+      return reply.code(502).send({ ok: false, reason: "Hermes 调用失败", detail: (err as Error).message });
+    }
+  });
+
+  app.post("/api/codex/generate-image-tasks", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+    const hermesApiToken = process.env.HERMES_API_TOKEN;
+    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
+    try {
+      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/codex/generate-image-tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
+        body: JSON.stringify(request.body),
+        signal: AbortSignal.timeout(120_000),
+      });
+      const body = await res.text();
+      return reply.code(res.status).header("Content-Type", "application/json; charset=utf-8").send(body);
+    } catch (err) {
+      return reply.code(502).send({ ok: false, reason: "Hermes 调用失败", detail: (err as Error).message });
+    }
+  });
+
   // ─── 素材库写文章：调用 Hermes write-article API，异步执行 ───
   app.post("/api/creative/source-items/:id/write-article", async (request, reply) => {
     const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");

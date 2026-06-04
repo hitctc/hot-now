@@ -47,10 +47,9 @@ const pipelineGroup = [
   },
 ];
 
-// 第二组：业务开关（隐藏旧开关 auto_generate_images / codex_image_task）
-const businessGroup = [
-  { key: "draft_push", label: "草稿推送", type: "onoff" as const, description: "控制成品文章是否标记为可推送" },
-];
+// 第二组：业务开关
+// （draft_push 开关已移除——状态统一管理上线后不再需要）
+const businessGroup: typeof pipelineGroup = [];
 
 // 第三组：参数配置（image_gen_mode + image_provider 联动 + 只读时间戳）
 const paramGroup = [
@@ -203,18 +202,20 @@ onMounted(() => refresh());
         <div v-if="!pipelineOn" class="pl-2 text-[10px] text-orange-500">管线已紧急制动，write 开关不可操作</div>
       </div>
 
-      <!-- 第二组：业务开关 -->
-      <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">业务开关</div>
-      <div class="mb-3 space-y-1.5">
-        <div v-for="def in businessGroup" :key="def.key" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5">
-          <div class="min-w-0 flex-1">
-            <span class="text-xs font-medium text-editorial-text-body">{{ def.label }}</span>
-            <span class="ml-1 text-[10px] text-editorial-text-muted/70">{{ def.description }}</span>
+      <!-- 第二组：业务开关（仅在有条目时显示） -->
+      <template v-if="businessGroup.length">
+        <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">业务开关</div>
+        <div class="mb-3 space-y-1.5">
+          <div v-for="def in businessGroup" :key="def.key" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5">
+            <div class="min-w-0 flex-1">
+              <span class="text-xs font-medium text-editorial-text-body">{{ def.label }}</span>
+              <span class="ml-1 text-[10px] text-editorial-text-muted/70">{{ def.description }}</span>
+            </div>
+            <span class="shrink-0 text-[10px] font-mono text-editorial-text-muted/60">{{ switches[def.key] ?? '-' }}</span>
+            <a-switch :checked="isOn(def.key)" :loading="saving === def.key" size="small" @change="(checked: boolean) => handleSwitchChange(def.key, checked)" />
           </div>
-          <span class="shrink-0 text-[10px] font-mono text-editorial-text-muted/60">{{ switches[def.key] ?? '-' }}</span>
-          <a-switch :checked="isOn(def.key)" :loading="saving === def.key" size="small" @change="(checked: boolean) => handleSwitchChange(def.key, checked)" />
         </div>
-      </div>
+      </template>
 
       <!-- 第三组：参数配置 -->
       <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">参数配置</div>

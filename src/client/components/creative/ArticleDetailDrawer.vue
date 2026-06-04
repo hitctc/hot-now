@@ -78,14 +78,24 @@
         </div>
 
         <!-- 异常/审核信息（统一展示区） -->
-        <section v-if="hasAnomalyInfo" class="rounded border bg-red-50 border-red-200 px-3 py-2.5">
-          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-            <span class="font-semibold text-red-700">{{ article.status === 'anomaly' ? '异常' : article.status === 'needs_review' ? '待审核' : '警告' }}</span>
-            <span v-if="article.anomalyReason" class="text-red-600">{{ formatAnomalyReason(article.anomalyReason) }}</span>
-            <span v-if="article.reasonCode" class="text-red-500">代码: {{ article.reasonCode }}</span>
-            <span v-if="article.reasonText" class="text-red-500">{{ article.reasonText }}</span>
-            <span v-if="article.manualReviewReason" class="text-yellow-700">审核原因: {{ manualReviewReasonText }}</span>
-            <span v-for="r in (article.manualReviewReasons ?? [])" :key="r" class="text-yellow-600">{{ r }}</span>
+        <section v-if="hasAnomalyInfo" class="rounded border bg-red-50 border-red-200 px-3 py-2.5 space-y-1">
+          <div class="text-xs font-semibold text-red-700">
+            {{ article.status === 'anomaly' ? '⚠ 异常' : article.status === 'needs_review' ? '⚠ 待审核' : '⚠ 警告' }}
+          </div>
+          <div v-if="article.anomalyReason" class="text-xs text-red-600">
+            <span class="text-editorial-text-muted">异常原因：</span>{{ formatAnomalyReason(article.anomalyReason) }}
+          </div>
+          <div v-if="article.reasonCode" class="text-xs text-red-500">
+            <span class="text-editorial-text-muted">异常代码：</span>
+            <span class="font-mono">{{ article.reasonCode }}</span>
+          </div>
+          <div v-if="article.reasonText" class="text-xs text-red-500">
+            <span class="text-editorial-text-muted">异常说明：</span>{{ article.reasonText }}
+          </div>
+          <div v-if="article.manualReviewReason || (article.manualReviewReasons?.length ?? 0) > 0" class="text-xs text-yellow-700">
+            <span class="text-editorial-text-muted">审核标记：</span>
+            <span v-if="article.manualReviewReason">{{ manualReviewReasonText }}</span>
+            <span v-for="(r, i) in (article.manualReviewReasons ?? [])" :key="r">{{ i > 0 || article.manualReviewReason ? '、' : '' }}{{ formatReviewReason(r) }}</span>
           </div>
         </section>
 
@@ -198,10 +208,6 @@
         <section v-if="article?.similarityCheck">
           <div class="mb-2">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">相似度检测</h3>
-          </div>
-          <!-- 人工审核提示 -->
-          <div v-if="article.needsManualReview || article.status === 'needs_review'" class="mb-2 rounded border border-yellow-400 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
-            ⚠ 需要人工审核{{ article.manualReviewReason ? `：${manualReviewReasonText}` : '' }}
           </div>
           <template v-if="sc">
             <!-- 外层结论 -->
@@ -626,16 +632,27 @@ const ANOMALY_REASON_MAP: Record<string, string> = {
   image_prompt_parse_failed: "图片提示词解析失败",
 };
 
-/** 异常原因中文翻译，带英文原文对照 */
+const REVIEW_REASON_MAP: Record<string, string> = {
+  originality_risk_high: "原创风险过高（originality_risk_high）",
+  similarity_high: "相似度过高（similarity_high）",
+  first_person_risk: "第一人称风险（first_person_risk）",
+};
+
+/** 异常原因中文翻译 + 英文原文 */
 function formatAnomalyReason(raw: string): string {
-  for (const [prefix, cn] of Object.entries(ANOMALY_REASON_MAP)) {
-    if (raw === prefix) return `${cn}（${raw}）`;
-    if (raw.startsWith(prefix + ":") || raw.startsWith(prefix + " - ")) {
-      const rest = raw.slice(prefix.length).replace(/^[: -]+/, "");
-      return `${cn}（${raw}）${rest ? "：" + rest : ""}`;
+  for (const [key, cn] of Object.entries(ANOMALY_REASON_MAP)) {
+    if (raw === key) return `${cn}（${key}）`;
+    if (raw.startsWith(key + ":") || raw.startsWith(key + " - ")) {
+      const rest = raw.slice(key.length).replace(/^[: -]+/, "");
+      return `${cn}（${key}）${rest ? "——" + rest : ""}`;
     }
   }
   return raw;
+}
+
+/** 审核标记翻译 */
+function formatReviewReason(raw: string): string {
+  return REVIEW_REASON_MAP[raw] ?? raw;
 }
 
 /** 是否有任何异常信息需要展示 */

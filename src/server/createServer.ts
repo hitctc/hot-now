@@ -1115,7 +1115,12 @@ export function createServer(deps: ServerDeps = {}) {
     if (body?.reasonText !== undefined) { editInput.reasonText = body.reasonText; updatedFields.push("reasonText"); }
 
     if (Object.keys(editInput).length > 0) {
-      editCreativeFinishedArticle(db, id, editInput as any);
+      // Hermes token 调用跳过状态转换校验（管线内部自动流转），前端操作需要校验
+      const source = hasToken ? "hermes" : undefined;
+      const editResult = editCreativeFinishedArticle(db, id, editInput as any, source);
+      if (!editResult.ok) {
+        return reply.code(400).send({ ok: false, reason: editResult.reason });
+      }
     }
 
     // trendScore / trendBreakdown 存在 source_items 表，需关联更新

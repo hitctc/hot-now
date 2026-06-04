@@ -509,8 +509,8 @@ export function editCreativeFinishedArticle(
     return { ok: false, reason: "article not found" };
   }
 
-  // 状态变更校验：经过统一转换表
-  if (input.status !== undefined && input.status !== current.status) {
+  // 状态变更校验：Hermes 管线内部流转跳过（source="hermes"），仅校验前端人工操作
+  if (input.status !== undefined && input.status !== current.status && source !== "hermes") {
     const error = validateStatusTransition(current.status, input.status, current, source);
     if (error) return { ok: false, reason: error };
   }

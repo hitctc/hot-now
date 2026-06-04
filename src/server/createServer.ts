@@ -1534,6 +1534,28 @@ export function createServer(deps: ServerDeps = {}) {
         return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, detail: errorBody });
       }
       const data = await res.json();
+
+      // 从队列中收集所有 source_item_id，批量查本地素材表补充标题和来源
+      if (db) {
+        const tasks = [data.current, ...(data.queue ?? [])].filter(Boolean);
+        const sourceItemIds = [...new Set(tasks.map((t: any) => Number(t.source_item_id)).filter(Boolean))];
+        if (sourceItemIds.length > 0) {
+          const placeholders = sourceItemIds.map(() => "?").join(",");
+          const rows = db.prepare(
+            `SELECT id, title, source_name FROM creative_source_items WHERE id IN (${placeholders})`
+          ).all(...sourceItemIds) as { id: number; title: string; source_name: string | null }[];
+          const lookup = new Map(rows.map(r => [r.id, r]));
+          for (const task of tasks) {
+            const sid = Number(task.source_item_id);
+            if (sid && lookup.has(sid)) {
+              const info = lookup.get(sid)!;
+              task.source_item_title = info.title ?? null;
+              task.source_item_source_name = info.source_name ?? null;
+            }
+          }
+        }
+      }
+
       return reply.send(data);
     } catch (err) {
       const errMessage = (err as Error).message ?? String(err);

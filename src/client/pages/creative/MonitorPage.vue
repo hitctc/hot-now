@@ -51,14 +51,16 @@ onBeforeUnmount(() => {
         <div v-if="queueData.current" class="mb-2 flex items-center gap-2 rounded border border-blue-200 bg-blue-50 px-3 py-1.5">
           <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500 shrink-0" />
           <span v-if="queueData.current.source_item_id" class="shrink-0 text-[11px] font-semibold text-blue-600 cursor-pointer hover:underline" @click="openSourceModal(queueData.current.source_item_id)">#{{ queueData.current.source_item_id }}</span>
-          <span class="truncate text-[11px] text-blue-800">{{ queueData.current.label }}</span>
+          <span class="truncate text-[11px] text-blue-800">{{ queueData.current.source_item_title || queueData.current.label }}</span>
+          <span v-if="queueData.current.source_item_source_name" class="shrink-0 text-[10px] text-blue-400">· {{ queueData.current.source_item_source_name }}</span>
           <span class="ml-auto shrink-0 text-[10px] text-blue-500">{{ queueData.current.started_at ?? '' }}</span>
         </div>
         <!-- 排队列表 -->
         <div v-if="queueData.queue.length > 0" class="mb-2 space-y-1">
           <div v-for="task in queueData.queue" :key="task.task_id" class="flex items-center gap-2 rounded border border-gray-100 bg-gray-50 px-3 py-1">
             <span v-if="task.source_item_id" class="shrink-0 text-[11px] font-semibold text-blue-600 cursor-pointer hover:underline" @click="openSourceModal(task.source_item_id)">#{{ task.source_item_id }}</span>
-            <span class="flex-1 truncate text-[11px] text-editorial-text-body">{{ task.label }}</span>
+            <span class="flex-1 truncate text-[11px] text-editorial-text-body">{{ task.source_item_title || task.label }}</span>
+            <span v-if="task.source_item_source_name" class="shrink-0 text-[10px] text-editorial-text-muted">· {{ task.source_item_source_name }}</span>
             <span class="shrink-0 text-[10px]" :class="task.priority === 'high' ? 'text-yellow-600' : 'text-gray-400'">{{ task.priority }}</span>
           </div>
         </div>

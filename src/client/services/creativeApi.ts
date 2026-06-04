@@ -542,6 +542,9 @@ export type WriteQueueTask = {
   status: "writing" | "queued";
   submitted_at: string;
   started_at: string | null;
+  /** 后端代理从本地素材表补充 */
+  source_item_title?: string | null;
+  source_item_source_name?: string | null;
 };
 
 export type WriteQueueStats = {

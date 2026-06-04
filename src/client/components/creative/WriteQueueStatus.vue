@@ -64,14 +64,17 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer); });
         <!-- 当前任务 -->
         <div v-if="data.current" class="write-queue-current">
           <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500 shrink-0" />
-          <span class="truncate text-[11px] text-blue-800">{{ data.current.label }}</span>
+          <span v-if="data.current.source_item_id" class="write-queue-id" @click.stop="openSourceItem(data.current.source_item_id)">#{{ data.current.source_item_id }}</span>
+          <span class="truncate text-[11px] text-blue-800">{{ data.current.source_item_title || data.current.label }}</span>
+          <span v-if="data.current.source_item_source_name" class="shrink-0 text-[10px] text-blue-400">· {{ data.current.source_item_source_name }}</span>
         </div>
 
         <!-- 排队列表 -->
         <div v-if="data.queue.length > 0" class="write-queue-list">
           <div v-for="task in data.queue" :key="task.task_id" class="write-queue-task">
             <span v-if="task.source_item_id" class="write-queue-id" @click.stop="openSourceItem(task.source_item_id)">#{{ task.source_item_id }}</span>
-            <span class="flex-1 truncate text-[11px] text-editorial-text-body">{{ task.label }}</span>
+            <span class="flex-1 truncate text-[11px] text-editorial-text-body">{{ task.source_item_title || task.label }}</span>
+            <span v-if="task.source_item_source_name" class="shrink-0 text-[10px] text-editorial-text-muted">· {{ task.source_item_source_name }}</span>
             <span class="text-[10px]" :class="task.priority === 'high' ? 'text-yellow-600' : 'text-gray-400'">{{ task.priority }}</span>
           </div>
         </div>
@@ -207,4 +210,8 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .write-queue-refresh:hover:not(:disabled) { background: #f3f4f6; }
 .write-queue-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 浮窗内的 Modal 弹窗 z-index 必须高于浮窗自身(1900) */
+.source-item-detail-modal .ant-modal-wrap { z-index: 1950 !important; }
+.source-item-detail-modal .ant-modal-mask { z-index: 1950 !important; }
 </style>

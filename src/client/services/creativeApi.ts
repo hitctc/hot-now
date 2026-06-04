@@ -262,9 +262,10 @@ export function editFinishedArticle(
 
 // ─── WeChat Format ───
 
-export type WechatThemeId = "bauhaus" | "sunset-film" | "receipt";
+export type WechatThemeId = "classic" | "bauhaus" | "sunset-film" | "receipt";
 
 export const wechatThemeOptions: { value: WechatThemeId; label: string }[] = [
+  { value: "classic", label: "默认" },
   { value: "bauhaus", label: "包豪斯" },
   { value: "sunset-film", label: "落日胶片" },
   { value: "receipt", label: "购物小票" }

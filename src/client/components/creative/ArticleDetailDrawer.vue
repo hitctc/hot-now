@@ -213,95 +213,85 @@
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">相似度检测</h3>
           </div>
           <template v-if="sc">
-            <!-- 外层结论 -->
-            <div class="grid grid-cols-2 gap-x-4 gap-y-1 rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs">
-              <div class="text-editorial-text-muted">风险等级</div>
-              <div class="font-medium" :class="sc.risk_level === 'high' ? 'text-red-500' : sc.risk_level === 'medium' ? 'text-yellow-600' : 'text-green-600'">{{ riskLevelLabel }}</div>
-              <div class="text-editorial-text-muted">字面重复率</div>
-              <div>{{ Math.round((sc.literal_similarity ?? 0) * 100) }}%</div>
-            </div>
-            <!-- 规则算法结果 -->
-            <template v-if="sc.rule_based">
-              <div class="mt-2 text-[11px] font-medium text-editorial-text-muted">规则检测</div>
-              <div class="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs">
-                <div class="text-editorial-text-muted">字面重复率</div>
-                <div>{{ Math.round((sc.rule_based.literal_similarity ?? 0) * 100) }}%</div>
-                <div class="text-editorial-text-muted">结构相似度</div>
-                <div>{{ Math.round((sc.rule_based.literal_structure_similarity ?? 0) * 100) }}%</div>
-                <div class="text-editorial-text-muted">原文摘要相似度</div>
-                <div>{{ Math.round((sc.rule_based.source_content_similarity ?? 0) * 100) }}%</div>
-                <div class="text-editorial-text-muted">最长连续重叠</div>
-                <div>{{ sc.rule_based.max_continuous_overlap_chars ?? 0 }} 字</div>
-                <div class="text-editorial-text-muted">规则风险</div>
-                <div :class="sc.rule_based.risk_level === 'high' ? 'text-red-500' : sc.rule_based.risk_level === 'medium' ? 'text-yellow-600' : 'text-green-600'">{{ sc.rule_based.risk_level ?? '未知' }}</div>
+            <!-- 左中右三列布局 -->
+            <div class="grid grid-cols-3 gap-3">
+              <!-- 左：总览 + 规则检测 -->
+              <div class="space-y-2">
+                <div class="rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs space-y-1">
+                  <div class="font-medium text-editorial-text-body mb-1">总览</div>
+                  <div class="flex justify-between"><span class="text-editorial-text-muted">风险等级</span><span class="font-medium" :class="sc.risk_level === 'high' ? 'text-red-500' : sc.risk_level === 'medium' ? 'text-yellow-600' : 'text-green-600'">{{ riskLevelLabel }}</span></div>
+                  <div class="flex justify-between"><span class="text-editorial-text-muted">字面重复率</span><span>{{ Math.round((sc.literal_similarity ?? 0) * 100) }}%</span></div>
+                </div>
+                <!-- 规则检测 -->
+                <div v-if="sc.rule_based" class="rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs space-y-1">
+                  <div class="font-medium text-editorial-text-body mb-1">规则检测</div>
+                  <div class="flex justify-between"><span class="text-editorial-text-muted">字面重复率</span><span>{{ Math.round((sc.rule_based.literal_similarity ?? 0) * 100) }}%</span></div>
+                  <div class="flex justify-between"><span class="text-editorial-text-muted">结构相似度</span><span>{{ Math.round((sc.rule_based.literal_structure_similarity ?? 0) * 100) }}%</span></div>
+                  <div class="flex justify-between"><span class="text-editorial-text-muted">原文摘要相似度</span><span>{{ Math.round((sc.rule_based.source_content_similarity ?? 0) * 100) }}%</span></div>
+                  <div class="flex justify-between"><span class="text-editorial-text-muted">最长连续重叠</span><span>{{ sc.rule_based.max_continuous_overlap_chars ?? 0 }} 字</span></div>
+                  <div class="flex justify-between"><span class="text-editorial-text-muted">规则风险</span><span :class="sc.rule_based.risk_level === 'high' ? 'text-red-500' : sc.rule_based.risk_level === 'medium' ? 'text-yellow-600' : 'text-green-600'">{{ sc.rule_based.risk_level ?? '未知' }}</span></div>
+                </div>
               </div>
-              <!-- 规则高风险片段 -->
-              <template v-if="(sc.rule_based.high_risk_segments?.length ?? 0) > 0">
-                <div class="mt-1.5">
-                  <button class="text-[11px] text-editorial-link-active hover:underline" @click="showRuleSegments = !showRuleSegments">
-                    字面重复片段 {{ sc.rule_based.high_risk_segments!.length }} 条 {{ showRuleSegments ? '收起' : '展开' }}
-                  </button>
-                  <div v-if="showRuleSegments" class="mt-1 space-y-1">
-                    <div v-for="(seg, i) in sc.rule_based.high_risk_segments" :key="i" class="rounded border border-editorial-border bg-editorial-bg-page px-2 py-1.5 text-[11px] leading-relaxed">
-                      <div class="text-editorial-text-muted">文章片段：{{ seg.article_segment }}</div>
-                      <div class="text-editorial-text-muted">原文片段：{{ seg.source_segment }}</div>
-                      <div>相似度：{{ Math.round((seg.similarity ?? 0) * 100) }}%</div>
-                    </div>
+
+              <!-- 中：LLM 实质审查 -->
+              <div class="space-y-2">
+                <template v-if="sc.llm_review && sc.llm_review.status === 'success'">
+                  <div class="rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs space-y-1">
+                    <div class="font-medium text-editorial-text-body mb-1">LLM 实质审查</div>
+                    <div class="flex justify-between"><span class="text-editorial-text-muted">来源依赖</span><span :class="riskDimClass(sc.llm_review.source_dependency)">{{ sc.llm_review.source_dependency }}</span></div>
+                    <div class="flex justify-between"><span class="text-editorial-text-muted">叙事相似度</span><span :class="riskDimClass(sc.llm_review.narrative_similarity)">{{ sc.llm_review.narrative_similarity }}</span></div>
+                    <div class="flex justify-between"><span class="text-editorial-text-muted">观点重叠</span><span :class="riskDimClass(sc.llm_review.claim_overlap)">{{ sc.llm_review.claim_overlap }}</span></div>
+                    <div class="flex justify-between"><span class="text-editorial-text-muted">实体重叠</span><span :class="riskDimClass(sc.llm_review.entity_overlap)">{{ sc.llm_review.entity_overlap }}</span></div>
+                    <div class="flex justify-between"><span class="text-editorial-text-muted">案例复用</span><span :class="riskDimClass(sc.llm_review.case_reuse)">{{ sc.llm_review.case_reuse }}</span></div>
+                    <div class="flex justify-between"><span class="text-editorial-text-muted">第一人称风险</span><span :class="riskDimClass(sc.llm_review.first_person_risk)">{{ sc.llm_review.first_person_risk }}</span></div>
+                    <div class="flex justify-between"><span class="text-editorial-text-muted">LLM 综合风险</span><span class="font-medium" :class="riskDimClass(sc.llm_review.overall_risk)">{{ sc.llm_review.overall_risk }}</span></div>
+                    <div class="flex justify-between"><span class="text-editorial-text-muted">建议操作</span><span>{{ llmActionLabel }}</span></div>
+                    <template v-if="sc.llm_review.reason">
+                      <div class="mt-1 pt-1 border-t border-editorial-border">
+                        <div class="text-editorial-text-muted mb-0.5">原因</div>
+                        <a-tooltip :title="sc.llm_review.reason" placement="topLeft"><div class="line-clamp-2">{{ sc.llm_review.reason }}</div></a-tooltip>
+                      </div>
+                    </template>
                   </div>
-                </div>
-              </template>
-            </template>
-            <!-- LLM 审查结果 -->
-            <template v-if="sc.llm_review">
-              <div class="mt-2 text-[11px] font-medium text-editorial-text-muted">LLM 实质审查</div>
-              <template v-if="sc.llm_review.status === 'success'">
-                <div class="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs">
-                  <div class="text-editorial-text-muted">来源依赖</div>
-                  <div :class="riskDimClass(sc.llm_review.source_dependency)">{{ sc.llm_review.source_dependency }}</div>
-                  <div class="text-editorial-text-muted">叙事相似度</div>
-                  <div :class="riskDimClass(sc.llm_review.narrative_similarity)">{{ sc.llm_review.narrative_similarity }}</div>
-                  <div class="text-editorial-text-muted">观点重叠</div>
-                  <div :class="riskDimClass(sc.llm_review.claim_overlap)">{{ sc.llm_review.claim_overlap }}</div>
-                  <div class="text-editorial-text-muted">实体重叠</div>
-                  <div :class="riskDimClass(sc.llm_review.entity_overlap)">{{ sc.llm_review.entity_overlap }}</div>
-                  <div class="text-editorial-text-muted">案例复用</div>
-                  <div :class="riskDimClass(sc.llm_review.case_reuse)">{{ sc.llm_review.case_reuse }}</div>
-                  <div class="text-editorial-text-muted">第一人称风险</div>
-                  <div :class="riskDimClass(sc.llm_review.first_person_risk)">{{ sc.llm_review.first_person_risk }}</div>
-                  <div class="text-editorial-text-muted">LLM 综合风险</div>
-                  <div class="font-medium" :class="riskDimClass(sc.llm_review.overall_risk)">{{ sc.llm_review.overall_risk }}</div>
-                  <div class="text-editorial-text-muted">建议操作</div>
-                  <div>{{ llmActionLabel }}</div>
-                  <template v-if="sc.llm_review.reason">
-                    <div class="text-editorial-text-muted">原因</div>
-                    <div>{{ sc.llm_review.reason }}</div>
-                  </template>
-                </div>
-                <!-- 高风险点 -->
-                <template v-if="(sc.llm_review.high_risk_points?.length ?? 0) > 0">
-                  <div class="mt-1.5">
-                    <button class="text-[11px] text-editorial-link-active hover:underline" @click="showLlmRiskPoints = !showLlmRiskPoints">
-                      风险点 {{ sc.llm_review.high_risk_points!.length }} 条 {{ showLlmRiskPoints ? '收起' : '展开' }}
-                    </button>
-                    <div v-if="showLlmRiskPoints" class="mt-1 space-y-1">
-                      <div v-for="(point, i) in sc.llm_review.high_risk_points" :key="i" class="rounded border border-editorial-border bg-editorial-bg-page px-2 py-1 text-[11px] leading-relaxed">
-                        {{ point }}
+                </template>
+                <template v-else-if="sc.llm_review && sc.llm_review.status === 'failed'">
+                  <div class="rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs text-editorial-text-muted">LLM 审查失败{{ sc.llm_review.error ? `：${sc.llm_review.error}` : '' }}</div>
+                </template>
+                <template v-else-if="sc.llm_review">
+                  <div class="rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs text-editorial-text-muted">LLM 审查已跳过</div>
+                </template>
+              </div>
+
+              <!-- 右：风险点（完整展示） -->
+              <div class="space-y-2">
+                <!-- 字面重复片段 -->
+                <template v-if="sc.rule_based && (sc.rule_based.high_risk_segments?.length ?? 0) > 0">
+                  <div class="rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs">
+                    <div class="font-medium text-editorial-text-body mb-1.5">字面重复片段（{{ sc.rule_based.high_risk_segments!.length }}）</div>
+                    <div class="space-y-1.5">
+                      <div v-for="(seg, i) in sc.rule_based.high_risk_segments" :key="i" class="rounded bg-white px-2 py-1.5 text-[11px] leading-relaxed border border-editorial-border">
+                        <a-tooltip :title="seg.article_segment" placement="topLeft"><div class="line-clamp-2 text-editorial-text-muted">文章：<span class="text-editorial-text-body">{{ seg.article_segment }}</span></div></a-tooltip>
+                        <a-tooltip :title="seg.source_segment" placement="topLeft"><div class="line-clamp-2 text-editorial-text-muted mt-0.5">原文：<span class="text-editorial-text-body">{{ seg.source_segment }}</span></div></a-tooltip>
+                        <div class="text-editorial-text-muted mt-0.5">相似度：{{ Math.round((seg.similarity ?? 0) * 100) }}%</div>
                       </div>
                     </div>
                   </div>
                 </template>
-              </template>
-              <template v-else-if="sc.llm_review.status === 'failed'">
-                <div class="mt-1 rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs text-editorial-text-muted">
-                  LLM 审查失败{{ sc.llm_review.error ? `：${sc.llm_review.error}` : '' }}
-                </div>
-              </template>
-              <template v-else>
-                <div class="mt-1 rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs text-editorial-text-muted">
-                  LLM 审查已跳过
-                </div>
-              </template>
-            </template>
+                <!-- LLM 高风险点（完整展示） -->
+                <template v-if="sc.llm_review && sc.llm_review.status === 'success' && (sc.llm_review.high_risk_points?.length ?? 0) > 0">
+                  <div class="rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs">
+                    <div class="font-medium text-editorial-text-body mb-1.5">高风险点（{{ sc.llm_review.high_risk_points!.length }}）</div>
+                    <div class="space-y-1">
+                      <div v-for="(point, i) in sc.llm_review.high_risk_points" :key="i" class="rounded bg-white px-2 py-1.5 text-[11px] leading-relaxed border border-editorial-border">{{ point }}</div>
+                    </div>
+                  </div>
+                </template>
+                <!-- 无风险点时的占位 -->
+                <template v-if="(!sc.rule_based?.high_risk_segments?.length) && (!sc.llm_review?.high_risk_points?.length)">
+                  <div class="rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs text-editorial-text-muted">无风险片段</div>
+                </template>
+              </div>
+            </div>
           </template>
         </section>
         <section v-else-if="article?.similarityCheck === null && article?.id">
@@ -990,9 +980,6 @@ function riskDimClass(level: string | undefined): string {
   if (level === "medium") return "text-yellow-600";
   return "text-green-600";
 }
-
-const showRuleSegments = ref(false);
-const showLlmRiskPoints = ref(false);
 
 // 审核弹窗
 const reviewModalVisible = ref(false);

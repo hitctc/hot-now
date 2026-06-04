@@ -41,6 +41,7 @@
               </a-menu>
             </template>
           </a-dropdown>
+          <a-button @click="imageActionVisible = true">手动生图</a-button>
         </div>
         <div class="article-detail-footer__right">
           <a-tooltip :mouse-enter-delay="0.5" title="将当前正文按选定主题渲染后复制到剪贴板，可粘贴到公众号编辑器">
@@ -517,6 +518,13 @@
       @reviewed="handleReviewDone"
     />
   </Teleport>
+
+  <!-- 手动生图弹窗 -->
+  <ImageActionModal
+    v-model:open="imageActionVisible"
+    :article="article"
+    @done="handleImageActionDone"
+  />
 </template>
 
 <script setup lang="ts">
@@ -526,6 +534,7 @@ import { message } from "ant-design-vue";
 import ArticleMarkdownEditor from "./ArticleMarkdownEditor.vue";
 import StepTraceTimeline from "./StepTraceTimeline.vue";
 import ArticleReviewModal from "./ArticleReviewModal.vue";
+import ImageActionModal from "./ImageActionModal.vue";
 import { usePipelineStatus } from "../../composables/usePipelineStatus.js";
 import {
   editFinishedArticle,
@@ -884,8 +893,15 @@ const showLlmRiskPoints = ref(false);
 // 审核弹窗
 const reviewModalVisible = ref(false);
 
+// 手动生图弹窗
+const imageActionVisible = ref(false);
+
 function handleReviewDone(): void {
   emit("saved");
+}
+
+function handleImageActionDone(): void {
+  tickArticleChange();
 }
 
 // ─── 写文章（统一走 write-article 异步接口） ───

@@ -466,7 +466,7 @@ export function regenInlineImage(id: number, imageIndex: number): Promise<RegenI
   });
 }
 
-// ─── 手动生图 API（provider-manual / codex-manual 共用 action 结构） ───
+// ─── 手动生图 API（始终可用，不受 image_gen_mode 限制） ───
 
 export type ImageGenAction =
   | "fill-all" | "replace-all"
@@ -494,7 +494,7 @@ export type ImageGenResponse = {
   error?: string;
 };
 
-/** 服务商手动生图（仅 provider-manual 模式可用） */
+/** 服务商手动生图（任何自动模式下都可调用） */
 export function providerGenerateImage(articleId: number, action: ImageGenAction, imageIndex?: number): Promise<ImageGenResponse> {
   const body: Record<string, unknown> = { articleId, action };
   if (imageIndex != null) body.imageIndex = imageIndex;
@@ -504,7 +504,7 @@ export function providerGenerateImage(articleId: number, action: ImageGenAction,
   });
 }
 
-/** Codex 手动生图（仅 codex-manual 模式可用） */
+/** Codex 手动生图（任何自动模式下都可调用） */
 export function codexGenerateImage(articleId: number, action: ImageGenAction, imageIndex?: number): Promise<ImageGenResponse> {
   const body: Record<string, unknown> = { articleId, action };
   if (imageIndex != null) body.imageIndex = imageIndex;

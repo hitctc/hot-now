@@ -10,18 +10,17 @@ const switches = ref<Record<string, string>>({});
 const loading = ref(false);
 const saving = ref<string | null>(null);
 
-// 当前图片生成模式
+// 当前自动生图模式（三选一，与手动独立）
 const imageMode = computed(() => switches.value.image_gen_mode ?? "codex-auto");
-const isProviderMode = computed(() => imageMode.value.startsWith("provider"));
+const isProviderAuto = computed(() => imageMode.value === "provider-auto");
 // 只读生效时间
 const providerAutoSince = computed(() => switches.value.provider_auto_since ?? "");
 const codexAutoSince = computed(() => switches.value.codex_auto_since ?? "");
 
 const imageModeOptions = [
   { value: "provider-auto", label: "服务商自动" },
-  { value: "provider-manual", label: "服务商手动" },
   { value: "codex-auto", label: "Codex 自动" },
-  { value: "codex-manual", label: "Codex 手动" },
+  { value: "off", label: "关闭自动" },
 ];
 
 // 第一组：管线控制
@@ -55,8 +54,8 @@ const businessGroup = [
 
 // 第三组：参数配置（image_gen_mode + image_provider 联动 + 只读时间戳）
 const paramGroup = [
-  { key: "image_gen_mode", label: "图片生成模式", type: "select" as const, options: imageModeOptions, description: "控制图片由谁生成、何时生成", confirmChange: true },
-  { key: "image_provider", label: "图片服务商", type: "select" as const, options: ["aitechflux", "packy", "nebula"], description: "仅在 provider 模式下生效", confirmChange: true },
+  { key: "image_gen_mode", label: "自动生图模式", type: "select" as const, options: imageModeOptions, description: "自动模式三选一；手动生图始终可用，不受此开关影响", confirmChange: true },
+  { key: "image_provider", label: "图片服务商", type: "select" as const, options: ["aitechflux", "packy", "nebula"], description: "仅在 provider-auto 时生效", confirmChange: true },
   { key: "trend_score_threshold", label: "趋势分阈值", type: "number" as const, description: "≥ 此值的素材进入待写作队列" },
   { key: "interval_pipeline", label: "管线间隔（分钟）", type: "number" as const, description: "自动运行间隔" },
   { key: "interval_codex_generate", label: "Codex 生成间隔（分钟）", type: "number" as const, description: "Codex 任务生成间隔" },
@@ -143,8 +142,8 @@ async function handleSelectChange(key: string, value: string): Promise<void> {
   if (key === "image_gen_mode") {
     const confirmed = await new Promise<boolean>(resolve => {
       Modal.confirm({
-        title: "切换图片生成模式",
-        content: `将图片生成模式从「${imageMode.value}」切换为「${value}」。确认？`,
+        title: "切换自动生图模式",
+        content: `将自动生图模式从「${imageMode.value}」切换为「${value}」。手动生图不受影响。确认？`,
         okText: "确认切换", cancelText: "取消",
         onOk: () => resolve(true), onCancel: () => resolve(false),
       });
@@ -220,7 +219,7 @@ onMounted(() => refresh());
       <!-- 第三组：参数配置 -->
       <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">参数配置</div>
       <div class="space-y-1.5">
-        <div v-for="def in paramGroup" :key="def.key" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5" :class="{ 'opacity-50': def.key === 'image_provider' && !isProviderMode }">
+        <div v-for="def in paramGroup" :key="def.key" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5" :class="{ 'opacity-50': def.key === 'image_provider' && !isProviderAuto }">
           <div class="min-w-0 flex-1">
             <span class="text-xs font-medium text-editorial-text-body">{{ def.label }}</span>
             <span class="ml-1 text-[10px] text-editorial-text-muted/70">{{ def.description }}</span>
@@ -235,7 +234,7 @@ onMounted(() => refresh());
             size="small"
             :class="def.key === 'image_gen_mode' ? '!w-[120px]' : '!w-28'"
             :loading="saving === def.key"
-            :disabled="def.key === 'image_provider' && !isProviderMode"
+            :disabled="def.key === 'image_provider' && !isProviderAuto"
             @change="(val: string) => handleSelectChange(def.key, val)"
           />
 

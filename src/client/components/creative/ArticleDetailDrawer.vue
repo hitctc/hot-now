@@ -25,7 +25,7 @@
     <template #footer>
       <div v-if="article" class="article-detail-footer">
         <!-- 第一组：编辑操作（直接生效） -->
-        <div class="article-detail-footer__group">
+        <div class="article-detail-footer__group footer-group--edit">
           <a-tooltip :mouse-enter-delay="0.5" title="保存正文内容到数据库">
             <a-button type="primary" :loading="saving" @click="handleSave">保存</a-button>
           </a-tooltip>
@@ -37,7 +37,7 @@
         <div class="article-detail-footer__divider" />
 
         <!-- 第二组：内容生成（触发生成流程） -->
-        <div class="article-detail-footer__group">
+        <div class="article-detail-footer__group footer-group--generate">
           <a-tooltip v-if="!pipelineOn" title="管线已紧急制动，请先恢复管线">
             <a-dropdown disabled>
               <a-button disabled>写文章</a-button>
@@ -61,7 +61,7 @@
         <div class="article-detail-footer__divider" />
 
         <!-- 第三组：状态流转（二次确认） -->
-        <div class="article-detail-footer__group">
+        <div class="article-detail-footer__group footer-group--flow">
           <a-button v-if="article.status === 'needs_review'" type="primary" @click="reviewModalVisible = true">审核</a-button>
           <a-button v-if="getAvailableActions(article).some(a => a.type === 'mark_publishable')" @click="handleDetailMarkPublishable">标记可推送</a-button>
           <a-tooltip v-else-if="getAvailableActions(article).some(a => a.type === 'mark_publishable_disabled')" :title="getAvailableActions(article).find(a => a.type === 'mark_publishable_disabled')!.missing.join('、')">
@@ -1636,6 +1636,42 @@ async function handleDetailCancelPublishable(): Promise<void> {
   background: #e5e7eb;
   margin: 0 12px;
   flex-shrink: 0;
+}
+
+/* 第一组：编辑操作 — 蓝色系（保持 AntD primary 默认） */
+.footer-group--edit .ant-btn-primary {
+  /* 保持默认蓝色 */
+}
+
+/* 第二组：内容生成 — 紫色系 */
+.footer-group--generate .ant-btn:not(:disabled):not(.ant-btn-primary) {
+  color: #722ed1;
+  border-color: #d3adf7;
+}
+.footer-group--generate .ant-btn:not(:disabled):not(.ant-btn-primary):hover {
+  color: #531dab;
+  border-color: #b37feb;
+}
+.footer-group--generate .ant-btn.ant-btn-primary {
+  background: #722ed1;
+  border-color: #722ed1;
+}
+
+/* 第三组：状态流转 — 绿色系 */
+.footer-group--flow .ant-btn:not(:disabled):not(.ant-btn-primary) {
+  color: #389e0d;
+  border-color: #b7eb8f;
+}
+.footer-group--flow .ant-btn:not(:disabled):not(.ant-btn-primary):hover {
+  color: #237804;
+  border-color: #95de64;
+}
+.footer-group--flow .ant-btn.ant-btn-primary {
+  background: #389e0d;
+  border-color: #389e0d;
+}
+.footer-group--flow .ant-btn.ant-btn-primary:hover {
+  background: #237804;
 }
 
 .article-editor-wrapper {

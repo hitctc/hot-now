@@ -1514,14 +1514,14 @@ async function handleDetailCancelPublishable(): Promise<void> {
   const confirmed = await new Promise<boolean>(resolve => {
     Modal.confirm({
       title: "取消推送标记",
-      content: "确认取消推送标记？文章将回到排队状态。",
+      content: "确认取消推送标记？文章将回到已生成状态。",
       okText: "确认", cancelText: "取消",
       onOk: () => resolve(true), onCancel: () => resolve(false),
     });
   });
   if (!confirmed) return;
   try {
-    const res = await editFinishedArticle(props.article.id, { status: "queued" } as any);
+    const res = await editFinishedArticle(props.article.id, { status: "generated" } as any);
     if (res.ok) {
       message.success("已取消推送标记");
       emit("saved");

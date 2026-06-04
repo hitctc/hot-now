@@ -430,7 +430,6 @@ const columns = [
   { title: "ID", dataIndex: "id", key: "id", width: 60 },
   { title: "标题", key: "title", width: 280 },
   { title: "封面图", key: "coverImage", width: 80, ellipsis: true },
-  { title: "可发", key: "publishable", width: 60, ellipsis: true },
   { title: "状态", key: "status", width: 100 },
   { title: "来源", key: "sourceName", width: 170 },
   { title: "来源素材", key: "sourceItem", width: 110, ellipsis: true },
@@ -440,6 +439,7 @@ const columns = [
   { title: "模式", key: "mode", width: 72, ellipsis: true },
   { title: "发布时间", key: "publishedAt", width: 130, ellipsis: true },
   { title: "创建时间", key: "createdAt", width: 140, ellipsis: true },
+  { title: "可发", key: "publishable", width: 60, ellipsis: true },
   { title: "公众号", key: "wechatPublished", width: 80, ellipsis: true },
   { title: "推送", key: "pushDraft", width: 72, ellipsis: true },
 

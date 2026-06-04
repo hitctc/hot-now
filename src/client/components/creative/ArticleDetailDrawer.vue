@@ -53,6 +53,9 @@
           </a-tooltip>
           <a-button v-if="article.status === 'needs_review'" type="primary" @click="reviewModalVisible = true">审核</a-button>
           <a-button v-if="getAvailableActions(article).some(a => a.type === 'mark_publishable')" @click="handleDetailMarkPublishable">标记可推送</a-button>
+          <a-tooltip v-else-if="getAvailableActions(article).some(a => a.type === 'mark_publishable_disabled')" :title="getAvailableActions(article).find(a => a.type === 'mark_publishable_disabled')!.missing.join('、')">
+            <a-button disabled>不可推送</a-button>
+          </a-tooltip>
           <a-button v-if="getAvailableActions(article).some(a => a.type === 'cancel_publishable')" @click="handleDetailCancelPublishable">取消推送标记</a-button>
           <a-tooltip v-if="canPush" :mouse-enter-delay="0.5" title="自动保存正文后推送到微信公众号草稿箱">
             <a-button type="primary" :loading="saving" @click="saveAndPush">推送到草稿箱</a-button>

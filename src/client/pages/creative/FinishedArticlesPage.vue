@@ -553,6 +553,10 @@ const pagination = computed(() => ({
                 class="text-[10px] text-editorial-link-active hover:underline"
                 @click="handleMarkPublishable(record)"
               >标记可推送</button>
+              <!-- 不可推送（条件不满足，禁用态） -->
+              <a-tooltip v-else-if="getAvailableActions(record).some(a => a.type === 'mark_publishable_disabled')" :title="getAvailableActions(record).find(a => a.type === 'mark_publishable_disabled')!.missing.join('、')" placement="topLeft">
+                <span class="text-[10px] text-gray-400 cursor-not-allowed">不可推送</span>
+              </a-tooltip>
               <!-- 取消推送标记 -->
               <button
                 v-if="getAvailableActions(record).some(a => a.type === 'cancel_publishable')"

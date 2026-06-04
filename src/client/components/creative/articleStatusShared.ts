@@ -66,6 +66,7 @@ export function checkPublishConditions(article: CreativeFinishedArticle): { qual
 
 export type ArticleAction =
   | { type: "mark_publishable"; label: "标记可推送" }
+  | { type: "mark_publishable_disabled"; label: "不可推送"; missing: string[] }
   | { type: "cancel_publishable"; label: "取消推送标记" }
   | { type: "review"; label: "审核" };
 
@@ -78,9 +79,11 @@ export function getAvailableActions(article: CreativeFinishedArticle): ArticleAc
   const actions: ArticleAction[] = [];
 
   if (status === "queued" || status === "generated" || status === "anomaly") {
-    const { qualified } = checkPublishConditions(article);
+    const { qualified, missing } = checkPublishConditions(article);
     if (qualified) {
       actions.push({ type: "mark_publishable", label: "标记可推送" });
+    } else {
+      actions.push({ type: "mark_publishable_disabled", label: "不可推送", missing });
     }
   } else if (status === "ready_for_publish") {
     actions.push({ type: "cancel_publishable", label: "取消推送标记" });

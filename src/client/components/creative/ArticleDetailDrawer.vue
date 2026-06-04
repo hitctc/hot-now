@@ -51,6 +51,8 @@
             <a-button type="primary" :loading="saving" @click="handleSave">保存正文</a-button>
           </a-tooltip>
           <a-button v-if="article.status === 'needs_review'" type="primary" @click="reviewModalVisible = true">审核</a-button>
+          <a-button v-if="getAvailableActions(article).some(a => a.type === 'mark_publishable')" @click="handleDetailMarkPublishable">标记可推送</a-button>
+          <a-button v-if="getAvailableActions(article).some(a => a.type === 'cancel_publishable')" @click="handleDetailCancelPublishable">取消推送标记</a-button>
           <a-tooltip v-if="canPush" :mouse-enter-delay="0.5" title="自动保存正文后推送到微信公众号草稿箱">
             <a-button type="primary" :loading="saving" @click="saveAndPush">推送到草稿箱</a-button>
           </a-tooltip>
@@ -535,6 +537,7 @@ import ArticleMarkdownEditor from "./ArticleMarkdownEditor.vue";
 import StepTraceTimeline from "./StepTraceTimeline.vue";
 import ArticleReviewModal from "./ArticleReviewModal.vue";
 import ImageActionModal from "./ImageActionModal.vue";
+import { checkPublishConditions, getAvailableActions } from "./articleStatusShared.js";
 import { usePipelineStatus } from "../../composables/usePipelineStatus.js";
 import {
   editFinishedArticle,
@@ -1356,7 +1359,7 @@ async function copyMarkdownAsPlainText(mdText: string): Promise<void> {
   message.success("已复制纯文本到剪贴板");
 }
 
-// ─── 推送条件检查 ───
+// ─── 推送条件检查（复用共享模块） ───
 // props.article 深层属性修改不会触发响应式，用一个计数器手动刷新
 const articleChangeTick = ref(0);
 function tickArticleChange() { articleChangeTick.value++; }
@@ -1366,10 +1369,7 @@ const canPush = computed(() => {
   const article = props.article;
   if (!article) return false;
   if (article.status !== "ready_for_publish" && article.status !== "wechat_draft") return false;
-  if (parseJsonArray(article.titles).length === 0) return false;
-  if (article.coverImage.length === 0) return false;
-  if (!article.contentMarkdown) return false;
-  return true;
+  return checkPublishConditions(article).qualified;
 });
 
 const missingConditions = computed(() => {
@@ -1378,11 +1378,63 @@ const missingConditions = computed(() => {
   if (!article) return [];
   const missing: string[] = [];
   if (article.status !== "ready_for_publish" && article.status !== "wechat_draft") missing.push("状态不允许推送");
-  if (parseJsonArray(article.titles).length === 0) missing.push("缺少标题");
-  if (article.coverImage.length === 0) missing.push("缺少封面图");
-  if (!article.contentMarkdown) missing.push("缺少 Markdown 内容");
+  missing.push(...checkPublishConditions(article).missing);
   return missing;
 });
+
+// ─── 状态操作（标记可推送 / 取消推送标记） ───
+
+async function handleDetailMarkPublishable(): Promise<void> {
+  if (!props.article) return;
+  const { Modal } = await import("ant-design-vue");
+  const confirmed = await new Promise<boolean>(resolve => {
+    Modal.confirm({
+      title: "标记可推送",
+      content: "确认标记该文章为可推送？后续可在平台手动推送到微信公众号草稿箱。",
+      okText: "确认", cancelText: "取消",
+      onOk: () => resolve(true), onCancel: () => resolve(false),
+    });
+  });
+  if (!confirmed) return;
+  try {
+    const res = await editFinishedArticle(props.article.id, { status: "ready_for_publish" } as any);
+    if (res.ok) {
+      message.success("已标记为可推送");
+      emit("saved");
+    } else {
+      message.error("操作失败");
+    }
+  } catch (err: unknown) {
+    const httpErr = err as { body?: { reason?: string } };
+    message.error(httpErr?.body?.reason ?? "操作失败");
+  }
+}
+
+async function handleDetailCancelPublishable(): Promise<void> {
+  if (!props.article) return;
+  const { Modal } = await import("ant-design-vue");
+  const confirmed = await new Promise<boolean>(resolve => {
+    Modal.confirm({
+      title: "取消推送标记",
+      content: "确认取消推送标记？文章将回到排队状态。",
+      okText: "确认", cancelText: "取消",
+      onOk: () => resolve(true), onCancel: () => resolve(false),
+    });
+  });
+  if (!confirmed) return;
+  try {
+    const res = await editFinishedArticle(props.article.id, { status: "queued" } as any);
+    if (res.ok) {
+      message.success("已取消推送标记");
+      emit("saved");
+    } else {
+      message.error("操作失败");
+    }
+  } catch (err: unknown) {
+    const httpErr = err as { body?: { reason?: string } };
+    message.error(httpErr?.body?.reason ?? "操作失败");
+  }
+}
 </script>
 
 <style>

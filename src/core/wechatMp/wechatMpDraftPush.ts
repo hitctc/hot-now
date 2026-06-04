@@ -93,6 +93,10 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
     await onProgress?.("validate", "error");
     return { ok: false, errorCode: "article-not-found", errorMessage: "文章不存在" };
   }
+  if (article.status !== "ready_for_publish") {
+    await onProgress?.("validate", "error");
+    return { ok: false, errorCode: "invalid-status", errorMessage: `当前状态「${article.status}」不允许推送，仅「可推送」状态可操作` };
+  }
   if (!article.contentMarkdown) {
     await onProgress?.("validate", "error");
     return { ok: false, errorCode: "no-content", errorMessage: "文章无 Markdown 内容" };
@@ -193,7 +197,7 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
       SET status = 'success', media_id = ?, pushed_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(mediaId, logId);
-    editCreativeFinishedArticle(db, articleId, { status: "wechat_draft" });
+    editCreativeFinishedArticle(db, articleId, { status: "wechat_draft" }, "push");
     const pushCount = getArticlePushCount(db, articleId);
     await onProgress?.("status", "done");
 

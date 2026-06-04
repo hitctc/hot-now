@@ -441,16 +441,75 @@ export function listCreativeFinishedArticles(
   };
 }
 
+// ── 状态转换校验 ──────────────────────────────────────────────────────────
+
+/** 合法状态转换表：[fromStatus, toStatus] → 前置条件 key */
+const STATUS_TRANSITIONS: Record<string, Record<string, "publish_conditions" | "none">> = {
+  queued:            { ready_for_publish: "publish_conditions" },
+  ready_for_publish: { queued: "none", wechat_draft: "none" },
+  needs_review:      { ready_for_publish: "none", soft_deleted: "none" },
+  anomaly:           { ready_for_publish: "publish_conditions" },
+};
+
+/** 检查文章是否满足推送前置条件（封面图 + 标题 + 正文） */
+export function checkPublishConditions(article: CreativeFinishedArticleRecord): { qualified: boolean; missing: string[] } {
+  const missing: string[] = [];
+  if (!article.coverImage || article.coverImage.length === 0) missing.push("缺少封面图");
+  if (!article.titles || article.titles.length === 0) missing.push("缺少标题");
+  if (!article.contentMarkdown || article.contentMarkdown.length <= 50) missing.push("缺少正文");
+  return { qualified: missing.length === 0, missing };
+}
+
+/**
+ * 校验状态转换是否合法，返回错误原因或 null 表示通过。
+ * @param source - 调用来源，"review" 表示审核入口（允许 needs_review → ready_for_publish）
+ */
+export function validateStatusTransition(
+  currentStatus: string,
+  targetStatus: string,
+  article: CreativeFinishedArticleRecord,
+  source?: string,
+): string | null {
+  // 目标状态与当前状态相同时放行（幂等）
+  if (currentStatus === targetStatus) return null;
+
+  const fromTable = STATUS_TRANSITIONS[currentStatus];
+  if (!fromTable) return `当前状态「${currentStatus}」不允许变更`;
+
+  const condition = fromTable[targetStatus];
+  if (condition === undefined) return `非法状态转换: ${currentStatus} → ${targetStatus}`;
+
+  // needs_review → ready_for_publish 只允许审核入口
+  if (currentStatus === "needs_review" && targetStatus === "ready_for_publish" && source !== "review") {
+    return "待审核文章只能通过审核入口标记为可推送";
+  }
+
+  // 检查推送前置条件
+  if (condition === "publish_conditions") {
+    const { qualified, missing } = checkPublishConditions(article);
+    if (!qualified) return `条件不满足: ${missing.join("、")}`;
+  }
+
+  return null;
+}
+
 // ── Edit content fields ────────────────────────────────────────────────────
 
 export function editCreativeFinishedArticle(
   db: SqliteDatabase,
   id: number,
-  input: EditCreativeFinishedArticleInput
+  input: EditCreativeFinishedArticleInput,
+  source?: string,
 ): { ok: boolean; reason?: string } {
   const current = findCreativeFinishedArticleById(db, id);
   if (!current) {
     return { ok: false, reason: "article not found" };
+  }
+
+  // 状态变更校验：经过统一转换表
+  if (input.status !== undefined && input.status !== current.status) {
+    const error = validateStatusTransition(current.status, input.status, current, source);
+    if (error) return { ok: false, reason: error };
   }
 
   // Collect fields that were actually provided so we only update those columns.

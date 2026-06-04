@@ -20,6 +20,7 @@ import { readWechatMpAccounts, type WechatMpAccountSummary } from "../../service
 import ArticlePushFloatWidget from "../../components/creative/ArticlePushFloatWidget.vue";
 import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
 import SourceItemDetailModal from "../../components/creative/SourceItemDetailModal.vue";
+import { getStatusLabel, getAvailableActions, checkPublishConditions, type ArticleAction } from "../../components/creative/articleStatusShared.js";
 
 // ─── JSON 解析辅助 ───
 
@@ -81,7 +82,7 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 
 const statusOptions = [
   { label: "全部状态", value: "" },
-  { label: "队列中", value: "queued" },
+  { label: "排队中", value: "queued" },
   { label: "写作中", value: "writing" },
   { label: "已生成", value: "generated" },
   { label: "待审核", value: "needs_review" },
@@ -91,6 +92,7 @@ const statusOptions = [
   { label: "异常", value: "anomaly" },
   { label: "已中止", value: "stopped" },
   { label: "已失败", value: "failed" },
+  { label: "已删除", value: "soft_deleted" },
 ];
 
 // 发布状态切换操作锁
@@ -124,15 +126,11 @@ const defaultAccountName = computed(() => {
   return def?.name ?? '';
 });
 
-// 推送前置条件检查：文章必须标题、封面图、Markdown 正文齐全
+// 推送前置条件检查：文章必须标题、封面图、正文齐全 + 处于可推送/已推送状态
 function canPush(article: CreativeFinishedArticle | null): boolean {
   if (!article) return false;
   if (article.status !== 'ready_for_publish' && article.status !== 'wechat_draft') return false;
-  const parsedTitles = parseJsonArray(article.titles);
-  if (parsedTitles.length === 0) return false;
-  if (article.coverImage.length === 0) return false;
-  if (!article.contentMarkdown) return false;
-  return true;
+  return checkPublishConditions(article).qualified;
 }
 
 // 返回不满足推送条件的原因列表，用于 hover 提示
@@ -140,10 +138,7 @@ function getMissingConditions(article: CreativeFinishedArticle | null): string[]
   if (!article) return ['文章不存在'];
   const missing: string[] = [];
   if (article.status !== 'ready_for_publish' && article.status !== 'wechat_draft') missing.push('状态不允许推送');
-  const parsedTitles = parseJsonArray(article.titles);
-  if (parsedTitles.length === 0) missing.push('缺少标题');
-  if (article.coverImage.length === 0) missing.push('缺少封面图');
-  if (!article.contentMarkdown) missing.push('缺少 Markdown 内容');
+  missing.push(...checkPublishConditions(article).missing);
   return missing;
 }
 
@@ -211,16 +206,68 @@ async function handleTogglePublishable(article: CreativeFinishedArticle): Promis
   }
 }
 
-// 审核通过：把 needs_review 改为 ready_for_publish
+// 审核通过：走转换 #4，标注来源为审核入口
 async function handleApproveArticle(article: CreativeFinishedArticle): Promise<void> {
   try {
-    const res = await editFinishedArticle(article.id, { status: "ready_for_publish" });
+    const res = await editFinishedArticle(article.id, { status: "ready_for_publish", _source: "review" } as any);
     if (res.ok) {
       message.success("已通过审核");
       loadItems();
     }
   } catch {
     message.error("操作失败");
+  }
+}
+
+// 标记可推送（转换 #1 / #6）
+async function handleMarkPublishable(article: CreativeFinishedArticle): Promise<void> {
+  const { Modal } = await import("ant-design-vue");
+  const confirmed = await new Promise<boolean>(resolve => {
+    Modal.confirm({
+      title: "标记可推送",
+      content: "确认标记该文章为可推送？后续可在平台手动推送到微信公众号草稿箱。",
+      okText: "确认", cancelText: "取消",
+      onOk: () => resolve(true), onCancel: () => resolve(false),
+    });
+  });
+  if (!confirmed) return;
+  try {
+    const res = await editFinishedArticle(article.id, { status: "ready_for_publish" } as any);
+    if (res.ok) {
+      message.success("已标记为可推送");
+      loadItems();
+    } else {
+      message.error("操作失败");
+    }
+  } catch (err: unknown) {
+    const httpErr = err as { body?: { reason?: string } };
+    message.error(httpErr?.body?.reason ?? "操作失败");
+  }
+}
+
+// 取消推送标记（转换 #2）
+async function handleCancelPublishable(article: CreativeFinishedArticle): Promise<void> {
+  const { Modal } = await import("ant-design-vue");
+  const confirmed = await new Promise<boolean>(resolve => {
+    Modal.confirm({
+      title: "取消推送标记",
+      content: "确认取消推送标记？文章将回到排队状态。",
+      okText: "确认", cancelText: "取消",
+      onOk: () => resolve(true), onCancel: () => resolve(false),
+    });
+  });
+  if (!confirmed) return;
+  try {
+    const res = await editFinishedArticle(article.id, { status: "queued" } as any);
+    if (res.ok) {
+      message.success("已取消推送标记");
+      loadItems();
+    } else {
+      message.error("操作失败");
+    }
+  } catch (err: unknown) {
+    const httpErr = err as { body?: { reason?: string } };
+    message.error(httpErr?.body?.reason ?? "操作失败");
   }
 }
 
@@ -364,23 +411,11 @@ async function copyText(text: string): Promise<void> {
 
 
 
-// ─── 状态字典 ───
+// ─── 状态标签（统一由 articleStatusShared 管理） ───
 
-const statusMap: Record<string, { label: string; color: string }> = {
-  queued: { label: "队列中", color: "default" },
-  writing: { label: "写作中", color: "processing" },
-  generated: { label: "已生成", color: "blue" },
-  needs_review: { label: "待审核", color: "orange" },
-  ready_for_publish: { label: "可推送", color: "cyan" },
-  wechat_draft: { label: "已推送草稿", color: "green" },
-  review_rejected: { label: "审核不通过", color: "#666" },
-  anomaly: { label: "异常", color: "red" },
-  stopped: { label: "已中止", color: "default" },
-  failed: { label: "已失败", color: "red" },
-};
-
+// 状态标签渲染函数，直接转发到共享模块
 function getStatusInfo(status: string): { label: string; color: string } {
-  return statusMap[status] ?? { label: status, color: "default" };
+  return getStatusLabel(status);
 }
 
 // ─── 表格列 ───
@@ -507,10 +542,26 @@ const pagination = computed(() => ({
           <!-- 状态列 -->
           <template v-else-if="column.key === 'status'">
             <div class="flex flex-col items-start gap-0.5 leading-tight">
-              <a-tag :color="getStatusInfo(record.status).color" class="!m-0 !text-[11px] !py-0">{{ getStatusInfo(record.status).label }}</a-tag>
+              <a-tag
+                :color="getStatusInfo(record.status).color"
+                :class="['!m-0 !text-[11px] !py-0', record.status === 'soft_deleted' ? 'line-through' : '']"
+              >{{ getStatusInfo(record.status).label }}</a-tag>
               <a-tag v-if="record.pushCount > 0" color="green" class="!m-0 !text-[11px] !py-0">{{ record.pushCount }}次</a-tag>
+              <!-- 标记可推送 -->
               <button
-                v-if="record.status === 'needs_review'"
+                v-if="getAvailableActions(record).some(a => a.type === 'mark_publishable')"
+                class="text-[10px] text-editorial-link-active hover:underline"
+                @click="handleMarkPublishable(record)"
+              >标记可推送</button>
+              <!-- 取消推送标记 -->
+              <button
+                v-if="getAvailableActions(record).some(a => a.type === 'cancel_publishable')"
+                class="text-[10px] text-editorial-text-muted hover:underline"
+                @click="handleCancelPublishable(record)"
+              >取消推送标记</button>
+              <!-- 审核 -->
+              <button
+                v-if="getAvailableActions(record).some(a => a.type === 'review')"
                 class="text-[10px] text-editorial-link-active hover:underline"
                 @click="openDetail(record)"
               >去审核</button>

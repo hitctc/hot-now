@@ -2005,6 +2005,7 @@ export function createServer(deps: ServerDeps = {}) {
     const params = request.params as { id: string };
     const body = request.body as Record<string, unknown> | undefined;
     const id = parseInt(params.id, 10);
+    const source = typeof body?._source === "string" ? body._source : undefined;
     const result = editCreativeFinishedArticle(db, id, {
       contentMarkdown: typeof body?.contentMarkdown === "string" ? body.contentMarkdown : undefined,
       thesis: typeof body?.thesis === "string" ? body.thesis : undefined,
@@ -2021,7 +2022,7 @@ export function createServer(deps: ServerDeps = {}) {
       introIndex: typeof body?.introIndex === "number" ? body.introIndex : undefined,
       status: typeof body?.status === "string" ? body.status : undefined,
       anomalyReason: typeof body?.anomalyReason === "string" ? body.anomalyReason : undefined,
-    });
+    }, source);
     if (!result.ok && result.reason === "article not found") {
       return reply.code(404).send({ ok: false, reason: "not-found" });
     }

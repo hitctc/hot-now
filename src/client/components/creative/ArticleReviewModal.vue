@@ -33,7 +33,8 @@ async function handleApprove(): Promise<void> {
     const res = await editFinishedArticle(props.article.id, {
       status: "ready_for_publish",
       anomalyReason: "",
-    });
+      _source: "review",
+    } as any);
     if (res.ok) {
       message.success("审核通过");
       emit("reviewed");
@@ -51,9 +52,9 @@ async function handleReject(): Promise<void> {
   submitting.value = true;
   try {
     const res = await editFinishedArticle(props.article.id, {
-      status: "review_rejected",
+      status: "soft_deleted",
       anomalyReason: rejectReason.value || "审核不通过",
-    });
+    } as any);
     if (res.ok) {
       message.success("已标记为审核不通过");
       emit("reviewed");

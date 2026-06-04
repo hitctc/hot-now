@@ -23,7 +23,7 @@ const themes: Record<WechatThemeId, WechatTheme> = {
     id: "classic",
     name: "默认",
     styles: {
-      container: `max-width: 677px; margin: 0 auto; padding: 5px 20px; word-break: break-word; font-family: "Times New Roman", "Songti SC", "SimSun", serif; color: #000; background-color: transparent;`,
+      container: `max-width: 100%; margin: 0 auto; padding: 0; word-break: break-word; color: #000; background-color: transparent;`,
       h1: "margin: 40px 0 30px; font-size: 22px; font-weight: bold; color: #000; text-align: center; line-height: 1.4; display: block;",
       h2: "margin: 30px 0 15px; font-size: 18px; font-weight: bold; color: #000; text-align: left; border-bottom: 2px solid #000; padding-bottom: 8px;",
       h3: "margin: 20px 0 10px; font-size: 16px; font-weight: bold; color: #800000;",
@@ -37,7 +37,7 @@ const themes: Record<WechatThemeId, WechatTheme> = {
       ul: "margin: 16px 0; padding-left: 20px; list-style-type: disc;",
       ol: "margin: 16px 0; padding-left: 20px; list-style-type: decimal;",
       li: "margin: 5px 0; color: #333; line-height: 1.6; font-weight: 500;",
-      img: "display: block; margin: 30px auto; width: 100%; border: 1px solid #ddd;",
+      img: "display: block; margin: 0px auto; width: 100%; border: 1px solid #ddd;",
       hr: "margin: 10px 0; border: none; border-top: 1px solid #000;",
       code: "color: #000; background: #f4f4f4; border: 1px solid #eee; padding: 1px 4px; margin: 0 2px; border-radius: 2px; font-size: 14px; font-family: 'Courier New', Courier, monospace;",
       pre: "background: #f9f9f9; border: 1px solid #ccc; padding: 12px; font-family: 'Courier New', monospace; font-size: 13px; overflow-x: auto;",

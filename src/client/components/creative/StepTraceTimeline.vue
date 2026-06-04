@@ -56,10 +56,51 @@ function formatMeta(meta: Record<string, unknown> | undefined): Array<{ key: str
   if (!meta) return [];
   return Object.entries(meta)
     .filter(([, v]) => v != null)
+    .filter(([k]) => k !== "substepTraces")
     .map(([k, v]) => ({
       key: k,
       value: typeof v === "object" ? JSON.stringify(v, null, 2) : String(v),
     }));
+}
+
+// 搜索结果类型标签
+const TYPE_LABELS: Record<string, string> = {
+  official: "官方",
+  media: "媒体",
+  blog: "博客",
+  report: "报告",
+  reference: "参考",
+  original_source: "原文",
+};
+function resultTypeLabel(type?: string): string {
+  return TYPE_LABELS[type ?? ""] ?? type ?? "其他";
+}
+
+// 搜索结果类型样式
+function resultTypeStyle(type?: string): string {
+  const map: Record<string, string> = {
+    official: "bg-blue-100 text-blue-700",
+    media: "bg-purple-100 text-purple-700",
+    blog: "bg-green-100 text-green-700",
+    report: "bg-orange-100 text-orange-700",
+    reference: "bg-gray-100 text-gray-700",
+    original_source: "bg-teal-100 text-teal-700",
+  };
+  return map[type ?? ""] ?? "bg-gray-100 text-gray-600";
+}
+
+// 置信度颜色
+function confidenceColor(level: string): string {
+  if (level === "high") return "text-green-600";
+  if (level === "medium") return "text-yellow-600";
+  return "text-red-500";
+}
+
+// 风险等级颜色
+function riskColor(level: string): string {
+  if (level === "high") return "text-red-600 font-medium";
+  if (level === "medium") return "text-orange-600";
+  return "text-green-600";
 }
 </script>
 
@@ -132,19 +173,114 @@ function formatMeta(meta: Record<string, unknown> | undefined): Array<{ key: str
 
           <!-- 展开详情 -->
           <div v-if="expandedSteps.has(entry.step)" class="mt-1 space-y-1">
-            <div v-if="entry.summary" class="text-[11px] text-editorial-text-muted">
-              {{ entry.summary }}
-            </div>
             <div v-if="entry.startedAt" class="text-[11px] text-editorial-text-muted">
               {{ entry.startedAt }} → {{ entry.finishedAt ?? '...' }}
             </div>
-            <!-- meta 格式化展示 -->
-            <div v-if="formatMeta(entry.meta).length > 0" class="mt-1 rounded border border-editorial-border bg-editorial-bg-page px-2 py-1">
-              <div v-for="row in formatMeta(entry.meta)" :key="row.key" class="flex gap-2 text-[11px] leading-5">
-                <span class="shrink-0 text-editorial-text-muted">{{ row.key }}</span>
-                <span class="break-all text-editorial-text-body">{{ row.value }}</span>
+
+            <!-- Step1: 素材来源 -->
+            <template v-if="entry.step === 1 && entry.meta?.source_title">
+              <div class="rounded border border-editorial-border bg-editorial-bg-page px-2 py-1 text-[11px] space-y-0.5">
+                <div v-if="entry.meta.source_url" class="truncate">
+                  <a :href="String(entry.meta.source_url)" target="_blank" class="text-editorial-link-active hover:underline">{{ entry.meta.source_title }}</a>
+                </div>
+                <div v-else class="text-editorial-text-body">{{ entry.meta.source_title }}</div>
+                <div v-if="entry.meta.source_name" class="text-editorial-text-muted">{{ entry.meta.source_name }}</div>
               </div>
-            </div>
+            </template>
+
+            <!-- Step2: 搜索 query 列表 -->
+            <template v-else-if="entry.step === 2 && entry.meta?.queries">
+              <div class="rounded border border-editorial-border bg-editorial-bg-page px-2 py-1">
+                <div class="text-[10px] text-editorial-text-muted">搜索意图 · {{ (entry.meta.queries as string[]).length }} 条</div>
+                <div v-for="(q, i) in (entry.meta.queries as string[])" :key="i" class="text-[11px] text-editorial-text-body truncate">· {{ q }}</div>
+              </div>
+            </template>
+
+            <!-- Step3: 搜索结果（P0） -->
+            <template v-else-if="entry.step === 3 && entry.meta?.results">
+              <div class="rounded border border-editorial-border bg-editorial-bg-page px-2 py-1 space-y-1.5">
+                <div class="flex items-center gap-2 text-[10px]">
+                  <span class="text-editorial-text-muted">搜索结果</span>
+                  <span v-if="entry.meta.stats" class="text-editorial-text-muted">
+                    官方 {{ (entry.meta.stats as any).official ?? 0 }} · 媒体 {{ (entry.meta.stats as any).report ?? 0 }} · 共 {{ (entry.meta.stats as any).total ?? (entry.meta.results as any[]).length }}
+                  </span>
+                  <span v-if="entry.meta.confidence" :class="confidenceColor(String(entry.meta.confidence))">置信度 {{ entry.meta.confidence }}</span>
+                </div>
+                <div v-for="(r, i) in (entry.meta.results as Array<{title?: string; url?: string; type?: string}>)" :key="i" class="flex items-start gap-1 text-[11px]">
+                  <span class="shrink-0 rounded px-1 text-[9px] font-medium" :class="resultTypeStyle(r.type)">{{ resultTypeLabel(r.type) }}</span>
+                  <a v-if="r.url" :href="r.url" target="_blank" class="truncate text-editorial-link-active hover:underline" :title="r.title">{{ r.title || r.url }}</a>
+                  <span v-else class="truncate text-editorial-text-body">{{ r.title || '-' }}</span>
+                </div>
+              </div>
+            </template>
+
+            <!-- Step4: 写作策略 -->
+            <template v-else-if="entry.step === 4 && entry.meta?.angle">
+              <div class="rounded border border-editorial-border bg-editorial-bg-page px-2 py-1 text-[11px] space-y-0.5">
+                <div class="flex items-center gap-2">
+                  <span class="rounded bg-blue-100 px-1 text-[9px] font-medium text-blue-700">{{ entry.meta.final_mode ?? '-' }} 模式</span>
+                  <span class="text-editorial-text-muted">{{ entry.meta.archetype }}</span>
+                  <span v-if="entry.meta.confidence" :class="confidenceColor(String(entry.meta.confidence))">{{ entry.meta.confidence }}</span>
+                </div>
+                <div class="font-medium text-editorial-text-body">{{ entry.meta.angle }}</div>
+                <div class="text-editorial-text-muted">方向：{{ entry.meta.writing_direction ?? '-' }} · 风险：{{ entry.meta.dependency_risk ?? '-' }} · 厚度：{{ entry.meta.material_thickness ?? '-' }}</div>
+              </div>
+            </template>
+
+            <!-- Step7/9: 导语/摘要文本 -->
+            <template v-else-if="(entry.step === 7 || entry.step === 9) && entry.meta?.text">
+              <div class="rounded border border-editorial-border bg-editorial-bg-page px-2 py-1">
+                <div class="text-[10px] text-editorial-text-muted">{{ entry.step === 7 ? '导语' : '摘要' }} · {{ entry.meta.word_count ?? '?' }}字</div>
+                <div class="text-[11px] leading-5 text-editorial-text-body">{{ entry.meta.text }}</div>
+              </div>
+            </template>
+
+            <!-- Step10: 质量自检 -->
+            <template v-else-if="entry.step === 10 && entry.meta?.issues">
+              <div class="rounded border border-editorial-border bg-editorial-bg-page px-2 py-1 text-[11px] space-y-0.5">
+                <div class="flex items-center gap-2">
+                  <span :class="entry.meta.pass ? 'text-green-600' : 'text-orange-600'">{{ entry.meta.pass ? '✓ 通过' : '✗ 未通过' }}</span>
+                  <span v-if="entry.meta.severity" :class="entry.meta.severity === 'critical' ? 'text-red-600' : 'text-orange-500'">{{ entry.meta.severity }}</span>
+                  <span v-if="entry.meta.revised" class="text-editorial-text-muted">已修订</span>
+                </div>
+                <div v-for="(issue, i) in (entry.meta.issues as string[])" :key="i" class="text-editorial-text-body">· {{ issue }}</div>
+              </div>
+            </template>
+
+            <!-- Step11: 原创风险 -->
+            <template v-else-if="entry.step === 11 && (entry.meta?.llm_risk_points || entry.meta?.overall_risk)">
+              <div class="rounded border border-editorial-border bg-editorial-bg-page px-2 py-1 text-[11px] space-y-0.5">
+                <div class="flex items-center gap-2">
+                  <span :class="riskColor(String(entry.meta.overall_risk))">风险 {{ entry.meta.overall_risk }}</span>
+                  <span class="text-editorial-text-muted">规则 {{ entry.meta.rule_based_risk ?? '-' }} · LLM {{ entry.meta.llm_risk ?? '-' }}</span>
+                  <span v-if="entry.meta.high_risk_segments_count" class="text-editorial-text-muted">高风险片段 {{ entry.meta.high_risk_segments_count }}</span>
+                </div>
+                <div v-for="(pt, i) in ((entry.meta.llm_risk_points as string[]) ?? [])" :key="i" class="text-orange-700">⚠ {{ pt }}</div>
+              </div>
+            </template>
+
+            <!-- Step14: 引用来源（P0） -->
+            <template v-else-if="entry.step === 14 && entry.meta?.references">
+              <div class="rounded border border-editorial-border bg-editorial-bg-page px-2 py-1 space-y-0.5">
+                <div class="text-[10px] text-editorial-text-muted">引用来源 · {{ (entry.meta.references as any[]).length }} 条</div>
+                <div v-for="(ref, i) in (entry.meta.references as Array<{url?: string; name?: string; type?: string}>)" :key="i" class="flex items-start gap-1 text-[11px]">
+                  <span class="shrink-0 rounded px-1 text-[9px] font-medium" :class="resultTypeStyle(ref.type)">{{ resultTypeLabel(ref.type) }}</span>
+                  <a v-if="ref.url" :href="ref.url" target="_blank" class="truncate text-editorial-link-active hover:underline" :title="ref.name">{{ ref.name || ref.url }}</a>
+                  <span v-else class="truncate text-editorial-text-body">{{ ref.name || '-' }}</span>
+                </div>
+              </div>
+            </template>
+
+            <!-- 兜底: 通用 meta 平铺 -->
+            <template v-else-if="formatMeta(entry.meta).length > 0">
+              <div class="rounded border border-editorial-border bg-editorial-bg-page px-2 py-1">
+                <div v-for="row in formatMeta(entry.meta)" :key="row.key" class="flex gap-2 text-[11px] leading-5">
+                  <span class="shrink-0 text-editorial-text-muted">{{ row.key }}</span>
+                  <span class="break-all text-editorial-text-body">{{ row.value }}</span>
+                </div>
+              </div>
+            </template>
+
             <!-- Step 12 图片子步骤 -->
             <template v-if="entry.step === 12 && entry.meta?.substepTraces">
               <div class="mt-1 text-[11px] font-medium text-editorial-text-muted">图片生成子步骤</div>

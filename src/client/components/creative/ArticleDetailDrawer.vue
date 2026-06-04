@@ -1079,11 +1079,11 @@ async function handleRegenInlineImage(imageIndex: number): Promise<void> {
         props.article.contentMarkdown = result.contentMarkdown;
         lastSavedContent = result.contentMarkdown;
 
-        // 同步渲染并保存公众号预览 HTML（总是更新，live 模式用 bauhaus 兜底）
+        // 同步渲染并保存公众号预览 HTML（总是更新，live 模式用 classic 兜底）
         const saveFields: Record<string, unknown> = { contentMarkdown: result.contentMarkdown };
         const themeId = activePreviewTheme.value !== "live"
           ? themeIdMap[activePreviewTheme.value]
-          : "bauhaus" as WechatThemeId;
+          : "classic" as WechatThemeId;
         const html = renderWechatThemePreview(result.contentMarkdown, themeId);
         props.article.wechatHtml = html;
         saveFields.wechatHtml = html;
@@ -1233,10 +1233,10 @@ watch(() => props.open, (val) => {
     editorFullscreen.value = false;
     document.body.style.overflow = "";
     document.addEventListener("keydown", handleFullscreenEsc);
-    // 恢复文章保存的主题偏好，无记录时默认包豪斯
+    // 恢复文章保存的主题偏好，无记录时默认 classic
     const saved = props.article.wechatThemeId;
     const previewKey = saved ? reverseThemeIdMap[saved] : undefined;
-    activePreviewTheme.value = previewKey ?? "bauhaus";
+    activePreviewTheme.value = previewKey ?? "classic";
   }
 });
 
@@ -1294,9 +1294,10 @@ function handleClose(): void {
 
 // ─── 预览主题切换 ───
 
-type PreviewThemeKey = "live" | "bauhaus" | "sunsetFilm" | "receipt";
+type PreviewThemeKey = "classic" | "live" | "bauhaus" | "sunsetFilm" | "receipt";
 
 const previewThemeOptions: { key: PreviewThemeKey; label: string }[] = [
+  { key: "classic", label: "默认" },
   { key: "bauhaus", label: "包豪斯" },
   { key: "sunsetFilm", label: "落日胶片" },
   { key: "receipt", label: "购物小票" },
@@ -1306,12 +1307,14 @@ const previewThemeOptions: { key: PreviewThemeKey; label: string }[] = [
 const activePreviewTheme = ref<PreviewThemeKey>("live");
 
 const themeIdMap: Record<Exclude<PreviewThemeKey, "live">, WechatThemeId> = {
+  classic: "classic",
   bauhaus: "bauhaus",
   sunsetFilm: "sunset-film",
   receipt: "receipt",
 };
 
 const reverseThemeIdMap: Record<string, Exclude<PreviewThemeKey, "live">> = {
+  classic: "classic",
   bauhaus: "bauhaus",
   "sunset-film": "sunsetFilm",
   receipt: "receipt",
@@ -1406,7 +1409,7 @@ const currentWechatThemeId = computed<WechatThemeId>(() => {
     return themeIdMap[activePreviewTheme.value as Exclude<PreviewThemeKey, "live">];
   }
   // 实时预览模式下回退到文章保存的主题
-  return (props.article?.wechatThemeId as WechatThemeId) ?? "bauhaus";
+  return (props.article?.wechatThemeId as WechatThemeId) ?? "classic";
 });
 
 // ─── 微信公众号格式复制 ───

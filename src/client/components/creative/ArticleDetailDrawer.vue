@@ -77,6 +77,18 @@
             >素材 #{{ article.sourceItemId }}{{ (article as any).sourceTitle ? ' · ' + (article as any).sourceTitle : '' }}{{ (article as any).sourceName ? ' · ' + (article as any).sourceName : '' }}</a>
         </div>
 
+        <!-- 异常/审核信息（统一展示区） -->
+        <section v-if="hasAnomalyInfo" class="rounded border bg-red-50 border-red-200 px-3 py-2.5">
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            <span class="font-semibold text-red-700">{{ article.status === 'anomaly' ? '异常' : article.status === 'needs_review' ? '待审核' : '警告' }}</span>
+            <span v-if="article.anomalyReason" class="text-red-600">{{ formatAnomalyReason(article.anomalyReason) }}</span>
+            <span v-if="article.reasonCode" class="text-red-500">代码: {{ article.reasonCode }}</span>
+            <span v-if="article.reasonText" class="text-red-500">{{ article.reasonText }}</span>
+            <span v-if="article.manualReviewReason" class="text-yellow-700">审核原因: {{ manualReviewReasonText }}</span>
+            <span v-for="r in (article.manualReviewReasons ?? [])" :key="r" class="text-yellow-600">{{ r }}</span>
+          </div>
+        </section>
+
         <!-- 备选标题 -->
         <section v-if="displayTitles.length > 0 || regenTitleLoading">
           <div class="mb-2 flex items-center justify-between">
@@ -189,7 +201,7 @@
           </div>
           <!-- 人工审核提示 -->
           <div v-if="article.needsManualReview || article.status === 'needs_review'" class="mb-2 rounded border border-yellow-400 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
-            ⚠ 需要人工审核{{ article.manualReviewReason ? `：${manualReviewReasonText}` : '' }}{{ article.anomalyReason ? `（${article.anomalyReason}）` : '' }}
+            ⚠ 需要人工审核{{ article.manualReviewReason ? `：${manualReviewReasonText}` : '' }}
           </div>
           <template v-if="sc">
             <!-- 外层结论 -->
@@ -603,6 +615,37 @@ async function handleRepairImagePrompts(): Promise<void> {
     repairingPrompts.value = false;
   }
 }
+
+// ─── 异常信息翻译 ───
+
+const ANOMALY_REASON_MAP: Record<string, string> = {
+  originality_risk_high: "原创风险过高",
+  c_mode_word_count_insufficient: "C 模式字数不足",
+  image_prompt_missing: "图片提示词缺失",
+  image_prompt_count_mismatch: "图片提示词数量不匹配",
+  image_prompt_parse_failed: "图片提示词解析失败",
+};
+
+/** 异常原因中文翻译，带英文原文对照 */
+function formatAnomalyReason(raw: string): string {
+  for (const [prefix, cn] of Object.entries(ANOMALY_REASON_MAP)) {
+    if (raw === prefix) return `${cn}（${raw}）`;
+    if (raw.startsWith(prefix + ":") || raw.startsWith(prefix + " - ")) {
+      const rest = raw.slice(prefix.length).replace(/^[: -]+/, "");
+      return `${cn}（${raw}）${rest ? "：" + rest : ""}`;
+    }
+  }
+  return raw;
+}
+
+/** 是否有任何异常信息需要展示 */
+const hasAnomalyInfo = computed(() => {
+  if (!props.article) return false;
+  const a = props.article;
+  return a.status === "anomaly" || a.status === "needs_review"
+    || !!a.anomalyReason || !!a.reasonCode || !!a.reasonText
+    || !!a.manualReviewReason || (a.manualReviewReasons?.length ?? 0) > 0;
+});
 
 // ─── 正文全屏编辑 ───
 const editorFullscreen = ref(false);

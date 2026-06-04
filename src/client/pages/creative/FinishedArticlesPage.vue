@@ -249,69 +249,6 @@ function closeDetail(): void {
   detailArticle.value = null;
 }
 
-// ─── 图片操作菜单 ───
-
-const imageMenuVisible = ref<number | null>(null);
-let imageMenuTimer: ReturnType<typeof setTimeout> | null = null;
-
-function showImageMenu(article: CreativeFinishedArticle): void {
-  if (imageMenuTimer) { clearTimeout(imageMenuTimer); imageMenuTimer = null; }
-  imageMenuVisible.value = article.id;
-}
-
-function hideImageMenu(): void {
-  imageMenuTimer = setTimeout(() => {
-    imageMenuVisible.value = null;
-  }, 200);
-}
-
-function cancelHideImageMenu(): void {
-  if (imageMenuTimer) { clearTimeout(imageMenuTimer); imageMenuTimer = null; }
-}
-
-function getInlineCount(article: CreativeFinishedArticle): number {
-  return parseArticleImages(article.imagesJson).length;
-}
-
-// 从 markdown 中 [IMAGE1] [IMAGE2] 占位符推断预期正文配图数量
-function getExpectedInlineCount(article: CreativeFinishedArticle): number {
-  const md = article.contentMarkdown || "";
-  const matches = md.match(/\[IMAGE\d+\]/gi);
-  return matches ? matches.length : 0;
-}
-
-function getTotalInlineSlots(article: CreativeFinishedArticle): number {
-  return Math.max(getInlineCount(article), getExpectedInlineCount(article));
-}
-
-function getAllImageAction(article: CreativeFinishedArticle): string {
-  const hasCover = article.coverImage && article.coverImage.length > 0;
-  const hasMissing = !hasCover || getInlineCount(article) < getExpectedInlineCount(article);
-  return hasMissing ? "全部补全" : "全部替换";
-}
-
-function getCoverAction(article: CreativeFinishedArticle): string {
-  return article.coverImage && article.coverImage.length > 0 ? "替换封面图" : "生成封面图";
-}
-
-function getAllInlineAction(article: CreativeFinishedArticle): string {
-  return getInlineCount(article) > 0 ? "替换所有正文图" : "生成所有正文图";
-}
-
-function getInlineAction(article: CreativeFinishedArticle, index: number): string {
-  return index <= getInlineCount(article) ? `替换正文图 ${index}` : `生成正文图 ${index}`;
-}
-
-function copyImageInstruction(article: CreativeFinishedArticle, action: string): void {
-  const text = `对成品文章id为 ${article.id} 执行${action}`;
-  navigator.clipboard.writeText(text).then(() => {
-    message.success("已复制到剪贴板");
-  }).catch(() => {
-    message.error("复制失败");
-  });
-  imageMenuVisible.value = null;
-}
-
 // ─── 素材详情弹窗 ───
 
 async function openSourceItemModal(sourceItemId: number): Promise<void> {
@@ -324,9 +261,13 @@ function closeSourceItemModal(): void {
   sourceItemModalId.value = null;
 }
 
-// 详情弹窗保存后刷新列表
-function onDetailSaved(): void {
-  loadItems();
+// 详情弹窗保存后刷新列表，同步更新 detailArticle 以反映 DB 最新数据
+async function onDetailSaved(): Promise<void> {
+  await loadItems();
+  if (detailArticle.value) {
+    const updated = items.value.find(a => a.id === detailArticle.value!.id);
+    if (updated) detailArticle.value = updated;
+  }
 }
 
 // ─── 格式化辅助 ───
@@ -560,26 +501,6 @@ const pagination = computed(() => ({
                 />
               </a-tooltip>
               <span v-else class="text-xs text-editorial-text-muted">无</span>
-              <a-dropdown :trigger="['hover']" @openChange="(v: boolean) => v ? showImageMenu(record) : hideImageMenu()">
-                <a-button type="text" size="small" class="!p-0 !text-[14px] leading-none" @mouseenter="cancelHideImageMenu()">🖼</a-button>
-                <template #overlay>
-                  <a-menu class="!min-w-[140px]" @mouseenter="cancelHideImageMenu()" @mouseleave="hideImageMenu()">
-                    <a-menu-item key="all" @click="copyImageInstruction(record, getAllImageAction(record))">
-                      <span class="text-xs font-medium">全部图片（{{ getAllImageAction(record) }}）</span>
-                    </a-menu-item>
-                    <a-menu-divider />
-                    <a-menu-item key="cover" @click="copyImageInstruction(record, getCoverAction(record))">
-                      <span class="text-xs">{{ getCoverAction(record) }}</span>
-                    </a-menu-item>
-                    <a-menu-item v-if="getTotalInlineSlots(record) > 0" key="inline-all" @click="copyImageInstruction(record, getAllInlineAction(record))">
-                      <span class="text-xs">{{ getAllInlineAction(record) }}</span>
-                    </a-menu-item>
-                    <a-menu-item v-for="n in getTotalInlineSlots(record)" :key="`inline-${n}`" @click="copyImageInstruction(record, getInlineAction(record, n))">
-                      <span class="text-xs">{{ getInlineAction(record, n) }}</span>
-                    </a-menu-item>
-                  </a-menu>
-                </template>
-              </a-dropdown>
             </div>
           </template>
 

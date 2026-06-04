@@ -902,6 +902,7 @@ function handleReviewDone(): void {
 
 function handleImageActionDone(): void {
   tickArticleChange();
+  emit("saved");
 }
 
 // ─── 写文章（统一走 write-article 异步接口） ───

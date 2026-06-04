@@ -24,7 +24,20 @@
 
     <template #footer>
       <div v-if="article" class="article-detail-footer">
-        <div class="article-detail-footer__left">
+        <!-- 第一组：编辑操作（直接生效） -->
+        <div class="article-detail-footer__group">
+          <a-tooltip :mouse-enter-delay="0.5" title="保存正文内容到数据库">
+            <a-button type="primary" :loading="saving" @click="handleSave">保存</a-button>
+          </a-tooltip>
+          <a-tooltip :mouse-enter-delay="0.5" title="按选定主题渲染后复制到剪贴板，可粘贴到公众号编辑器">
+            <a-button :loading="wechatCopying" @click="copyAsWechatFormat">复制格式</a-button>
+          </a-tooltip>
+        </div>
+
+        <div class="article-detail-footer__divider" />
+
+        <!-- 第二组：内容生成（触发生成流程） -->
+        <div class="article-detail-footer__group">
           <a-tooltip v-if="!pipelineOn" title="管线已紧急制动，请先恢复管线">
             <a-dropdown disabled>
               <a-button disabled>写文章</a-button>
@@ -42,27 +55,25 @@
             </template>
           </a-dropdown>
           <a-button @click="imageActionVisible = true">手动生图</a-button>
-          <a-button v-if="canRepairImagePrompts" :loading="repairingPrompts" @click="handleRepairImagePrompts">重试生成图片提示词</a-button>
+          <a-button v-if="canRepairImagePrompts" :loading="repairingPrompts" @click="handleRepairImagePrompts">修复提示词</a-button>
         </div>
-        <div class="article-detail-footer__right">
-          <a-tooltip :mouse-enter-delay="0.5" title="将当前正文按选定主题渲染后复制到剪贴板，可粘贴到公众号编辑器">
-            <a-button :loading="wechatCopying" @click="copyAsWechatFormat">复制公众号格式</a-button>
-          </a-tooltip>
-          <a-tooltip :mouse-enter-delay="0.5" title="保存正文内容到数据库">
-            <a-button type="primary" :loading="saving" @click="handleSave">保存正文</a-button>
-          </a-tooltip>
+
+        <div class="article-detail-footer__divider" />
+
+        <!-- 第三组：状态流转（二次确认） -->
+        <div class="article-detail-footer__group">
           <a-button v-if="article.status === 'needs_review'" type="primary" @click="reviewModalVisible = true">审核</a-button>
           <a-button v-if="getAvailableActions(article).some(a => a.type === 'mark_publishable')" @click="handleDetailMarkPublishable">标记可推送</a-button>
           <a-tooltip v-else-if="getAvailableActions(article).some(a => a.type === 'mark_publishable_disabled')" :title="getAvailableActions(article).find(a => a.type === 'mark_publishable_disabled')!.missing.join('、')">
             <a-button disabled>不可推送</a-button>
           </a-tooltip>
-          <a-button v-if="getAvailableActions(article).some(a => a.type === 'cancel_publishable')" @click="handleDetailCancelPublishable">取消推送标记</a-button>
+          <a-button v-if="getAvailableActions(article).some(a => a.type === 'cancel_publishable')" @click="handleDetailCancelPublishable">取消推送</a-button>
           <a-tooltip v-if="canPush" :mouse-enter-delay="0.5" title="自动保存正文后推送到微信公众号草稿箱">
-            <a-button type="primary" :loading="saving" @click="saveAndPush">推送到草稿箱</a-button>
+            <a-button type="primary" :loading="saving" @click="saveAndPush">推送草稿箱</a-button>
           </a-tooltip>
-          <a-tooltip v-else :mouse-enter-delay="0.3">
+          <a-tooltip v-else-if="article.status !== 'needs_review'" :mouse-enter-delay="0.3">
             <template #title>{{ missingConditions.join('；') }}</template>
-            <a-button type="primary" disabled>推送到草稿箱</a-button>
+            <a-button type="primary" disabled>推送草稿箱</a-button>
           </a-tooltip>
         </div>
       </div>
@@ -1578,10 +1589,13 @@ async function handleDetailCancelPublishable(): Promise<void> {
     padding: 8px 12px !important;
   }
   .article-detail-footer {
-    flex-direction: column !important;
-    gap: 8px;
+    flex-wrap: wrap;
+    gap: 8px !important;
   }
-  .article-detail-footer__right {
+  .article-detail-footer__divider {
+    display: none;
+  }
+  .article-detail-footer__group {
     flex-wrap: wrap;
     gap: 4px;
   }
@@ -1609,12 +1623,19 @@ async function handleDetailCancelPublishable(): Promise<void> {
 .article-detail-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 0;
 }
-.article-detail-footer__right {
+.article-detail-footer__group {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.article-detail-footer__divider {
+  width: 1px;
+  height: 20px;
+  background: #e5e7eb;
+  margin: 0 12px;
+  flex-shrink: 0;
 }
 
 .article-editor-wrapper {

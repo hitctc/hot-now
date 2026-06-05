@@ -2074,6 +2074,7 @@ export function createServer(deps: ServerDeps = {}) {
       quotes: Array.isArray(body?.quotes) ? body.quotes as string[] : undefined,
       summary100: Array.isArray(body?.summary100) ? body.summary100 as string[] : (typeof body?.summary100 === "string" ? [body.summary100] : undefined),
       images: Array.isArray(body?.images) ? body.images as any[] : undefined,
+      coverImage: Array.isArray(body?.coverImage) ? body.coverImage as string[] : undefined,
       wechatThemeId: typeof body?.wechatThemeId === "string" ? body.wechatThemeId : (body?.wechatThemeId === null ? null : undefined),
       wechatHtml: typeof body?.wechatHtml === "string" ? body.wechatHtml : (body?.wechatHtml === null ? null : undefined),
       coverImageIndex: typeof body?.coverImageIndex === "number" ? body.coverImageIndex : undefined,

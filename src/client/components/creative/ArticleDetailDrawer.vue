@@ -1143,18 +1143,21 @@ async function handleUploadInlineImage(imageIndex: number, event: Event): Promis
     }
     const newUrl = uploaded[0].storedUrl;
 
-    // 替换 markdown 中对应的图片占位符
+    // 找到正文中第 N 个 ![配图...] 并替换，实际 markdown 格式是 ![配图](url) 不带序号
     let md = editContent.value;
-    const imgRegex = new RegExp(`!\\[配图${imageIndex}[^\\]]*\\]\\([^)]+\\)`, "g");
-    const placeholderRegex = new RegExp(`\\[配图${imageIndex}占位\\]|<!--\\s*image-placeholder-${imageIndex}\\s*-->`, "g");
-
-    if (imgRegex.test(md)) {
-      md = md.replace(imgRegex, `![配图${imageIndex}](${newUrl})`);
-    } else if (placeholderRegex.test(md)) {
-      md = md.replace(placeholderRegex, `![配图${imageIndex}](${newUrl})`);
+    const imgPattern = /!\[配图[^\]]*\]\([^)]+\)/g;
+    const matches = [...md.matchAll(imgPattern)];
+    // imageIndex 从 1 开始，对应第 N 个配图
+    if (matches[imageIndex - 1]) {
+      // 替换第 N 个匹配
+      let count = 0;
+      md = md.replace(imgPattern, (full) => {
+        count++;
+        return count === imageIndex ? `![配图](${newUrl})` : full;
+      });
     } else {
-      // 没有找到占位符，追加到正文末尾
-      md = `${md}\n\n![配图${imageIndex}](${newUrl})`;
+      // 没有足够的配图占位，追加到正文末尾
+      md = `${md}\n\n![配图](${newUrl})`;
     }
 
     editContent.value = md;
@@ -1258,10 +1261,10 @@ async function handleUploadCover(event: Event): Promise<void> {
       return;
     }
     const newUrl = uploaded[0].storedUrl;
-    // 追加到封面图列表，自动选中新上传的
-    const updatedCovers = [...displayCoverImages.value, newUrl];
+    // 插入封面图列表首位，自动选中
+    const updatedCovers = [newUrl, ...displayCoverImages.value];
     localCoverImages.value = updatedCovers;
-    activeCoverIndex.value = updatedCovers.length - 1;
+    activeCoverIndex.value = 0;
     props.article.coverImage = updatedCovers;
     props.article.coverImageIndex = updatedCovers.length - 1;
 

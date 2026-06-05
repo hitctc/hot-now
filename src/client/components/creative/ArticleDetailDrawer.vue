@@ -1131,11 +1131,12 @@ async function handleUploadInlineImage(imageIndex: number, event: Event): Promis
   const input = event.target as HTMLInputElement;
   const files = input.files;
   if (!files || files.length === 0 || !props.article) return;
+  const fileArray = Array.from(files);
   input.value = "";
 
   uploadingInline.value = new Set([...uploadingInline.value, imageIndex]);
   try {
-    const uploaded = await uploadImages(Array.from(files), "inline");
+    const uploaded = await uploadImages(fileArray, "inline");
     if (uploaded.length === 0) {
       message.error(`配图 ${imageIndex} 上传失败`);
       return;
@@ -1245,12 +1246,13 @@ async function handleUploadCover(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement;
   const files = input.files;
   if (!files || files.length === 0 || !props.article) return;
-  // 清空 input 以便重复选择同一文件
+  // 先转数组再清空 input（某些浏览器 FileList 是实时引用，清空后变空）
+  const fileArray = Array.from(files);
   input.value = "";
 
   uploadingCover.value = true;
   try {
-    const uploaded = await uploadImages(Array.from(files), "cover");
+    const uploaded = await uploadImages(fileArray, "cover");
     if (uploaded.length === 0) {
       message.error("封面图上传失败");
       return;

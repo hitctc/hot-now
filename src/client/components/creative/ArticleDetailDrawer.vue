@@ -23,7 +23,7 @@
     </template>
 
     <template #footer>
-      <div v-if="article" class="article-detail-footer">
+      <div v-if="article && !props.readonly" class="article-detail-footer">
         <!-- 第一组：编辑操作（直接生效） -->
         <div class="article-detail-footer__group footer-group--edit">
           <a-tooltip :mouse-enter-delay="0.5" title="保存正文内容到数据库">
@@ -114,10 +114,10 @@
         </section>
 
         <!-- 备选标题 -->
-        <section v-if="displayTitles.length > 0 || regenTitleLoading">
+        <section v-if="displayTitles.length > 0 || (!props.readonly && regenTitleLoading)">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">备选标题</h3>
-            <div class="flex items-center gap-3">
+            <div v-if="!props.readonly" class="flex items-center gap-3">
               <a-button
                 type="link"
                 size="small"
@@ -148,11 +148,11 @@
               >✓ 发布标题</span>
               <span v-if="idx === 0 && idx !== activeTitleIndex" class="flex-shrink-0 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</span>
               <button
-                v-if="idx !== activeTitleIndex"
+                v-if="!props.readonly && idx !== activeTitleIndex"
                 class="flex-shrink-0 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/title:opacity-100 hover:!bg-black/70"
                 @click.stop="selectTitle(idx)"
               >设为发布标题</button>
-              <a-button type="link" size="small" class="!p-0 !text-[11px] opacity-0 group-hover/title:opacity-100" @click="copyText(t)">复制</a-button>
+              <a-button v-if="!props.readonly" type="link" size="small" class="!p-0 !text-[11px] opacity-0 group-hover/title:opacity-100" @click="copyText(t)">复制</a-button>
             </li>
           </ul>
         </section>
@@ -170,7 +170,7 @@
         <section>
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">导语</h3>
-            <div class="flex items-center gap-3">
+            <div v-if="!props.readonly" class="flex items-center gap-3">
               <a-button
                 type="link"
                 size="small"
@@ -201,7 +201,7 @@
               >✓ 发布</span>
               <span v-if="idx === 0 && idx !== activeIntroIndex" class="flex-shrink-0 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</span>
               <button
-                v-if="idx !== activeIntroIndex"
+                v-if="!props.readonly && idx !== activeIntroIndex"
                 class="flex-shrink-0 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/intro:opacity-100 hover:!bg-black/70"
                 @click.stop="selectIntro(idx)"
               >设为发布</button>
@@ -352,7 +352,7 @@
         <section>
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">封面图</h3>
-            <a-button
+            <a-button v-if="!props.readonly"
               type="link"
               size="small"
               class="!p-0 !text-[11px]"
@@ -388,7 +388,7 @@
                   <div v-if="idx === 0 && idx !== activeCoverIndex" class="absolute left-1 top-1 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</div>
                   <!-- 设为发布：始终可见，不遮挡图片 -->
                   <button
-                    v-if="idx !== activeCoverIndex"
+                    v-if="!props.readonly && idx !== activeCoverIndex"
                     class="absolute right-1 bottom-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white hover:bg-black/80"
                     @click.stop="selectCoverImage(idx)"
                   >设为发布封面</button>
@@ -409,7 +409,7 @@
         <section v-if="articleImages.length > 0 || inlineImageSlotCount > 0">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文配图</h3>
-            <div class="flex items-center gap-1">
+            <div v-if="!props.readonly" class="flex items-center gap-1">
               <template v-for="idx in totalImageSlotCount" :key="idx">
                 <span class="inline-flex items-center gap-1">
                   <a-button
@@ -459,31 +459,36 @@
           </template>
         </section>
 
-        <!-- 正文：左右分屏编辑器 + 主题切换 -->
-        <section>
+        <!-- 正文：编辑器或只读预览 -->
+        <section v-if="article.contentMarkdown">
           <div class="mb-2 flex items-center justify-between">
             <div class="flex items-center gap-2">
               <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文</h3>
               <span class="text-[11px] text-editorial-text-muted">{{ countWords(editContent) }}字</span>
               <span v-if="lastSavedAt" class="text-[11px] text-editorial-text-muted">{{ lastSavedAt }}</span>
             </div>
-            <div class="flex flex-wrap items-center gap-2">
-              <div v-if="article.contentMarkdown" class="flex flex-wrap gap-1">
-                <a-button
-                  v-for="opt in previewThemeOptions"
-                  :key="opt.key"
-                  :type="activePreviewTheme === opt.key ? 'primary' : 'default'"
-                  size="small"
-                  class="!text-[11px] !px-2 !py-0.5"
-                  @click="switchPreviewTheme(opt.key)"
-                >{{ opt.label }}</a-button>
+            <template v-if="!props.readonly">
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="flex flex-wrap gap-1">
+                  <a-button
+                    v-for="opt in previewThemeOptions"
+                    :key="opt.key"
+                    :type="activePreviewTheme === opt.key ? 'primary' : 'default'"
+                    size="small"
+                    class="!text-[11px] !px-2 !py-0.5"
+                    @click="switchPreviewTheme(opt.key)"
+                  >{{ opt.label }}</a-button>
+                </div>
+                <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(editContent)">复制原文</a-button>
+                <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyMarkdownAsPlainText(editContent)">复制纯文本</a-button>
+                <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="toggleEditorFullscreen">{{ editorFullscreen ? '退出全屏' : '全屏' }}</a-button>
               </div>
-              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(editContent)">复制原文</a-button>
-              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyMarkdownAsPlainText(editContent)">复制纯文本</a-button>
-              <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="toggleEditorFullscreen">{{ editorFullscreen ? '退出全屏' : '全屏' }}</a-button>
-            </div>
+            </template>
           </div>
-          <div v-if="!editorFullscreen" class="article-editor-wrapper">
+          <!-- 只读模式：渲染后的 HTML 预览 -->
+          <div v-if="props.readonly" class="rounded border border-editorial-border bg-white p-4 overflow-auto max-h-[600px]" v-html="activePreviewHtml"></div>
+          <!-- 编辑模式：左右分屏编辑器 -->
+          <div v-else-if="!editorFullscreen" class="article-editor-wrapper">
             <ArticleMarkdownEditor
               v-model="editContent"
               :preview-html="activePreviewHtml"
@@ -497,7 +502,7 @@
     <!-- 全屏编辑器覆盖层 -->
     <Teleport to="body">
       <div
-        v-if="editorFullscreen && article"
+        v-if="editorFullscreen && article && !props.readonly"
         class="fixed inset-0 z-[9999] flex flex-col"
         style="background: var(--editorial-bg-page);"
       >
@@ -581,6 +586,7 @@ import { renderWechatThemePreview } from "../../services/wechatRenderer.js";
 const props = defineProps<{
   open: boolean;
   article: CreativeFinishedArticle | null;
+  readonly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -1208,7 +1214,7 @@ async function selectCoverImage(idx: number): Promise<void> {
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
 watch(editContent, (val) => {
-  if (!props.open || val === lastSavedContent) return;
+  if (!props.open || props.readonly || val === lastSavedContent) return;
   if (autoSaveTimer) clearTimeout(autoSaveTimer);
   autoSaveTimer = setTimeout(() => {
     if (val !== lastSavedContent && props.article) {

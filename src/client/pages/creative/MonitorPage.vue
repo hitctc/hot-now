@@ -113,10 +113,11 @@ onBeforeUnmount(() => {
     <!-- 素材详情弹窗 -->
     <SourceItemDetailModal v-model:visible="sourceModalVisible" :source-item-id="sourceModalId" />
 
-    <!-- 成品文章详情弹窗 -->
+    <!-- 成品文章详情弹窗（只读，从 Codex 打开） -->
     <ArticleDetailDrawer
       :open="articleDetailOpen"
       :article="articleDetailData"
+      :readonly="true"
       @update:open="(val: boolean) => { if (!val) closeArticleDetail(); }"
       @saved="articleDetailData && openArticleDetail(articleDetailData.id)"
       @open-source-item="openSourceModal"

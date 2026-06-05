@@ -44,6 +44,10 @@ function timeAgo(iso: string): string {
   return `${Math.round(diff / 3600_000)}小时前`;
 }
 
+const emit = defineEmits<{
+  openArticle: [articleId: number];
+}>();
+
 onMounted(() => { refresh(); timer = setInterval(refresh, 30_000); });
 onBeforeUnmount(() => { if (timer) clearInterval(timer); });
 </script>
@@ -83,9 +87,15 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer); });
             {{ item.image_type === 'cover' ? '封面' : `配图${item.image_index}` }}
           </span>
 
+          <!-- 文章 ID（可点击） -->
+          <span
+            class="shrink-0 cursor-pointer text-[11px] font-semibold text-blue-600 hover:underline"
+            @click="emit('openArticle', item.article_id)"
+          >#{{ item.article_id }}</span>
+
           <!-- 文章标题 -->
           <span class="min-w-0 flex-1 truncate text-editorial-text-body" :title="item.article_title ?? ''">
-            {{ item.article_title || `#${item.article_id}` }}
+            {{ item.article_title || `文章 #${item.article_id}` }}
           </span>
 
           <!-- 缩略图 -->

@@ -7,7 +7,8 @@ import MonitorSwitches from "../../components/monitor/MonitorSwitches.vue";
 import CodexTaskQueue from "../../components/monitor/CodexTaskQueue.vue";
 import CodexConsumption from "../../components/monitor/CodexConsumption.vue";
 import SourceItemDetailModal from "../../components/creative/SourceItemDetailModal.vue";
-import { fetchWriteQueueStatus, type WriteQueueStatus } from "../../services/creativeApi.js";
+import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
+import { fetchWriteQueueStatus, readCreativeFinishedArticle, type WriteQueueStatus, type CreativeFinishedArticle } from "../../services/creativeApi.js";
 
 // ─── 写作队列状态 ───
 const queueData = ref<WriteQueueStatus | null>(null);
@@ -26,6 +27,29 @@ const sourceModalId = ref<number | null>(null);
 function openSourceModal(id: number): void {
   sourceModalId.value = id;
   sourceModalVisible.value = true;
+}
+
+// ─── 成品文章详情弹窗 ───
+const articleDetailOpen = ref(false);
+const articleDetailData = ref<CreativeFinishedArticle | null>(null);
+const articleDetailLoading = ref(false);
+
+async function openArticleDetail(articleId: number): Promise<void> {
+  articleDetailLoading.value = true;
+  articleDetailOpen.value = true;
+  try {
+    articleDetailData.value = await readCreativeFinishedArticle(articleId);
+  } catch {
+    articleDetailData.value = null;
+    articleDetailOpen.value = false;
+  } finally {
+    articleDetailLoading.value = false;
+  }
+}
+
+function closeArticleDetail(): void {
+  articleDetailOpen.value = false;
+  articleDetailData.value = null;
 }
 
 onMounted(() => {
@@ -78,15 +102,24 @@ onBeforeUnmount(() => {
     <MonitorRunsTable />
 
     <!-- Codex 生图任务 -->
-    <CodexTaskQueue />
+    <CodexTaskQueue @open-article="openArticleDetail" />
 
     <!-- Codex 结果消费 -->
-    <CodexConsumption />
+    <CodexConsumption @open-article="openArticleDetail" />
 
     <!-- 素材列表 -->
     <MonitorItemsTable />
 
     <!-- 素材详情弹窗 -->
     <SourceItemDetailModal v-model:visible="sourceModalVisible" :source-item-id="sourceModalId" />
+
+    <!-- 成品文章详情弹窗 -->
+    <ArticleDetailDrawer
+      :open="articleDetailOpen"
+      :article="articleDetailData"
+      @update:open="(val: boolean) => { if (!val) closeArticleDetail(); }"
+      @saved="articleDetailData && openArticleDetail(articleDetailData.id)"
+      @open-source-item="openSourceModal"
+    />
   </div>
 </template>

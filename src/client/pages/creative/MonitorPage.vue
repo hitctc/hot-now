@@ -36,12 +36,12 @@ const articleDetailLoading = ref(false);
 
 async function openArticleDetail(articleId: number): Promise<void> {
   articleDetailLoading.value = true;
-  articleDetailOpen.value = true;
   try {
+    // 先拿到数据再开弹窗，确保 ArticleDetailDrawer 的 watch(open) 触发时 article 已就绪
     articleDetailData.value = await readCreativeFinishedArticle(articleId);
+    articleDetailOpen.value = true;
   } catch {
     articleDetailData.value = null;
-    articleDetailOpen.value = false;
   } finally {
     articleDetailLoading.value = false;
   }
@@ -98,14 +98,14 @@ onBeforeUnmount(() => {
       <div v-else class="text-xs text-editorial-text-muted">加载中…</div>
     </section>
 
+    <!-- Codex 生图任务 + 结果消费：左右布局 -->
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <CodexTaskQueue @open-article="openArticleDetail" />
+      <CodexConsumption @open-article="openArticleDetail" />
+    </div>
+
     <!-- 流水线运行记录 -->
     <MonitorRunsTable />
-
-    <!-- Codex 生图任务 -->
-    <CodexTaskQueue @open-article="openArticleDetail" />
-
-    <!-- Codex 结果消费 -->
-    <CodexConsumption @open-article="openArticleDetail" />
 
     <!-- 素材列表 -->
     <MonitorItemsTable />

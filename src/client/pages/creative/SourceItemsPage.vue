@@ -13,6 +13,7 @@ import {
   readCreativeFinishedArticle,
   updateSourceItemWritingStatus,
   writeSourceItemArticle,
+  submitManualWrite,
   type CreativeSourceItem,
   type CreativeFinishedArticle,
   type TrendBreakdown
@@ -297,6 +298,54 @@ const writeModeOptions = [
   { value: "C", label: "长篇观点文（C）— 3000~6000 字" },
 ];
 
+// ─── 手动写作弹窗 ───
+const manualWriteVisible = ref(false);
+const manualWriteSubmitting = ref(false);
+const manualContentType = ref<"viewpoint" | "article">("viewpoint");
+const manualTitle = ref("");
+const manualContent = ref("");
+const manualMode = ref<string | null>(null);
+
+const contentTypeOptions = [
+  { value: "viewpoint" as const, label: "观点/想法", desc: "简短观点，几句话到一段话" },
+  { value: "article" as const, label: "素材/文章", desc: "较长的原文或素材内容" },
+];
+
+function openManualWriteModal(): void {
+  manualContentType.value = "viewpoint";
+  manualTitle.value = "";
+  manualContent.value = "";
+  manualMode.value = null;
+  manualWriteVisible.value = true;
+}
+
+async function confirmManualWrite(): Promise<void> {
+  if (!manualContent.value.trim()) {
+    message.warning("请输入内容");
+    return;
+  }
+  manualWriteSubmitting.value = true;
+  try {
+    const result = await submitManualWrite({
+      title: manualTitle.value.trim() || undefined,
+      content: manualContent.value.trim(),
+      contentType: manualContentType.value,
+      mode: (manualMode.value as "A" | "B" | "C") ?? undefined,
+    });
+    if (result.ok && result.sourceItemId) {
+      message.success(`已提交写作（素材#${result.sourceItemId}）`);
+      manualWriteVisible.value = false;
+      loadItems();
+    } else {
+      message.error(result.reason ?? "提交失败");
+    }
+  } catch {
+    message.error("提交写作请求失败");
+  } finally {
+    manualWriteSubmitting.value = false;
+  }
+}
+
 function openWriteModeModal(item: CreativeSourceItem): void {
   writeModeTarget.value = item;
   writeModeValue.value = null;
@@ -458,6 +507,9 @@ const pagination = computed(() => ({
           </div>
         </div>
       </div>
+      <a-button type="primary" size="small" @click="openManualWriteModal">
+        <span class="mr-1">✏️</span>自定义写作
+      </a-button>
     </div>
 
     <!-- 表格 -->
@@ -718,6 +770,62 @@ const pagination = computed(() => ({
           {{ opt.label }}
         </a-radio>
       </a-radio-group>
+    </a-modal>
+
+    <!-- 手动写作弹窗 -->
+    <a-modal
+      :open="manualWriteVisible"
+      title="自定义内容写文章"
+      :confirm-loading="manualWriteSubmitting"
+      ok-text="开始写作"
+      cancel-text="取消"
+      :destroy-on-close="true"
+      width="560px"
+      centered
+      @ok="confirmManualWrite"
+      @cancel="manualWriteVisible = false"
+    >
+      <div class="space-y-4">
+        <!-- 内容类型 -->
+        <div>
+          <div class="mb-1 text-xs font-medium text-editorial-text-muted">内容类型</div>
+          <a-radio-group v-model:value="manualContentType" size="small">
+            <a-radio-button v-for="opt in contentTypeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</a-radio-button>
+          </a-radio-group>
+        </div>
+
+        <!-- 标题 -->
+        <div>
+          <div class="mb-1 text-xs font-medium text-editorial-text-muted">标题（可选）</div>
+          <a-input
+            v-model:value="manualTitle"
+            placeholder="不填则自动取内容前 50 字"
+            allow-clear
+          />
+        </div>
+
+        <!-- 内容 -->
+        <div>
+          <div class="mb-1 text-xs font-medium text-editorial-text-muted">内容</div>
+          <a-textarea
+            v-model:value="manualContent"
+            :placeholder="manualContentType === 'viewpoint' ? '输入你的观点、想法或简短评论…' : '粘贴文章全文或素材内容…'"
+            :rows="8"
+            allow-clear
+          />
+        </div>
+
+        <!-- 写作模式 -->
+        <div>
+          <div class="mb-1 text-xs font-medium text-editorial-text-muted">写作模式</div>
+          <a-radio-group v-model:value="manualMode" class="flex flex-col gap-1">
+            <a-radio :value="null">自动判断（观点默认随笔 B，文章默认观点文 A）</a-radio>
+            <a-radio value="A">短篇观点文（A）— 600~1500 字</a-radio>
+            <a-radio value="B">短篇随笔（B）— 600~1500 字</a-radio>
+            <a-radio value="C">长篇观点文（C）— 3000~6000 字</a-radio>
+          </a-radio-group>
+        </div>
+      </div>
     </a-modal>
   </div>
 </template>

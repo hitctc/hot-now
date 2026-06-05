@@ -1732,6 +1732,76 @@ export function createServer(deps: ServerDeps = {}) {
 
 
 
+  // ─── 手动输入内容写文章：创建手动素材 + 触发 Hermes 写作 ───
+  app.post("/actions/creative/source-items/manual-write", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+    if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
+
+    const body = request.body as { title?: string; content?: string; contentType?: string; mode?: string } | undefined;
+    const content = typeof body?.content === "string" ? body.content.trim() : "";
+    const contentType = body?.contentType === "article" ? "article" : "viewpoint";
+    if (!content) {
+      return reply.code(400).send({ ok: false, reason: "content-required" });
+    }
+
+    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+    const hermesApiToken = process.env.HERMES_API_TOKEN;
+    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
+
+    // 生成素材字段
+    const title = typeof body?.title === "string" && body.title.trim() ? body.title.trim() : content.slice(0, 50).replace(/\n/g, " ");
+    const externalId = `manual-${Date.now()}`;
+
+    const result = insertCreativeSourceItem(db, {
+      externalId,
+      collectorAgent: "manual",
+      title,
+      url: "",
+      sourceName: "手动输入",
+      summary: contentType === "viewpoint" ? content : content.slice(0, 300),
+      fullContent: content,
+      writingStatus: "writing",
+    });
+
+    // 调用 Hermes 写文章
+    const hermesBody: Record<string, unknown> = { sourceItemId: result.id };
+    // 观点默认 mode B，文章默认 mode A
+    if (body?.mode && ["A", "B", "C"].includes(body.mode)) {
+      hermesBody.mode = body.mode;
+    } else if (contentType === "viewpoint") {
+      hermesBody.mode = "B";
+    } else {
+      hermesBody.mode = "A";
+    }
+
+    try {
+      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/write-article`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
+        body: JSON.stringify(hermesBody),
+        signal: AbortSignal.timeout(15_000),
+      });
+
+      if (!res.ok) {
+        const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
+        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, hermesResponse: errorBody });
+      }
+
+      const data = await res.json() as { success: boolean; status?: string; message?: string; error?: string };
+      if (!data.success) {
+        return reply.code(502).send({ ok: false, reason: data.error ?? "写文章失败", hermesResponse: JSON.stringify(data) });
+      }
+
+      return reply.send({ ok: true, sourceItemId: result.id });
+    } catch (err) {
+      const errMessage = (err as Error).message ?? String(err);
+      return reply.code(502).send({ ok: false, reason: "Hermes 调用失败", detail: errMessage });
+    }
+  });
+
+
+
   // ─── Daily Digest: Hermes 推送日报（token 鉴权） ───
 
   app.post("/api/creative/daily-digests", async (request, reply) => {

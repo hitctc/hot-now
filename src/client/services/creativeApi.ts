@@ -620,3 +620,26 @@ export type WriteQueueStatus = {
 export function fetchWriteQueueStatus(): Promise<WriteQueueStatus> {
   return requestJson<WriteQueueStatus>("/api/creative/write-queue/status");
 }
+
+// ─── 手动输入内容写文章 ───
+
+export type ManualWriteRequest = {
+  title?: string;
+  content: string;
+  contentType: "viewpoint" | "article";
+  mode?: "A" | "B" | "C";
+};
+
+export type ManualWriteResult = {
+  ok: boolean;
+  sourceItemId?: number;
+  reason?: string;
+};
+
+/** 手动输入内容创建素材并触发写作 */
+export function submitManualWrite(req: ManualWriteRequest): Promise<ManualWriteResult> {
+  return requestJson<ManualWriteResult>("/actions/creative/source-items/manual-write", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
+}

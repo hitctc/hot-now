@@ -1639,6 +1639,11 @@ export function createServer(deps: ServerDeps = {}) {
   app.get("/api/codex/tasks", async (req, reply) => hermesMonitorProxy(req, reply, "/api/codex/tasks"));
   app.get("/api/codex/consumption", async (req, reply) => hermesMonitorProxy(req, reply, "/api/codex/consumption"));
 
+  // ─── 定时任务立即触发 ───
+  app.post("/api/monitor/trigger/pipeline", async (req, reply) => hermesMonitorProxy(req, reply, "/api/monitor/trigger/pipeline", "POST"));
+  app.post("/api/monitor/trigger/codex-generate", async (req, reply) => hermesMonitorProxy(req, reply, "/api/monitor/trigger/codex-generate", "POST"));
+  app.post("/api/monitor/trigger/codex-consume", async (req, reply) => hermesMonitorProxy(req, reply, "/api/monitor/trigger/codex-consume", "POST"));
+
   // ─── 手动生图 API 代理（provider-manual / codex-manual） ───
   app.post("/api/provider/generate-image", async (request, reply) => {
     const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");

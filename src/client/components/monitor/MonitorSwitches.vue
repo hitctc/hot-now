@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { Modal, message } from "ant-design-vue";
-import { fetchMonitorStats, updateSwitch, type MonitorStats } from "../../services/monitorApi.js";
+import { fetchMonitorStats, updateSwitch, getTriggerPath, triggerTask, type MonitorStats } from "../../services/monitorApi.js";
 import { usePipelineStatus } from "../../composables/usePipelineStatus.js";
 
 const { pipelineOn, writeOn, refresh: refreshGlobal } = usePipelineStatus();
@@ -10,6 +10,7 @@ const switches = ref<Record<string, string>>({});
 const stats = ref<MonitorStats | null>(null);
 const loading = ref(false);
 const saving = ref<string | null>(null);
+const triggering = ref<string | null>(null);
 
 // 当前自动生图模式（三选一，与手动独立）
 const imageMode = computed(() => switches.value.image_gen_mode ?? "codex-auto");
@@ -115,6 +116,26 @@ async function saveSwitch(key: string, value: string): Promise<void> {
     message.error(errMsg);
   } finally {
     saving.value = null;
+  }
+}
+
+// 立即触发间隔任务
+async function handleTrigger(key: string): Promise<void> {
+  const path = getTriggerPath(key);
+  if (!path) return;
+  triggering.value = key;
+  try {
+    const res = await triggerTask(path);
+    if (res.ok) {
+      message.success(res.message);
+    } else {
+      message.warning(res.message);
+    }
+    await refresh();
+  } catch {
+    message.error("触发失败");
+  } finally {
+    triggering.value = null;
   }
 }
 
@@ -295,6 +316,13 @@ onBeforeUnmount(() => { if (countdownTimer) clearInterval(countdownTimer); });
               :disabled="saving === def.key || !hasDraft(def.key)"
               @click="confirmNumber(def.key)"
             >确认</button>
+            <!-- 立即触发按钮（仅间隔参数显示） -->
+            <button
+              v-if="getTriggerPath(def.key)"
+              class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-50"
+              :disabled="triggering === def.key"
+              @click="handleTrigger(def.key)"
+            >{{ triggering === def.key ? '触发中…' : '立即触发' }}</button>
             <!-- 间隔参数行内显示下次执行倒计时 -->
           </template>
         </div>

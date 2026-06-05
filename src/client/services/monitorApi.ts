@@ -151,6 +151,31 @@ export function updateSwitch(key: string, value: string): Promise<{ ok: boolean;
   });
 }
 
+// ─── 定时任务立即触发 ───
+
+export type TriggerResponse = {
+  ok: boolean;
+  message: string;
+  pid?: number;
+  triggered_at?: string;
+};
+
+// 间隔参数 key → trigger 接口路径
+const triggerPaths: Record<string, string> = {
+  interval_pipeline: "/api/monitor/trigger/pipeline",
+  interval_codex_generate: "/api/monitor/trigger/codex-generate",
+  interval_codex_consume: "/api/monitor/trigger/codex-consume",
+};
+
+/** 触发间隔参数对应的立即执行，非间隔参数 key 返回 null */
+export function getTriggerPath(key: string): string | null {
+  return triggerPaths[key] ?? null;
+}
+
+export function triggerTask(path: string): Promise<TriggerResponse> {
+  return requestJson<TriggerResponse>(path, { method: "POST", body: "{}" });
+}
+
 // ─── Codex 生图可观测性 ──
 
 export type CodexTask = {

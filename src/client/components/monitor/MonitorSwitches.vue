@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { Modal, message } from "ant-design-vue";
 import { fetchMonitorStats, updateSwitch, type MonitorStats } from "../../services/monitorApi.js";
 import { usePipelineStatus } from "../../composables/usePipelineStatus.js";
-import ScheduleCountdown from "./ScheduleCountdown.vue";
 
 const { pipelineOn, writeOn, refresh: refreshGlobal } = usePipelineStatus();
 
@@ -177,7 +176,42 @@ function formatSince(raw: string): string {
   return d.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
-onMounted(() => refresh());
+// 每秒刷新的倒计时驱动
+const now = ref(Date.now());
+let countdownTimer: ReturnType<typeof setInterval> | null = null;
+
+// 间隔参数 key → stats 中对应下次执行时间字段
+const intervalCountdownKey: Record<string, "next_pipeline_at" | "next_codex_generate_at" | "next_codex_consume_at"> = {
+  interval_pipeline: "next_pipeline_at",
+  interval_codex_generate: "next_codex_generate_at",
+  interval_codex_consume: "next_codex_consume_at",
+};
+
+// 获取间隔参数对应的下次执行时间
+function getCountdownIso(key: string): string | null | undefined {
+  if (!stats.value) return undefined;
+  const field = intervalCountdownKey[key];
+  if (!field) return undefined;
+  return stats.value[field];
+}
+
+function formatCountdown(iso: string | null | undefined): string {
+  if (!iso) return "-";
+  const target = new Date(iso).getTime();
+  const diff = target - now.value;
+  if (diff <= 0) return "即将执行";
+  const totalSec = Math.floor(diff / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  if (min > 0) return `${min}分${sec}秒`;
+  return `${sec}秒`;
+}
+
+onMounted(() => {
+  refresh();
+  countdownTimer = setInterval(() => { now.value = Date.now(); }, 1000);
+});
+onBeforeUnmount(() => { if (countdownTimer) clearInterval(countdownTimer); });
 </script>
 
 <template>
@@ -190,15 +224,6 @@ onMounted(() => refresh());
     <a-spin :spinning="loading && Object.keys(switches).length === 0">
       <!-- 状态摘要 -->
       <a-alert :type="statusSummary.type" :message="statusSummary.text" show-icon class="!mb-3 !py-1.5 !text-xs" />
-
-      <!-- 调度倒计时 -->
-      <div class="mb-3">
-        <ScheduleCountdown
-          :pipeline-at="stats?.next_pipeline_at ?? null"
-          :codex-generate-at="stats?.next_codex_generate_at ?? null"
-          :codex-consume-at="stats?.next_codex_consume_at ?? null"
-        />
-      </div>
 
       <!-- 第一组：管线控制 -->
       <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">管线控制</div>
@@ -265,6 +290,12 @@ onMounted(() => refresh());
               :disabled="saving === def.key || !hasDraft(def.key)"
               @click="confirmNumber(def.key)"
             >确认</button>
+            <!-- 间隔参数行内显示下次执行倒计时 -->
+            <span
+              v-if="intervalCountdownKey[def.key]"
+              class="shrink-0 text-[10px] font-medium tabular-nums"
+              :class="formatCountdown(getCountdownIso(def.key)) === '-' ? 'text-editorial-text-muted/40' : 'text-blue-500'"
+            >{{ formatCountdown(getCountdownIso(def.key)) }}</span>
           </template>
         </div>
 

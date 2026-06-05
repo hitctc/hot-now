@@ -4,6 +4,8 @@ import MonitorStatsCards from "../../components/monitor/MonitorStatsCards.vue";
 import MonitorRunsTable from "../../components/monitor/MonitorRunsTable.vue";
 import MonitorItemsTable from "../../components/monitor/MonitorItemsTable.vue";
 import MonitorSwitches from "../../components/monitor/MonitorSwitches.vue";
+import CodexTaskQueue from "../../components/monitor/CodexTaskQueue.vue";
+import CodexConsumption from "../../components/monitor/CodexConsumption.vue";
 import SourceItemDetailModal from "../../components/creative/SourceItemDetailModal.vue";
 import { fetchWriteQueueStatus, type WriteQueueStatus } from "../../services/creativeApi.js";
 
@@ -74,6 +76,12 @@ onBeforeUnmount(() => {
 
     <!-- 流水线运行记录 -->
     <MonitorRunsTable />
+
+    <!-- Codex 生图任务 -->
+    <CodexTaskQueue />
+
+    <!-- Codex 结果消费 -->
+    <CodexConsumption />
 
     <!-- 素材列表 -->
     <MonitorItemsTable />

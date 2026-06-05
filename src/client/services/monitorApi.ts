@@ -146,3 +146,80 @@ export function updateSwitch(key: string, value: string): Promise<{ ok: boolean;
     body: JSON.stringify({ value }),
   });
 }
+
+// ─── Codex 生图可观测性 ──
+
+export type CodexTask = {
+  task_id: string;
+  article_id: number;
+  article_title: string | null;
+  image_index: number;
+  image_type: string;
+  prompt_summary: string | null;
+  model: string | null;
+  status: "queued" | "running" | "completed" | "failed";
+  queue_position: number | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  duration_ms: number | null;
+  result_url: string | null;
+  error: string | null;
+};
+
+export type CodexTasksResponse = {
+  tasks: CodexTask[];
+  total: number;
+  has_more: boolean;
+};
+
+export function fetchCodexTasks(params?: {
+  limit?: number;
+  offset?: number;
+  status?: string;
+  article_id?: number;
+}): Promise<CodexTasksResponse> {
+  const query = new URLSearchParams();
+  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.offset) query.set("offset", String(params.offset));
+  if (params?.status) query.set("status", params.status);
+  if (params?.article_id) query.set("article_id", String(params.article_id));
+  const qs = query.toString();
+  return requestJson<CodexTasksResponse>(`/api/codex/tasks${qs ? `?${qs}` : ""}`);
+}
+
+export type CodexConsumptionItem = {
+  task_id: string;
+  article_id: number;
+  article_title: string | null;
+  image_index: number;
+  image_type: string;
+  result_url: string;
+  consumed: boolean;
+  consumed_at: string | null;
+  consume_status: "success" | "failed" | "pending" | "failed_generate" | null;
+  consume_error: string | null;
+  next_consume_at: string | null;
+};
+
+export type CodexConsumptionResponse = {
+  items: CodexConsumptionItem[];
+  pending_count: number;
+  total: number;
+  has_more: boolean;
+  next_schedule_at: string | null;
+  schedule_interval_seconds: number | null;
+};
+
+export function fetchCodexConsumption(params?: {
+  limit?: number;
+  offset?: number;
+  consumed?: boolean;
+}): Promise<CodexConsumptionResponse> {
+  const query = new URLSearchParams();
+  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.offset) query.set("offset", String(params.offset));
+  if (params?.consumed != null) query.set("consumed", String(params.consumed));
+  const qs = query.toString();
+  return requestJson<CodexConsumptionResponse>(`/api/codex/consumption${qs ? `?${qs}` : ""}`);
+}

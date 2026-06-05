@@ -1635,6 +1635,10 @@ export function createServer(deps: ServerDeps = {}) {
   app.get("/api/monitor/switch/:key", async (req, reply) => hermesMonitorProxy(req, reply, `/api/monitor/switch/${(req.params as { key: string }).key}`));
   app.post("/api/monitor/switch/:key", async (req, reply) => hermesMonitorProxy(req, reply, `/api/monitor/switch/${(req.params as { key: string }).key}`, "POST"));
 
+  // ─── Codex 生图可观测性 ───
+  app.get("/api/codex/tasks", async (req, reply) => hermesMonitorProxy(req, reply, "/api/codex/tasks"));
+  app.get("/api/codex/consumption", async (req, reply) => hermesMonitorProxy(req, reply, "/api/codex/consumption"));
+
   // ─── 手动生图 API 代理（provider-manual / codex-manual） ───
   app.post("/api/provider/generate-image", async (request, reply) => {
     const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");

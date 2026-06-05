@@ -14,6 +14,23 @@ import { fetchWriteQueueStatus, readCreativeFinishedArticle, type WriteQueueStat
 const queueData = ref<WriteQueueStatus | null>(null);
 let queueTimer: ReturnType<typeof setInterval> | null = null;
 
+// 实时耗时计时驱动（每秒刷新）
+const elapsedNow = ref(Date.now());
+let elapsedTimer: ReturnType<typeof setInterval> | null = null;
+
+/** 将 ISO 时间戳格式化为已耗时 "X分X秒" */
+function formatElapsed(iso: string | null | undefined): string {
+  if (!iso) return "-";
+  const started = new Date(iso).getTime();
+  const diff = elapsedNow.value - started;
+  if (diff < 0) return "0秒";
+  const totalSec = Math.floor(diff / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  if (min > 0) return `${min}分${sec}秒`;
+  return `${sec}秒`;
+}
+
 async function refreshQueue(): Promise<void> {
   try {
     queueData.value = await fetchWriteQueueStatus();
@@ -55,9 +72,11 @@ function closeArticleDetail(): void {
 onMounted(() => {
   refreshQueue();
   queueTimer = setInterval(refreshQueue, 15_000);
+  elapsedTimer = setInterval(() => { elapsedNow.value = Date.now(); }, 1000);
 });
 onBeforeUnmount(() => {
   if (queueTimer) clearInterval(queueTimer);
+  if (elapsedTimer) clearInterval(elapsedTimer);
 });
 </script>
 
@@ -74,12 +93,16 @@ onBeforeUnmount(() => {
       <h3 class="m-0 mb-3 text-sm font-semibold text-editorial-text-muted">写作队列</h3>
       <template v-if="queueData">
         <!-- 当前任务 -->
-        <div v-if="queueData.current" class="mb-2 flex items-center gap-2 rounded border border-blue-200 bg-blue-50 px-3 py-1.5">
-          <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500 shrink-0" />
-          <span v-if="queueData.current.source_item_id" class="shrink-0 text-[11px] font-semibold text-blue-600 cursor-pointer hover:underline" @click="openSourceModal(queueData.current.source_item_id)">#{{ queueData.current.source_item_id }}</span>
-          <span class="truncate text-[11px] text-blue-800">{{ queueData.current.source_item_title || queueData.current.label }}</span>
-          <span v-if="queueData.current.source_item_source_name" class="shrink-0 text-[10px] text-blue-400">· {{ queueData.current.source_item_source_name }}</span>
-          <span class="ml-auto shrink-0 text-[10px] text-blue-500">{{ queueData.current.started_at ?? '' }}</span>
+        <div v-if="queueData.current" class="mb-2 rounded border border-blue-200 bg-blue-50 px-3 py-1.5">
+          <div class="flex items-center gap-2">
+            <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500 shrink-0" />
+            <span v-if="queueData.current.source_item_id" class="shrink-0 text-[11px] font-semibold text-blue-600 cursor-pointer hover:underline" @click="openSourceModal(queueData.current.source_item_id)">#{{ queueData.current.source_item_id }}</span>
+            <span class="truncate text-[11px] text-blue-800">{{ queueData.current.source_item_title || queueData.current.label }}</span>
+            <span v-if="queueData.current.source_item_source_name" class="shrink-0 text-[10px] text-blue-400">· {{ queueData.current.source_item_source_name }}</span>
+          </div>
+          <div v-if="queueData.current.started_at" class="mt-0.5 text-[10px] font-medium tabular-nums text-blue-500">
+            本文 {{ formatElapsed(queueData.current.started_at) }}<template v-if="queueData.run_started_at"> · 队列 {{ formatElapsed(queueData.run_started_at) }}</template>
+          </div>
         </div>
         <!-- 排队列表 -->
         <div v-if="queueData.queue.length > 0" class="mb-2 space-y-1">

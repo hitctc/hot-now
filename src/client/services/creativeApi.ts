@@ -612,6 +612,8 @@ export type WriteQueueStatus = {
   queue_length: number;
   queue: WriteQueueTask[];
   stats: WriteQueueStats;
+  /** 本次队列运行首次开始执行的时间（Hermes 提供，暂未上线时为 undefined） */
+  run_started_at?: string | null;
 };
 
 /** 查询 Hermes 写作队列状态 */

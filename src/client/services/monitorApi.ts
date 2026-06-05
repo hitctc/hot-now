@@ -23,6 +23,10 @@ export type MonitorStats = {
   pending_write: number;
   last_run: MonitorLastRun | null;
   switches: Record<string, string>;
+  // Hermes 调度器下次触发时刻（精确倒计时用，暂未上线时为 null）
+  next_pipeline_at?: string | null;
+  next_codex_generate_at?: string | null;
+  next_codex_consume_at?: string | null;
 };
 
 export function fetchMonitorStats(): Promise<MonitorStats> {

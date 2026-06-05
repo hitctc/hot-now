@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { Modal, message } from "ant-design-vue";
-import { fetchMonitorStats, updateSwitch } from "../../services/monitorApi.js";
+import { fetchMonitorStats, updateSwitch, type MonitorStats } from "../../services/monitorApi.js";
 import { usePipelineStatus } from "../../composables/usePipelineStatus.js";
+import ScheduleCountdown from "./ScheduleCountdown.vue";
 
 const { pipelineOn, writeOn, refresh: refreshGlobal } = usePipelineStatus();
 
 const switches = ref<Record<string, string>>({});
+const stats = ref<MonitorStats | null>(null);
 const loading = ref(false);
 const saving = ref<string | null>(null);
 
@@ -93,10 +95,11 @@ async function confirmNumber(key: string): Promise<void> {
 async function refresh(): Promise<void> {
   loading.value = true;
   try {
-    const stats = await fetchMonitorStats();
-    switches.value = stats.switches;
-    pipelineOn.value = stats.switches.pipeline === "on";
-    writeOn.value = stats.switches.write === "on";
+    const s = await fetchMonitorStats();
+    stats.value = s;
+    switches.value = s.switches;
+    pipelineOn.value = s.switches.pipeline === "on";
+    writeOn.value = s.switches.write === "on";
   } catch { /* 静默 */ }
   finally { loading.value = false; }
 }
@@ -187,6 +190,15 @@ onMounted(() => refresh());
     <a-spin :spinning="loading && Object.keys(switches).length === 0">
       <!-- 状态摘要 -->
       <a-alert :type="statusSummary.type" :message="statusSummary.text" show-icon class="!mb-3 !py-1.5 !text-xs" />
+
+      <!-- 调度倒计时 -->
+      <div class="mb-3">
+        <ScheduleCountdown
+          :pipeline-at="stats?.next_pipeline_at ?? null"
+          :codex-generate-at="stats?.next_codex_generate_at ?? null"
+          :codex-consume-at="stats?.next_codex_consume_at ?? null"
+        />
+      </div>
 
       <!-- 第一组：管线控制 -->
       <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">管线控制</div>

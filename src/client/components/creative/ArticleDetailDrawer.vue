@@ -1143,28 +1143,47 @@ async function handleUploadInlineImage(imageIndex: number, event: Event): Promis
     }
     const newUrl = uploaded[0].storedUrl;
 
-    // 找到正文中第 N 个 ![配图...] 并替换，实际 markdown 格式是 ![配图](url) 不带序号
+    // ── 逻辑1：更新 imagesJson 数组对应位置 ──
+    const currentImages = parseArticleImages(props.article?.imagesJson ?? null);
+    const updatedImages = [...currentImages];
+    // 确保数组足够长
+    while (updatedImages.length < imageIndex) {
+      updatedImages.push({ url: "", purpose: "inline", alt: "" });
+    }
+    updatedImages[imageIndex - 1] = newUrl;
+    props.article.imagesJson = updatedImages as typeof props.article.imagesJson;
+
+    // ── 逻辑2 & 3：替换正文 markdown 中的图片 ──
     let md = editContent.value;
-    const imgPattern = /!\[配图[^\]]*\]\([^)]+\)/g;
-    const matches = [...md.matchAll(imgPattern)];
-    // imageIndex 从 1 开始，对应第 N 个配图
-    if (matches[imageIndex - 1]) {
-      // 替换第 N 个匹配
-      let count = 0;
-      md = md.replace(imgPattern, (full) => {
-        count++;
-        return count === imageIndex ? `![配图](${newUrl})` : full;
-      });
+
+    // 先尝试匹配 [IMAGEN] 占位符（未生图状态）
+    const placeholderPattern = new RegExp(`\\[IMAGE${imageIndex}\\]`, "g");
+    if (placeholderPattern.test(md)) {
+      md = md.replace(new RegExp(`\\[IMAGE${imageIndex}\\]`, "g"), `![配图${imageIndex}](${newUrl})`);
     } else {
-      // 没有足够的配图占位，追加到正文末尾
-      md = `${md}\n\n![配图](${newUrl})`;
+      // 已有配图：找第 N 个 ![配图...] 替换
+      const imgPattern = /!\[配图[^\]]*\]\([^)]+\)/g;
+      const matches = [...md.matchAll(imgPattern)];
+      if (matches[imageIndex - 1]) {
+        let count = 0;
+        md = md.replace(imgPattern, (full) => {
+          count++;
+          return count === imageIndex ? `![配图${imageIndex}](${newUrl})` : full;
+        });
+      } else {
+        // 没有足够的配图，追加到正文末尾
+        md = `${md}\n\n![配图${imageIndex}](${newUrl})`;
+      }
     }
 
     editContent.value = md;
     props.article.contentMarkdown = md;
     lastSavedContent = md;
 
-    const saveFields: Record<string, unknown> = { contentMarkdown: md };
+    const saveFields: Record<string, unknown> = {
+      contentMarkdown: md,
+      images: updatedImages,
+    };
     const themeId = activePreviewTheme.value !== "live"
       ? themeIdMap[activePreviewTheme.value]
       : "classic" as WechatThemeId;
@@ -1249,7 +1268,6 @@ async function handleUploadCover(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement;
   const files = input.files;
   if (!files || files.length === 0 || !props.article) return;
-  // 先转数组再清空 input（某些浏览器 FileList 是实时引用，清空后变空）
   const fileArray = Array.from(files);
   input.value = "";
 
@@ -1261,19 +1279,22 @@ async function handleUploadCover(event: Event): Promise<void> {
       return;
     }
     const newUrl = uploaded[0].storedUrl;
-    // 插入封面图列表首位，自动选中
+
+    // ── 逻辑1：更新 coverImage 数组（插入首位，默认选中） ──
     const updatedCovers = [newUrl, ...displayCoverImages.value];
     localCoverImages.value = updatedCovers;
     activeCoverIndex.value = 0;
     props.article.coverImage = updatedCovers;
-    props.article.coverImageIndex = updatedCovers.length - 1;
+    props.article.coverImageIndex = 0;
 
-    // 联动：替换 markdown 中的封面图行
+    // ── 逻辑2：将新封面图插入正文顶部 ──
     let md = editContent.value;
     const coverRegex = /^!\[封面图[^\]]*\]\([^)]+\)/m;
     if (coverRegex.test(md)) {
+      // 已有封面图行：替换
       md = md.replace(coverRegex, `![封面图](${newUrl})`);
     } else {
+      // 无封面图行：插入正文最前面
       md = `![封面图](${newUrl})\n\n${md}`;
     }
     editContent.value = md;
@@ -1282,7 +1303,7 @@ async function handleUploadCover(event: Event): Promise<void> {
 
     const saveFields: Record<string, unknown> = {
       coverImage: updatedCovers,
-      coverImageIndex: updatedCovers.length - 1,
+      coverImageIndex: 0,
       contentMarkdown: md,
     };
     if (activePreviewTheme.value !== "live" && md) {

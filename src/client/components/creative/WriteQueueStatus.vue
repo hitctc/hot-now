@@ -17,6 +17,23 @@ const loading = ref(false);
 const expanded = ref(false);
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
+// 实时耗时计时驱动（每秒刷新）
+const elapsedNow = ref(Date.now());
+let elapsedTimer: ReturnType<typeof setInterval> | null = null;
+
+/** 将 ISO 时间戳格式化为已耗时 "X分X秒" */
+function formatElapsed(iso: string | null | undefined): string {
+  if (!iso) return "-";
+  const started = new Date(iso).getTime();
+  const diff = elapsedNow.value - started;
+  if (diff < 0) return "0秒";
+  const totalSec = Math.floor(diff / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  if (min > 0) return `${min}分${sec}秒`;
+  return `${sec}秒`;
+}
+
 // 素材详情弹窗
 const modalVisible = ref(false);
 const modalSourceItemId = ref<number | null>(null);
@@ -42,8 +59,15 @@ function openSourceItem(id: number): void {
   modalVisible.value = true;
 }
 
-onMounted(() => { refresh(); pollTimer = setInterval(refresh, 15_000); });
-onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer); });
+onMounted(() => {
+  refresh();
+  pollTimer = setInterval(refresh, 15_000);
+  elapsedTimer = setInterval(() => { elapsedNow.value = Date.now(); }, 1000);
+});
+onBeforeUnmount(() => {
+  if (pollTimer) clearInterval(pollTimer);
+  if (elapsedTimer) clearInterval(elapsedTimer);
+});
 </script>
 
 <template>
@@ -63,10 +87,15 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer); });
 
         <!-- 当前任务 -->
         <div v-if="data.current" class="write-queue-current">
-          <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500 shrink-0" />
-          <span v-if="data.current.source_item_id" class="write-queue-id" @click.stop="openSourceItem(data.current.source_item_id)">#{{ data.current.source_item_id }}</span>
-          <span class="truncate text-[11px] text-blue-800">{{ data.current.source_item_title || data.current.label }}</span>
-          <span v-if="data.current.source_item_source_name" class="shrink-0 text-[10px] text-blue-400">· {{ data.current.source_item_source_name }}</span>
+          <div class="flex items-center gap-[5px]">
+            <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500 shrink-0" />
+            <span v-if="data.current.source_item_id" class="write-queue-id" @click.stop="openSourceItem(data.current.source_item_id)">#{{ data.current.source_item_id }}</span>
+            <span class="truncate text-[11px] text-blue-800">{{ data.current.source_item_title || data.current.label }}</span>
+            <span v-if="data.current.source_item_source_name" class="shrink-0 text-[10px] text-blue-400">· {{ data.current.source_item_source_name }}</span>
+          </div>
+          <div v-if="data.current.started_at" class="mt-0.5 text-[10px] font-medium tabular-nums text-blue-500">
+            本文 {{ formatElapsed(data.current.started_at) }}<template v-if="data.run_started_at"> · 队列 {{ formatElapsed(data.run_started_at) }}</template>
+          </div>
         </div>
 
         <!-- 排队列表 -->

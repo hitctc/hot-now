@@ -238,6 +238,7 @@ export function editFinishedArticle(
     quotes?: string[];
     wechatThemeId?: string | null;
     wechatHtml?: string | null;
+    coverImage?: string[];
     coverImageIndex?: number;
     titleIndex?: number;
     intros?: string[];
@@ -257,6 +258,51 @@ export function editFinishedArticle(
   return requestJson<{ ok: boolean }>(`/actions/creative/finished-articles/${id}`, {
     method: "PUT",
     body: JSON.stringify(fields)
+  });
+}
+
+// ─── 手动上传图片 ──
+
+export type UploadedImage = {
+  storedUrl: string;
+  purpose: string;
+  alt: string;
+};
+
+/** 将本地文件上传到服务端图片存储，返回可访问的 URL */
+export async function uploadImages(
+  files: File[],
+  purpose: "cover" | "inline" = "cover",
+): Promise<UploadedImage[]> {
+  const images = await Promise.all(
+    files.map(async (file) => {
+      const data = await fileToBase64(file);
+      return {
+        data,
+        filename: file.name,
+        contentType: file.type,
+        purpose,
+      };
+    }),
+  );
+  const res = await requestJson<{ ok: boolean; images: UploadedImage[]; failed?: Array<{ index: number; reason: string }> }>(
+    "/actions/creative/images/upload",
+    { method: "POST", body: JSON.stringify({ images }) },
+  );
+  return res.images;
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // 去掉 "data:image/png;base64," 前缀
+      const base64 = result.split(",")[1] ?? "";
+      resolve(base64);
+    };
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(file);
   });
 }
 

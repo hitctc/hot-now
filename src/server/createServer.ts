@@ -2402,6 +2402,72 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.send(response);
   });
 
+  // ─── Creative: 前端手动上传图片（session 鉴权） ───
+
+  app.post("/actions/creative/images/upload", { bodyLimit: 15 * 1024 * 1024 }, async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+
+    if (!creativeImageDir) {
+      return reply.code(503).send({ ok: false, reason: "image-dir-not-configured" });
+    }
+
+    const body = request.body as {
+      images?: Array<{
+        data: string;       // base64 编码的图片数据
+        filename?: string;
+        contentType?: string;
+        purpose?: string;   // "cover" | "inline"
+        alt?: string;
+      }>;
+    } | undefined;
+
+    const images = Array.isArray(body?.images) ? body.images : [];
+    if (images.length === 0) {
+      return reply.code(400).send({ ok: false, reason: "missing-images" });
+    }
+    if (images.length > 9) {
+      return reply.code(400).send({ ok: false, reason: "too-many-images" });
+    }
+
+    const publicBaseUrl = (deps.config?.publicBaseUrl ?? "").replace(/\/+$/, "");
+    const results: Array<{ storedUrl: string; purpose: string; alt: string }> = [];
+    const failed: Array<{ index: number; reason: string }> = [];
+
+    for (let i = 0; i < images.length; i++) {
+      const img = images[i];
+      if (!img.data) {
+        failed.push({ index: i, reason: "missing-data" });
+        continue;
+      }
+
+      try {
+        const buffer = Buffer.from(img.data, "base64");
+        const ext = resolveExtFromFilename(img.filename) ?? resolveExtFromContentType(img.contentType);
+        const stored = await storeImageBuffer(creativeImageDir, buffer, ext);
+        results.push({
+          storedUrl: publicBaseUrl ? `${publicBaseUrl}${stored.urlPath}` : stored.urlPath,
+          purpose: img.purpose ?? "cover",
+          alt: img.alt ?? "",
+        });
+      } catch (err) {
+        request.log.warn({ err, index: i }, "Image upload/store failed");
+        failed.push({ index: i, reason: (err as Error).message ?? "store_failed" });
+      }
+    }
+
+    if (results.length === 0) {
+      return reply.code(500).send({ ok: false, reason: "all_uploads_failed", details: failed });
+    }
+
+    const response: Record<string, unknown> = { ok: true, images: results };
+    if (failed.length > 0) {
+      response.failed = failed;
+    }
+    return reply.send(response);
+  });
+
   // ─── Creative: 图片文件服务（公开访问，无需鉴权） ───
 
   app.get("/api/creative/images/:date/:file", async (request, reply) => {

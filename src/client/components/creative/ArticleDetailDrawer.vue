@@ -352,14 +352,21 @@
         <section>
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">封面图</h3>
-            <a-button v-if="!props.readonly"
-              type="link"
-              size="small"
-              class="!p-0 !text-[11px]"
-              :loading="regenerating"
-              :disabled="regenerating"
-              @click="handleRegenCover"
-            >{{ regenerating ? '生成中...' : (displayCoverImages.length > 0 ? '生成新封面图' : '生成封面图') }}</a-button>
+            <div v-if="!props.readonly" class="flex items-center gap-3">
+              <a-button
+                type="link"
+                size="small"
+                class="!p-0 !text-[11px]"
+                :loading="regenerating"
+                :disabled="regenerating"
+                @click="handleRegenCover"
+              >{{ regenerating ? '生成中...' : (displayCoverImages.length > 0 ? '生成新封面图' : '生成封面图') }}</a-button>
+              <label class="cursor-pointer text-[11px] text-editorial-link-active hover:underline">
+                <span v-if="uploadingCover">上传中...</span>
+                <span v-else>上传封面图</span>
+                <input type="file" accept="image/*" class="hidden" @change="handleUploadCover" />
+              </label>
+            </div>
           </div>
           <template v-if="displayCoverImages.length > 0">
             <a-image-preview-group>
@@ -420,6 +427,11 @@
                     :disabled="regenInlineImageLoading.has(idx)"
                     @click="handleRegenInlineImage(idx)"
                   >{{ regenInlineImageLoading.has(idx) ? `配图${idx} 生成中...` : remainingImageSlots.includes(idx) ? `生成配图${idx}` : `生成新配图${idx}` }}</a-button>
+                  <label class="cursor-pointer text-[11px] text-editorial-link-active hover:underline">
+                    <span v-if="uploadingInline.has(idx)">上传中...</span>
+                    <span v-else>上传配图{{ idx }}</span>
+                    <input type="file" accept="image/*" class="hidden" @change="handleUploadInlineImage(idx, $event)" />
+                  </label>
                   <span v-if="idx < totalImageSlotCount" class="text-editorial-text-muted/40">|</span>
                 </span>
               </template>
@@ -577,6 +589,7 @@ import {
   repairImagePrompts,
   parseArticleImages,
   extractImageUrl,
+  uploadImages,
   type CreativeFinishedArticle,
   type WechatThemeId,
 } from "../../services/creativeApi.js";
@@ -1110,6 +1123,61 @@ async function handleRegenInlineImage(imageIndex: number): Promise<void> {
   }
 }
 
+// ─── 手动上传正文配图 ──
+
+const uploadingInline = ref<Set<number>>(new Set());
+
+async function handleUploadInlineImage(imageIndex: number, event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const files = input.files;
+  if (!files || files.length === 0 || !props.article) return;
+  input.value = "";
+
+  uploadingInline.value = new Set([...uploadingInline.value, imageIndex]);
+  try {
+    const uploaded = await uploadImages(Array.from(files), "inline");
+    if (uploaded.length === 0) {
+      message.error(`配图 ${imageIndex} 上传失败`);
+      return;
+    }
+    const newUrl = uploaded[0].storedUrl;
+
+    // 替换 markdown 中对应的图片占位符
+    let md = editContent.value;
+    const imgRegex = new RegExp(`!\\[配图${imageIndex}[^\\]]*\\]\\([^)]+\\)`, "g");
+    const placeholderRegex = new RegExp(`\\[配图${imageIndex}占位\\]|<!--\\s*image-placeholder-${imageIndex}\\s*-->`, "g");
+
+    if (imgRegex.test(md)) {
+      md = md.replace(imgRegex, `![配图${imageIndex}](${newUrl})`);
+    } else if (placeholderRegex.test(md)) {
+      md = md.replace(placeholderRegex, `![配图${imageIndex}](${newUrl})`);
+    } else {
+      // 没有找到占位符，追加到正文末尾
+      md = `${md}\n\n![配图${imageIndex}](${newUrl})`;
+    }
+
+    editContent.value = md;
+    props.article.contentMarkdown = md;
+    lastSavedContent = md;
+
+    const saveFields: Record<string, unknown> = { contentMarkdown: md };
+    const themeId = activePreviewTheme.value !== "live"
+      ? themeIdMap[activePreviewTheme.value]
+      : "classic" as WechatThemeId;
+    const html = renderWechatThemePreview(md, themeId);
+    props.article.wechatHtml = html;
+    saveFields.wechatHtml = html;
+
+    await editFinishedArticle(props.article.id, saveFields);
+    message.success(`配图 ${imageIndex} 已上传`);
+    tickArticleChange();
+  } catch {
+    message.error(`配图 ${imageIndex} 上传失败`);
+  } finally {
+    uploadingInline.value = new Set([...uploadingInline.value].filter(i => i !== imageIndex));
+  }
+}
+
 // ─── 封面图选择 & 重新生成 ───
 
 const activeCoverIndex = ref(0);
@@ -1166,6 +1234,64 @@ async function handleRegenCover(): Promise<void> {
     message.error("封面图生成请求失败");
   } finally {
     regenerating.value = false;
+  }
+}
+
+// ─── 手动上传封面图 ──
+
+const uploadingCover = ref(false);
+
+async function handleUploadCover(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const files = input.files;
+  if (!files || files.length === 0 || !props.article) return;
+  // 清空 input 以便重复选择同一文件
+  input.value = "";
+
+  uploadingCover.value = true;
+  try {
+    const uploaded = await uploadImages(Array.from(files), "cover");
+    if (uploaded.length === 0) {
+      message.error("封面图上传失败");
+      return;
+    }
+    const newUrl = uploaded[0].storedUrl;
+    // 追加到封面图列表，自动选中新上传的
+    const updatedCovers = [...displayCoverImages.value, newUrl];
+    localCoverImages.value = updatedCovers;
+    activeCoverIndex.value = updatedCovers.length - 1;
+    props.article.coverImage = updatedCovers;
+    props.article.coverImageIndex = updatedCovers.length - 1;
+
+    // 联动：替换 markdown 中的封面图行
+    let md = editContent.value;
+    const coverRegex = /^!\[封面图[^\]]*\]\([^)]+\)/m;
+    if (coverRegex.test(md)) {
+      md = md.replace(coverRegex, `![封面图](${newUrl})`);
+    } else {
+      md = `![封面图](${newUrl})\n\n${md}`;
+    }
+    editContent.value = md;
+    props.article.contentMarkdown = md;
+    lastSavedContent = md;
+
+    const saveFields: Record<string, unknown> = {
+      coverImage: updatedCovers,
+      coverImageIndex: updatedCovers.length - 1,
+      contentMarkdown: md,
+    };
+    if (activePreviewTheme.value !== "live" && md) {
+      const html = renderWechatThemePreview(md, themeIdMap[activePreviewTheme.value]);
+      props.article.wechatHtml = html;
+      saveFields.wechatHtml = html;
+    }
+    await editFinishedArticle(props.article.id, saveFields);
+    message.success("封面图已上传");
+    tickArticleChange();
+  } catch {
+    message.error("封面图上传失败");
+  } finally {
+    uploadingCover.value = false;
   }
 }
 

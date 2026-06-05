@@ -259,8 +259,13 @@ onBeforeUnmount(() => { if (countdownTimer) clearInterval(countdownTimer); });
       <div class="space-y-1.5">
         <div v-for="def in paramGroup" :key="def.key" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5" :class="{ 'opacity-50': def.key === 'image_provider' && !isProviderAuto }">
           <div class="min-w-0 flex-1">
-            <span class="text-xs font-medium text-editorial-text-body">{{ def.label }}</span>
-            <span class="ml-1 text-[10px] text-editorial-text-muted/70">{{ def.description }}</span>
+            <div>
+              <span class="text-xs font-medium text-editorial-text-body">{{ def.label }}</span>
+              <span class="ml-1 text-[10px] text-editorial-text-muted/70">{{ def.description }}</span>
+            </div>
+            <div v-if="intervalCountdownKey[def.key] && getCountdownIso(def.key)" class="mt-0.5 text-[10px] font-medium tabular-nums" :class="formatCountdown(getCountdownIso(def.key)) === '即将执行' ? 'text-orange-500' : 'text-blue-500'">
+              {{ formatCountdown(getCountdownIso(def.key)) }}后执行
+            </div>
           </div>
           <span class="shrink-0 text-[10px] font-mono text-editorial-text-muted/60">{{ switches[def.key] ?? '-' }}</span>
 
@@ -291,11 +296,6 @@ onBeforeUnmount(() => { if (countdownTimer) clearInterval(countdownTimer); });
               @click="confirmNumber(def.key)"
             >确认</button>
             <!-- 间隔参数行内显示下次执行倒计时 -->
-            <span
-              v-if="intervalCountdownKey[def.key]"
-              class="shrink-0 text-[10px] font-medium tabular-nums"
-              :class="formatCountdown(getCountdownIso(def.key)) === '-' ? 'text-editorial-text-muted/40' : 'text-blue-500'"
-            >{{ formatCountdown(getCountdownIso(def.key)) }}</span>
           </template>
         </div>
 

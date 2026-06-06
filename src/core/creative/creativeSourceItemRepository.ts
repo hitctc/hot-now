@@ -350,8 +350,8 @@ export function listCreativeSourceItems(
   }
 
   if (filters.sourceName) {
-    whereClauses.push("source_name = ?");
-    params.push(filters.sourceName);
+    whereClauses.push("source_name LIKE ?");
+    params.push(`%${filters.sourceName}%`);
   }
 
   if (filters.search) {

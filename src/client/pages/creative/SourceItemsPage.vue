@@ -350,31 +350,64 @@ async function confirmManualWrite(): Promise<void> {
 
 // ─── 素材溯源 ───
 const tracingIds = ref<Set<number>>(new Set());
+// 溯源轮询定时器
+let tracePollTimer: ReturnType<typeof setInterval> | null = null;
+const tracePollItems = new Map<number, number>(); // itemId -> startTime
 
 async function handleTrace(item: CreativeSourceItem): Promise<void> {
   tracingIds.value = new Set([...tracingIds.value, item.id]);
   try {
     const result = await traceSourceItem(item.id);
     if (result.ok) {
-      message.success("溯源已提交，结果将在 30~60 秒后显示");
-      // 30 秒后自动刷新该素材查看结果
-      setTimeout(async () => {
-        try {
-          const updated = await readCreativeSourceItem(item.id);
-          const local = items.value.find(i => i.id === item.id);
-          if (local && updated.tracedSources) {
-            local.tracedSources = updated.tracedSources;
-          }
-        } catch { /* 静默 */ }
-      }, 35_000);
+      message.info("溯源已提交，正在搜索原始来源…");
+      // 加入轮询队列，10 秒后开始检查结果
+      tracePollItems.set(item.id, Date.now());
+      startTracePoll();
     } else {
       message.error(result.reason ?? "溯源失败");
+      tracingIds.value = new Set([...tracingIds.value].filter(id => id !== item.id));
     }
   } catch {
     message.error("溯源请求失败");
-  } finally {
     tracingIds.value = new Set([...tracingIds.value].filter(id => id !== item.id));
   }
+}
+
+/** 轮询溯源结果，每 10 秒检查一次，90 秒超时 */
+function startTracePoll(): void {
+  if (tracePollTimer) return;
+  tracePollTimer = setInterval(async () => {
+    if (tracePollItems.size === 0) { stopTracePoll(); return; }
+    const now = Date.now();
+    const entries = [...tracePollItems.entries()];
+    for (const [itemId, startTime] of entries) {
+      if (now - startTime > 90_000) {
+        tracePollItems.delete(itemId);
+        tracingIds.value = new Set([...tracingIds.value].filter(id => id !== itemId));
+        message.info(`素材#${itemId} 溯源超时，请稍后手动刷新查看`);
+        continue;
+      }
+      try {
+        const updated = await readCreativeSourceItem(itemId);
+        if (updated.tracedSources !== null) {
+          tracePollItems.delete(itemId);
+          tracingIds.value = new Set([...tracingIds.value].filter(id => id !== itemId));
+          const local = items.value.find(i => i.id === itemId);
+          if (local) local.tracedSources = updated.tracedSources;
+          if (updated.tracedSources.length > 0) {
+            message.success(`素材#${itemId} 溯源完成，找到 ${updated.tracedSources.length} 条原始来源`);
+          } else {
+            message.info(`素材#${itemId} 溯源完成，未找到可靠原始来源`);
+          }
+        }
+      } catch { /* 单次轮询失败不中断 */ }
+    }
+    if (tracePollItems.size === 0) stopTracePoll();
+  }, 10_000);
+}
+
+function stopTracePoll(): void {
+  if (tracePollTimer) { clearInterval(tracePollTimer); tracePollTimer = null; }
 }
 
 function openWriteModeModal(item: CreativeSourceItem): void {
@@ -437,7 +470,7 @@ function stopWritingPoll(): void {
   }
 }
 
-onBeforeUnmount(() => stopWritingPoll());
+onBeforeUnmount(() => { stopWritingPoll(); stopTracePoll(); });
 
 async function confirmWriteMode(): Promise<void> {
   const item = writeModeTarget.value;
@@ -772,6 +805,11 @@ const pagination = computed(() => ({
                     <p v-if="src.reason" class="m-0 mt-0.5 text-[10px] text-editorial-text-muted/70">{{ src.reason }}</p>
                   </div>
                 </div>
+              </div>
+              <!-- 溯源进行中 -->
+              <div v-else-if="tracingIds.has(record.id)" class="flex items-center gap-2 py-2">
+                <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
+                <span class="text-[11px] text-blue-500">正在搜索原始来源…预计 30~60 秒</span>
               </div>
               <p v-else-if="record.tracedSources && record.tracedSources.length === 0" class="text-[11px] italic text-editorial-text-muted">已溯源，未找到可靠原始来源</p>
               <p v-else class="text-[11px] text-editorial-text-muted/50">点击「溯源」搜索该素材的原始官方来源</p>

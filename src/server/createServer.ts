@@ -81,7 +81,8 @@ import {
   updateCreativeSourceItemWritingStatus,
   updateCreativeSourceItemLinkedArticle,
   updateCreativeSourceItemTrendScore,
-  updateCreativeSourceItemFields
+  updateCreativeSourceItemFields,
+  toggleSourceItemWritable
 } from "../core/creative/creativeSourceItemRepository.js";
 import {
   insertCreativeFinishedArticle,
@@ -918,6 +919,7 @@ export function createServer(deps: ServerDeps = {}) {
       writingStatus: query.writingStatus as "ready" | "writing" | "done" | "skipped" | "excluded" | undefined,
       collectorAgent: query.collectorAgent,
       sourceName: query.sourceName,
+      writable: query.writable === "1" ? true : undefined,
       search: query.search,
       trendScoreMin: query.trendScoreMin ? parseInt(query.trendScoreMin, 10) : undefined,
       sourceFeed: query.sourceFeed || undefined,
@@ -2139,6 +2141,18 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.code(404).send({ ok: false, reason: "not-found" });
     }
     return reply.send({ ok: true });
+  });
+
+  // ─── 素材可写标记切换 ───
+  app.post("/actions/creative/source-items/:id/toggle-writable", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+    if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
+
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const updated = toggleSourceItemWritable(db, id);
+    if (!updated) { return reply.code(404).send({ ok: false, reason: "not-found" }); }
+    return reply.send({ ok: true, writable: updated.writable });
   });
 
   app.post("/actions/creative/source-items/:id/update", async (request, reply) => {

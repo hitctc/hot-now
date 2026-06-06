@@ -1321,6 +1321,11 @@ export function runMigrations(db: SqliteDatabase): void {
       db.exec(`ALTER TABLE creative_source_items ADD COLUMN traced_sources_json TEXT DEFAULT NULL`);
     }
 
+    // 素材可写标记
+    if (!hasColumn(db, "creative_source_items", "writable")) {
+      db.exec(`ALTER TABLE creative_source_items ADD COLUMN writable INTEGER NOT NULL DEFAULT 0`);
+    }
+
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(35, stepTraceMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);

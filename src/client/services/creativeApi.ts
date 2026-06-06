@@ -35,6 +35,7 @@ export type CreativeSourceItem = {
   trendBreakdown: TrendBreakdown | null;
   linkedArticleId: number | null;
   tracedSources: TracedSource[] | null;
+  writable: boolean;
   writeCount: number;
   createdAt: string;
   updatedAt: string;
@@ -157,6 +158,7 @@ export function readCreativeSourceItems(params?: {
   writingStatus?: string;
   collectorAgent?: string;
   sourceName?: string;
+  writable?: boolean;
   search?: string;
 }): Promise<SourceItemListResponse> {
   const query = new URLSearchParams();
@@ -165,6 +167,7 @@ export function readCreativeSourceItems(params?: {
   if (params?.writingStatus) query.set("writingStatus", params.writingStatus);
   if (params?.collectorAgent) query.set("collectorAgent", params.collectorAgent);
   if (params?.sourceName) query.set("sourceName", params.sourceName);
+  if (params?.writable) query.set("writable", "1");
   if (params?.search) query.set("search", params.search);
   const qs = query.toString();
   return requestJson<SourceItemListResponse>(`/api/creative/source-items${qs ? `?${qs}` : ""}`);
@@ -176,6 +179,10 @@ export function readCreativeSourceItem(id: number): Promise<CreativeSourceItem> 
 
 export function fetchSourceNames(): Promise<string[]> {
   return requestJson<string[]>("/api/creative/source-names");
+}
+
+export function toggleSourceItemWritable(id: number): Promise<{ ok: boolean; writable: boolean }> {
+  return requestJson<{ ok: boolean; writable: boolean }>(`/actions/creative/source-items/${id}/toggle-writable`, { method: "POST" });
 }
 
 // ─── Finished Articles ───

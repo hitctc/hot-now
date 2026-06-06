@@ -26,6 +26,7 @@ const SELECT_COLUMNS = `
   trend_score,
   trend_breakdown,
   traced_sources_json,
+  writable,
   linked_article_id,
   created_at,
   updated_at,
@@ -55,6 +56,7 @@ type SourceItemRow = {
   trend_score: number | null;
   trend_breakdown: string | null;
   traced_sources_json: string | null;
+  writable: number;
   linked_article_id: number | null;
   created_at: string;
   updated_at: string;
@@ -85,6 +87,7 @@ function mapRow(row: SourceItemRow): CreativeSourceItemRecord {
     trendScore: row.trend_score,
     trendBreakdown: row.trend_breakdown ? JSON.parse(row.trend_breakdown) : null,
     tracedSources: row.traced_sources_json ? JSON.parse(row.traced_sources_json) : null,
+    writable: row.writable === 1,
     linkedArticleId: row.linked_article_id,
     writeCount: row.write_count ?? 0,
     createdAt: row.created_at,
@@ -136,6 +139,7 @@ export type CreativeSourceItemRecord = {
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
   tracedSources: TracedSource[] | null;
+  writable: boolean;
   linkedArticleId: number | null;
   writeCount: number;
   createdAt: string;
@@ -170,6 +174,7 @@ export type ListCreativeSourceItemsFilters = {
   writingStatus?: CreativeSourceItemWritingStatus;
   collectorAgent?: string;
   sourceName?: string;
+  writable?: boolean;
   search?: string;
   trendScoreMin?: number;
   last24h?: boolean;
@@ -354,6 +359,10 @@ export function listCreativeSourceItems(
     params.push(`%${filters.sourceName}%`);
   }
 
+  if (filters.writable === true) {
+    whereClauses.push("writable = 1");
+  }
+
   if (filters.search) {
     whereClauses.push("(title LIKE ? OR summary LIKE ?)");
     const term = `%${filters.search}%`;
@@ -497,4 +506,13 @@ export function updateCreativeSourceItemLinkedArticle(
     .run(articleId, id);
 
   return result.changes > 0;
+}
+
+/** 切换素材可写标记（0↔1） */
+export function toggleSourceItemWritable(db: SqliteDatabase, id: number): { writable: boolean } | null {
+  const row = db.prepare("SELECT writable FROM creative_source_items WHERE id = ?").get(id) as { writable: number } | undefined;
+  if (!row) return null;
+  const newValue = row.writable === 1 ? 0 : 1;
+  db.prepare("UPDATE creative_source_items SET writable = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(newValue, id);
+  return { writable: newValue === 1 };
 }

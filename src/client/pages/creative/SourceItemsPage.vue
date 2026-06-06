@@ -15,6 +15,7 @@ import {
   writeSourceItemArticle,
   submitManualWrite,
   traceSourceItem,
+  toggleSourceItemWritable,
   type CreativeSourceItem,
   type CreativeFinishedArticle,
   type TrendBreakdown,
@@ -41,6 +42,7 @@ const saved = (() => {
 })();
 const writingStatusFilter = ref<string | undefined>(saved.writingStatus || undefined);
 const sourceNameFilter = ref(saved.sourceName || "");
+const writableOnly = ref(false);
 const searchText = ref(saved.search || "");
 
 // 搜索历史
@@ -97,6 +99,7 @@ async function loadItems(): Promise<void> {
       pageSize: pageSize.value,
       writingStatus: writingStatusFilter.value || undefined,
       sourceName: sourceNameFilter.value.trim() || undefined,
+      writable: writableOnly.value || undefined,
       search: searchText.value || undefined
     });
     items.value = res.items;
@@ -119,6 +122,11 @@ onMounted(() => {
 watch(writingStatusFilter, () => {
   currentPage.value = 1;
   saveSourceFilters();
+  void loadItems();
+});
+
+watch(writableOnly, () => {
+  currentPage.value = 1;
   void loadItems();
 });
 
@@ -413,6 +421,15 @@ function stopTracePoll(): void {
   if (tracePollTimer) { clearInterval(tracePollTimer); tracePollTimer = null; }
 }
 
+async function handleToggleWritable(item: CreativeSourceItem): Promise<void> {
+  try {
+    const res = await toggleSourceItemWritable(item.id);
+    if (res.ok) {
+      item.writable = res.writable;
+    }
+  } catch { /* 静默 */ }
+}
+
 function openWriteModeModal(item: CreativeSourceItem): void {
   writeModeTarget.value = item;
   writeModeValue.value = null;
@@ -524,6 +541,7 @@ const columns = [
   { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 60, align: "center" as const, ellipsis: true },
   { title: "发布时间", dataIndex: "publishedAt", key: "publishedAt", width: 130, ellipsis: true },
   { title: "成品创建时间", key: "linkedArticleCreatedAt", width: 140, ellipsis: true },
+  { title: "可写", key: "writable", width: 60, align: "center" as const },
   { title: "写文章", key: "quickCopy", width: 80, ellipsis: true }
 ];
 
@@ -554,6 +572,7 @@ const pagination = computed(() => ({
         @search="() => { currentPage = 1; saveSourceFilters(); void loadItems(); }"
         @change="(val: string) => { if (!val) { currentPage = 1; saveSourceFilters(); void loadItems(); } }"
       />
+      <a-checkbox v-model:checked="writableOnly">只看可写</a-checkbox>
       <div ref="searchDropdownRef" class="relative">
         <a-input-search
           v-model:value="searchText"
@@ -710,6 +729,16 @@ const pagination = computed(() => ({
               </a-tag>
               <a-tag v-if="record.writeCount > 0" color="green" class="!m-0 !text-[11px] !py-0">{{ record.writeCount }}次</a-tag>
             </div>
+          </template>
+
+          <!-- 可写列 -->
+          <template v-else-if="column.key === 'writable'">
+            <a-button
+              size="small"
+              :type="record.writable ? 'primary' : 'default'"
+              class="!text-[11px] !px-2 !py-0.5"
+              @click="handleToggleWritable(record)"
+            >{{ record.writable ? '可写' : '-' }}</a-button>
           </template>
 
           <!-- 写文章列 -->

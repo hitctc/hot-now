@@ -15,6 +15,7 @@ import {
   writeSourceItemArticle,
   submitManualWrite,
   traceSourceItem,
+  fetchSourceNames,
   type CreativeSourceItem,
   type CreativeFinishedArticle,
   type TrendBreakdown,
@@ -40,7 +41,11 @@ const saved = (() => {
   } catch { return {}; }
 })();
 const writingStatusFilter = ref<string | undefined>(saved.writingStatus || undefined);
+const sourceNameFilter = ref<string | undefined>(saved.sourceName || undefined);
 const searchText = ref(saved.search || "");
+
+// 来源名称列表（页面加载时获取）
+const sourceNameOptions = ref<string[]>([]);
 
 // 搜索历史
 const { history: searchHistory, addToHistory, removeFromHistory } = useSearchHistory("creative-source-search-history");
@@ -62,6 +67,7 @@ function saveSourceFilters(): void {
   try {
     localStorage.setItem(SOURCE_FILTERS_KEY, JSON.stringify({
       writingStatus: writingStatusFilter.value || "",
+      sourceName: sourceNameFilter.value || "",
       search: searchText.value
     }));
   } catch { /* quota 超限等忽略 */ }
@@ -94,6 +100,7 @@ async function loadItems(): Promise<void> {
       page: currentPage.value,
       pageSize: pageSize.value,
       writingStatus: writingStatusFilter.value || undefined,
+      sourceName: sourceNameFilter.value || undefined,
       search: searchText.value || undefined
     });
     items.value = res.items;
@@ -111,9 +118,16 @@ async function loadItems(): Promise<void> {
 
 onMounted(() => {
   void loadItems();
+  fetchSourceNames().then(names => { sourceNameOptions.value = names; }).catch(() => {});
 });
 
 watch(writingStatusFilter, () => {
+  currentPage.value = 1;
+  saveSourceFilters();
+  void loadItems();
+});
+
+watch(sourceNameFilter, () => {
   currentPage.value = 1;
   saveSourceFilters();
   void loadItems();
@@ -542,6 +556,13 @@ const pagination = computed(() => ({
         :options="writingStatusOptions"
         placeholder="写作状态"
         class="!w-[140px]"
+      />
+      <a-select
+        v-model:value="sourceNameFilter"
+        :options="([{ label: '全部来源', value: '' }, ...sourceNameOptions.map(n => ({ label: n, value: n }))])"
+        placeholder="来源"
+        allow-clear
+        class="!w-[160px]"
       />
       <div ref="searchDropdownRef" class="relative">
         <a-input-search

@@ -156,6 +156,7 @@ export function readCreativeSourceItems(params?: {
   pageSize?: number;
   writingStatus?: string;
   collectorAgent?: string;
+  sourceName?: string;
   search?: string;
 }): Promise<SourceItemListResponse> {
   const query = new URLSearchParams();
@@ -163,6 +164,7 @@ export function readCreativeSourceItems(params?: {
   if (params?.pageSize) query.set("pageSize", String(params.pageSize));
   if (params?.writingStatus) query.set("writingStatus", params.writingStatus);
   if (params?.collectorAgent) query.set("collectorAgent", params.collectorAgent);
+  if (params?.sourceName) query.set("sourceName", params.sourceName);
   if (params?.search) query.set("search", params.search);
   const qs = query.toString();
   return requestJson<SourceItemListResponse>(`/api/creative/source-items${qs ? `?${qs}` : ""}`);
@@ -170,6 +172,10 @@ export function readCreativeSourceItems(params?: {
 
 export function readCreativeSourceItem(id: number): Promise<CreativeSourceItem> {
   return requestJson<CreativeSourceItem>(`/api/creative/source-items/${id}`);
+}
+
+export function fetchSourceNames(): Promise<string[]> {
+  return requestJson<string[]>("/api/creative/source-names");
 }
 
 // ─── Finished Articles ───

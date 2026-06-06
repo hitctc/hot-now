@@ -169,6 +169,7 @@ export type ListCreativeSourceItemsFilters = {
   pageSize?: number;
   writingStatus?: CreativeSourceItemWritingStatus;
   collectorAgent?: string;
+  sourceName?: string;
   search?: string;
   trendScoreMin?: number;
   last24h?: boolean;
@@ -346,6 +347,11 @@ export function listCreativeSourceItems(
   if (filters.collectorAgent) {
     whereClauses.push("collector_agent = ?");
     params.push(filters.collectorAgent);
+  }
+
+  if (filters.sourceName) {
+    whereClauses.push("source_name = ?");
+    params.push(filters.sourceName);
   }
 
   if (filters.search) {

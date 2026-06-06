@@ -917,8 +917,9 @@ export function createServer(deps: ServerDeps = {}) {
       pageSize: query.pageSize ? parseInt(query.pageSize, 10) : undefined,
       writingStatus: query.writingStatus as "ready" | "writing" | "done" | "skipped" | "excluded" | undefined,
       collectorAgent: query.collectorAgent,
+      sourceName: query.sourceName,
       search: query.search,
-      trendScoreMin: query.trendScore_min ? parseInt(query.trendScore_min, 10) : undefined,
+      trendScoreMin: query.trendScoreMin ? parseInt(query.trendScoreMin, 10) : undefined,
       sourceFeed: query.sourceFeed || undefined,
       last24h: query.sourceFeed ? true : undefined
     });
@@ -941,6 +942,18 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     return reply.send(result);
+  });
+
+  // ─── 素材来源名称列表（去重，用于筛选下拉） ───
+  app.get("/api/creative/source-names", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+    if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
+
+    const rows = db.prepare(
+      "SELECT DISTINCT source_name FROM creative_source_items WHERE source_name IS NOT NULL AND source_name != '' ORDER BY source_name"
+    ).all() as Array<{ source_name: string }>;
+    return reply.send(rows.map(r => r.source_name));
   });
 
   app.get("/api/creative/source-items/:id", async (request, reply) => {

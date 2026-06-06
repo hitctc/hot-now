@@ -1800,6 +1800,66 @@ export function createServer(deps: ServerDeps = {}) {
     }
   });
 
+  // ─── 素材溯源：调用 Hermes 搜索原始来源 ───
+  app.post("/actions/creative/source-items/:id/trace", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+    if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
+
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const item = findCreativeSourceItemById(db, id);
+    if (!item) { return reply.code(404).send({ ok: false, reason: "source-item-not-found" }); }
+
+    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+    const hermesApiToken = process.env.HERMES_API_TOKEN;
+    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
+
+    // 取标题 + 摘要前 1500 字作为搜索内容
+    const contentForTrace = (item.summary ?? item.fullContent ?? "").slice(0, 1500);
+
+    try {
+      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/source-trace`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
+        body: JSON.stringify({
+          sourceItemId: id,
+          title: item.title,
+          content: contentForTrace,
+          sourceUrl: item.url || undefined,
+          maxResults: 3,
+        }),
+        signal: AbortSignal.timeout(15_000),
+      });
+
+      if (!res.ok) {
+        const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
+        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: errorBody });
+      }
+
+      const data = await res.json() as { ok?: boolean; status?: string };
+      return reply.send({ ok: true, status: data.status ?? "tracing" });
+    } catch (err) {
+      const errMessage = (err as Error).message ?? String(err);
+      return reply.code(502).send({ ok: false, reason: "Hermes 调用失败", detail: errMessage });
+    }
+  });
+
+  // ─── 素材溯源回调：Hermes 写入溯源结果 ───
+  app.put("/api/creative/source-items/:id/trace-results", async (request, reply) => {
+    if (!validateCreativeApiToken(request, reply, creativeApiToken)) { return; }
+    if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
+
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const body = request.body as { results?: unknown[] } | undefined;
+    const results = Array.isArray(body?.results) ? body.results : [];
+
+    // 结果写入 traced_sources_json 字段
+    db.prepare("UPDATE creative_source_items SET traced_sources_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .run(JSON.stringify(results), id);
+
+    return reply.send({ ok: true });
+  });
+
 
 
   // ─── Daily Digest: Hermes 推送日报（token 鉴权） ───

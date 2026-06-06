@@ -25,6 +25,7 @@ const SELECT_COLUMNS = `
   raw_payload_json,
   trend_score,
   trend_breakdown,
+  traced_sources_json,
   linked_article_id,
   created_at,
   updated_at,
@@ -53,6 +54,7 @@ type SourceItemRow = {
   raw_payload_json: string;
   trend_score: number | null;
   trend_breakdown: string | null;
+  traced_sources_json: string | null;
   linked_article_id: number | null;
   created_at: string;
   updated_at: string;
@@ -82,6 +84,7 @@ function mapRow(row: SourceItemRow): CreativeSourceItemRecord {
     rawPayloadJson: row.raw_payload_json,
     trendScore: row.trend_score,
     trendBreakdown: row.trend_breakdown ? JSON.parse(row.trend_breakdown) : null,
+    tracedSources: row.traced_sources_json ? JSON.parse(row.traced_sources_json) : null,
     linkedArticleId: row.linked_article_id,
     writeCount: row.write_count ?? 0,
     createdAt: row.created_at,
@@ -90,6 +93,16 @@ function mapRow(row: SourceItemRow): CreativeSourceItemRecord {
 }
 
 // ── Public types ────────────────────────────────────────────────────────────
+
+/** 溯源结果条目 */
+export type TracedSource = {
+  title: string;
+  url: string;
+  source_name: string;
+  published_at?: string;
+  relevance_score?: number;
+  reason?: string;
+};
 
 export type TrendBreakdown = {
   topicPower: number;
@@ -122,6 +135,7 @@ export type CreativeSourceItemRecord = {
   rawPayloadJson: string;
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
+  tracedSources: TracedSource[] | null;
   linkedArticleId: number | null;
   writeCount: number;
   createdAt: string;

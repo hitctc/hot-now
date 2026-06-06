@@ -34,9 +34,19 @@ export type CreativeSourceItem = {
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
   linkedArticleId: number | null;
+  tracedSources: TracedSource[] | null;
   writeCount: number;
   createdAt: string;
   updatedAt: string;
+};
+
+export type TracedSource = {
+  title: string;
+  url: string;
+  source_name: string;
+  published_at?: string;
+  relevance_score?: number;
+  reason?: string;
 };
 
 // images 字段支持两种格式：纯 URL 字符串 或 带元数据的对象
@@ -641,5 +651,14 @@ export function submitManualWrite(req: ManualWriteRequest): Promise<ManualWriteR
   return requestJson<ManualWriteResult>("/actions/creative/source-items/manual-write", {
     method: "POST",
     body: JSON.stringify(req),
+  });
+}
+
+// ─── 素材溯源 ───
+
+export function traceSourceItem(id: number): Promise<{ ok: boolean; status?: string; reason?: string }> {
+  return requestJson("/actions/creative/source-items/" + id + "/trace", {
+    method: "POST",
+    body: "{}",
   });
 }

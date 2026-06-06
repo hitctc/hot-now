@@ -14,9 +14,11 @@ import {
   updateSourceItemWritingStatus,
   writeSourceItemArticle,
   submitManualWrite,
+  traceSourceItem,
   type CreativeSourceItem,
   type CreativeFinishedArticle,
-  type TrendBreakdown
+  type TrendBreakdown,
+  type TracedSource
 } from "../../services/creativeApi.js";
 
 // ─── 状态 ───
@@ -343,6 +345,35 @@ async function confirmManualWrite(): Promise<void> {
     message.error("提交写作请求失败");
   } finally {
     manualWriteSubmitting.value = false;
+  }
+}
+
+// ─── 素材溯源 ───
+const tracingIds = ref<Set<number>>(new Set());
+
+async function handleTrace(item: CreativeSourceItem): Promise<void> {
+  tracingIds.value = new Set([...tracingIds.value, item.id]);
+  try {
+    const result = await traceSourceItem(item.id);
+    if (result.ok) {
+      message.success("溯源已提交，结果将在 30~60 秒后显示");
+      // 30 秒后自动刷新该素材查看结果
+      setTimeout(async () => {
+        try {
+          const updated = await readCreativeSourceItem(item.id);
+          const local = items.value.find(i => i.id === item.id);
+          if (local && updated.tracedSources) {
+            local.tracedSources = updated.tracedSources;
+          }
+        } catch { /* 静默 */ }
+      }, 35_000);
+    } else {
+      message.error(result.reason ?? "溯源失败");
+    }
+  } catch {
+    message.error("溯源请求失败");
+  } finally {
+    tracingIds.value = new Set([...tracingIds.value].filter(id => id !== item.id));
   }
 }
 
@@ -708,6 +739,43 @@ const pagination = computed(() => ({
                 <span v-else class="text-editorial-text-muted">-</span>
               </a-descriptions-item>
             </a-descriptions>
+
+            <!-- 溯源：搜索原始来源 -->
+            <div class="border-t border-editorial-border pt-3">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-xs font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">素材溯源</span>
+                <a-button
+                  size="small"
+                  :loading="tracingIds.has(record.id)"
+                  @click="handleTrace(record)"
+                >
+                  {{ record.tracedSources ? '重新溯源' : '🔍 溯源' }}
+                </a-button>
+              </div>
+              <!-- 已有溯源结果 -->
+              <div v-if="record.tracedSources && record.tracedSources.length > 0" class="space-y-1.5">
+                <div
+                  v-for="(src, idx) in record.tracedSources"
+                  :key="idx"
+                  class="flex items-start gap-2 rounded border border-editorial-border bg-editorial-page px-3 py-2"
+                >
+                  <span class="shrink-0 text-[10px] font-bold text-editorial-text-muted">{{ idx + 1 }}</span>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2">
+                      <a :href="src.url" target="_blank" rel="noopener noreferrer" class="truncate text-[12px] font-medium text-editorial-link-active hover:underline">{{ src.title }}</a>
+                      <span v-if="src.relevance_score" class="shrink-0 rounded bg-blue-50 px-1 py-0.5 text-[10px] text-blue-600">{{ Math.round(src.relevance_score * 100) }}%</span>
+                    </div>
+                    <div class="mt-0.5 flex items-center gap-2 text-[10px] text-editorial-text-muted">
+                      <span>{{ src.source_name }}</span>
+                      <span v-if="src.published_at">{{ src.published_at }}</span>
+                    </div>
+                    <p v-if="src.reason" class="m-0 mt-0.5 text-[10px] text-editorial-text-muted/70">{{ src.reason }}</p>
+                  </div>
+                </div>
+              </div>
+              <p v-else-if="record.tracedSources && record.tracedSources.length === 0" class="text-[11px] italic text-editorial-text-muted">已溯源，未找到可靠原始来源</p>
+              <p v-else class="text-[11px] text-editorial-text-muted/50">点击「溯源」搜索该素材的原始官方来源</p>
+            </div>
 
             <!-- 写作状态操作 -->
             <div class="flex items-center gap-3 border-t border-editorial-border pt-3">

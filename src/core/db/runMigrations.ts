@@ -1315,6 +1315,12 @@ export function runMigrations(db: SqliteDatabase): void {
     if (!hasColumn(db, "creative_finished_articles", "deleted_at")) {
       db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN deleted_at TEXT`);
     }
+
+    // 素材溯源结果存储
+    if (!hasColumn(db, "creative_source_items", "traced_sources_json")) {
+      db.exec(`ALTER TABLE creative_source_items ADD COLUMN traced_sources_json TEXT DEFAULT NULL`);
+    }
+
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(35, stepTraceMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);

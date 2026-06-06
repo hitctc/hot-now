@@ -87,12 +87,12 @@ onBeforeUnmount(() => {
 
         <!-- 当前任务 -->
         <div v-if="data.current" class="write-queue-current">
-          <div class="flex items-center gap-[5px]">
+          <div class="flex flex-wrap items-center gap-x-1 gap-y-0">
             <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500 shrink-0" />
             <span v-if="data.current.source_item_id" class="write-queue-id" @click.stop="openSourceItem(data.current.source_item_id)">#{{ data.current.source_item_id }}</span>
-            <span class="truncate text-[11px] text-blue-800">{{ data.current.source_item_title || data.current.label }}</span>
-            <span v-if="data.current.source_item_source_name" class="shrink-0 text-[10px] text-blue-400">· {{ data.current.source_item_source_name }}</span>
+            <span class="text-[11px] text-blue-800 break-all">{{ data.current.source_item_title || data.current.label }}</span>
           </div>
+          <div v-if="data.current.source_item_source_name" class="mt-0.5 text-[10px] text-blue-400 truncate">{{ data.current.source_item_source_name }}</div>
           <div v-if="data.current.started_at" class="mt-0.5 text-[10px] font-medium tabular-nums text-blue-500">
             本文 {{ formatElapsed(data.current.started_at) }}<template v-if="data.run_started_at"> · 队列 {{ formatElapsed(data.run_started_at) }}</template>
           </div>
@@ -132,7 +132,7 @@ onBeforeUnmount(() => {
   transform: translateY(-50%);
   z-index: 1900;
   min-width: 32px;
-  max-width: 280px;
+  max-width: 320px;
   border-radius: 8px;
   border: 1px solid #e5e7eb;
   background: #fff;
@@ -188,10 +188,10 @@ onBeforeUnmount(() => {
 .write-queue-close:hover { color: #374151; }
 .write-queue-current {
   display: flex;
-  align-items: center;
-  gap: 5px;
+  flex-direction: column;
+  gap: 0;
   margin: 4px 8px;
-  padding: 4px 6px;
+  padding: 6px 8px;
   border-radius: 4px;
   background: #eff6ff;
 }

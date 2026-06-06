@@ -659,7 +659,9 @@ const pagination = computed(() => ({
             <!-- 摘要 -->
             <div v-if="record.summary">
               <p class="m-0 mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">摘要 <span class="font-normal opacity-70">{{ record.summary.length }} 字</span></p>
-              <p class="m-0 text-sm leading-6 text-editorial-text-body">{{ record.summary }}</p>
+              <div class="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-editorial-md bg-editorial-page p-3 text-sm leading-6 text-editorial-text-body">
+                {{ record.summary }}
+              </div>
             </div>
 
             <!-- 原文内容 -->

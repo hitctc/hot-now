@@ -8,7 +8,7 @@
     width="90%"
     centered
     wrap-class-name="article-detail-modal"
-    :body-style="{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }"
+    :body-style="{ padding: '24px', overflowY: 'auto' }"
     :z-index="1000"
     @cancel="handleClose"
   >
@@ -472,8 +472,8 @@
         </section>
 
         <!-- 正文：编辑器或只读预览 -->
-        <section v-if="article.contentMarkdown">
-          <div class="mb-2 flex items-center justify-between">
+        <section v-if="article.contentMarkdown" ref="editorSectionRef">
+          <div class="mb-2 flex items-center justify-between" data-editor-title>
             <div class="flex items-center gap-2">
               <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文</h3>
               <span class="text-[11px] text-editorial-text-muted">{{ countWords(editContent) }}字</span>
@@ -498,9 +498,9 @@
             </template>
           </div>
           <!-- 只读模式：渲染后的 HTML 预览 -->
-          <div v-if="props.readonly" class="article-editor-sticky rounded border border-editorial-border bg-white p-4 overflow-auto" v-html="activePreviewHtml"></div>
+          <div v-if="props.readonly" class="rounded border border-editorial-border bg-white p-4 overflow-auto" :style="{ height: dynamicEditorHeight + 'px' }" v-html="activePreviewHtml"></div>
           <!-- 编辑模式：左右分屏编辑器 -->
-          <div v-else-if="!editorFullscreen" class="article-editor-sticky article-editor-wrapper">
+          <div v-else-if="!editorFullscreen" class="article-editor-wrapper" :style="{ height: dynamicEditorHeight + 'px' }">
             <ArticleMarkdownEditor
               v-model="editContent"
               :preview-html="activePreviewHtml"
@@ -570,7 +570,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, nextTick, onBeforeUnmount } from "vue";
 import { message } from "ant-design-vue";
 
 import ArticleMarkdownEditor from "./ArticleMarkdownEditor.vue";
@@ -690,6 +690,39 @@ const hasAnomalyInfo = computed(() => {
 
 // ─── 正文全屏编辑 ───
 const editorFullscreen = ref(false);
+
+// ─── 编辑器动态高度：测量 modal body 可视区域 ───
+const editorSectionRef = ref<HTMLElement | null>(null);
+const dynamicEditorHeight = ref(400);
+let editorResizeObserver: ResizeObserver | null = null;
+
+/** 测量 modal body 可视区域高度，减去 padding 和正文标题栏 */
+function measureEditorHeight(): void {
+  const section = editorSectionRef.value;
+  if (!section) return;
+  const scrollParent = section.closest(".ant-modal-body") as HTMLElement;
+  if (!scrollParent) return;
+  // scrollParent.clientHeight = modal body 可视区域高度（不含滚动溢出）
+  const bodyPadding = 48; // padding top 24 + bottom 24
+  const titleBar = section.querySelector("[data-editor-title]") as HTMLElement;
+  const titleBarH = titleBar?.offsetHeight ?? 40;
+  dynamicEditorHeight.value = Math.max(200, scrollParent.clientHeight - bodyPadding - titleBarH);
+}
+
+/** 弹窗打开后启动测量 */
+function setupEditorResize(): void {
+  const section = editorSectionRef.value;
+  if (!section) return;
+  const scrollParent = section.closest(".ant-modal-body") as HTMLElement;
+  if (!scrollParent) return;
+  measureEditorHeight();
+  editorResizeObserver = new ResizeObserver(() => measureEditorHeight());
+  editorResizeObserver.observe(scrollParent);
+}
+
+function teardownEditorResize(): void {
+  if (editorResizeObserver) { editorResizeObserver.disconnect(); editorResizeObserver = null; }
+}
 
 function copyArticleId(id: number): void {
   navigator.clipboard.writeText(`【成品文章id: ${id}】`).then(() => {
@@ -1395,6 +1428,10 @@ watch(() => props.open, (val) => {
     const saved = props.article.wechatThemeId;
     const previewKey = saved ? reverseThemeIdMap[saved] : undefined;
     activePreviewTheme.value = previewKey ?? "classic";
+    // 弹窗打开后测量编辑器可用高度
+    nextTick(() => setupEditorResize());
+  } else {
+    teardownEditorResize();
   }
 });
 
@@ -1695,6 +1732,11 @@ async function handleDetailCancelPublishable(): Promise<void> {
     message.error(httpErr?.body?.reason ?? "操作失败");
   }
 }
+
+onBeforeUnmount(() => {
+  teardownEditorResize();
+  if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+});
 </script>
 
 <style>
@@ -1765,9 +1807,6 @@ async function handleDetailCancelPublishable(): Promise<void> {
     padding: 0 8px !important;
     height: 28px !important;
   }
-  .article-editor-sticky {
-    height: calc(100dvh - 140px);
-  }
   .article-editor-wrapper {
     min-height: 200px;
   }
@@ -1831,19 +1870,9 @@ async function handleDetailCancelPublishable(): Promise<void> {
   border-color: #52c41a;
 }
 
-/* 编辑器/预览区粘在 body 可视区底部，高度动态填满 */
-.article-editor-sticky {
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
-  background: var(--editorial-bg-page, #f9fafb);
-  /* 视口高度减去 modal header + footer + body padding */
-  height: calc(100dvh - 180px);
-  min-height: 200px;
-}
+/* 编辑器/预览区由 JS 动态设置高度 */
 .article-editor-wrapper {
-  height: 100%;
-  min-height: 300px;
+  min-height: 200px;
 }
 
 .article-markdown-body {

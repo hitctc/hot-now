@@ -8,7 +8,7 @@
     width="90%"
     centered
     wrap-class-name="article-detail-modal"
-    :body-style="{ padding: '24px', overflowY: 'auto' }"
+    :body-style="{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }"
     :z-index="1000"
     @cancel="handleClose"
   >
@@ -498,9 +498,9 @@
             </template>
           </div>
           <!-- 只读模式：渲染后的 HTML 预览 -->
-          <div v-if="props.readonly" class="rounded border border-editorial-border bg-white p-4 overflow-auto max-h-[600px]" v-html="activePreviewHtml"></div>
+          <div v-if="props.readonly" class="article-editor-sticky rounded border border-editorial-border bg-white p-4 overflow-auto" v-html="activePreviewHtml"></div>
           <!-- 编辑模式：左右分屏编辑器 -->
-          <div v-else-if="!editorFullscreen" class="article-editor-wrapper">
+          <div v-else-if="!editorFullscreen" class="article-editor-sticky article-editor-wrapper">
             <ArticleMarkdownEditor
               v-model="editContent"
               :preview-html="activePreviewHtml"
@@ -1765,8 +1765,10 @@ async function handleDetailCancelPublishable(): Promise<void> {
     padding: 0 8px !important;
     height: 28px !important;
   }
+  .article-editor-sticky {
+    height: calc(100dvh - 140px);
+  }
   .article-editor-wrapper {
-    height: calc(100dvh - 600px);
     min-height: 200px;
   }
   /* 全屏编辑器工具栏：移动端紧凑布局 */
@@ -1829,8 +1831,18 @@ async function handleDetailCancelPublishable(): Promise<void> {
   border-color: #52c41a;
 }
 
+/* 编辑器/预览区粘在 body 可视区底部，高度动态填满 */
+.article-editor-sticky {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: var(--editorial-bg-page, #f9fafb);
+  /* 视口高度减去 modal header + footer + body padding */
+  height: calc(100dvh - 180px);
+  min-height: 200px;
+}
 .article-editor-wrapper {
-  height: calc(100vh - 480px);
+  height: 100%;
   min-height: 300px;
 }
 

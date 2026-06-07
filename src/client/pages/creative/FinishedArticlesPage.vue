@@ -389,6 +389,32 @@ function getFirstTitle(titles: string | null): string {
   return parsed.length > 0 ? parsed[0] : "无标题";
 }
 
+/** 从 stepTrace 计算总写作耗时（ms），返回 null 表示无数据 */
+function calcWritingDuration(stepTrace: Array<{ startedAt?: string; finishedAt?: string }> | null): number | null {
+  if (!stepTrace || stepTrace.length === 0) return null;
+  const withStarted = stepTrace.filter(s => s.startedAt);
+  const withFinished = stepTrace.filter(s => s.finishedAt);
+  if (withStarted.length === 0 || withFinished.length === 0) return null;
+  const firstStart = new Date(withStarted[0].startedAt!).getTime();
+  const lastFinish = new Date(withFinished[withFinished.length - 1].finishedAt!).getTime();
+  if (Number.isNaN(firstStart) || Number.isNaN(lastFinish)) return null;
+  return lastFinish - firstStart;
+}
+
+/** 格式化毫秒为人类可读耗时 */
+function formatDuration(ms: number | null): string {
+  if (ms == null) return "-";
+  if (ms < 1000) return `${ms}ms`;
+  const sec = Math.round(ms / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  const remainSec = sec % 60;
+  if (min < 60) return `${min}m${String(remainSec).padStart(2, "0")}s`;
+  const hr = Math.floor(min / 60);
+  const remainMin = min % 60;
+  return `${hr}h${String(remainMin).padStart(2, "0")}m`;
+}
+
 function formatPublishedAt(value: string | null): string {
   if (!value) return "-";
   const date = new Date(value);
@@ -437,6 +463,7 @@ const columns = [
   { title: "爆文维度", key: "trendBreakdown", width: 160, ellipsis: true },
   { title: "相似度", key: "similarity", width: 72, ellipsis: true },
   { title: "模式", key: "mode", width: 72, ellipsis: true },
+  { title: "写作耗时", key: "writingDuration", width: 90, ellipsis: true },
   { title: "发布时间", key: "publishedAt", width: 130, ellipsis: true },
   { title: "创建时间", key: "createdAt", width: 140, ellipsis: true },
   { title: "可发", key: "publishable", width: 60, ellipsis: true },
@@ -684,6 +711,11 @@ const pagination = computed(() => ({
           <!-- 模式列 -->
           <template v-else-if="column.key === 'mode'">
             <span class="text-xs text-editorial-text-body">{{ record.mode || "-" }}</span>
+          </template>
+
+          <!-- 写作耗时列 -->
+          <template v-else-if="column.key === 'writingDuration'">
+            <span class="text-xs text-editorial-text-body">{{ formatDuration(calcWritingDuration(record.stepTrace)) }}</span>
           </template>
 
           <!-- 发布时间列 -->

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import {
   CheckCircleFilled,
   CloseCircleFilled,
@@ -16,6 +16,19 @@ const props = defineProps<{
 }>();
 
 const expandedSteps = ref<Set<number>>(new Set());
+
+// 从 stepTrace 计算总写作耗时：首步 startedAt → 末步 finishedAt
+const totalDuration = computed((): number | null => {
+  const trace = props.stepTrace;
+  if (!trace || trace.length === 0) return null;
+  const withStarted = trace.filter(s => s.startedAt);
+  const withFinished = trace.filter(s => s.finishedAt);
+  if (withStarted.length === 0 || withFinished.length === 0) return null;
+  const firstStart = new Date(withStarted[0].startedAt!).getTime();
+  const lastFinish = new Date(withFinished[withFinished.length - 1].finishedAt!).getTime();
+  if (Number.isNaN(firstStart) || Number.isNaN(lastFinish)) return null;
+  return lastFinish - firstStart;
+});
 
 function toggleStep(step: number): void {
   const next = new Set(expandedSteps.value);
@@ -107,7 +120,10 @@ function riskColor(level: string): string {
 <template>
   <section v-if="stepTrace && stepTrace.length > 0">
     <div class="mb-2 flex items-center justify-between">
-      <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">写作流程</h3>
+      <div class="flex items-center gap-2">
+        <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">写作流程</h3>
+        <span v-if="totalDuration != null" class="text-[11px] text-editorial-text-muted">总耗时 {{ formatDuration(totalDuration) }}</span>
+      </div>
       <span v-if="stepTrace.filter(s => s.status === 'success').length === stepTrace.length" class="text-[11px] text-green-500">
         全部完成
       </span>

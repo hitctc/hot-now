@@ -92,7 +92,8 @@ import {
   editCreativeFinishedArticle,
   toggleWechatPublished,
   togglePublishable,
-  softDeleteFinishedArticle
+  softDeleteFinishedArticle,
+  restoreFinishedArticle
 } from "../core/creative/creativeFinishedArticleRepository.js";
 import {
   insertDailyDigest,
@@ -1210,6 +1211,24 @@ export function createServer(deps: ServerDeps = {}) {
     const deleted = softDeleteFinishedArticle(db, id);
     if (!deleted) {
       return reply.code(404).send({ ok: false, reason: "not-found-or-already-deleted" });
+    }
+    return reply.send({ ok: true });
+  });
+
+  // 恢复已废弃的成品文章
+  app.post("/actions/creative/finished-articles/:id/restore", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const params = request.params as { id: string };
+    const id = parseInt(params.id, 10);
+    const restored = restoreFinishedArticle(db, id);
+    if (!restored) {
+      return reply.code(404).send({ ok: false, reason: "not-found-or-not-deleted" });
     }
     return reply.send({ ok: true });
   });

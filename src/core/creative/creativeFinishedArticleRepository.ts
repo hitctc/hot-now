@@ -688,3 +688,11 @@ export function softDeleteFinishedArticle(db: SqliteDatabase, id: number): boole
   ).run(id);
   return result.changes > 0;
 }
+
+// 恢复已废弃的成品文章（清空 deleted_at）
+export function restoreFinishedArticle(db: SqliteDatabase, id: number): boolean {
+  const result = db.prepare(
+    "UPDATE creative_finished_articles SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NOT NULL"
+  ).run(id);
+  return result.changes > 0;
+}

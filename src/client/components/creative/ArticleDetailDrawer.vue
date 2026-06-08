@@ -68,7 +68,8 @@
             <a-button disabled>不可推送</a-button>
           </a-tooltip>
           <a-button v-if="getAvailableActions(article).some(a => a.type === 'cancel_publishable')" @click="handleDetailCancelPublishable">取消推送</a-button>
-          <a-button v-if="!article.deletedAt" danger @click="handleDetailDiscard">废弃</a-button>
+          <a-button v-if="article.deletedAt" type="primary" @click="handleDetailRestore">恢复</a-button>
+          <a-button v-else danger @click="handleDetailDiscard">废弃</a-button>
           <a-tooltip v-if="canPush" :mouse-enter-delay="0.5" title="自动保存正文后推送到微信公众号草稿箱">
             <a-button :loading="saving" @click="saveAndPush">推送草稿箱</a-button>
           </a-tooltip>
@@ -583,6 +584,7 @@ import { usePipelineStatus } from "../../composables/usePipelineStatus.js";
 import {
   editFinishedArticle,
   deleteFinishedArticle,
+  restoreFinishedArticle,
   regenCover,
   regenTitle,
   regenIntro,
@@ -1757,6 +1759,21 @@ async function handleDetailDiscard(): Promise<void> {
     }
   } catch {
     message.error("废弃失败");
+  }
+}
+
+async function handleDetailRestore(): Promise<void> {
+  if (!props.article) return;
+  try {
+    const res = await restoreFinishedArticle(props.article.id);
+    if (res.ok) {
+      message.success("已恢复");
+      emit("saved");
+    } else {
+      message.error("恢复失败");
+    }
+  } catch {
+    message.error("恢复失败");
   }
 }
 

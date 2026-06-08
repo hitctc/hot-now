@@ -235,6 +235,13 @@ export function deleteFinishedArticle(id: number): Promise<{ ok: boolean }> {
   });
 }
 
+// 恢复已废弃的成品文章
+export function restoreFinishedArticle(id: number): Promise<{ ok: boolean }> {
+  return requestJson<{ ok: boolean }>(`/actions/creative/finished-articles/${id}/restore`, {
+    method: "POST"
+  });
+}
+
 export function fetchMissingImages(id: number): Promise<MissingImagesResponse> {
   return requestJson<MissingImagesResponse>(`/api/creative/finished-articles/${id}/missing-images`);
 }

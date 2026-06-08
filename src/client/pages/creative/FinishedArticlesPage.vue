@@ -8,6 +8,7 @@ import {
   readCreativeFinishedArticles,
   editFinishedArticle,
   deleteFinishedArticle,
+  restoreFinishedArticle,
   toggleFinishedArticlePublished,
   toggleFinishedArticlePublishable,
   parseArticleImages,
@@ -299,6 +300,19 @@ async function handleDiscardArticle(article: CreativeFinishedArticle): Promise<v
     }
   } catch {
     message.error("废弃失败");
+  }
+}
+
+// 恢复已废弃的文章
+async function handleRestoreArticle(article: CreativeFinishedArticle): Promise<void> {
+  try {
+    const res = await restoreFinishedArticle(article.id);
+    if (res.ok) {
+      message.success("已恢复");
+      loadItems();
+    }
+  } catch {
+    message.error("恢复失败");
   }
 }
 
@@ -670,14 +684,18 @@ const pagination = computed(() => ({
             </a-tooltip>
           </template>
 
-          <!-- 操作列：废弃 -->
+          <!-- 操作列：废弃/恢复 -->
           <template v-else-if="column.key === 'actions'">
             <button
               v-if="!record.deletedAt"
               class="text-[10px] text-red-400 hover:text-red-600 hover:underline"
               @click="handleDiscardArticle(record)"
             >废弃</button>
-            <span v-else class="text-[10px] text-gray-300">已废弃</span>
+            <button
+              v-else
+              class="text-[10px] text-editorial-link-active hover:underline"
+              @click="handleRestoreArticle(record)"
+            >恢复</button>
           </template>
 
 

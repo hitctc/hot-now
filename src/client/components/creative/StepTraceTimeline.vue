@@ -538,7 +538,9 @@ function parseDetailedJudgments(raw: unknown): ModelJudgment[] {
                             </div>
                           </template>
                           <div v-if="(sub.meta as any).correctionsMade" class="text-blue-600">已修正</div>
-                          <div v-if="(sub.meta as any).fallbackUsed" class="text-orange-600">⚠ 使用降级方案</div>
+                          <div v-if="(sub.meta as any).fallbackUsed" class="text-orange-600">
+                            ⚠ 使用降级方案<template v-if="(sub.meta as any).fallbackReason">：{{ (sub.meta as any).fallbackReason }}</template>
+                          </div>
                         </div>
                       </template>
                       <!-- 7.4 提示词渲染 -->

@@ -690,16 +690,21 @@ const pagination = computed(() => ({
 
           <!-- 操作列：废弃/恢复 -->
           <template v-else-if="column.key === 'actions'">
-            <button
+            <a-button
               v-if="!record.deletedAt"
-              class="text-[10px] text-red-400 hover:text-red-600 hover:underline"
+              size="small"
+              danger
+              ghost
+              class="!text-[10px] !px-1.5 !py-0"
               @click="handleDiscardArticle(record)"
-            >废弃</button>
-            <button
+            >废弃</a-button>
+            <a-button
               v-else
-              class="text-[10px] text-editorial-link-active hover:underline"
+              size="small"
+              type="link"
+              class="!text-[10px] !px-1.5 !py-0"
               @click="handleRestoreArticle(record)"
-            >恢复</button>
+            >恢复</a-button>
           </template>
 
 

@@ -57,15 +57,17 @@ const savedFinished = (() => {
 })();
 const searchText = ref(savedFinished.search || "");
 const statusFilter = ref<string | undefined>(savedFinished.status || undefined);
-const publishableOnly = ref(false);
-const showDeleted = ref(false);
+const publishableOnly = ref(savedFinished.publishableOnly || false);
+const showDeleted = ref(savedFinished.showDeleted || false);
 
 // 筛选条件变更时持久化
 function saveFinishedFilters(): void {
   try {
     localStorage.setItem(FINISHED_FILTERS_KEY, JSON.stringify({
       search: searchText.value,
-      status: statusFilter.value || ""
+      status: statusFilter.value || "",
+      publishableOnly: publishableOnly.value,
+      showDeleted: showDeleted.value
     }));
   } catch { /* quota 超限等忽略 */ }
 }
@@ -196,11 +198,13 @@ watch(statusFilter, () => {
 
 watch(publishableOnly, () => {
   currentPage.value = 1;
+  saveFinishedFilters();
   void loadItems();
 });
 
 watch(showDeleted, () => {
   currentPage.value = 1;
+  saveFinishedFilters();
   void loadItems();
 });
 

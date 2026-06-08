@@ -73,6 +73,10 @@ function formatMeta(meta: Record<string, unknown> | undefined): Array<{ key: str
     "detailedJudgments", "modifications", "disputes",
     "modelsUsed", "modelsFailed", "consensusCount", "disputeCount",
     "status", "result", "confidence",
+    // Step13 图片生成
+    "coverPromptGenerated", "inlineImageCount", "imageStatus",
+    "designPlanFallbackUsed", "designPlanFallbackReason",
+    "validationPassed", "validationWarnings", "validationErrors",
   ]);
   return Object.entries(meta)
     .filter(([, v]) => v != null)
@@ -456,32 +460,118 @@ function parseDetailedJudgments(raw: unknown): ModelJudgment[] {
               </div>
             </template>
 
-            <!-- Step 12 图片子步骤 -->
-            <template v-if="entry.step === 12 && entry.meta?.substepTraces">
-              <div class="mt-1 text-[11px] font-medium text-editorial-text-muted">图片生成子步骤</div>
-              <div
-                v-for="sub in (entry.meta.substepTraces as Array<Record<string, unknown>>)"
-                :key="String(sub.step)"
-                class="mt-1 rounded border border-editorial-border bg-editorial-bg-page px-2 py-1"
-              >
-                <div class="flex items-center gap-2 text-[11px]">
-                  <span class="font-medium">{{ sub.step }}</span>
-                  <span :class="String(sub.status) === 'completed' || String(sub.status) === 'passed' ? 'text-green-500' : 'text-orange-500'">
-                    {{ String(sub.status) }}
-                  </span>
-                  <span v-if="sub.model" class="text-editorial-text-muted">({{ String(sub.model) }})</span>
-                  <span class="ml-auto text-editorial-text-muted">{{ formatDuration(Number(sub.durationMs)) }}</span>
+            <!-- Step13: 图片生成（结构化） -->
+            <template v-if="entry.step === 13 && entry.meta?.substepTraces">
+              <!-- 总览 -->
+              <div class="rounded border border-editorial-border bg-editorial-bg-page px-2.5 py-1.5 text-[11px]">
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span v-if="entry.meta.imageStatus" class="rounded px-1.5 py-0.5 font-medium" :class="entry.meta.imageStatus === 'skipped' ? 'bg-gray-100 text-gray-500' : entry.meta.imageStatus === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'">{{ entry.meta.imageStatus === 'skipped' ? '跳过生图' : entry.meta.imageStatus }}</span>
+                  <span v-if="entry.meta.coverPromptGenerated" class="text-editorial-text-body">封面提示词 ✓</span>
+                  <span class="text-editorial-text-muted">正文图 {{ entry.meta.inlineImageCount ?? 0 }} 张</span>
+                  <template v-if="entry.meta.validationPassed != null">
+                    <span :class="entry.meta.validationPassed ? 'text-green-600' : 'text-red-500'">{{ entry.meta.validationPassed ? '验证通过' : '验证未通过' }}</span>
+                    <span v-if="entry.meta.validationWarnings" class="text-yellow-600">{{ entry.meta.validationWarnings }} 警告</span>
+                    <span v-if="entry.meta.validationErrors" class="text-red-500">{{ entry.meta.validationErrors }} 错误</span>
+                  </template>
                 </div>
-                <div v-if="sub.warnings && (sub.warnings as string[]).length > 0" class="mt-0.5 text-[11px] text-yellow-600">
-                  ⚠ {{ (sub.warnings as string[]).join('; ') }}
+                <div v-if="entry.meta.designPlanFallbackUsed" class="mt-1 text-orange-600">
+                  ⚠ 设计方案降级：{{ entry.meta.designPlanFallbackReason ?? '未知原因' }}
                 </div>
-                <div v-if="sub.errors && (sub.errors as string[]).length > 0" class="mt-0.5 text-[11px] text-red-500">
-                  ✗ {{ (sub.errors as string[]).join('; ') }}
-                </div>
-                <div v-if="sub.meta && typeof sub.meta === 'object'" class="mt-0.5">
-                  <div v-for="row in formatMeta(sub.meta as Record<string, unknown>)" :key="row.key" class="flex gap-2 text-[11px] leading-5">
-                    <span class="shrink-0 text-editorial-text-muted">{{ row.key }}</span>
-                    <span class="break-all text-editorial-text-body">{{ row.value }}</span>
+              </div>
+
+              <!-- 子步骤时间线 -->
+              <div class="space-y-0 mt-1">
+                <div v-for="(sub, si) in (entry.meta.substepTraces as Array<Record<string, unknown>>)" :key="si" class="flex gap-2">
+                  <!-- 左侧竖线 + 节点 -->
+                  <div class="flex flex-col items-center">
+                    <div class="flex h-4 w-4 items-center justify-center rounded-full text-[9px]" :class="String(sub.status) === 'completed' || String(sub.status) === 'passed' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'">✓</div>
+                    <div v-if="si < (entry.meta.substepTraces as Array<Record<string, unknown>>).length - 1" class="w-px flex-1 bg-green-200" />
+                  </div>
+                  <!-- 右侧内容 -->
+                  <div class="flex-1 pb-2">
+                    <div class="flex items-center gap-2 text-[11px]">
+                      <span class="font-medium text-editorial-text-body">{{ sub.name }}</span>
+                      <span v-if="sub.model" class="text-editorial-text-muted">({{ String(sub.model) }})</span>
+                      <span class="ml-auto text-editorial-text-muted">{{ formatDuration(Number(sub.durationMs)) }}</span>
+                    </div>
+                    <!-- 警告/错误 -->
+                    <div v-if="sub.warnings && (sub.warnings as string[]).length > 0" class="text-[11px] text-yellow-600 mt-0.5">⚠ {{ (sub.warnings as string[]).join('; ') }}</div>
+                    <div v-if="sub.errors && (sub.errors as string[]).length > 0" class="text-[11px] text-red-500 mt-0.5">✗ {{ (sub.errors as string[]).join('; ') }}</div>
+                    <!-- 子步骤结构化详情 -->
+                    <template v-if="sub.meta && typeof sub.meta === 'object'">
+                      <!-- 7.1 风格画像 -->
+                      <template v-if="String(sub.name) === 'article_style_profile'">
+                        <div class="mt-1 rounded bg-editorial-bg-page px-2 py-1 text-[11px] space-y-0.5">
+                          <div class="flex items-center gap-2">
+                            <span class="rounded bg-purple-100 px-1 text-[9px] font-medium text-purple-700">{{ (sub.meta as any).visual_family }}</span>
+                            <span class="text-editorial-text-muted">{{ (sub.meta as any).content_mood }}</span>
+                          </div>
+                          <template v-if="(sub.meta as any).palette">
+                            <div class="text-editorial-text-muted">主色：{{ (sub.meta as any).palette.primary }}</div>
+                            <div v-if="(sub.meta as any).palette.accent" class="text-editorial-text-muted">强调：{{ (sub.meta as any).palette.accent }}</div>
+                          </template>
+                          <div v-if="(sub.meta as any).whitespace_level" class="text-editorial-text-muted">留白：{{ (sub.meta as any).whitespace_level }}</div>
+                        </div>
+                      </template>
+                      <!-- 7.2 图片决策 -->
+                      <template v-else-if="String(sub.name) === 'image_decision'">
+                        <div class="mt-1 rounded bg-editorial-bg-page px-2 py-1 text-[11px] space-y-0.5">
+                          <div class="flex items-center gap-2">
+                            <span class="text-editorial-text-muted">共 {{ (sub.meta as any).imageCount }} 张</span>
+                            <span class="text-editorial-text-muted">封面 {{ (sub.meta as any).coverCount }}</span>
+                            <span class="text-editorial-text-muted">正文 {{ (sub.meta as any).inlineCount }}</span>
+                          </div>
+                          <template v-if="(sub.meta as any).visualBranches">
+                            <div class="text-[10px] font-medium text-editorial-text-muted">视觉分支</div>
+                            <div v-for="(branch, bi) in (sub.meta as any).visualBranches as string[]" :key="bi" class="text-editorial-text-body">· {{ branch }}</div>
+                          </template>
+                        </div>
+                      </template>
+                      <!-- 7.3 设计方案审查 -->
+                      <template v-else-if="String(sub.name) === 'design_plan_review'">
+                        <div class="mt-1 rounded bg-editorial-bg-page px-2 py-1 text-[11px] space-y-0.5">
+                          <template v-if="(sub.meta as any).consistencyCheck">
+                            <div class="flex items-center gap-2">
+                              <span :class="(sub.meta as any).consistencyCheck.styleUnified ? 'text-green-600' : 'text-red-500'">{{ (sub.meta as any).consistencyCheck.styleUnified ? '风格统一' : '风格不统一' }}</span>
+                              <span :class="(sub.meta as any).consistencyCheck.imageDifferentiated ? 'text-green-600' : 'text-orange-500'">{{ (sub.meta as any).consistencyCheck.imageDifferentiated ? '图片有差异' : '图片雷同' }}</span>
+                              <span :class="(sub.meta as any).consistencyCheck.noDefaultStyle ? 'text-green-600' : 'text-yellow-600'">{{ (sub.meta as any).consistencyCheck.noDefaultStyle ? '无默认风格' : '使用了默认风格' }}</span>
+                            </div>
+                          </template>
+                          <div v-if="(sub.meta as any).correctionsMade" class="text-blue-600">已修正</div>
+                          <div v-if="(sub.meta as any).fallbackUsed" class="text-orange-600">⚠ 使用降级方案</div>
+                        </div>
+                      </template>
+                      <!-- 7.4 提示词渲染 -->
+                      <template v-else-if="String(sub.name) === 'render_prompts'">
+                        <div class="mt-1 rounded bg-editorial-bg-page px-2 py-1 text-[11px]">
+                          <div class="flex items-center gap-2">
+                            <span class="text-editorial-text-muted">共 {{ (sub.meta as any).totalPrompts }} 条提示词</span>
+                            <span class="text-editorial-text-muted">封面 {{ (sub.meta as any).coverPrompts }}</span>
+                            <span class="text-editorial-text-muted">正文 {{ (sub.meta as any).inlinePrompts }}</span>
+                            <span v-if="(sub.meta as any).renderErrors" class="text-red-500">{{ (sub.meta as any).renderErrors }} 错误</span>
+                          </div>
+                        </div>
+                      </template>
+                      <!-- 7.5 验证 -->
+                      <template v-else-if="String(sub.name) === 'validate'">
+                        <div class="mt-1 rounded bg-editorial-bg-page px-2 py-1 text-[11px]">
+                          <div class="flex items-center gap-2">
+                            <span :class="(sub.meta as any).passed ? 'text-green-600' : 'text-red-500'">{{ (sub.meta as any).passed ? '✓ 验证通过' : '✗ 验证失败' }}</span>
+                            <span class="text-editorial-text-muted">通过 {{ (sub.meta as any).validatedCount }}</span>
+                            <span v-if="(sub.meta as any).blockedCount" class="text-red-500">拦截 {{ (sub.meta as any).blockedCount }}</span>
+                          </div>
+                        </div>
+                      </template>
+                      <!-- 兜底 -->
+                      <template v-else>
+                        <div v-if="formatMeta(sub.meta as Record<string, unknown>).length > 0" class="mt-1 rounded bg-editorial-bg-page px-2 py-1">
+                          <div v-for="row in formatMeta(sub.meta as Record<string, unknown>)" :key="row.key" class="flex gap-2 text-[11px] leading-5">
+                            <span class="shrink-0 text-editorial-text-muted">{{ row.key }}</span>
+                            <span class="break-all text-editorial-text-body">{{ row.value }}</span>
+                          </div>
+                        </div>
+                      </template>
+                    </template>
                   </div>
                 </div>
               </div>

@@ -583,7 +583,7 @@ const pagination = computed(() => ({
         row-key="id"
         data-article-table
         size="small"
-        :row-class-name="(record: CreativeFinishedArticle) => record.status === 'needs_review' ? 'review-highlight' : record.deletedAt ? 'discarded-row' : ''"
+        :row-class-name="(record: CreativeFinishedArticle) => record.deletedAt ? 'discarded-row' : record.status === 'needs_review' ? 'review-highlight' : ''"
         @change="handleTableChange"
       >
         <template #bodyCell="{ column, record }">
@@ -828,12 +828,10 @@ const pagination = computed(() => ({
 .review-highlight td {
   background-color: #fffbe6 !important;
 }
-/* 已废弃行置灰 */
+/* 已废弃行置灰（优先级最高，覆盖 review-highlight 等） */
 .discarded-row td {
-  background-color: #f9f9f9 !important;
-}
-.discarded-row {
-  opacity: 0.55;
+  background-color: #f0f0f0 !important;
+  opacity: 0.45;
 }
 .source-item-detail-modal .ant-modal {
   top: 0;

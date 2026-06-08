@@ -67,9 +67,16 @@ function formatDuration(ms: number | undefined): string {
 // 格式化 meta 为 key-value 对
 function formatMeta(meta: Record<string, unknown> | undefined): Array<{ key: string; value: string }> {
   if (!meta) return [];
+  // 排除已结构化渲染的字段和 Step12 的特殊字段
+  const excludeKeys = new Set([
+    "substepTraces",
+    "detailedJudgments", "modifications", "disputes",
+    "modelsUsed", "modelsFailed", "consensusCount", "disputeCount",
+    "status", "result", "confidence",
+  ]);
   return Object.entries(meta)
     .filter(([, v]) => v != null)
-    .filter(([k]) => k !== "substepTraces")
+    .filter(([k]) => !excludeKeys.has(k))
     .map(([k, v]) => ({
       key: k,
       value: typeof v === "object" ? JSON.stringify(v, null, 2) : String(v),
@@ -114,6 +121,76 @@ function riskColor(level: string): string {
   if (level === "high") return "text-red-600 font-medium";
   if (level === "medium") return "text-orange-600";
   return "text-green-600";
+}
+
+// ─── Step12 三模型质检 结构化解析 ───
+
+// 维度中文名和排序
+const DIMENSION_ORDER = ["click_appeal", "read_retention", "information_value", "reader_alignment", "viral_memory"] as const;
+const DIMENSION_LABELS: Record<string, string> = {
+  click_appeal: "点击吸引力",
+  read_retention: "阅读留存",
+  information_value: "信息价值",
+  reader_alignment: "读者契合",
+  viral_memory: "传播记忆",
+};
+
+// 等级标签和样式
+function gradeLabel(grade: string): string {
+  const map: Record<string, string> = { pass: "通过", minor: "轻微", major: "严重" };
+  return map[grade] ?? grade;
+}
+function gradeStyle(grade: string): string {
+  if (grade === "pass") return "bg-green-100 text-green-700";
+  if (grade === "minor") return "bg-yellow-100 text-yellow-700";
+  if (grade === "major") return "bg-orange-100 text-orange-700";
+  return "bg-red-100 text-red-700";
+}
+
+type Modification = { location: string; before: string; after: string; reason: string };
+
+/** 解析 modifications，兼容 JSON 对象和 Python dict 字符串 */
+function parseModifications(raw: unknown): Modification[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(item => {
+    if (typeof item === "object" && item !== null) return item as Modification;
+    const str = String(item);
+    try { return JSON.parse(str) as Modification; } catch { /* fall through */ }
+    // Python dict: {'location': '...', 'before': '...', 'after': '...', 'reason': '...'}
+    const getVal = (key: string): string => {
+      const regex = new RegExp(`'${key}'\\s*:\\s*'((?:[^'\\\\]|\\\\.)*)'`);
+      const match = str.match(regex);
+      return match ? match[1].replace(/\\'/g, "'") : "";
+    };
+    return { location: getVal("location"), before: getVal("before"), after: getVal("after"), reason: getVal("reason") };
+  });
+}
+
+type DimensionGrade = { grade: string; issue_location: string; issue_reason: string; suggestion: string };
+type ModelJudgment = { model: string; dimensions: Record<string, DimensionGrade>; overallAssessment: string; topConcerns: string[] };
+
+/** 解析 detailedJudgments：去掉 markdown code fence 后解析 JSON */
+function parseDetailedJudgments(raw: unknown): ModelJudgment[] {
+  if (!Array.isArray(raw)) return [];
+  return (raw as Array<{ model?: string; response?: string }>).map(dj => {
+    let resp = dj.response ?? "";
+    if (resp.startsWith("```")) {
+      const nl = resp.indexOf("\n");
+      if (nl >= 0) resp = resp.slice(nl + 1);
+      if (resp.endsWith("```")) resp = resp.slice(0, -3);
+    }
+    try {
+      const parsed = JSON.parse(resp);
+      return {
+        model: dj.model ?? "",
+        dimensions: parsed.dimensions ?? {},
+        overallAssessment: parsed.overall_assessment ?? "",
+        topConcerns: Array.isArray(parsed.top_concerns) ? parsed.top_concerns : [],
+      };
+    } catch {
+      return { model: dj.model ?? "", dimensions: {}, overallAssessment: resp.slice(0, 200), topConcerns: [] };
+    }
+  });
 }
 </script>
 
@@ -272,6 +349,88 @@ function riskColor(level: string): string {
                   <span v-if="entry.meta.high_risk_segments_count" class="text-editorial-text-muted">高风险片段 {{ entry.meta.high_risk_segments_count }}</span>
                 </div>
                 <div v-for="(pt, i) in ((entry.meta.llm_risk_points as string[]) ?? [])" :key="i" class="text-orange-700">⚠ {{ pt }}</div>
+              </div>
+            </template>
+
+            <!-- Step12: 三模型发布前质检+有限改造（结构化） -->
+            <template v-else-if="entry.step === 12 && entry.meta?.detailedJudgments">
+              <!-- 总览 -->
+              <div class="rounded border border-editorial-border bg-editorial-bg-page px-2.5 py-1.5 text-[11px]">
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span v-if="entry.meta.status" class="rounded px-1.5 py-0.5 font-medium" :class="String(entry.meta.status).includes('改造') ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'">{{ entry.meta.status }}</span>
+                  <span v-if="entry.meta.result" class="text-editorial-text-body">{{ entry.meta.result }}</span>
+                  <span v-if="entry.meta.confidence" class="rounded px-1.5 py-0.5" :class="String(entry.meta.confidence) === '高' ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600'">置信度 {{ entry.meta.confidence }}</span>
+                  <span class="text-editorial-text-muted">
+                    {{ (entry.meta.modelsUsed as string[] ?? []).join(' / ') }}
+                    <template v-if="(entry.meta.modelsFailed as string[] ?? []).length > 0">
+                      <span class="text-red-400 ml-1">失败: {{ (entry.meta.modelsFailed as string[]).join(', ') }}</span>
+                    </template>
+                  </span>
+                  <span v-if="entry.meta.consensusCount != null" class="text-editorial-text-muted">共识 {{ entry.meta.consensusCount }}/{{ (entry.meta.consensusCount as number) + (entry.meta.disputeCount as number ?? 0) }}</span>
+                </div>
+              </div>
+
+              <!-- 改造内容 -->
+              <template v-if="parseModifications(entry.meta.modifications).length > 0">
+                <div v-for="(mod, mi) in parseModifications(entry.meta.modifications)" :key="mi" class="rounded border border-blue-200 bg-blue-50/50 px-2.5 py-1.5 text-[11px] space-y-1">
+                  <div class="flex items-center gap-2">
+                    <span class="rounded bg-blue-100 px-1 text-[9px] font-medium text-blue-700">改造</span>
+                    <span class="font-medium text-editorial-text-body">{{ mod.location }}</span>
+                  </div>
+                  <div class="flex items-start gap-1.5">
+                    <span class="shrink-0 text-red-400">−</span>
+                    <span class="text-editorial-text-muted line-through">{{ mod.before }}</span>
+                  </div>
+                  <div class="flex items-start gap-1.5">
+                    <span class="shrink-0 text-green-500">+</span>
+                    <span class="text-editorial-text-body">{{ mod.after }}</span>
+                  </div>
+                  <div v-if="mod.reason" class="text-editorial-text-muted border-t border-blue-200 pt-1 mt-1">{{ mod.reason }}</div>
+                </div>
+              </template>
+
+              <!-- 争议点 -->
+              <template v-if="(entry.meta.disputes as string[] ?? []).length > 0">
+                <div class="rounded border border-yellow-300 bg-yellow-50/50 px-2.5 py-1.5 text-[11px] space-y-1">
+                  <div class="font-medium text-yellow-700">争议点</div>
+                  <div v-for="(d, di) in (entry.meta.disputes as string[])" :key="di" class="text-editorial-text-body">{{ d }}</div>
+                </div>
+              </template>
+
+              <!-- 各模型评审卡片 -->
+              <div v-for="(j, ji) in parseDetailedJudgments(entry.meta.detailedJudgments)" :key="ji" class="rounded border border-editorial-border bg-white px-2.5 py-2 text-[11px] space-y-1.5">
+                <div class="flex items-center gap-2">
+                  <span class="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-editorial-text-body">{{ j.model }}</span>
+                </div>
+                <!-- 维度等级总览 -->
+                <div class="flex flex-wrap gap-1.5">
+                  <div v-for="dimKey in DIMENSION_ORDER" :key="dimKey" class="flex items-center gap-1">
+                    <span class="text-editorial-text-muted">{{ DIMENSION_LABELS[dimKey] ?? dimKey }}</span>
+                    <span class="rounded px-1 py-0.5 text-[10px] font-medium" :class="gradeStyle(j.dimensions[dimKey]?.grade ?? '')">{{ gradeLabel(j.dimensions[dimKey]?.grade ?? '-') }}</span>
+                  </div>
+                </div>
+                <!-- 各维度详情 -->
+                <div class="space-y-1">
+                  <div v-for="dimKey in DIMENSION_ORDER.filter(d => j.dimensions[d]?.issue_reason)" :key="dimKey" class="rounded bg-editorial-bg-page px-2 py-1">
+                    <div class="flex items-center gap-1.5 mb-0.5">
+                      <span class="font-medium text-editorial-text-body">{{ DIMENSION_LABELS[dimKey] }}</span>
+                      <span class="rounded px-1 py-0.5 text-[10px] font-medium" :class="gradeStyle(j.dimensions[dimKey].grade)">{{ gradeLabel(j.dimensions[dimKey].grade) }}</span>
+                      <span v-if="j.dimensions[dimKey].issue_location" class="text-editorial-text-muted">· {{ j.dimensions[dimKey].issue_location }}</span>
+                    </div>
+                    <div class="text-editorial-text-body leading-4">{{ j.dimensions[dimKey].issue_reason }}</div>
+                    <div v-if="j.dimensions[dimKey].suggestion" class="text-editorial-text-muted mt-0.5">建议：{{ j.dimensions[dimKey].suggestion }}</div>
+                  </div>
+                </div>
+                <!-- 总评 -->
+                <div v-if="j.overallAssessment" class="rounded bg-editorial-bg-page px-2 py-1">
+                  <div class="text-[10px] font-medium text-editorial-text-muted mb-0.5">总评</div>
+                  <div class="text-editorial-text-body leading-4">{{ j.overallAssessment }}</div>
+                </div>
+                <!-- 关注点 -->
+                <div v-if="j.topConcerns.length > 0" class="rounded bg-editorial-bg-page px-2 py-1">
+                  <div class="text-[10px] font-medium text-editorial-text-muted mb-0.5">关注点</div>
+                  <div v-for="(c, ci) in j.topConcerns" :key="ci" class="text-editorial-text-body">· {{ c }}</div>
+                </div>
               </div>
             </template>
 

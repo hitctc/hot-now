@@ -7,6 +7,7 @@ import { useSearchHistory } from "../../composables/useSearchHistory.js";
 import {
   readCreativeFinishedArticles,
   editFinishedArticle,
+  deleteFinishedArticle,
   toggleFinishedArticlePublished,
   toggleFinishedArticlePublishable,
   parseArticleImages,
@@ -56,6 +57,7 @@ const savedFinished = (() => {
 const searchText = ref(savedFinished.search || "");
 const statusFilter = ref<string | undefined>(savedFinished.status || undefined);
 const publishableOnly = ref(false);
+const showDeleted = ref(false);
 
 // 筛选条件变更时持久化
 function saveFinishedFilters(): void {
@@ -171,7 +173,8 @@ async function loadItems(): Promise<void> {
       pageSize: pageSize.value,
       status: statusFilter.value || undefined,
       search: searchText.value || undefined,
-      publishable: publishableOnly.value ? "1" : undefined
+      publishable: publishableOnly.value ? "1" : undefined,
+      includeDeleted: showDeleted.value ? "1" : undefined
     });
     items.value = res.items;
     total.value = res.total;
@@ -191,6 +194,11 @@ watch(statusFilter, () => {
 });
 
 watch(publishableOnly, () => {
+  currentPage.value = 1;
+  void loadItems();
+});
+
+watch(showDeleted, () => {
   currentPage.value = 1;
   void loadItems();
 });
@@ -268,6 +276,29 @@ async function handleCancelPublishable(article: CreativeFinishedArticle): Promis
   } catch (err: unknown) {
     const httpErr = err as { body?: { reason?: string } };
     message.error(httpErr?.body?.reason ?? "操作失败");
+  }
+}
+
+// 废弃文章（软删除）：留痕但不再生图和发布
+async function handleDiscardArticle(article: CreativeFinishedArticle): Promise<void> {
+  const { Modal } = await import("ant-design-vue");
+  const confirmed = await new Promise<boolean>(resolve => {
+    Modal.confirm({
+      title: "废弃文章",
+      content: "废弃后文章不再走自动生图和发布流程，但保留记录可随时查看。确认废弃？",
+      okText: "确认废弃", cancelText: "取消",
+      onOk: () => resolve(true), onCancel: () => resolve(false),
+    });
+  });
+  if (!confirmed) return;
+  try {
+    const res = await deleteFinishedArticle(article.id);
+    if (res.ok) {
+      message.success("已废弃");
+      loadItems();
+    }
+  } catch {
+    message.error("废弃失败");
   }
 }
 
@@ -469,6 +500,7 @@ const columns = [
   { title: "可发", key: "publishable", width: 60, ellipsis: true },
   { title: "公众号", key: "wechatPublished", width: 80, ellipsis: true },
   { title: "推送", key: "pushDraft", width: 72, ellipsis: true },
+  { title: "操作", key: "actions", width: 60 },
 
 ];
 
@@ -492,6 +524,7 @@ const pagination = computed(() => ({
         class="!w-[140px]"
       />
       <a-checkbox v-model:checked="publishableOnly">只看可发</a-checkbox>
+      <a-checkbox v-model:checked="showDeleted">显示已废弃</a-checkbox>
       <div ref="searchDropdownRef" class="relative">
         <a-input-search
           v-model:value="searchText"
@@ -532,7 +565,7 @@ const pagination = computed(() => ({
         row-key="id"
         data-article-table
         size="small"
-        :row-class-name="(record: CreativeFinishedArticle) => record.status === 'needs_review' ? 'review-highlight' : ''"
+        :row-class-name="(record: CreativeFinishedArticle) => record.status === 'needs_review' ? 'review-highlight' : record.deletedAt ? 'discarded-row' : ''"
         @change="handleTableChange"
       >
         <template #bodyCell="{ column, record }">
@@ -635,6 +668,16 @@ const pagination = computed(() => ({
               <template #title>{{ getMissingConditions(record).join('；') }}</template>
               <a-button size="small" disabled class="!text-[11px] !px-2 !py-0.5">推送</a-button>
             </a-tooltip>
+          </template>
+
+          <!-- 操作列：废弃 -->
+          <template v-else-if="column.key === 'actions'">
+            <button
+              v-if="!record.deletedAt"
+              class="text-[10px] text-red-400 hover:text-red-600 hover:underline"
+              @click="handleDiscardArticle(record)"
+            >废弃</button>
+            <span v-else class="text-[10px] text-gray-300">已废弃</span>
           </template>
 
 
@@ -762,6 +805,13 @@ const pagination = computed(() => ({
 /* needs_review 行高亮 */
 .review-highlight td {
   background-color: #fffbe6 !important;
+}
+/* 已废弃行置灰 */
+.discarded-row td {
+  background-color: #f9f9f9 !important;
+}
+.discarded-row {
+  opacity: 0.55;
 }
 .source-item-detail-modal .ant-modal {
   top: 0;

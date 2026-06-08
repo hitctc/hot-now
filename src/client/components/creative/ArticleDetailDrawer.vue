@@ -68,6 +68,7 @@
             <a-button disabled>不可推送</a-button>
           </a-tooltip>
           <a-button v-if="getAvailableActions(article).some(a => a.type === 'cancel_publishable')" @click="handleDetailCancelPublishable">取消推送</a-button>
+          <a-button v-if="!article.deletedAt" danger @click="handleDetailDiscard">废弃</a-button>
           <a-tooltip v-if="canPush" :mouse-enter-delay="0.5" title="自动保存正文后推送到微信公众号草稿箱">
             <a-button :loading="saving" @click="saveAndPush">推送草稿箱</a-button>
           </a-tooltip>
@@ -581,6 +582,7 @@ import { checkPublishConditions, getAvailableActions } from "./articleStatusShar
 import { usePipelineStatus } from "../../composables/usePipelineStatus.js";
 import {
   editFinishedArticle,
+  deleteFinishedArticle,
   regenCover,
   regenTitle,
   regenIntro,
@@ -1730,6 +1732,31 @@ async function handleDetailCancelPublishable(): Promise<void> {
   } catch (err: unknown) {
     const httpErr = err as { body?: { reason?: string } };
     message.error(httpErr?.body?.reason ?? "操作失败");
+  }
+}
+
+async function handleDetailDiscard(): Promise<void> {
+  if (!props.article) return;
+  const { Modal } = await import("ant-design-vue");
+  const confirmed = await new Promise<boolean>(resolve => {
+    Modal.confirm({
+      title: "废弃文章",
+      content: "废弃后文章不再走自动生图和发布流程，但保留记录可随时查看。确认废弃？",
+      okText: "确认废弃", cancelText: "取消",
+      onOk: () => resolve(true), onCancel: () => resolve(false),
+    });
+  });
+  if (!confirmed) return;
+  try {
+    const res = await deleteFinishedArticle(props.article.id);
+    if (res.ok) {
+      message.success("已废弃");
+      emit("saved");
+    } else {
+      message.error("废弃失败");
+    }
+  } catch {
+    message.error("废弃失败");
   }
 }
 

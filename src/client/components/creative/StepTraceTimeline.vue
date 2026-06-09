@@ -64,6 +64,14 @@ function formatDuration(ms: number | undefined): string {
   return `${min}m${remainSec}s`;
 }
 
+// 将 ISO 时间戳格式化为 YYYY-MM-DD HH:mm:ss
+function formatTimestamp(value: string): string {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 // 格式化 meta 为 key-value 对
 function formatMeta(meta: Record<string, unknown> | undefined): Array<{ key: string; value: string }> {
   if (!meta) return [];
@@ -271,7 +279,7 @@ function parseDetailedJudgments(raw: unknown): ModelJudgment[] {
           <!-- 展开详情 -->
           <div v-if="expandedSteps.has(entry.step)" class="mt-1 space-y-1">
             <div v-if="entry.startedAt" class="text-[11px] text-editorial-text-muted">
-              {{ entry.startedAt }} → {{ entry.finishedAt ?? '...' }}
+              {{ formatTimestamp(entry.startedAt!) }} → {{ entry.finishedAt ? formatTimestamp(entry.finishedAt) : '...' }}
             </div>
 
             <!-- Step1: 素材来源 -->

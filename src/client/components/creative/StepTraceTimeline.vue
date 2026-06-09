@@ -257,7 +257,7 @@ function parseDetailedJudgments(raw: unknown): ModelJudgment[] {
             <span class="text-[11px]" :class="getStatusStyle(entry.status).color">
               {{ entry.status }}
             </span>
-            <span v-if="entry.durationMs" class="ml-auto text-[11px] text-editorial-text-muted">
+            <span v-if="entry.durationMs" class="text-[11px] text-editorial-text-muted">
               {{ formatDuration(entry.durationMs) }}
             </span>
             <span class="text-[11px] text-editorial-text-muted">{{ expandedSteps.has(entry.step) ? '▲' : '▼' }}</span>

@@ -286,20 +286,10 @@ async function handleCancelPublishable(article: CreativeFinishedArticle): Promis
 
 // 废弃文章（软删除）：留痕但不再生图和发布
 async function handleDiscardArticle(article: CreativeFinishedArticle): Promise<void> {
-  const { Modal } = await import("ant-design-vue");
-  const confirmed = await new Promise<boolean>(resolve => {
-    Modal.confirm({
-      title: "废弃文章",
-      content: "废弃后文章不再走自动生图和发布流程，但保留记录可随时查看。确认废弃？",
-      okText: "确认废弃", cancelText: "取消",
-      onOk: () => resolve(true), onCancel: () => resolve(false),
-    });
-  });
-  if (!confirmed) return;
   try {
     const res = await deleteFinishedArticle(article.id);
     if (res.ok) {
-      message.success("已废弃");
+      message.success("已废弃，文章不再走自动生图和发布流程，但保留记录可随时恢复");
       loadItems();
     }
   } catch {

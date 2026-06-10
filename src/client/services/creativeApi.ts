@@ -616,6 +616,28 @@ export function repairImagePrompts(articleId: number): Promise<{ ok: boolean; er
   });
 }
 
+// ─── 重新生成图片提示词 ───
+
+export type RegenImagePromptsResult = {
+  ok: boolean;
+  articleId?: number;
+  thesis?: string;
+  coverPromptLength?: number;
+  inlinePromptCount?: number;
+  /** 内联图序号列表 */
+  inlinePromptKeys?: number[];
+  designPlanImages?: number;
+  warnings?: string[];
+  reason?: string;
+};
+
+/** 根据当前正文重新生成所有图片提示词（覆盖旧值） */
+export function regenImagePrompts(articleId: number): Promise<RegenImagePromptsResult> {
+  return requestJson<RegenImagePromptsResult>(`/api/creative/finished-articles/${articleId}/regen-image-prompts`, {
+    method: "POST",
+  });
+}
+
 // ─── 写作队列状态 ───
 
 export type WriteQueueTask = {

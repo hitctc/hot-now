@@ -1361,6 +1361,56 @@ export function createServer(deps: ServerDeps = {}) {
     }
   });
 
+  // 重新生成图片提示词：代理 Hermes POST /api/articles/regen-image-prompts（2~3分钟，超时5分钟）
+  app.post("/api/creative/finished-articles/:id/regen-image-prompts", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+
+    if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
+
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const article = findCreativeFinishedArticleById(db, id);
+    if (!article) { return reply.code(404).send({ ok: false, reason: "article-not-found" }); }
+
+    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+    const hermesApiToken = process.env.HERMES_API_TOKEN;
+    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
+
+    try {
+      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/articles/regen-image-prompts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
+        body: JSON.stringify({ articleId: id }),
+        signal: AbortSignal.timeout(300_000),
+      });
+
+      if (!res.ok) {
+        const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
+        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, detail: errorBody });
+      }
+
+      const data = await res.json() as { success: boolean; error?: string; [k: string]: unknown };
+      if (!data.success) {
+        return reply.code(502).send({ ok: false, reason: data.error ?? "图片提示词生成失败" });
+      }
+
+      // Hermes 已 PATCH 回平台，重新读取最新数据返回
+      const updated = findCreativeFinishedArticleById(db, id);
+      return reply.send({
+        ok: true,
+        articleId: id,
+        thesis: data.thesis,
+        coverPromptLength: data.coverPromptLength,
+        inlinePromptCount: data.inlinePromptCount,
+        inlinePromptKeys: data.inlinePromptKeys,
+        designPlanImages: data.designPlanImages,
+        warnings: data.warnings,
+      });
+    } catch (err) {
+      return reply.code(502).send({ ok: false, reason: "Hermes 调用失败", detail: (err as Error).message });
+    }
+  });
+
   app.post("/api/creative/finished-articles/:id/regen-title", async (request, reply) => {
     const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
     if (session === undefined) { return; }

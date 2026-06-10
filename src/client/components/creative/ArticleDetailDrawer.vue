@@ -62,6 +62,7 @@
         <div class="article-detail-footer__group footer-group--flow">
           <a-button @click="imageActionVisible = true">手动生图</a-button>
           <a-button v-if="canRepairImagePrompts" :loading="repairingPrompts" @click="handleRepairImagePrompts">修复提示词</a-button>
+          <a-button :loading="regenPromptsLoading" :disabled="regenPromptsLoading" @click="handleRegenImagePrompts">刷新配图提示</a-button>
           <a-button v-if="article.status === 'needs_review'" @click="reviewModalVisible = true">审核</a-button>
           <a-button v-if="getAvailableActions(article).some(a => a.type === 'mark_publishable')" @click="handleDetailMarkPublishable">标记可推送</a-button>
           <a-tooltip v-else-if="getAvailableActions(article).some(a => a.type === 'mark_publishable_disabled')" :title="getAvailableActions(article).find(a => a.type === 'mark_publishable_disabled')!.missing.join('、')">
@@ -591,6 +592,7 @@ import {
   regenInlineImage,
   writeSourceItemArticle,
   repairImagePrompts,
+  regenImagePrompts,
   parseArticleImages,
   extractImageUrl,
   uploadImages,
@@ -646,6 +648,39 @@ async function handleRepairImagePrompts(): Promise<void> {
     message.error("修复请求失败");
   } finally {
     repairingPrompts.value = false;
+  }
+}
+
+// ─── 重新生成图片提示词 ───
+
+const regenPromptsLoading = ref(false);
+
+async function handleRegenImagePrompts(): Promise<void> {
+  if (!props.article) return;
+  const { Modal } = await import("ant-design-vue");
+  const confirmed = await new Promise<boolean>(resolve => {
+    Modal.confirm({
+      title: "重新生成图片提示词",
+      content: "将根据当前正文重新生成所有图片提示词，原有提示词会被覆盖。预计需要 2~3 分钟，确认继续？",
+      okText: "确认生成", cancelText: "取消",
+      onOk: () => resolve(true), onCancel: () => resolve(false),
+    });
+  });
+  if (!confirmed) return;
+
+  regenPromptsLoading.value = true;
+  try {
+    const res = await regenImagePrompts(props.article.id);
+    if (res.ok) {
+      message.success("图片提示词已更新");
+      emit("saved");
+    } else {
+      message.error(res.reason ?? "图片提示词生成失败");
+    }
+  } catch {
+    message.error("图片提示词生成请求失败");
+  } finally {
+    regenPromptsLoading.value = false;
   }
 }
 

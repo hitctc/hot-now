@@ -302,6 +302,7 @@ function setWritingIds(ids: Set<number>): void {
 const writeModeVisible = ref(false);
 const writeModeTarget = ref<CreativeSourceItem | null>(null);
 const writeModeValue = ref<string | null>(null);
+const writeModeThesis = ref("");
 const writeModeConfirming = ref(false);
 
 const writeModeOptions = [
@@ -436,6 +437,7 @@ async function handleToggleWritable(item: CreativeSourceItem): Promise<void> {
 function openWriteModeModal(item: CreativeSourceItem): void {
   writeModeTarget.value = item;
   writeModeValue.value = null;
+  writeModeThesis.value = "";
   writeModeVisible.value = true;
 }
 
@@ -443,6 +445,7 @@ function cancelWriteMode(): void {
   writeModeVisible.value = false;
   writeModeTarget.value = null;
   writeModeConfirming.value = false;
+  writeModeThesis.value = "";
 }
 
 // 写作状态轮询：10 秒间隔，10 分钟超时
@@ -500,7 +503,7 @@ async function confirmWriteMode(): Promise<void> {
   if (!item) return;
   writeModeConfirming.value = true;
   try {
-    const result = await writeSourceItemArticle(item.id, writeModeValue.value ?? undefined);
+    const result = await writeSourceItemArticle(item.id, writeModeValue.value ?? undefined, writeModeThesis.value.trim() || undefined);
     if (result.ok) {
       writeModeVisible.value = false;
       addWritingId(item.id);
@@ -921,6 +924,15 @@ const pagination = computed(() => ({
           {{ opt.label }}
         </a-radio>
       </a-radio-group>
+      <div class="mt-4">
+        <div class="mb-1 text-xs font-medium text-editorial-text-muted">核心立意（可选）</div>
+        <a-input
+          v-model:value="writeModeThesis"
+          placeholder="可选：指定文章的核心观点/立意"
+          allow-clear
+        />
+        <div class="mt-0.5 text-[10px] text-editorial-text-muted">指定后系统会锁定这个观点，不会被自动替换或反转</div>
+      </div>
     </a-modal>
 
     <!-- 手动写作弹窗 -->

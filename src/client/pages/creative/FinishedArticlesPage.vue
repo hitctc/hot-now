@@ -507,7 +507,6 @@ const columns = [
   { title: "创建时间", key: "createdAt", width: 140, ellipsis: true },
   { title: "可发", key: "publishable", width: 60, ellipsis: true },
   { title: "公众号", key: "wechatPublished", width: 80, ellipsis: true },
-  { title: "推送", key: "pushDraft", width: 72, ellipsis: true },
   { title: "操作", key: "actions", width: 60 },
 
 ];
@@ -661,21 +660,6 @@ const pagination = computed(() => ({
               class="!text-[11px] !px-2 !py-0.5"
               @click="handleTogglePublishable(record)"
             >{{ record.publishable ? '可发' : '-' }}</a-button>
-          </template>
-
-          <!-- 推送到草稿箱列 -->
-          <template v-else-if="column.key === 'pushDraft'">
-            <a-button
-              v-if="canPush(record)"
-              size="small"
-              type="primary"
-              class="!text-[11px] !px-2 !py-0.5"
-              @click="openPushConfirm(record)"
-            >推送</a-button>
-            <a-tooltip v-else :mouse-enter-delay="0.3">
-              <template #title>{{ getMissingConditions(record).join('；') }}</template>
-              <a-button size="small" disabled class="!text-[11px] !px-2 !py-0.5">推送</a-button>
-            </a-tooltip>
           </template>
 
           <!-- 操作列：废弃/恢复 -->

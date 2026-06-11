@@ -318,6 +318,7 @@ const manualContentType = ref<"viewpoint" | "article">("viewpoint");
 const manualTitle = ref("");
 const manualContent = ref("");
 const manualMode = ref<string | null>(null);
+const manualThesis = ref("");
 
 const contentTypeOptions = [
   { value: "viewpoint" as const, label: "观点/想法", desc: "简短观点，几句话到一段话" },
@@ -329,6 +330,7 @@ function openManualWriteModal(): void {
   manualTitle.value = "";
   manualContent.value = "";
   manualMode.value = null;
+  manualThesis.value = "";
   manualWriteVisible.value = true;
 }
 
@@ -344,6 +346,7 @@ async function confirmManualWrite(): Promise<void> {
       content: manualContent.value.trim(),
       contentType: manualContentType.value,
       mode: (manualMode.value as "A" | "B" | "C") ?? undefined,
+      thesis: manualThesis.value.trim() || undefined,
     });
     if (result.ok && result.sourceItemId) {
       message.success(`已提交写作（素材#${result.sourceItemId}）`);
@@ -972,6 +975,17 @@ const pagination = computed(() => ({
             <a-radio value="B">短篇随笔（B）— 600~1500 字</a-radio>
             <a-radio value="C">长篇观点文（C）— 3000~6000 字</a-radio>
           </a-radio-group>
+        </div>
+
+        <!-- 核心立意 -->
+        <div>
+          <div class="mb-1 text-xs font-medium text-editorial-text-muted">核心立意（可选）</div>
+          <a-input
+            v-model:value="manualThesis"
+            placeholder="可选：指定文章的核心观点/立意"
+            allow-clear
+          />
+          <div class="mt-0.5 text-[10px] text-editorial-text-muted">指定后系统会锁定这个观点，不会被自动替换或反转</div>
         </div>
       </div>
     </a-modal>

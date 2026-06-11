@@ -1776,7 +1776,7 @@ export function createServer(deps: ServerDeps = {}) {
     if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
 
     const id = parseInt((request.params as { id: string }).id, 10);
-    const body = request.body as { mode?: string } | undefined;
+    const body = request.body as { mode?: string; thesis?: string } | undefined;
     const item = findCreativeSourceItemById(db, id);
     if (!item) { return reply.code(404).send({ ok: false, reason: "source-item-not-found" }); }
 
@@ -1787,6 +1787,9 @@ export function createServer(deps: ServerDeps = {}) {
     const hermesBody: Record<string, unknown> = { sourceItemId: id };
     if (body?.mode && ["A", "B", "C"].includes(body.mode)) {
       hermesBody.mode = body.mode;
+    }
+    if (typeof body?.thesis === "string" && body.thesis.trim()) {
+      hermesBody.thesis = body.thesis.trim();
     }
 
     try {
@@ -1822,7 +1825,7 @@ export function createServer(deps: ServerDeps = {}) {
     if (session === undefined) { return; }
     if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
 
-    const body = request.body as { title?: string; content?: string; contentType?: string; mode?: string } | undefined;
+    const body = request.body as { title?: string; content?: string; contentType?: string; mode?: string; thesis?: string } | undefined;
     const content = typeof body?.content === "string" ? body.content.trim() : "";
     const contentType = body?.contentType === "article" ? "article" : "viewpoint";
     if (!content) {
@@ -1857,6 +1860,9 @@ export function createServer(deps: ServerDeps = {}) {
       hermesBody.mode = "B";
     } else {
       hermesBody.mode = "A";
+    }
+    if (typeof body?.thesis === "string" && body.thesis.trim()) {
+      hermesBody.thesis = body.thesis.trim();
     }
 
     try {

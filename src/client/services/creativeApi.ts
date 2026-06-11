@@ -599,10 +599,11 @@ export type WriteArticleResult = {
   reason?: string;
 };
 
-/** 调用 Hermes write-article API（异步），可指定写作模式 */
-export function writeSourceItemArticle(id: number, mode?: string): Promise<WriteArticleResult> {
+/** 调用 Hermes write-article API（异步），可指定写作模式和核心立意 */
+export function writeSourceItemArticle(id: number, mode?: string, thesis?: string): Promise<WriteArticleResult> {
   const body: Record<string, unknown> = {};
   if (mode) body.mode = mode;
+  if (thesis) body.thesis = thesis;
   return requestJson<WriteArticleResult>(`/api/creative/source-items/${id}/write-article`, {
     method: "POST",
     body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined,
@@ -680,6 +681,8 @@ export type ManualWriteRequest = {
   content: string;
   contentType: "viewpoint" | "article";
   mode?: "A" | "B" | "C";
+  /** 可选：指定文章的核心观点/立意，锁定后不会被自动替换 */
+  thesis?: string;
 };
 
 export type ManualWriteResult = {

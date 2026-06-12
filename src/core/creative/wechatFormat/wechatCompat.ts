@@ -161,25 +161,16 @@ export async function makeWechatCompatible(html: string, options?: { skipImageBa
   links.forEach((a: Element) => {
     a.removeAttribute("target");
     a.removeAttribute("rel");
-    const text = a.textContent || "";
-    // 长链接（URL 等超长文本）：用 <pre><code> 滚动容器包裹
-    // 微信对 <code> 的 overflow-x 支持最可靠（<section> 会被吞），复刻博主验证过的结构
-    // 短链接保持折行，避免把普通描述性链接也撑出滚动条
-    if (text.length > 40) {
-      a.setAttribute("style", "color: #576b95; white-space: nowrap; word-break: keep-all;");
-      const code = doc.createElement("code");
-      code.setAttribute(
-        "style",
-        "display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; word-break: keep-all; padding: 12px; background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 14px; font-family: Operator Mono, Consolas, Monaco, Menlo, monospace; margin: 10px 0;"
-      );
-      const pre = doc.createElement("pre");
-      pre.setAttribute("style", "margin: 0; padding: 0; background: transparent;");
-      a.parentNode?.insertBefore(pre, a);
-      code.appendChild(a);
-      pre.appendChild(code);
-    } else {
-      a.setAttribute("style", "color: #576b95; overflow-wrap: break-word; word-break: break-all;");
-    }
+    a.setAttribute("style", "color: #576b95; overflow-wrap: break-word; word-break: break-all;");
+  });
+
+  // 6.5 代码块横向滚动：<pre> 内的 <code> 必须是 display:block 才能让 overflow-x 生效
+  // <code> 默认是 inline 元素，overflow-x 对 inline 不生效，长 URL/代码在微信里无法滚动
+  section.querySelectorAll("pre code").forEach((code: Element) => {
+    code.setAttribute(
+      "style",
+      "display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; word-break: keep-all;"
+    );
   });
 
   // 7. 外链图片转 Base64（仅"复制到剪贴板"流程需要，推送流程跳过以保留原始 URL）

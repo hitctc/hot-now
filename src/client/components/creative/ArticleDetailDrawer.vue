@@ -36,29 +36,7 @@
 
         <div class="article-detail-footer__divider" />
 
-        <!-- 第二组：内容生成（触发写作管线） -->
-        <div class="article-detail-footer__group footer-group--generate">
-          <a-tooltip v-if="!pipelineOn" title="管线已紧急制动，请先恢复管线">
-            <a-dropdown disabled>
-              <a-button disabled>写文章</a-button>
-            </a-dropdown>
-          </a-tooltip>
-          <a-dropdown v-else-if="article.sourceItemId">
-            <a-button>写文章</a-button>
-            <template #overlay>
-              <a-menu @click="handleWriteMenuClick">
-                <a-menu-item key="auto">自动判断</a-menu-item>
-                <a-menu-item key="A">短篇观点文（A）</a-menu-item>
-                <a-menu-item key="B">短篇随笔（B）</a-menu-item>
-                <a-menu-item key="C">长篇观点文（C）</a-menu-item>
-              </a-menu>
-            </template>
-          </a-dropdown>
-        </div>
-
-        <div class="article-detail-footer__divider" />
-
-        <!-- 第三组：弹窗确认（二次操作） -->
+        <!-- 第二组：弹窗确认（二次操作） -->
         <div class="article-detail-footer__group footer-group--flow">
           <a-button @click="imageActionVisible = true">手动生图</a-button>
           <a-button v-if="canRepairImagePrompts" :loading="repairingPrompts" @click="handleRepairImagePrompts">修复提示词</a-button>
@@ -581,7 +559,6 @@ import StepTraceTimeline from "./StepTraceTimeline.vue";
 import ArticleReviewModal from "./ArticleReviewModal.vue";
 import ImageActionModal from "./ImageActionModal.vue";
 import { checkPublishConditions, getAvailableActions } from "./articleStatusShared.js";
-import { usePipelineStatus } from "../../composables/usePipelineStatus.js";
 import {
   editFinishedArticle,
   deleteFinishedArticle,
@@ -590,7 +567,6 @@ import {
   regenTitle,
   regenIntro,
   regenInlineImage,
-  writeSourceItemArticle,
   repairImagePrompts,
   regenImagePrompts,
   parseArticleImages,
@@ -599,7 +575,6 @@ import {
   type CreativeFinishedArticle,
   type WechatThemeId,
 } from "../../services/creativeApi.js";
-import { HttpError } from "../../services/http.js";
 import { renderWechatThemePreview } from "../../services/wechatRenderer.js";
 
 const props = defineProps<{
@@ -614,8 +589,6 @@ const emit = defineEmits<{
   openSourceItem: [sourceItemId: number];
   openPush: [article: CreativeFinishedArticle, themeId: WechatThemeId];
 }>();
-
-const { pipelineOn } = usePipelineStatus();
 
 // ─── 重试生成图片提示词 ───
 
@@ -1096,37 +1069,6 @@ function handleReviewDone(): void {
 function handleImageActionDone(): void {
   tickArticleChange();
   emit("saved");
-}
-
-// ─── 写文章（统一走 write-article 异步接口） ───
-
-const writeArticleSubmitting = ref(false);
-
-function handleWriteMenuClick({ key }: { key: string }): void {
-  void handleWriteArticle(key === "auto" ? undefined : key);
-}
-
-async function handleWriteArticle(mode?: string): Promise<void> {
-  if (!props.article || writeArticleSubmitting.value) return;
-  writeArticleSubmitting.value = true;
-  try {
-    const result = await writeSourceItemArticle(props.article.sourceItemId, mode);
-    if (result.ok) {
-      message.success(`写作任务已提交${result.status === "queued" ? "（排队中）" : ""}，完成后可在成品文章列表查看`);
-    } else {
-      message.error(result.reason ?? "写文章失败");
-    }
-  } catch (err) {
-    // 409 = 素材已在写作中或已排队
-    if (err instanceof HttpError && err.status === 409) {
-      const detail = (err.body as { error?: string })?.error ?? "该素材正在写作中";
-      message.warning(detail);
-    } else {
-      message.error("写文章请求失败");
-    }
-  } finally {
-    writeArticleSubmitting.value = false;
-  }
 }
 
 // ─── 正文配图重新生成 ───

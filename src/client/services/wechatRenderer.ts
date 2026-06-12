@@ -156,7 +156,7 @@ const themes: Record<WechatThemeId, WechatTheme> = {
       img: "display: block; margin: 0px auto; width: 100%; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.06);",
       hr: "margin: 10px auto; border: none; border-top: 1px solid #9E8045; width: 40px;",
       code: "color: #9E8045; background: rgba(158, 128, 69, 0.06); border: 1px solid rgba(158, 128, 69, 0.2); padding: 2px 6px; margin: 0 4px; border-radius: 2px; font-size: 14px; font-family: serif;",
-      pre: "background: #fcfcfc; color: #333; padding: 10px; font-family: serif; font-size: 13px; line-height: 1.6; border: 1px solid #eee; overflow-x: auto; white-space: pre; min-width: max-content;",
+      pre: "background: #fcfcfc; color: #333; padding: 10px; font-family: serif; font-size: 13px; line-height: 1.6; border: 1px solid #eee;",
       table: "width: 100%; margin: 10px 0; border-collapse: collapse; font-size: 14px; border-top: 1px solid #000; border-bottom: 1px solid #000;",
       th: "color: #9E8045; font-weight: normal; border-bottom: 1px solid #eee; padding: 8px 10px; text-align: center;",
       td: "border-bottom: 1px solid #eee; padding: 8px 10px; color: #555; text-align: center;",

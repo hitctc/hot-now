@@ -208,10 +208,9 @@ watch(() => props.digest?.contentMarkdown, (val) => {
           <a-button
             v-if="pushState === 'idle' || pushState === 'done'"
             type="primary"
-            :disabled="digest.status === 'published'"
             @click="startPush"
           >
-            {{ digest.status === 'published' ? '已推送' : '推送草稿' }}
+            {{ digest.status === 'published' ? '重新推送草稿' : '推送草稿' }}
           </a-button>
         </div>
       </div>

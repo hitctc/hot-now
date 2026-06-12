@@ -161,7 +161,18 @@ export async function makeWechatCompatible(html: string, options?: { skipImageBa
   links.forEach((a: Element) => {
     a.removeAttribute("target");
     a.removeAttribute("rel");
-    a.setAttribute("style", "color: #576b95; overflow-wrap: break-word; word-break: break-all;");
+    const text = a.textContent || "";
+    // 长链接（URL 等超长文本）：包裹可横向滚动的容器，微信支持 overflow-x: auto
+    // 短链接保持折行，避免把普通描述性链接也撑出滚动条
+    if (text.length > 40) {
+      a.setAttribute("style", "color: #576b95; display: inline-block; white-space: nowrap;");
+      const wrapper = doc.createElement("section");
+      wrapper.setAttribute("style", "overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 2px 0;");
+      a.parentNode?.insertBefore(wrapper, a);
+      wrapper.appendChild(a);
+    } else {
+      a.setAttribute("style", "color: #576b95; overflow-wrap: break-word; word-break: break-all;");
+    }
   });
 
   // 7. 外链图片转 Base64（仅"复制到剪贴板"流程需要，推送流程跳过以保留原始 URL）

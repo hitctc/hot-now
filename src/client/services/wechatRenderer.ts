@@ -141,9 +141,9 @@ const themes: Record<WechatThemeId, WechatTheme> = {
     styles: {
       container: `max-width: 100%; margin: 0 auto; padding: 0px; word-break: break-word; font-family: "Songti SC", "SimSun", "STSong", "Georgia", serif; color: #222; background-color: transparent;`,
       h1: "margin: 0px; font-size: 26px; font-weight: normal; color: #000; text-align: center; letter-spacing: 3px; border-bottom: 1px solid #000; padding-bottom: 10px; display: block;",
-      h2: "width: 100%; margin: 0px; font-size: 19px; font-weight: normal; color: #9E8045; text-align: center; display: inline-block; border-top: 1px solid #9E8045; border-bottom: 1px solid #9E8045; padding: 10px; letter-spacing: 1px;",
-      h3: "margin: 0px; font-size: 17px; font-weight: bold; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 1px;",
-      h4: "margin: 0px; font-size: 16px; font-weight: normal; color: #9E8045; text-align: center; border-bottom: 1px solid #eee; padding-bottom: 4px; display: inline-block;",
+      h2: "width: 100%; margin: 20px 0 0 0; font-size: 19px; font-weight: normal; color: #9E8045; text-align: center; display: inline-block; border-top: 1px solid #9E8045; border-bottom: 1px solid #9E8045; padding: 10px; letter-spacing: 1px;",
+      h3: "margin: 20px 0 0 0; font-size: 17px; font-weight: bold; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 1px;",
+      h4: "margin: 20px 0 0 0; font-size: 16px; font-weight: normal; color: #9E8045; text-align: center; border-bottom: 1px solid #eee; padding-bottom: 4px; display: inline-block;",
       p: "margin: 10px 0; font-size: 16px; line-height: 2.0; color: #444; text-align: justify; overflow-wrap: break-word;",
       strong: "font-weight: bold; color: #9E8045;",
       em: "font-style: italic; color: #9E8045;",

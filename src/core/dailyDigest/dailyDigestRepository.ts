@@ -100,6 +100,39 @@ export function insertDailyDigest(
   return mapRow(row);
 }
 
+// ── Replace (幂等覆盖：同日期已存在时全量更新业务字段，保留 id 和 status) ──
+
+/**
+ * 全量覆盖指定日期的日报：所有业务字段用新值替换。
+ * status 保留为 'generated'，因为这是重新生成的内容；id/created_at 保持不变。
+ */
+export function replaceDailyDigest(
+  db: SqliteDatabase,
+  date: string,
+  input: InsertDailyDigestInput
+): DailyDigestRecord | null {
+  const existing = findDailyDigestByDate(db, date);
+  if (!existing) return null;
+
+  db.prepare(
+    `
+      UPDATE daily_digests
+      SET title = ?, content_markdown = ?, cover_image = ?, total_items = ?, categories = ?, collector_agent = ?, status = 'generated', updated_at = CURRENT_TIMESTAMP
+      WHERE date = ?
+    `
+  ).run(
+    input.title,
+    input.contentMarkdown,
+    input.coverImage ?? null,
+    input.totalItems,
+    JSON.stringify(input.categories),
+    input.collectorAgent,
+    date
+  );
+
+  return findDailyDigestByDate(db, date);
+}
+
 // ── Find by id ───────────────────────────────────────────────────────────────
 
 export function findDailyDigestById(db: SqliteDatabase, id: number): DailyDigestRecord | null {

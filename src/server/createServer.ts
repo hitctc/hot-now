@@ -101,7 +101,8 @@ import {
   listDailyDigests,
   updateDailyDigestStatus,
   findDailyDigestByDate,
-  editDailyDigest
+  editDailyDigest,
+  replaceDailyDigest
 } from "../core/dailyDigest/dailyDigestRepository.js";
 
 import { downloadAndStoreImage, storeImageBuffer, readStoredImage } from "../core/storage/imageStore.js";
@@ -1199,8 +1200,12 @@ export function createServer(deps: ServerDeps = {}) {
 
   // 软删除成品文章
   app.delete("/api/creative/finished-articles/:id", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-    if (session === undefined) { return; }
+    // 支持两种认证：token（外部 Agent）或 session（管理 UI）
+    const hasToken = creativeApiToken && request.headers["x-creative-token"] === creativeApiToken;
+    if (!hasToken) {
+      const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+      if (session === undefined) { return; }
+    }
 
     if (!db) {
       return reply.code(503).send({ ok: false, reason: "database-not-available" });
@@ -1976,10 +1981,19 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.code(400).send({ ok: false, reason: "missing-required-fields" });
     }
 
-    // 同一天幂等：已存在则返回 409
+    // 同一天幂等：已存在则全量覆盖（Hermes 改进日报后可重新 POST 更新）
     const existing = findDailyDigestByDate(db, date);
     if (existing) {
-      return reply.code(409).send({ ok: false, reason: "already-exists", id: existing.id });
+      const replaced = replaceDailyDigest(db, date, {
+        date,
+        title,
+        contentMarkdown,
+        coverImage,
+        totalItems,
+        categories,
+        collectorAgent
+      });
+      return reply.send(replaced);
     }
 
     const record = insertDailyDigest(db, {
@@ -2040,8 +2054,12 @@ export function createServer(deps: ServerDeps = {}) {
   // ─── Daily Digest: 更新状态（session 鉴权） ───
 
   app.patch("/api/creative/daily-digests/:id", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-    if (session === undefined) { return; }
+    // 支持两种认证：token（外部 Agent）或 session（管理 UI）
+    const hasToken = creativeApiToken && request.headers["x-creative-token"] === creativeApiToken;
+    if (!hasToken) {
+      const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+      if (session === undefined) { return; }
+    }
 
     if (!db) {
       return reply.code(503).send({ ok: false, reason: "database-not-available" });

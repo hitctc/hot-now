@@ -162,14 +162,21 @@ export async function makeWechatCompatible(html: string, options?: { skipImageBa
     a.removeAttribute("target");
     a.removeAttribute("rel");
     const text = a.textContent || "";
-    // 长链接（URL 等超长文本）：包裹可横向滚动的容器，微信支持 overflow-x: auto
+    // 长链接（URL 等超长文本）：用 <pre><code> 滚动容器包裹
+    // 微信对 <code> 的 overflow-x 支持最可靠（<section> 会被吞），复刻博主验证过的结构
     // 短链接保持折行，避免把普通描述性链接也撑出滚动条
     if (text.length > 40) {
-      a.setAttribute("style", "color: #576b95; display: inline-block; white-space: nowrap;");
-      const wrapper = doc.createElement("section");
-      wrapper.setAttribute("style", "overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 2px 0;");
-      a.parentNode?.insertBefore(wrapper, a);
-      wrapper.appendChild(a);
+      a.setAttribute("style", "color: #576b95; white-space: nowrap; word-break: keep-all;");
+      const code = doc.createElement("code");
+      code.setAttribute(
+        "style",
+        "display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; word-break: keep-all; padding: 12px; background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 14px; font-family: Operator Mono, Consolas, Monaco, Menlo, monospace; margin: 10px 0;"
+      );
+      const pre = doc.createElement("pre");
+      pre.setAttribute("style", "margin: 0; padding: 0; background: transparent;");
+      a.parentNode?.insertBefore(pre, a);
+      code.appendChild(a);
+      pre.appendChild(code);
     } else {
       a.setAttribute("style", "color: #576b95; overflow-wrap: break-word; word-break: break-all;");
     }

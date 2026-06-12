@@ -338,13 +338,14 @@ function fileToBase64(file: File): Promise<string> {
 
 // ─── WeChat Format ───
 
-export type WechatThemeId = "classic" | "bauhaus" | "sunset-film" | "receipt";
+export type WechatThemeId = "classic" | "bauhaus" | "sunset-film" | "receipt" | "black-gold";
 
 export const wechatThemeOptions: { value: WechatThemeId; label: string }[] = [
   { value: "classic", label: "默认" },
   { value: "bauhaus", label: "包豪斯" },
   { value: "sunset-film", label: "落日胶片" },
-  { value: "receipt", label: "购物小票" }
+  { value: "receipt", label: "购物小票" },
+  { value: "black-gold", label: "黑金主题" }
 ];
 
 // ─── Image Upload ───

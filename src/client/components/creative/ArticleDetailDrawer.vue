@@ -1528,13 +1528,14 @@ function handleClose(): void {
 
 // ─── 预览主题切换 ───
 
-type PreviewThemeKey = "classic" | "live" | "bauhaus" | "sunsetFilm" | "receipt";
+type PreviewThemeKey = "classic" | "live" | "bauhaus" | "sunsetFilm" | "receipt" | "blackGold";
 
 const previewThemeOptions: { key: PreviewThemeKey; label: string }[] = [
   { key: "classic", label: "默认" },
   { key: "bauhaus", label: "包豪斯" },
   { key: "sunsetFilm", label: "落日胶片" },
   { key: "receipt", label: "购物小票" },
+  { key: "blackGold", label: "黑金主题" },
   { key: "live", label: "实时预览" },
 ];
 
@@ -1545,6 +1546,7 @@ const themeIdMap: Record<Exclude<PreviewThemeKey, "live">, WechatThemeId> = {
   bauhaus: "bauhaus",
   sunsetFilm: "sunset-film",
   receipt: "receipt",
+  blackGold: "black-gold",
 };
 
 const reverseThemeIdMap: Record<string, Exclude<PreviewThemeKey, "live">> = {
@@ -1552,6 +1554,7 @@ const reverseThemeIdMap: Record<string, Exclude<PreviewThemeKey, "live">> = {
   bauhaus: "bauhaus",
   "sunset-film": "sunsetFilm",
   receipt: "receipt",
+  "black-gold": "blackGold",
 };
 
 // 切换预览主题：客户端即时渲染

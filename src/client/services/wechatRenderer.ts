@@ -6,7 +6,7 @@ import MarkdownIt from "markdown-it";
 
 // ── 主题定义 ──
 
-export type WechatThemeId = "classic" | "bauhaus" | "sunset-film" | "receipt";
+export type WechatThemeId = "classic" | "bauhaus" | "sunset-film" | "receipt" | "black-gold";
 
 type ThemeStyles = Record<string, string>;
 
@@ -133,6 +133,35 @@ const themes: Record<WechatThemeId, WechatTheme> = {
       td: "border-bottom: 1px dotted #000; padding: 8px 5px; text-align: right; color: #000;",
       mark: "background: #ddd; color: #000; padding: 0 4px;",
       del: "text-decoration: line-through; color: #666;",
+    },
+  },
+  "black-gold": {
+    id: "black-gold",
+    name: "黑金主题",
+    styles: {
+      container: `max-width: 100%; margin: 0 auto; padding: 5px 22px; word-break: break-word; font-family: "Songti SC", "SimSun", "STSong", "Georgia", serif; color: #222; background-color: transparent;`,
+      h1: "margin: 70px 0 50px; font-size: 26px; font-weight: normal; color: #000; text-align: center; letter-spacing: 3px; border-bottom: 1px solid #000; padding-bottom: 20px; display: block;",
+      h2: "margin: 50px 0 30px; font-size: 19px; font-weight: normal; color: #9E8045; text-align: center; display: inline-block; border-top: 1px solid #9E8045; border-bottom: 1px solid #9E8045; padding: 10px 24px; letter-spacing: 1px;",
+      h3: "margin: 40px 0 20px; font-size: 17px; font-weight: bold; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 1px;",
+      h4: "margin: 30px 0 15px; font-size: 16px; font-weight: normal; color: #9E8045; text-align: center; border-bottom: 1px solid #eee; padding-bottom: 4px; display: inline-block;",
+      p: "margin: 30px 0; font-size: 16px; line-height: 2.0; color: #444; text-align: justify; overflow-wrap: break-word;",
+      strong: "font-weight: bold; color: #9E8045;",
+      em: "font-style: italic; color: #9E8045;",
+      a: "color: #000; text-decoration: none; border-bottom: 1px solid #9E8045; overflow-wrap: break-word;",
+      blockquote: "margin: 40px 0; padding: 20px 30px; background: #fff; border: none; border-left: 2px solid #9E8045; text-align: center;",
+      blockquote_p: "margin: 0; font-size: 15px; line-height: 1.8; color: #666; font-style: italic; font-family: serif;",
+      ul: "margin: 20px 0; padding-left: 20px; list-style-type: square; color: #9E8045;",
+      ol: "margin: 20px 0; padding-left: 20px; list-style-type: decimal; color: #9E8045;",
+      li: "margin: 0 0 10px 0; color: #444; font-weight: normal; line-height: 2.0;",
+      img: "display: block; margin: 50px auto; width: 100%; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.06);",
+      hr: "margin: 60px auto; border: none; border-top: 1px solid #9E8045; width: 40px;",
+      code: "color: #9E8045; background: rgba(158, 128, 69, 0.06); border: 1px solid rgba(158, 128, 69, 0.2); padding: 2px 6px; margin: 0 4px; border-radius: 2px; font-size: 14px; font-family: serif;",
+      pre: "background: #fcfcfc; color: #333; padding: 20px; font-family: serif; font-size: 13px; line-height: 1.6; border: 1px solid #eee; overflow-x: auto; white-space: pre; min-width: max-content;",
+      table: "width: 100%; margin: 40px 0; border-collapse: collapse; font-size: 14px; border-top: 1px solid #000; border-bottom: 1px solid #000;",
+      th: "color: #9E8045; font-weight: normal; border-bottom: 1px solid #eee; padding: 12px 10px; text-align: center;",
+      td: "border-bottom: 1px solid #eee; padding: 12px 10px; color: #555; text-align: center;",
+      mark: "background: rgba(158, 128, 69, 0.15); color: #9E8045; padding: 2px 6px; border-bottom: 1px solid rgba(158, 128, 69, 0.3);",
+      del: "text-decoration: line-through; color: #999; text-decoration-color: #9E8045;",
     },
   },
 };

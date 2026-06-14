@@ -244,7 +244,8 @@ function persistCollectedItems(db: SqliteDatabase, issue: LoadedIssue, items: En
           continue;
         }
       }
-      const fullContent = item.article.ok ? item.article.text : null;
+      // 优先使用 RSS 自带的详情正文（人工筛选整理，质量优于从原始 URL 抓取）
+      const fullContent = item.contentHtml ?? (item.article.ok ? item.article.text : null);
       insertCreativeSourceItem(db, {
         externalId: item.externalId,
         collectorAgent: "hotnow-feed",

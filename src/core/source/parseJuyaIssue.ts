@@ -25,6 +25,7 @@ export async function parseJuyaIssue(feedXml: string): Promise<DailyIssue> {
 
   const $ = cheerio.load(html);
   const summariesByRank = collectDetailedSummaries($);
+  const contentsByRank = collectDetailedContents($);
   const items: CandidateItem[] = [];
   let currentCategory = "未分类";
 
@@ -60,7 +61,8 @@ export async function parseJuyaIssue(feedXml: string): Promise<DailyIssue> {
         sourceName: BUILTIN_SOURCES.juya.name,
         externalId: link,
         ...(issuePublishedAt ? { publishedAt: issuePublishedAt } : {}),
-        ...(summariesByRank.get(rank) ? { summary: summariesByRank.get(rank) } : {})
+        ...(summariesByRank.get(rank) ? { summary: summariesByRank.get(rank) } : {}),
+        ...(contentsByRank.get(rank) ? { contentHtml: contentsByRank.get(rank) } : {})
       });
     }
   });
@@ -102,6 +104,40 @@ function collectDetailedSummaries($: cheerio.CheerioAPI): Map<number, string> {
   });
 
   return summariesByRank;
+}
+
+// 收集每个条目详情区块的完整正文（blockquote + 全部段落文本）
+// Juya RSS 的详情区块是人工筛选整理的中文内容，质量优于从原始 URL 重新抓取
+function collectDetailedContents($: cheerio.CheerioAPI): Map<number, string> {
+  const contentsByRank = new Map<number, string>();
+
+  $("h2").each((_, element) => {
+    const headingText = normalizeText($(element).text());
+
+    if (!headingText || headingText === "概览") {
+      return;
+    }
+
+    const rank = parseRank(headingText);
+
+    if (rank == null) {
+      return;
+    }
+
+    const sectionNodes = $(element).nextUntil("h2");
+    const parts: string[] = [];
+
+    sectionNodes.filter("blockquote, p").each((_, el) => {
+      const text = normalizeText($(el).text());
+      if (text) parts.push(text);
+    });
+
+    if (parts.length > 0) {
+      contentsByRank.set(rank, parts.join("\n\n"));
+    }
+  });
+
+  return contentsByRank;
 }
 
 function extractSectionSummary($: cheerio.CheerioAPI, sectionNodes: cheerio.Cheerio<AnyNode>): string | undefined {

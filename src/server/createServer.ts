@@ -1349,34 +1349,6 @@ export function createServer(deps: ServerDeps = {}) {
     }
   });
 
-  // 修复图片提示词：代理 Hermes POST /api/articles/repair-image-prompts
-  app.post("/api/creative/finished-articles/:id/repair-image-prompts", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-    if (session === undefined) { return; }
-
-    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
-    const hermesApiToken = process.env.HERMES_API_TOKEN;
-    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
-
-    const id = parseInt((request.params as { id: string }).id, 10);
-    try {
-      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/articles/repair-image-prompts`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
-        body: JSON.stringify({ articleId: id }),
-        signal: AbortSignal.timeout(60_000),
-      });
-      if (!res.ok) {
-        const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
-        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, detail: errorBody });
-      }
-      const data = await res.json();
-      return reply.send(data);
-    } catch (err) {
-      return reply.code(502).send({ ok: false, reason: "Hermes 调用失败", detail: (err as Error).message });
-    }
-  });
-
   // 重新生成图片提示词：代理 Hermes POST /api/articles/regen-image-prompts（2~3分钟，超时5分钟）
   app.post("/api/creative/finished-articles/:id/regen-image-prompts", async (request, reply) => {
     const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");

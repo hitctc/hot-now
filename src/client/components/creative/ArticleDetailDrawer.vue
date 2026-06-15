@@ -39,7 +39,6 @@
         <!-- 第二组：弹窗确认（二次操作） -->
         <div class="article-detail-footer__group footer-group--flow">
           <a-button @click="imageActionVisible = true">手动生图</a-button>
-          <a-button v-if="canRepairImagePrompts" :loading="repairingPrompts" @click="handleRepairImagePrompts">修复提示词</a-button>
           <a-button :loading="regenPromptsLoading" :disabled="regenPromptsLoading" @click="handleRegenImagePrompts">刷新配图提示</a-button>
           <a-button v-if="article.status === 'needs_review'" @click="reviewModalVisible = true">审核</a-button>
           <a-button v-if="getAvailableActions(article).some(a => a.type === 'mark_publishable')" @click="handleDetailMarkPublishable">标记可推送</a-button>
@@ -567,7 +566,6 @@ import {
   regenTitle,
   regenIntro,
   regenInlineImage,
-  repairImagePrompts,
   regenImagePrompts,
   parseArticleImages,
   extractImageUrl,
@@ -591,38 +589,6 @@ const emit = defineEmits<{
 }>();
 
 // ─── 重试生成图片提示词 ───
-
-const IMAGE_PROMPT_ANOMALY_PREFIXES = [
-  "image_prompt_missing",
-  "image_prompt_count_mismatch",
-  "image_prompt_parse_failed",
-];
-
-/** 判断当前文章是否为图片提示词异常，可以重试 */
-const canRepairImagePrompts = computed(() => {
-  if (!props.article?.anomalyReason) return false;
-  return IMAGE_PROMPT_ANOMALY_PREFIXES.some(p => props.article!.anomalyReason!.startsWith(p));
-});
-
-const repairingPrompts = ref(false);
-
-async function handleRepairImagePrompts(): Promise<void> {
-  if (!props.article) return;
-  repairingPrompts.value = true;
-  try {
-    const res = await repairImagePrompts(props.article.id);
-    if (res.ok) {
-      message.success("图片提示词修复成功");
-      emit("saved");
-    } else {
-      message.error(res.error ?? "修复失败");
-    }
-  } catch {
-    message.error("修复请求失败");
-  } finally {
-    repairingPrompts.value = false;
-  }
-}
 
 // ─── 重新生成图片提示词 ───
 

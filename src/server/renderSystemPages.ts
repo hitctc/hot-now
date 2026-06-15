@@ -83,6 +83,7 @@ export type SourcesSettingsOperationsView = {
   canTriggerManualBilibiliCollect?: boolean;
   canTriggerManualWechatRssCollect?: boolean;
   canTriggerManualWeiboTrendingCollect?: boolean;
+  canTriggerManualJuyaCollect?: boolean;
   canTriggerManualSendLatestEmail: boolean;
   isRunning: boolean;
   lastCollectionRunAt: string | null;

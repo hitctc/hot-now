@@ -45,6 +45,7 @@ import { runTwitterKeywordCollection } from "./core/twitter/runTwitterKeywordCol
 import { runHackerNewsCollection } from "./core/hackernews/runHackerNewsCollection.js";
 import { runBilibiliCollection } from "./core/bilibili/runBilibiliCollection.js";
 import { runWechatRssCollection } from "./core/wechatRss/runWechatRssCollection.js";
+import { runJuyaCollection } from "./core/source/runJuyaCollection.js";
 import { readWeiboTrendingRunState, runWeiboTrendingCollection } from "./core/weibo/runWeiboTrendingCollection.js";
 import { readAiTimelineFeedFile, readAiTimelineFeedPageModel } from "./core/aiTimeline/aiTimelineFeedFile.js";
 import {
@@ -127,8 +128,7 @@ runMigrations(db);
 seedInitialData(db, {
   username: config.auth.username,
   password: config.auth.password,
-  email: config.smtp.user,
-  juyaRssUrl: config.source.rssUrl
+  email: config.smtp.user
 });
 const lock = createRunLock();
 const aiTimelineAlertLock = createRunLock();
@@ -138,6 +138,7 @@ const twitterLock = createRunLock();
 const hackerNewsLock = createRunLock();
 const bilibiliLock = createRunLock();
 const weiboLock = createRunLock();
+const juyaLock = createRunLock();
 const readAdminProfile = db.prepare(
   `
     SELECT username, password_hash, role, display_name
@@ -190,6 +191,11 @@ async function runBilibiliCollectionTask() {
 // 微信公众号 RSS 由后台单独维护，第一版只手动采集，避免混进普通 RSS 定时轮询。
 async function runWechatRssCollectionTask() {
   return await runWechatRssCollection(db);
+}
+
+// Juya RSS 独立采集入口，避免为了补单个来源触发全量 runCollectionCycle（拖累其他来源 + 生成日报）。
+async function runJuyaCollectionTask() {
+  return await runJuyaCollection(db, { fetchArticle: fetchAndExtractArticle });
 }
 
 // 微博热搜榜匹配只做热点补充信号，不进默认采集调度。
@@ -551,6 +557,19 @@ const triggerManualWeiboTrendingCollect = config.manualActions.collectEnabled
     }
   : undefined;
 
+// Juya RSS 独立采集，独占锁避免和全量采集并发；结果映射为 action 响应格式。
+const triggerManualJuyaCollect = config.manualActions.collectEnabled
+  ? async () => {
+      return await juyaLock.runExclusive(async () => {
+        const result = await runJuyaCollectionTask();
+        if (result.ok) {
+          return { accepted: true as const, action: "collect-juya" as const, itemCount: result.itemCount };
+        }
+        return { accepted: false as const, reason: result.reason ?? "juya-collect-failed" };
+      });
+    }
+  : undefined;
+
 // 新增来源后先只补这一条 source 的内容入库，避免为了拿到首批数据就把整轮全站采集串进保存接口。
 async function saveAndHydrateSource(input: Parameters<typeof persistSource>[1]) {
   const result = await persistSource(db, input, {
@@ -668,6 +687,7 @@ const app = createServer({
   triggerManualBilibiliCollect,
   triggerManualWechatRssCollect,
   triggerManualWeiboTrendingCollect,
+  triggerManualJuyaCollect,
   getCurrentUserProfile: async () => getCurrentUserProfile(),
   updatePassword: async (newPassword: string) => {
     const newHash = hashPassword(newPassword);

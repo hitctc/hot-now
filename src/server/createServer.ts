@@ -260,6 +260,16 @@ type ManualWeiboTrendingCollectResult = {
   reusedContentItemCount: number;
   failureCount: number;
 };
+type ManualJuyaCollectResult =
+  | {
+      accepted: true;
+      action: "collect-juya";
+      itemCount: number;
+    }
+  | {
+      accepted: false;
+      reason: "juya-source-not-found" | "juya-rss-url-empty" | "juya-fetch-failed" | string;
+    };
 type ManualSendLatestEmailResult =
   | { accepted: true; action: "send-latest-email" }
   | { accepted: false; reason: LatestReportEmailErrorReason };
@@ -449,6 +459,7 @@ type ServerDeps = {
   triggerManualBilibiliCollect?: () => Promise<ManualBilibiliCollectResult>;
   triggerManualWechatRssCollect?: () => Promise<ManualWechatRssCollectResult>;
   triggerManualWeiboTrendingCollect?: () => Promise<ManualWeiboTrendingCollectResult>;
+  triggerManualJuyaCollect?: () => Promise<ManualJuyaCollectResult>;
   getCurrentUserProfile?: () => Promise<CurrentUserProfile | null> | CurrentUserProfile | null;
   updatePassword?: (newPassword: string) => Promise<void>;
   pushArticleToWechatDraft?: (
@@ -3059,6 +3070,16 @@ export function createServer(deps: ServerDeps = {}) {
     );
   });
 
+  app.post("/actions/sources/juya/collect", async (request, reply) => {
+    return await handleManualJuyaCollectAction(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? "",
+      deps.triggerManualJuyaCollect
+    );
+  });
+
   app.post("/actions/ai-timeline/collect", async (request, reply) => {
     if (!ensureManualActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
       return;
@@ -4352,6 +4373,7 @@ async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSett
       canTriggerManualBilibiliCollect: typeof deps.triggerManualBilibiliCollect === "function",
       canTriggerManualWechatRssCollect: typeof deps.triggerManualWechatRssCollect === "function",
       canTriggerManualWeiboTrendingCollect: typeof deps.triggerManualWeiboTrendingCollect === "function",
+      canTriggerManualJuyaCollect: typeof deps.triggerManualJuyaCollect === "function",
       canTriggerManualSendLatestEmail: typeof deps.triggerManualSendLatestEmail === "function",
       isRunning: deps.isRunning?.() ?? false
     },
@@ -5612,6 +5634,26 @@ async function handleManualWeiboTrendingCollectAction(
   }
 
   const result = await triggerManualWeiboTrendingCollect();
+  return reply.code(202).send(result);
+}
+
+// Juya RSS 独立采集：只抓 juya 一个源，独占锁，不生成日报，结果只回条目数。
+async function handleManualJuyaCollectAction(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  authEnabled: boolean,
+  sessionSecret: string,
+  triggerManualJuyaCollect: ServerDeps["triggerManualJuyaCollect"]
+) {
+  if (!ensureManualActionAuthorized(request, reply, authEnabled, sessionSecret)) {
+    return;
+  }
+
+  if (!triggerManualJuyaCollect) {
+    return reply.code(503).send({ accepted: false });
+  }
+
+  const result = await triggerManualJuyaCollect();
   return reply.code(202).send(result);
 }
 

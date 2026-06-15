@@ -15,11 +15,11 @@ import { insertCreativeSourceItem } from "../creative/creativeSourceItemReposito
 
 const collectionMailStatus = "not-sent-by-collection";
 
-type EnrichedCollectedItem = LoadedIssue["items"][number] & {
+export type EnrichedCollectedItem = LoadedIssue["items"][number] & {
   article: ArticleResult;
 };
 
-type EnrichedIssue = LoadedIssue & {
+export type EnrichedIssue = LoadedIssue & {
   items: EnrichedCollectedItem[];
 };
 
@@ -200,7 +200,7 @@ async function enrichItem(
 
 // Each enabled issue is enriched independently so one source can still contribute even if a
 // sibling source has a degraded article fetch.
-async function enrichIssue(
+export async function enrichIssue(
   issue: LoadedIssue,
   fetchArticle: (url: string) => Promise<ArticleResult>
 ): Promise<EnrichedIssue> {
@@ -212,7 +212,7 @@ async function enrichIssue(
 
 // Persisted content keeps the raw collected article text and source metadata together so later
 // query work can read from SQLite without changing the report-generation shape.
-function persistCollectedItems(db: SqliteDatabase, issue: LoadedIssue, items: EnrichedCollectedItem[]): number[] {
+export function persistCollectedItems(db: SqliteDatabase, issue: LoadedIssue, items: EnrichedCollectedItem[]): number[] {
   const source = resolveSourceByKind(db, issue.sourceKind);
 
   if (!source) {

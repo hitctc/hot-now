@@ -6,7 +6,6 @@ type AuthBootstrap = {
   username: string;
   password: string;
   email?: string;
-  juyaRssUrl?: string;
 };
 
 const builtinSources = [
@@ -177,14 +176,6 @@ export function seedInitialData(db: SqliteDatabase, authBootstrap?: AuthBootstra
         updated_at = CURRENT_TIMESTAMP
     `
   );
-  const updateJuyaRssUrl = db.prepare(
-    `
-      UPDATE content_sources
-      SET rss_url = ?,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE kind = 'juya'
-    `
-  );
   const upsertAdmin = db.prepare(
     `
       INSERT INTO user_profile (
@@ -215,11 +206,8 @@ export function seedInitialData(db: SqliteDatabase, authBootstrap?: AuthBootstra
     ensureDefaultViewRules(db);
     ensureDefaultActiveSource(db);
 
-    if (authBootstrap?.juyaRssUrl) {
-      // Legacy config still treats `config.source.rssUrl` as the effective juya feed, so bootstrap
-      // keeps that single row aligned until dedicated source management replaces the old setting.
-      updateJuyaRssUrl.run(authBootstrap.juyaRssUrl);
-    }
+    // juya RSS URL 现以 DB 为唯一数据源，由「数据收集」页配置卡管理，seed 不再覆盖。
+    // 全新部署时 builtinSources 里的初始 URL 会被写入；之后不再回写。
 
     if (authBootstrap) {
       upsertAdmin.run({

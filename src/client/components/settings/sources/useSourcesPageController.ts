@@ -29,6 +29,7 @@ import {
   triggerManualTwitterKeywordCollect,
   triggerManualWeiboTrendingCollect,
   triggerManualWechatRssCollect,
+  triggerManualJuyaCollect,
   updateTwitterAccount,
   updateTwitterSearchKeyword,
   updateBilibiliQuery,
@@ -45,6 +46,7 @@ import {
   type ManualTwitterKeywordCollectResponse,
   type ManualWeiboTrendingCollectResponse,
   type ManualWechatRssCollectResponse,
+  type ManualJuyaCollectResponse,
   type ManualSendLatestEmailResponse,
   type SaveBilibiliQueryPayload,
   type SaveHackerNewsQueryPayload,
@@ -860,6 +862,50 @@ export function useSourcesPageController() {
     });
   }
 
+  // juya RSS 从 sources 数组里筛出（kind=juya），独立展示在配置卡上。
+  const juyaSource = computed<SettingsSourceItem | null>(
+    () => sourcesModel.value?.sources.find((s) => s.kind === "juya") ?? null
+  );
+
+  // juya 启停复用通用 toggleSource，actionKey 区分 pending 状态。
+  async function handleToggleJuya(enable: boolean): Promise<void> {
+    await runSourcesAction("juya:toggle", () => toggleSource("juya", enable), {
+      fallbackMessage: "Juya 采集状态切换失败，请稍后再试。",
+      successMessage: enable ? "已启用 Juya 采集。" : "已停用 Juya 采集。",
+      reasonMessages: {
+        "not-found": "Juya 来源不存在，可能数据异常。",
+        unauthorized: "请先登录后再操作。"
+      }
+    });
+  }
+
+  // juya RSS 地址编辑复用 updateSource（sourceType=rss，只传 rssUrl）。
+  async function handleSaveJuyaRss(rssUrl: string): Promise<void> {
+    await runSourcesAction("juya:save", () => updateSource({ kind: "juya", sourceType: "rss", rssUrl }), {
+      fallbackMessage: "Juya RSS 地址保存失败，请稍后再试。",
+      successMessage: "Juya RSS 地址已更新，下一轮采集生效。",
+      reasonMessages: {
+        "invalid-rss-feed": "RSS 地址无效，请检查后重试。",
+        unauthorized: "请先登录后再操作。"
+      }
+    });
+  }
+
+  // juya 独立手动采集，只抓 juya 一个源，不触发全量采集。
+  async function handleManualJuyaCollect(): Promise<void> {
+    await runSourcesAction("manual:juya-collect", () => triggerManualJuyaCollect(), {
+      fallbackMessage: "Juya 采集启动失败，请稍后再试。",
+      successMessage: (result: ManualJuyaCollectResponse) =>
+        result.accepted ? `Juya 采集已完成，抓取 ${result.itemCount} 条。` : "Juya 采集未成功。",
+      reasonMessages: {
+        "juya-source-not-found": "Juya 来源不存在，请检查数据。",
+        "juya-rss-url-empty": "Juya RSS 地址为空，请先配置。",
+        "juya-fetch-failed": "RSS 地址无法访问，请检查地址是否正确。",
+        unauthorized: "请先登录后再操作。"
+      }
+    });
+  }
+
   // 手动发送最新报告邮件沿用后端错误原因映射，用户能直接看懂当前阻塞点。
   async function handleManualSendLatestEmail(): Promise<void> {
     await runSourcesAction("manual:send-latest-email", () => triggerManualSendLatestEmail(), {
@@ -1480,6 +1526,10 @@ export function useSourcesPageController() {
     handleManualBilibiliCollect,
     handleManualWechatRssCollect,
     handleManualWeiboTrendingCollect,
+    handleManualJuyaCollect,
+    juyaSource,
+    handleToggleJuya,
+    handleSaveJuyaRss,
     handleManualSendLatestEmail,
     handleSubmitSource,
     handleSubmitTwitterAccount,

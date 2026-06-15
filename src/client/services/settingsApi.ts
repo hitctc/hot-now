@@ -127,6 +127,7 @@ export type SettingsSourcesOperations = {
   canTriggerManualBilibiliCollect?: boolean;
   canTriggerManualWechatRssCollect?: boolean;
   canTriggerManualWeiboTrendingCollect?: boolean;
+  canTriggerManualJuyaCollect?: boolean;
   canTriggerManualSendLatestEmail: boolean;
   isRunning: boolean;
 };
@@ -586,6 +587,17 @@ export type ManualWeiboTrendingCollectResponse =
       reason?: "already-running";
     };
 
+export type ManualJuyaCollectResponse =
+  | {
+      accepted: true;
+      action: "collect-juya";
+      itemCount: number;
+    }
+  | {
+      accepted: false;
+      reason?: string;
+    };
+
 export type ManualSendLatestEmailResponse = {
   accepted: boolean;
   action?: "send-latest-email";
@@ -848,6 +860,11 @@ export function triggerManualWechatRssCollect(): Promise<ManualWechatRssCollectR
 // 微博热搜榜匹配只走独立手动入口，不进入默认采集链路。
 export function triggerManualWeiboTrendingCollect(): Promise<ManualWeiboTrendingCollectResponse> {
   return postSettingsAction<ManualWeiboTrendingCollectResponse>("/actions/weibo/collect", {});
+}
+
+// Juya RSS 独立采集，只抓 juya 一个源，不触发全量采集。
+export function triggerManualJuyaCollect(): Promise<ManualJuyaCollectResponse> {
+  return postSettingsAction<ManualJuyaCollectResponse>("/actions/sources/juya/collect", {});
 }
 
 // 手动发送最新报告沿用现有后端接口，错误原因由调用方再翻译成用户提示。

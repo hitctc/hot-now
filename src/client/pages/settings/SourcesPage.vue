@@ -8,6 +8,7 @@ import BilibiliQueriesCard from "../../components/settings/sources/BilibiliQueri
 import BilibiliQueryModal from "../../components/settings/sources/BilibiliQueryModal.vue";
 import HackerNewsQueriesCard from "../../components/settings/sources/HackerNewsQueriesCard.vue";
 import HackerNewsQueryModal from "../../components/settings/sources/HackerNewsQueryModal.vue";
+import JuyaRssSourceCard from "../../components/settings/sources/JuyaRssSourceCard.vue";
 import ManualSendLatestEmailCard from "../../components/settings/sources/ManualSendLatestEmailCard.vue";
 import RssSourceModal from "../../components/settings/sources/RssSourceModal.vue";
 import SourceInventoryCard from "../../components/settings/sources/SourceInventoryCard.vue";
@@ -103,6 +104,10 @@ const {
   handleManualBilibiliCollect,
   handleManualWechatRssCollect,
   handleManualWeiboTrendingCollect,
+  handleManualJuyaCollect,
+  juyaSource,
+  handleToggleJuya,
+  handleSaveJuyaRss,
   handleManualSendLatestEmail,
   handleSubmitSource,
   handleSubmitTwitterAccount,
@@ -243,6 +248,15 @@ const {
           @toggle="handleToggleBilibiliQuery"
           @edit="openEditBilibiliQueryModal"
           @delete="handleDeleteBilibiliQuery"
+        />
+
+        <JuyaRssSourceCard
+          :source="juyaSource"
+          :operations="sourcesModel.operations"
+          :is-action-pending="isActionPending"
+          @toggle="handleToggleJuya"
+          @save="handleSaveJuyaRss"
+          @collect="handleManualJuyaCollect"
         />
 
         <WechatRssSourcesCard

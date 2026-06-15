@@ -6,8 +6,8 @@ export const BUILTIN_SOURCES: Record<BuiltinSourceKind, SourceDefinition> = {
   juya: {
     kind: "juya",
     name: "Juya AI Daily",
-    siteUrl: "https://imjuya.github.io/juya-ai-daily/",
-    rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml",
+    siteUrl: "https://daily.juya.uk/",
+    rssUrl: "https://daily.juya.uk/rss.xml",
     navigationViews: ["hot", "ai"],
     category: "热点资讯",
     sourceType: "aggregator",

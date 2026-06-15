@@ -13,8 +13,8 @@ const builtinSources = [
   {
     kind: "juya",
     name: "Juya AI Daily",
-    siteUrl: "https://imjuya.github.io/juya-ai-daily/",
-    rssUrl: "https://imjuya.github.io/juya-ai-daily/rss.xml"
+    siteUrl: "https://daily.juya.uk/",
+    rssUrl: "https://daily.juya.uk/rss.xml"
   },
   {
     kind: "openai",

@@ -15,6 +15,6 @@
     "manifestFile": "../data/feeds/ai-timeline-feed-manifest.json",
     "maxFallbackVersions": 10
   },
-  "source": { "rssUrl": "https://imjuya.github.io/juya-ai-daily/rss.xml" },
+  "source": { "rssUrl": "https://daily.juya.uk/rss.xml" },
   "database": { "file": "../data/hot-now.sqlite" }
 }

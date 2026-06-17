@@ -13,12 +13,18 @@
     @cancel="handleClose"
   >
     <template #title>
-      <span v-if="article" class="flex items-center gap-2">
+      <span v-if="article" class="flex flex-wrap items-baseline gap-x-2">
         <span
           class="cursor-pointer text-xs text-editorial-link-active hover:underline"
           @click="copyArticleId(article.id)"
         >#{{ article.id }}</span>
         <span class="text-base font-semibold">{{ getFirstTitle(article.titles) }}</span>
+        <span class="text-xs text-editorial-text-muted">{{ modeLabel(article.mode) }}</span>
+        <span class="text-xs text-editorial-text-muted">{{ formatLocalTime(article.createdAt) }}</span>
+        <a
+          class="cursor-pointer text-xs text-editorial-link-active hover:underline"
+          @click.prevent="$emit('openSourceItem', article.sourceItemId)"
+        >素材 #{{ article.sourceItemId }}{{ (article as any).sourceTitle ? ' · ' + (article as any).sourceTitle : '' }}{{ (article as any).sourceName ? ' · ' + (article as any).sourceName : '' }}</a>
       </span>
     </template>
 
@@ -61,16 +67,6 @@
 
     <template v-if="article">
       <div class="flex flex-col gap-6">
-        <!-- 顶部元信息 -->
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span class="text-xs text-editorial-text-muted">{{ modeLabel(article.mode) }}</span>
-          <span class="text-xs text-editorial-text-muted">{{ formatLocalTime(article.createdAt) }}</span>
-          <a
-            class="inline-block max-w-[260px] truncate md:max-w-none md:whitespace-nowrap align-bottom cursor-pointer text-xs text-editorial-link-active hover:underline"
-            @click.prevent="$emit('openSourceItem', article.sourceItemId)"
-            >素材 #{{ article.sourceItemId }}{{ (article as any).sourceTitle ? ' · ' + (article as any).sourceTitle : '' }}{{ (article as any).sourceName ? ' · ' + (article as any).sourceName : '' }}</a>
-        </div>
-
         <!-- 异常/审核信息（统一展示区） -->
         <section v-if="hasAnomalyInfo" class="rounded border bg-red-50 border-red-200 px-3 py-2.5 space-y-1">
           <div class="text-xs font-semibold text-red-700">

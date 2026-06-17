@@ -3,27 +3,23 @@
   <div class="md-editor">
     <div class="md-editor__pane" :style="{ flex: `0 0 ${leftPercent}%` }">
       <div class="md-editor__label">Markdown</div>
-      <div class="md-editor__textarea-wrap">
-        <div v-if="syncScroll" class="md-editor__line-highlight" :style="{ top: lineHighlightTop + 'px' }" />
-        <textarea
-          ref="textareaRef"
-          class="md-editor__textarea"
-          :value="modelValue"
-          @input="onInput"
-          @scroll="onTextareaScroll"
-          @click="updateCursorLine"
-          @keyup="updateCursorLine"
-          @select="updateCursorLine"
-          placeholder="在此输入 Markdown 内容..."
-          data-testid="markdown-editor-textarea"
-        />
-      </div>
+      <textarea
+        ref="textareaRef"
+        class="md-editor__textarea"
+        :value="modelValue"
+        @input="onInput"
+        @scroll="onTextareaScroll"
+        @click="updateCursorHighlight"
+        @keyup="updateCursorHighlight"
+        placeholder="在此输入 Markdown 内容..."
+        data-testid="markdown-editor-textarea"
+      />
     </div>
     <div class="md-editor__divider" @mousedown="onDividerMouseDown" />
     <div class="md-editor__pane">
       <div class="md-editor__label">{{ previewLabel }}</div>
-      <div v-if="previewHtml" ref="previewRef" class="md-editor__preview" @scroll="onPreviewScroll" v-html="previewHtml" />
-      <div v-else ref="previewRef" class="md-editor__preview" @scroll="onPreviewScroll" v-html="renderedHtml" />
+      <div v-if="previewHtml" ref="previewRef" class="md-editor__preview" v-html="previewHtml" />
+      <div v-else ref="previewRef" class="md-editor__preview" v-html="renderedHtml" />
     </div>
   </div>
 </template>
@@ -38,7 +34,7 @@ const props = withDefaults(defineProps<{
   /** 外部传入的 HTML 覆盖右侧预览（如主题渲染），为空则用 Markdown 实时渲染 */
   previewHtml?: string;
   previewLabel?: string;
-  /** 是否开启编辑区与预览区双向同步滚动 + 光标行/对应块高亮 */
+  /** 是否开启编辑区→预览区滚动同步 + 预览对应块高亮 */
   syncScroll?: boolean;
 }>(), {
   previewHtml: "",
@@ -72,31 +68,16 @@ const renderedHtml = computed(() => md.render(props.modelValue || ""));
 
 function onInput(e: Event): void {
   emit("update:modelValue", (e.target as HTMLTextAreaElement).value);
-  updateCursorLine();
+  updateCursorHighlight();
 }
 
-// ─── 按行映射的双向同步 + 光标高亮 ───
-const TEXTAREA_PADDING_TOP = 12;
-
+// ─── 滚动同步（编辑区→预览区，单向）+ 预览对应块高亮 ───
+// 设计原则：只让编辑区驱动预览区，反向不联动，从根上杜绝双向滚动打架。
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const previewRef = ref<HTMLElement | null>(null);
-const lineHighlightTop = ref(0);
-// 实际渲染行高，挂载后从 computed style 动态测量，避免硬编码误差累积
-let lineHeight = 22;
-
-// 抑制标志位：程序化设置 scrollTop 后，紧接触发的自身 scroll 事件是"回弹"，需吞掉。
-// 比 requestAnimationFrame 稳：平滑/连续滚动的事件在 rAF 后仍会触发导致打架。
-let suppressTextareaScroll = false;
-let suppressPreviewScroll = false;
-const SUPPRESS_FALLBACK_MS = 60;
-
-/** 测量 textarea 真实行高，纠正高亮条位置 */
-function measureLineHeight(): void {
-  const ta = textareaRef.value;
-  if (!ta) return;
-  const computed = parseFloat(getComputedStyle(ta).lineHeight);
-  if (computed > 0) lineHeight = computed;
-}
+// 编辑区约定行高（font-size 14 × line-height 1.6 ≈ 22），仅用于滚动位置→行号换算，
+// 预览块按源码行反查时容差大，不需要像素级精确。
+const EDITOR_LINE_HEIGHT = 22;
 
 /** 当前光标所在行（1 索引） */
 function getCursorLine(): number {
@@ -105,15 +86,12 @@ function getCursorLine(): number {
   return ta.value.substring(0, ta.selectionStart).split("\n").length;
 }
 
-/** 更新编辑区光标行高亮条位置（不碰预览） */
-function updateLineHighlight(): void {
-  const ta = textareaRef.value;
-  if (!ta) return;
-  const line = getCursorLine();
-  lineHighlightTop.value = TEXTAREA_PADDING_TOP + (line - 1) * lineHeight - ta.scrollTop;
+/** 预览区所有带源码行号的块 */
+function getPreviewBlocks(): HTMLElement[] {
+  return Array.from(previewRef.value?.querySelectorAll("[data-source-line]") ?? []) as HTMLElement[];
 }
 
-/** 在预览区找源码行 line 对应的块 */
+/** 找源码行 line 所属的块（最后一个起始行 ≤ line 的块） */
 function findBlockForLine(blocks: HTMLElement[], line: number): HTMLElement | null {
   let target: HTMLElement | null = null;
   for (const el of blocks) {
@@ -123,82 +101,32 @@ function findBlockForLine(blocks: HTMLElement[], line: number): HTMLElement | nu
   return target;
 }
 
-/** 高亮预览中光标对应的块；仅当块不在视口内才瞬时滚动到可见（避免与滚动同步打架） */
-function highlightPreviewForCursor(): void {
+/** 光标移动时高亮预览中对应的块（只高亮，不滚动——滚动交给 onTextareaScroll） */
+function updateCursorHighlight(): void {
   const preview = previewRef.value;
   if (!preview) return;
-  const blocks = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
-  if (blocks.length === 0) return;
-  const target = findBlockForLine(blocks, getCursorLine());
   preview.querySelectorAll(".md-editor__active-block").forEach((e) => e.classList.remove("md-editor__active-block"));
-  if (!target) return;
-  target.classList.add("md-editor__active-block");
-  // 仅在块脱离视口时才滚动，且用瞬时滚动（非 smooth），杜绝持续事件引发的打架
-  const prect = preview.getBoundingClientRect();
-  const trect = target.getBoundingClientRect();
-  if (trect.top < prect.top || trect.bottom > prect.bottom) {
-    suppressPreviewScroll = true;
-    preview.scrollTop += trect.top - prect.top - (preview.clientHeight - trect.height) / 2;
-    setTimeout(() => { suppressPreviewScroll = false; }, SUPPRESS_FALLBACK_MS);
-  }
+  if (!props.syncScroll) return;
+  const target = findBlockForLine(getPreviewBlocks(), getCursorLine());
+  if (target) target.classList.add("md-editor__active-block");
 }
 
-/** 光标移动（点击/按键/输入）时调用 */
-function updateCursorLine(): void {
-  updateLineHighlight();
-  if (props.syncScroll) highlightPreviewForCursor();
-}
-
-/** 编辑区滚动 → 预览区滚到顶部可见行对应的块 */
+/** 编辑区滚动 → 预览区滚到顶部可见行对应的块（单向，不会打架） */
 function onTextareaScroll(): void {
-  // 吞掉程序化滚动引发的回弹事件
-  if (suppressTextareaScroll) { suppressTextareaScroll = false; return; }
-  updateLineHighlight();
   if (!props.syncScroll) return;
   const ta = textareaRef.value;
   const preview = previewRef.value;
   if (!ta || !preview) return;
-  const topLine = Math.round(ta.scrollTop / lineHeight) + 1;
-  const blocks = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
-  if (blocks.length === 0) return;
-  const target = findBlockForLine(blocks, topLine);
-  if (target) {
-    suppressPreviewScroll = true;
-    preview.scrollTop = target.offsetTop;
-    setTimeout(() => { suppressPreviewScroll = false; }, SUPPRESS_FALLBACK_MS);
-  }
+  const topLine = Math.round(ta.scrollTop / EDITOR_LINE_HEIGHT) + 1;
+  const target = findBlockForLine(getPreviewBlocks(), topLine);
+  if (target) preview.scrollTop = target.offsetTop;
 }
 
-/** 预览区滚动 → 编辑区滚到顶部可见块对应的源码行 */
-function onPreviewScroll(): void {
-  if (suppressPreviewScroll) { suppressPreviewScroll = false; return; }
-  if (!props.syncScroll) return;
-  const preview = previewRef.value;
-  const ta = textareaRef.value;
-  if (!preview || !ta) return;
-  const blocks = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
-  if (blocks.length === 0) return;
-  // 找预览区视口顶部第一个可见块
-  let topLine = 1;
-  const viewTop = preview.scrollTop;
-  for (const el of blocks) {
-    if (el.offsetTop >= viewTop) { topLine = Number(el.getAttribute("data-source-line")); break; }
-  }
-  suppressTextareaScroll = true;
-  ta.scrollTop = (topLine - 1) * lineHeight;
-  setTimeout(() => { suppressTextareaScroll = false; }, SUPPRESS_FALLBACK_MS);
-}
+onMounted(() => { nextTick(() => updateCursorHighlight()); });
 
-// 挂载后测量真实行高并刷新高亮位置
-onMounted(() => {
-  measureLineHeight();
-  nextTick(() => updateCursorLine());
-});
-
-// 内容或预览变化后，重新刷新高亮位置（等 DOM 更新）
+// 内容或预览变化后刷新高亮
 watch(() => [props.modelValue, props.previewHtml, props.syncScroll], () => {
-  measureLineHeight();
-  nextTick(() => updateCursorLine());
+  nextTick(() => updateCursorHighlight());
 });
 
 // 拖拽分割线调整左右比例，持久化到 localStorage
@@ -273,40 +201,17 @@ function onDividerMouseDown(e: MouseEvent): void {
   user-select: none;
 }
 
-.md-editor__textarea-wrap {
-  position: relative;
-  flex: 1;
-  overflow: hidden;
-}
-
-/* 当前光标行高亮条：绝对定位在 textarea 后面，textarea 透明背景透出 */
-.md-editor__line-highlight {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 22px;
-  background: rgba(24, 144, 255, 0.08);
-  border-left: 2px solid #1890ff;
-  pointer-events: none;
-  z-index: 0;
-}
-
 .md-editor__textarea {
-  position: relative;
-  z-index: 1;
-  display: block;
-  width: 100%;
-  height: 100%;
+  flex: 1;
   padding: 12px;
   border: none;
   outline: none;
   resize: none;
   font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
   font-size: 14px;
-  /* 行高固定为 22px，与 JS 中 LINE_HEIGHT 常量保持一致 */
-  line-height: 22px;
+  line-height: 1.6;
   color: #333;
-  background: transparent;
+  background: #fff;
 }
 
 .md-editor__divider {

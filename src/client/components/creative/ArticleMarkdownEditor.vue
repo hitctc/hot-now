@@ -4,9 +4,11 @@
     <div class="md-editor__pane" :style="{ flex: `0 0 ${leftPercent}%` }">
       <div class="md-editor__label">Markdown</div>
       <textarea
+        ref="textareaRef"
         class="md-editor__textarea"
         :value="modelValue"
         @input="onInput"
+        @scroll="onTextareaScroll"
         placeholder="在此输入 Markdown 内容..."
         data-testid="markdown-editor-textarea"
       />
@@ -14,8 +16,8 @@
     <div class="md-editor__divider" @mousedown="onDividerMouseDown" />
     <div class="md-editor__pane">
       <div class="md-editor__label">{{ previewLabel }}</div>
-      <div v-if="previewHtml" class="md-editor__preview" v-html="previewHtml" />
-      <div v-else class="md-editor__preview" v-html="renderedHtml" />
+      <div v-if="previewHtml" ref="previewRef" class="md-editor__preview" @scroll="onPreviewScroll" v-html="previewHtml" />
+      <div v-else ref="previewRef" class="md-editor__preview" @scroll="onPreviewScroll" v-html="renderedHtml" />
     </div>
   </div>
 </template>
@@ -29,9 +31,12 @@ const props = withDefaults(defineProps<{
   /** 外部传入的 HTML 覆盖右侧预览（如主题渲染），为空则用 Markdown 实时渲染 */
   previewHtml?: string;
   previewLabel?: string;
+  /** 是否开启编辑区与预览区双向同步滚动 */
+  syncScroll?: boolean;
 }>(), {
   previewHtml: "",
   previewLabel: "预览",
+  syncScroll: true,
 });
 
 const emit = defineEmits<{
@@ -57,6 +62,38 @@ const renderedHtml = computed(() => md.render(props.modelValue || ""));
 
 function onInput(e: Event): void {
   emit("update:modelValue", (e.target as HTMLTextAreaElement).value);
+}
+
+// ─── 双向同步滚动 ───
+// syncing 标志位防止两侧 scroll 事件互相触发形成死循环
+const textareaRef = ref<HTMLTextAreaElement | null>(null);
+const previewRef = ref<HTMLElement | null>(null);
+let syncing = false;
+
+function syncScrollRatio(source: HTMLElement, target: HTMLElement): void {
+  const sourceMax = source.scrollHeight - source.clientHeight;
+  const targetMax = target.scrollHeight - target.clientHeight;
+  if (sourceMax <= 0 || targetMax <= 0) return;
+  const ratio = source.scrollTop / sourceMax;
+  target.scrollTop = ratio * targetMax;
+}
+
+function onTextareaScroll(): void {
+  if (!props.syncScroll || syncing) return;
+  syncing = true;
+  if (textareaRef.value && previewRef.value) {
+    syncScrollRatio(textareaRef.value, previewRef.value);
+  }
+  requestAnimationFrame(() => { syncing = false; });
+}
+
+function onPreviewScroll(): void {
+  if (!props.syncScroll || syncing) return;
+  syncing = true;
+  if (textareaRef.value && previewRef.value) {
+    syncScrollRatio(previewRef.value, textareaRef.value);
+  }
+  requestAnimationFrame(() => { syncing = false; });
 }
 
 // 拖拽分割线调整左右比例，持久化到 localStorage

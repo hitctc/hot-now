@@ -469,18 +469,20 @@
                 </div>
                 <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(editContent)">复制原文</a-button>
                 <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyMarkdownAsPlainText(editContent)">复制纯文本</a-button>
+                <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="toggleSyncScroll">{{ syncScrollEnabled ? '同步滚动：开' : '同步滚动：关' }}</a-button>
                 <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="toggleEditorFullscreen">{{ editorFullscreen ? '退出全屏' : '全屏' }}</a-button>
               </div>
             </template>
           </div>
           <!-- 只读模式：渲染后的 HTML 预览 -->
           <div v-if="props.readonly" class="rounded border border-editorial-border bg-white p-4 overflow-auto" :style="{ height: dynamicEditorHeight + 'px' }" v-html="activePreviewHtml"></div>
-          <!-- 编辑模式：左右分屏编辑器 -->
-          <div v-else-if="!editorFullscreen" class="article-editor-wrapper" :style="{ height: dynamicEditorHeight + 'px' }">
+          <!-- 编辑模式：左右分屏编辑器（全屏时隐藏而非卸载，避免退出全屏重挂载闪烁） -->
+          <div v-else v-show="!editorFullscreen" class="article-editor-wrapper" :style="{ height: dynamicEditorHeight + 'px' }">
             <ArticleMarkdownEditor
               v-model="editContent"
               :preview-html="activePreviewHtml"
               :preview-label="activePreviewLabel"
+              :sync-scroll="syncScrollEnabled"
             />
           </div>
         </section>
@@ -513,6 +515,7 @@
             </div>
             <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(editContent)">复制原文</a-button>
             <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyMarkdownAsPlainText(editContent)">复制纯文本</a-button>
+            <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="toggleSyncScroll">{{ syncScrollEnabled ? '同步滚动：开' : '同步滚动：关' }}</a-button>
             <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="handleSave" :loading="saving">保存</a-button>
             <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="toggleEditorFullscreen">退出全屏</a-button>
           </div>
@@ -522,6 +525,7 @@
             v-model="editContent"
             :preview-html="activePreviewHtml"
             :preview-label="activePreviewLabel"
+            :sync-scroll="syncScrollEnabled"
           />
         </div>
       </div>
@@ -664,6 +668,25 @@ const hasAnomalyInfo = computed(() => {
 
 // ─── 正文全屏编辑 ───
 const editorFullscreen = ref(false);
+
+// ─── 编辑/预览同步滚动开关：持久化，跨详情弹窗共享 ───
+const SYNC_SCROLL_KEY = "md-editor-sync-scroll";
+function loadSyncScroll(): boolean {
+  try {
+    const saved = localStorage.getItem(SYNC_SCROLL_KEY);
+    // 未设置过时默认开启
+    return saved === null ? true : saved === "1";
+  } catch {
+    return true;
+  }
+}
+const syncScrollEnabled = ref(loadSyncScroll());
+function toggleSyncScroll(): void {
+  syncScrollEnabled.value = !syncScrollEnabled.value;
+  try {
+    localStorage.setItem(SYNC_SCROLL_KEY, syncScrollEnabled.value ? "1" : "0");
+  } catch { /* quota 忽略 */ }
+}
 
 // ─── 编辑器动态高度：测量 modal body 可视区域 ───
 const editorSectionRef = ref<HTMLElement | null>(null);
@@ -1422,9 +1445,11 @@ async function saveAndPush(): Promise<void> {
 }
 
 function handleClose(): void {
+  // 全屏状态下 ESC/关闭只退出全屏，不连带关闭详情弹窗
   if (editorFullscreen.value) {
     editorFullscreen.value = false;
     document.body.style.overflow = "";
+    return;
   }
   document.removeEventListener("keydown", handleFullscreenEsc);
   emit("update:open", false);

@@ -101,14 +101,20 @@ function findBlockForLine(blocks: HTMLElement[], line: number): HTMLElement | nu
   return target;
 }
 
-/** 光标移动时高亮预览中对应的块（只高亮，不滚动——滚动交给 onTextareaScroll） */
+/** 光标移动时高亮预览中对应的块；块不在视口内时瞬时滚到可见（单向写 scrollTop，不会打架） */
 function updateCursorHighlight(): void {
   const preview = previewRef.value;
   if (!preview) return;
   preview.querySelectorAll(".md-editor__active-block").forEach((e) => e.classList.remove("md-editor__active-block"));
   if (!props.syncScroll) return;
   const target = findBlockForLine(getPreviewBlocks(), getCursorLine());
-  if (target) target.classList.add("md-editor__active-block");
+  if (!target) return;
+  target.classList.add("md-editor__active-block");
+  // 仅当块脱离预览视口时才滚动，避免每次点击都跳动
+  const delta = target.getBoundingClientRect().top - preview.getBoundingClientRect().top;
+  if (delta < 0 || delta + target.offsetHeight > preview.clientHeight) {
+    preview.scrollTop += delta;
+  }
 }
 
 /** 编辑区滚动 → 预览区滚到顶部可见行对应的块（单向，不会打架） */
@@ -119,7 +125,11 @@ function onTextareaScroll(): void {
   if (!ta || !preview) return;
   const topLine = Math.round(ta.scrollTop / EDITOR_LINE_HEIGHT) + 1;
   const target = findBlockForLine(getPreviewBlocks(), topLine);
-  if (target) preview.scrollTop = target.offsetTop;
+  if (!target) return;
+  // 用 getBoundingClientRect 算目标块相对预览区的偏移，叠加当前 scrollTop。
+  // 不能用 offsetTop——它相对 offsetParent（定位祖先），详情弹窗 modal 里有定位祖先会算错。
+  const delta = target.getBoundingClientRect().top - preview.getBoundingClientRect().top;
+  preview.scrollTop += delta;
 }
 
 onMounted(() => { nextTick(() => updateCursorHighlight()); });

@@ -52,7 +52,7 @@ function formatTime(value: string | null): string {
     :footer="null"
     :closable="true"
     :mask-closable="true"
-    width="860px"
+    width="90%"
     centered
     wrap-class-name="source-item-detail-modal"
     destroy-on-close

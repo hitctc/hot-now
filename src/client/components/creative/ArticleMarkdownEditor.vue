@@ -3,15 +3,21 @@
   <div class="md-editor">
     <div class="md-editor__pane" :style="{ flex: `0 0 ${leftPercent}%` }">
       <div class="md-editor__label">Markdown</div>
-      <textarea
-        ref="textareaRef"
-        class="md-editor__textarea"
-        :value="modelValue"
-        @input="onInput"
-        @scroll="onTextareaScroll"
-        placeholder="在此输入 Markdown 内容..."
-        data-testid="markdown-editor-textarea"
-      />
+      <div class="md-editor__textarea-wrap">
+        <div v-if="syncScroll" class="md-editor__line-highlight" :style="{ top: lineHighlightTop + 'px' }" />
+        <textarea
+          ref="textareaRef"
+          class="md-editor__textarea"
+          :value="modelValue"
+          @input="onInput"
+          @scroll="onTextareaScroll"
+          @click="updateCursorLine"
+          @keyup="updateCursorLine"
+          @select="updateCursorLine"
+          placeholder="在此输入 Markdown 内容..."
+          data-testid="markdown-editor-textarea"
+        />
+      </div>
     </div>
     <div class="md-editor__divider" @mousedown="onDividerMouseDown" />
     <div class="md-editor__pane">
@@ -23,15 +29,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import MarkdownIt from "markdown-it";
+import { injectSourceLineTracking } from "../../services/mdSourceLines.js";
 
 const props = withDefaults(defineProps<{
   modelValue: string;
   /** 外部传入的 HTML 覆盖右侧预览（如主题渲染），为空则用 Markdown 实时渲染 */
   previewHtml?: string;
   previewLabel?: string;
-  /** 是否开启编辑区与预览区双向同步滚动 */
+  /** 是否开启编辑区与预览区双向同步滚动 + 光标行/对应块高亮 */
   syncScroll?: boolean;
 }>(), {
   previewHtml: "",
@@ -58,43 +65,122 @@ md.core.ruler.push("external_links", (state) => {
   }
 });
 
+// 注入源码行号标记，预览每个块都能反查到源码行
+injectSourceLineTracking(md);
+
 const renderedHtml = computed(() => md.render(props.modelValue || ""));
 
 function onInput(e: Event): void {
   emit("update:modelValue", (e.target as HTMLTextAreaElement).value);
+  updateCursorLine();
 }
 
-// ─── 双向同步滚动 ───
-// syncing 标志位防止两侧 scroll 事件互相触发形成死循环
+// ─── 按行映射的双向同步 + 光标高亮 ───
+// textarea 行高（与 CSS line-height 一致，改 CSS 时同步改这里）
+const LINE_HEIGHT = 22;
+const TEXTAREA_PADDING_TOP = 12;
+
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const previewRef = ref<HTMLElement | null>(null);
+const lineHighlightTop = ref(0);
+// syncing 标志位防止两侧 scroll 事件互相触发形成死循环
 let syncing = false;
 
-function syncScrollRatio(source: HTMLElement, target: HTMLElement): void {
-  const sourceMax = source.scrollHeight - source.clientHeight;
-  const targetMax = target.scrollHeight - target.clientHeight;
-  if (sourceMax <= 0 || targetMax <= 0) return;
-  const ratio = source.scrollTop / sourceMax;
-  target.scrollTop = ratio * targetMax;
+/** 当前光标所在行（1 索引） */
+function getCursorLine(): number {
+  const ta = textareaRef.value;
+  if (!ta) return 1;
+  return ta.value.substring(0, ta.selectionStart).split("\n").length;
 }
 
-function onTextareaScroll(): void {
-  if (!props.syncScroll || syncing) return;
-  syncing = true;
-  if (textareaRef.value && previewRef.value) {
-    syncScrollRatio(textareaRef.value, previewRef.value);
+/** 编辑区顶部可见的源码行（1 索引） */
+function getTopLine(): number {
+  const ta = textareaRef.value;
+  if (!ta) return 1;
+  return Math.round(ta.scrollTop / LINE_HEIGHT) + 1;
+}
+
+/** 更新光标行高亮条位置 + 预览对应块高亮 */
+function updateCursorLine(): void {
+  const ta = textareaRef.value;
+  if (!ta) return;
+  const line = getCursorLine();
+  lineHighlightTop.value = TEXTAREA_PADDING_TOP + (line - 1) * LINE_HEIGHT - ta.scrollTop;
+  if (props.syncScroll) highlightPreviewBlock(line);
+}
+
+/** 在预览区找到源码行 line 对应的块，高亮并居中滚动 */
+function highlightPreviewBlock(line: number): void {
+  const preview = previewRef.value;
+  if (!preview) return;
+  const blocks = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
+  if (blocks.length === 0) return;
+  // 找最后一个起始行 <= line 的块（即包含或最近位于 line 之前的块）
+  let target: HTMLElement | null = null;
+  for (const el of blocks) {
+    const start = Number(el.getAttribute("data-source-line"));
+    if (start <= line) target = el;
+    else break;
   }
-  requestAnimationFrame(() => { syncing = false; });
+  // 清除旧高亮
+  preview.querySelectorAll(".md-editor__active-block").forEach((e) => e.classList.remove("md-editor__active-block"));
+  if (target) {
+    target.classList.add("md-editor__active-block");
+    syncing = true;
+    target.scrollIntoView({ block: "center", behavior: "smooth" });
+    requestAnimationFrame(() => { syncing = false; });
+  }
 }
 
+/** 编辑区滚动 → 预览区滚动到顶部可见行对应的块顶部 */
+function onTextareaScroll(): void {
+  const ta = textareaRef.value;
+  if (!ta) return;
+  // 同步刷新光标高亮条纵向位置（跟随滚动）
+  lineHighlightTop.value = TEXTAREA_PADDING_TOP + (getCursorLine() - 1) * LINE_HEIGHT - ta.scrollTop;
+  if (!props.syncScroll || syncing) return;
+  syncPreviewToLine(getTopLine());
+}
+
+/** 预览区滚动 → 编辑区滚动到顶部可见块对应的源码行 */
 function onPreviewScroll(): void {
   if (!props.syncScroll || syncing) return;
-  syncing = true;
-  if (textareaRef.value && previewRef.value) {
-    syncScrollRatio(previewRef.value, textareaRef.value);
+  const preview = previewRef.value;
+  if (!preview) return;
+  const blocks = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
+  if (blocks.length === 0) return;
+  // 找预览区顶部第一个可见块
+  let topLine = 1;
+  for (const el of blocks) {
+    if (el.offsetTop - preview.scrollTop >= 0) { topLine = Number(el.getAttribute("data-source-line")); break; }
   }
+  syncing = true;
+  if (textareaRef.value) textareaRef.value.scrollTop = (topLine - 1) * LINE_HEIGHT;
   requestAnimationFrame(() => { syncing = false; });
 }
+
+/** 把预览区滚动到源码行 line 对应块的顶部 */
+function syncPreviewToLine(line: number): void {
+  const preview = previewRef.value;
+  if (!preview) return;
+  const blocks = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
+  if (blocks.length === 0) return;
+  let target: HTMLElement | null = null;
+  for (const el of blocks) {
+    if (Number(el.getAttribute("data-source-line")) <= line) target = el;
+    else break;
+  }
+  if (target) {
+    syncing = true;
+    preview.scrollTop = target.offsetTop;
+    requestAnimationFrame(() => { syncing = false; });
+  }
+}
+
+// 内容或预览变化后，重新刷新高亮位置（等 DOM 更新）
+watch(() => [props.modelValue, props.previewHtml, props.syncScroll], () => {
+  nextTick(() => updateCursorLine());
+});
 
 // 拖拽分割线调整左右比例，持久化到 localStorage
 const STORAGE_KEY = "md-editor-left-percent";
@@ -168,17 +254,41 @@ function onDividerMouseDown(e: MouseEvent): void {
   user-select: none;
 }
 
-.md-editor__textarea {
+.md-editor__textarea-wrap {
+  position: relative;
   flex: 1;
+  overflow: hidden;
+}
+
+/* 当前光标行高亮条：绝对定位在 textarea 后面，textarea 透明背景透出 */
+.md-editor__line-highlight {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 22px;
+  background: rgba(24, 144, 255, 0.08);
+  border-left: 2px solid #1890ff;
+  pointer-events: none;
+  z-index: 0;
+  transition: top 0.05s linear;
+}
+
+.md-editor__textarea {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
   padding: 12px;
   border: none;
   outline: none;
   resize: none;
   font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
   font-size: 14px;
-  line-height: 1.6;
+  /* 行高固定为 22px，与 JS 中 LINE_HEIGHT 常量保持一致 */
+  line-height: 22px;
   color: #333;
-  background: #fff;
+  background: transparent;
 }
 
 .md-editor__divider {
@@ -215,6 +325,13 @@ function onDividerMouseDown(e: MouseEvent): void {
   line-height: 1.7;
   color: #333;
   background: #fff;
+}
+
+/* 预览区当前光标对应块的高亮 */
+.md-editor__preview :deep(.md-editor__active-block) {
+  background: rgba(24, 144, 255, 0.08);
+  box-shadow: -2px 0 0 #1890ff;
+  border-radius: 2px;
 }
 
 .md-editor__preview :deep(img) {

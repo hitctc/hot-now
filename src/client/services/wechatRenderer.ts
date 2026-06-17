@@ -3,6 +3,7 @@
 // 服务端的 makeWechatCompatible（微信兼容处理）不移植，仅推送/复制时走服务端
 
 import MarkdownIt from "markdown-it";
+import { injectSourceLineTracking } from "./mdSourceLines.js";
 
 // ── 主题定义 ──
 
@@ -204,6 +205,9 @@ md.core.ruler.push("external_links", (state) => {
     }
   }
 });
+
+// 注入源码行号标记，供编辑器/预览按行对齐使用（data-source-line 会在推送前被剥离）
+injectSourceLineTracking(md);
 
 // ── 主题样式注入 ──
 

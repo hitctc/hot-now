@@ -195,5 +195,8 @@ export async function makeWechatCompatible(html: string, options?: { skipImageBa
     "$1⁠$2"
   );
 
+  // 剥离编辑器用的源码行号标记，避免进入推送 HTML
+  outputHtml = outputHtml.replace(/ data-source-(?:line|end)="[^"]*"/g, "");
+
   return outputHtml;
 }

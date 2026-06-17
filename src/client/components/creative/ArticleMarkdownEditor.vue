@@ -29,7 +29,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import MarkdownIt from "markdown-it";
 import { injectSourceLineTracking } from "../../services/mdSourceLines.js";
 
@@ -76,15 +76,27 @@ function onInput(e: Event): void {
 }
 
 // ─── 按行映射的双向同步 + 光标高亮 ───
-// textarea 行高（与 CSS line-height 一致，改 CSS 时同步改这里）
-const LINE_HEIGHT = 22;
 const TEXTAREA_PADDING_TOP = 12;
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const previewRef = ref<HTMLElement | null>(null);
 const lineHighlightTop = ref(0);
-// syncing 标志位防止两侧 scroll 事件互相触发形成死循环
-let syncing = false;
+// 实际渲染行高，挂载后从 computed style 动态测量，避免硬编码误差累积
+let lineHeight = 22;
+
+// 抑制标志位：程序化设置 scrollTop 后，紧接触发的自身 scroll 事件是"回弹"，需吞掉。
+// 比 requestAnimationFrame 稳：平滑/连续滚动的事件在 rAF 后仍会触发导致打架。
+let suppressTextareaScroll = false;
+let suppressPreviewScroll = false;
+const SUPPRESS_FALLBACK_MS = 60;
+
+/** 测量 textarea 真实行高，纠正高亮条位置 */
+function measureLineHeight(): void {
+  const ta = textareaRef.value;
+  if (!ta) return;
+  const computed = parseFloat(getComputedStyle(ta).lineHeight);
+  if (computed > 0) lineHeight = computed;
+}
 
 /** 当前光标所在行（1 索引） */
 function getCursorLine(): number {
@@ -93,92 +105,99 @@ function getCursorLine(): number {
   return ta.value.substring(0, ta.selectionStart).split("\n").length;
 }
 
-/** 编辑区顶部可见的源码行（1 索引） */
-function getTopLine(): number {
-  const ta = textareaRef.value;
-  if (!ta) return 1;
-  return Math.round(ta.scrollTop / LINE_HEIGHT) + 1;
-}
-
-/** 更新光标行高亮条位置 + 预览对应块高亮 */
-function updateCursorLine(): void {
+/** 更新编辑区光标行高亮条位置（不碰预览） */
+function updateLineHighlight(): void {
   const ta = textareaRef.value;
   if (!ta) return;
   const line = getCursorLine();
-  lineHighlightTop.value = TEXTAREA_PADDING_TOP + (line - 1) * LINE_HEIGHT - ta.scrollTop;
-  if (props.syncScroll) highlightPreviewBlock(line);
+  lineHighlightTop.value = TEXTAREA_PADDING_TOP + (line - 1) * lineHeight - ta.scrollTop;
 }
 
-/** 在预览区找到源码行 line 对应的块，高亮并居中滚动 */
-function highlightPreviewBlock(line: number): void {
-  const preview = previewRef.value;
-  if (!preview) return;
-  const blocks = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
-  if (blocks.length === 0) return;
-  // 找最后一个起始行 <= line 的块（即包含或最近位于 line 之前的块）
-  let target: HTMLElement | null = null;
-  for (const el of blocks) {
-    const start = Number(el.getAttribute("data-source-line"));
-    if (start <= line) target = el;
-    else break;
-  }
-  // 清除旧高亮
-  preview.querySelectorAll(".md-editor__active-block").forEach((e) => e.classList.remove("md-editor__active-block"));
-  if (target) {
-    target.classList.add("md-editor__active-block");
-    syncing = true;
-    target.scrollIntoView({ block: "center", behavior: "smooth" });
-    requestAnimationFrame(() => { syncing = false; });
-  }
-}
-
-/** 编辑区滚动 → 预览区滚动到顶部可见行对应的块顶部 */
-function onTextareaScroll(): void {
-  const ta = textareaRef.value;
-  if (!ta) return;
-  // 同步刷新光标高亮条纵向位置（跟随滚动）
-  lineHighlightTop.value = TEXTAREA_PADDING_TOP + (getCursorLine() - 1) * LINE_HEIGHT - ta.scrollTop;
-  if (!props.syncScroll || syncing) return;
-  syncPreviewToLine(getTopLine());
-}
-
-/** 预览区滚动 → 编辑区滚动到顶部可见块对应的源码行 */
-function onPreviewScroll(): void {
-  if (!props.syncScroll || syncing) return;
-  const preview = previewRef.value;
-  if (!preview) return;
-  const blocks = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
-  if (blocks.length === 0) return;
-  // 找预览区顶部第一个可见块
-  let topLine = 1;
-  for (const el of blocks) {
-    if (el.offsetTop - preview.scrollTop >= 0) { topLine = Number(el.getAttribute("data-source-line")); break; }
-  }
-  syncing = true;
-  if (textareaRef.value) textareaRef.value.scrollTop = (topLine - 1) * LINE_HEIGHT;
-  requestAnimationFrame(() => { syncing = false; });
-}
-
-/** 把预览区滚动到源码行 line 对应块的顶部 */
-function syncPreviewToLine(line: number): void {
-  const preview = previewRef.value;
-  if (!preview) return;
-  const blocks = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
-  if (blocks.length === 0) return;
+/** 在预览区找源码行 line 对应的块 */
+function findBlockForLine(blocks: HTMLElement[], line: number): HTMLElement | null {
   let target: HTMLElement | null = null;
   for (const el of blocks) {
     if (Number(el.getAttribute("data-source-line")) <= line) target = el;
     else break;
   }
-  if (target) {
-    syncing = true;
-    preview.scrollTop = target.offsetTop;
-    requestAnimationFrame(() => { syncing = false; });
+  return target;
+}
+
+/** 高亮预览中光标对应的块；仅当块不在视口内才瞬时滚动到可见（避免与滚动同步打架） */
+function highlightPreviewForCursor(): void {
+  const preview = previewRef.value;
+  if (!preview) return;
+  const blocks = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
+  if (blocks.length === 0) return;
+  const target = findBlockForLine(blocks, getCursorLine());
+  preview.querySelectorAll(".md-editor__active-block").forEach((e) => e.classList.remove("md-editor__active-block"));
+  if (!target) return;
+  target.classList.add("md-editor__active-block");
+  // 仅在块脱离视口时才滚动，且用瞬时滚动（非 smooth），杜绝持续事件引发的打架
+  const prect = preview.getBoundingClientRect();
+  const trect = target.getBoundingClientRect();
+  if (trect.top < prect.top || trect.bottom > prect.bottom) {
+    suppressPreviewScroll = true;
+    preview.scrollTop += trect.top - prect.top - (preview.clientHeight - trect.height) / 2;
+    setTimeout(() => { suppressPreviewScroll = false; }, SUPPRESS_FALLBACK_MS);
   }
 }
 
+/** 光标移动（点击/按键/输入）时调用 */
+function updateCursorLine(): void {
+  updateLineHighlight();
+  if (props.syncScroll) highlightPreviewForCursor();
+}
+
+/** 编辑区滚动 → 预览区滚到顶部可见行对应的块 */
+function onTextareaScroll(): void {
+  // 吞掉程序化滚动引发的回弹事件
+  if (suppressTextareaScroll) { suppressTextareaScroll = false; return; }
+  updateLineHighlight();
+  if (!props.syncScroll) return;
+  const ta = textareaRef.value;
+  const preview = previewRef.value;
+  if (!ta || !preview) return;
+  const topLine = Math.round(ta.scrollTop / lineHeight) + 1;
+  const blocks = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
+  if (blocks.length === 0) return;
+  const target = findBlockForLine(blocks, topLine);
+  if (target) {
+    suppressPreviewScroll = true;
+    preview.scrollTop = target.offsetTop;
+    setTimeout(() => { suppressPreviewScroll = false; }, SUPPRESS_FALLBACK_MS);
+  }
+}
+
+/** 预览区滚动 → 编辑区滚到顶部可见块对应的源码行 */
+function onPreviewScroll(): void {
+  if (suppressPreviewScroll) { suppressPreviewScroll = false; return; }
+  if (!props.syncScroll) return;
+  const preview = previewRef.value;
+  const ta = textareaRef.value;
+  if (!preview || !ta) return;
+  const blocks = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
+  if (blocks.length === 0) return;
+  // 找预览区视口顶部第一个可见块
+  let topLine = 1;
+  const viewTop = preview.scrollTop;
+  for (const el of blocks) {
+    if (el.offsetTop >= viewTop) { topLine = Number(el.getAttribute("data-source-line")); break; }
+  }
+  suppressTextareaScroll = true;
+  ta.scrollTop = (topLine - 1) * lineHeight;
+  setTimeout(() => { suppressTextareaScroll = false; }, SUPPRESS_FALLBACK_MS);
+}
+
+// 挂载后测量真实行高并刷新高亮位置
+onMounted(() => {
+  measureLineHeight();
+  nextTick(() => updateCursorLine());
+});
+
 // 内容或预览变化后，重新刷新高亮位置（等 DOM 更新）
 watch(() => [props.modelValue, props.previewHtml, props.syncScroll], () => {
+  measureLineHeight();
   nextTick(() => updateCursorLine());
 });
 
@@ -270,7 +289,6 @@ function onDividerMouseDown(e: MouseEvent): void {
   border-left: 2px solid #1890ff;
   pointer-events: none;
   z-index: 0;
-  transition: top 0.05s linear;
 }
 
 .md-editor__textarea {

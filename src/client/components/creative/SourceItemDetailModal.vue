@@ -91,12 +91,12 @@ function formatTime(value: string | null): string {
             </a-descriptions-item>
           </a-descriptions>
           <section v-if="data.summary">
-            <h3 class="m-0 mb-2 text-sm font-semibold text-editorial-text-muted">摘要</h3>
-            <p class="m-0 text-sm leading-6 text-editorial-text-body">{{ data.summary }}</p>
+            <h3 class="m-0 mb-2 text-sm font-semibold text-editorial-text-muted">摘要（{{ data.summary.length }} 字）</h3>
+            <p class="source-detail-scroll m-0 text-sm leading-6 text-editorial-text-body">{{ data.summary }}</p>
           </section>
           <section>
-            <h3 class="m-0 mb-2 text-sm font-semibold text-editorial-text-muted">原文内容</h3>
-            <div v-if="data.fullContent" class="whitespace-pre-wrap rounded-editorial-md border border-editorial-border bg-editorial-page px-4 py-3 text-sm leading-6 text-editorial-text-body">{{ data.fullContent }}</div>
+            <h3 class="m-0 mb-2 text-sm font-semibold text-editorial-text-muted">原文内容<span v-if="data.fullContent">（{{ data.fullContent.length }} 字）</span></h3>
+            <div v-if="data.fullContent" class="source-detail-scroll whitespace-pre-wrap rounded-editorial-md border border-editorial-border bg-editorial-page px-4 py-3 text-sm leading-6 text-editorial-text-body">{{ data.fullContent }}</div>
             <p v-else class="m-0 text-sm italic text-editorial-text-muted">采集未提供原文</p>
           </section>
         </div>
@@ -104,3 +104,11 @@ function formatTime(value: string | null): string {
     </a-spin>
   </a-modal>
 </template>
+
+<style>
+/* 摘要和正文限高滚动，避免长内容撑爆弹窗 */
+.source-detail-scroll {
+  max-height: 280px;
+  overflow-y: auto;
+}
+</style>

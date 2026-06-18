@@ -1897,21 +1897,29 @@ code {
   color: var(--danger);
 }
 
-/* 登录按钮状态：未填表单弱化、填好后激活、提交中加载态（仅登录页，不影响全站 primary-button） */
+/* 登录按钮状态：未填表单弱化、填好后实色高亮、提交中加载态（仅登录页，不影响全站 primary-button） */
 .login-page .primary-button {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 .login-page .primary-button.is-ready {
   opacity: 1;
   cursor: pointer;
+  /* 实色高饱和蓝 + 微光，让"可点击"一眼可见（覆盖全站淡色 accent） */
+  background: linear-gradient(135deg, #4f7bff, #2f5bd9);
+  box-shadow: 0 6px 18px rgba(79, 123, 255, 0.35);
+}
+.login-page .primary-button.is-ready:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(79, 123, 255, 0.45);
 }
 .login-page .primary-button:not(.is-ready):hover {
   transform: none;
 }
 .login-page .primary-button.is-loading {
-  opacity: 0.8;
+  opacity: 0.85;
   cursor: progress;
+  background: linear-gradient(135deg, #4f7bff, #2f5bd9);
 }
 
 @media (hover: hover) {

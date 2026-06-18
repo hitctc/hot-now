@@ -5833,29 +5833,59 @@ function renderLoginPage() {
     <script>
       const form = document.getElementById("login-form");
       const errorNode = document.getElementById("login-error");
+      const submitBtn = form ? form.querySelector(".primary-button") : null;
+      const usernameInput = document.getElementById("username");
+      const passwordInput = document.getElementById("password");
+
+      // 账号密码都填好后才激活按钮，给用户"可以点了"的视觉反馈
+      function syncReady() {
+        if (!submitBtn || !usernameInput || !passwordInput) return;
+        const ready = (usernameInput.value || "").trim() !== "" && (passwordInput.value || "") !== "";
+        submitBtn.classList.toggle("is-ready", ready);
+      }
+      usernameInput?.addEventListener("input", syncReady);
+      passwordInput?.addEventListener("input", syncReady);
+      syncReady();
 
       form?.addEventListener("submit", async (event) => {
         event.preventDefault();
         errorNode.textContent = "";
         const username = (document.getElementById("username")?.value || "").trim();
         const password = document.getElementById("password")?.value || "";
-        const response = await fetch("/login", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ username, password })
-        });
-
-        if (response.redirected) {
-          location.href = response.url;
-          return;
+        // 提交中：禁用按钮 + 切换文案，防止重复点击并给出加载反馈
+        const originalText = submitBtn ? submitBtn.textContent : "登录";
+        if (submitBtn) {
+          submitBtn.classList.add("is-loading");
+          submitBtn.disabled = true;
+          submitBtn.textContent = "登录中…";
         }
+        try {
+          const response = await fetch("/login", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ username, password })
+          });
 
-        if (response.status === 200 || response.status === 204 || response.status === 302) {
-          location.href = "/";
-          return;
+          if (response.redirected) {
+            location.href = response.url;
+            return;
+          }
+
+          if (response.status === 200 || response.status === 204 || response.status === 302) {
+            location.href = "/";
+            return;
+          }
+
+          errorNode.textContent = "登录失败，请检查用户名和密码。";
+        } catch {
+          errorNode.textContent = "登录请求失败，请稍后重试。";
+        } finally {
+          if (submitBtn) {
+            submitBtn.classList.remove("is-loading");
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+          }
         }
-
-        errorNode.textContent = "登录失败，请检查用户名和密码。";
       });
     </script>
   </body>

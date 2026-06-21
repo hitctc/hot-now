@@ -1382,6 +1382,16 @@ export function createServer(deps: ServerDeps = {}) {
         return reply.code(502).send({ ok: false, reason: data.error ?? "图片提示词生成失败" });
       }
 
+      // 提示词重新生成成功后，清理因提示词缺失导致的异常标记；
+      // 卡在 queued 的文章（写作已完成但因缺提示词滞留）推进到 generated，否则 UI 一直显示"排队中"。
+      // 用 source="hermes" 走管线恢复路径，跳过人工状态变更校验。
+      if (article.anomalyReason && article.anomalyReason.startsWith("image_prompt_")) {
+        editCreativeFinishedArticle(db, id, {
+          anomalyReason: null,
+          ...(article.status === "queued" ? { status: "generated" } : {})
+        }, "hermes");
+      }
+
       // Hermes 已 PATCH 回平台，重新读取最新数据返回
       const updated = findCreativeFinishedArticleById(db, id);
       return reply.send({

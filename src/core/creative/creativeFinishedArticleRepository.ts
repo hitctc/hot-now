@@ -254,7 +254,7 @@ export type EditCreativeFinishedArticleInput = {
   titleIndex?: number;
   rawResponseText?: string;
   status?: string;
-  anomalyReason?: string;
+  anomalyReason?: string | null;
   wechatThemeId?: string | null;
   wechatHtml?: string | null;
   coverImagePrompt?: string;

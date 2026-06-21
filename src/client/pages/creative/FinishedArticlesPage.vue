@@ -124,6 +124,8 @@ const sourceItemModalId = ref<number | null>(null);
 
 const pushConfirmVisible = ref(false);
 const pushConfirmArticle = ref<CreativeFinishedArticle | null>(null);
+// 推送浮窗实例引用，用于判断是否正在推送、切换文章时重置状态
+const pushWidgetRef = ref<{ isPushing: boolean; resetState: () => void } | null>(null);
 const wechatTheme = ref<WechatThemeId>("bauhaus");
 const wechatMpAccounts = ref<WechatMpAccountSummary[]>([]);
 const defaultAccountName = computed(() => {
@@ -148,9 +150,16 @@ function getMissingConditions(article: CreativeFinishedArticle | null): string[]
 }
 
 function openPushConfirm(article: CreativeFinishedArticle, themeId?: WechatThemeId): void {
+  // 正在推送时禁止切换到新文章，避免并发推送和状态混乱
+  if (pushWidgetRef.value?.isPushing) {
+    message.warning("当前有正在推送的文章，请等待上一篇推送完成后再推送新文章");
+    return;
+  }
   wechatTheme.value = themeId ?? (article.wechatThemeId as WechatThemeId) ?? "bauhaus";
   pushConfirmArticle.value = article;
   pushConfirmVisible.value = true;
+  // 浮窗已打开时切换文章：重置状态回确认态（visible 未变化不会触发组件内 watch）
+  pushWidgetRef.value?.resetState();
   loadWechatMpAccounts();
 }
 
@@ -791,6 +800,7 @@ const pagination = computed(() => ({
     <!-- 推送悬浮组件（teleport 到 body，避免被 modal 层叠上下文遮挡） -->
     <Teleport to="body">
       <ArticlePushFloatWidget
+        ref="pushWidgetRef"
         v-model:visible="pushConfirmVisible"
         :article="pushConfirmArticle"
         :theme-id="wechatTheme"

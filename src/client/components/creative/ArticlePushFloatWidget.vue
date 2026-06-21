@@ -43,14 +43,17 @@ const stepStates = reactive<Record<string, { status: StepStatus; detail?: string
   Object.fromEntries(STEP_DEFS.map((s) => [s.id, { status: "pending" as StepStatus }]))
 );
 
+// 重置为初始确认态：切换到新文章推送或重新推送时调用
+function resetState(): void {
+  pushState.value = "idle";
+  pushResult.value = null;
+  STEP_DEFS.forEach((s) => { stepStates[s.id] = { status: "pending" }; });
+}
+
 watch(
   () => props.visible,
   (v) => {
-    if (v) {
-      pushState.value = "idle";
-      pushResult.value = null;
-      STEP_DEFS.forEach((s) => { stepStates[s.id] = { status: "pending" }; });
-    }
+    if (v) resetState();
   }
 );
 
@@ -108,6 +111,9 @@ function close(): void {
 const isPushing = computed(() => pushState.value === "pushing");
 const isDone = computed(() => pushState.value === "done");
 const failedStepError = computed(() => pushResult.value?.ok ? "" : (pushResult.value?.errorMessage || "推送失败"));
+
+// 暴露给父组件：isPushing 判断是否正在推送，resetState 切换新文章时重置浮窗状态
+defineExpose({ isPushing, resetState });
 </script>
 
 <template>

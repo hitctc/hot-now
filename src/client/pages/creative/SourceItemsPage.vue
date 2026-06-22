@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { computed, onMounted, onBeforeUnmount, ref, watch, nextTick } from "vue";
 import { message } from "ant-design-vue";
 
 import { HttpError } from "../../services/http.js";
@@ -148,11 +148,24 @@ function handleTableChange(pagination: { current?: number; pageSize?: number }):
 // ─── 展开控制 ───
 
 function toggleExpand(id: number): void {
+  // 锚定被点击行：记录其视口纵坐标，展开/折叠后拉回原位。
+  // 这样长内容展开/折叠导致页面高度变化时，用户正在看的那行不会跑偏，无需重新找位置。
+  const rowEl = document.querySelector(`tr.ant-table-row[data-row-key="${id}"]`) as HTMLElement | null;
+  const anchorTop = rowEl?.getBoundingClientRect().top ?? null;
+
   const idx = expandedRowKeys.value.indexOf(id);
   if (idx >= 0) {
     expandedRowKeys.value.splice(idx, 1);
   } else {
     expandedRowKeys.value.push(id);
+  }
+
+  if (anchorTop != null && rowEl) {
+    nextTick(() => {
+      // 父行 TR 在折叠后仍然存在（只移除了展开子行），测量新坐标并补偿滚动差值
+      const delta = rowEl.getBoundingClientRect().top - anchorTop;
+      if (delta !== 0) window.scrollBy(0, delta);
+    });
   }
 }
 

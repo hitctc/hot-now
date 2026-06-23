@@ -41,7 +41,10 @@
     pointer-events: none;
   }
 
-  body > * {
+  /* 仅抬升应用根节点到背景装饰层之上；勿用 body > *，否则会把 antd 各 portal
+     (modal/message/notification 等) 统一压到 z-index:1 的同一层叠上下文，
+     打平 antd 原生 z-index 体系，导致 message 被后插入的 modal 遮挡 */
+  #app {
     position: relative;
     z-index: 1;
   }

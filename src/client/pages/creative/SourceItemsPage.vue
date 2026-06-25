@@ -44,6 +44,11 @@ const writingStatusFilter = ref<string | undefined>(saved.writingStatus || undef
 const sourceNameFilter = ref(saved.sourceName || "");
 const writableOnly = ref(false);
 const searchText = ref(saved.search || "");
+// 爆文分下限：筛选 trend_score >= 该值的素材。
+// localStorage 里无此字段时默认 60；用户主动清空后为 null（不过滤）。
+const minTrendScore = ref<number | null>(
+  "minTrendScore" in saved ? (saved.minTrendScore ?? null) : 60
+);
 
 // 搜索历史
 const { history: searchHistory, addToHistory, removeFromHistory } = useSearchHistory("creative-source-search-history");
@@ -66,7 +71,8 @@ function saveSourceFilters(): void {
     localStorage.setItem(SOURCE_FILTERS_KEY, JSON.stringify({
       writingStatus: writingStatusFilter.value || "",
       sourceName: sourceNameFilter.value || "",
-      search: searchText.value
+      search: searchText.value,
+      minTrendScore: minTrendScore.value
     }));
   } catch { /* quota 超限等忽略 */ }
 }
@@ -100,7 +106,8 @@ async function loadItems(): Promise<void> {
       writingStatus: writingStatusFilter.value || undefined,
       sourceName: sourceNameFilter.value.trim() || undefined,
       writable: writableOnly.value || undefined,
-      search: searchText.value || undefined
+      search: searchText.value || undefined,
+      minTrendScore: minTrendScore.value ?? undefined
     });
     items.value = res.items;
     total.value = res.total;
@@ -127,6 +134,13 @@ watch(writingStatusFilter, () => {
 
 watch(writableOnly, () => {
   currentPage.value = 1;
+  void loadItems();
+});
+
+// 爆文分下限变化：重置到第一页并重新加载（步进按钮每次 ±1，离散触发，无需防抖）
+watch(minTrendScore, () => {
+  currentPage.value = 1;
+  saveSourceFilters();
   void loadItems();
 });
 
@@ -615,6 +629,16 @@ const pagination = computed(() => ({
         @change="(val: string) => { if (!val) { currentPage = 1; saveSourceFilters(); void loadItems(); } }"
       />
       <a-checkbox v-model:checked="writableOnly">只看可写</a-checkbox>
+      <a-input-number
+        v-model:value="minTrendScore"
+        :min="0"
+        :max="100"
+        :step="1"
+        :precision="0"
+        addon-before="爆文分≥"
+        placeholder="不限"
+        class="!w-[170px]"
+      />
       <div ref="searchDropdownRef" class="relative">
         <a-input-search
           v-model:value="searchText"

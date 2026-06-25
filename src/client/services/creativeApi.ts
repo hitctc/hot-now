@@ -160,6 +160,8 @@ export function readCreativeSourceItems(params?: {
   sourceName?: string;
   writable?: boolean;
   search?: string;
+  /** 爆文分下限，仅显示 trend_score >= 该值的素材；为 null/undefined 时不限 */
+  minTrendScore?: number;
 }): Promise<SourceItemListResponse> {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
@@ -169,6 +171,7 @@ export function readCreativeSourceItems(params?: {
   if (params?.sourceName) query.set("sourceName", params.sourceName);
   if (params?.writable) query.set("writable", "1");
   if (params?.search) query.set("search", params.search);
+  if (params?.minTrendScore != null) query.set("trendScoreMin", String(params.minTrendScore));
   const qs = query.toString();
   return requestJson<SourceItemListResponse>(`/api/creative/source-items${qs ? `?${qs}` : ""}`);
 }

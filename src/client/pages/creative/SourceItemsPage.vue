@@ -629,21 +629,23 @@ const pagination = computed(() => ({
         @change="(val: string) => { if (!val) { currentPage = 1; saveSourceFilters(); void loadItems(); } }"
       />
       <a-checkbox v-model:checked="writableOnly">只看可写</a-checkbox>
-      <a-input-number
-        v-model:value="minTrendScore"
-        :min="0"
-        :max="100"
-        :step="1"
-        :precision="0"
-        addon-before="爆文分≥"
-        placeholder="不限"
-        class="!w-[170px]"
-      />
+      <div class="flex items-center gap-1.5">
+        <span class="whitespace-nowrap text-xs text-editorial-text-muted">爆文分≥</span>
+        <a-input-number
+          v-model:value="minTrendScore"
+          :min="0"
+          :max="100"
+          :step="1"
+          :precision="0"
+          placeholder="不限"
+          class="!w-[96px]"
+        />
+      </div>
       <div ref="searchDropdownRef" class="relative">
         <a-input-search
           v-model:value="searchText"
           placeholder="搜索标题"
-          class="!w-[360px]"
+          class="!w-[280px]"
           allow-clear
           @search="handleSearch"
           @change="(val: string) => { if (!val) handleSearch(''); }"

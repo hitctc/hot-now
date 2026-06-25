@@ -18,6 +18,9 @@ DEPLOY_USER="${HOT_NOW_DEPLOY_USER:-}"
 DEPLOY_APP_DIR="${HOT_NOW_DEPLOY_APP_DIR:-/srv/hot-now/app}"
 DEPLOY_SERVICE="${HOT_NOW_DEPLOY_SERVICE:-hot-now}"
 DEPLOY_HEALTH_URL="${HOT_NOW_DEPLOY_HEALTH_URL:-http://127.0.0.1:3030/health}"
+# 健康检查重试窗口：低配服务器冷启动偏慢，默认 15 次 × 3 秒（≈45s）避免误报"重启失败"
+DEPLOY_HEALTH_RETRIES="${HOT_NOW_DEPLOY_HEALTH_RETRIES:-15}"
+DEPLOY_HEALTH_INTERVAL="${HOT_NOW_DEPLOY_HEALTH_INTERVAL:-3}"
 REMOTE_TARGET="${DEPLOY_USER}@${DEPLOY_HOST}"
 
 if [[ -z "${DEPLOY_HOST}" ]]; then
@@ -71,11 +74,11 @@ ssh "${REMOTE_TARGET}" \
     echo 'Install the deploy sudoers rule from deploy/sudoers/hot-now-systemctl.' >&2
     exit 1
   fi
-  for attempt in 1 2 3 4 5; do
+  for ((attempt=1; attempt<=${DEPLOY_HEALTH_RETRIES}; attempt++)); do
     if curl -fsS '${DEPLOY_HEALTH_URL}'; then
       exit 0
     fi
-    sleep 2
+    sleep ${DEPLOY_HEALTH_INTERVAL}
   done
   echo 'Health check failed after restart' >&2
   exit 1"

@@ -548,6 +548,29 @@ function copyId(id: number): void {
   });
 }
 
+// ─── 文本截断时才显示 tooltip ───
+// 标题/来源等 line-clamp-2 单元格：鼠标进入时检测 scrollHeight 是否超出 clientHeight，
+// 仅当实际溢出截断时才延迟 300ms 弹 tooltip，避免短文本也弹出无意义的悬浮提示。
+// 两列共用一份状态，以 `${col}-${id}` 作为 key 区分。
+const overflowHover = ref<{ key: string } | null>(null);
+let overflowHoverTimer: ReturnType<typeof setTimeout> | null = null;
+
+function onOverflowCellEnter(key: string, e: MouseEvent): void {
+  const el = e.currentTarget as HTMLElement;
+  // +1 像素容差，规避亚像素渲染导致 scrollHeight 略大于 clientHeight 的误判
+  const isOverflowing = el.scrollHeight > el.clientHeight + 1;
+  if (overflowHoverTimer) clearTimeout(overflowHoverTimer);
+  if (!isOverflowing) return; // 未截断：不弹 tooltip
+  overflowHoverTimer = setTimeout(() => {
+    overflowHover.value = { key };
+  }, 300);
+}
+
+function onOverflowCellLeave(key: string): void {
+  if (overflowHoverTimer) { clearTimeout(overflowHoverTimer); overflowHoverTimer = null; }
+  if (overflowHover.value?.key === key) overflowHover.value = null;
+}
+
 const columns = [
   { title: "ID", dataIndex: "id", key: "id", width: 60 },
   { title: "标题", dataIndex: "title", key: "title", width: 280 },
@@ -646,10 +669,16 @@ const pagination = computed(() => ({
           </template>
           <template v-if="column.key === 'title'">
             <div class="flex items-center gap-2 min-w-0">
-              <a-tooltip :title="record.title" placement="topLeft" :mouse-enter-delay="0.3">
+              <a-tooltip
+                :open="overflowHover?.key === 'title-' + record.id"
+                :title="record.title"
+                placement="topLeft"
+              >
                 <span
                   class="line-clamp-2 cursor-pointer text-[13px] leading-tight font-medium text-editorial-text-main hover:text-editorial-link-active"
                   @click="toggleExpand(record.id)"
+                  @mouseenter="onOverflowCellEnter('title-' + record.id, $event)"
+                  @mouseleave="onOverflowCellLeave('title-' + record.id)"
                 >
                   {{ record.title }}
                 </span>
@@ -676,8 +705,16 @@ const pagination = computed(() => ({
 
           <!-- 来源列 -->
           <template v-else-if="column.key === 'sourceName'">
-            <a-tooltip :title="(record.sourceName || '').replace('微信公众号', 'WX')" placement="topLeft" :mouse-enter-delay="0.3">
-              <span class="line-clamp-2 text-[13px] leading-tight text-editorial-text-body">{{ (record.sourceName || "-").replace("微信公众号", "WX") }}</span>
+            <a-tooltip
+              :open="overflowHover?.key === 'sourceName-' + record.id"
+              :title="(record.sourceName || '').replace('微信公众号', 'WX')"
+              placement="topLeft"
+            >
+              <span
+                class="line-clamp-2 text-[13px] leading-tight text-editorial-text-body"
+                @mouseenter="onOverflowCellEnter('sourceName-' + record.id, $event)"
+                @mouseleave="onOverflowCellLeave('sourceName-' + record.id)"
+              >{{ (record.sourceName || "-").replace("微信公众号", "WX") }}</span>
             </a-tooltip>
           </template>
 

@@ -79,10 +79,12 @@ const previewRef = ref<HTMLElement | null>(null);
 // 预览块按源码行反查时容差大，不需要像素级精确。
 const EDITOR_LINE_HEIGHT = 22;
 
-/** 当前光标所在行（1 索引） */
+/** 当前光标所在行（1 索引）。
+ *  仅在 textarea 拥有焦点时才读 selectionStart：刚挂载的 textarea 未聚焦时，
+ *  浏览器会把 selectionStart 停在 value 末尾，若当成光标位置会让预览被拉到底部。 */
 function getCursorLine(): number {
   const ta = textareaRef.value;
-  if (!ta) return 1;
+  if (!ta || document.activeElement !== ta) return 1;
   return ta.value.substring(0, ta.selectionStart).split("\n").length;
 }
 

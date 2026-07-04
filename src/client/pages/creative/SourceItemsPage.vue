@@ -137,12 +137,12 @@ watch(writableOnly, () => {
   void loadItems();
 });
 
-// 爆文分下限变化：重置到第一页并重新加载（步进按钮每次 ±1，离散触发，无需防抖）
-watch(minTrendScore, () => {
+// 爆文分筛选：输入时不触发，仅在回车或点击搜索图标时应用，与搜索来源/标题交互一致
+function applyTrendScoreFilter(): void {
   currentPage.value = 1;
   saveSourceFilters();
   void loadItems();
-});
+}
 
 function handleSearch(value: string): void {
   searchText.value = value;
@@ -639,7 +639,9 @@ const pagination = computed(() => ({
           :precision="0"
           placeholder="不限"
           class="!w-[96px]"
+          @press-enter="applyTrendScoreFilter"
         />
+        <a-button type="primary" size="small" @click="applyTrendScoreFilter">搜索</a-button>
       </div>
       <div ref="searchDropdownRef" class="relative">
         <a-input-search

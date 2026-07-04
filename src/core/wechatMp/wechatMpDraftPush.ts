@@ -1,6 +1,7 @@
 // 草稿推送编排
 // 渲染 Markdown → 上传封面图 → 上传正文图片 → 替换图片 URL → 创建草稿 → 记录结果
 
+import { JSDOM } from "jsdom";
 import { findDefaultWechatMpAccount } from "./wechatMpAccountRepository.js";
 import { getAccessToken } from "./wechatMpAccessToken.js";
 import { uploadPermanentImage, uploadContentImage, createDraft, WechatApiCallError } from "./wechatMpApiClient.js";
@@ -32,15 +33,23 @@ async function downloadImage(url: string): Promise<Buffer> {
   return Buffer.from(await response.arrayBuffer());
 }
 
-// 从 images 数组中提取图片 URL（支持纯字符串和带元数据的对象）
-function extractImageUrls(images: unknown[]): string[] {
-  return images
-    .map((img) => {
-      if (typeof img === "string") return img;
-      if (img && typeof img === "object" && "url" in img) return (img as { url: string }).url;
-      return null;
-    })
-    .filter((url): url is string => typeof url === "string" && url.length > 0);
+// 从渲染后的 HTML 中收集需要上传到微信 CDN 的图片 URL
+// 跳过：data: 内联图、已经落在微信 CDN（mmbiz.qpic.cn）的图，避免重复上传
+// 去重：同一张图在 HTML 出现多次只上传一次，替换时全量替换
+export function collectImageUrlsFromHtml(html: string): string[] {
+  const dom = new JSDOM(`<!DOCTYPE html><body>${html}</body>`);
+  const seen = new Set<string>();
+  const urls: string[] = [];
+  dom.window.document.querySelectorAll("img").forEach((img) => {
+    const src = img.getAttribute("src");
+    if (!src) return;
+    if (src.startsWith("data:")) return;
+    if (src.includes("mmbiz.qpic.cn")) return;
+    if (seen.has(src)) return;
+    seen.add(src);
+    urls.push(src);
+  });
+  return urls;
 }
 
 // 替换 HTML 中正文图片的 src 为微信 CDN URL
@@ -154,9 +163,11 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
     await onProgress?.("cover", "done");
 
     // ─── 步骤 5：逐张上传正文图片 ───
+    // 以渲染后 HTML 中的 <img> 为准（覆盖配图占位符 + Markdown 手写图两类来源），
+    // 跳过 data: 与已是微信 CDN 的 src，避免重复上传。每张图只调一次 uploadContentImage。
     currentStep = "images";
-    if (article.images && Array.isArray(article.images) && article.images.length > 0) {
-      const imageUrls = extractImageUrls(article.images);
+    const imageUrls = collectImageUrlsFromHtml(html);
+    if (imageUrls.length > 0) {
       await onProgress?.("images", "running", `0/${imageUrls.length}`);
       const cdnUrls: string[] = [];
 

@@ -477,13 +477,13 @@ function copyId(id: number): void {
 const columns = [
   { title: "ID", dataIndex: "id", key: "id", width: 60, fixed: "left" as const },
   { title: "标题", key: "title", width: 280 },
-  { title: "封面图", key: "coverImage", width: 80, ellipsis: true },
+  { title: "封面图", key: "coverImage", width: 70, ellipsis: true },
   { title: "状态", key: "status", width: 100 },
   { title: "来源", key: "sourceName", width: 170 },
   { title: "来源素材", key: "sourceItem", width: 110, ellipsis: true },
   { title: "爆文", key: "trend", width: 120, ellipsis: true },
-  { title: "相似度", key: "similarity", width: 72, ellipsis: true },
-  { title: "模式", key: "mode", width: 72, ellipsis: true },
+  { title: "相似度", key: "similarity", width: 56, ellipsis: true },
+  { title: "模式", key: "mode", width: 48, ellipsis: true },
   { title: "耗时/时间", key: "timeInfo", width: 130, ellipsis: true },
   { title: "操作", key: "actions", width: 60, fixed: "right" as const },
 ];
@@ -573,10 +573,9 @@ const pagination = computed(() => ({
               <a-tooltip v-if="record.coverImage && record.coverImage.length > 0" :title="record.coverImagePrompt ? `Prompt: ${record.coverImagePrompt}` : '无 Prompt'" placement="topLeft">
                 <a-image
                   :src="record.coverImage[0]"
-                  :width="36"
-                  :height="36"
-                  class="!rounded !border !border-editorial-border"
-                  style="object-fit:cover;"
+                  :width="44"
+                  class="!rounded !border !border-editorial-border !object-contain"
+                  style="max-height:44px;"
                 />
               </a-tooltip>
               <span v-else class="text-xs text-editorial-text-muted">无</span>

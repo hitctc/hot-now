@@ -501,7 +501,7 @@ function copyId(id: number): void {
 }
 
 const columns = [
-  { title: "ID", dataIndex: "id", key: "id", width: 60 },
+  { title: "ID", dataIndex: "id", key: "id", width: 60, fixed: "left" as const },
   { title: "标题", key: "title", width: 280 },
   { title: "封面图", key: "coverImage", width: 80, ellipsis: true },
   { title: "状态", key: "status", width: 100 },
@@ -516,8 +516,7 @@ const columns = [
   { title: "创建时间", key: "createdAt", width: 140, ellipsis: true },
   { title: "可发", key: "publishable", width: 60, ellipsis: true },
   { title: "公众号", key: "wechatPublished", width: 80, ellipsis: true },
-  { title: "操作", key: "actions", width: 60 },
-
+  { title: "操作", key: "actions", width: 60, fixed: "right" as const },
 ];
 
 const pagination = computed(() => ({
@@ -817,10 +816,19 @@ const pagination = computed(() => ({
 .review-highlight td {
   background-color: #fffbe6 !important;
 }
+/* 固定列 cell 自带白底，高亮行里要跟随行背景，避免横向滚动时出现白底割裂 */
+.review-highlight .ant-table-cell-fix-left,
+.review-highlight .ant-table-cell-fix-right {
+  background-color: #fffbe6 !important;
+}
 /* 已废弃行置灰（优先级最高，覆盖 review-highlight 等） */
 .discarded-row td {
   background-color: #f0f0f0 !important;
   opacity: 0.45;
+}
+.discarded-row .ant-table-cell-fix-left,
+.discarded-row .ant-table-cell-fix-right {
+  background-color: #f0f0f0 !important;
 }
 .source-item-detail-modal .ant-modal {
   top: 0;

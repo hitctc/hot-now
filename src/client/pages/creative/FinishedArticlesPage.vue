@@ -476,11 +476,10 @@ function copyId(id: number): void {
 
 const columns = [
   { title: "ID", dataIndex: "id", key: "id", width: 60, fixed: "left" as const },
-  { title: "标题", key: "title", width: 280 },
+  { title: "标题", key: "title", width: 300 },
   { title: "封面图", key: "coverImage", width: 70, ellipsis: true },
   { title: "状态", key: "status", width: 100 },
   { title: "来源", key: "sourceName", width: 170 },
-  { title: "来源素材", key: "sourceItem", width: 110, ellipsis: true },
   { title: "爆文", key: "trend", width: 120, ellipsis: true },
   { title: "相似度", key: "similarity", width: 56, ellipsis: true },
   { title: "模式", key: "mode", width: 48, ellipsis: true },
@@ -557,7 +556,7 @@ const pagination = computed(() => ({
           <template v-if="column.key === 'id'">
             <span class="cursor-pointer text-editorial-link-active hover:underline" @click="copyId(record.id)"> {{ record.id }} </span>
           </template>
-          <!-- 标题列：点击打开详情弹窗 -->
+          <!-- 标题列：点击标题打开详情，点击素材链接打开来源素材弹窗，互不影响 -->
           <template v-if="column.key === 'title'">
             <span
               class="line-clamp-2 cursor-pointer text-[13px] leading-tight font-medium text-editorial-text-main transition-colors hover:text-editorial-link-active"
@@ -565,6 +564,11 @@ const pagination = computed(() => ({
             >
               {{ getFirstTitle(record.titles) }}
             </span>
+            <a
+              v-if="record.sourceItemId"
+              class="mt-0.5 inline-block cursor-pointer text-[10px] text-editorial-link-active hover:underline"
+              @click.prevent="openSourceItemModal(record.sourceItemId)"
+            >素材 #{{ record.sourceItemId }}</a>
           </template>
 
           <!-- 封面图列 -->
@@ -644,14 +648,6 @@ const pagination = computed(() => ({
             <a-tooltip :title="(record.sourceName || '').replace('微信公众号', 'WX')" placement="topLeft" :mouse-enter-delay="0.3">
               <span class="line-clamp-2 text-[13px] leading-tight text-editorial-text-body">{{ (record.sourceName || "-").replace("微信公众号", "WX") }}</span>
             </a-tooltip>
-          </template>
-
-          <!-- 来源素材列 -->
-          <template v-else-if="column.key === 'sourceItem'">
-            <a
-              class="cursor-pointer text-xs text-editorial-link-active hover:underline"
-              @click.prevent="openSourceItemModal(record.sourceItemId)"
-            >素材 #{{ record.sourceItemId }}</a>
           </template>
 
           <!-- 爆文列：分数 + 维度柱状图 两行紧凑展示 -->

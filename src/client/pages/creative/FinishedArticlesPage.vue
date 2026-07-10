@@ -821,13 +821,13 @@ const pagination = computed(() => ({
 .review-highlight .ant-table-cell-fix-right {
   background-color: #fffbe6 !important;
 }
-/* 已推送草稿箱行弱化：文章周期已结束，浅绿色表示正常完成 */
+/* 已推送草稿箱行弱化：文章周期已结束，极浅绿色表示正常完成 */
 .completed-row td {
-  background-color: #f0f9eb !important;
+  background-color: #f6fbed !important;
 }
 .completed-row .ant-table-cell-fix-left,
 .completed-row .ant-table-cell-fix-right {
-  background-color: #f0f9eb !important;
+  background-color: #f6fbed !important;
 }
 /* 已废弃行置灰（优先级最高，覆盖 review-highlight 等） */
 .discarded-row td {

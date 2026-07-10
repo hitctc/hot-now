@@ -9,8 +9,6 @@ import {
   editFinishedArticle,
   deleteFinishedArticle,
   restoreFinishedArticle,
-  toggleFinishedArticlePublished,
-  toggleFinishedArticlePublishable,
   parseArticleImages,
   wechatThemeOptions,
   type CreativeFinishedArticle,
@@ -99,19 +97,6 @@ const statusOptions = [
   { label: "已失败", value: "failed" },
   { label: "已删除", value: "soft_deleted" },
 ];
-
-// 发布状态切换操作锁
-const publishPendingId = ref<number | null>(null);
-
-async function handleTogglePublished(article: CreativeFinishedArticle): Promise<void> {
-  publishPendingId.value = article.id;
-  try {
-    const res = await toggleFinishedArticlePublished(article.id);
-    article.wechatPublished = res.wechatPublished;
-  } finally {
-    publishPendingId.value = null;
-  }
-}
 
 // 文章详情全屏弹窗
 const detailArticle = ref<CreativeFinishedArticle | null>(null);
@@ -216,17 +201,6 @@ watch(showDeleted, () => {
   saveFinishedFilters();
   void loadItems();
 });
-
-async function handleTogglePublishable(article: CreativeFinishedArticle): Promise<void> {
-  try {
-    const res = await toggleFinishedArticlePublishable(article.id);
-    if (res.ok) {
-      article.publishable = res.publishable;
-    }
-  } catch {
-    // ignore
-  }
-}
 
 // 审核通过：走转换 #4，标注来源为审核入口
 async function handleApproveArticle(article: CreativeFinishedArticle): Promise<void> {
@@ -511,11 +485,7 @@ const columns = [
   { title: "爆文维度", key: "trendBreakdown", width: 160, ellipsis: true },
   { title: "相似度", key: "similarity", width: 72, ellipsis: true },
   { title: "模式", key: "mode", width: 72, ellipsis: true },
-  { title: "写作耗时", key: "writingDuration", width: 90, ellipsis: true },
-  { title: "发布时间", key: "publishedAt", width: 130, ellipsis: true },
-  { title: "创建时间", key: "createdAt", width: 140, ellipsis: true },
-  { title: "可发", key: "publishable", width: 60, ellipsis: true },
-  { title: "公众号", key: "wechatPublished", width: 80, ellipsis: true },
+  { title: "耗时/时间", key: "timeInfo", width: 130, ellipsis: true },
   { title: "操作", key: "actions", width: 60, fixed: "right" as const },
 ];
 
@@ -650,26 +620,6 @@ const pagination = computed(() => ({
             </div>
           </template>
 
-          <!-- 公众号发布状态列 -->
-          <template v-else-if="column.key === 'wechatPublished'">
-            <a-button
-              size="small"
-              :type="record.wechatPublished ? 'primary' : 'default'"
-              :loading="publishPendingId === record.id"
-              class="!text-[11px] !px-2 !py-0.5"
-              @click="handleTogglePublished(record)"
-            >{{ record.wechatPublished ? '已发布' : '未发布' }}</a-button>
-          </template>
-
-          <template v-else-if="column.key === 'publishable'">
-            <a-button
-              size="small"
-              :type="record.publishable ? 'primary' : 'default'"
-              class="!text-[11px] !px-2 !py-0.5"
-              @click="handleTogglePublishable(record)"
-            >{{ record.publishable ? '可发' : '-' }}</a-button>
-          </template>
-
           <!-- 操作列：废弃/恢复 -->
           <template v-else-if="column.key === 'actions'">
             <a-button
@@ -765,19 +715,13 @@ const pagination = computed(() => ({
             <span class="text-xs text-editorial-text-body">{{ record.mode || "-" }}</span>
           </template>
 
-          <!-- 写作耗时列 -->
-          <template v-else-if="column.key === 'writingDuration'">
-            <span class="text-xs text-editorial-text-body">{{ formatDuration(calcWritingDuration(record.stepTrace)) }}</span>
-          </template>
-
-          <!-- 发布时间列 -->
-          <template v-else-if="column.key === 'publishedAt'">
-            <span class="text-xs text-editorial-text-muted">{{ formatLocalTime(record.publishedAt) }}</span>
-          </template>
-
-          <!-- 创建时间列 -->
-          <template v-else-if="column.key === 'createdAt'">
-            <span class="text-xs text-editorial-text-muted">{{ formatLocalTime(record.createdAt) }}</span>
+          <!-- 耗时/时间列：写作耗时 + 发布时间 + 创建时间 三行紧凑展示 -->
+          <template v-else-if="column.key === 'timeInfo'">
+            <div class="flex flex-col gap-0 leading-tight">
+              <span class="text-[10px] text-editorial-text-body">耗时 {{ formatDuration(calcWritingDuration(record.stepTrace)) }}</span>
+              <span class="text-[10px] text-editorial-text-muted">发 {{ formatLocalTime(record.publishedAt) }}</span>
+              <span class="text-[10px] text-editorial-text-muted">建 {{ formatLocalTime(record.createdAt) }}</span>
+            </div>
           </template>
         </template>
       </a-table>

@@ -479,7 +479,7 @@ const columns = [
   { title: "标题", key: "title", width: 300 },
   { title: "封面图", key: "coverImage", width: 70, ellipsis: true },
   { title: "状态", key: "status", width: 100 },
-  { title: "来源", key: "sourceName", width: 115, ellipsis: true },
+  { title: "来源", key: "sourceName", width: 115 },
   { title: "爆文", key: "trend", width: 120, ellipsis: true },
   { title: "相似度", key: "similarity", width: 56, ellipsis: true },
   { title: "模式", key: "mode", width: 48, ellipsis: true },

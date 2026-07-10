@@ -580,7 +580,7 @@ const pagination = computed(() => ({
         row-key="id"
         data-article-table
         size="small"
-        :row-class-name="(record: CreativeFinishedArticle) => record.deletedAt ? 'discarded-row' : record.status === 'needs_review' ? 'review-highlight' : ''"
+        :row-class-name="(record: CreativeFinishedArticle) => record.deletedAt ? 'discarded-row' : record.status === 'needs_review' ? 'review-highlight' : record.status === 'wechat_draft' ? 'completed-row' : ''"
         @change="handleTableChange"
       >
         <template #bodyCell="{ column, record }">
@@ -820,6 +820,15 @@ const pagination = computed(() => ({
 .review-highlight .ant-table-cell-fix-left,
 .review-highlight .ant-table-cell-fix-right {
   background-color: #fffbe6 !important;
+}
+/* 已推送草稿箱行弱化：文章周期已结束，比已废弃稍强一点便于区分 */
+.completed-row td {
+  background-color: #f7f7f7 !important;
+  opacity: 0.65;
+}
+.completed-row .ant-table-cell-fix-left,
+.completed-row .ant-table-cell-fix-right {
+  background-color: #f7f7f7 !important;
 }
 /* 已废弃行置灰（优先级最高，覆盖 review-highlight 等） */
 .discarded-row td {

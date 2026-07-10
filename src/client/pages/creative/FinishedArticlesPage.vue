@@ -481,8 +481,7 @@ const columns = [
   { title: "状态", key: "status", width: 100 },
   { title: "来源", key: "sourceName", width: 170 },
   { title: "来源素材", key: "sourceItem", width: 110, ellipsis: true },
-  { title: "爆文分", key: "trendScore", width: 72, ellipsis: true },
-  { title: "爆文维度", key: "trendBreakdown", width: 160, ellipsis: true },
+  { title: "爆文", key: "trend", width: 120, ellipsis: true },
   { title: "相似度", key: "similarity", width: 72, ellipsis: true },
   { title: "模式", key: "mode", width: 72, ellipsis: true },
   { title: "耗时/时间", key: "timeInfo", width: 130, ellipsis: true },
@@ -656,20 +655,16 @@ const pagination = computed(() => ({
             >素材 #{{ record.sourceItemId }}</a>
           </template>
 
-          <!-- 传播分列 -->
-          <template v-else-if="column.key === 'trendScore'">
-            <span v-if="record.trendScore != null" class="inline-flex items-center rounded-editorial-pill border px-2 py-0.5 text-[11px] font-bold" :class="record.trendScore >= 90 ? 'border-purple-600 bg-purple-600 text-white shadow-sm' : record.trendScore >= 80 ? 'border-red-500 bg-red-500 text-white shadow-sm' : 'border-orange-300 bg-orange-50 text-orange-700'">{{ record.trendScore }}</span>
-            <span v-else class="text-xs text-editorial-text-muted">未评分</span>
-          </template>
-
-          <!-- 评分维度列 -->
-          <template v-else-if="column.key === 'trendBreakdown'">
-            <template v-if="record.trendBreakdown && getBreakdownBars(record.trendBreakdown).length > 0">
-              <a-tooltip :mouse-enter-delay="0.3">
+          <!-- 爆文列：分数 + 维度柱状图 两行紧凑展示 -->
+          <template v-else-if="column.key === 'trend'">
+            <div class="flex flex-col gap-0.5 leading-tight">
+              <span v-if="record.trendScore != null" class="inline-flex items-center self-start rounded-editorial-pill border px-1.5 py-0 text-[10px] font-bold" :class="record.trendScore >= 90 ? 'border-purple-600 bg-purple-600 text-white shadow-sm' : record.trendScore >= 80 ? 'border-red-500 bg-red-500 text-white shadow-sm' : 'border-orange-300 bg-orange-50 text-orange-700'">{{ record.trendScore }}</span>
+              <span v-else class="text-[10px] text-editorial-text-muted">未评分</span>
+              <a-tooltip v-if="record.trendBreakdown && getBreakdownBars(record.trendBreakdown).length > 0" :mouse-enter-delay="0.3">
                 <template #title>
                   <div class="text-xs leading-5">{{ formatBreakdown(record.trendBreakdown) }}</div>
                 </template>
-                <div class="flex h-3 w-full min-w-[80px] overflow-hidden rounded-sm">
+                <div class="flex h-2.5 w-full min-w-[80px] overflow-hidden rounded-sm">
                   <div
                     v-for="(bar, idx) in getBreakdownBars(record.trendBreakdown)"
                     :key="idx"
@@ -678,8 +673,7 @@ const pagination = computed(() => ({
                   />
                 </div>
               </a-tooltip>
-            </template>
-            <span v-else class="text-xs text-editorial-text-muted">-</span>
+            </div>
           </template>
 
           <!-- 相似度列 -->

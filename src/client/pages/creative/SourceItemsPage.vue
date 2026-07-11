@@ -576,14 +576,14 @@ function onOverflowCellLeave(key: string): void {
 }
 
 const columns = [
-  { title: "ID", dataIndex: "id", key: "id", width: 60, fixed: "left" as const },
+  { title: "ID", dataIndex: "id", key: "id", width: 40, fixed: "left" as const },
   { title: "标题", dataIndex: "title", key: "title", width: 300 },
   { title: "来源", dataIndex: "sourceName", key: "sourceName", width: 115 },
-  { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: 90, ellipsis: true },
+  { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: 72, ellipsis: true },
   { title: "评分", key: "score", width: 110 },
   { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 60, align: "center" as const, ellipsis: true },
-  { title: "耗时/时间", key: "timeInfo", width: 120 },
-  { title: "写文章", key: "quickCopy", width: 80, ellipsis: true, fixed: "right" as const }
+  { title: "耗时/时间", key: "timeInfo", width: 100 },
+  { title: "写文章", key: "quickCopy", width: 64, ellipsis: true, fixed: "right" as const }
 ];
 
 const pagination = computed(() => ({

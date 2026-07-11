@@ -15,7 +15,6 @@ import {
   writeSourceItemArticle,
   submitManualWrite,
   traceSourceItem,
-  toggleSourceItemWritable,
   type CreativeSourceItem,
   type CreativeFinishedArticle,
   type TrendBreakdown,
@@ -452,15 +451,6 @@ function stopTracePoll(): void {
   if (tracePollTimer) { clearInterval(tracePollTimer); tracePollTimer = null; }
 }
 
-async function handleToggleWritable(item: CreativeSourceItem): Promise<void> {
-  try {
-    const res = await toggleSourceItemWritable(item.id);
-    if (res.ok) {
-      item.writable = res.writable;
-    }
-  } catch { /* 静默 */ }
-}
-
 function openWriteModeModal(item: CreativeSourceItem): void {
   writeModeTarget.value = item;
   writeModeValue.value = null;
@@ -587,17 +577,12 @@ function onOverflowCellLeave(key: string): void {
 
 const columns = [
   { title: "ID", dataIndex: "id", key: "id", width: 60, fixed: "left" as const },
-  { title: "标题", dataIndex: "title", key: "title", width: 280 },
-  { title: "成品", key: "linkedArticle", width: 100, align: "center" as const },
-  { title: "来源", dataIndex: "sourceName", key: "sourceName", width: 170 },
+  { title: "标题", dataIndex: "title", key: "title", width: 300 },
+  { title: "来源", dataIndex: "sourceName", key: "sourceName", width: 115 },
   { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: 90, ellipsis: true },
-  { title: "评分", dataIndex: "score", key: "score", width: 72, ellipsis: true },
-  { title: "爆文分", key: "trendScore", width: 72, ellipsis: true },
-  { title: "爆文维度", key: "trendBreakdown", width: 120, ellipsis: true },
+  { title: "评分", key: "score", width: 110 },
   { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 60, align: "center" as const, ellipsis: true },
-  { title: "发布时间", dataIndex: "publishedAt", key: "publishedAt", width: 130, ellipsis: true },
-  { title: "成品创建时间", key: "linkedArticleCreatedAt", width: 140, ellipsis: true },
-  { title: "可写", key: "writable", width: 60, align: "center" as const },
+  { title: "耗时/时间", key: "timeInfo", width: 120 },
   { title: "写文章", key: "quickCopy", width: 80, ellipsis: true, fixed: "right" as const }
 ];
 
@@ -712,23 +697,18 @@ const pagination = computed(() => ({
                 </span>
               </a-tooltip>
             </div>
-          </template>
-
-          <!-- 成品列 -->
-          <template v-else-if="column.key === 'linkedArticle'">
-            <div v-if="record.linkedArticleId != null" class="flex flex-wrap items-center justify-center gap-1 leading-tight">
+            <div v-if="record.linkedArticleId != null" class="mt-0.5 flex flex-wrap items-center gap-1 leading-none">
               <a
-                class="inline-flex cursor-pointer items-center gap-1 rounded-editorial-pill bg-editorial-link-active/30 px-2 py-0.5 text-[11px] font-semibold text-editorial-link-active hover:bg-editorial-link-active/50"
+                class="inline-flex cursor-pointer items-center gap-1 rounded-editorial-pill bg-editorial-link-active/30 px-1.5 py-0 text-[10px] font-semibold text-editorial-link-active hover:bg-editorial-link-active/50"
                 @click.prevent="openArticleModal(record.linkedArticleId!)"
               >
-                #{{ record.linkedArticleId }}
+                成品 #{{ record.linkedArticleId }}
               </a>
               <span
                 v-if="(record as any).linkedArticlePublished"
-                class="inline-flex items-center rounded-editorial-pill bg-green-100 px-1.5 py-0.5 text-[10px] leading-none text-green-700"
+                class="inline-flex items-center rounded-editorial-pill bg-green-100 px-1.5 py-0 text-[10px] leading-none text-green-700"
               >已发布</span>
             </div>
-            <span v-else class="text-xs text-editorial-text-muted">-</span>
           </template>
 
           <!-- 来源列 -->
@@ -739,38 +719,32 @@ const pagination = computed(() => ({
               placement="topLeft"
             >
               <span
-                class="line-clamp-2 text-[13px] leading-tight text-editorial-text-body"
+                class="line-clamp-3 text-[10px] leading-tight text-editorial-text-body"
                 @mouseenter="onOverflowCellEnter('sourceName-' + record.id, $event)"
                 @mouseleave="onOverflowCellLeave('sourceName-' + record.id)"
               >{{ (record.sourceName || "-").replace("微信公众号", "WX") }}</span>
             </a-tooltip>
           </template>
 
-          <!-- 评分列 -->
+          <!-- 评分列：评分 + 爆文分 + 爆文维度柱状图 三行紧凑展示 -->
           <template v-else-if="column.key === 'score'">
-            <span
-              v-if="record.score != null"
-              class="inline-flex items-center rounded-editorial-pill border border-editorial-border bg-editorial-link-active px-2 py-0.5 text-[11px] font-semibold text-editorial-text-main"
-            >
-              {{ record.score }}
-            </span>
-            <span v-else class="text-editorial-text-muted">-</span>
-          </template>
-
-          <!-- 传播分列 -->
-          <template v-else-if="column.key === 'trendScore'">
-            <span v-if="record.trendScore != null" class="inline-flex items-center rounded-editorial-pill border px-2 py-0.5 text-[11px] font-bold" :class="record.trendScore >= 90 ? 'border-purple-600 bg-purple-600 text-white shadow-sm' : record.trendScore >= 80 ? 'border-red-500 bg-red-500 text-white shadow-sm' : 'border-orange-300 bg-orange-50 text-orange-700'">{{ record.trendScore }}</span>
-            <span v-else class="text-xs text-editorial-text-muted">未评分</span>
-          </template>
-
-          <!-- 评分维度列 -->
-          <template v-else-if="column.key === 'trendBreakdown'">
-            <template v-if="record.trendBreakdown && getBreakdownBars(record.trendBreakdown).length > 0">
-              <a-tooltip :mouse-enter-delay="0.3">
+            <div class="flex flex-col gap-0.5 leading-tight">
+              <div class="flex items-center gap-1">
+                <span
+                  v-if="record.score != null"
+                  class="inline-flex items-center rounded-editorial-pill border border-editorial-border bg-editorial-link-active px-1.5 py-0 text-[10px] font-semibold text-editorial-text-main"
+                >{{ record.score }}</span>
+                <span
+                  v-if="record.trendScore != null"
+                  class="inline-flex items-center rounded-editorial-pill border px-1.5 py-0 text-[10px] font-bold"
+                  :class="record.trendScore >= 90 ? 'border-purple-600 bg-purple-600 text-white shadow-sm' : record.trendScore >= 80 ? 'border-red-500 bg-red-500 text-white shadow-sm' : 'border-orange-300 bg-orange-50 text-orange-700'"
+                >{{ record.trendScore }}</span>
+              </div>
+              <a-tooltip v-if="record.trendBreakdown && getBreakdownBars(record.trendBreakdown).length > 0" :mouse-enter-delay="0.3">
                 <template #title>
                   <div class="text-xs leading-5">{{ formatBreakdown(record.trendBreakdown) }}</div>
                 </template>
-                <div class="flex h-3 w-full min-w-[80px] overflow-hidden rounded-sm">
+                <div class="flex h-2.5 w-full min-w-[80px] overflow-hidden rounded-sm">
                   <div
                     v-for="(bar, idx) in getBreakdownBars(record.trendBreakdown)"
                     :key="idx"
@@ -779,8 +753,7 @@ const pagination = computed(() => ({
                   />
                 </div>
               </a-tooltip>
-            </template>
-            <span v-else class="text-xs text-editorial-text-muted">-</span>
+            </div>
           </template>
 
           <!-- Agent 列 -->
@@ -794,15 +767,12 @@ const pagination = computed(() => ({
             </a-tooltip>
           </template>
 
-          <!-- 发布时间列 -->
-          <template v-else-if="column.key === 'publishedAt'">
-            <span class="text-xs text-editorial-text-muted">{{ formatPublishedAt(record.publishedAt) }}</span>
-          </template>
-
-          <!-- 成品创建时间列 -->
-          <template v-else-if="column.key === 'linkedArticleCreatedAt'">
-            <span v-if="record.linkedArticleCreatedAt" class="text-xs text-editorial-text-muted">{{ formatPublishedAt(record.linkedArticleCreatedAt) }}</span>
-            <span v-else class="text-xs text-editorial-text-muted">-</span>
+          <!-- 耗时/时间列：发布时间 + 成品创建时间 两行紧凑展示 -->
+          <template v-else-if="column.key === 'timeInfo'">
+            <div class="flex flex-col gap-0 leading-tight">
+              <span class="text-[10px] text-editorial-text-muted">发 {{ formatPublishedAt(record.publishedAt) }}</span>
+              <span class="text-[10px] text-editorial-text-muted">建 {{ record.linkedArticleCreatedAt ? formatPublishedAt(record.linkedArticleCreatedAt) : '-' }}</span>
+            </div>
           </template>
 
           <!-- 写作状态列 -->
@@ -813,16 +783,6 @@ const pagination = computed(() => ({
               </a-tag>
               <a-tag v-if="record.writeCount > 0" color="green" class="!m-0 !text-[11px] !py-0">{{ record.writeCount }}次</a-tag>
             </div>
-          </template>
-
-          <!-- 可写列 -->
-          <template v-else-if="column.key === 'writable'">
-            <a-button
-              size="small"
-              :type="record.writable ? 'primary' : 'default'"
-              class="!text-[11px] !px-2 !py-0.5"
-              @click="handleToggleWritable(record)"
-            >{{ record.writable ? '可写' : '-' }}</a-button>
           </template>
 
           <!-- 写文章列 -->

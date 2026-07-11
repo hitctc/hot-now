@@ -1776,7 +1776,7 @@ async function handleDetailRestore(): Promise<void> {
 // 有保存时间后启动每秒刷新，让相对时间持续更新
 watch(lastSavedAt, (ts) => {
   if (ts != null && !relativeTimer) {
-    relativeTimer = setInterval(() => { relativeTick.value++; }, 10000);
+    relativeTimer = setInterval(() => { relativeTick.value++; }, 5000);
   }
 });
 

@@ -1383,7 +1383,7 @@ async function selectCoverImage(idx: number): Promise<void> {
   } catch { /* 静默失败，本地状态已更新 */ }
 }
 
-// 10 秒防抖自动保存正文
+// 5 秒防抖自动保存正文
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
 watch(editContent, (val) => {
@@ -1393,7 +1393,7 @@ watch(editContent, (val) => {
     if (val !== lastSavedContent && props.article) {
       doSaveContent(val);
     }
-  }, 10_000);
+  }, 5_000);
 });
 
 watch(() => props.open, (val) => {

@@ -1401,6 +1401,8 @@ watch(() => props.open, (val) => {
     const md = props.article.contentMarkdown || "";
     editContent.value = md;
     lastSavedContent = md;
+    // 重置保存时间，避免上一篇的相对时间残留到当前文章
+    lastSavedAt.value = null;
     // 重置本地缓存状态
     localCoverImages.value = [];
     localTitles.value = [];
@@ -1769,7 +1771,7 @@ async function handleDetailRestore(): Promise<void> {
 // 有保存时间后启动每秒刷新，让相对时间持续更新
 watch(lastSavedAt, (ts) => {
   if (ts != null && !relativeTimer) {
-    relativeTimer = setInterval(() => { relativeTick.value++; }, 1000);
+    relativeTimer = setInterval(() => { relativeTick.value++; }, 10000);
   }
 });
 

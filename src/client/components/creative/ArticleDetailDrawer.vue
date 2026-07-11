@@ -1422,6 +1422,11 @@ watch(() => props.open, (val) => {
     nextTick(() => setupEditorResize());
   } else {
     teardownEditorResize();
+    // 关闭弹窗时如果有未保存的内容，立即保存一次，避免防抖定时器还没触发就丢失
+    if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+    if (props.article && editContent.value !== lastSavedContent) {
+      void doSaveContent(editContent.value);
+    }
   }
 });
 

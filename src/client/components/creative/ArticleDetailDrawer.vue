@@ -453,7 +453,7 @@
             <div class="flex items-center gap-2">
               <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文</h3>
               <span class="text-[11px] text-editorial-text-muted">{{ countWords(editContent) }}字</span>
-              <span v-if="lastSavedAt" class="text-[11px] text-editorial-text-muted">{{ lastSavedAt }}</span>
+              <span v-if="savedAtLabel" class="text-[11px] font-medium text-green-600">{{ savedAtLabel }}</span>
             </div>
             <template v-if="!props.readonly">
               <div class="flex flex-wrap items-center gap-2">
@@ -500,7 +500,7 @@
           <div class="flex flex-wrap items-center gap-2">
             <h3 class="m-0 text-sm font-semibold" style="color: var(--editorial-text-main);">正文编辑（全屏）</h3>
             <span class="text-[11px]" style="color: var(--editorial-text-muted);">{{ countWords(editContent) }}字</span>
-            <span v-if="lastSavedAt" class="text-[11px]" style="color: var(--editorial-text-muted);">{{ lastSavedAt }}</span>
+            <span v-if="savedAtLabel" class="text-[11px] font-medium text-green-600">{{ savedAtLabel }}</span>
           </div>
           <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
             <div class="flex flex-wrap gap-1">
@@ -760,9 +760,31 @@ function handleFullscreenEsc(e: KeyboardEvent): void {
 
 const editContent = ref("");
 const saving = ref(false);
-const lastSavedAt = ref("");
+const lastSavedAt = ref<number | null>(null);
+// 相对时间展示需要每秒刷新，用 tick 驱动 computed 重算
+const relativeTick = ref(0);
+let relativeTimer: ReturnType<typeof setInterval> | null = null;
 // 记住打开时的原始内容，用于判断是否真正发生变化
 let lastSavedContent = "";
+
+// 保存时间相对格式化：60秒内显示秒前，60分钟内分钟前，24小时内小时前，否则天前
+function formatRelativeTime(ts: number): string {
+  const diff = Math.max(0, Date.now() - ts);
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return `${sec}秒前`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}分钟前`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}小时前`;
+  return `${Math.floor(hr / 24)}天前`;
+}
+
+const savedAtLabel = computed(() => {
+  // 依赖 relativeTick 触发重算
+  void relativeTick.value;
+  if (lastSavedAt.value == null) return "";
+  return `保存成功 · ${formatRelativeTime(lastSavedAt.value)}`;
+});
 
 // ─── 标题选择 & 重新生成 ───
 
@@ -1407,7 +1429,7 @@ async function doSaveContent(content: string): Promise<void> {
   try {
     await editFinishedArticle(props.article.id, { contentMarkdown: content });
     lastSavedContent = content;
-    lastSavedAt.value = `保存成功(${new Date().toLocaleTimeString("zh-CN", { hour12: false })})`;
+    lastSavedAt.value = Date.now();
     emit("saved");
   } catch {
     message.error("自动保存失败");
@@ -1424,7 +1446,7 @@ async function handleSave(): Promise<void> {
       contentMarkdown: editContent.value,
     });
     lastSavedContent = editContent.value;
-    lastSavedAt.value = `保存成功(${new Date().toLocaleTimeString("zh-CN", { hour12: false })})`;
+    lastSavedAt.value = Date.now();
     emit("saved");
   } catch {
     message.error("保存失败");
@@ -1744,9 +1766,17 @@ async function handleDetailRestore(): Promise<void> {
   }
 }
 
+// 有保存时间后启动每秒刷新，让相对时间持续更新
+watch(lastSavedAt, (ts) => {
+  if (ts != null && !relativeTimer) {
+    relativeTimer = setInterval(() => { relativeTick.value++; }, 1000);
+  }
+});
+
 onBeforeUnmount(() => {
   teardownEditorResize();
   if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+  if (relativeTimer) { clearInterval(relativeTimer); relativeTimer = null; }
 });
 </script>
 

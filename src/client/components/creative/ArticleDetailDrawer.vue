@@ -324,6 +324,19 @@
           </ul>
         </section>
 
+        <!-- 配图提示词（短内容线：只产出提示词不出图，手动出图用） -->
+        <section v-if="article?.imagePrompts && article.imagePrompts.length">
+          <div class="mb-2 flex items-center justify-between">
+            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">配图提示词</h3>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <div v-for="(p, i) in article.imagePrompts" :key="i" class="flex items-start gap-1.5 rounded border border-editorial-border bg-editorial-bg-page px-2 py-1">
+              <span class="flex-1 text-[11px] leading-relaxed text-editorial-text-muted">{{ p }}</span>
+              <button class="shrink-0 text-[11px] text-editorial-link-active hover:underline" @click="copyPrompt(p)">复制</button>
+            </div>
+          </div>
+        </section>
+
         <!-- 封面图 -->
         <section>
           <div class="mb-2 flex items-center justify-between">

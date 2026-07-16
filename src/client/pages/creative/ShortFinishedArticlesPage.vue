@@ -486,7 +486,7 @@ function copyId(id: number): void {
 const columns = [
   { title: "ID", dataIndex: "id", key: "id", width: 60, fixed: "left" as const },
   { title: "标题", key: "title", width: 300 },
-  { title: "配图", key: "coverImage", width: 90, ellipsis: true },
+  { title: "配图提示词", key: "coverImage", width: 240, ellipsis: true },
   { title: "状态", key: "status", width: 100 },
   { title: "来源", key: "sourceName", width: 115 },
   { title: "爆文", key: "trend", width: 120, ellipsis: true },
@@ -582,13 +582,16 @@ const pagination = computed(() => ({
 
           <!-- 封面图列 -->
           <template v-else-if="column.key === 'coverImage'">
-            <div class="flex items-center gap-1">
-              <!-- 短内容贴文：优先显示配图提示词（hover 看全文，手动出图用） -->
+            <div class="flex flex-col gap-0.5">
+              <!-- 短内容贴文：直接显示配图提示词内容（截断），hover 看全文 -->
               <a-tooltip v-if="record.imagePrompts && record.imagePrompts.length" placement="topLeft">
                 <template #title>
-                  <div v-for="(p, i) in record.imagePrompts" :key="i" class="max-w-[320px] text-xs whitespace-pre-wrap">{{ p }}</div>
+                  <div v-for="(p, i) in record.imagePrompts" :key="i" class="max-w-[380px] whitespace-pre-wrap text-xs">{{ p }}</div>
                 </template>
-                <span class="cursor-pointer text-editorial-link-active">{{ record.imagePrompts.length }}条提示词</span>
+                <div class="cursor-help text-[11px] leading-snug text-editorial-link-active line-clamp-2">
+                  {{ record.imagePrompts[0] }}
+                </div>
+                <div v-if="record.imagePrompts.length > 1" class="text-[10px] text-editorial-text-muted">共 {{ record.imagePrompts.length }} 条</div>
               </a-tooltip>
               <a-image
                 v-else-if="record.coverImage && record.coverImage.length > 0"

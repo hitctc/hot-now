@@ -284,6 +284,7 @@ export type EditCreativeFinishedArticleInput = {
   wechatHtml?: string | null;
   coverImagePrompt?: string;
   inlineImagePrompts?: Record<string, string>;
+  imagePrompts?: string[];
   similarityCheck?: Record<string, unknown>;
   needsManualReview?: boolean;
   manualReviewReason?: string;
@@ -644,6 +645,10 @@ export function editCreativeFinishedArticle(
   if (input.inlineImagePrompts !== undefined) {
     setClauses.push("inline_image_prompts = ?");
     params.push(JSON.stringify(input.inlineImagePrompts));
+  }
+  if (input.imagePrompts !== undefined) {
+    setClauses.push("image_prompts = ?");
+    params.push(JSON.stringify(input.imagePrompts));
   }
   if (input.similarityCheck !== undefined) {
     setClauses.push("similarity_check = ?");

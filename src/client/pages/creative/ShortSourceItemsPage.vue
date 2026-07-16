@@ -43,10 +43,9 @@ const writingStatusFilter = ref<string | undefined>(saved.writingStatus || undef
 const sourceNameFilter = ref(saved.sourceName || "");
 const writableOnly = ref(false);
 const searchText = ref(saved.search || "");
-// 爆文分下限：筛选 trend_score >= 该值的素材。
-// localStorage 里无此字段时默认 60；用户主动清空后为 null（不过滤）。
+// 爆文分下限：短内容线默认不按反转分过滤（多数素材尚未评分），用户主动设置才生效
 const minTrendScore = ref<number | null>(
-  "minTrendScore" in saved ? (saved.minTrendScore ?? null) : 60
+  "minTrendScore" in saved ? (saved.minTrendScore ?? null) : null
 );
 
 // 搜索历史

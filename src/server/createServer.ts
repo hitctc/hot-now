@@ -1140,6 +1140,7 @@ export function createServer(deps: ServerDeps = {}) {
     if (body?.wechatHtml !== undefined) { editInput.wechatHtml = body.wechatHtml; updatedFields.push("wechatHtml"); }
     if (body?.coverImagePrompt !== undefined) { editInput.coverImagePrompt = body.coverImagePrompt; updatedFields.push("coverImagePrompt"); }
     if (body?.inlineImagePrompts !== undefined) { editInput.inlineImagePrompts = body.inlineImagePrompts; updatedFields.push("inlineImagePrompts"); }
+    if (body?.imagePrompts !== undefined) { editInput.imagePrompts = body.imagePrompts; updatedFields.push("imagePrompts"); }
     if (body?.similarityCheck !== undefined) { editInput.similarityCheck = body.similarityCheck; updatedFields.push("similarityCheck"); }
     if (body?.needsManualReview !== undefined) { editInput.needsManualReview = body.needsManualReview; updatedFields.push("needsManualReview"); }
     if (body?.manualReviewReason !== undefined) { editInput.manualReviewReason = body.manualReviewReason; updatedFields.push("manualReviewReason"); }

@@ -463,8 +463,16 @@ async function copyText(text: string): Promise<void> {
 // ─── 状态标签（统一由 articleStatusShared 管理） ───
 
 // 状态标签渲染函数，直接转发到共享模块
+// 短内容线状态（draft/ready/needs_rewrite/published）映射中文，公众号状态作 fallback
+const SHORT_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  draft: { label: "草稿", color: "default" },
+  ready: { label: "可发布", color: "green" },
+  needs_rewrite: { label: "待重写", color: "orange" },
+  published: { label: "已发布", color: "blue" }
+};
+
 function getStatusInfo(status: string): { label: string; color: string } {
-  return getStatusLabel(status);
+  return SHORT_STATUS_LABELS[status] ?? getStatusLabel(status);
 }
 
 // ─── 表格列 ───
@@ -478,7 +486,7 @@ function copyId(id: number): void {
 const columns = [
   { title: "ID", dataIndex: "id", key: "id", width: 60, fixed: "left" as const },
   { title: "标题", key: "title", width: 300 },
-  { title: "封面图", key: "coverImage", width: 70, ellipsis: true },
+  { title: "配图", key: "coverImage", width: 90, ellipsis: true },
   { title: "状态", key: "status", width: 100 },
   { title: "来源", key: "sourceName", width: 115 },
   { title: "爆文", key: "trend", width: 120, ellipsis: true },
@@ -575,15 +583,21 @@ const pagination = computed(() => ({
           <!-- 封面图列 -->
           <template v-else-if="column.key === 'coverImage'">
             <div class="flex items-center gap-1">
-              <a-tooltip v-if="record.coverImage && record.coverImage.length > 0" :title="record.coverImagePrompt ? `Prompt: ${record.coverImagePrompt}` : '无 Prompt'" placement="topLeft">
-                <a-image
-                  :src="record.coverImage[0]"
-                  :width="44"
-                  class="!rounded !border !border-editorial-border !object-contain"
-                  style="max-height:44px;"
-                />
+              <!-- 短内容贴文：优先显示配图提示词（hover 看全文，手动出图用） -->
+              <a-tooltip v-if="record.imagePrompts && record.imagePrompts.length" placement="topLeft">
+                <template #title>
+                  <div v-for="(p, i) in record.imagePrompts" :key="i" class="max-w-[320px] text-xs whitespace-pre-wrap">{{ p }}</div>
+                </template>
+                <span class="cursor-pointer text-editorial-link-active">{{ record.imagePrompts.length }}条提示词</span>
               </a-tooltip>
-              <span v-else class="text-xs text-editorial-text-muted">无</span>
+              <a-image
+                v-else-if="record.coverImage && record.coverImage.length > 0"
+                :src="record.coverImage[0]"
+                :width="44"
+                class="!rounded !border !border-editorial-border !object-contain"
+                style="max-height:44px;"
+              />
+              <span v-else class="text-xs text-editorial-text-muted">—</span>
             </div>
           </template>
 

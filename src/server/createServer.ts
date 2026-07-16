@@ -778,7 +778,8 @@ export function createServer(deps: ServerDeps = {}) {
       collectorTimestamp: typeof body?.collectorTimestamp === "string" ? body.collectorTimestamp : undefined,
       writingStatus: typeof body?.writingStatus === "string" && ["ready", "writing", "done", "skipped", "excluded"].includes(body.writingStatus) ? body.writingStatus as "ready" | "writing" | "done" | "skipped" | "excluded" : undefined,
       trendScore: typeof body?.trendScore === "number" ? body.trendScore : undefined,
-      trendBreakdown: typeof body?.trendBreakdown === "object" && body.trendBreakdown !== null ? body.trendBreakdown as any : undefined
+      trendBreakdown: typeof body?.trendBreakdown === "object" && body.trendBreakdown !== null ? body.trendBreakdown as any : undefined,
+      direction: typeof body?.direction === "string" ? body.direction : undefined
     });
 
     return reply.code(result.created ? 201 : 200).send({
@@ -843,6 +844,11 @@ export function createServer(deps: ServerDeps = {}) {
       stopStep: typeof body?.stopStep === "number" ? body.stopStep : undefined,
       reasonCode: typeof body?.reasonCode === "string" ? body.reasonCode : undefined,
       reasonText: typeof body?.reasonText === "string" ? body.reasonText : undefined,
+      direction: typeof body?.direction === "string" ? body.direction : undefined,
+      form: typeof body?.form === "string" ? body.form : undefined,
+      reversalScore: typeof body?.reversalScore === "number" ? body.reversalScore : undefined,
+      reversalAngle: typeof body?.reversalAngle === "string" ? body.reversalAngle : undefined,
+      imagePrompts: Array.isArray(body?.imagePrompts) ? body.imagePrompts as string[] : undefined,
     });
 
     // 推送成品文章后，自动将素材写作状态标为 done
@@ -936,7 +942,8 @@ export function createServer(deps: ServerDeps = {}) {
       search: query.search,
       trendScoreMin: query.trendScoreMin ? parseInt(query.trendScoreMin, 10) : undefined,
       sourceFeed: query.sourceFeed || undefined,
-      last24h: query.sourceFeed ? true : undefined
+      last24h: query.sourceFeed ? true : undefined,
+      direction: query.direction as string | undefined
     });
 
     // 批量查询关联成品文章的创建时间和公众号发布状态
@@ -1011,7 +1018,8 @@ export function createServer(deps: ServerDeps = {}) {
       status: query.status,
       search: query.search,
       publishable: query.publishable === "1" ? true : undefined,
-      includeDeleted: query.includeDeleted === "1" ? true : undefined
+      includeDeleted: query.includeDeleted === "1" ? true : undefined,
+      direction: query.direction as string | undefined
     });
 
     // 批量查询关联素材的 trendScore/trendBreakdown/publishedAt

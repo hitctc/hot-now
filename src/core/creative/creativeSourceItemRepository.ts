@@ -27,6 +27,7 @@ const SELECT_COLUMNS = `
   trend_breakdown,
   traced_sources_json,
   writable,
+  direction,
   linked_article_id,
   created_at,
   updated_at,
@@ -57,6 +58,7 @@ type SourceItemRow = {
   trend_breakdown: string | null;
   traced_sources_json: string | null;
   writable: number;
+  direction: string;
   linked_article_id: number | null;
   created_at: string;
   updated_at: string;
@@ -88,6 +90,7 @@ function mapRow(row: SourceItemRow): CreativeSourceItemRecord {
     trendBreakdown: row.trend_breakdown ? JSON.parse(row.trend_breakdown) : null,
     tracedSources: row.traced_sources_json ? JSON.parse(row.traced_sources_json) : null,
     writable: row.writable === 1,
+    direction: row.direction,
     linkedArticleId: row.linked_article_id,
     writeCount: row.write_count ?? 0,
     createdAt: row.created_at,
@@ -140,6 +143,7 @@ export type CreativeSourceItemRecord = {
   trendBreakdown: TrendBreakdown | null;
   tracedSources: TracedSource[] | null;
   writable: boolean;
+  direction: string;
   linkedArticleId: number | null;
   writeCount: number;
   createdAt: string;
@@ -166,6 +170,7 @@ export type InsertCreativeSourceItemInput = {
   writingStatus?: CreativeSourceItemWritingStatus;
   trendScore?: number | null;
   trendBreakdown?: TrendBreakdown | null;
+  direction?: string;
 };
 
 export type ListCreativeSourceItemsFilters = {
@@ -179,6 +184,7 @@ export type ListCreativeSourceItemsFilters = {
   trendScoreMin?: number;
   last24h?: boolean;
   sourceFeed?: string;
+  direction?: string;
 };
 
 export type ListCreativeSourceItemsResult = {
@@ -267,9 +273,10 @@ export function insertCreativeSourceItem(
         writing_status,
         raw_payload_json,
         trend_score,
-        trend_breakdown
+        trend_breakdown,
+        direction
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
   ).run(
     input.externalId,
@@ -291,7 +298,8 @@ export function insertCreativeSourceItem(
     input.writingStatus ?? "ready",
     rawPayloadJson,
     input.trendScore ?? null,
-    input.trendBreakdown ? JSON.stringify(input.trendBreakdown) : null
+    input.trendBreakdown ? JSON.stringify(input.trendBreakdown) : null,
+    input.direction ?? "article"
   );
 
   const row = db
@@ -361,6 +369,11 @@ export function listCreativeSourceItems(
 
   if (filters.writable === true) {
     whereClauses.push("writable = 1");
+  }
+
+  if (filters.direction) {
+    whereClauses.push("direction = ?");
+    params.push(filters.direction);
   }
 
   if (filters.search) {

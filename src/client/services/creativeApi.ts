@@ -37,6 +37,7 @@ export type CreativeSourceItem = {
   tracedSources: TracedSource[] | null;
   writable: boolean;
   writeCount: number;
+  direction?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -108,6 +109,11 @@ export type CreativeFinishedArticle = {
   wechatThemeId: string | null;
   wechatHtml: string | null;
   pushCount: number;
+  direction?: string;
+  form?: string | null;
+  reversalScore?: number | null;
+  reversalAngle?: string | null;
+  imagePrompts?: string[] | null;
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
   sourceTitle: string | null;
@@ -162,6 +168,7 @@ export function readCreativeSourceItems(params?: {
   search?: string;
   /** 爆文分下限，仅显示 trend_score >= 该值的素材；为 null/undefined 时不限 */
   minTrendScore?: number;
+  direction?: string;
 }): Promise<SourceItemListResponse> {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
@@ -172,6 +179,7 @@ export function readCreativeSourceItems(params?: {
   if (params?.writable) query.set("writable", "1");
   if (params?.search) query.set("search", params.search);
   if (params?.minTrendScore != null) query.set("trendScoreMin", String(params.minTrendScore));
+  if (params?.direction) query.set("direction", params.direction);
   const qs = query.toString();
   return requestJson<SourceItemListResponse>(`/api/creative/source-items${qs ? `?${qs}` : ""}`);
 }
@@ -197,6 +205,7 @@ export function readCreativeFinishedArticles(params?: {
   search?: string;
   publishable?: string;
   includeDeleted?: string;
+  direction?: string;
 }): Promise<FinishedArticleListResponse> {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
@@ -205,6 +214,7 @@ export function readCreativeFinishedArticles(params?: {
   if (params?.search) query.set("search", params.search);
   if (params?.publishable) query.set("publishable", params.publishable);
   if (params?.includeDeleted) query.set("includeDeleted", params.includeDeleted);
+  if (params?.direction) query.set("direction", params.direction);
   const qs = query.toString();
   return requestJson<FinishedArticleListResponse>(`/api/creative/finished-articles${qs ? `?${qs}` : ""}`);
 }

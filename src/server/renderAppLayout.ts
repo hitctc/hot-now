@@ -27,6 +27,8 @@ const appShellPages: AppShellPage[] = [
   { path: "/ai-timeline", title: "AI 时间线", section: "content", description: "这里会按时间追踪主流 AI 公司官方发布的模型、产品、开发生态和行业动态。" },
   { path: "/creative/source-items", title: "素材库", section: "creative", description: "查看外部 agent 推送的新闻素材和关联的成品文章。" },
   { path: "/creative/finished-articles", title: "成品文章", section: "creative", description: "查看、编辑和管理 AI 写作的成品文章。" },
+  { path: "/creative/short-source-items", title: "短内容素材", section: "creative", description: "短内容线（反转贴文/短文）的热搜素材。" },
+  { path: "/creative/short-finished-articles", title: "短内容成品", section: "creative", description: "短内容线写作产出的贴文和短文成品。" },
   { path: "/daily-digest", title: "AI日报", section: "creative", description: "每日自动生成的 AI 动态信息合集，按天查看和管理。" },
   { path: "/settings/sources", title: "数据收集", section: "system", description: "这里会管理 RSS 数据源的启用状态、抓取结果和手动采集。" },
   {

@@ -40,6 +40,11 @@ const SELECT_COLUMNS = `
   deleted_at,
   wechat_theme_id,
   wechat_html,
+  direction,
+  form,
+  reversal_score,
+  reversal_angle,
+  image_prompts,
   created_at,
   updated_at,
   (SELECT COUNT(*) FROM wechat_draft_push_log WHERE article_id = creative_finished_articles.id AND status = 'success') AS push_count
@@ -81,6 +86,11 @@ type ArticleRow = {
   deleted_at: string | null;
   wechat_theme_id: string | null;
   wechat_html: string | null;
+  direction: string;
+  form: string | null;
+  reversal_score: number | null;
+  reversal_angle: string | null;
+  image_prompts: string | null;
   push_count: number;
   created_at: string;
   updated_at: string;
@@ -146,6 +156,11 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     deletedAt: row.deleted_at ?? null,
     wechatThemeId: row.wechat_theme_id,
     wechatHtml: row.wechat_html,
+    direction: row.direction,
+    form: row.form,
+    reversalScore: row.reversal_score,
+    reversalAngle: row.reversal_angle,
+    imagePrompts: row.image_prompts ? JSON.parse(row.image_prompts) : null,
     pushCount: row.push_count ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -204,6 +219,11 @@ export type CreativeFinishedArticleRecord = {
   deletedAt: string | null;
   wechatThemeId: string | null;
   wechatHtml: string | null;
+  direction: string;
+  form: string | null;
+  reversalScore: number | null;
+  reversalAngle: string | null;
+  imagePrompts: string[] | null;
   pushCount: number;
   createdAt: string;
   updatedAt: string;
@@ -235,6 +255,11 @@ export type InsertCreativeFinishedArticleInput = {
   stopStep?: number;
   reasonCode?: string;
   reasonText?: string;
+  direction?: string;
+  form?: string;
+  reversalScore?: number;
+  reversalAngle?: string;
+  imagePrompts?: string[];
 };
 
 export type EditCreativeFinishedArticleInput = {
@@ -277,6 +302,7 @@ export type ListCreativeFinishedArticlesFilters = {
   search?: string;
   publishable?: boolean;
   includeDeleted?: boolean;
+  direction?: string;
 };
 
 export type ListCreativeFinishedArticlesResult = {
@@ -319,9 +345,14 @@ export function insertCreativeFinishedArticle(
         reason_text,
         status,
         anomaly_reason,
-        raw_response_text
+        raw_response_text,
+        direction,
+        form,
+        reversal_score,
+        reversal_angle,
+        image_prompts
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
   ).run(
     input.sourceItemId,
@@ -348,7 +379,12 @@ export function insertCreativeFinishedArticle(
     input.reasonText ?? null,
     input.status ?? "generated",
     input.anomalyReason ?? null,
-    input.rawResponseText ?? null
+    input.rawResponseText ?? null,
+    input.direction ?? "article",
+    input.form ?? null,
+    input.reversalScore ?? null,
+    input.reversalAngle ?? null,
+    input.imagePrompts ? JSON.stringify(input.imagePrompts) : null
   );
 
   const row = db
@@ -406,6 +442,11 @@ export function listCreativeFinishedArticles(
   if (filters.status) {
     whereClauses.push("status = ?");
     params.push(filters.status);
+  }
+
+  if (filters.direction) {
+    whereClauses.push("direction = ?");
+    params.push(filters.direction);
   }
 
   if (filters.search) {

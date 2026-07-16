@@ -9,6 +9,8 @@ export type ShellPageKey =
   | "ai-timeline-admin"
   | "creative-source-items"
   | "creative-finished-articles"
+  | "creative-short-source-items"
+  | "creative-short-finished-articles"
   | "daily-digest"
   | "monitor"
   | "view-rules"
@@ -73,6 +75,24 @@ const creativeFinishedArticlesPageMeta = {
   navLabel: "成品文章",
   title: "成品文章",
   description: "查看、编辑和管理 AI 写作的成品文章。"
+} as const satisfies ShellPageMeta;
+
+const creativeShortSourceItemsPageMeta = {
+  key: "creative-short-source-items",
+  path: "/creative/short-source-items",
+  section: "creative",
+  navLabel: "短内容素材",
+  title: "短内容线 · 素材库",
+  description: "短内容线（反转贴文/短文）的热搜素材。"
+} as const satisfies ShellPageMeta;
+
+const creativeShortFinishedArticlesPageMeta = {
+  key: "creative-short-finished-articles",
+  path: "/creative/short-finished-articles",
+  section: "creative",
+  navLabel: "短内容成品",
+  title: "短内容线 · 成品",
+  description: "短内容线写作产出的贴文和短文成品。"
 } as const satisfies ShellPageMeta;
 
 const dailyDigestPageMeta = {
@@ -144,6 +164,8 @@ export const shellPageMetas = [
   // aiTimelinePageMeta, // 暂时下架 AI 时间线（2026-05-17）
   creativeSourceItemsPageMeta,
   creativeFinishedArticlesPageMeta,
+  creativeShortSourceItemsPageMeta,
+  creativeShortFinishedArticlesPageMeta,
   dailyDigestPageMeta,
   sourcesPageMeta,
   // aiTimelineAdminPageMeta, // 暂时下架 AI 时间线 feed 管理（2026-05-17）
@@ -206,6 +228,8 @@ const aiHotPage = () => import("./pages/content/AiHotPage.vue");
 const aiTimelinePage = () => import("./pages/content/AiTimelinePage.vue");
 const creativeSourceItemsPage = () => import("./pages/creative/SourceItemsPage.vue");
 const creativeFinishedArticlesPage = () => import("./pages/creative/FinishedArticlesPage.vue");
+const creativeShortSourceItemsPage = () => import("./pages/creative/ShortSourceItemsPage.vue");
+const creativeShortFinishedArticlesPage = () => import("./pages/creative/ShortFinishedArticlesPage.vue");
 const dailyDigestPage = () => import("./pages/creative/DailyDigestPage.vue");
 const monitorPage = () => import("./pages/creative/MonitorPage.vue");
 
@@ -216,6 +240,8 @@ const routes: RouteRecordRaw[] = [
   // createShellRoute(aiTimelinePageMeta, aiTimelinePage), // 暂时下架 AI 时间线（2026-05-17）
   createShellRoute(creativeSourceItemsPageMeta, creativeSourceItemsPage),
   createShellRoute(creativeFinishedArticlesPageMeta, creativeFinishedArticlesPage),
+  createShellRoute(creativeShortSourceItemsPageMeta, creativeShortSourceItemsPage),
+  createShellRoute(creativeShortFinishedArticlesPageMeta, creativeShortFinishedArticlesPage),
   createShellRoute(dailyDigestPageMeta, dailyDigestPage),
   createShellRoute(viewRulesPageMeta, viewRulesPage),
   createShellRoute(sourcesPageMeta, sourcesPage),

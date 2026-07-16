@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 35;
+const schemaVersion = 36;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -1327,6 +1327,30 @@ export function runMigrations(db: SqliteDatabase): void {
     }
 
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(35, stepTraceMigrationName);
+
+    // 036: 短内容线 direction 字段 + 短内容成品特有字段
+    const shortContentMigrationName = "036_direction_and_short_content_fields";
+    if (!hasColumn(db, "creative_source_items", "direction")) {
+      db.exec(`ALTER TABLE creative_source_items ADD COLUMN direction TEXT NOT NULL DEFAULT 'article'`);
+    }
+    if (!hasColumn(db, "creative_finished_articles", "direction")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN direction TEXT NOT NULL DEFAULT 'article'`);
+    }
+    if (!hasColumn(db, "creative_finished_articles", "form")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN form TEXT`);
+    }
+    if (!hasColumn(db, "creative_finished_articles", "reversal_score")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN reversal_score REAL`);
+    }
+    if (!hasColumn(db, "creative_finished_articles", "reversal_angle")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN reversal_angle TEXT`);
+    }
+    if (!hasColumn(db, "creative_finished_articles", "image_prompts")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN image_prompts TEXT`);
+    }
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_creative_source_items_direction ON creative_source_items(direction)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_creative_finished_articles_direction ON creative_finished_articles(direction)`);
+    db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(36, shortContentMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

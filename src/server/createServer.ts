@@ -2801,12 +2801,14 @@ export function createServer(deps: ServerDeps = {}) {
   if (authEnabled) {
     app.get("/login", async (request, reply) => {
       const existingSession = readAuthenticatedSession(request.headers.cookie, authConfig?.sessionSecret ?? "");
+      const redirectTarget = safeRedirectTarget((request.query as { redirect?: unknown } | undefined)?.redirect) || "";
 
+      // 已登录访问 /login：有回跳目标就去目标，否则回首页
       if (existingSession) {
-        return reply.redirect("/");
+        return reply.redirect(redirectTarget || "/");
       }
 
-      return reply.type("text/html").send(renderLoginPage());
+      return reply.type("text/html").send(renderLoginPage(redirectTarget));
     });
 
     app.post("/login", async (request, reply) => {
@@ -2814,9 +2816,10 @@ export function createServer(deps: ServerDeps = {}) {
         return reply.code(503).send({ ok: false, reason: "login-disabled" });
       }
 
-      const body = request.body as { username?: unknown; password?: unknown } | undefined;
+      const body = request.body as { username?: unknown; password?: unknown; redirect?: unknown } | undefined;
       const username = typeof body?.username === "string" ? body.username.trim() : "";
       const password = typeof body?.password === "string" ? body.password : "";
+      const redirectTarget = safeRedirectTarget(body?.redirect) || "";
 
       if (!username || !password) {
         return reply.code(400).send({ ok: false, reason: "invalid-credentials-format" });
@@ -2846,7 +2849,7 @@ export function createServer(deps: ServerDeps = {}) {
         })
       );
 
-      return reply.redirect("/");
+      return reply.redirect(redirectTarget || "/");
     });
 
     app.post("/logout", async (request, reply) => {
@@ -2876,7 +2879,7 @@ export function createServer(deps: ServerDeps = {}) {
 
         // Content pages stay readable without a session, but system pages still require an authenticated user.
         if (!session && (currentPage.section === "system" || currentPage.section === "creative")) {
-          return reply.redirect("/login");
+          return redirectToLogin(reply, request);
         }
 
         if (isClientSettingsPath(currentPage.path)) {
@@ -2964,13 +2967,13 @@ export function createServer(deps: ServerDeps = {}) {
     });
   }
 
-  app.get("/history", async (_request, reply) => {
+  app.get("/history", async (request, reply) => {
     if (authEnabled) {
       // Legacy pages stay mounted for compatibility, but unified auth mode requires a valid session first.
-      const session = readAuthenticatedSession(_request.headers.cookie, authConfig?.sessionSecret ?? "");
+      const session = readAuthenticatedSession(request.headers.cookie, authConfig?.sessionSecret ?? "");
 
       if (!session) {
-        return reply.redirect("/login");
+        return redirectToLogin(reply, request);
       }
     }
 
@@ -2983,7 +2986,7 @@ export function createServer(deps: ServerDeps = {}) {
       const session = readAuthenticatedSession(request.headers.cookie, authConfig?.sessionSecret ?? "");
 
       if (!session) {
-        return reply.redirect("/login");
+        return redirectToLogin(reply, request);
       }
     }
 
@@ -2996,12 +2999,12 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.type("text/html").send(html);
   });
 
-  app.get("/control", async (_request, reply) => {
+  app.get("/control", async (request, reply) => {
     if (authEnabled) {
-      const session = readAuthenticatedSession(_request.headers.cookie, authConfig?.sessionSecret ?? "");
+      const session = readAuthenticatedSession(request.headers.cookie, authConfig?.sessionSecret ?? "");
 
       if (!session) {
-        return reply.redirect("/login");
+        return redirectToLogin(reply, request);
       }
     }
 
@@ -5842,7 +5845,21 @@ function parseStringArray(value: unknown): { ok: true; values: string[] } | { ok
   return values.length === value.length ? { ok: true, values } : { ok: false };
 }
 
-function renderLoginPage() {
+// 登录回跳白名单：只允许同源相对路径，挡掉 //evil.com 协议相对 URL 和 /login 自指
+function safeRedirectTarget(target: unknown): string | null {
+  if (typeof target !== "string") return null;
+  if (!target.startsWith("/") || target.startsWith("//")) return null;
+  if (target === "/login") return null;
+  return target;
+}
+
+// 未登录跳登录页时带上原地址，登录后才能回到原页面；helper 收口多处调用避免漏改
+function redirectToLogin(reply: FastifyReply, request: FastifyRequest) {
+  const target = safeRedirectTarget(request.url) || "";
+  return reply.redirect(target ? `/login?redirect=${encodeURIComponent(target)}` : "/login");
+}
+
+function renderLoginPage(redirectTarget?: string) {
   // Login remains a small self-contained page that posts JSON without adding extra Fastify plugins.
   return `<!doctype html>
 <html lang="zh-CN">
@@ -5896,6 +5913,7 @@ function renderLoginPage() {
       </section>
     </main>
     <script>
+      const redirectTarget = ${JSON.stringify(redirectTarget || "")};
       const form = document.getElementById("login-form");
       const errorNode = document.getElementById("login-error");
       const submitBtn = form ? form.querySelector(".primary-button") : null;
@@ -5928,7 +5946,7 @@ function renderLoginPage() {
           const response = await fetch("/login", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ username, password })
+            body: JSON.stringify({ username, password, redirect: redirectTarget || undefined })
           });
 
           if (response.redirected) {
@@ -5937,7 +5955,7 @@ function renderLoginPage() {
           }
 
           if (response.status === 200 || response.status === 204 || response.status === 302) {
-            location.href = "/";
+            location.href = redirectTarget || "/";
             return;
           }
 

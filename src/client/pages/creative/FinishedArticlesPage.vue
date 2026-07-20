@@ -166,6 +166,7 @@ async function loadItems(): Promise<void> {
   isLoading.value = true;
   try {
     const res = await readCreativeFinishedArticles({
+      direction: "article",
       page: currentPage.value,
       pageSize: pageSize.value,
       status: statusFilter.value || undefined,

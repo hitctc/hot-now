@@ -491,7 +491,7 @@ const columns = [
   { title: "来源", key: "sourceName", width: 115 },
   { title: "爆文", key: "trend", width: 120, ellipsis: true },
   { title: "相似度", key: "similarity", width: 56, ellipsis: true },
-  { title: "模式", key: "mode", width: 48, ellipsis: true },
+  { title: "形态", key: "form", width: 72 },
   { title: "耗时/时间", key: "timeInfo", width: 130, ellipsis: true },
   { title: "操作", key: "actions", width: 60, fixed: "right" as const },
 ];
@@ -657,6 +657,20 @@ const pagination = computed(() => ({
               class="!text-[10px] !px-1.5 !py-0"
               @click="handleRestoreArticle(record)"
             >恢复</a-button>
+          </template>
+
+          <!-- 形态列：贴图(tuwen) / 反转文(duanwen) -->
+          <template v-else-if="column.key === 'form'">
+            <a-tag
+              v-if="record.form === 'tuwen'"
+              color="blue"
+              class="!m-0 !text-[11px] !py-0"
+            >贴图</a-tag>
+            <a-tag
+              v-else
+              color="cyan"
+              class="!m-0 !text-[11px] !py-0"
+            >反转文</a-tag>
           </template>
 
 

@@ -625,7 +625,7 @@ export function writeSourceItemArticle(id: number, mode?: string, thesis?: strin
 }
 
 /** 调用 Hermes /api/short/write 写短内容成品（tuwen/duanwen），异步。externalId 定位素材 */
-export function writeSourceItemShort(id: number, externalId: string, form: "tuwen" | "duanwen"): Promise<WriteArticleResult> {
+export function writeSourceItemShort(id: number, externalId: string, form: "tuwen" | "duanwen" | "auto"): Promise<WriteArticleResult> {
   return requestJson<WriteArticleResult>(`/api/creative/source-items/${id}/write-short`, {
     method: "POST",
     body: JSON.stringify({ externalId, form }),

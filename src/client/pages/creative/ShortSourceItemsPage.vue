@@ -327,11 +327,12 @@ function setWritingIds(ids: Set<number>): void {
 }
 const writeModeVisible = ref(false);
 const writeModeTarget = ref<CreativeSourceItem | null>(null);
-const writeModeValue = ref<string | null>("duanwen");
+const writeModeValue = ref<string | null>("auto");
 const writeModeThesis = ref("");
 const writeModeConfirming = ref(false);
 
 const writeModeOptions = [
+  { value: "auto", label: "自动判断 — LLM 按素材选贴图/反转文" },
   { value: "duanwen", label: "反转文（duanwen）— 纯文字反转短文，不配图" },
   { value: "tuwen", label: "贴图（tuwen）— 配图贴文，带配图提示词" },
 ];
@@ -451,7 +452,7 @@ function stopTracePoll(): void {
 
 function openWriteModeModal(item: CreativeSourceItem): void {
   writeModeTarget.value = item;
-  writeModeValue.value = "duanwen";
+  writeModeValue.value = "auto";
   writeModeThesis.value = "";
   writeModeVisible.value = true;
 }
@@ -518,7 +519,7 @@ async function confirmWriteMode(): Promise<void> {
   if (!item) return;
   writeModeConfirming.value = true;
   try {
-    const result = await writeSourceItemShort(item.id, item.externalId ?? "", (writeModeValue.value ?? "duanwen") as "tuwen" | "duanwen");
+    const result = await writeSourceItemShort(item.id, item.externalId ?? "", (writeModeValue.value ?? "auto") as "tuwen" | "duanwen" | "auto");
     if (result.ok) {
       writeModeVisible.value = false;
       addWritingId(item.id);

@@ -12,7 +12,7 @@ import {
   readCreativeSourceItem,
   readCreativeFinishedArticle,
   updateSourceItemWritingStatus,
-  writeSourceItemArticle,
+  writeSourceItemShort,
   submitManualWrite,
   traceSourceItem,
   type CreativeSourceItem,
@@ -327,15 +327,13 @@ function setWritingIds(ids: Set<number>): void {
 }
 const writeModeVisible = ref(false);
 const writeModeTarget = ref<CreativeSourceItem | null>(null);
-const writeModeValue = ref<string | null>(null);
+const writeModeValue = ref<string | null>("duanwen");
 const writeModeThesis = ref("");
 const writeModeConfirming = ref(false);
 
 const writeModeOptions = [
-  { value: null, label: "自动判断（LLM 选择最合适的模式）" },
-  { value: "A", label: "短篇观点文（A）— 600~1500 字" },
-  { value: "B", label: "短篇随笔（B）— 600~1500 字" },
-  { value: "C", label: "长篇观点文（C）— 3000~6000 字" },
+  { value: "duanwen", label: "反转文（duanwen）— 纯文字反转短文，不配图" },
+  { value: "tuwen", label: "贴图（tuwen）— 配图贴文，带配图提示词" },
 ];
 
 // ─── 手动写作弹窗 ───
@@ -453,7 +451,7 @@ function stopTracePoll(): void {
 
 function openWriteModeModal(item: CreativeSourceItem): void {
   writeModeTarget.value = item;
-  writeModeValue.value = null;
+  writeModeValue.value = "duanwen";
   writeModeThesis.value = "";
   writeModeVisible.value = true;
 }
@@ -520,7 +518,7 @@ async function confirmWriteMode(): Promise<void> {
   if (!item) return;
   writeModeConfirming.value = true;
   try {
-    const result = await writeSourceItemArticle(item.id, writeModeValue.value ?? undefined, writeModeThesis.value.trim() || undefined);
+    const result = await writeSourceItemShort(item.id, item.externalId ?? "", (writeModeValue.value ?? "duanwen") as "tuwen" | "duanwen");
     if (result.ok) {
       writeModeVisible.value = false;
       addWritingId(item.id);
@@ -788,7 +786,7 @@ const pagination = computed(() => ({
           <!-- 写文章列 -->
           <template v-else-if="column.key === 'quickCopy'">
             <a-tooltip v-if="!pipelineOn" title="管线已紧急制动，请先恢复管线">
-              <a-button type="link" size="small" class="!p-0 !text-[11px]" disabled>写文章</a-button>
+              <a-button type="link" size="small" class="!p-0 !text-[11px]" disabled>写短内容</a-button>
             </a-tooltip>
             <a-button
               v-else
@@ -797,7 +795,7 @@ const pagination = computed(() => ({
               class="!p-0 !text-[11px]"
               :disabled="writingIds.has(record.id)"
               @click="openWriteModeModal(record)"
-            >{{ writingIds.has(record.id) ? '写作中...' : '写文章' }}</a-button>
+            >{{ writingIds.has(record.id) ? '写作中...' : '写短内容' }}</a-button>
           </template>
         </template>
 
@@ -944,7 +942,7 @@ const pagination = computed(() => ({
     <!-- 写文章模式选择弹窗 -->
     <a-modal
       :open="writeModeVisible"
-      title="选择写作模式"
+      title="选择短内容形态"
       :confirm-loading="writeModeConfirming"
       ok-text="开始写作"
       cancel-text="取消"
@@ -962,15 +960,6 @@ const pagination = computed(() => ({
           {{ opt.label }}
         </a-radio>
       </a-radio-group>
-      <div class="mt-4">
-        <div class="mb-1 text-xs font-medium text-editorial-text-muted">核心立意（可选）</div>
-        <a-input
-          v-model:value="writeModeThesis"
-          placeholder="可选：指定文章的核心观点/立意"
-          allow-clear
-        />
-        <div class="mt-0.5 text-[10px] text-editorial-text-muted">指定后系统会锁定这个观点，不会被自动替换或反转</div>
-      </div>
     </a-modal>
 
     <!-- 手动写作弹窗 -->

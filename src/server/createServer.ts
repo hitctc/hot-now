@@ -1824,6 +1824,52 @@ export function createServer(deps: ServerDeps = {}) {
     }
   });
 
+  // ─── 短内容素材写短内容：调用 Hermes /api/short/write，异步执行 ───
+  app.post("/api/creative/source-items/:id/write-short", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+    if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
+
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const body = request.body as { externalId?: string; form?: string } | undefined;
+    const item = findCreativeSourceItemById(db, id);
+    if (!item) { return reply.code(404).send({ ok: false, reason: "source-item-not-found" }); }
+
+    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+    const hermesApiToken = process.env.HERMES_API_TOKEN;
+    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
+
+    const form = body?.form === "tuwen" ? "tuwen" : "duanwen";
+    const hermesBody: Record<string, unknown> = { form };
+    if (typeof body?.externalId === "string" && body.externalId.trim()) {
+      hermesBody.external_id = body.externalId.trim();
+    }
+
+    try {
+      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/short/write`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
+        body: JSON.stringify(hermesBody),
+        signal: AbortSignal.timeout(15_000),
+      });
+
+      if (!res.ok) {
+        const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
+        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, hermesResponse: errorBody });
+      }
+
+      const data = await res.json() as { success?: boolean; error?: string };
+      if (!data.success) {
+        return reply.code(502).send({ ok: false, reason: data.error ?? "写短内容失败", hermesResponse: JSON.stringify(data) });
+      }
+
+      return reply.send({ ok: true, status: "writing" });
+    } catch (err) {
+      const errMessage = (err as Error).message ?? String(err);
+      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败`, detail: errMessage });
+    }
+  });
+
 
 
   // ─── 手动输入内容写文章：创建手动素材 + 触发 Hermes 写作 ───

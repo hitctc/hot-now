@@ -409,14 +409,11 @@
   color: #fff !important;
 }
 
-/* 移动端弹窗去掉 antd 默认的 content padding（20px 24px），让寸土寸金的小屏多显示内容。
-   桌面端保持默认。两点必要说明：
-   1) 必须在 @layer 外 + !important：antd v5 用 CSS-in-JS 在运行时往 <head> 注入 <style>，
-      权重和加载顺序都不稳定（经常晚于打包 CSS 注入），普通选择器覆写不住，!important 最稳。
-   2) 全局命中所有弹窗：已有的 editorial-form-modal / editorial-feedback-modal 本来就是
-      padding:0，不受影响；裸用默认样式的弹窗（详情/审核/推送等）在移动端会贴边，内容优先。 */
-@media (max-width: 767px) {
-  .ant-modal .ant-modal-content {
-    padding: 0 !important;
-  }
+/* 全局去掉 antd 默认的弹窗 content padding（20px 24px），PC 和移动端都生效。
+   必须在 @layer 外 + !important：antd v5 用 CSS-in-JS 在运行时往 <head> 注入 <style>，
+   权重和加载顺序都不稳定（经常晚于打包 CSS 注入），普通选择器覆写不住，!important 最稳。
+   已有的 editorial-form-modal / editorial-feedback-modal 本来就是 padding:0，不受影响；
+   裸用默认样式的弹窗（详情/审核/推送等）content 会贴边，标题/正文区各自的内边距仍保留。 */
+.ant-modal .ant-modal-content {
+  padding: 0 !important;
 }

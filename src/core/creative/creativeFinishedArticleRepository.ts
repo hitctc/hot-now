@@ -45,6 +45,7 @@ const SELECT_COLUMNS = `
   reversal_score,
   reversal_angle,
   image_prompts,
+  comments,
   created_at,
   updated_at,
   (SELECT COUNT(*) FROM wechat_draft_push_log WHERE article_id = creative_finished_articles.id AND status = 'success') AS push_count
@@ -91,6 +92,7 @@ type ArticleRow = {
   reversal_score: number | null;
   reversal_angle: string | null;
   image_prompts: string | null;
+  comments: string | null;
   push_count: number;
   created_at: string;
   updated_at: string;
@@ -161,6 +163,7 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     reversalScore: row.reversal_score,
     reversalAngle: row.reversal_angle,
     imagePrompts: row.image_prompts ? JSON.parse(row.image_prompts) : null,
+    comments: row.comments ? JSON.parse(row.comments) : null,
     pushCount: row.push_count ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -224,6 +227,7 @@ export type CreativeFinishedArticleRecord = {
   reversalScore: number | null;
   reversalAngle: string | null;
   imagePrompts: string[] | null;
+  comments: { reader: string; author_reply: string }[] | null;
   pushCount: number;
   createdAt: string;
   updatedAt: string;
@@ -260,6 +264,7 @@ export type InsertCreativeFinishedArticleInput = {
   reversalScore?: number;
   reversalAngle?: string;
   imagePrompts?: string[];
+  comments?: { reader: string; author_reply: string }[];
 };
 
 export type EditCreativeFinishedArticleInput = {
@@ -351,9 +356,10 @@ export function insertCreativeFinishedArticle(
         form,
         reversal_score,
         reversal_angle,
-        image_prompts
+        image_prompts,
+        comments
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
   ).run(
     input.sourceItemId,
@@ -385,7 +391,8 @@ export function insertCreativeFinishedArticle(
     input.form ?? null,
     input.reversalScore ?? null,
     input.reversalAngle ?? null,
-    input.imagePrompts ? JSON.stringify(input.imagePrompts) : null
+    input.imagePrompts ? JSON.stringify(input.imagePrompts) : null,
+    input.comments ? JSON.stringify(input.comments) : null
   );
 
   const row = db

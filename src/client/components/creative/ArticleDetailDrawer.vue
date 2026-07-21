@@ -337,6 +337,27 @@
           </div>
         </section>
 
+        <!-- 读者评论 + 作者回复（写作时生成，可复制用于发布互动） -->
+        <section v-if="article?.comments && article.comments.length">
+          <div class="mb-2 flex items-center justify-between">
+            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">读者评论 + 作者回复</h3>
+            <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText((article?.comments ?? []).map(formatCommentPair).join('\n\n'))">复制全部</a-button>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <div v-for="(c, i) in article.comments" :key="i" class="rounded border border-editorial-border bg-editorial-bg-page px-2 py-1.5">
+              <div class="flex items-start gap-1.5">
+                <span class="shrink-0 text-[10px] font-medium text-editorial-text-muted">读者</span>
+                <span class="flex-1 text-[12px] leading-relaxed text-editorial-text-body">{{ c.reader }}</span>
+              </div>
+              <div class="mt-1 flex items-start gap-1.5">
+                <span class="shrink-0 text-[10px] font-medium text-editorial-text-muted">作者</span>
+                <span class="flex-1 text-[12px] leading-relaxed text-editorial-text-body">{{ c.author_reply }}</span>
+              </div>
+              <button class="mt-1 text-[11px] text-editorial-link-active hover:underline" @click="copyText(formatCommentPair(c))">复制</button>
+            </div>
+          </div>
+        </section>
+
         <!-- 封面图 -->
         <section>
           <div class="mb-2 flex items-center justify-between">
@@ -1651,6 +1672,11 @@ async function copyAsWechatFormat(): Promise<void> {
 async function copyText(text: string): Promise<void> {
   await navigator.clipboard.writeText(text);
   message.success("已复制到剪贴板");
+}
+
+// 格式化一条评论+回复（单条/整块复制都用）
+function formatCommentPair(c: { reader: string; author_reply: string }): string {
+  return `读者：${c.reader}\n作者回复：${c.author_reply}`;
 }
 
 async function copyMarkdownAsPlainText(mdText: string): Promise<void> {

@@ -71,6 +71,8 @@ export type StepTraceEntry = {
   meta?: Record<string, unknown>;
 };
 
+export type ArticleComment = { reader: string; author_reply: string };
+
 export type CreativeFinishedArticle = {
   id: number;
   sourceItemId: number;
@@ -114,6 +116,7 @@ export type CreativeFinishedArticle = {
   reversalScore?: number | null;
   reversalAngle?: string | null;
   imagePrompts?: string[] | null;
+  comments?: ArticleComment[] | null;
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
   sourceTitle: string | null;

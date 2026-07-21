@@ -849,6 +849,10 @@ export function createServer(deps: ServerDeps = {}) {
       reversalScore: typeof body?.reversalScore === "number" ? body.reversalScore : undefined,
       reversalAngle: typeof body?.reversalAngle === "string" ? body.reversalAngle : undefined,
       imagePrompts: Array.isArray(body?.imagePrompts) ? body.imagePrompts as string[] : undefined,
+      comments: Array.isArray(body?.comments)
+        ? body.comments.filter((c): c is { reader: string; author_reply: string } =>
+            !!c && typeof c.reader === "string" && typeof c.author_reply === "string")
+        : undefined,
     });
 
     // 推送成品文章后，自动将素材写作状态标为 done

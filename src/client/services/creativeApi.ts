@@ -117,6 +117,7 @@ export type CreativeFinishedArticle = {
   reversalAngle?: string | null;
   imagePrompts?: string[] | null;
   comments?: ArticleComment[] | null;
+  authorExtensions?: string[] | null;
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
   sourceTitle: string | null;
@@ -512,6 +513,19 @@ export type GenerateCommentsResult = {
 /** 调用后端代理按需生成读者评论+作者回复，返回更新后的 comments 数组 */
 export function generateComments(id: number): Promise<GenerateCommentsResult> {
   return requestJson<GenerateCommentsResult>(`/api/creative/finished-articles/${id}/generate-comments`, {
+    method: "POST",
+  });
+}
+
+export type GenerateAuthorExtensionsResult = {
+  ok: boolean;
+  extensions?: string[];
+  reason?: string;
+};
+
+/** 调用后端代理按需生成作者拓展评论，返回更新后的 extensions 数组 */
+export function generateAuthorExtensions(id: number): Promise<GenerateAuthorExtensionsResult> {
+  return requestJson<GenerateAuthorExtensionsResult>(`/api/creative/finished-articles/${id}/generate-author-extensions`, {
     method: "POST",
   });
 }

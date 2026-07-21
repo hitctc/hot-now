@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 37;
+const schemaVersion = 38;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -1358,6 +1358,13 @@ export function runMigrations(db: SqliteDatabase): void {
       db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN comments TEXT`);
     }
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(37, commentsMigrationName);
+
+    // 038: 成品作者拓展评论（公众号+短内容共用，写作时生成）
+    const authorExtensionsMigrationName = "038_finished_articles_author_extensions";
+    if (!hasColumn(db, "creative_finished_articles", "author_extensions")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN author_extensions TEXT`);
+    }
+    db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(38, authorExtensionsMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

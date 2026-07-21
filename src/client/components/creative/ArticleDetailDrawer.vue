@@ -363,6 +363,24 @@
           <p v-else class="m-0 text-[12px] leading-relaxed text-editorial-text-muted">暂无评论，点击右上「生成评论」按需补生成。</p>
         </section>
 
+        <!-- 作者拓展（作者视角的延伸评论：总结/隐喻/感悟/延伸/反问，5 条长短不一） -->
+        <section v-if="!props.readonly || (article?.authorExtensions && article.authorExtensions.length)">
+          <div class="mb-2 flex items-center justify-between">
+            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">作者拓展</h3>
+            <div class="flex items-center gap-2">
+              <a-button v-if="article?.authorExtensions && article.authorExtensions.length" type="link" size="small" class="!p-0 !text-[11px]" @click="copyText((article?.authorExtensions ?? []).join('\n\n'))">复制全部</a-button>
+              <a-button v-if="!props.readonly" type="link" size="small" class="!p-0 !text-[11px]" :loading="generatingAuthorExtensions" :disabled="generatingAuthorExtensions" @click="handleGenerateAuthorExtensions">{{ generatingAuthorExtensions ? '生成中...' : (article?.authorExtensions && article.authorExtensions.length ? '重新生成拓展' : '生成拓展') }}</a-button>
+            </div>
+          </div>
+          <div v-if="article?.authorExtensions && article.authorExtensions.length" class="flex flex-col gap-1.5">
+            <div v-for="(ext, i) in article.authorExtensions" :key="i" class="flex items-start gap-1.5 rounded border border-editorial-border bg-editorial-bg-page px-2 py-1.5">
+              <span class="flex-1 text-[12px] leading-relaxed text-editorial-text-body">{{ ext }}</span>
+              <button class="shrink-0 text-[11px] text-editorial-link-active hover:underline" @click="copyText(ext)">复制</button>
+            </div>
+          </div>
+          <p v-else class="m-0 text-[12px] leading-relaxed text-editorial-text-muted">暂无作者拓展，点击右上「生成拓展」按需补生成。</p>
+        </section>
+
         <!-- 封面图 -->
         <section>
           <div class="mb-2 flex items-center justify-between">
@@ -603,6 +621,7 @@ import {
   restoreFinishedArticle,
   regenCover,
   generateComments,
+  generateAuthorExtensions,
   regenTitle,
   regenIntro,
   regenInlineImage,
@@ -1268,6 +1287,8 @@ const activeCoverIndex = ref(0);
 const regenerating = ref(false);
 // 按需生成评论的 loading 态
 const generatingComments = ref(false);
+// 按需生成作者拓展的 loading 态
+const generatingAuthorExtensions = ref(false);
 // 本地缓存最新的 coverImage 数组，regen 后不依赖父组件刷新
 const localCoverImages = ref<string[]>([]);
 
@@ -1340,6 +1361,26 @@ async function handleGenerateComments(): Promise<void> {
     message.error("评论生成请求失败");
   } finally {
     generatingComments.value = false;
+  }
+}
+
+// 按需补作者拓展：调后端代理拉 Hermes 生成 5 条作者视角拓展 + 注入 article.authorExtensions
+async function handleGenerateAuthorExtensions(): Promise<void> {
+  if (!props.article || generatingAuthorExtensions.value) return;
+  generatingAuthorExtensions.value = true;
+  try {
+    const result = await generateAuthorExtensions(props.article.id);
+    if (result.ok && result.extensions) {
+      props.article.authorExtensions = result.extensions;
+      message.success(`已生成 ${result.extensions.length} 条作者拓展`);
+      tickArticleChange();
+    } else {
+      message.error(result.reason ?? "作者拓展生成失败");
+    }
+  } catch {
+    message.error("作者拓展生成请求失败");
+  } finally {
+    generatingAuthorExtensions.value = false;
   }
 }
 

@@ -46,6 +46,7 @@ const SELECT_COLUMNS = `
   reversal_angle,
   image_prompts,
   comments,
+  author_extensions,
   created_at,
   updated_at,
   (SELECT COUNT(*) FROM wechat_draft_push_log WHERE article_id = creative_finished_articles.id AND status = 'success') AS push_count
@@ -93,6 +94,7 @@ type ArticleRow = {
   reversal_angle: string | null;
   image_prompts: string | null;
   comments: string | null;
+  author_extensions: string | null;
   push_count: number;
   created_at: string;
   updated_at: string;
@@ -164,6 +166,7 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     reversalAngle: row.reversal_angle,
     imagePrompts: row.image_prompts ? JSON.parse(row.image_prompts) : null,
     comments: row.comments ? JSON.parse(row.comments) : null,
+    authorExtensions: row.author_extensions ? JSON.parse(row.author_extensions) : null,
     pushCount: row.push_count ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -228,6 +231,7 @@ export type CreativeFinishedArticleRecord = {
   reversalAngle: string | null;
   imagePrompts: string[] | null;
   comments: { reader: string; author_reply: string }[] | null;
+  authorExtensions: string[] | null;
   pushCount: number;
   createdAt: string;
   updatedAt: string;
@@ -265,6 +269,7 @@ export type InsertCreativeFinishedArticleInput = {
   reversalAngle?: string;
   imagePrompts?: string[];
   comments?: { reader: string; author_reply: string }[];
+  authorExtensions?: string[];
 };
 
 export type EditCreativeFinishedArticleInput = {
@@ -291,6 +296,7 @@ export type EditCreativeFinishedArticleInput = {
   inlineImagePrompts?: Record<string, string>;
   imagePrompts?: string[];
   comments?: { reader: string; author_reply: string }[];
+  authorExtensions?: string[];
   similarityCheck?: Record<string, unknown>;
   needsManualReview?: boolean;
   manualReviewReason?: string;
@@ -358,7 +364,8 @@ export function insertCreativeFinishedArticle(
         reversal_score,
         reversal_angle,
         image_prompts,
-        comments
+        comments,
+        author_extensions
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
@@ -393,7 +400,8 @@ export function insertCreativeFinishedArticle(
     input.reversalScore ?? null,
     input.reversalAngle ?? null,
     input.imagePrompts ? JSON.stringify(input.imagePrompts) : null,
-    input.comments ? JSON.stringify(input.comments) : null
+    input.comments ? JSON.stringify(input.comments) : null,
+    input.authorExtensions ? JSON.stringify(input.authorExtensions) : null
   );
 
   const row = db
@@ -661,6 +669,10 @@ export function editCreativeFinishedArticle(
   if (input.comments !== undefined) {
     setClauses.push("comments = ?");
     params.push(JSON.stringify(input.comments));
+  }
+  if (input.authorExtensions !== undefined) {
+    setClauses.push("author_extensions = ?");
+    params.push(JSON.stringify(input.authorExtensions));
   }
   if (input.similarityCheck !== undefined) {
     setClauses.push("similarity_check = ?");

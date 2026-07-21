@@ -63,8 +63,24 @@ const paramGroup = [
   { key: "interval_codex_consume", label: "Codex 消费间隔（分钟）", type: "number" as const, description: "Codex 结果消费间隔" },
 ];
 
+// 第四组：短内容线（反转贴文/短文）
+const shortContentGroup = [
+  {
+    key: "short_content",
+    label: "短内容线",
+    type: "onoff" as const,
+    description: "关闭后采集、评分、写作全部停止",
+    confirmMessages: {
+      onToOff: { title: "关闭短内容线", content: "短内容线的采集、评分、写作将全部停止。确认关闭？" },
+      offToOn: { title: "开启短内容线", content: "短内容线恢复运行，下一轮调度到来时正常执行。确认开启？" },
+    },
+  },
+  { key: "interval_short_content", label: "运行间隔（分钟）", type: "number" as const, description: "自动运行间隔，默认 60，建议 ≥10" },
+  { key: "short_content_batch_size", label: "每次写作数量", type: "number" as const, description: "每次自动跑写几篇反转内容，默认 1" },
+];
+
 type SwitchDef = { key: string; confirmChange?: boolean; confirmMessages?: Record<string, { title: string; content: string }> };
-const allDefs = [...pipelineGroup, ...businessGroup, ...paramGroup] as SwitchDef[];
+const allDefs = [...pipelineGroup, ...businessGroup, ...paramGroup, ...shortContentGroup] as SwitchDef[];
 
 // 状态摘要
 const statusSummary = computed(() => {
@@ -331,6 +347,23 @@ onBeforeUnmount(() => { if (countdownTimer) clearInterval(countdownTimer); });
         <div v-if="providerAutoSince || codexAutoSince" class="mt-2 rounded border border-editorial-border bg-editorial-bg-page px-2.5 py-1.5 space-y-0.5">
           <div v-if="providerAutoSince" class="text-[10px] text-editorial-text-muted">服务商自动生效于 {{ formatSince(providerAutoSince) }}</div>
           <div v-if="codexAutoSince" class="text-[10px] text-editorial-text-muted">Codex 自动生效于 {{ formatSince(codexAutoSince) }}</div>
+        </div>
+      </div>
+
+      <!-- 第四组：短内容线（反转贴文/短文） -->
+      <div class="mb-2 mt-3 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">短内容线</div>
+      <div class="space-y-1.5">
+        <div v-for="def in shortContentGroup" :key="def.key" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5">
+          <div class="min-w-0 flex-1">
+            <span class="text-xs font-medium text-editorial-text-body">{{ def.label }}</span>
+            <span class="ml-1 text-[10px] text-editorial-text-muted/70">{{ def.description }}</span>
+          </div>
+          <span class="shrink-0 text-[10px] font-mono text-editorial-text-muted/60">{{ switches[def.key] ?? '-' }}</span>
+          <a-switch v-if="def.type === 'onoff'" :checked="isOn(def.key)" :loading="saving === def.key" size="small" @change="(checked: boolean) => handleSwitchChange(def.key, checked)" />
+          <template v-else-if="def.type === 'number'">
+            <a-input-number :value="hasDraft(def.key) ? draftNumbers[def.key] : Number(switches[def.key] ?? 0)" :min="0" :step="1" size="small" class="!w-20" :disabled="saving === def.key" @change="(val: number) => onNumberInput(def.key, val)" />
+            <button class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium disabled:opacity-50" :class="hasDraft(def.key) ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-gray-100 text-gray-400 cursor-default'" :disabled="saving === def.key || !hasDraft(def.key)" @click="confirmNumber(def.key)">确认</button>
+          </template>
         </div>
       </div>
     </a-spin>

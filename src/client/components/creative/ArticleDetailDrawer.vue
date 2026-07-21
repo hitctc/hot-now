@@ -494,8 +494,8 @@
               <span v-if="savedAtLabel" class="text-[11px] font-medium text-green-600">{{ savedAtLabel }}</span>
             </div>
             <template v-if="!props.readonly">
-              <div class="flex flex-wrap items-center gap-2">
-                <div class="flex flex-wrap gap-1">
+              <div class="flex flex-wrap items-center gap-2 max-[768px]:flex-nowrap max-[768px]:overflow-x-auto">
+                <div class="flex flex-wrap gap-1 max-[768px]:flex-nowrap">
                   <a-button
                     v-for="opt in previewThemeOptions"
                     :key="opt.key"
@@ -540,8 +540,8 @@
             <span class="text-[11px]" style="color: var(--editorial-text-muted);">{{ countWords(editContent) }}字</span>
             <span v-if="savedAtLabel" class="text-[11px] font-medium text-green-600">{{ savedAtLabel }}</span>
           </div>
-          <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <div class="flex flex-wrap gap-1">
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1 max-[768px]:flex-nowrap max-[768px]:overflow-x-auto">
+            <div class="flex flex-wrap gap-1 max-[768px]:flex-nowrap">
               <a-button
                 v-for="opt in previewThemeOptions"
                 :key="opt.key"
@@ -1906,14 +1906,17 @@ onBeforeUnmount(() => {
     padding: 8px 12px !important;
   }
   .article-detail-footer {
-    flex-wrap: wrap;
+    display: flex;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
     gap: 8px !important;
   }
   .article-detail-footer__divider {
     display: none;
   }
   .article-detail-footer__group {
-    flex-wrap: wrap;
+    flex-wrap: nowrap !important;
+    flex-shrink: 0;
     gap: 4px;
   }
   .article-detail-footer .ant-btn {
@@ -1922,7 +1925,7 @@ onBeforeUnmount(() => {
     height: 28px !important;
   }
   .article-editor-wrapper {
-    min-height: 200px;
+    min-height: 500px;
   }
   /* 全屏编辑器工具栏：移动端紧凑布局 */
   .fullscreen-toolbar {

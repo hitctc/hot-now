@@ -417,3 +417,10 @@
 .ant-modal .ant-modal-content {
   padding: 0 !important;
 }
+
+/* 弹窗标题区补回 padding：content padding 清零后标题会贴左/右/上边，这里给 header 单独补。
+   editorial-form-modal / editorial-feedback-modal 已有更具体的 header 规则（权重更高），不受影响；
+   ArticleDetailDrawer 移动端有自己的 header 规则（.article-detail-modal .ant-modal-header）也不受影响。 */
+.ant-modal-header {
+  padding: 20px 24px 14px !important;
+}

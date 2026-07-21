@@ -241,7 +241,7 @@ function onDividerMouseDown(e: MouseEvent): void {
 @media (max-width: 768px) {
   .md-editor {
     flex-direction: column;
-    min-height: 300px;
+    min-height: 500px;
   }
   .md-editor__pane:first-child {
     flex: 0 0 50% !important;

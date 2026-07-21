@@ -119,7 +119,7 @@ function readStageAccentClass(): string {
       :data-content-stage="config.pageKey"
     >
       <div :class="readStageAccentClass()" aria-hidden="true" />
-      <div class="relative z-[1] flex flex-col gap-4">
+      <div class="relative z-[1] flex flex-col gap-4 max-[900px]:gap-2">
         <div class="flex flex-wrap items-center gap-2">
           <span class="rounded-editorial-pill border border-editorial-border bg-editorial-panel/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-editorial-text-muted">
             {{ config.stageBadge }}
@@ -127,7 +127,7 @@ function readStageAccentClass(): string {
           <span class="text-xs leading-6 text-editorial-text-muted">{{ config.stageKicker }}</span>
         </div>
         <div class="flex flex-col gap-2">
-          <h3 class="m-0 text-[28px] font-semibold tracking-[-0.04em] text-editorial-text-main">
+          <h3 class="m-0 text-[28px] font-semibold tracking-[-0.04em] text-editorial-text-main max-[900px]:text-[22px]">
             {{ config.stageTitle }}
           </h3>
           <p class="m-0 max-w-3xl text-sm leading-7 text-editorial-text-body">

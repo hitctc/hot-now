@@ -39,14 +39,14 @@ export const editorialContentControlButtonDangerClass =
 export const editorialContentControlButtonActiveClass =
   "!border-editorial-border-strong !bg-editorial-link-active !text-editorial-text-main !shadow-editorial-accent hover:!border-editorial-border-strong hover:!bg-editorial-link-active hover:!text-editorial-text-main";
 
-export const editorialContentPageClass = "flex w-full flex-col gap-6 pb-4";
+export const editorialContentPageClass = "flex w-full flex-col gap-6 pb-4 max-[900px]:gap-3 max-[900px]:pb-2";
 
 export const editorialContentIntroSectionClass =
-  "relative overflow-hidden rounded-editorial-xl border border-editorial-border-strong bg-editorial-panel-strong px-4 py-4 shadow-editorial-floating";
+  "relative overflow-hidden rounded-editorial-xl border border-editorial-border-strong bg-editorial-panel-strong px-4 py-4 shadow-editorial-floating max-[900px]:px-3 max-[900px]:py-3";
 
 export const editorialContentFeaturedSectionClass = "grid gap-4";
 
-export const editorialContentListSectionClass = "flex flex-col gap-2";
+export const editorialContentListSectionClass = "flex flex-col gap-2 max-[900px]:gap-1.5";
 
 export function cloneContentCard(card: ContentCard): ContentCard {
   return {

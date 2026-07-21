@@ -426,7 +426,7 @@ onBeforeUnmount(() => {
     </aside>
 
     <main class="min-w-0 flex-1">
-      <div class="flex w-full flex-1 flex-col px-4 pb-6 pt-2 min-[901px]:px-5 min-[901px]:pt-4">
+      <div class="flex w-full flex-1 flex-col px-4 pb-6 pt-2 min-[901px]:px-5 min-[901px]:pt-4 max-[900px]:px-3 max-[900px]:pb-4 max-[900px]:pt-1.5">
         <EditorialPageIntro
           :title="String(currentPageTitle)"
           :description="String(currentPageDescription)"

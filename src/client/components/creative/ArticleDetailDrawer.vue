@@ -337,13 +337,16 @@
           </div>
         </section>
 
-        <!-- 读者评论 + 作者回复（写作时生成，可复制用于发布互动） -->
-        <section v-if="article?.comments && article.comments.length">
+        <!-- 读者评论 + 作者回复（写作时生成，可复制用于发布互动；可按需补生成） -->
+        <section v-if="!props.readonly || (article?.comments && article.comments.length)">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">读者评论 + 作者回复</h3>
-            <a-button type="link" size="small" class="!p-0 !text-[11px]" @click="copyText((article?.comments ?? []).map(formatCommentPair).join('\n\n'))">复制全部</a-button>
+            <div class="flex items-center gap-2">
+              <a-button v-if="article?.comments && article.comments.length" type="link" size="small" class="!p-0 !text-[11px]" @click="copyText((article?.comments ?? []).map(formatCommentPair).join('\n\n'))">复制全部</a-button>
+              <a-button v-if="!props.readonly" type="link" size="small" class="!p-0 !text-[11px]" :loading="generatingComments" :disabled="generatingComments" @click="handleGenerateComments">{{ generatingComments ? '生成中...' : (article?.comments && article.comments.length ? '重新生成评论' : '生成评论') }}</a-button>
+            </div>
           </div>
-          <div class="flex flex-col gap-1.5">
+          <div v-if="article?.comments && article.comments.length" class="flex flex-col gap-1.5">
             <div v-for="(c, i) in article.comments" :key="i" class="rounded border border-editorial-border bg-editorial-bg-page px-2 py-1.5">
               <div class="flex items-start gap-1.5">
                 <span class="shrink-0 text-[10px] font-medium text-editorial-text-muted">读者</span>
@@ -356,6 +359,7 @@
               <button class="mt-1 text-[11px] text-editorial-link-active hover:underline" @click="copyText(formatCommentPair(c))">复制</button>
             </div>
           </div>
+          <p v-else class="m-0 text-[12px] leading-relaxed text-editorial-text-muted">暂无评论，点击右上「生成评论」按需补生成。</p>
         </section>
 
         <!-- 封面图 -->
@@ -597,6 +601,7 @@ import {
   deleteFinishedArticle,
   restoreFinishedArticle,
   regenCover,
+  generateComments,
   regenTitle,
   regenIntro,
   regenInlineImage,
@@ -1260,6 +1265,8 @@ async function handleUploadInlineImage(imageIndex: number, event: Event): Promis
 
 const activeCoverIndex = ref(0);
 const regenerating = ref(false);
+// 按需生成评论的 loading 态
+const generatingComments = ref(false);
 // 本地缓存最新的 coverImage 数组，regen 后不依赖父组件刷新
 const localCoverImages = ref<string[]>([]);
 
@@ -1312,6 +1319,26 @@ async function handleRegenCover(): Promise<void> {
     message.error("封面图生成请求失败");
   } finally {
     regenerating.value = false;
+  }
+}
+
+// 按需补评论：调后端代理拉 Hermes 生成 + 注入 article.comments（历史文章可首次生成，已有可覆盖）
+async function handleGenerateComments(): Promise<void> {
+  if (!props.article || generatingComments.value) return;
+  generatingComments.value = true;
+  try {
+    const result = await generateComments(props.article.id);
+    if (result.ok && result.comments) {
+      props.article.comments = result.comments;
+      message.success(`已生成 ${result.comments.length} 对评论`);
+      tickArticleChange();
+    } else {
+      message.error(result.reason ?? "评论生成失败");
+    }
+  } catch {
+    message.error("评论生成请求失败");
+  } finally {
+    generatingComments.value = false;
   }
 }
 

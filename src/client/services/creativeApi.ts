@@ -503,6 +503,19 @@ export function regenCover(id: number): Promise<RegenCoverResult> {
   });
 }
 
+export type GenerateCommentsResult = {
+  ok: boolean;
+  comments?: ArticleComment[];
+  reason?: string;
+};
+
+/** 调用后端代理按需生成读者评论+作者回复，返回更新后的 comments 数组 */
+export function generateComments(id: number): Promise<GenerateCommentsResult> {
+  return requestJson<GenerateCommentsResult>(`/api/creative/finished-articles/${id}/generate-comments`, {
+    method: "POST",
+  });
+}
+
 export type RegenTitleResult = {
   ok: boolean;
   titles?: string[];

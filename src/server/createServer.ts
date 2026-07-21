@@ -1145,6 +1145,7 @@ export function createServer(deps: ServerDeps = {}) {
     if (body?.coverImagePrompt !== undefined) { editInput.coverImagePrompt = body.coverImagePrompt; updatedFields.push("coverImagePrompt"); }
     if (body?.inlineImagePrompts !== undefined) { editInput.inlineImagePrompts = body.inlineImagePrompts; updatedFields.push("inlineImagePrompts"); }
     if (body?.imagePrompts !== undefined) { editInput.imagePrompts = body.imagePrompts; updatedFields.push("imagePrompts"); }
+    if (body?.comments !== undefined) { editInput.comments = body.comments; updatedFields.push("comments"); }
     if (body?.similarityCheck !== undefined) { editInput.similarityCheck = body.similarityCheck; updatedFields.push("similarityCheck"); }
     if (body?.needsManualReview !== undefined) { editInput.needsManualReview = body.needsManualReview; updatedFields.push("needsManualReview"); }
     if (body?.manualReviewReason !== undefined) { editInput.manualReviewReason = body.manualReviewReason; updatedFields.push("manualReviewReason"); }
@@ -1359,6 +1360,80 @@ export function createServer(deps: ServerDeps = {}) {
         return reply.code(504).send({ ok: false, reason: "封面图生成超时（>180s），Hermes 未响应", detail: errMessage });
       }
       return reply.code(502).send({ ok: false, reason: `Hermes 调用失败`, detail: errMessage });
+    }
+  });
+
+  // 按需生成读者评论+作者回复：代理 Hermes POST /api/generate-comments，hot-now 侧存储
+  app.post("/api/creative/finished-articles/:id/generate-comments", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const params = request.params as { id: string };
+    const id = parseInt(params.id, 10);
+    const article = findCreativeFinishedArticleById(db, id);
+    if (!article) {
+      return reply.code(404).send({ ok: false, reason: "article-not-found" });
+    }
+
+    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+    const hermesApiToken = process.env.HERMES_API_TOKEN;
+    if (!hermesApiUrl || !hermesApiToken) {
+      return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" });
+    }
+
+    // 提取标题/正文/形态给 Hermes 生成评论（form 短内容线独有，公众号文章为空）
+    const titleList = article.titles ?? [];
+    const title = titleList[article.titleIndex] ?? titleList[0] ?? "";
+    const contentBody = article.contentMarkdown ?? "";
+    const form = article.form ?? undefined;
+    if (!title || !contentBody) {
+      return reply.code(400).send({ ok: false, reason: "article-missing-title-or-body" });
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 180_000);
+
+      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/generate-comments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${hermesApiToken}`,
+        },
+        body: JSON.stringify({ title, body: contentBody, form }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
+        return reply.code(res.status >= 500 ? 502 : res.status).send({
+          ok: false,
+          reason: `Hermes HTTP ${res.status}`,
+          hermesResponse: errorBody,
+        });
+      }
+
+      const data = await res.json() as { success: boolean; comments?: { reader: string; author_reply: string }[]; error?: string };
+      if (!data.success || !data.comments || data.comments.length === 0) {
+        return reply.code(502).send({ ok: false, reason: data.error ?? "评论生成失败", hermesResponse: JSON.stringify(data) });
+      }
+
+      // hot-now 侧存储（单一写入点，Hermes 不碰平台 DB）
+      editCreativeFinishedArticle(db, id, { comments: data.comments });
+
+      return reply.send({ ok: true, comments: data.comments });
+    } catch (err) {
+      const errMessage = (err as Error).message ?? String(err);
+      if ((err as Error).name === "AbortError") {
+        return reply.code(504).send({ ok: false, reason: "评论生成超时（>180s），Hermes 未响应", detail: errMessage });
+      }
+      return reply.code(502).send({ ok: false, reason: "Hermes 调用失败", detail: errMessage });
     }
   });
 

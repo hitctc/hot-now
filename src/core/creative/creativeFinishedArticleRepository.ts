@@ -290,6 +290,7 @@ export type EditCreativeFinishedArticleInput = {
   coverImagePrompt?: string;
   inlineImagePrompts?: Record<string, string>;
   imagePrompts?: string[];
+  comments?: { reader: string; author_reply: string }[];
   similarityCheck?: Record<string, unknown>;
   needsManualReview?: boolean;
   manualReviewReason?: string;
@@ -656,6 +657,10 @@ export function editCreativeFinishedArticle(
   if (input.imagePrompts !== undefined) {
     setClauses.push("image_prompts = ?");
     params.push(JSON.stringify(input.imagePrompts));
+  }
+  if (input.comments !== undefined) {
+    setClauses.push("comments = ?");
+    params.push(JSON.stringify(input.comments));
   }
   if (input.similarityCheck !== undefined) {
     setClauses.push("similarity_check = ?");

@@ -351,12 +351,13 @@
               <div class="flex items-start gap-1.5">
                 <span class="shrink-0 text-[10px] font-medium text-editorial-text-muted">读者</span>
                 <span class="flex-1 text-[12px] leading-relaxed text-editorial-text-body">{{ c.reader }}</span>
+                <button class="shrink-0 text-[11px] text-editorial-link-active hover:underline" @click="copyText(c.reader)">复制</button>
               </div>
               <div class="mt-1 flex items-start gap-1.5">
                 <span class="shrink-0 text-[10px] font-medium text-editorial-text-muted">作者</span>
                 <span class="flex-1 text-[12px] leading-relaxed text-editorial-text-body">{{ c.author_reply }}</span>
+                <button class="shrink-0 text-[11px] text-editorial-link-active hover:underline" @click="copyText(c.author_reply)">复制</button>
               </div>
-              <button class="mt-1 text-[11px] text-editorial-link-active hover:underline" @click="copyText(formatCommentPair(c))">复制</button>
             </div>
           </div>
           <p v-else class="m-0 text-[12px] leading-relaxed text-editorial-text-muted">暂无评论，点击右上「生成评论」按需补生成。</p>

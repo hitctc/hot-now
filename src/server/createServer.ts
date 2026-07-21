@@ -5845,11 +5845,12 @@ function parseStringArray(value: unknown): { ok: true; values: string[] } | { ok
   return values.length === value.length ? { ok: true, values } : { ok: false };
 }
 
-// 登录回跳白名单：只允许同源相对路径，挡掉 //evil.com 协议相对 URL 和 /login 自指
+// 登录回跳白名单：只允许同源相对路径，挡 //evil.com 协议相对、/\ 反斜杠绕过、<> 脚本注入、CRLF
 function safeRedirectTarget(target: unknown): string | null {
   if (typeof target !== "string") return null;
-  if (!target.startsWith("/") || target.startsWith("//")) return null;
+  if (!target.startsWith("/") || target.startsWith("//") || target.startsWith("/\\")) return null;
   if (target === "/login") return null;
+  if (/[<>\r\n]/.test(target)) return null;
   return target;
 }
 

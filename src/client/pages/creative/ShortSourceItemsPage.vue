@@ -769,7 +769,7 @@ const pagination = computed(() => ({
           <!-- 耗时/时间列：发布时间 + 成品创建时间 两行紧凑展示 -->
           <template v-else-if="column.key === 'timeInfo'">
             <div class="flex flex-col gap-0 leading-tight">
-              <span class="text-[10px] text-editorial-text-muted">发 {{ formatPublishedAt(record.publishedAt) }}</span>
+              <span class="text-[10px] text-editorial-text-muted">发 {{ formatPublishedAt(record.publishedAt || record.createdAt) }}</span>
               <span class="text-[10px] text-editorial-text-muted">建 {{ record.linkedArticleCreatedAt ? formatPublishedAt(record.linkedArticleCreatedAt) : '-' }}</span>
             </div>
           </template>

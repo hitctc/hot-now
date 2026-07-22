@@ -740,7 +740,7 @@ const pagination = computed(() => ({
           <template v-else-if="column.key === 'timeInfo'">
             <div class="flex flex-col gap-0 leading-tight">
               <span class="text-[10px] text-editorial-text-body">耗时 {{ formatDuration(calcWritingDuration(record.stepTrace)) }}</span>
-              <span class="text-[10px] text-editorial-text-muted">发 {{ formatLocalTime(record.publishedAt) }}</span>
+              <span class="text-[10px] text-editorial-text-muted">发 {{ formatLocalTime(record.publishedAt || record.createdAt) }}</span>
               <span class="text-[10px] text-editorial-text-muted">建 {{ formatLocalTime(record.createdAt) }}</span>
             </div>
           </template>

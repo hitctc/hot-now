@@ -685,7 +685,7 @@ const pagination = computed(() => ({
           <!-- 爆文列：分数 + 维度柱状图 两行紧凑展示 -->
           <template v-else-if="column.key === 'trend'">
             <div class="flex flex-col gap-0.5 leading-tight">
-              <span v-if="record.trendScore != null" class="inline-flex items-center self-start rounded-editorial-pill border px-1.5 py-0 text-[10px] font-bold" :class="record.trendScore >= 90 ? 'border-purple-600 bg-purple-600 text-white shadow-sm' : record.trendScore >= 80 ? 'border-red-500 bg-red-500 text-white shadow-sm' : 'border-orange-300 bg-orange-50 text-orange-700'">{{ record.trendScore }}</span>
+              <span v-if="record.reversalScore != null" class="inline-flex items-center self-start rounded-editorial-pill border px-1.5 py-0 text-[10px] font-bold" :class="record.reversalScore >= 90 ? 'border-purple-600 bg-purple-600 text-white shadow-sm' : record.reversalScore >= 80 ? 'border-red-500 bg-red-500 text-white shadow-sm' : 'border-orange-300 bg-orange-50 text-orange-700'">{{ record.reversalScore }}</span>
               <span v-else class="text-[10px] text-editorial-text-muted">未评分</span>
               <a-tooltip v-if="record.trendBreakdown && getBreakdownBars(record.trendBreakdown).length > 0" :mouse-enter-delay="0.3">
                 <template #title>

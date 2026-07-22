@@ -101,6 +101,7 @@ function handleDelete(): void {
     width="640px"
     centered
     destroy-on-close
+    :body-style="{ padding: '20px 24px' }"
     @cancel="close"
   >
     <template v-if="article">

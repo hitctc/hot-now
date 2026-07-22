@@ -1796,6 +1796,69 @@ export function createServer(deps: ServerDeps = {}) {
     }
   });
 
+  // ─── 短内容配图：按第 promptIndex 条提示词出图，回写 images[promptIndex]（短内容图后置，不注入正文） ───
+  app.post("/api/creative/finished-articles/:id/render-short-image", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+    if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
+
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const body = request.body as Record<string, unknown> | undefined;
+    const promptIndex = typeof body?.promptIndex === "number" ? body.promptIndex : undefined;
+    if (promptIndex === undefined || promptIndex < 0) {
+      return reply.code(400).send({ ok: false, reason: "promptIndex is required" });
+    }
+
+    const article = findCreativeFinishedArticleById(db, id);
+    if (!article) { return reply.code(404).send({ ok: false, reason: "article-not-found" }); }
+
+    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+    const hermesApiToken = process.env.HERMES_API_TOKEN;
+    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 180_000);
+      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/short/image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
+        body: JSON.stringify({ aid: id, index: promptIndex }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
+        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, hermesResponse: errorBody });
+      }
+
+      const data = await res.json() as { success: boolean; imageUrl?: string; index?: number; provider?: string; model?: string; error?: string };
+      if (!data.success || !data.imageUrl) {
+        return reply.code(502).send({ ok: false, reason: data.error ?? "配图生成失败", hermesResponse: JSON.stringify(data) });
+      }
+
+      // 短内容 images 为 string[]；读-改-写整列覆盖 images_json[promptIndex]
+      const currentImages: unknown[] = Array.isArray(article.images) ? [...article.images] : [];
+      while (currentImages.length <= promptIndex) { currentImages.push(""); }
+      currentImages[promptIndex] = data.imageUrl;
+      editCreativeFinishedArticle(db, id, { images: currentImages });
+
+      const updated = findCreativeFinishedArticleById(db, id);
+      return reply.send({
+        ok: true,
+        imageUrl: data.imageUrl,
+        promptIndex,
+        images: updated?.images ?? currentImages,
+        provider: data.provider ?? "",
+        model: data.model ?? "",
+      });
+    } catch (err) {
+      const errMessage = (err as Error).message ?? String(err);
+      if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "配图生成超时（>180s），Hermes 未响应", detail: errMessage }); }
+      return reply.code(502).send({ ok: false, reason: "Hermes 调用失败", detail: errMessage });
+    }
+  });
+
   // ─── 写作队列状态：代理 Hermes GET /api/write-queue/status ───
   app.get("/api/creative/write-queue/status", async (request, reply) => {
     const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");

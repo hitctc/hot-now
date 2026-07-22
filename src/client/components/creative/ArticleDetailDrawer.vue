@@ -332,6 +332,7 @@
           <div class="flex flex-col gap-1.5">
             <div v-for="(p, i) in article.imagePrompts" :key="i" class="flex items-start gap-1.5 rounded border border-editorial-border bg-editorial-bg-page px-2 py-1">
               <span class="flex-1 text-[11px] leading-relaxed text-editorial-text-muted">{{ p }}</span>
+              <button v-if="!props.readonly && article?.direction === 'short_content'" class="shrink-0 text-[11px] text-editorial-link-active hover:underline disabled:opacity-50" :disabled="renderShortImageLoading.has(i)" @click="handleRenderShortImage(i)">{{ renderShortImageLoading.has(i) ? '出图中...' : '出图' }}</button>
               <button class="shrink-0 text-[11px] text-editorial-link-active hover:underline" @click="copyPrompt(p)">复制</button>
             </div>
           </div>
@@ -385,7 +386,7 @@
         <section>
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">封面图</h3>
-            <div v-if="!props.readonly" class="flex items-center gap-3">
+            <div v-if="!props.readonly && article?.direction !== 'short_content'" class="flex items-center gap-3">
               <a-button
                 type="link"
                 size="small"
@@ -404,9 +405,9 @@
           <template v-if="displayCoverImages.length > 0">
             <a-image-preview-group>
               <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <template v-for="(url, idx) in displayCoverImages" :key="idx">
                 <div
-                  v-for="(url, idx) in displayCoverImages"
-                  :key="idx"
+                  v-if="url"
                   class="relative overflow-hidden rounded-editorial-md border transition-all"
                   :class="idx === activeCoverIndex
                     ? 'border-editorial-accent ring-2 ring-editorial-ring'
@@ -433,11 +434,12 @@
                     @click.stop="selectCoverImage(idx)"
                   >设为发布封面</button>
                 </div>
+                </template>
               </div>
             </a-image-preview-group>
           </template>
           <div v-else class="flex items-center justify-center rounded-editorial-md border border-dashed border-editorial-border bg-editorial-bg-page px-4 py-6 text-xs text-editorial-text-muted">
-            暂无封面图，点击上方按钮生成
+            {{ article?.direction === 'short_content' ? '暂无配图，到上方「配图提示词」点出图' : '暂无封面图，点击上方按钮生成' }}
           </div>
           <div v-if="article?.coverImagePrompt" class="mt-1.5 flex items-start gap-1.5 rounded border border-editorial-border bg-editorial-bg-page px-2 py-1">
             <span class="flex-1 text-[11px] leading-relaxed text-editorial-text-muted">Prompt（{{ charCount(article.coverImagePrompt) }}字）：{{ article.coverImagePrompt }}</span>
@@ -446,7 +448,7 @@
         </section>
 
         <!-- 正文配图 -->
-        <section v-if="articleImages.length > 0 || inlineImageSlotCount > 0">
+        <section v-if="article?.direction !== 'short_content' && (articleImages.length > 0 || inlineImageSlotCount > 0)">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文配图</h3>
             <div v-if="!props.readonly" class="flex items-center gap-1">
@@ -625,6 +627,7 @@ import {
   regenTitle,
   regenIntro,
   regenInlineImage,
+  renderShortImage,
   regenImagePrompts,
   parseArticleImages,
   extractImageUrl,
@@ -1203,6 +1206,32 @@ async function handleRegenInlineImage(imageIndex: number): Promise<void> {
   }
 }
 
+// ─── 短内容配图：按第 promptIndex 条提示词出图（图后置，不注入正文） ───
+
+const renderShortImageLoading = ref<Set<number>>(new Set());
+
+async function handleRenderShortImage(promptIndex: number): Promise<void> {
+  if (!props.article || renderShortImageLoading.value.has(promptIndex)) return;
+  renderShortImageLoading.value = new Set([...renderShortImageLoading.value, promptIndex]);
+  try {
+    const result = await renderShortImage(props.article.id, promptIndex);
+    if (result.ok) {
+      // 后端已回写 images_json，更新本地状态（封面图区短内容分支会自动显示新图）
+      if (result.images) {
+        props.article.imagesJson = result.images as typeof props.article.imagesJson;
+      }
+      message.success(`配图 ${promptIndex + 1} 已生成`);
+      tickArticleChange();
+    } else {
+      message.error(result.reason ?? "配图生成失败");
+    }
+  } catch {
+    message.error("配图生成请求失败");
+  } finally {
+    renderShortImageLoading.value = new Set([...renderShortImageLoading.value].filter(i => i !== promptIndex));
+  }
+}
+
 // ─── 手动上传正文配图 ──
 
 const uploadingInline = ref<Set<number>>(new Set());
@@ -1293,6 +1322,13 @@ const generatingAuthorExtensions = ref(false);
 const localCoverImages = ref<string[]>([]);
 
 const displayCoverImages = computed(() => {
+  // 短内容：封面来自配图组（images），不 filter——保留空位让 idx == images 原始索引
+  // （和 imagePrompts 对齐），空 url 的格子由模板 v-if 跳过
+  if (props.article?.direction === "short_content") {
+    return parseArticleImages(props.article?.imagesJson ?? null)
+      .map(extractImageUrl)
+      .slice(0, 10);
+  }
   const src = localCoverImages.value.length > 0 ? localCoverImages.value : (props.article?.coverImage ?? []);
   return src.slice(0, 10);
 });
@@ -1447,6 +1483,17 @@ async function handleUploadCover(event: Event): Promise<void> {
 
 async function selectCoverImage(idx: number): Promise<void> {
   if (!props.article || idx === activeCoverIndex.value) return;
+
+  // 短内容：封面 = 配图组第 idx 张（idx 是 images 原始索引），只记 coverImageIndex，不改正文（图后置）
+  if (props.article.direction === "short_content") {
+    activeCoverIndex.value = idx;
+    try {
+      await editFinishedArticle(props.article.id, { coverImageIndex: idx });
+      props.article.coverImageIndex = idx;
+      emit("saved");
+    } catch { /* 静默失败，本地状态已更新 */ }
+    return;
+  }
 
   const imgs = displayCoverImages.value;
   const oldUrl = imgs[activeCoverIndex.value];

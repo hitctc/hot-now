@@ -587,6 +587,24 @@ export function regenInlineImage(id: number, imageIndex: number): Promise<RegenI
   });
 }
 
+export type RenderShortImageResult = {
+  ok: boolean;
+  imageUrl?: string;
+  promptIndex?: number;
+  images?: unknown[];
+  provider?: string;
+  model?: string;
+  reason?: string;
+};
+
+/** 短内容配图：按第 promptIndex 条提示词出图，返回更新后的 images 数组（图后置，不注入正文） */
+export function renderShortImage(id: number, promptIndex: number): Promise<RenderShortImageResult> {
+  return requestJson<RenderShortImageResult>(`/api/creative/finished-articles/${id}/render-short-image`, {
+    method: "POST",
+    body: JSON.stringify({ promptIndex }),
+  });
+}
+
 // ─── 手动生图 API（始终可用，不受 image_gen_mode 限制） ───
 
 export type ImageGenAction =

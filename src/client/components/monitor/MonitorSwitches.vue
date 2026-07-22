@@ -77,6 +77,7 @@ const shortContentGroup = [
   },
   { key: "interval_short_content", label: "运行间隔（分钟）", type: "number" as const, description: "自动运行间隔，默认 60，建议 ≥10" },
   { key: "short_content_batch_size", label: "每次写作数量", type: "number" as const, description: "每次自动跑写几篇反转内容，默认 1" },
+  { key: "short_content_score_threshold", label: "反转评分阈值", type: "number" as const, description: "短内容素材反转评分≥此值才写，默认 75（0-100），越高越严" },
 ];
 
 type SwitchDef = { key: string; confirmChange?: boolean; confirmMessages?: Record<string, { title: string; content: string }> };

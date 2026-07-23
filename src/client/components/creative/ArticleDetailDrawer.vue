@@ -330,10 +330,11 @@
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">素材原图</h3>
             <a :href="sourceCoverUrl" target="_blank" rel="noopener noreferrer" class="text-[11px] text-editorial-link-active hover:underline">在新标签打开原图</a>
           </div>
-          <div class="overflow-hidden rounded-editorial-md border border-editorial-border">
-            <img :src="sourceCoverUrl" referrerpolicy="no-referrer" alt="素材原图" class="block w-full object-cover" loading="lazy" />
-          </div>
-          <p class="m-0 mt-1 text-[11px] text-editorial-text-muted/70">素材原文封面图（外链，右键图片另存后上传到成品）</p>
+          <img :src="sourceCoverUrl" referrerpolicy="no-referrer" alt="素材原图" loading="lazy" class="block w-1/5 cursor-pointer rounded-editorial-md border border-editorial-border object-cover transition-opacity hover:opacity-80" @click="sourceCoverPreviewOpen = true" />
+          <p class="m-0 mt-1 text-[11px] text-editorial-text-muted/70">素材原文封面图（外链，点击图片预览，右键另存后上传到成品）</p>
+          <a-modal v-model:open="sourceCoverPreviewOpen" :footer="null" :width="760" destroy-on-close>
+            <img :src="sourceCoverUrl" referrerpolicy="no-referrer" alt="素材原图预览" class="mx-auto block max-h-[72vh] max-w-full object-contain" />
+          </a-modal>
         </section>
 
         <!-- 配图提示词（短内容线：只产出提示词不出图，手动出图用） -->
@@ -1561,6 +1562,7 @@ watch(editContent, (val) => {
 
 // ─── 素材原图：按 sourceItemId 取素材 cover 外链展示（不转存，no-referrer 绕防盗链）───
 const sourceCoverUrl = ref<string | null>(null);
+const sourceCoverPreviewOpen = ref(false);
 watch(() => props.article?.sourceItemId, (sid) => {
   if (!sid) { sourceCoverUrl.value = null; return; }
   readCreativeSourceItem(sid)

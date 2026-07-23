@@ -324,6 +324,18 @@
           </ul>
         </section>
 
+        <!-- 素材原图：外链展示素材 cover，右键另存后上传成品用（不转存自己服务器） -->
+        <section v-if="sourceCoverUrl">
+          <div class="mb-2 flex items-center justify-between">
+            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">素材原图</h3>
+            <a :href="sourceCoverUrl" target="_blank" rel="noopener noreferrer" class="text-[11px] text-editorial-link-active hover:underline">在新标签打开原图</a>
+          </div>
+          <div class="overflow-hidden rounded-editorial-md border border-editorial-border">
+            <img :src="sourceCoverUrl" referrerpolicy="no-referrer" alt="素材原图" class="block w-full object-cover" loading="lazy" />
+          </div>
+          <p class="m-0 mt-1 text-[11px] text-editorial-text-muted/70">素材原文封面图（外链，右键图片另存后上传到成品）</p>
+        </section>
+
         <!-- 配图提示词（短内容线：只产出提示词不出图，手动出图用） -->
         <section v-if="article?.imagePrompts && article.imagePrompts.length">
           <div class="mb-2 flex items-center justify-between">
@@ -619,6 +631,7 @@ import ImageActionModal from "./ImageActionModal.vue";
 import { checkPublishConditions, getAvailableActions } from "./articleStatusShared.js";
 import {
   editFinishedArticle,
+  readCreativeSourceItem,
   deleteFinishedArticle,
   restoreFinishedArticle,
   regenCover,
@@ -1544,6 +1557,15 @@ watch(editContent, (val) => {
       doSaveContent(val);
     }
   }, 5_000);
+});
+
+// ─── 素材原图：按 sourceItemId 取素材 cover 外链展示（不转存，no-referrer 绕防盗链）───
+const sourceCoverUrl = ref<string | null>(null);
+watch(() => props.article?.sourceItemId, (sid) => {
+  if (!sid) { sourceCoverUrl.value = null; return; }
+  readCreativeSourceItem(sid)
+    .then(s => { sourceCoverUrl.value = s.coverImageUrl ?? null; })
+    .catch(() => { sourceCoverUrl.value = null; });
 });
 
 watch(() => props.open, (val) => {

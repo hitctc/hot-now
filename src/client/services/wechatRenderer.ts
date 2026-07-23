@@ -191,7 +191,7 @@ const md = new MarkdownIt({
   html: true,
   linkify: true,
   typographer: false,
-});
+}).enable("strikethrough");
 
 // 所有链接在新标签打开
 md.core.ruler.push("external_links", (state) => {

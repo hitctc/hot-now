@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 38;
+const schemaVersion = 39;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -1365,6 +1365,24 @@ export function runMigrations(db: SqliteDatabase): void {
       db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN author_extensions TEXT`);
     }
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(38, authorExtensionsMigrationName);
+
+    // 039: 素材/成品按 direction 各自从 1 编号（seq_number）
+    const seqNumberMigrationName = "039_seq_number_by_direction";
+    if (!hasColumn(db, "creative_source_items", "seq_number")) {
+      db.exec(`ALTER TABLE creative_source_items ADD COLUMN seq_number INTEGER`);
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN seq_number INTEGER`);
+      // 回填历史：首次加列时一次性按 direction + created_at 升序编号；放守卫内，避免每次重启覆盖 INSERT 算的新序号
+      for (const tbl of ["creative_source_items", "creative_finished_articles"] as const) {
+        for (const dir of ["article", "short_content"]) {
+          const rows = db.prepare(`SELECT id FROM ${tbl} WHERE direction = ? ORDER BY created_at, id`).all(dir) as Array<{ id: number }>;
+          const upd = db.prepare(`UPDATE ${tbl} SET seq_number = ? WHERE id = ?`);
+          rows.forEach((r, i) => upd.run(i + 1, r.id));
+        }
+      }
+    }
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_source_items_direction_seq ON creative_source_items(direction, seq_number)`);
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_finished_articles_direction_seq ON creative_finished_articles(direction, seq_number)`);
+    db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(39, seqNumberMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

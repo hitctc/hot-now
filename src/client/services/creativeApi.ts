@@ -38,6 +38,7 @@ export type CreativeSourceItem = {
   writable: boolean;
   writeCount: number;
   direction?: string;
+  seqNumber?: number | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -112,6 +113,7 @@ export type CreativeFinishedArticle = {
   wechatHtml: string | null;
   pushCount: number;
   direction?: string;
+  seqNumber?: number | null;
   form?: string | null;
   reversalScore?: number | null;
   reversalAngle?: string | null;

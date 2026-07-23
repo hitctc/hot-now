@@ -28,6 +28,7 @@ const SELECT_COLUMNS = `
   traced_sources_json,
   writable,
   direction,
+  seq_number,
   linked_article_id,
   created_at,
   updated_at,
@@ -59,6 +60,7 @@ type SourceItemRow = {
   traced_sources_json: string | null;
   writable: number;
   direction: string;
+  seq_number: number | null;
   linked_article_id: number | null;
   created_at: string;
   updated_at: string;
@@ -91,6 +93,7 @@ function mapRow(row: SourceItemRow): CreativeSourceItemRecord {
     tracedSources: row.traced_sources_json ? JSON.parse(row.traced_sources_json) : null,
     writable: row.writable === 1,
     direction: row.direction,
+    seqNumber: row.seq_number,
     linkedArticleId: row.linked_article_id,
     writeCount: row.write_count ?? 0,
     createdAt: row.created_at,
@@ -144,6 +147,7 @@ export type CreativeSourceItemRecord = {
   tracedSources: TracedSource[] | null;
   writable: boolean;
   direction: string;
+  seqNumber: number | null;
   linkedArticleId: number | null;
   writeCount: number;
   createdAt: string;
@@ -250,6 +254,11 @@ export function insertCreativeSourceItem(
   }
 
   const rawPayloadJson = JSON.stringify(input);
+  const direction = input.direction ?? "article";
+  // seq_number：同 direction 内从 1 递增（幂等命中已走 UPDATE 分支，这里是新建）
+  const seqRow = db.prepare(
+    "SELECT COALESCE(MAX(seq_number), 0) + 1 AS next FROM creative_source_items WHERE direction = ?"
+  ).get(direction) as { next: number };
 
   db.prepare(
     `
@@ -274,9 +283,10 @@ export function insertCreativeSourceItem(
         raw_payload_json,
         trend_score,
         trend_breakdown,
-        direction
+        direction,
+        seq_number
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
   ).run(
     input.externalId,
@@ -299,7 +309,8 @@ export function insertCreativeSourceItem(
     rawPayloadJson,
     input.trendScore ?? null,
     input.trendBreakdown ? JSON.stringify(input.trendBreakdown) : null,
-    input.direction ?? "article"
+    direction,
+    seqRow.next
   );
 
   const row = db

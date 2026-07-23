@@ -484,7 +484,7 @@ function copyId(id: number): void {
 }
 
 const columns = [
-  { title: "ID", dataIndex: "id", key: "id", width: 60, fixed: "left" as const },
+  { title: "序号", dataIndex: "seqNumber", key: "seqNumber", width: 50, fixed: "left" as const },
   { title: "标题", key: "title", width: 300 },
   { title: "配图提示词", key: "coverImage", width: 240, ellipsis: true },
   { title: "状态", key: "status", width: 100 },
@@ -562,8 +562,8 @@ const pagination = computed(() => ({
       >
         <template #bodyCell="{ column, record }">
           <!-- ID 列：点击复制 -->
-          <template v-if="column.key === 'id'">
-            <span class="cursor-pointer text-editorial-link-active hover:underline" @click="copyId(record.id)"> {{ record.id }} </span>
+          <template v-if="column.key === 'seqNumber'">
+            <span class="cursor-pointer text-editorial-link-active hover:underline" @click="copyId(record.seqNumber ?? record.id)"> {{ record.seqNumber ?? '-' }} </span>
           </template>
           <!-- 标题列：点击标题打开详情，点击素材链接打开来源素材弹窗，互不影响 -->
           <template v-if="column.key === 'title'">

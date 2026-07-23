@@ -41,6 +41,7 @@ const SELECT_COLUMNS = `
   wechat_theme_id,
   wechat_html,
   direction,
+  seq_number,
   form,
   reversal_score,
   reversal_angle,
@@ -89,6 +90,7 @@ type ArticleRow = {
   wechat_theme_id: string | null;
   wechat_html: string | null;
   direction: string;
+  seq_number: number | null;
   form: string | null;
   reversal_score: number | null;
   reversal_angle: string | null;
@@ -161,6 +163,7 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     wechatThemeId: row.wechat_theme_id,
     wechatHtml: row.wechat_html,
     direction: row.direction,
+    seqNumber: row.seq_number,
     form: row.form,
     reversalScore: row.reversal_score,
     reversalAngle: row.reversal_angle,
@@ -226,6 +229,7 @@ export type CreativeFinishedArticleRecord = {
   wechatThemeId: string | null;
   wechatHtml: string | null;
   direction: string;
+  seqNumber: number | null;
   form: string | null;
   reversalScore: number | null;
   reversalAngle: string | null;
@@ -331,6 +335,12 @@ export function insertCreativeFinishedArticle(
   db: SqliteDatabase,
   input: InsertCreativeFinishedArticleInput
 ): CreativeFinishedArticleRecord {
+  const direction = input.direction ?? "article";
+  // seq_number：同 direction 内从 1 递增
+  const seqRow = db.prepare(
+    "SELECT COALESCE(MAX(seq_number), 0) + 1 AS next FROM creative_finished_articles WHERE direction = ?"
+  ).get(direction) as { next: number };
+
   db.prepare(
     `
       INSERT INTO creative_finished_articles (
@@ -360,6 +370,7 @@ export function insertCreativeFinishedArticle(
         anomaly_reason,
         raw_response_text,
         direction,
+        seq_number,
         form,
         reversal_score,
         reversal_angle,
@@ -367,7 +378,7 @@ export function insertCreativeFinishedArticle(
         comments,
         author_extensions
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
   ).run(
     input.sourceItemId,
@@ -395,7 +406,8 @@ export function insertCreativeFinishedArticle(
     input.status ?? "generated",
     input.anomalyReason ?? null,
     input.rawResponseText ?? null,
-    input.direction ?? "article",
+    direction,
+    seqRow.next,
     input.form ?? null,
     input.reversalScore ?? null,
     input.reversalAngle ?? null,

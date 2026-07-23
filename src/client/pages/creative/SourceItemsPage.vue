@@ -577,7 +577,7 @@ function onOverflowCellLeave(key: string): void {
 }
 
 const columns = [
-  { title: "ID", dataIndex: "id", key: "id", width: 40, fixed: "left" as const },
+  { title: "序号", dataIndex: "seqNumber", key: "seqNumber", width: 50, fixed: "left" as const },
   { title: "标题", dataIndex: "title", key: "title", width: 300 },
   { title: "来源", dataIndex: "sourceName", key: "sourceName", width: 115 },
   { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: 72, ellipsis: true },
@@ -678,8 +678,8 @@ const pagination = computed(() => ({
       >
         <!-- 标题列：点击展开/折叠 -->
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'id'">
-            <span class="cursor-pointer text-editorial-link-active hover:underline" @click="copyId(record.id)"> {{ record.id }} </span>
+          <template v-if="column.key === 'seqNumber'">
+            <span class="cursor-pointer text-editorial-link-active hover:underline" @click="copyId(record.seqNumber ?? record.id)"> {{ record.seqNumber ?? '-' }} </span>
           </template>
           <template v-if="column.key === 'title'">
             <div class="flex items-center gap-2 min-w-0">

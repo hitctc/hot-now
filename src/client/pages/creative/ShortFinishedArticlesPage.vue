@@ -486,7 +486,7 @@ function copyId(id: number): void {
 const columns = [
   { title: "ID / 序号", dataIndex: "id", key: "idSeq", width: 72, fixed: "left" as const },
   { title: "标题", key: "title", width: 300 },
-  { title: "配图提示词", key: "coverImage", width: 240, ellipsis: true },
+  { title: "配图提示词", key: "coverImage", width: 120 },
   { title: "状态", key: "status", width: 100 },
   { title: "来源", key: "sourceName", width: 115 },
   { title: "爆文", key: "trend", width: 120, ellipsis: true },
@@ -594,7 +594,6 @@ const pagination = computed(() => ({
                 <div class="cursor-help text-[11px] leading-snug text-editorial-link-active line-clamp-2">
                   {{ record.imagePrompts[0] }}
                 </div>
-                <div v-if="record.imagePrompts.length > 1" class="text-[10px] text-editorial-text-muted">共 {{ record.imagePrompts.length }} 条</div>
               </a-tooltip>
               <a-image
                 v-else-if="record.coverImage && record.coverImage.length > 0"

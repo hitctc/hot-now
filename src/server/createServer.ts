@@ -2591,6 +2591,7 @@ export function createServer(deps: ServerDeps = {}) {
     const source = typeof body?._source === "string" ? body._source : undefined;
     const result = editCreativeFinishedArticle(db, id, {
       contentMarkdown: typeof body?.contentMarkdown === "string" ? body.contentMarkdown : undefined,
+      humanMarkdown: typeof body?.humanMarkdown === "string" ? body.humanMarkdown : (body?.humanMarkdown === null ? null : undefined),
       thesis: typeof body?.thesis === "string" ? body.thesis : undefined,
       titles: Array.isArray(body?.titles) ? body.titles as string[] : undefined,
       hooks: Array.isArray(body?.hooks) ? body.hooks as string[] : undefined,

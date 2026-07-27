@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 39;
+const schemaVersion = 40;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -1383,6 +1383,13 @@ export function runMigrations(db: SqliteDatabase): void {
     db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_source_items_direction_seq ON creative_source_items(direction, seq_number)`);
     db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_finished_articles_direction_seq ON creative_finished_articles(direction, seq_number)`);
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(39, seqNumberMigrationName);
+
+    // 040: 成品文章增加"人工转写"markdown（详情弹窗中栏），用户在 AI 草稿基础上口述/改写，注入真人 token 过朱雀
+    const humanMarkdownMigrationName = "040_finished_articles_human_markdown";
+    if (!hasColumn(db, "creative_finished_articles", "human_markdown")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN human_markdown TEXT`);
+    }
+    db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(40, humanMarkdownMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

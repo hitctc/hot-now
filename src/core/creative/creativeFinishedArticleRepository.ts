@@ -11,6 +11,7 @@ const SELECT_COLUMNS = `
   thesis,
   intros,
   content_markdown,
+  human_markdown,
   titles,
   hooks,
   quotes,
@@ -60,6 +61,7 @@ type ArticleRow = {
   thesis: string | null;
   intros: string | null;
   content_markdown: string;
+  human_markdown: string | null;
   titles: string | null;
   hooks: string | null;
   quotes: string | null;
@@ -132,6 +134,7 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     thesis: row.thesis,
     intros: row.intros ? JSON.parse(row.intros) : null,
     contentMarkdown: row.content_markdown,
+    humanMarkdown: row.human_markdown ?? null,
     titles: row.titles ? JSON.parse(row.titles) : null,
     hooks: row.hooks ? JSON.parse(row.hooks) : null,
     quotes: row.quotes ? JSON.parse(row.quotes) : null,
@@ -198,6 +201,7 @@ export type CreativeFinishedArticleRecord = {
   thesis: string | null;
   intros: string[] | null;
   contentMarkdown: string;
+  humanMarkdown: string | null;
   titles: string[] | null;
   hooks: string[] | null;
   quotes: string[] | null;
@@ -282,6 +286,7 @@ export type EditCreativeFinishedArticleInput = {
   intros?: string[];
   introIndex?: number;
   contentMarkdown?: string;
+  humanMarkdown?: string | null;
   titles?: string[];
   hooks?: string[];
   quotes?: string[];
@@ -605,6 +610,10 @@ export function editCreativeFinishedArticle(
   if (input.contentMarkdown !== undefined) {
     setClauses.push("content_markdown = ?");
     params.push(input.contentMarkdown);
+  }
+  if (input.humanMarkdown !== undefined) {
+    setClauses.push("human_markdown = ?");
+    params.push(input.humanMarkdown);
   }
   if (input.titles !== undefined) {
     setClauses.push("titles = ?");

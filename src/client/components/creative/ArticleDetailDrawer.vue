@@ -551,7 +551,10 @@
           <!-- 编辑模式：左右分屏编辑器（全屏时隐藏而非卸载，避免退出全屏重挂载闪烁） -->
           <div v-else v-show="!editorFullscreen" class="article-editor-wrapper" :style="{ height: dynamicEditorHeight + 'px' }">
             <ArticleMarkdownEditor
-              v-model="editContent"
+              v-model="humanContent"
+              human-mode
+              :ai-draft="editContent"
+              @update:ai-draft="editContent = $event"
               :preview-html="activePreviewHtml"
               :preview-label="activePreviewLabel"
               :sync-scroll="syncScrollEnabled"
@@ -571,7 +574,7 @@
         <div class="fullscreen-toolbar flex flex-col gap-2 border-b px-3 py-2 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-x-4 md:gap-y-2 md:px-4" style="border-color: var(--editorial-border);">
           <div class="flex flex-wrap items-center gap-2">
             <h3 class="m-0 text-sm font-semibold" style="color: var(--editorial-text-main);">正文编辑（全屏）</h3>
-            <span class="text-[11px]" style="color: var(--editorial-text-muted);">{{ countWords(editContent) }}字</span>
+            <span class="text-[11px]" style="color: var(--editorial-text-muted);">{{ countWords(humanContent) }}字</span>
             <span v-if="savedAtLabel" class="text-[11px] font-medium text-green-600">{{ savedAtLabel }}</span>
           </div>
           <div class="flex flex-wrap items-center gap-x-2 gap-y-1 max-[768px]:flex-nowrap max-[768px]:overflow-x-auto">
@@ -594,7 +597,10 @@
         </div>
         <div class="flex-1 overflow-hidden p-2 md:p-4">
           <ArticleMarkdownEditor
-            v-model="editContent"
+            v-model="humanContent"
+            human-mode
+            :ai-draft="editContent"
+            @update:ai-draft="editContent = $event"
             :preview-html="activePreviewHtml"
             :preview-label="activePreviewLabel"
             :sync-scroll="syncScrollEnabled"
@@ -835,6 +841,8 @@ function handleFullscreenEsc(e: KeyboardEvent): void {
 // ─── 正文编辑 ───
 
 const editContent = ref("");
+// 人工转写内容（中栏 = 发布内容）：注入真人 token 过朱雀；打开时初始预填 AI 草稿副本
+const humanContent = ref("");
 const saving = ref(false);
 const lastSavedAt = ref<number | null>(null);
 // 相对时间展示需要每秒刷新，用 tick 驱动 computed 重算
@@ -842,6 +850,8 @@ const relativeTick = ref(0);
 let relativeTimer: ReturnType<typeof setInterval> | null = null;
 // 记住打开时的原始内容，用于判断是否真正发生变化
 let lastSavedContent = "";
+let lastSavedHuman = "";
+let humanAutoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
 // 保存时间相对格式化：60秒内显示秒前，60分钟内分钟前，24小时内小时前，否则天前
 function formatRelativeTime(ts: number): string {
@@ -1560,6 +1570,17 @@ watch(editContent, (val) => {
   }, 5_000);
 });
 
+// 5 秒防抖自动保存人工转写内容（中栏，human_markdown）
+watch(humanContent, (val) => {
+  if (!props.open || props.readonly || val === lastSavedHuman) return;
+  if (humanAutoSaveTimer) clearTimeout(humanAutoSaveTimer);
+  humanAutoSaveTimer = setTimeout(() => {
+    if (val !== lastSavedHuman && props.article) {
+      void doSaveHumanContent(val);
+    }
+  }, 5_000);
+});
+
 // ─── 素材原图：按 sourceItemId 取素材 cover 外链展示（不转存，no-referrer 绕防盗链）───
 const sourceCoverUrl = ref<string | null>(null);
 const sourceCoverPreviewOpen = ref(false);
@@ -1575,6 +1596,10 @@ watch(() => props.open, (val) => {
     const md = props.article.contentMarkdown || "";
     editContent.value = md;
     lastSavedContent = md;
+    // 人工转写：优先用已保存的 human_markdown，为空则预填 AI 草稿副本（用户在此基础上改）
+    const hm = props.article.humanMarkdown ?? "";
+    humanContent.value = hm || md;
+    lastSavedHuman = humanContent.value;
     // 重置保存时间，避免上一篇的相对时间残留到当前文章
     lastSavedAt.value = null;
     // 重置本地缓存状态
@@ -1598,8 +1623,12 @@ watch(() => props.open, (val) => {
     teardownEditorResize();
     // 关闭弹窗时如果有未保存的内容，立即保存一次，避免防抖定时器还没触发就丢失
     if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+    if (humanAutoSaveTimer) { clearTimeout(humanAutoSaveTimer); humanAutoSaveTimer = null; }
     if (props.article && editContent.value !== lastSavedContent) {
       void doSaveContent(editContent.value);
+    }
+    if (props.article && humanContent.value !== lastSavedHuman) {
+      void doSaveHumanContent(humanContent.value);
     }
   }
 });
@@ -1619,14 +1648,30 @@ async function doSaveContent(content: string): Promise<void> {
   }
 }
 
+// 保存人工转写内容（中栏，human_markdown = 发布内容）
+async function doSaveHumanContent(content: string): Promise<void> {
+  if (!props.article) return;
+  try {
+    await editFinishedArticle(props.article.id, { humanMarkdown: content });
+    lastSavedHuman = content;
+    props.article.humanMarkdown = content;
+  } catch {
+    message.error("人工转写保存失败");
+  }
+}
+
 async function handleSave(): Promise<void> {
   if (!props.article) return;
   saving.value = true;
   try {
+    // 手动保存同时落盘左栏 AI 草稿（content_markdown）和中栏人工转写（human_markdown）
     await editFinishedArticle(props.article.id, {
       contentMarkdown: editContent.value,
+      humanMarkdown: humanContent.value,
     });
     lastSavedContent = editContent.value;
+    lastSavedHuman = humanContent.value;
+    props.article.humanMarkdown = humanContent.value;
     lastSavedAt.value = Date.now();
     emit("saved");
   } catch {
@@ -1639,10 +1684,34 @@ async function handleSave(): Promise<void> {
 // 推送前先保存正文，确保 DB 中是最新内容
 async function saveAndPush(): Promise<void> {
   if (!props.article) return;
+  // 中栏（发布内容）为空则阻止发布
+  if (!humanContent.value.trim()) {
+    message.warning("请先在中间栏输入或转写发布内容");
+    return;
+  }
+  // 软提示：中栏内容与 AI 草稿一致（未实际改动），发布将是纯 AI（0% 人工），可能被限流
+  if (humanContent.value === editContent.value) {
+    const { Modal } = await import("ant-design-vue");
+    const confirmed = await new Promise<boolean>((resolve) => {
+      Modal.confirm({
+        title: "内容未改动",
+        content: "中间栏内容与 AI 草稿一致，发布出去将是纯 AI（0% 人工），可能被限流。确认发布？",
+        okText: "确认发布",
+        cancelText: "再改改",
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      });
+    });
+    if (!confirmed) return;
+  }
   // 取消自动保存定时器，手动触发一次保存
   if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+  if (humanAutoSaveTimer) { clearTimeout(humanAutoSaveTimer); humanAutoSaveTimer = null; }
   if (editContent.value !== lastSavedContent) {
     await doSaveContent(editContent.value);
+  }
+  if (humanContent.value !== lastSavedHuman) {
+    await doSaveHumanContent(humanContent.value);
   }
   emit("openPush", props.article, currentWechatThemeId.value);
 }
@@ -1689,13 +1758,13 @@ const reverseThemeIdMap: Record<string, Exclude<PreviewThemeKey, "live">> = {
   "black-gold": "blackGold",
 };
 
-// 切换预览主题：客户端即时渲染
+// 切换预览主题：客户端即时渲染（基于人工转写内容 = 发布内容）
 function switchPreviewTheme(key: PreviewThemeKey): void {
   activePreviewTheme.value = key;
-  if (key === "live" || !editContent.value) return;
+  if (key === "live" || !humanContent.value) return;
 
   const themeId = themeIdMap[key];
-  const html = renderWechatThemePreview(editContent.value, themeId);
+  const html = renderWechatThemePreview(humanContent.value, themeId);
 
   // 首次选中该主题时保存偏好和渲染结果
   if (props.article && (props.article.wechatThemeId !== themeId || props.article.wechatHtml !== html)) {
@@ -1705,12 +1774,12 @@ function switchPreviewTheme(key: PreviewThemeKey): void {
   }
 }
 
-// 根据当前选中的预览主题返回 HTML，编辑时即时重新渲染
+// 根据当前选中的预览主题返回 HTML（联动中栏人工转写内容）
 const activePreviewHtml = computed(() => {
   if (activePreviewTheme.value === "live") return "";
   const themeId = themeIdMap[activePreviewTheme.value];
-  if (!editContent.value) return "";
-  return renderWechatThemePreview(editContent.value, themeId);
+  if (!humanContent.value) return "";
+  return renderWechatThemePreview(humanContent.value, themeId);
 });
 
 const activePreviewLabel = computed(() => {

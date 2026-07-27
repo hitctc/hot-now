@@ -89,8 +89,9 @@ async function startPush(): Promise<void> {
     latestArticle = await readCreativeFinishedArticle(props.article.id);
   } catch { /* 拉取失败则回退到内存中的数据 */ }
 
-  const html = latestArticle.contentMarkdown
-    ? renderWechatThemePreview(latestArticle.contentMarkdown, props.themeId)
+  const sourceMarkdown = latestArticle.humanMarkdown ?? latestArticle.contentMarkdown;
+  const html = sourceMarkdown
+    ? renderWechatThemePreview(sourceMarkdown, props.themeId)
     : undefined;
 
   try {

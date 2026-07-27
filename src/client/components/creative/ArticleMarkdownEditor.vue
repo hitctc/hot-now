@@ -1,26 +1,64 @@
 <!-- 左右分屏 Markdown 编辑器：左侧 textarea 编辑，右侧实时预览 -->
 <template>
-  <div class="md-editor">
-    <div class="md-editor__pane" :style="{ flex: `0 0 ${leftPercent}%` }">
-      <div class="md-editor__label">Markdown</div>
-      <textarea
-        ref="textareaRef"
-        class="md-editor__textarea"
-        :value="modelValue"
-        @input="onInput"
-        @scroll="onTextareaScroll"
-        @click="updateCursorHighlight"
-        @keyup="updateCursorHighlight"
-        placeholder="在此输入 Markdown 内容..."
-        data-testid="markdown-editor-textarea"
-      />
-    </div>
-    <div class="md-editor__divider" @mousedown="onDividerMouseDown" />
-    <div class="md-editor__pane">
-      <div class="md-editor__label">{{ previewLabel }}</div>
-      <div v-if="previewHtml" ref="previewRef" class="md-editor__preview" v-html="previewHtml" />
-      <div v-else ref="previewRef" class="md-editor__preview" v-html="renderedHtml" />
-    </div>
+  <div class="md-editor" :class="{ 'md-editor--3pane': humanMode }">
+    <template v-if="humanMode">
+      <!-- 左栏：AI 生成的草稿（可编辑，独立滚动，不参与预览联动） -->
+      <div class="md-editor__pane md-editor__pane--ai-draft">
+        <div class="md-editor__label">AI 生成的草稿</div>
+        <textarea
+          ref="aiDraftTextareaRef"
+          class="md-editor__textarea"
+          :value="aiDraft"
+          @input="onAiDraftInput"
+          placeholder="AI 生成的草稿（可编辑）..."
+        />
+      </div>
+      <div class="md-editor__divider md-editor__divider--static" />
+      <!-- 中栏：人工转写（发布内容），滚动同步驱动右栏预览 -->
+      <div class="md-editor__pane">
+        <div class="md-editor__label md-editor__label--human">人工转写（发布内容）</div>
+        <textarea
+          ref="textareaRef"
+          class="md-editor__textarea"
+          :value="modelValue"
+          @input="onInput"
+          @scroll="onTextareaScroll"
+          @click="updateCursorHighlight"
+          @keyup="updateCursorHighlight"
+          placeholder="在此口述/输入要发布的内容..."
+          data-testid="markdown-editor-textarea"
+        />
+      </div>
+      <div class="md-editor__divider md-editor__divider--static" />
+      <!-- 右栏：预览（联动中栏） -->
+      <div class="md-editor__pane">
+        <div class="md-editor__label">{{ previewLabel }}</div>
+        <div v-if="previewHtml" ref="previewRef" class="md-editor__preview" v-html="previewHtml" />
+        <div v-else ref="previewRef" class="md-editor__preview" v-html="renderedHtml" />
+      </div>
+    </template>
+    <template v-else>
+      <div class="md-editor__pane" :style="{ flex: `0 0 ${leftPercent}%` }">
+        <div class="md-editor__label">Markdown</div>
+        <textarea
+          ref="textareaRef"
+          class="md-editor__textarea"
+          :value="modelValue"
+          @input="onInput"
+          @scroll="onTextareaScroll"
+          @click="updateCursorHighlight"
+          @keyup="updateCursorHighlight"
+          placeholder="在此输入 Markdown 内容..."
+          data-testid="markdown-editor-textarea"
+        />
+      </div>
+      <div class="md-editor__divider" @mousedown="onDividerMouseDown" />
+      <div class="md-editor__pane">
+        <div class="md-editor__label">{{ previewLabel }}</div>
+        <div v-if="previewHtml" ref="previewRef" class="md-editor__preview" v-html="previewHtml" />
+        <div v-else ref="previewRef" class="md-editor__preview" v-html="renderedHtml" />
+      </div>
+    </template>
   </div>
 </template>
 
@@ -36,14 +74,21 @@ const props = withDefaults(defineProps<{
   previewLabel?: string;
   /** 是否开启编辑区→预览区滚动同步 + 预览对应块高亮 */
   syncScroll?: boolean;
+  /** 三栏模式：左 AI 草稿 + 中 人工转写 + 右 预览。false 时保持两栏（Markdown + 预览） */
+  humanMode?: boolean;
+  /** 三栏模式下的左栏 AI 草稿内容（content_markdown），独立编辑、不联动预览 */
+  aiDraft?: string;
 }>(), {
   previewHtml: "",
   previewLabel: "预览",
   syncScroll: true,
+  humanMode: false,
+  aiDraft: "",
 });
 
 const emit = defineEmits<{
   "update:modelValue": [value: string];
+  "update:aiDraft": [value: string];
 }>();
 
 const md = new MarkdownIt({ html: true, linkify: true, breaks: true });
@@ -71,9 +116,15 @@ function onInput(e: Event): void {
   updateCursorHighlight();
 }
 
+// 左栏 AI 草稿独立编辑（三栏模式），不参与预览联动与滚动同步
+function onAiDraftInput(e: Event): void {
+  emit("update:aiDraft", (e.target as HTMLTextAreaElement).value);
+}
+
 // ─── 滚动同步（编辑区→预览区，单向）+ 预览对应块高亮 ───
 // 设计原则：只让编辑区驱动预览区，反向不联动，从根上杜绝双向滚动打架。
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
+const aiDraftTextareaRef = ref<HTMLTextAreaElement | null>(null);
 const previewRef = ref<HTMLElement | null>(null);
 // 编辑区约定行高（font-size 14 × line-height 1.6 ≈ 22），仅用于滚动位置→行号换算，
 // 预览块按源码行反查时容差大，不需要像素级精确。
@@ -235,6 +286,22 @@ function onDividerMouseDown(e: MouseEvent): void {
 
 .md-editor__divider:hover {
   background: #1890ff;
+}
+
+/* 三栏模式：左栏静态分隔条（不拖拽）+ 中栏标签高亮（发布内容）+ 左栏灰底（AI 草稿） */
+.md-editor__divider--static {
+  cursor: default;
+}
+.md-editor__divider--static:hover {
+  background: #e8e8e8;
+}
+.md-editor__label--human {
+  background: #fff7e6;
+  color: #d46b08;
+  font-weight: 600;
+}
+.md-editor__pane--ai-draft .md-editor__textarea {
+  background: #fafafa;
 }
 
 /* 移动端上下分屏 */

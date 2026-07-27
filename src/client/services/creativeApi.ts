@@ -81,6 +81,7 @@ export type CreativeFinishedArticle = {
   thesis: string | null;
   intros: string[] | null;
   contentMarkdown: string;
+  humanMarkdown: string | null;
   titles: string | null;
   hooks: string | null;
   quotes: string | null;
@@ -281,6 +282,7 @@ export function editFinishedArticle(
   id: number,
   fields: {
     contentMarkdown?: string;
+    humanMarkdown?: string | null;
     thesis?: string;
     titles?: string[];
     hooks?: string[];

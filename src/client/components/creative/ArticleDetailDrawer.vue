@@ -1016,12 +1016,11 @@ async function saveTitleEdit(idx: number): Promise<void> {
 
   const saveFields: Record<string, unknown> = { titles };
 
-  // 发布标题：同步正文 H1 + 主题预览，与 selectTitle 保持一致
+  // 发布标题：同步正文 H1 + 主题预览
   if (idx === activeTitleIndex.value) {
     let content = editContent.value;
-    if (oldTitle && content.includes(oldTitle)) {
-      content = content.replaceAll(oldTitle, newTitle);
-    } else if (/^# .+/m.test(content)) {
+    // 只替换 H1 标题行，不 replaceAll 正文，避免误改正文里出现的标题文字
+    if (/^# .+/m.test(content)) {
       content = content.replace(/^# .+/m, `# ${newTitle}`);
     }
     editContent.value = content;
@@ -1685,6 +1684,9 @@ watch(() => props.open, (val) => {
     activeCoverIndex.value = props.article.coverImageIndex ?? 0;
     activeTitleIndex.value = props.article.titleIndex ?? 0;
     activeIntroIndex.value = props.article.introIndex ?? 0;
+    // 重置标题编辑态，避免上一篇的编辑下标残留到当前文章
+    editingTitleIdx.value = null;
+    editingTitleValue.value = "";
     if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
     editorFullscreen.value = false;
     document.body.style.overflow = "";

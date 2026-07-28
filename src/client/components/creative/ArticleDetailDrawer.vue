@@ -136,15 +136,15 @@
               <span v-if="idx === 0 && idx !== activeTitleIndex" class="flex-shrink-0 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</span>
               <button
                 v-if="!props.readonly && idx !== activeTitleIndex && editingTitleIdx !== idx"
-                class="flex-shrink-0 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/title:opacity-100 hover:!bg-black/70"
+                class="flex-shrink-0 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white hover:!bg-black/70"
                 @click.stop="selectTitle(idx)"
               >设为发布标题</button>
               <button
                 v-if="!props.readonly && editingTitleIdx !== idx"
-                class="flex-shrink-0 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/title:opacity-100 hover:!bg-black/70"
+                class="flex-shrink-0 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white hover:!bg-black/70"
                 @click.stop="startEditTitle(idx)"
               >编辑</button>
-              <a-button v-if="!props.readonly && editingTitleIdx !== idx" type="link" size="small" class="!p-0 !text-[11px] opacity-0 group-hover/title:opacity-100" @click="copyText(t)">复制</a-button>
+              <a-button v-if="!props.readonly && editingTitleIdx !== idx" type="link" size="small" class="!p-0 !text-[11px]" @click="copyText(t)">复制</a-button>
             </li>
           </ul>
         </section>
@@ -194,7 +194,7 @@
               <span v-if="idx === 0 && idx !== activeIntroIndex" class="flex-shrink-0 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</span>
               <button
                 v-if="!props.readonly && idx !== activeIntroIndex"
-                class="flex-shrink-0 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/intro:opacity-100 hover:!bg-black/70"
+                class="flex-shrink-0 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white hover:!bg-black/70"
                 @click.stop="selectIntro(idx)"
               >设为发布</button>
             </li>

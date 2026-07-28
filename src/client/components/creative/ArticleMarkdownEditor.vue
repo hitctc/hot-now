@@ -170,19 +170,26 @@ function updateCursorHighlight(): void {
   }
 }
 
-/** 编辑区滚动 → 预览区滚到顶部可见行对应的块（单向，不会打架） */
+// 滚动同步 rAF 句柄：合并高频 scroll 到下一帧，避免预览抖动
+let scrollSyncRaf: number | null = null;
+
+/** 中栏滚动 → 预览按滚动比例同步（单向，连续跟随不跳跃） */
 function onTextareaScroll(): void {
   if (!props.syncScroll) return;
-  const ta = textareaRef.value;
-  const preview = previewRef.value;
-  if (!ta || !preview) return;
-  const topLine = Math.round(ta.scrollTop / EDITOR_LINE_HEIGHT) + 1;
-  const target = findBlockForLine(getPreviewBlocks(), topLine);
-  if (!target) return;
-  // 用 getBoundingClientRect 算目标块相对预览区的偏移，叠加当前 scrollTop。
-  // 不能用 offsetTop——它相对 offsetParent（定位祖先），详情弹窗 modal 里有定位祖先会算错。
-  const delta = target.getBoundingClientRect().top - preview.getBoundingClientRect().top;
-  preview.scrollTop += delta;
+  // 已排队 rAF 则跳过本帧后续 scroll，合并去抖
+  if (scrollSyncRaf != null) return;
+  scrollSyncRaf = requestAnimationFrame(() => {
+    scrollSyncRaf = null;
+    const ta = textareaRef.value;
+    const preview = previewRef.value;
+    if (!ta || !preview) return;
+    // 按滚动比例映射：中栏滚动百分比 → 预览同百分比。
+    // 不再用块对齐（每次对齐块顶部会跳跃），比例同步连续跟随更流畅。
+    const taMax = ta.scrollHeight - ta.clientHeight;
+    const pvMax = preview.scrollHeight - preview.clientHeight;
+    if (taMax <= 0 || pvMax <= 0) return;
+    preview.scrollTop = (ta.scrollTop / taMax) * pvMax;
+  });
 }
 
 onMounted(() => { nextTick(() => updateCursorHighlight()); });

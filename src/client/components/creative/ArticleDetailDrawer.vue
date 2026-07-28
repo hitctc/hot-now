@@ -1655,6 +1655,8 @@ async function doSaveHumanContent(content: string): Promise<void> {
     await editFinishedArticle(props.article.id, { humanMarkdown: content });
     lastSavedHuman = content;
     props.article.humanMarkdown = content;
+    // 与 doSaveContent 一致：更新保存时间戳，驱动"保存成功·X前"标签反馈
+    lastSavedAt.value = Date.now();
   } catch {
     message.error("人工转写保存失败");
   }

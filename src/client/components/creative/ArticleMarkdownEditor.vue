@@ -148,9 +148,6 @@ const previewRef = ref<HTMLElement | null>(null);
 // 光标行高亮条（中栏 + AI 草稿各一），层叠在 textarea 透明背景之下
 const humanHighlightRef = ref<HTMLElement | null>(null);
 const aiDraftHighlightRef = ref<HTMLElement | null>(null);
-// textarea 行高与上内边距，用于光标行高亮条定位（line-height 固定 22px，见 CSS）
-const LINE_HEIGHT = 22;
-const TEXTAREA_PADDING_TOP = 12;
 
 /** 当前光标所在行（1 索引）。
  *  仅在 textarea 拥有焦点时才读 selectionStart：刚挂载的 textarea 未聚焦时，
@@ -190,8 +187,15 @@ function updateCursorHighlight(): void {
 /** 把高亮条移到 textarea 当前光标行；仅聚焦时显示，失焦由 hideLineHighlight 隐藏 */
 function updateLineHighlight(ta: HTMLTextAreaElement | null, hl: HTMLElement | null): void {
   if (!ta || !hl || document.activeElement !== ta) return;
+  // 动态读实际行高与上内边距：硬编码会与 CSS 实际渲染不符，导致光标行高亮越往下越偏
+  const cs = getComputedStyle(ta);
+  const fontSize = parseFloat(cs.fontSize) || 14;
+  let lineHeight = parseFloat(cs.lineHeight);
+  if (lineHeight > 0 && lineHeight < 10) lineHeight *= fontSize; // unitless line-height（如 1.6）换算成 px
+  if (!(lineHeight > 0)) lineHeight = fontSize * 1.5;
+  const paddingTop = parseFloat(cs.paddingTop) || 12;
   const line = ta.value.substring(0, ta.selectionStart).split("\n").length;
-  hl.style.transform = `translateY(${TEXTAREA_PADDING_TOP + (line - 1) * LINE_HEIGHT - ta.scrollTop}px)`;
+  hl.style.transform = `translateY(${paddingTop + (line - 1) * lineHeight - ta.scrollTop}px)`;
   hl.style.opacity = "1";
 }
 

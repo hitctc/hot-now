@@ -109,7 +109,7 @@
             <li
               v-for="(t, idx) in displayTitles"
               :key="idx"
-              class="group/title relative flex items-start gap-3 rounded-editorial-sm border px-3 py-2 transition-colors"
+              class="group/title relative flex items-center gap-3 rounded-editorial-sm border px-3 py-2 transition-colors"
               :class="idx === activeTitleIndex
                 ? 'border-editorial-accent ring-2 ring-editorial-ring'
                 : 'border-editorial-border hover:border-editorial-link-active/40'"
@@ -179,7 +179,7 @@
             <li
               v-for="(text, idx) in displayIntros"
               :key="idx"
-              class="group/intro relative flex items-start gap-3 rounded-editorial-sm border px-3 py-2 transition-colors"
+              class="group/intro relative flex items-center gap-3 rounded-editorial-sm border px-3 py-2 transition-colors"
               :class="idx === activeIntroIndex
                 ? 'border-editorial-accent ring-2 ring-editorial-ring'
                 : 'border-editorial-border hover:border-editorial-link-active/40'"
@@ -945,34 +945,35 @@ async function handleRegenTitle(): Promise<void> {
   }
 }
 
+/** 替换 markdown 第一个 H1 标题行（# 开头）为新标题，不动正文，避免误改正文里出现的标题文字 */
+function replaceH1(md: string, newTitle: string): string {
+  return /^# .+/m.test(md) ? md.replace(/^# .+/m, `# ${newTitle}`) : md;
+}
+
 // 选择发布标题：替换 markdown 中的 H1，保存 titleIndex + contentMarkdown
 async function selectTitle(idx: number): Promise<void> {
   if (!props.article || idx === activeTitleIndex.value) return;
+  const newTitle = displayTitles.value[idx];
 
-  const titles = displayTitles.value;
-  const oldTitle = titles[activeTitleIndex.value];
-  const newTitle = titles[idx];
-
-  // 替换 markdown 中的 H1 标题行
-  let content = editContent.value;
-  if (oldTitle && content.includes(oldTitle)) {
-    content = content.replaceAll(oldTitle, newTitle);
-  } else if (/^# .+/m.test(content)) {
-    content = content.replace(/^# .+/m, `# ${newTitle}`);
-  }
+  // 同步替换 AI 草稿和人工转写（发布内容）的 H1，只动 # 标题行不 replaceAll 正文
+  const content = replaceH1(editContent.value, newTitle);
+  const humanMd = replaceH1(humanContent.value, newTitle);
 
   activeTitleIndex.value = idx;
   editContent.value = content;
+  humanContent.value = humanMd;
+  lastSavedHuman = humanMd;
 
   try {
     const saveFields: Record<string, unknown> = {
       titleIndex: idx,
       contentMarkdown: content,
+      humanMarkdown: humanMd,
     };
 
-    if (activePreviewTheme.value !== "live" && content) {
+    if (activePreviewTheme.value !== "live" && humanMd) {
       const themeId = themeIdMap[activePreviewTheme.value];
-      const html = renderWechatThemePreview(content, themeId);
+      const html = renderWechatThemePreview(humanMd, themeId);
       props.article.wechatHtml = html;
       saveFields.wechatHtml = html;
     }
@@ -980,6 +981,7 @@ async function selectTitle(idx: number): Promise<void> {
     await editFinishedArticle(props.article.id, saveFields);
     props.article.titleIndex = idx;
     props.article.contentMarkdown = content;
+    props.article.humanMarkdown = humanMd;
     lastSavedContent = content;
 
     emit("saved");
@@ -1016,21 +1018,22 @@ async function saveTitleEdit(idx: number): Promise<void> {
 
   const saveFields: Record<string, unknown> = { titles };
 
-  // 发布标题：同步正文 H1 + 主题预览
+  // 发布标题：同步 AI 草稿和人工转写（发布内容）的 H1 + 主题预览
   if (idx === activeTitleIndex.value) {
-    let content = editContent.value;
-    // 只替换 H1 标题行，不 replaceAll 正文，避免误改正文里出现的标题文字
-    if (/^# .+/m.test(content)) {
-      content = content.replace(/^# .+/m, `# ${newTitle}`);
-    }
+    const content = replaceH1(editContent.value, newTitle);
+    const humanMd = replaceH1(humanContent.value, newTitle);
     editContent.value = content;
+    humanContent.value = humanMd;
     props.article.contentMarkdown = content;
+    props.article.humanMarkdown = humanMd;
     lastSavedContent = content;
+    lastSavedHuman = humanMd;
     saveFields.contentMarkdown = content;
+    saveFields.humanMarkdown = humanMd;
 
-    if (activePreviewTheme.value !== "live" && content) {
+    if (activePreviewTheme.value !== "live" && humanMd) {
       const themeId = themeIdMap[activePreviewTheme.value];
-      const html = renderWechatThemePreview(content, themeId);
+      const html = renderWechatThemePreview(humanMd, themeId);
       props.article.wechatHtml = html;
       saveFields.wechatHtml = html;
     }
@@ -1239,6 +1242,38 @@ function handleImageActionDone(): void {
   emit("saved");
 }
 
+/** 在 markdown 中替换第 imageIndex 个配图：先占位符 [IMAGEN]，再第 N 个 ![配图N]，都没有则追加到末尾 */
+function applyInlineImage(md: string, imageIndex: number, newUrl: string): string {
+  if (new RegExp(`\\[IMAGE${imageIndex}\\]`).test(md)) {
+    return md.replace(new RegExp(`\\[IMAGE${imageIndex}\\]`, "g"), `![配图${imageIndex}](${newUrl})`);
+  }
+  const imgPattern = /!\[配图[^\]]*\]\([^)]+\)/g;
+  if ([...md.matchAll(imgPattern)][imageIndex - 1]) {
+    let count = 0;
+    return md.replace(imgPattern, (full) => {
+      count++;
+      return count === imageIndex ? `![配图${imageIndex}](${newUrl})` : full;
+    });
+  }
+  return `${md}\n\n![配图${imageIndex}](${newUrl})`;
+}
+
+/** 从 markdown 提取第 imageIndex 个配图 URL（用于 regen 后端回写 contentMarkdown 后定位新图） */
+function extractInlineImageUrl(md: string, imageIndex: number): string | null {
+  const matches = [...md.matchAll(/!\[配图[^\]]*\]\(([^)]+)\)/g)];
+  return matches[imageIndex - 1]?.[1] ?? null;
+}
+
+/** 替换 markdown 中的封面图行；newUrl 为空则不动，无封面图行则在开头插入 */
+function applyCoverImage(md: string, newUrl: string): string {
+  if (!newUrl) return md;
+  const coverRegex = /^!\[封面图[^\]]*\]\([^)]+\)/m;
+  if (coverRegex.test(md)) {
+    return md.replace(coverRegex, `![封面图](${newUrl})`);
+  }
+  return `![封面图](${newUrl})\n\n${md}`;
+}
+
 // ─── 正文配图重新生成 ───
 
 const regenInlineImageLoading = ref<Set<number>>(new Set());
@@ -1280,12 +1315,23 @@ async function handleRegenInlineImage(imageIndex: number): Promise<void> {
         props.article.contentMarkdown = result.contentMarkdown;
         lastSavedContent = result.contentMarkdown;
 
+        // 同步人工转写（发布内容）的对应配图：从回写的 contentMarkdown 提取新图 URL，只换图不丢用户转写文字
+        const newUrl = extractInlineImageUrl(result.contentMarkdown, imageIndex);
+        let humanMd = humanContent.value;
+        if (newUrl) {
+          humanMd = applyInlineImage(humanContent.value, imageIndex, newUrl);
+          humanContent.value = humanMd;
+          lastSavedHuman = humanMd;
+          props.article.humanMarkdown = humanMd;
+        }
+
         // 同步渲染并保存公众号预览 HTML（总是更新，live 模式用 classic 兜底）
         const saveFields: Record<string, unknown> = { contentMarkdown: result.contentMarkdown };
+        if (newUrl) saveFields.humanMarkdown = humanMd;
         const themeId = activePreviewTheme.value !== "live"
           ? themeIdMap[activePreviewTheme.value]
           : "classic" as WechatThemeId;
-        const html = renderWechatThemePreview(result.contentMarkdown, themeId);
+        const html = renderWechatThemePreview(humanMd, themeId);
         props.article.wechatHtml = html;
         saveFields.wechatHtml = html;
         editFinishedArticle(props.article.id, saveFields).catch(() => {});
@@ -1361,41 +1407,26 @@ async function handleUploadInlineImage(imageIndex: number, event: Event): Promis
     updatedImages[imageIndex - 1] = newUrl;
     props.article.imagesJson = updatedImages as typeof props.article.imagesJson;
 
-    // ── 逻辑2 & 3：替换正文 markdown 中的图片 ──
-    let md = editContent.value;
-
-    // 先尝试匹配 [IMAGEN] 占位符（未生图状态）
-    const placeholderPattern = new RegExp(`\\[IMAGE${imageIndex}\\]`, "g");
-    if (placeholderPattern.test(md)) {
-      md = md.replace(new RegExp(`\\[IMAGE${imageIndex}\\]`, "g"), `![配图${imageIndex}](${newUrl})`);
-    } else {
-      // 已有配图：找第 N 个 ![配图...] 替换
-      const imgPattern = /!\[配图[^\]]*\]\([^)]+\)/g;
-      const matches = [...md.matchAll(imgPattern)];
-      if (matches[imageIndex - 1]) {
-        let count = 0;
-        md = md.replace(imgPattern, (full) => {
-          count++;
-          return count === imageIndex ? `![配图${imageIndex}](${newUrl})` : full;
-        });
-      } else {
-        // 没有足够的配图，追加到正文末尾
-        md = `${md}\n\n![配图${imageIndex}](${newUrl})`;
-      }
-    }
+    // ── 逻辑2 & 3：替换正文 markdown 中的图片（AI 草稿 + 人工转写双写）──
+    const md = applyInlineImage(editContent.value, imageIndex, newUrl);
+    const humanMd = applyInlineImage(humanContent.value, imageIndex, newUrl);
 
     editContent.value = md;
+    humanContent.value = humanMd;
     props.article.contentMarkdown = md;
+    props.article.humanMarkdown = humanMd;
     lastSavedContent = md;
+    lastSavedHuman = humanMd;
 
     const saveFields: Record<string, unknown> = {
       contentMarkdown: md,
+      humanMarkdown: humanMd,
       images: updatedImages,
     };
     const themeId = activePreviewTheme.value !== "live"
       ? themeIdMap[activePreviewTheme.value]
       : "classic" as WechatThemeId;
-    const html = renderWechatThemePreview(md, themeId);
+    const html = renderWechatThemePreview(humanMd, themeId);
     props.article.wechatHtml = html;
     saveFields.wechatHtml = html;
 
@@ -1443,25 +1474,24 @@ async function handleRegenCover(): Promise<void> {
       props.article.coverImage = result.coverImage;
       props.article.coverImageIndex = 0;
 
-      // 联动：替换 markdown 中的封面图行，渲染并保存 wechatHtml
+      // 联动：替换 AI 草稿和人工转写（发布内容）的封面图行，渲染并保存 wechatHtml
       const newUrl = result.coverImage[0] ?? "";
-      let md = editContent.value;
-      const coverRegex = /^!\[封面图[^\]]*\]\([^)]+\)/m;
-      if (newUrl && coverRegex.test(md)) {
-        md = md.replace(coverRegex, `![封面图](${newUrl})`);
-      } else if (newUrl) {
-        md = `![封面图](${newUrl})\n\n${md}`;
-      }
+      const md = applyCoverImage(editContent.value, newUrl);
+      const humanMd = applyCoverImage(humanContent.value, newUrl);
       editContent.value = md;
+      humanContent.value = humanMd;
       props.article.contentMarkdown = md;
+      props.article.humanMarkdown = humanMd;
       lastSavedContent = md;
+      lastSavedHuman = humanMd;
 
       const saveFields: Record<string, unknown> = {
         coverImageIndex: 0,
         contentMarkdown: md,
+        humanMarkdown: humanMd,
       };
-      if (activePreviewTheme.value !== "live" && md) {
-        const html = renderWechatThemePreview(md, themeIdMap[activePreviewTheme.value]);
+      if (activePreviewTheme.value !== "live" && humanMd) {
+        const html = renderWechatThemePreview(humanMd, themeIdMap[activePreviewTheme.value]);
         props.article.wechatHtml = html;
         saveFields.wechatHtml = html;
       }
@@ -1546,27 +1576,24 @@ async function handleUploadCover(event: Event): Promise<void> {
     props.article.coverImage = updatedCovers;
     props.article.coverImageIndex = 0;
 
-    // ── 逻辑2：将新封面图插入正文顶部 ──
-    let md = editContent.value;
-    const coverRegex = /^!\[封面图[^\]]*\]\([^)]+\)/m;
-    if (coverRegex.test(md)) {
-      // 已有封面图行：替换
-      md = md.replace(coverRegex, `![封面图](${newUrl})`);
-    } else {
-      // 无封面图行：插入正文最前面
-      md = `![封面图](${newUrl})\n\n${md}`;
-    }
+    // ── 逻辑2：将新封面图插入 AI 草稿和人工转写（发布内容）顶部 ──
+    const md = applyCoverImage(editContent.value, newUrl);
+    const humanMd = applyCoverImage(humanContent.value, newUrl);
     editContent.value = md;
+    humanContent.value = humanMd;
     props.article.contentMarkdown = md;
+    props.article.humanMarkdown = humanMd;
     lastSavedContent = md;
+    lastSavedHuman = humanMd;
 
     const saveFields: Record<string, unknown> = {
       coverImage: updatedCovers,
       coverImageIndex: 0,
       contentMarkdown: md,
+      humanMarkdown: humanMd,
     };
-    if (activePreviewTheme.value !== "live" && md) {
-      const html = renderWechatThemePreview(md, themeIdMap[activePreviewTheme.value]);
+    if (activePreviewTheme.value !== "live" && humanMd) {
+      const html = renderWechatThemePreview(humanMd, themeIdMap[activePreviewTheme.value]);
       props.article.wechatHtml = html;
       saveFields.wechatHtml = html;
     }
@@ -1594,31 +1621,27 @@ async function selectCoverImage(idx: number): Promise<void> {
     return;
   }
 
-  const imgs = displayCoverImages.value;
-  const oldUrl = imgs[activeCoverIndex.value];
-  const newUrl = imgs[idx];
+  const newUrl = displayCoverImages.value[idx];
 
-  // 精确替换 markdown 中的封面图行，避免 URL 重复导致误替换或额外插入
-  let content = editContent.value;
-  const coverLineRegex = /^!\[封面图[^\]]*\]\([^)]+\)/m;
-  if (coverLineRegex.test(content)) {
-    content = content.replace(coverLineRegex, `![封面图](${newUrl})`);
-  } else if (newUrl) {
-    content = `![封面图](${newUrl})\n\n${content}`;
-  }
+  // 替换 AI 草稿和人工转写（发布内容）的封面图行
+  const content = applyCoverImage(editContent.value, newUrl);
+  const humanMd = applyCoverImage(humanContent.value, newUrl);
 
   activeCoverIndex.value = idx;
   editContent.value = content;
+  humanContent.value = humanMd;
+  lastSavedHuman = humanMd;
 
   try {
     const saveFields: Record<string, unknown> = {
       coverImageIndex: idx,
       contentMarkdown: content,
+      humanMarkdown: humanMd,
     };
 
-    if (activePreviewTheme.value !== "live" && content) {
+    if (activePreviewTheme.value !== "live" && humanMd) {
       const themeId = themeIdMap[activePreviewTheme.value];
-      const html = renderWechatThemePreview(content, themeId);
+      const html = renderWechatThemePreview(humanMd, themeId);
       props.article.wechatHtml = html;
       saveFields.wechatHtml = html;
     }
@@ -1626,6 +1649,7 @@ async function selectCoverImage(idx: number): Promise<void> {
     await editFinishedArticle(props.article.id, saveFields);
     props.article.coverImageIndex = idx;
     props.article.contentMarkdown = content;
+    props.article.humanMarkdown = humanMd;
     lastSavedContent = content;
 
     emit("saved");

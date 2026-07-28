@@ -77,6 +77,7 @@
         <div v-else ref="previewRef" class="md-editor__preview" v-html="renderedHtml" />
       </div>
     </template>
+    <div ref="mirrorRef" class="md-editor__mirror" aria-hidden="true" />
   </div>
 </template>
 
@@ -184,65 +185,77 @@ function updateCursorHighlight(): void {
   target.classList.add("md-editor__active-block");
 }
 
-/** 字符是否全角（等宽字体下占 2 个半角单位）：中文/全角符号/韩文等 */
-function isFullWidthChar(ch: string): boolean {
-  const code = ch.codePointAt(0) ?? 0;
-  return code >= 0x1100 && code <= 0x115f
-    || (code >= 0x2e80 && code <= 0x9fff)
-    || (code >= 0xac00 && code <= 0xd7a3)
-    || (code >= 0xf900 && code <= 0xfaff)
-    || (code >= 0xff00 && code <= 0xff60)
-    || (code >= 0xffe0 && code <= 0xffe6)
-    || code >= 0x20000;
+// 光标段落左边框定位用的 mirror：克隆 textarea box-model 测字符真实像素位置，
+// 避免估算软换行行数的误差（textarea 无原生 API 给视觉行数）
+const mirrorRef = ref<HTMLElement | null>(null);
+const MIRROR_STYLE_PROPS = [
+  "fontFamily", "fontSize", "lineHeight", "fontWeight", "fontStyle", "fontVariant",
+  "letterSpacing", "tabSize", "textIndent", "textTransform", "wordSpacing",
+  "paddingTop", "paddingRight", "paddingBottom", "paddingLeft",
+  "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth",
+  "boxSizing", "whiteSpace", "wordBreak", "overflowWrap", "wordWrap",
+] as const;
+// mirror 宽度缓存：宽度不变则跳过样式同步，避免每次键入都全量设样式
+let lastMirrorWidth = -1;
+
+/** 把 mirror 的 box-model 同步到目标 textarea（宽度变化时才重设） */
+function syncMirror(mirror: HTMLElement, ta: HTMLTextAreaElement): void {
+  const scrollbarW = ta.offsetWidth - ta.clientWidth;
+  const width = Math.max(0, ta.clientWidth - scrollbarW);
+  if (width === lastMirrorWidth) return;
+  lastMirrorWidth = width;
+  const cs = getComputedStyle(ta);
+  for (const p of MIRROR_STYLE_PROPS) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (mirror.style as any)[p] = (cs as any)[p];
+  }
+  mirror.style.width = `${width}px`;
 }
 
-/** 估算一段（不含 \n）文本在 textarea 里占的视觉行数。
- *  等宽字体下半角 1 单位、全角 2 单位，除以一行容量；中英文混排边界可能有 1 行误差。 */
-function estimateParagraphLines(p: string, unitsPerLine: number): number {
-  if (!p) return 1;
-  let units = 0;
-  for (const ch of p) units += isFullWidthChar(ch) ? 2 : 1;
-  return Math.max(1, Math.ceil(units / unitsPerLine));
+/** 用 Range 在 mirror 里测字符偏移相对 mirror 顶的像素 top（含 mirror padding） */
+function measureOffsetTop(textNode: Text, offset: number, mirrorTop: number): number {
+  const range = document.createRange();
+  range.setStart(textNode, Math.min(offset, textNode.length));
+  range.collapse(true);
+  return range.getBoundingClientRect().top - mirrorTop;
 }
 
-/** 估算文本（可能含 \n）的累计视觉行数 */
-function estimateVisualLines(text: string, unitsPerLine: number): number {
-  if (!text) return 0;
-  return text.split("\n").reduce((sum, p) => sum + estimateParagraphLines(p, unitsPerLine), 0);
-}
-
-/** 重算当前光标所在段落的左边框位置和高度（input/keyup/click/focus 触发）。
- *  textarea 软换行无原生 API，用字符宽度估算视觉行数；段落顶高缓存到 hl.dataset 供滚动复用。 */
+/** 重算当前光标所在段落的左边框位置和高度（mirror 精确测量，无估算误差）。
+ *  段落顶高缓存到 hl.dataset 供滚动复用。 */
 function updateLineHighlight(ta: HTMLTextAreaElement | null, hl: HTMLElement | null): void {
   if (!ta || !hl || document.activeElement !== ta) return;
-  const cs = getComputedStyle(ta);
-  const fontSize = parseFloat(cs.fontSize) || 14;
-  let lineHeight = parseFloat(cs.lineHeight);
-  if (lineHeight > 0 && lineHeight < 10) lineHeight *= fontSize;
-  if (!(lineHeight > 0)) lineHeight = fontSize * 1.5;
-  const paddingTop = parseFloat(cs.paddingTop) || 12;
-  const paddingLeft = parseFloat(cs.paddingLeft) || 0;
-  const paddingRight = parseFloat(cs.paddingRight) || 0;
-  // 一行能容纳的半角单位数：等宽字体半角宽 ≈ 字号 × 0.6，宽度扣 padding 和滚动条
-  const charWidth = fontSize * 0.6;
-  const scrollbarW = ta.offsetWidth - ta.clientWidth;
-  const contentWidth = Math.max(1, ta.clientWidth - paddingLeft - paddingRight - scrollbarW);
-  const unitsPerLine = contentWidth / charWidth;
+  const mirror = mirrorRef.value;
+  if (!mirror) return;
+  syncMirror(mirror, ta);
+  mirror.textContent = ta.value;
+  const textNode = mirror.firstChild;
+  if (!textNode || textNode.nodeType !== Node.TEXT_NODE) return;
+  const mirrorTop = mirror.getBoundingClientRect().top;
 
-  // 光标所在段落（两个 \n 之间）的边界
+  // 光标所在段落（两个 \n 之间）边界
   const before = ta.value.substring(0, ta.selectionStart);
   const after = ta.value.substring(ta.selectionStart);
   const lineStart = before.lastIndexOf("\n") + 1;
   const nlAfter = after.indexOf("\n");
   const lineEnd = nlAfter === -1 ? ta.value.length : ta.selectionStart + nlAfter;
-  const paraContent = ta.value.substring(lineStart, lineEnd);
+  const nextLineStart = nlAfter === -1 ? -1 : lineEnd + 1;
 
-  const beforeLines = estimateVisualLines(before.substring(0, lineStart), unitsPerLine);
-  const paraLines = estimateParagraphLines(paraContent, unitsPerLine);
-  const paraTop = paddingTop + beforeLines * lineHeight;
+  const paraTop = measureOffsetTop(textNode as Text, lineStart, mirrorTop);
+  let paraBottom: number;
+  if (nextLineStart >= 0) {
+    paraBottom = measureOffsetTop(textNode as Text, nextLineStart, mirrorTop);
+  } else {
+    // 最后一段没有下一段可参照，用末尾字符 top + 一个行高
+    const cs = getComputedStyle(ta);
+    const fontSize = parseFloat(cs.fontSize) || 14;
+    let lineHeight = parseFloat(cs.lineHeight);
+    if (lineHeight > 0 && lineHeight < 10) lineHeight *= fontSize;
+    if (!(lineHeight > 0)) lineHeight = fontSize * 1.5;
+    paraBottom = measureOffsetTop(textNode as Text, lineEnd, mirrorTop) + lineHeight;
+  }
 
   hl.dataset.paraTop = String(paraTop);
-  hl.style.height = `${Math.max(lineHeight, paraLines * lineHeight)}px`;
+  hl.style.height = `${Math.max(20, paraBottom - paraTop)}px`;
   hl.style.transform = `translateY(${paraTop - ta.scrollTop}px)`;
   hl.style.opacity = "1";
 }
@@ -409,6 +422,15 @@ function onDividerMouseDown(e: MouseEvent): void {
   opacity: 0;
   transition: opacity 0.12s;
   border-radius: 0 2px 2px 0;
+}
+
+/* mirror：克隆 textarea box-model 用于精确测字符像素位置，不可见、不占布局 */
+.md-editor__mirror {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .md-editor__textarea {

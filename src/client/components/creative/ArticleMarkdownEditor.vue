@@ -14,7 +14,7 @@
             @input="onAiDraftInput"
             @click="updateAiDraftLineHighlight"
             @keyup="updateAiDraftLineHighlight"
-            @scroll="updateAiDraftLineHighlight"
+            @scroll="scrollAiDraftLineHighlight"
             @focus="updateAiDraftLineHighlight"
             @blur="hideLineHighlight(aiDraftHighlightRef)"
             placeholder="AI 生成的草稿（可编辑）..."
@@ -184,19 +184,73 @@ function updateCursorHighlight(): void {
   target.classList.add("md-editor__active-block");
 }
 
-/** 把高亮条移到 textarea 当前光标行；仅聚焦时显示，失焦由 hideLineHighlight 隐藏 */
+/** 字符是否全角（等宽字体下占 2 个半角单位）：中文/全角符号/韩文等 */
+function isFullWidthChar(ch: string): boolean {
+  const code = ch.codePointAt(0) ?? 0;
+  return code >= 0x1100 && code <= 0x115f
+    || (code >= 0x2e80 && code <= 0x9fff)
+    || (code >= 0xac00 && code <= 0xd7a3)
+    || (code >= 0xf900 && code <= 0xfaff)
+    || (code >= 0xff00 && code <= 0xff60)
+    || (code >= 0xffe0 && code <= 0xffe6)
+    || code >= 0x20000;
+}
+
+/** 估算一段（不含 \n）文本在 textarea 里占的视觉行数。
+ *  等宽字体下半角 1 单位、全角 2 单位，除以一行容量；中英文混排边界可能有 1 行误差。 */
+function estimateParagraphLines(p: string, unitsPerLine: number): number {
+  if (!p) return 1;
+  let units = 0;
+  for (const ch of p) units += isFullWidthChar(ch) ? 2 : 1;
+  return Math.max(1, Math.ceil(units / unitsPerLine));
+}
+
+/** 估算文本（可能含 \n）的累计视觉行数 */
+function estimateVisualLines(text: string, unitsPerLine: number): number {
+  if (!text) return 0;
+  return text.split("\n").reduce((sum, p) => sum + estimateParagraphLines(p, unitsPerLine), 0);
+}
+
+/** 重算当前光标所在段落的左边框位置和高度（input/keyup/click/focus 触发）。
+ *  textarea 软换行无原生 API，用字符宽度估算视觉行数；段落顶高缓存到 hl.dataset 供滚动复用。 */
 function updateLineHighlight(ta: HTMLTextAreaElement | null, hl: HTMLElement | null): void {
   if (!ta || !hl || document.activeElement !== ta) return;
-  // 动态读实际行高与上内边距：硬编码会与 CSS 实际渲染不符，导致光标行高亮越往下越偏
   const cs = getComputedStyle(ta);
   const fontSize = parseFloat(cs.fontSize) || 14;
   let lineHeight = parseFloat(cs.lineHeight);
-  if (lineHeight > 0 && lineHeight < 10) lineHeight *= fontSize; // unitless line-height（如 1.6）换算成 px
+  if (lineHeight > 0 && lineHeight < 10) lineHeight *= fontSize;
   if (!(lineHeight > 0)) lineHeight = fontSize * 1.5;
   const paddingTop = parseFloat(cs.paddingTop) || 12;
-  const line = ta.value.substring(0, ta.selectionStart).split("\n").length;
-  hl.style.transform = `translateY(${paddingTop + (line - 1) * lineHeight - ta.scrollTop}px)`;
+  const paddingLeft = parseFloat(cs.paddingLeft) || 0;
+  const paddingRight = parseFloat(cs.paddingRight) || 0;
+  // 一行能容纳的半角单位数：等宽字体半角宽 ≈ 字号 × 0.6，宽度扣 padding 和滚动条
+  const charWidth = fontSize * 0.6;
+  const scrollbarW = ta.offsetWidth - ta.clientWidth;
+  const contentWidth = Math.max(1, ta.clientWidth - paddingLeft - paddingRight - scrollbarW);
+  const unitsPerLine = contentWidth / charWidth;
+
+  // 光标所在段落（两个 \n 之间）的边界
+  const before = ta.value.substring(0, ta.selectionStart);
+  const after = ta.value.substring(ta.selectionStart);
+  const lineStart = before.lastIndexOf("\n") + 1;
+  const nlAfter = after.indexOf("\n");
+  const lineEnd = nlAfter === -1 ? ta.value.length : ta.selectionStart + nlAfter;
+  const paraContent = ta.value.substring(lineStart, lineEnd);
+
+  const beforeLines = estimateVisualLines(before.substring(0, lineStart), unitsPerLine);
+  const paraLines = estimateParagraphLines(paraContent, unitsPerLine);
+  const paraTop = paddingTop + beforeLines * lineHeight;
+
+  hl.dataset.paraTop = String(paraTop);
+  hl.style.height = `${Math.max(lineHeight, paraLines * lineHeight)}px`;
+  hl.style.transform = `translateY(${paraTop - ta.scrollTop}px)`;
   hl.style.opacity = "1";
+}
+
+/** 滚动时只跟随 scrollTop 移动左边框（用缓存的段落顶高，不重算估算，避免长文滚动卡） */
+function scrollLineHighlight(ta: HTMLTextAreaElement | null, hl: HTMLElement | null): void {
+  if (!ta || !hl || hl.dataset.paraTop == null) return;
+  hl.style.transform = `translateY(${parseFloat(hl.dataset.paraTop) - ta.scrollTop}px)`;
 }
 
 function hideLineHighlight(hl: HTMLElement | null): void {
@@ -209,6 +263,10 @@ function updateHumanLineHighlight(): void {
 
 function updateAiDraftLineHighlight(): void {
   updateLineHighlight(aiDraftTextareaRef.value, aiDraftHighlightRef.value);
+}
+
+function scrollAiDraftLineHighlight(): void {
+  scrollLineHighlight(aiDraftTextareaRef.value, aiDraftHighlightRef.value);
 }
 
 /** 中栏光标活动：刷新光标行高亮 + 预览对应块高亮（click/keyup/input 共用） */
@@ -238,8 +296,8 @@ function onTextareaScroll(): void {
     const ta = textareaRef.value;
     const preview = previewRef.value;
     if (!ta || !preview) return;
-    // 光标行高亮条随滚动跟随（不依赖滚动同步开关）
-    updateHumanLineHighlight();
+    // 左边框随滚动跟随（用缓存的段落顶高，不重算估算，避免长文滚动卡）
+    scrollLineHighlight(textareaRef.value, humanHighlightRef.value);
     if (!props.syncScroll) return;
     const taMax = ta.scrollHeight - ta.clientHeight;
     const pvMax = preview.scrollHeight - preview.clientHeight;
@@ -345,12 +403,12 @@ function onDividerMouseDown(e: MouseEvent): void {
 .md-editor__line-highlight {
   position: absolute;
   left: 0;
-  right: 0;
-  height: 22px;
-  background: rgba(24, 144, 255, 0.10);
+  width: 3px;
+  background: #1890ff;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.12s;
+  border-radius: 0 2px 2px 0;
 }
 
 .md-editor__textarea {

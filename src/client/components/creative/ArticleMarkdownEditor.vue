@@ -4,30 +4,43 @@
     <template v-if="humanMode">
       <!-- 左栏：AI 生成的草稿（可编辑，独立滚动，不参与预览联动） -->
       <div class="md-editor__pane md-editor__pane--ai-draft">
-        <div class="md-editor__label">AI 生成的草稿</div>
-        <textarea
-          ref="aiDraftTextareaRef"
-          class="md-editor__textarea"
-          :value="aiDraft"
-          @input="onAiDraftInput"
-          placeholder="AI 生成的草稿（可编辑）..."
-        />
+        <div class="md-editor__label">AI 生成的草稿<span class="md-editor__word-count">{{ countWords(aiDraft) }}字</span></div>
+        <div class="md-editor__textarea-wrap">
+          <div ref="aiDraftHighlightRef" class="md-editor__line-highlight" />
+          <textarea
+            ref="aiDraftTextareaRef"
+            class="md-editor__textarea"
+            :value="aiDraft"
+            @input="onAiDraftInput"
+            @click="updateAiDraftLineHighlight"
+            @keyup="updateAiDraftLineHighlight"
+            @scroll="updateAiDraftLineHighlight"
+            @focus="updateAiDraftLineHighlight"
+            @blur="hideLineHighlight(aiDraftHighlightRef)"
+            placeholder="AI 生成的草稿（可编辑）..."
+          />
+        </div>
       </div>
       <div class="md-editor__divider md-editor__divider--static" />
       <!-- 中栏：人工转写（发布内容），滚动同步驱动右栏预览 -->
       <div class="md-editor__pane">
-        <div class="md-editor__label md-editor__label--human">人工转写（发布内容）</div>
-        <textarea
-          ref="textareaRef"
-          class="md-editor__textarea"
-          :value="modelValue"
-          @input="onInput"
-          @scroll="onTextareaScroll"
-          @click="updateCursorHighlight"
-          @keyup="updateCursorHighlight"
-          placeholder="在此口述/输入要发布的内容..."
-          data-testid="markdown-editor-textarea"
-        />
+        <div class="md-editor__label md-editor__label--human">人工转写（发布内容）<span class="md-editor__word-count">{{ countWords(modelValue) }}字</span></div>
+        <div class="md-editor__textarea-wrap">
+          <div ref="humanHighlightRef" class="md-editor__line-highlight" />
+          <textarea
+            ref="textareaRef"
+            class="md-editor__textarea"
+            :value="modelValue"
+            @input="onInput"
+            @scroll="onTextareaScroll"
+            @click="onHumanActivate"
+            @keyup="onHumanActivate"
+            @focus="updateHumanLineHighlight"
+            @blur="hideLineHighlight(humanHighlightRef)"
+            placeholder="在此口述/输入要发布的内容..."
+            data-testid="markdown-editor-textarea"
+          />
+        </div>
       </div>
       <div class="md-editor__divider md-editor__divider--static" />
       <!-- 右栏：预览（联动中栏） -->
@@ -40,17 +53,22 @@
     <template v-else>
       <div class="md-editor__pane" :style="{ flex: `0 0 ${leftPercent}%` }">
         <div class="md-editor__label">Markdown</div>
-        <textarea
-          ref="textareaRef"
-          class="md-editor__textarea"
-          :value="modelValue"
-          @input="onInput"
-          @scroll="onTextareaScroll"
-          @click="updateCursorHighlight"
-          @keyup="updateCursorHighlight"
-          placeholder="在此输入 Markdown 内容..."
-          data-testid="markdown-editor-textarea"
-        />
+        <div class="md-editor__textarea-wrap">
+          <div ref="humanHighlightRef" class="md-editor__line-highlight" />
+          <textarea
+            ref="textareaRef"
+            class="md-editor__textarea"
+            :value="modelValue"
+            @input="onInput"
+            @scroll="onTextareaScroll"
+            @click="onHumanActivate"
+            @keyup="onHumanActivate"
+            @focus="updateHumanLineHighlight"
+            @blur="hideLineHighlight(humanHighlightRef)"
+            placeholder="在此输入 Markdown 内容..."
+            data-testid="markdown-editor-textarea"
+          />
+        </div>
       </div>
       <div class="md-editor__divider" @mousedown="onDividerMouseDown" />
       <div class="md-editor__pane">
@@ -113,19 +131,26 @@ const renderedHtml = computed(() => md.render(props.modelValue || ""));
 
 function onInput(e: Event): void {
   emit("update:modelValue", (e.target as HTMLTextAreaElement).value);
-  updateCursorHighlight();
+  onHumanActivate();
 }
 
 // 左栏 AI 草稿独立编辑（三栏模式），不参与预览联动与滚动同步
 function onAiDraftInput(e: Event): void {
   emit("update:aiDraft", (e.target as HTMLTextAreaElement).value);
+  updateAiDraftLineHighlight();
 }
 
-// ─── 滚动同步（编辑区→预览区，单向）+ 预览对应块高亮 ───
+// ─── 滚动同步（编辑区→预览区，单向）+ 预览对应块高亮 + 光标行高亮 ───
 // 设计原则：只让编辑区驱动预览区，反向不联动，从根上杜绝双向滚动打架。
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const aiDraftTextareaRef = ref<HTMLTextAreaElement | null>(null);
 const previewRef = ref<HTMLElement | null>(null);
+// 光标行高亮条（中栏 + AI 草稿各一），层叠在 textarea 透明背景之下
+const humanHighlightRef = ref<HTMLElement | null>(null);
+const aiDraftHighlightRef = ref<HTMLElement | null>(null);
+// textarea 行高与上内边距，用于光标行高亮条定位（line-height 固定 22px，见 CSS）
+const LINE_HEIGHT = 22;
+const TEXTAREA_PADDING_TOP = 12;
 
 /** 当前光标所在行（1 索引）。
  *  仅在 textarea 拥有焦点时才读 selectionStart：刚挂载的 textarea 未聚焦时，
@@ -162,18 +187,56 @@ function updateCursorHighlight(): void {
   target.classList.add("md-editor__active-block");
 }
 
+/** 把高亮条移到 textarea 当前光标行；仅聚焦时显示，失焦由 hideLineHighlight 隐藏 */
+function updateLineHighlight(ta: HTMLTextAreaElement | null, hl: HTMLElement | null): void {
+  if (!ta || !hl || document.activeElement !== ta) return;
+  const line = ta.value.substring(0, ta.selectionStart).split("\n").length;
+  hl.style.transform = `translateY(${TEXTAREA_PADDING_TOP + (line - 1) * LINE_HEIGHT - ta.scrollTop}px)`;
+  hl.style.opacity = "1";
+}
+
+function hideLineHighlight(hl: HTMLElement | null): void {
+  if (hl) hl.style.opacity = "0";
+}
+
+function updateHumanLineHighlight(): void {
+  updateLineHighlight(textareaRef.value, humanHighlightRef.value);
+}
+
+function updateAiDraftLineHighlight(): void {
+  updateLineHighlight(aiDraftTextareaRef.value, aiDraftHighlightRef.value);
+}
+
+/** 中栏光标活动：刷新光标行高亮 + 预览对应块高亮（click/keyup/input 共用） */
+function onHumanActivate(): void {
+  updateLineHighlight(textareaRef.value, humanHighlightRef.value);
+  updateCursorHighlight();
+}
+
+/** 计算中文字数：中文按字数计，英文按单词计 */
+function countWords(text: string): number {
+  const chinese = text.match(/[一-鿿㐀-䶿]/g);
+  const chineseCount = chinese ? chinese.length : 0;
+  const withoutChinese = text.replace(/[一-鿿㐀-䶿]/g, " ");
+  const englishWords = withoutChinese.match(/[a-zA-Z0-9]+/g);
+  const englishCount = englishWords ? englishWords.length : 0;
+  return chineseCount + englishCount;
+}
+
 // 滚动同步 rAF 句柄：合并高频 scroll 到下一帧
 let scrollSyncRaf: number | null = null;
 
-/** 中栏滚动 → 预览按整体比例同步（单向）：纯比例连续跟随，不读块位置，避免每帧布局计算造成跳闪 */
+/** 中栏滚动 → 光标行高亮条跟随 + 预览按整体比例同步（单向，不读块位置避免每帧布局计算跳闪） */
 function onTextareaScroll(): void {
-  if (!props.syncScroll) return;
   if (scrollSyncRaf != null) return;
   scrollSyncRaf = requestAnimationFrame(() => {
     scrollSyncRaf = null;
     const ta = textareaRef.value;
     const preview = previewRef.value;
     if (!ta || !preview) return;
+    // 光标行高亮条随滚动跟随（不依赖滚动同步开关）
+    updateHumanLineHighlight();
+    if (!props.syncScroll) return;
     const taMax = ta.scrollHeight - ta.clientHeight;
     const pvMax = preview.scrollHeight - preview.clientHeight;
     if (taMax <= 0 || pvMax <= 0) return;
@@ -260,17 +323,44 @@ function onDividerMouseDown(e: MouseEvent): void {
   user-select: none;
 }
 
-.md-editor__textarea {
+.md-editor__word-count {
+  margin-left: 6px;
+  font-weight: 400;
+  color: #bbb;
+  font-variant-numeric: tabular-nums;
+}
+
+/* textarea 外层：承载光标行高亮条（absolute 定位在透明 textarea 之下） */
+.md-editor__textarea-wrap {
+  position: relative;
   flex: 1;
+  overflow: hidden;
+  background: #fff;
+}
+
+.md-editor__line-highlight {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 22px;
+  background: rgba(24, 144, 255, 0.10);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.md-editor__textarea {
+  position: absolute;
+  inset: 0;
   padding: 12px;
   border: none;
   outline: none;
   resize: none;
   font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 22px;
   color: #333;
-  background: #fff;
+  background: transparent;
 }
 
 .md-editor__divider {
@@ -296,7 +386,7 @@ function onDividerMouseDown(e: MouseEvent): void {
   color: #d46b08;
   font-weight: 600;
 }
-.md-editor__pane--ai-draft .md-editor__textarea {
+.md-editor__pane--ai-draft .md-editor__textarea-wrap {
   background: #fafafa;
 }
 

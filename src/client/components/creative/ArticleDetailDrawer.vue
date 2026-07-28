@@ -115,8 +115,19 @@
                 : 'border-editorial-border hover:border-editorial-link-active/40'"
             >
               <span class="flex-shrink-0 text-[11px] font-bold tabular-nums text-editorial-text-muted">{{ idx + 1 }}</span>
-              <span class="flex-1 text-sm leading-6 text-editorial-text-main">{{ t }}</span>
-              <span class="flex-shrink-0 text-[10px] text-editorial-text-muted">{{ countWords(t) }}字</span>
+              <!-- 编辑态：输入框；非编辑态：纯文本 -->
+              <div v-if="editingTitleIdx === idx" class="flex-1">
+                <a-input
+                  ref="editingInputRef"
+                  v-model:value="editingTitleValue"
+                  size="small"
+                  @keyup.enter="saveTitleEdit(idx)"
+                  @keyup.esc="cancelEditTitle"
+                  @blur="saveTitleEdit(idx)"
+                />
+              </div>
+              <span v-else class="flex-1 text-sm leading-6 text-editorial-text-main">{{ t }}</span>
+              <span class="flex-shrink-0 text-[10px] text-editorial-text-muted">{{ countWords(editingTitleIdx === idx ? editingTitleValue : t) }}字</span>
               <!-- 选中标记 -->
               <span
                 v-if="idx === activeTitleIndex"
@@ -124,11 +135,16 @@
               >✓ 发布标题</span>
               <span v-if="idx === 0 && idx !== activeTitleIndex" class="flex-shrink-0 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</span>
               <button
-                v-if="!props.readonly && idx !== activeTitleIndex"
+                v-if="!props.readonly && idx !== activeTitleIndex && editingTitleIdx !== idx"
                 class="flex-shrink-0 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/title:opacity-100 hover:!bg-black/70"
                 @click.stop="selectTitle(idx)"
               >设为发布标题</button>
-              <a-button v-if="!props.readonly" type="link" size="small" class="!p-0 !text-[11px] opacity-0 group-hover/title:opacity-100" @click="copyText(t)">复制</a-button>
+              <button
+                v-if="!props.readonly && editingTitleIdx !== idx"
+                class="flex-shrink-0 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover/title:opacity-100 hover:!bg-black/70"
+                @click.stop="startEditTitle(idx)"
+              >编辑</button>
+              <a-button v-if="!props.readonly && editingTitleIdx !== idx" type="link" size="small" class="!p-0 !text-[11px] opacity-0 group-hover/title:opacity-100" @click="copyText(t)">复制</a-button>
             </li>
           </ul>
         </section>
@@ -524,7 +540,6 @@
           <div class="mb-2 flex items-center justify-between" data-editor-title>
             <div class="flex items-center gap-2">
               <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文</h3>
-              <span class="text-[11px] text-editorial-text-muted">{{ countWords(editContent) }}字</span>
               <span v-if="savedAtLabel" class="text-[11px] font-medium text-green-600">{{ savedAtLabel }}</span>
             </div>
             <template v-if="!props.readonly">
@@ -574,7 +589,6 @@
         <div class="fullscreen-toolbar flex flex-col gap-2 border-b px-3 py-2 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-x-4 md:gap-y-2 md:px-4" style="border-color: var(--editorial-border);">
           <div class="flex flex-wrap items-center gap-2">
             <h3 class="m-0 text-sm font-semibold" style="color: var(--editorial-text-main);">正文编辑（全屏）</h3>
-            <span class="text-[11px]" style="color: var(--editorial-text-muted);">{{ countWords(humanContent) }}字</span>
             <span v-if="savedAtLabel" class="text-[11px] font-medium text-green-600">{{ savedAtLabel }}</span>
           </div>
           <div class="flex flex-wrap items-center gap-x-2 gap-y-1 max-[768px]:flex-nowrap max-[768px]:overflow-x-auto">
@@ -877,6 +891,11 @@ const savedAtLabel = computed(() => {
 const regenTitleLoading = ref(false);
 const activeTitleIndex = ref(0);
 const localTitles = ref<string[]>([]);
+// 备选标题原地编辑态：editingTitleIdx 为正在编辑的下标，null 表示无
+const editingTitleIdx = ref<number | null>(null);
+const editingTitleValue = ref("");
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const editingInputRef = ref<any>(null);
 
 const displayTitles = computed(() => {
   return localTitles.value.length > 0 ? localTitles.value : parseJsonArray(props.article?.titles ?? null);
@@ -965,6 +984,63 @@ async function selectTitle(idx: number): Promise<void> {
 
     emit("saved");
   } catch { /* 静默失败，本地状态已更新 */ }
+}
+
+// 进入备选标题原地编辑：先把 displayTitles 整体固化进 localTitles（避免只改一项丢其他），再聚焦输入框
+function startEditTitle(idx: number): void {
+  if (localTitles.value.length === 0) {
+    localTitles.value = [...displayTitles.value];
+  }
+  editingTitleIdx.value = idx;
+  editingTitleValue.value = localTitles.value[idx] ?? "";
+  nextTick(() => editingInputRef.value?.focus());
+}
+
+function cancelEditTitle(): void {
+  editingTitleIdx.value = null;
+  editingTitleValue.value = "";
+}
+
+// 保存编辑：更新标题数组；若改的是发布标题，同步替换正文 H1 + 重渲主题预览
+async function saveTitleEdit(idx: number): Promise<void> {
+  // 已保存或已取消则跳过，防 enter 触发后又 blur 重复保存
+  if (editingTitleIdx.value !== idx) return;
+  const newTitle = editingTitleValue.value.trim();
+  const titles = localTitles.value;
+  const oldTitle = titles[idx] ?? "";
+  cancelEditTitle();
+  if (!props.article || !newTitle || newTitle === oldTitle) return;
+
+  titles[idx] = newTitle;
+  props.article.titles = JSON.stringify(titles);
+
+  const saveFields: Record<string, unknown> = { titles };
+
+  // 发布标题：同步正文 H1 + 主题预览，与 selectTitle 保持一致
+  if (idx === activeTitleIndex.value) {
+    let content = editContent.value;
+    if (oldTitle && content.includes(oldTitle)) {
+      content = content.replaceAll(oldTitle, newTitle);
+    } else if (/^# .+/m.test(content)) {
+      content = content.replace(/^# .+/m, `# ${newTitle}`);
+    }
+    editContent.value = content;
+    props.article.contentMarkdown = content;
+    lastSavedContent = content;
+    saveFields.contentMarkdown = content;
+
+    if (activePreviewTheme.value !== "live" && content) {
+      const themeId = themeIdMap[activePreviewTheme.value];
+      const html = renderWechatThemePreview(content, themeId);
+      props.article.wechatHtml = html;
+      saveFields.wechatHtml = html;
+    }
+  }
+
+  try {
+    await editFinishedArticle(props.article.id, saveFields);
+    emit("saved");
+  } catch { /* 静默失败，本地已更新 */ }
 }
 
 // ─── 导语选择 & 重新生成 ───

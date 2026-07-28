@@ -416,8 +416,9 @@ function onDividerMouseDown(e: MouseEvent): void {
 .md-editor__line-highlight {
   position: absolute;
   left: 0;
-  width: 3px;
+  width: 4px;
   background: #1890ff;
+  box-shadow: 0 0 8px rgba(24, 144, 255, 0.55);
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.12s;

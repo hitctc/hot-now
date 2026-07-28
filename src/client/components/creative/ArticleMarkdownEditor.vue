@@ -170,44 +170,40 @@ function updateCursorHighlight(): void {
   }
 }
 
-// 滚动同步 rAF 句柄 + 目标 scrollTop：缓动逼近，平滑过渡
+// 滚动同步 rAF 句柄：合并高频 scroll 到下一帧
 let scrollSyncRaf: number | null = null;
-let scrollTargetTop: number | null = null;
 
-/** 中栏滚动 → 块对齐算目标 + rAF 缓动逼近（单向，准且平滑不硬跳） */
+/** 中栏滚动 → 预览按块内比例同步（单向）：块边界对齐 + 块内连续跟随，直接设不滞后 */
 function onTextareaScroll(): void {
   if (!props.syncScroll) return;
-  const ta = textareaRef.value;
-  const preview = previewRef.value;
-  if (!ta || !preview) return;
-  // 块对齐：中栏顶部行号 → 预览对应块 → 目标 scrollTop（块顶对齐预览顶）
-  const topLine = Math.round(ta.scrollTop / EDITOR_LINE_HEIGHT) + 1;
-  const target = findBlockForLine(getPreviewBlocks(), topLine);
-  if (!target) return;
-  const delta = target.getBoundingClientRect().top - preview.getBoundingClientRect().top;
-  // 目标 scrollTop 限制在可滚动范围内，避免逼近越界值（如滚回顶部目标为负）导致 lerp 无法收敛、持续空转
-  const pvMax = preview.scrollHeight - preview.clientHeight;
-  scrollTargetTop = Math.max(0, Math.min(pvMax, preview.scrollTop + delta));
-  // 已有 rAF 在跑就不重复启动，lerp 会追逐最新 scrollTargetTop
-  if (scrollSyncRaf == null) {
-    scrollSyncRaf = requestAnimationFrame(lerpPreviewScroll);
-  }
-}
-
-/** 每帧缓动逼近 scrollTargetTop，过渡平滑 */
-function lerpPreviewScroll(): void {
-  scrollSyncRaf = null;
-  const preview = previewRef.value;
-  if (!preview || scrollTargetTop == null) return;
-  const diff = scrollTargetTop - preview.scrollTop;
-  if (Math.abs(diff) < 1) {
-    preview.scrollTop = scrollTargetTop;
-    scrollTargetTop = null;
-    return;
-  }
-  // 缓动系数 0.25：每帧逼近 1/4，平滑且不过度滞后
-  preview.scrollTop += diff * 0.25;
-  scrollSyncRaf = requestAnimationFrame(lerpPreviewScroll);
+  if (scrollSyncRaf != null) return;
+  scrollSyncRaf = requestAnimationFrame(() => {
+    scrollSyncRaf = null;
+    const ta = textareaRef.value;
+    const preview = previewRef.value;
+    if (!ta || !preview) return;
+    const blocks = getPreviewBlocks();
+    if (blocks.length === 0) return;
+    // 中栏顶部行号用连续浮点（不取整）：scrollTop 每变一点 topLine 就变，保证块内也连续跟随
+    const topLine = ta.scrollTop / EDITOR_LINE_HEIGHT + 1;
+    // 找 topLine 所在块，再用下一块的起始行确定块内行数范围，做块内比例插值
+    let idx = 0;
+    for (let i = 0; i < blocks.length; i++) {
+      if (Number(blocks[i].getAttribute("data-source-line")) <= topLine) idx = i;
+      else break;
+    }
+    const block = blocks[idx];
+    const startLine = Number(block.getAttribute("data-source-line"));
+    const nextLine = idx + 1 < blocks.length
+      ? Number(blocks[idx + 1].getAttribute("data-source-line"))
+      : startLine + 1;
+    const ratio = Math.min(1, Math.max(0, (topLine - startLine) / Math.max(1, nextLine - startLine)));
+    // 预览目标 scrollTop：让「块顶 + 块内偏移×块高」对齐预览视口顶
+    const blockTop = block.getBoundingClientRect().top - preview.getBoundingClientRect().top + preview.scrollTop;
+    const target = blockTop + ratio * block.offsetHeight;
+    const pvMax = preview.scrollHeight - preview.clientHeight;
+    preview.scrollTop = Math.max(0, Math.min(pvMax, target));
+  });
 }
 
 onMounted(() => { nextTick(() => updateCursorHighlight()); });

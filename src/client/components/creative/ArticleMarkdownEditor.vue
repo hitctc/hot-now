@@ -327,8 +327,8 @@ function onDividerMouseDown(e: MouseEvent): void {
 
 /* 预览区当前光标对应块的高亮 */
 .md-editor__preview :deep(.md-editor__active-block) {
-  background: rgba(24, 144, 255, 0.08);
-  box-shadow: -2px 0 0 #1890ff;
+  background: rgba(24, 144, 255, 0.16);
+  box-shadow: -3px 0 0 #1890ff;
   border-radius: 2px;
 }
 

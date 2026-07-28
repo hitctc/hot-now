@@ -97,12 +97,12 @@
               <a-button
                 type="link"
                 size="small"
-                class="!p-3 !text-[11px]"
+                class="!h-auto !px-2 !py-1 !text-[11px]"
                 :loading="regenTitleLoading"
                 :disabled="regenTitleLoading"
                 @click="handleRegenTitle"
               >{{ regenTitleLoading ? '生成中...' : '生成新标题' }}</a-button>
-              <a-button type="link" size="small" class="!p-3 !text-[11px]" @click="copyText(displayTitles.join('\n'))">复制全部</a-button>
+              <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText(displayTitles.join('\n'))">复制全部</a-button>
             </div>
           </div>
           <ul class="m-0 list-none space-y-1 pl-0">
@@ -144,7 +144,7 @@
                 class="flex-shrink-0 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white hover:!bg-black/70"
                 @click.stop="startEditTitle(idx)"
               >编辑</button>
-              <a-button v-if="!props.readonly && editingTitleIdx !== idx" type="link" size="small" class="!p-3 !text-[11px]" @click="copyText(t)">复制</a-button>
+              <a-button v-if="!props.readonly && editingTitleIdx !== idx" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText(t)">复制</a-button>
             </li>
           </ul>
         </section>
@@ -153,7 +153,7 @@
         <section v-if="article.thesis">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">核心立意</h3>
-            <a-button type="link" size="small" class="!p-3 !text-[11px]" @click="copyText(article.thesis!)">复制</a-button>
+            <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText(article.thesis!)">复制</a-button>
           </div>
           <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ article.thesis }}</p>
         </section>
@@ -166,12 +166,12 @@
               <a-button
                 type="link"
                 size="small"
-                class="!p-3 !text-[11px]"
+                class="!h-auto !px-2 !py-1 !text-[11px]"
                 :loading="regenIntroLoading"
                 :disabled="regenIntroLoading"
                 @click="handleRegenIntro"
               >{{ regenIntroLoading ? '生成中...' : '生成新导语' }}</a-button>
-              <a-button v-if="displayIntros.length > 0" type="link" size="small" class="!p-3 !text-[11px]" @click="copyText(displayIntros[activeIntroIndex] ?? '')">复制</a-button>
+              <a-button v-if="displayIntros.length > 0" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText(displayIntros[activeIntroIndex] ?? '')">复制</a-button>
             </div>
           </div>
           <p v-if="displayIntros.length === 0" class="m-0 text-sm text-editorial-text-muted">暂无导语，点击上方按钮生成</p>
@@ -205,7 +205,7 @@
         <section v-if="displaySummaries.length > 0">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">百字摘要 <span class="font-normal text-[11px] text-editorial-text-muted/60">{{ charCount(displaySummaries[0]) }}字</span></h3>
-            <a-button type="link" size="small" class="!p-3 !text-[11px]" @click="copyText(displaySummaries[0] ?? '')">复制</a-button>
+            <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText(displaySummaries[0] ?? '')">复制</a-button>
           </div>
           <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ displaySummaries[0] }}</p>
         </section>
@@ -315,7 +315,7 @@
         <section v-if="parseJsonArray(article.hooks).length > 0">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">开头钩子</h3>
-            <a-button type="link" size="small" class="!p-3 !text-[11px]" @click="copyText(parseJsonArray(article.hooks).join('\n'))">复制全部</a-button>
+            <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText(parseJsonArray(article.hooks).join('\n'))">复制全部</a-button>
           </div>
           <ul class="m-0 list-none space-y-1 pl-0">
             <li
@@ -324,7 +324,7 @@
               class="group flex items-start gap-3 rounded-editorial-sm bg-editorial-panel/40 px-3 py-2"
             >
               <span class="flex-1 text-sm leading-6 text-editorial-text-body">{{ h }}</span>
-              <a-button type="link" size="small" class="!p-3 !text-[11px] opacity-0 group-hover:opacity-100" @click="copyText(h)">复制</a-button>
+              <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px] opacity-0 group-hover:opacity-100" @click="copyText(h)">复制</a-button>
             </li>
           </ul>
         </section>
@@ -333,7 +333,7 @@
         <section v-if="parseJsonArray(article.quotes).length > 0">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">可摘句</h3>
-            <a-button type="link" size="small" class="!p-3 !text-[11px]" @click="copyText(parseJsonArray(article.quotes).join('\n'))">复制全部</a-button>
+            <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText(parseJsonArray(article.quotes).join('\n'))">复制全部</a-button>
           </div>
           <ul class="m-0 list-inside list-disc pl-1">
             <li v-for="(q, idx) in parseJsonArray(article.quotes)" :key="idx" class="text-sm leading-6 text-editorial-text-body">{{ q }}</li>
@@ -362,7 +362,7 @@
             <div v-for="(p, i) in article.imagePrompts" :key="i" class="flex items-start gap-1.5 rounded border border-editorial-border bg-editorial-bg-page px-2 py-1">
               <span class="flex-1 text-[11px] leading-relaxed text-editorial-text-muted">{{ p }}</span>
               <button v-if="!props.readonly && article?.direction === 'short_content'" class="shrink-0 text-[11px] text-editorial-link-active hover:underline disabled:opacity-50" :disabled="renderShortImageLoading.has(i)" @click="handleRenderShortImage(i)">{{ renderShortImageLoading.has(i) ? '出图中...' : '出图' }}</button>
-              <button class="shrink-0 p-3 text-[11px] text-editorial-link-active hover:underline" @click="copyPrompt(p)">复制</button>
+              <button class="shrink-0 px-2 py-1 text-[11px] text-editorial-link-active hover:underline" @click="copyPrompt(p)">复制</button>
             </div>
           </div>
         </section>
@@ -372,8 +372,8 @@
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">读者评论 + 作者回复</h3>
             <div class="flex items-center gap-2">
-              <a-button v-if="article?.comments && article.comments.length" type="link" size="small" class="!p-3 !text-[11px]" @click="copyText((article?.comments ?? []).map(formatCommentPair).join('\n\n'))">复制全部</a-button>
-              <a-button v-if="!props.readonly" type="link" size="small" class="!p-3 !text-[11px]" :loading="generatingComments" :disabled="generatingComments" @click="handleGenerateComments">{{ generatingComments ? '生成中...' : (article?.comments && article.comments.length ? '重新生成评论' : '生成评论') }}</a-button>
+              <a-button v-if="article?.comments && article.comments.length" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText((article?.comments ?? []).map(formatCommentPair).join('\n\n'))">复制全部</a-button>
+              <a-button v-if="!props.readonly" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" :loading="generatingComments" :disabled="generatingComments" @click="handleGenerateComments">{{ generatingComments ? '生成中...' : (article?.comments && article.comments.length ? '重新生成评论' : '生成评论') }}</a-button>
             </div>
           </div>
           <div v-if="article?.comments && article.comments.length" class="flex flex-col gap-1.5">
@@ -381,12 +381,12 @@
               <div class="flex items-start gap-1.5">
                 <span class="shrink-0 text-[10px] font-medium text-editorial-text-muted">读者</span>
                 <span class="flex-1 text-[12px] leading-relaxed text-editorial-text-body">{{ c.reader }}</span>
-                <button class="shrink-0 p-3 text-[11px] text-editorial-link-active hover:underline" @click="copyText(c.reader)">复制</button>
+                <button class="shrink-0 px-2 py-1 text-[11px] text-editorial-link-active hover:underline" @click="copyText(c.reader)">复制</button>
               </div>
               <div class="mt-1 flex items-start gap-1.5">
                 <span class="shrink-0 text-[10px] font-medium text-editorial-text-muted">作者</span>
                 <span class="flex-1 text-[12px] leading-relaxed text-editorial-text-body">{{ c.author_reply }}</span>
-                <button class="shrink-0 p-3 text-[11px] text-editorial-link-active hover:underline" @click="copyText(c.author_reply)">复制</button>
+                <button class="shrink-0 px-2 py-1 text-[11px] text-editorial-link-active hover:underline" @click="copyText(c.author_reply)">复制</button>
               </div>
             </div>
           </div>
@@ -398,14 +398,14 @@
           <div class="mb-2 flex items-center justify-between">
             <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">作者拓展</h3>
             <div class="flex items-center gap-2">
-              <a-button v-if="article?.authorExtensions && article.authorExtensions.length" type="link" size="small" class="!p-3 !text-[11px]" @click="copyText((article?.authorExtensions ?? []).join('\n\n'))">复制全部</a-button>
-              <a-button v-if="!props.readonly" type="link" size="small" class="!p-3 !text-[11px]" :loading="generatingAuthorExtensions" :disabled="generatingAuthorExtensions" @click="handleGenerateAuthorExtensions">{{ generatingAuthorExtensions ? '生成中...' : (article?.authorExtensions && article.authorExtensions.length ? '重新生成拓展' : '生成拓展') }}</a-button>
+              <a-button v-if="article?.authorExtensions && article.authorExtensions.length" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText((article?.authorExtensions ?? []).join('\n\n'))">复制全部</a-button>
+              <a-button v-if="!props.readonly" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" :loading="generatingAuthorExtensions" :disabled="generatingAuthorExtensions" @click="handleGenerateAuthorExtensions">{{ generatingAuthorExtensions ? '生成中...' : (article?.authorExtensions && article.authorExtensions.length ? '重新生成拓展' : '生成拓展') }}</a-button>
             </div>
           </div>
           <div v-if="article?.authorExtensions && article.authorExtensions.length" class="flex flex-col gap-1.5">
             <div v-for="(ext, i) in article.authorExtensions" :key="i" class="flex items-start gap-1.5 rounded border border-editorial-border bg-editorial-bg-page px-2 py-1.5">
               <span class="flex-1 text-[12px] leading-relaxed text-editorial-text-body">{{ ext }}</span>
-              <button class="shrink-0 p-3 text-[11px] text-editorial-link-active hover:underline" @click="copyText(ext)">复制</button>
+              <button class="shrink-0 px-2 py-1 text-[11px] text-editorial-link-active hover:underline" @click="copyText(ext)">复制</button>
             </div>
           </div>
           <p v-else class="m-0 text-[12px] leading-relaxed text-editorial-text-muted">暂无作者拓展，点击右上「生成拓展」按需补生成。</p>
@@ -419,7 +419,7 @@
               <a-button
                 type="link"
                 size="small"
-                class="!p-3 !text-[11px]"
+                class="!h-auto !px-2 !py-1 !text-[11px]"
                 :loading="regenerating"
                 :disabled="regenerating"
                 @click="handleRegenCover"
@@ -472,7 +472,7 @@
           </div>
           <div v-if="article?.coverImagePrompt" class="mt-1.5 flex items-start gap-1.5 rounded border border-editorial-border bg-editorial-bg-page px-2 py-1">
             <span class="flex-1 text-[11px] leading-relaxed text-editorial-text-muted">Prompt（{{ charCount(article.coverImagePrompt) }}字）：{{ article.coverImagePrompt }}</span>
-            <button class="shrink-0 p-3 text-[11px] text-editorial-link-active hover:underline" @click="copyPrompt(article.coverImagePrompt!)">复制</button>
+            <button class="shrink-0 px-2 py-1 text-[11px] text-editorial-link-active hover:underline" @click="copyPrompt(article.coverImagePrompt!)">复制</button>
           </div>
         </section>
 
@@ -486,7 +486,7 @@
                   <a-button
                     type="link"
                     size="small"
-                    class="!p-3 !text-[11px]"
+                    class="!h-auto !px-2 !py-1 !text-[11px]"
                     :loading="regenInlineImageLoading.has(idx)"
                     :disabled="regenInlineImageLoading.has(idx)"
                     @click="handleRegenInlineImage(idx)"
@@ -529,7 +529,7 @@
             <div class="mt-1.5 space-y-1">
               <div v-for="(prompt, idx) in article.inlineImagePrompts" :key="idx" class="flex items-start gap-1.5 rounded border border-editorial-border bg-editorial-bg-page px-2 py-1">
                 <span class="flex-1 text-[11px] leading-relaxed text-editorial-text-muted">配图{{ idx }} Prompt（{{ charCount(String(prompt)) }}字）：{{ prompt }}</span>
-                <button class="shrink-0 p-3 text-[11px] text-editorial-link-active hover:underline" @click="copyPrompt(String(prompt))">复制</button>
+                <button class="shrink-0 px-2 py-1 text-[11px] text-editorial-link-active hover:underline" @click="copyPrompt(String(prompt))">复制</button>
               </div>
             </div>
           </template>
@@ -554,10 +554,10 @@
                     @click="switchPreviewTheme(opt.key)"
                   >{{ opt.label }}</a-button>
                 </div>
-                <a-button type="link" size="small" class="!p-3 !text-[11px]" @click="copyText(editContent)">复制原文</a-button>
-                <a-button type="link" size="small" class="!p-3 !text-[11px]" @click="copyMarkdownAsPlainText(editContent)">复制纯文本</a-button>
-                <a-button type="link" size="small" class="!p-3 !text-[11px]" @click="toggleSyncScroll">{{ syncScrollEnabled ? '同步滚动：开' : '同步滚动：关' }}</a-button>
-                <a-button type="link" size="small" class="!p-3 !text-[11px]" @click="toggleEditorFullscreen">{{ editorFullscreen ? '退出全屏' : '全屏' }}</a-button>
+                <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText(editContent)">复制原文</a-button>
+                <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyMarkdownAsPlainText(editContent)">复制纯文本</a-button>
+                <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="toggleSyncScroll">{{ syncScrollEnabled ? '同步滚动：开' : '同步滚动：关' }}</a-button>
+                <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="toggleEditorFullscreen">{{ editorFullscreen ? '退出全屏' : '全屏' }}</a-button>
               </div>
             </template>
           </div>
@@ -602,11 +602,11 @@
                 @click="switchPreviewTheme(opt.key)"
               >{{ opt.label }}</a-button>
             </div>
-            <a-button type="link" size="small" class="!p-3 !text-[11px]" @click="copyText(editContent)">复制原文</a-button>
-            <a-button type="link" size="small" class="!p-3 !text-[11px]" @click="copyMarkdownAsPlainText(editContent)">复制纯文本</a-button>
-            <a-button type="link" size="small" class="!p-3 !text-[11px]" @click="toggleSyncScroll">{{ syncScrollEnabled ? '同步滚动：开' : '同步滚动：关' }}</a-button>
-            <a-button type="link" size="small" class="!p-3 !text-[11px]" @click="handleSave" :loading="saving">保存</a-button>
-            <a-button type="link" size="small" class="!p-3 !text-[11px]" @click="toggleEditorFullscreen">退出全屏</a-button>
+            <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText(editContent)">复制原文</a-button>
+            <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyMarkdownAsPlainText(editContent)">复制纯文本</a-button>
+            <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="toggleSyncScroll">{{ syncScrollEnabled ? '同步滚动：开' : '同步滚动：关' }}</a-button>
+            <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="handleSave" :loading="saving">保存</a-button>
+            <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="toggleEditorFullscreen">退出全屏</a-button>
           </div>
         </div>
         <div class="flex-1 overflow-hidden p-2 md:p-4">

@@ -325,11 +325,13 @@ function onDividerMouseDown(e: MouseEvent): void {
   background: #fff;
 }
 
-/* 预览区当前光标对应块的高亮 */
+/* 预览区当前光标对应块的高亮：
+   - background !important 压过主题注入的内联 background（标题/图片/引用等主题带底色的块），统一显眼；
+   - outline 用负 offset 内嵌，不被预览面板 overflow:hidden 裁剪（之前向左的 box-shadow 溢出面板被裁，看不到）。 */
 .md-editor__preview :deep(.md-editor__active-block) {
-  background: rgba(24, 144, 255, 0.16);
-  box-shadow: -3px 0 0 #1890ff;
-  border-radius: 2px;
+  background: rgba(24, 144, 255, 0.18) !important;
+  outline: 3px solid #1890ff;
+  outline-offset: -3px;
 }
 
 .md-editor__preview :deep(img) {

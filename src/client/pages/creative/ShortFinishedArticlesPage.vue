@@ -221,6 +221,7 @@ async function handleMarkPublishable(article: CreativeFinishedArticle): Promise<
   const { Modal } = await import("ant-design-vue");
   const confirmed = await new Promise<boolean>(resolve => {
     Modal.confirm({
+      bodyStyle: { padding: '24px' },
       title: "标记可推送",
       content: "确认标记该文章为可推送？后续可在平台手动推送到微信公众号草稿箱。",
       okText: "确认", cancelText: "取消",
@@ -247,6 +248,7 @@ async function handleCancelPublishable(article: CreativeFinishedArticle): Promis
   const { Modal } = await import("ant-design-vue");
   const confirmed = await new Promise<boolean>(resolve => {
     Modal.confirm({
+      bodyStyle: { padding: '24px' },
       title: "取消推送标记",
       content: "确认取消推送标记？文章将回到已生成状态。",
       okText: "确认", cancelText: "取消",

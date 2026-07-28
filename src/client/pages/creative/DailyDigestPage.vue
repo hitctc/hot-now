@@ -69,6 +69,7 @@ onMounted(loadItems);
 
 function handleGenerate(): void {
   Modal.confirm({
+    bodyStyle: { padding: '24px' },
     title: "生成日报",
     content: "确认触发 Hermes 生成日报？生成过程可能需要 1-2 分钟。",
     okText: "确认生成",

@@ -55,6 +55,7 @@ function formatTime(value: string | null): string {
     width="90%"
     centered
     wrap-class-name="source-item-detail-modal"
+    :body-style="{ padding: '24px' }"
     destroy-on-close
     @cancel="close"
   >

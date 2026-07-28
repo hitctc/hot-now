@@ -157,6 +157,7 @@ const flowOptions = [
     :destroy-on-close="true"
     width="480px"
     centered
+    :body-style="{ padding: '24px' }"
     title="手动生图"
     @after-open-change="(v: boolean) => v && handleOpen()"
     @cancel="handleClose"

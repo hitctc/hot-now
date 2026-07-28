@@ -70,6 +70,7 @@ async function handleReject(): Promise<void> {
 function handleDelete(): void {
   if (!props.article) return;
   Modal.confirm({
+    bodyStyle: { padding: '24px' },
     title: "确认删除",
     content: `确定要删除文章 #${props.article.id} 吗？删除后可从回收站恢复。`,
     okText: "删除",

@@ -348,7 +348,7 @@
           </div>
           <img :src="sourceCoverUrl" referrerpolicy="no-referrer" alt="素材原图" loading="lazy" class="block w-1/5 cursor-pointer rounded-editorial-md border border-editorial-border object-cover transition-opacity hover:opacity-80" @click="sourceCoverPreviewOpen = true" />
           <p class="m-0 mt-1 text-[11px] text-editorial-text-muted/70">素材原文封面图（外链，点击图片预览，右键另存后上传到成品）</p>
-          <a-modal v-model:open="sourceCoverPreviewOpen" :footer="null" :width="760" destroy-on-close>
+          <a-modal v-model:open="sourceCoverPreviewOpen" :footer="null" :width="760" :body-style="{ padding: '24px' }" destroy-on-close>
             <img :src="sourceCoverUrl" referrerpolicy="no-referrer" alt="素材原图预览" class="mx-auto block max-h-[72vh] max-w-full object-contain" />
           </a-modal>
         </section>
@@ -695,6 +695,7 @@ async function handleRegenImagePrompts(): Promise<void> {
   const { Modal } = await import("ant-design-vue");
   const confirmed = await new Promise<boolean>(resolve => {
     Modal.confirm({
+      bodyStyle: { padding: '24px' },
       title: "重新生成图片提示词",
       content: "将根据当前正文重新生成所有图片提示词，原有提示词会被覆盖。预计需要 2~3 分钟，确认继续？",
       okText: "确认生成", cancelText: "取消",
@@ -1798,6 +1799,7 @@ async function saveAndPush(): Promise<void> {
     const { Modal } = await import("ant-design-vue");
     const confirmed = await new Promise<boolean>((resolve) => {
       Modal.confirm({
+        bodyStyle: { padding: '24px' },
         title: "内容未改动",
         content: "中间栏内容与 AI 草稿一致，发布出去将是纯 AI（0% 人工），可能被限流。确认发布？",
         okText: "确认发布",
@@ -2038,6 +2040,7 @@ async function handleDetailMarkPublishable(): Promise<void> {
   const { Modal } = await import("ant-design-vue");
   const confirmed = await new Promise<boolean>(resolve => {
     Modal.confirm({
+      bodyStyle: { padding: '24px' },
       title: "标记可推送",
       content: "确认标记该文章为可推送？后续可在平台手动推送到微信公众号草稿箱。",
       okText: "确认", cancelText: "取消",
@@ -2064,6 +2067,7 @@ async function handleDetailCancelPublishable(): Promise<void> {
   const { Modal } = await import("ant-design-vue");
   const confirmed = await new Promise<boolean>(resolve => {
     Modal.confirm({
+      bodyStyle: { padding: '24px' },
       title: "取消推送标记",
       content: "确认取消推送标记？文章将回到已生成状态。",
       okText: "确认", cancelText: "取消",
@@ -2090,6 +2094,7 @@ async function handleDetailDiscard(): Promise<void> {
   const { Modal } = await import("ant-design-vue");
   const confirmed = await new Promise<boolean>(resolve => {
     Modal.confirm({
+      bodyStyle: { padding: '24px' },
       title: "废弃文章",
       content: "废弃后文章不再走自动生图和发布流程，但保留记录可随时查看。确认废弃？",
       okText: "确认废弃", cancelText: "取消",

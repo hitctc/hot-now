@@ -126,9 +126,6 @@ function onAiDraftInput(e: Event): void {
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const aiDraftTextareaRef = ref<HTMLTextAreaElement | null>(null);
 const previewRef = ref<HTMLElement | null>(null);
-// 编辑区约定行高（font-size 14 × line-height 1.6 ≈ 22），仅用于滚动位置→行号换算，
-// 预览块按源码行反查时容差大，不需要像素级精确。
-const EDITOR_LINE_HEIGHT = 22;
 
 /** 当前光标所在行（1 索引）。
  *  仅在 textarea 拥有焦点时才读 selectionStart：刚挂载的 textarea 未聚焦时，
@@ -154,7 +151,7 @@ function findBlockForLine(blocks: HTMLElement[], line: number): HTMLElement | nu
   return target;
 }
 
-/** 光标移动时高亮预览中对应的块；块不在视口内时瞬时滚到可见（单向写 scrollTop，不会打架） */
+/** 光标移动时高亮预览中对应的块；不自动滚动预览，滚动统一交给中栏滚动同步，避免两套目标打架跳闪 */
 function updateCursorHighlight(): void {
   const preview = previewRef.value;
   if (!preview) return;
@@ -163,17 +160,12 @@ function updateCursorHighlight(): void {
   const target = findBlockForLine(getPreviewBlocks(), getCursorLine());
   if (!target) return;
   target.classList.add("md-editor__active-block");
-  // 仅当块脱离预览视口时才滚动，避免每次点击都跳动
-  const delta = target.getBoundingClientRect().top - preview.getBoundingClientRect().top;
-  if (delta < 0 || delta + target.offsetHeight > preview.clientHeight) {
-    preview.scrollTop += delta;
-  }
 }
 
 // 滚动同步 rAF 句柄：合并高频 scroll 到下一帧
 let scrollSyncRaf: number | null = null;
 
-/** 中栏滚动 → 预览按块内比例同步（单向）：块边界对齐 + 块内连续跟随，直接设不滞后 */
+/** 中栏滚动 → 预览按整体比例同步（单向）：纯比例连续跟随，不读块位置，避免每帧布局计算造成跳闪 */
 function onTextareaScroll(): void {
   if (!props.syncScroll) return;
   if (scrollSyncRaf != null) return;
@@ -182,27 +174,10 @@ function onTextareaScroll(): void {
     const ta = textareaRef.value;
     const preview = previewRef.value;
     if (!ta || !preview) return;
-    const blocks = getPreviewBlocks();
-    if (blocks.length === 0) return;
-    // 中栏顶部行号用连续浮点（不取整）：scrollTop 每变一点 topLine 就变，保证块内也连续跟随
-    const topLine = ta.scrollTop / EDITOR_LINE_HEIGHT + 1;
-    // 找 topLine 所在块，再用下一块的起始行确定块内行数范围，做块内比例插值
-    let idx = 0;
-    for (let i = 0; i < blocks.length; i++) {
-      if (Number(blocks[i].getAttribute("data-source-line")) <= topLine) idx = i;
-      else break;
-    }
-    const block = blocks[idx];
-    const startLine = Number(block.getAttribute("data-source-line"));
-    const nextLine = idx + 1 < blocks.length
-      ? Number(blocks[idx + 1].getAttribute("data-source-line"))
-      : startLine + 1;
-    const ratio = Math.min(1, Math.max(0, (topLine - startLine) / Math.max(1, nextLine - startLine)));
-    // 预览目标 scrollTop：让「块顶 + 块内偏移×块高」对齐预览视口顶
-    const blockTop = block.getBoundingClientRect().top - preview.getBoundingClientRect().top + preview.scrollTop;
-    const target = blockTop + ratio * block.offsetHeight;
+    const taMax = ta.scrollHeight - ta.clientHeight;
     const pvMax = preview.scrollHeight - preview.clientHeight;
-    preview.scrollTop = Math.max(0, Math.min(pvMax, target));
+    if (taMax <= 0 || pvMax <= 0) return;
+    preview.scrollTop = (ta.scrollTop / taMax) * pvMax;
   });
 }
 

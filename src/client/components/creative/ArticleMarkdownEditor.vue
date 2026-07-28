@@ -170,26 +170,44 @@ function updateCursorHighlight(): void {
   }
 }
 
-// 滚动同步 rAF 句柄：合并高频 scroll 到下一帧，避免预览抖动
+// 滚动同步 rAF 句柄 + 目标 scrollTop：缓动逼近，平滑过渡
 let scrollSyncRaf: number | null = null;
+let scrollTargetTop: number | null = null;
 
-/** 中栏滚动 → 预览按滚动比例同步（单向，连续跟随不跳跃） */
+/** 中栏滚动 → 块对齐算目标 + rAF 缓动逼近（单向，准且平滑不硬跳） */
 function onTextareaScroll(): void {
   if (!props.syncScroll) return;
-  // 已排队 rAF 则跳过本帧后续 scroll，合并去抖
-  if (scrollSyncRaf != null) return;
-  scrollSyncRaf = requestAnimationFrame(() => {
-    scrollSyncRaf = null;
-    const ta = textareaRef.value;
-    const preview = previewRef.value;
-    if (!ta || !preview) return;
-    // 按滚动比例映射：中栏滚动百分比 → 预览同百分比。
-    // 不再用块对齐（每次对齐块顶部会跳跃），比例同步连续跟随更流畅。
-    const taMax = ta.scrollHeight - ta.clientHeight;
-    const pvMax = preview.scrollHeight - preview.clientHeight;
-    if (taMax <= 0 || pvMax <= 0) return;
-    preview.scrollTop = (ta.scrollTop / taMax) * pvMax;
-  });
+  const ta = textareaRef.value;
+  const preview = previewRef.value;
+  if (!ta || !preview) return;
+  // 块对齐：中栏顶部行号 → 预览对应块 → 目标 scrollTop（块顶对齐预览顶）
+  const topLine = Math.round(ta.scrollTop / EDITOR_LINE_HEIGHT) + 1;
+  const target = findBlockForLine(getPreviewBlocks(), topLine);
+  if (!target) return;
+  const delta = target.getBoundingClientRect().top - preview.getBoundingClientRect().top;
+  // 目标 scrollTop 限制在可滚动范围内，避免逼近越界值（如滚回顶部目标为负）导致 lerp 无法收敛、持续空转
+  const pvMax = preview.scrollHeight - preview.clientHeight;
+  scrollTargetTop = Math.max(0, Math.min(pvMax, preview.scrollTop + delta));
+  // 已有 rAF 在跑就不重复启动，lerp 会追逐最新 scrollTargetTop
+  if (scrollSyncRaf == null) {
+    scrollSyncRaf = requestAnimationFrame(lerpPreviewScroll);
+  }
+}
+
+/** 每帧缓动逼近 scrollTargetTop，过渡平滑 */
+function lerpPreviewScroll(): void {
+  scrollSyncRaf = null;
+  const preview = previewRef.value;
+  if (!preview || scrollTargetTop == null) return;
+  const diff = scrollTargetTop - preview.scrollTop;
+  if (Math.abs(diff) < 1) {
+    preview.scrollTop = scrollTargetTop;
+    scrollTargetTop = null;
+    return;
+  }
+  // 缓动系数 0.25：每帧逼近 1/4，平滑且不过度滞后
+  preview.scrollTop += diff * 0.25;
+  scrollSyncRaf = requestAnimationFrame(lerpPreviewScroll);
 }
 
 onMounted(() => { nextTick(() => updateCursorHighlight()); });

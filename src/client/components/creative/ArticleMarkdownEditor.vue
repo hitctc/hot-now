@@ -446,6 +446,7 @@ function onDividerMouseDown(e: MouseEvent): void {
   line-height: 22px;
   color: #333;
   background: transparent;
+  caret-color: #1890ff;
 }
 
 .md-editor__divider {

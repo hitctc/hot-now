@@ -449,6 +449,12 @@ function onDividerMouseDown(e: MouseEvent): void {
   caret-color: #1890ff;
 }
 
+/* textarea/preview 滚到边界不冒泡到详情弹窗（配合详情弹窗的 wheel 锁，编辑区聚焦时锁住外层滚动） */
+.md-editor__textarea,
+.md-editor__preview {
+  overscroll-behavior: contain;
+}
+
 .md-editor__divider {
   flex: 0 0 6px;
   background: #e8e8e8;

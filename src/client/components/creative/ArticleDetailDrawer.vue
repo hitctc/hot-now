@@ -812,10 +812,22 @@ function setupEditorResize(): void {
   measureEditorHeight();
   editorResizeObserver = new ResizeObserver(() => measureEditorHeight());
   editorResizeObserver.observe(scrollParent);
+  scrollParent.addEventListener("wheel", onModalBodyWheel, { passive: false });
 }
 
 function teardownEditorResize(): void {
   if (editorResizeObserver) { editorResizeObserver.disconnect(); editorResizeObserver = null; }
+  const scrollParent = editorSectionRef.value?.closest(".ant-modal-body") as HTMLElement | null;
+  scrollParent?.removeEventListener("wheel", onModalBodyWheel);
+}
+
+/** 编辑区 textarea 聚焦时，编辑区外的滚轮锁住 modal body（避免滚详情弹窗），编辑区内仍可正常滚 */
+function onModalBodyWheel(e: WheelEvent): void {
+  const active = document.activeElement as HTMLElement | null;
+  if (!active || !active.classList.contains("md-editor__textarea")) return;
+  const target = e.target as HTMLElement;
+  if (target.closest(".md-editor__textarea-wrap, .md-editor__preview")) return;
+  e.preventDefault();
 }
 
 function copyArticleId(id: number): void {

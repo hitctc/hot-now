@@ -771,7 +771,10 @@ const editorFullscreen = ref(false);
 const focusMode = ref(false);
 let focusModeTimer: ReturnType<typeof setTimeout> | null = null;
 const articleDetailWrapClass = computed(() => `article-detail-modal${focusMode.value ? " article-detail-modal--focus" : ""}`);
-const articleDetailMaskStyle = computed(() => focusMode.value ? { background: "rgba(0, 0, 0, 0.78)" } : {});
+// 专注时遮罩由半透明黑缓慢过渡到纯白，凸显编辑器；非专注保持 antd 默认半透明黑
+const articleDetailMaskStyle = computed(() => focusMode.value
+  ? { background: "#ffffff", transition: "background 0.8s ease" }
+  : { background: "rgba(0, 0, 0, 0.45)", transition: "background 0.8s ease" });
 
 // ─── 编辑/预览同步滚动开关：持久化，跨详情弹窗共享 ───
 const SYNC_SCROLL_KEY = "md-editor-sync-scroll";
@@ -2208,7 +2211,7 @@ onBeforeUnmount(() => {
 .article-detail-modal .ant-modal-footer,
 .article-detail-modal .ant-modal-body > section,
 .article-detail-modal .editor-section > * {
-  transition: opacity 0.3s ease;
+  transition: opacity 0.8s ease;
 }
 .article-detail-modal--focus .ant-modal-header,
 .article-detail-modal--focus .ant-modal-footer,

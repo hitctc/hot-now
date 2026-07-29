@@ -577,7 +577,7 @@
             />
           </div>
           <!-- 专注模式专属：保存状态浮层（其余内容渐隐后淡入，给自动保存可见反馈） -->
-          <span v-if="savedAtLabel" class="focus-save-hint">{{ savedAtLabel }}</span>
+          <span class="focus-save-hint" :class="{ 'focus-save-hint--idle': !savedAtLabel }">{{ savedAtLabel || "未触发保存" }}</span>
         </section>
       </div>
     </template>
@@ -2238,6 +2238,9 @@ onBeforeUnmount(() => {
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.8s ease;
+}
+.focus-save-hint--idle {
+  color: #999;
 }
 .article-detail-modal--focus .focus-save-hint {
   opacity: 1;

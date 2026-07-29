@@ -587,7 +587,7 @@
       <div
         v-if="editorFullscreen && article && !props.readonly"
         class="fixed inset-0 z-[9999] flex flex-col"
-        style="background: var(--editorial-bg-page);"
+        :style="{ background: focusMode ? '#ffffff' : 'var(--editorial-bg-page)', transition: 'background-color 0.8s ease' }"
       >
         <div class="fullscreen-toolbar flex flex-col gap-2 border-b px-3 py-2 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-x-4 md:gap-y-2 md:px-4" style="border-color: var(--editorial-border);">
           <div class="flex flex-wrap items-center gap-2">
@@ -775,8 +775,8 @@ let focusModeTimer: ReturnType<typeof setTimeout> | null = null;
 const articleDetailWrapClass = computed(() => `article-detail-modal${focusMode.value ? " article-detail-modal--focus" : ""}`);
 // 专注时遮罩由半透明黑缓慢过渡到纯白，凸显编辑器；非专注保持 antd 默认半透明黑
 const articleDetailMaskStyle = computed(() => focusMode.value
-  ? { background: "#ffffff", transition: "background 0.8s ease" }
-  : { background: "rgba(0, 0, 0, 0.45)", transition: "background 0.8s ease" });
+  ? { backgroundColor: "#ffffff", opacity: 1, transition: "background-color 0.8s ease, opacity 0.8s ease" }
+  : { backgroundColor: "rgba(0, 0, 0, 0.45)", transition: "background-color 0.8s ease, opacity 0.8s ease" });
 
 // ─── 编辑/预览同步滚动开关：持久化，跨详情弹窗共享 ───
 const SYNC_SCROLL_KEY = "md-editor-sync-scroll";
@@ -2244,6 +2244,10 @@ onBeforeUnmount(() => {
 }
 .article-detail-modal--focus .focus-save-hint {
   opacity: 1;
+}
+/* 专注模式：modal-content 强制纯白不透明，覆盖主题半透明白，确保整体纯白 */
+.article-detail-modal--focus .ant-modal-content {
+  background: #ffffff !important;
 }
 /* modal content 固定 90vh，body 内部滚动 */
 .article-detail-modal .ant-modal-content {

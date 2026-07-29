@@ -7,7 +7,8 @@
     :destroy-on-close="true"
     width="90%"
     centered
-    wrap-class-name="article-detail-modal"
+    :wrap-class-name="articleDetailWrapClass"
+    :mask-style="articleDetailMaskStyle"
     :body-style="{ padding: '24px', overflowY: 'auto' }"
     :z-index="1000"
     @cancel="handleClose"
@@ -536,7 +537,7 @@
         </section>
 
         <!-- 正文：编辑器或只读预览 -->
-        <section v-if="article.contentMarkdown" ref="editorSectionRef">
+        <section v-if="article.contentMarkdown" ref="editorSectionRef" class="editor-section">
           <div class="mb-2 flex items-center justify-between" data-editor-title>
             <div class="flex items-center gap-2">
               <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文</h3>
@@ -766,6 +767,12 @@ const hasAnomalyInfo = computed(() => {
 // ─── 正文全屏编辑 ───
 const editorFullscreen = ref(false);
 
+// ─── 专注模式：编辑区持续聚焦时渐隐弹窗其余内容 + mask 加深 ───
+const focusMode = ref(false);
+let focusModeTimer: ReturnType<typeof setTimeout> | null = null;
+const articleDetailWrapClass = computed(() => `article-detail-modal${focusMode.value ? " article-detail-modal--focus" : ""}`);
+const articleDetailMaskStyle = computed(() => focusMode.value ? { background: "rgba(0, 0, 0, 0.78)" } : {});
+
 // ─── 编辑/预览同步滚动开关：持久化，跨详情弹窗共享 ───
 const SYNC_SCROLL_KEY = "md-editor-sync-scroll";
 function loadSyncScroll(): boolean {
@@ -813,12 +820,18 @@ function setupEditorResize(): void {
   editorResizeObserver = new ResizeObserver(() => measureEditorHeight());
   editorResizeObserver.observe(scrollParent);
   scrollParent.addEventListener("wheel", onModalBodyWheel, { passive: false });
+  scrollParent.addEventListener("focusin", onEditorFocusIn);
+  scrollParent.addEventListener("focusout", onEditorFocusOut);
 }
 
 function teardownEditorResize(): void {
   if (editorResizeObserver) { editorResizeObserver.disconnect(); editorResizeObserver = null; }
   const scrollParent = editorSectionRef.value?.closest(".ant-modal-body") as HTMLElement | null;
   scrollParent?.removeEventListener("wheel", onModalBodyWheel);
+  scrollParent?.removeEventListener("focusin", onEditorFocusIn);
+  scrollParent?.removeEventListener("focusout", onEditorFocusOut);
+  if (focusModeTimer) { clearTimeout(focusModeTimer); focusModeTimer = null; }
+  focusMode.value = false;
 }
 
 /** 编辑区 textarea 聚焦时，编辑区外的滚轮锁住 modal body（避免滚详情弹窗），编辑区内仍可正常滚 */
@@ -828,6 +841,24 @@ function onModalBodyWheel(e: WheelEvent): void {
   const target = e.target as HTMLElement;
   if (target.closest(".md-editor__textarea-wrap, .md-editor__preview")) return;
   e.preventDefault();
+}
+
+/** 编辑区聚焦停留 1.2s 进入专注模式；失焦（且没切到另一个编辑区）退出 */
+function onEditorFocusIn(e: FocusEvent): void {
+  const t = e.target as HTMLElement;
+  if (!t.classList || !t.classList.contains("md-editor__textarea")) return;
+  if (focusModeTimer) clearTimeout(focusModeTimer);
+  focusModeTimer = setTimeout(() => { focusModeTimer = null; focusMode.value = true; }, 1200);
+}
+
+function onEditorFocusOut(e: FocusEvent): void {
+  const t = e.target as HTMLElement;
+  if (!t.classList || !t.classList.contains("md-editor__textarea")) return;
+  // 切到另一个编辑区（中栏↔AI 草稿）保持专注，不退出
+  const related = e.relatedTarget as HTMLElement | null;
+  if (related && related.classList.contains("md-editor__textarea")) return;
+  if (focusModeTimer) { clearTimeout(focusModeTimer); focusModeTimer = null; }
+  focusMode.value = false;
 }
 
 function copyArticleId(id: number): void {
@@ -2170,6 +2201,21 @@ onBeforeUnmount(() => {
 /* 弹窗打开时禁止蒙层滚动 */
 .article-detail-modal {
   overflow: hidden !important;
+}
+
+/* 专注模式：编辑区持续聚焦时渐隐弹窗 header/footer/其他 section 和正文标题栏，只凸显编辑器 */
+.article-detail-modal .ant-modal-header,
+.article-detail-modal .ant-modal-footer,
+.article-detail-modal .ant-modal-body > section,
+.article-detail-modal .editor-section > * {
+  transition: opacity 0.3s ease;
+}
+.article-detail-modal--focus .ant-modal-header,
+.article-detail-modal--focus .ant-modal-footer,
+.article-detail-modal--focus .ant-modal-body > section:not(.editor-section),
+.article-detail-modal--focus .editor-section > *:not(.article-editor-wrapper) {
+  opacity: 0;
+  pointer-events: none;
 }
 /* modal content 固定 90vh，body 内部滚动 */
 .article-detail-modal .ant-modal-content {

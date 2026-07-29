@@ -2230,7 +2230,7 @@ onBeforeUnmount(() => {
 .focus-save-hint {
   position: absolute;
   top: 6px;
-  right: 10px;
+  left: 10px;
   z-index: 5;
   font-size: 11px;
   font-weight: 500;

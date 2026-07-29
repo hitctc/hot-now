@@ -836,20 +836,30 @@ function charCount(text: string | null | undefined): number {
   return text.replace(/[\s\n]/g, "").length;
 }
 
+// 进入全屏前存 modal body 滚动位置：正文节 v-show 全屏时 display:none 会让 modal body 重排丢失 scrollTop
+let savedModalScrollTop = 0;
+
 function toggleEditorFullscreen(): void {
-  editorFullscreen.value = !editorFullscreen.value;
-  if (editorFullscreen.value) {
+  if (!editorFullscreen.value) {
+    const body = editorSectionRef.value?.closest(".ant-modal-body") as HTMLElement | null;
+    savedModalScrollTop = body?.scrollTop ?? 0;
+    editorFullscreen.value = true;
     document.body.style.overflow = "hidden";
   } else {
+    editorFullscreen.value = false;
     document.body.style.overflow = "";
+    // 等正文节重新显示、modal body 重排完成后，恢复进入全屏前的滚动位置
+    nextTick(() => {
+      const body = editorSectionRef.value?.closest(".ant-modal-body") as HTMLElement | null;
+      if (body) body.scrollTop = savedModalScrollTop;
+    });
   }
 }
 
 // ESC 退出全屏
 function handleFullscreenEsc(e: KeyboardEvent): void {
   if (e.key === "Escape" && editorFullscreen.value) {
-    editorFullscreen.value = false;
-    document.body.style.overflow = "";
+    toggleEditorFullscreen();
   }
 }
 

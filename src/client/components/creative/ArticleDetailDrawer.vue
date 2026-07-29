@@ -2249,6 +2249,14 @@ onBeforeUnmount(() => {
 .article-detail-modal--focus .ant-modal-content {
   background: #ffffff !important;
 }
+/* 专注模式：弹窗宽度缓慢过渡到 100%，给编辑区更大横向空间 */
+.article-detail-modal .ant-modal {
+  transition: width 0.8s ease, max-width 0.8s ease;
+}
+.article-detail-modal--focus .ant-modal {
+  width: 100% !important;
+  max-width: 100% !important;
+}
 /* modal content 固定 90vh，body 内部滚动 */
 .article-detail-modal .ant-modal-content {
   max-height: 100vh;

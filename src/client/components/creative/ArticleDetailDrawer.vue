@@ -576,6 +576,8 @@
               :sync-scroll="syncScrollEnabled"
             />
           </div>
+          <!-- 专注模式专属：保存状态浮层（其余内容渐隐后淡入，给自动保存可见反馈） -->
+          <span v-if="savedAtLabel" class="focus-save-hint">{{ savedAtLabel }}</span>
         </section>
       </div>
     </template>
@@ -2216,9 +2218,29 @@ onBeforeUnmount(() => {
 .article-detail-modal--focus .ant-modal-header,
 .article-detail-modal--focus .ant-modal-footer,
 .article-detail-modal--focus .ant-modal-body > section:not(.editor-section),
-.article-detail-modal--focus .editor-section > *:not(.article-editor-wrapper) {
+.article-detail-modal--focus .editor-section > *:not(.article-editor-wrapper):not(.focus-save-hint) {
   opacity: 0;
   pointer-events: none;
+}
+
+/* 专注模式专属：保存状态浮在编辑器右上角，其余内容渐隐后淡入，给自动保存可见反馈 */
+.article-detail-modal .editor-section {
+  position: relative;
+}
+.focus-save-hint {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  z-index: 5;
+  font-size: 11px;
+  font-weight: 500;
+  color: #16a34a;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+.article-detail-modal--focus .focus-save-hint {
+  opacity: 1;
 }
 /* modal content 固定 90vh，body 内部滚动 */
 .article-detail-modal .ant-modal-content {

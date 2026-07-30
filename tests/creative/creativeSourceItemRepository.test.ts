@@ -6,7 +6,8 @@ import {
   listCreativeSourceItems,
   updateCreativeSourceItemWritingStatus,
   updateCreativeSourceItemLinkedArticle,
-  updateCreativeSourceItemTrendScore
+  updateCreativeSourceItemTrendScore,
+  updateCreativeSourceItemAccountFit
 } from "../../src/core/creative/creativeSourceItemRepository.js";
 import { type TestDatabaseHandle, createTestDatabase } from "../helpers/testDatabase.js";
 
@@ -246,6 +247,30 @@ describe("updateCreativeSourceItemWritingStatus", () => {
       writingStoppedAt: null
     });
   });
+
+  it("persists retryable technical failure details", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+
+    const item = insertCreativeSourceItem(handle.db, {
+      externalId: "failed-status-item",
+      collectorAgent: "test",
+      title: "技术失败素材",
+      url: "https://example.com/failed-status-item"
+    });
+
+    updateCreativeSourceItemWritingStatus(handle.db, item.id, "failed", {
+      step: 4,
+      stepName: "口述底稿生成",
+      reason: "模型超时"
+    });
+
+    const stored = findCreativeSourceItemById(handle.db, item.id);
+    expect(stored?.writingStatus).toBe("failed");
+    expect(stored?.writingStopStep).toBe(4);
+    expect(stored?.writingStopStepName).toBe("口述底稿生成");
+    expect(stored?.writingStopReason).toBe("模型超时");
+  });
 });
 
 describe("updateCreativeSourceItemLinkedArticle", () => {
@@ -369,5 +394,97 @@ describe("trendScore", () => {
 
     const breakdown = { topicPower: 10, emotionResonance: 10, infoGap: 10, socialCurrency: 10, timingWindow: 10, audienceBreadth: 10 };
     expect(updateCreativeSourceItemTrendScore(handle.db, 99999, 60, breakdown)).toBe(false);
+  });
+});
+
+describe("accountFit", () => {
+  it("persists fit details without changing writing status in shadow mode", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+    const item = insertCreativeSourceItem(handle.db, { ...baseInput, externalId: "fit-shadow" });
+
+    updateCreativeSourceItemAccountFit(handle.db, item.id, {
+      level: "high",
+      reason: "直接影响轻度用户的订阅选择",
+      details: {
+        targetReader: "偶尔使用豆包的普通职场人",
+        readerScenario: "正在判断是否订阅",
+        ordinaryImpact: "需要承担新增订阅成本",
+        articleValue: "判断是否值得付费",
+        evidenceBasis: ["素材包含订阅价格"],
+        supplemented: false
+      },
+      ruleVersion: "v1"
+    });
+
+    expect(findCreativeSourceItemById(handle.db, item.id)).toMatchObject({
+      writingStatus: "ready",
+      accountFitLevel: "high",
+      accountFitReason: "直接影响轻度用户的订阅选择",
+      accountFitRuleVersion: "v1",
+      accountFitDetails: {
+        targetReader: "偶尔使用豆包的普通职场人",
+        supplemented: false
+      }
+    });
+  });
+
+  it("updates writing status only when enforcement is enabled", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+    const high = insertCreativeSourceItem(handle.db, {
+      ...baseInput,
+      externalId: "fit-high",
+      url: "https://example.com/fit-high",
+      writingStatus: "pending"
+    });
+    const low = insertCreativeSourceItem(handle.db, {
+      ...baseInput,
+      externalId: "fit-low",
+      url: "https://example.com/fit-low",
+      writingStatus: "ready"
+    });
+
+    updateCreativeSourceItemAccountFit(handle.db, high.id, {
+      level: "high",
+      reason: "四项条件完整",
+      details: {},
+      ruleVersion: "v1",
+      updateWritingStatus: true
+    });
+    updateCreativeSourceItemAccountFit(handle.db, low.id, {
+      level: "low",
+      reason: "纯开发者工具",
+      details: {},
+      ruleVersion: "v1",
+      updateWritingStatus: true
+    });
+
+    expect(findCreativeSourceItemById(handle.db, high.id)!.writingStatus).toBe("ready");
+    expect(findCreativeSourceItemById(handle.db, low.id)!.writingStatus).toBe("excluded");
+  });
+
+  it("filters evaluated and unassessed materials", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+    const evaluated = insertCreativeSourceItem(handle.db, {
+      ...baseInput,
+      externalId: "fit-filtered",
+      url: "https://example.com/fit-filtered"
+    });
+    insertCreativeSourceItem(handle.db, {
+      ...baseInput,
+      externalId: "fit-unassessed",
+      url: "https://example.com/fit-unassessed"
+    });
+    updateCreativeSourceItemAccountFit(handle.db, evaluated.id, {
+      level: "medium",
+      reason: "影响存在但行动不具体",
+      details: {},
+      ruleVersion: "v1"
+    });
+
+    expect(listCreativeSourceItems(handle.db, { accountFitLevel: "medium" }).items.map((item) => item.id)).toEqual([evaluated.id]);
+    expect(listCreativeSourceItems(handle.db, { accountFitLevel: "unassessed" }).total).toBe(1);
   });
 });

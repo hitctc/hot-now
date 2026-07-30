@@ -37,6 +37,11 @@ export type CreativeSourceItem = {
   rawPayloadJson: string;
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
+  accountFitLevel: AccountFitLevel | null;
+  accountFitReason: string | null;
+  accountFitDetails: AccountFitDetails | null;
+  accountFitRuleVersion: string | null;
+  accountFitEvaluatedAt: string | null;
   linkedArticleId: number | null;
   tracedSources: TracedSource[] | null;
   writable: boolean;
@@ -45,6 +50,21 @@ export type CreativeSourceItem = {
   seqNumber?: number | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type AccountFitLevel = "high" | "medium" | "low" | "insufficient" | "error";
+
+export type AccountFitDetails = {
+  targetReader?: string;
+  readerScenario?: string;
+  ordinaryImpact?: string;
+  articleValue?: string;
+  evidenceBasis?: string[];
+  missingCriteria?: string[];
+  criteria?: Record<string, boolean>;
+  supplemented?: boolean;
+  searchQueries?: string[];
+  technicalError?: string;
 };
 
 export type TracedSource = {
@@ -210,6 +230,7 @@ export function readCreativeSourceItems(params?: {
   search?: string;
   /** 爆文分下限，仅显示 trend_score >= 该值的素材；为 null/undefined 时不限 */
   minTrendScore?: number;
+  accountFitLevel?: AccountFitLevel | "unassessed";
   direction?: string;
 }): Promise<SourceItemListResponse> {
   const query = new URLSearchParams();
@@ -221,6 +242,7 @@ export function readCreativeSourceItems(params?: {
   if (params?.writable) query.set("writable", "1");
   if (params?.search) query.set("search", params.search);
   if (params?.minTrendScore != null) query.set("trendScoreMin", String(params.minTrendScore));
+  if (params?.accountFitLevel) query.set("accountFitLevel", params.accountFitLevel);
   if (params?.direction) query.set("direction", params.direction);
   const qs = query.toString();
   return requestJson<SourceItemListResponse>(`/api/creative/source-items${qs ? `?${qs}` : ""}`);
@@ -325,7 +347,7 @@ export function fetchMissingImages(id: number): Promise<MissingImagesResponse> {
 
 export function updateSourceItemWritingStatus(
   id: number,
-  writingStatus: "ready" | "writing" | "done" | "skipped"
+  writingStatus: "pending" | "ready" | "queued" | "writing" | "done" | "skipped" | "excluded" | "failed"
 ): Promise<{ ok: boolean }> {
   return requestJson<{ ok: boolean }>(`/actions/creative/source-items/${id}/writing-status`, {
     method: "POST",
@@ -725,12 +747,31 @@ export type WriteArticleResult = {
 };
 
 /** 调用 Hermes v2 write-article API（异步），只允许人工锁定核心立意。 */
-export function writeSourceItemArticle(id: number, thesis?: string): Promise<WriteArticleResult> {
+export function writeSourceItemArticle(id: number, thesis?: string, forceAccountFit = false): Promise<WriteArticleResult> {
   const body: Record<string, unknown> = {};
   if (thesis) body.thesis = thesis;
+  if (forceAccountFit) body.forceAccountFit = true;
   return requestJson<WriteArticleResult>(`/api/creative/source-items/${id}/write-article`, {
     method: "POST",
     body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined,
+  });
+}
+
+export type EvaluateAccountFitResult = {
+  ok: boolean;
+  accountFit?: {
+    level: AccountFitLevel;
+    reason: string;
+    details: AccountFitDetails;
+    ruleVersion: string;
+  };
+  reason?: string;
+};
+
+/** 立即评估并持久化单条素材的账号适配度。 */
+export function evaluateSourceItemAccountFit(id: number): Promise<EvaluateAccountFitResult> {
+  return requestJson<EvaluateAccountFitResult>(`/api/creative/source-items/${id}/evaluate-account-fit`, {
+    method: "POST"
   });
 }
 

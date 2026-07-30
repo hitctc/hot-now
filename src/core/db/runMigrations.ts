@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 43;
+const schemaVersion = 44;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -1453,6 +1453,26 @@ export function runMigrations(db: SqliteDatabase): void {
       }
     }
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(43, sourceWritingStopDetailsMigrationName);
+
+    // 044: 素材账号适配度，用于替代爆文分作为公众号自动写作准入依据
+    const sourceAccountFitMigrationName = "044_source_items_account_fit";
+    const sourceAccountFitColumns = [
+      ["account_fit_level", "TEXT"],
+      ["account_fit_reason", "TEXT"],
+      ["account_fit_details_json", "TEXT"],
+      ["account_fit_rule_version", "TEXT"],
+      ["account_fit_evaluated_at", "TEXT"],
+    ] as const;
+    for (const [columnName, columnType] of sourceAccountFitColumns) {
+      if (!hasColumn(db, "creative_source_items", columnName)) {
+        db.exec(`ALTER TABLE creative_source_items ADD COLUMN ${columnName} ${columnType}`);
+      }
+    }
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_creative_source_items_account_fit_level
+      ON creative_source_items(account_fit_level)
+    `);
+    db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(44, sourceAccountFitMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

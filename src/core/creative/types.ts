@@ -1,3 +1,3 @@
-export type CreativeSourceItemWritingStatus = "ready" | "writing" | "done" | "skipped" | "excluded";
+export type CreativeSourceItemWritingStatus = "pending" | "ready" | "queued" | "writing" | "done" | "skipped" | "excluded" | "failed";
 
 export type CreativeFinishedArticleMode = "A" | "B";

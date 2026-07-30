@@ -81,8 +81,10 @@ import {
   updateCreativeSourceItemWritingStatus,
   updateCreativeSourceItemLinkedArticle,
   updateCreativeSourceItemTrendScore,
+  updateCreativeSourceItemAccountFit,
   updateCreativeSourceItemFields,
-  toggleSourceItemWritable
+  toggleSourceItemWritable,
+  type AccountFitDetails
 } from "../core/creative/creativeSourceItemRepository.js";
 import {
   insertCreativeFinishedArticle,
@@ -777,7 +779,10 @@ export function createServer(deps: ServerDeps = {}) {
       score: typeof body?.score === "number" ? body.score : undefined,
       publishedAt: typeof body?.publishedAt === "string" ? body.publishedAt : undefined,
       collectorTimestamp: typeof body?.collectorTimestamp === "string" ? body.collectorTimestamp : undefined,
-      writingStatus: typeof body?.writingStatus === "string" && ["ready", "writing", "done", "skipped", "excluded"].includes(body.writingStatus) ? body.writingStatus as "ready" | "writing" | "done" | "skipped" | "excluded" : undefined,
+      writingStatus: typeof body?.writingStatus === "string"
+        && ["pending", "ready", "queued", "writing", "done", "skipped", "excluded", "failed"].includes(body.writingStatus)
+        ? body.writingStatus as "pending" | "ready" | "queued" | "writing" | "done" | "skipped" | "excluded" | "failed"
+        : undefined,
       trendScore: typeof body?.trendScore === "number" ? body.trendScore : undefined,
       trendBreakdown: typeof body?.trendBreakdown === "object" && body.trendBreakdown !== null ? body.trendBreakdown as any : undefined,
       direction: typeof body?.direction === "string" ? body.direction : undefined
@@ -953,12 +958,13 @@ export function createServer(deps: ServerDeps = {}) {
     const result = listCreativeSourceItems(db, {
       page: query.page ? parseInt(query.page, 10) : undefined,
       pageSize: query.pageSize ? parseInt(query.pageSize, 10) : undefined,
-      writingStatus: query.writingStatus as "ready" | "writing" | "done" | "skipped" | "excluded" | undefined,
+      writingStatus: query.writingStatus as "pending" | "ready" | "queued" | "writing" | "done" | "skipped" | "excluded" | "failed" | undefined,
       collectorAgent: query.collectorAgent,
       sourceName: query.sourceName,
       writable: query.writable === "1" ? true : undefined,
       search: query.search,
       trendScoreMin: query.trendScoreMin ? parseInt(query.trendScoreMin, 10) : undefined,
+      accountFitLevel: query.accountFitLevel as "high" | "medium" | "low" | "insufficient" | "error" | "unassessed" | undefined,
       sourceFeed: query.sourceFeed || undefined,
       last24h: query.sourceFeed ? true : undefined,
       direction: query.direction as string | undefined
@@ -2079,7 +2085,7 @@ export function createServer(deps: ServerDeps = {}) {
     if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
 
     const id = parseInt((request.params as { id: string }).id, 10);
-    const body = request.body as { thesis?: string } | undefined;
+    const body = request.body as { thesis?: string; forceAccountFit?: boolean } | undefined;
     const item = findCreativeSourceItemById(db, id);
     if (!item) { return reply.code(404).send({ ok: false, reason: "source-item-not-found" }); }
 
@@ -2090,6 +2096,9 @@ export function createServer(deps: ServerDeps = {}) {
     const hermesBody: Record<string, unknown> = { sourceItemId: id };
     if (typeof body?.thesis === "string" && body.thesis.trim()) {
       hermesBody.thesis = body.thesis.trim();
+    }
+    if (body?.forceAccountFit === true) {
+      hermesBody.forceAccountFit = true;
     }
 
     try {
@@ -2114,6 +2123,43 @@ export function createServer(deps: ServerDeps = {}) {
     } catch (err) {
       const errMessage = (err as Error).message ?? String(err);
       return reply.code(502).send({ ok: false, reason: `Hermes 调用失败`, detail: errMessage });
+    }
+  });
+
+  // ─── 手动评估账号适配度：由 Hermes 完成判断并回写本素材 ───
+  app.post("/api/creative/source-items/:id/evaluate-account-fit", async (request, reply) => {
+    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
+    if (session === undefined) { return; }
+    if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
+
+    const id = parseInt((request.params as { id: string }).id, 10);
+    if (!findCreativeSourceItemById(db, id)) {
+      return reply.code(404).send({ ok: false, reason: "source-item-not-found" });
+    }
+    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+    const hermesApiToken = process.env.HERMES_API_TOKEN;
+    if (!hermesApiUrl || !hermesApiToken) {
+      return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" });
+    }
+
+    try {
+      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/evaluate-account-fit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
+        body: JSON.stringify({ sourceItemId: id }),
+        signal: AbortSignal.timeout(120_000),
+      });
+      const responseBody = await res.text();
+      return reply
+        .code(res.status >= 500 ? 502 : res.status)
+        .header("Content-Type", "application/json; charset=utf-8")
+        .send(responseBody);
+    } catch (err) {
+      return reply.code(502).send({
+        ok: false,
+        reason: "Hermes 适配度评估失败",
+        detail: (err as Error).message
+      });
     }
   });
 
@@ -2568,7 +2614,7 @@ export function createServer(deps: ServerDeps = {}) {
     } | undefined;
     const id = parseInt(params.id, 10);
     const status = typeof body?.writingStatus === "string" ? body.writingStatus : "";
-    if (!["ready", "writing", "done", "skipped", "excluded"].includes(status)) {
+    if (!["pending", "ready", "queued", "writing", "done", "skipped", "excluded", "failed"].includes(status)) {
       return reply.code(400).send({ ok: false, reason: "invalid-status" });
     }
     const hasStopDetails = body?.stopStep !== undefined
@@ -2581,13 +2627,13 @@ export function createServer(deps: ServerDeps = {}) {
       && body.stopStepName.trim().length > 0
       && typeof body?.stopReason === "string"
       && body.stopReason.trim().length > 0;
-    if (hasStopDetails && (status !== "skipped" || !stopDetailsValid)) {
+    if (hasStopDetails && (!["skipped", "failed"].includes(status) || !stopDetailsValid)) {
       return reply.code(400).send({ ok: false, reason: "invalid-stop-details" });
     }
     const updated = updateCreativeSourceItemWritingStatus(
       db,
       id,
-      status as "ready" | "writing" | "done" | "skipped" | "excluded",
+      status as "pending" | "ready" | "queued" | "writing" | "done" | "skipped" | "excluded" | "failed",
       stopDetailsValid
         ? {
             step: body.stopStep as number,
@@ -2668,6 +2714,41 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     const updated = updateCreativeSourceItemTrendScore(db, id, trendScore, trendBreakdown as any);
+    if (!updated) {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+    return reply.send({ ok: true });
+  });
+
+  app.put("/actions/creative/source-items/:id/account-fit", async (request, reply) => {
+    if (!validateCreativeApiToken(request, reply, creativeApiToken)) {
+      return;
+    }
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const body = request.body as Record<string, unknown> | undefined;
+    const level = typeof body?.level === "string" ? body.level : "";
+    const allowedLevels = new Set(["high", "medium", "low", "insufficient", "error"]);
+    if (
+      !allowedLevels.has(level)
+      || typeof body?.reason !== "string"
+      || typeof body?.ruleVersion !== "string"
+      || typeof body?.details !== "object"
+      || body.details === null
+    ) {
+      return reply.code(400).send({ ok: false, reason: "invalid-account-fit-payload" });
+    }
+
+    const updated = updateCreativeSourceItemAccountFit(db, id, {
+      level: level as "high" | "medium" | "low" | "insufficient" | "error",
+      reason: body.reason,
+      details: body.details as AccountFitDetails,
+      ruleVersion: body.ruleVersion,
+      updateWritingStatus: body.updateWritingStatus === true,
+    });
     if (!updated) {
       return reply.code(404).send({ ok: false, reason: "not-found" });
     }

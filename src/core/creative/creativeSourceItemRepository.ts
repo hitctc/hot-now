@@ -29,6 +29,11 @@ const SELECT_COLUMNS = `
   raw_payload_json,
   trend_score,
   trend_breakdown,
+  account_fit_level,
+  account_fit_reason,
+  account_fit_details_json,
+  account_fit_rule_version,
+  account_fit_evaluated_at,
   traced_sources_json,
   writable,
   direction,
@@ -65,6 +70,11 @@ type SourceItemRow = {
   raw_payload_json: string;
   trend_score: number | null;
   trend_breakdown: string | null;
+  account_fit_level: string | null;
+  account_fit_reason: string | null;
+  account_fit_details_json: string | null;
+  account_fit_rule_version: string | null;
+  account_fit_evaluated_at: string | null;
   traced_sources_json: string | null;
   writable: number;
   direction: string;
@@ -102,6 +112,11 @@ function mapRow(row: SourceItemRow): CreativeSourceItemRecord {
     rawPayloadJson: row.raw_payload_json,
     trendScore: row.trend_score,
     trendBreakdown: row.trend_breakdown ? JSON.parse(row.trend_breakdown) : null,
+    accountFitLevel: row.account_fit_level as AccountFitLevel | null,
+    accountFitReason: row.account_fit_reason,
+    accountFitDetails: row.account_fit_details_json ? JSON.parse(row.account_fit_details_json) : null,
+    accountFitRuleVersion: row.account_fit_rule_version,
+    accountFitEvaluatedAt: row.account_fit_evaluated_at,
     tracedSources: row.traced_sources_json ? JSON.parse(row.traced_sources_json) : null,
     writable: row.writable === 1,
     direction: row.direction,
@@ -134,6 +149,21 @@ export type TrendBreakdown = {
   audienceBreadth: number;
 };
 
+export type AccountFitLevel = "high" | "medium" | "low" | "insufficient" | "error";
+
+export type AccountFitDetails = {
+  targetReader?: string;
+  readerScenario?: string;
+  ordinaryImpact?: string;
+  articleValue?: string;
+  evidenceBasis?: string[];
+  missingCriteria?: string[];
+  criteria?: Record<string, boolean>;
+  supplemented?: boolean;
+  searchQueries?: string[];
+  technicalError?: string;
+};
+
 export type CreativeSourceItemRecord = {
   id: number;
   externalId: string;
@@ -160,6 +190,11 @@ export type CreativeSourceItemRecord = {
   rawPayloadJson: string;
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
+  accountFitLevel: AccountFitLevel | null;
+  accountFitReason: string | null;
+  accountFitDetails: AccountFitDetails | null;
+  accountFitRuleVersion: string | null;
+  accountFitEvaluatedAt: string | null;
   tracedSources: TracedSource[] | null;
   writable: boolean;
   direction: string;
@@ -202,6 +237,7 @@ export type ListCreativeSourceItemsFilters = {
   writable?: boolean;
   search?: string;
   trendScoreMin?: number;
+  accountFitLevel?: AccountFitLevel | "unassessed";
   last24h?: boolean;
   sourceFeed?: string;
   direction?: string;
@@ -414,6 +450,13 @@ export function listCreativeSourceItems(
     params.push(filters.trendScoreMin);
   }
 
+  if (filters.accountFitLevel === "unassessed") {
+    whereClauses.push("account_fit_level IS NULL");
+  } else if (filters.accountFitLevel) {
+    whereClauses.push("account_fit_level = ?");
+    params.push(filters.accountFitLevel);
+  }
+
   // last24h 模式：只返回最近 24 小时内发布的素材，不分页
   // 按发布时间（published_at）过滤，published_at 为空时回退到入库时间（created_at）
   if (filters.last24h) {
@@ -491,7 +534,7 @@ export function updateCreativeSourceItemWritingStatus(
   stopDetails?: CreativeSourceItemWritingStopDetails
 ): boolean {
   let result;
-  if (status === "skipped" && stopDetails) {
+  if ((status === "skipped" || status === "failed") && stopDetails) {
     result = db
       .prepare(
         `UPDATE creative_source_items
@@ -504,7 +547,7 @@ export function updateCreativeSourceItemWritingStatus(
          WHERE id = ?`
       )
       .run(status, stopDetails.step, stopDetails.stepName, stopDetails.reason, id);
-  } else if (status !== "skipped") {
+  } else if (status !== "skipped" && status !== "failed") {
     result = db
       .prepare(
         `UPDATE creative_source_items
@@ -539,6 +582,50 @@ export function updateCreativeSourceItemTrendScore(
       "UPDATE creative_source_items SET trend_score = ?, trend_breakdown = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
     )
     .run(trendScore, JSON.stringify(trendBreakdown), id);
+  return result.changes > 0;
+}
+
+export type UpdateCreativeSourceItemAccountFitInput = {
+  level: AccountFitLevel;
+  reason: string;
+  details: AccountFitDetails;
+  ruleVersion: string;
+  updateWritingStatus?: boolean;
+};
+
+/**
+ * 保存账号适配度；只有正式准入模式才同步写作状态，影子评估不会改变现有队列。
+ */
+export function updateCreativeSourceItemAccountFit(
+  db: SqliteDatabase,
+  id: number,
+  input: UpdateCreativeSourceItemAccountFitInput
+): boolean {
+  const writingStatus = input.level === "high" ? "ready" : input.level === "low" ? "excluded" : "pending";
+  const statusSql = input.updateWritingStatus ? ", writing_status = ?" : "";
+  const values: unknown[] = [
+    input.level,
+    input.reason,
+    JSON.stringify(input.details),
+    input.ruleVersion,
+  ];
+  if (input.updateWritingStatus) {
+    values.push(writingStatus);
+  }
+  values.push(id);
+  const result = db
+    .prepare(
+      `UPDATE creative_source_items
+       SET account_fit_level = ?,
+           account_fit_reason = ?,
+           account_fit_details_json = ?,
+           account_fit_rule_version = ?,
+           account_fit_evaluated_at = CURRENT_TIMESTAMP
+           ${statusSql},
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`
+    )
+    .run(...values);
   return result.changes > 0;
 }
 

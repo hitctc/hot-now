@@ -14,11 +14,13 @@ import {
   readCreativeFinishedArticle,
   updateSourceItemWritingStatus,
   writeSourceItemArticle,
+  evaluateSourceItemAccountFit,
   fetchWriteQueueStatus,
   submitManualWrite,
   traceSourceItem,
   type CreativeSourceItem,
   type CreativeFinishedArticle,
+  type AccountFitLevel,
   type TrendBreakdown,
   type TracedSource
 } from "../../services/creativeApi.js";
@@ -42,13 +44,15 @@ const saved = (() => {
   } catch { return {}; }
 })();
 const writingStatusFilter = ref<string | undefined>(saved.writingStatus || undefined);
+const accountFitFilter = ref<string | undefined>(saved.accountFitLevel || undefined);
 const sourceNameFilter = ref(saved.sourceName || "");
 const writableOnly = ref(false);
 const searchText = ref(saved.search || "");
-// 爆文分下限：筛选 trend_score >= 该值的素材。
-// localStorage 里无此字段时默认 60；用户主动清空后为 null（不过滤）。
+// 爆文分仅供人工查看和筛选，默认不再过滤低热度素材。
 const minTrendScore = ref<number | null>(
-  "minTrendScore" in saved ? (saved.minTrendScore ?? null) : 60
+  !("accountFitLevel" in saved) && saved.minTrendScore === 60
+    ? null
+    : ("minTrendScore" in saved ? (saved.minTrendScore ?? null) : null)
 );
 
 // 搜索历史
@@ -71,6 +75,7 @@ function saveSourceFilters(): void {
   try {
     localStorage.setItem(SOURCE_FILTERS_KEY, JSON.stringify({
       writingStatus: writingStatusFilter.value || "",
+      accountFitLevel: accountFitFilter.value || "",
       sourceName: sourceNameFilter.value || "",
       search: searchText.value,
       minTrendScore: minTrendScore.value
@@ -89,11 +94,24 @@ const detailArticle = ref<CreativeFinishedArticle | null>(null);
 
 const writingStatusOptions = [
   { label: "全部", value: "" },
+  { label: "待评估", value: "pending" },
   { label: "待写作", value: "ready" },
+  { label: "排队中", value: "queued" },
   { label: "不写作", value: "excluded" },
   { label: "写作中", value: "writing" },
   { label: "已写作", value: "done" },
-  { label: "跳过不写", value: "skipped" }
+  { label: "跳过不写", value: "skipped" },
+  { label: "技术失败", value: "failed" }
+];
+
+const accountFitOptions = [
+  { label: "全部适配度", value: "" },
+  { label: "高适配", value: "high" },
+  { label: "中适配", value: "medium" },
+  { label: "低适配", value: "low" },
+  { label: "信息不足", value: "insufficient" },
+  { label: "评估失败", value: "error" },
+  { label: "未评估", value: "unassessed" }
 ];
 
 // ─── 数据加载 ───
@@ -106,6 +124,7 @@ async function loadItems(): Promise<void> {
       page: currentPage.value,
       pageSize: pageSize.value,
       writingStatus: writingStatusFilter.value || undefined,
+      accountFitLevel: accountFitFilter.value as AccountFitLevel | "unassessed" | undefined,
       sourceName: sourceNameFilter.value.trim() || undefined,
       writable: writableOnly.value || undefined,
       search: searchText.value || undefined,
@@ -129,6 +148,12 @@ onMounted(() => {
 });
 
 watch(writingStatusFilter, () => {
+  currentPage.value = 1;
+  saveSourceFilters();
+  void loadItems();
+});
+
+watch(accountFitFilter, () => {
   currentPage.value = 1;
   saveSourceFilters();
   void loadItems();
@@ -285,6 +310,8 @@ function writingStatusColor(status: string): string {
   switch (status) {
     case "ready":
       return "blue";
+    case "queued":
+      return "cyan";
     case "excluded":
       return "default";
     case "writing":
@@ -293,6 +320,8 @@ function writingStatusColor(status: string): string {
       return "green";
     case "skipped":
       return "default";
+    case "failed":
+      return "red";
     default:
       return "blue";
   }
@@ -300,8 +329,12 @@ function writingStatusColor(status: string): string {
 
 function writingStatusLabel(status: string): string {
   switch (status) {
+    case "pending":
+      return "待评估";
     case "ready":
       return "待写作";
+    case "queued":
+      return "排队中";
     case "excluded":
       return "不写作";
     case "writing":
@@ -310,6 +343,8 @@ function writingStatusLabel(status: string): string {
       return "已写作";
     case "skipped":
       return "跳过不写";
+    case "failed":
+      return "技术失败";
     default:
       return status;
   }
@@ -332,6 +367,7 @@ const writeModeVisible = ref(false);
 const writeModeTarget = ref<CreativeSourceItem | null>(null);
 const writeModeThesis = ref("");
 const writeModeConfirming = ref(false);
+const writeModeLowConfirmed = ref(false);
 
 // ─── 手动写作弹窗 ───
 const manualWriteVisible = ref(false);
@@ -446,6 +482,7 @@ function stopTracePoll(): void {
 function openWriteModeModal(item: CreativeSourceItem): void {
   writeModeTarget.value = item;
   writeModeThesis.value = "";
+  writeModeLowConfirmed.value = false;
   writeModeVisible.value = true;
 }
 
@@ -453,6 +490,7 @@ function cancelWriteMode(): void {
   writeModeVisible.value = false;
   writeModeTarget.value = null;
   writeModeConfirming.value = false;
+  writeModeLowConfirmed.value = false;
   writeModeThesis.value = "";
 }
 
@@ -545,7 +583,39 @@ async function confirmWriteMode(): Promise<void> {
   if (!item) return;
   writeModeConfirming.value = true;
   try {
-    const result = await writeSourceItemArticle(item.id, writeModeThesis.value.trim() || undefined);
+    if (!item.accountFitLevel) {
+      const evaluated = await evaluateSourceItemAccountFit(item.id);
+      if (!evaluated.ok || !evaluated.accountFit) {
+        message.error(evaluated.reason ?? "账号适配度评估失败");
+        return;
+      }
+      Object.assign(item, {
+        accountFitLevel: evaluated.accountFit.level,
+        accountFitReason: evaluated.accountFit.reason,
+        accountFitDetails: evaluated.accountFit.details,
+        accountFitRuleVersion: evaluated.accountFit.ruleVersion,
+        accountFitEvaluatedAt: new Date().toISOString()
+      });
+    }
+    if (item.accountFitLevel === "error") {
+      message.error(item.accountFitReason || "账号适配度评估失败，请重试");
+      return;
+    }
+    if (item.accountFitLevel === "insufficient") {
+      message.warning(item.accountFitReason || "素材信息仍然不足，暂不进入写作");
+      return;
+    }
+    if (item.accountFitLevel === "low" && !writeModeLowConfirmed.value) {
+      writeModeLowConfirmed.value = true;
+      message.warning("该素材为低适配；请查看原因，再次点击“仍然写作”即可强制继续");
+      return;
+    }
+
+    const result = await writeSourceItemArticle(
+      item.id,
+      writeModeThesis.value.trim() || undefined,
+      item.accountFitLevel === "low" && writeModeLowConfirmed.value
+    );
     if (result.ok) {
       writeModeVisible.value = false;
       addWritingId(item.id);
@@ -568,6 +638,48 @@ async function confirmWriteMode(): Promise<void> {
   } finally {
     writeModeConfirming.value = false;
   }
+}
+
+/** 手动重评单条素材，适用于历史素材和需要重新判断的边界案例。 */
+async function handleAccountFitEvaluation(item: CreativeSourceItem): Promise<void> {
+  actionPendingId.value = item.id;
+  try {
+    const evaluated = await evaluateSourceItemAccountFit(item.id);
+    if (!evaluated.ok || !evaluated.accountFit) {
+      message.error(evaluated.reason ?? "账号适配度评估失败");
+      return;
+    }
+    Object.assign(item, {
+      accountFitLevel: evaluated.accountFit.level,
+      accountFitReason: evaluated.accountFit.reason,
+      accountFitDetails: evaluated.accountFit.details,
+      accountFitRuleVersion: evaluated.accountFit.ruleVersion,
+      accountFitEvaluatedAt: new Date().toISOString()
+    });
+    message.success(`账号适配度：${accountFitLabel(evaluated.accountFit.level)}`);
+  } catch {
+    message.error("账号适配度评估请求失败");
+  } finally {
+    actionPendingId.value = null;
+  }
+}
+
+function accountFitLabel(level: AccountFitLevel | null): string {
+  if (level === "high") return "高适配";
+  if (level === "medium") return "中适配";
+  if (level === "low") return "低适配";
+  if (level === "insufficient") return "信息不足";
+  if (level === "error") return "评估失败";
+  return "未评估";
+}
+
+function accountFitColor(level: AccountFitLevel | null): string {
+  if (level === "high") return "green";
+  if (level === "medium") return "gold";
+  if (level === "low") return "default";
+  if (level === "insufficient") return "blue";
+  if (level === "error") return "red";
+  return "default";
 }
 
 // ─── 表格列 ───
@@ -629,6 +741,12 @@ const pagination = computed(() => ({
         v-model:value="writingStatusFilter"
         :options="writingStatusOptions"
         placeholder="写作状态"
+        class="!w-[140px]"
+      />
+      <a-select
+        v-model:value="accountFitFilter"
+        :options="accountFitOptions"
+        placeholder="账号适配度"
         class="!w-[140px]"
       />
       <a-input-search
@@ -755,7 +873,7 @@ const pagination = computed(() => ({
             </a-tooltip>
           </template>
 
-          <!-- 评分列：评分 + 爆文分 + 爆文维度柱状图 三行紧凑展示 -->
+          <!-- 原评分列同时展示评分、爆文维度和账号适配，不额外增加表格列。 -->
           <template v-else-if="column.key === 'score'">
             <div class="flex flex-col gap-0.5 leading-tight">
               <div class="flex items-center gap-1">
@@ -781,6 +899,25 @@ const pagination = computed(() => ({
                     :title="bar.label"
                   />
                 </div>
+              </a-tooltip>
+              <a-tooltip placement="topLeft" :mouse-enter-delay="0.2">
+                <template #title>
+                  <div class="max-w-[420px] text-xs leading-5">
+                    <div class="font-semibold">{{ accountFitLabel(record.accountFitLevel) }}</div>
+                    <div v-if="record.accountFitReason" class="mt-1">{{ record.accountFitReason }}</div>
+                    <div v-if="record.accountFitDetails?.targetReader" class="mt-1">读者：{{ record.accountFitDetails.targetReader }}</div>
+                    <div v-if="record.accountFitDetails?.readerScenario">场景：{{ record.accountFitDetails.readerScenario }}</div>
+                    <div v-if="record.accountFitDetails?.ordinaryImpact">影响：{{ record.accountFitDetails.ordinaryImpact }}</div>
+                    <div v-if="record.accountFitDetails?.articleValue">价值：{{ record.accountFitDetails.articleValue }}</div>
+                    <div v-if="record.accountFitRuleVersion" class="mt-1 opacity-70">规则：{{ record.accountFitRuleVersion }}</div>
+                  </div>
+                </template>
+                <a-tag
+                  :color="accountFitColor(record.accountFitLevel)"
+                  class="!m-0 w-fit cursor-help !px-1.5 !py-0 !text-[10px]"
+                >
+                  {{ accountFitLabel(record.accountFitLevel) }}
+                </a-tag>
               </a-tooltip>
             </div>
           </template>
@@ -808,7 +945,7 @@ const pagination = computed(() => ({
           <template v-else-if="column.key === 'writingStatus'">
             <div class="flex flex-col items-start gap-0.5 leading-tight">
               <a-tooltip
-                v-if="record.writingStatus === 'skipped' && record.writingStopReason"
+                v-if="['skipped', 'failed'].includes(record.writingStatus) && record.writingStopReason"
                 placement="topLeft"
               >
                 <template #title>
@@ -855,13 +992,13 @@ const pagination = computed(() => ({
         <!-- 展开行 -->
         <template #expandedRowRender="{ record }">
           <div class="flex flex-col gap-4 rounded-editorial-md border border-editorial-border bg-editorial-panel/60 p-4">
-            <!-- 完整停止说明放在展开区顶部，避免表格截断隐藏关键原因。 -->
+            <!-- 完整终止说明放在展开区顶部，技术失败明确提示可重试。 -->
             <div
-              v-if="record.writingStatus === 'skipped' && record.writingStopReason"
+              v-if="['skipped', 'failed'].includes(record.writingStatus) && record.writingStopReason"
               class="rounded-editorial-md border border-orange-300 bg-orange-50 px-4 py-3"
             >
               <div class="flex flex-wrap items-center gap-2 text-sm font-semibold text-orange-800">
-                <span>写作已停止</span>
+                <span>{{ record.writingStatus === "failed" ? "技术失败，可重试" : "写作已停止" }}</span>
                 <span>第 {{ record.writingStopStep ?? "-" }} 阶段</span>
                 <span>{{ record.writingStopStepName || "质量闸门" }}</span>
                 <span v-if="record.writingStoppedAt" class="text-xs font-normal text-orange-600">
@@ -973,6 +1110,13 @@ const pagination = computed(() => ({
               <span class="text-xs font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">写作状态：</span>
               <a-button
                 size="small"
+                :loading="actionPendingId === record.id"
+                @click="handleAccountFitEvaluation(record)"
+              >
+                {{ record.accountFitLevel ? "重新评估适配度" : "评估适配度" }}
+              </a-button>
+              <a-button
+                size="small"
                 type="primary"
                 :disabled="record.writingStatus === 'done' || actionPendingId === record.id"
                 :loading="actionPendingId === record.id"
@@ -1015,7 +1159,7 @@ const pagination = computed(() => ({
       :open="writeModeVisible"
       title="开始写作"
       :confirm-loading="writeModeConfirming"
-      ok-text="开始写作"
+      :ok-text="writeModeLowConfirmed ? '仍然写作' : '开始写作'"
       cancel-text="取消"
       :destroy-on-close="true"
       width="480px"
@@ -1027,8 +1171,16 @@ const pagination = computed(() => ({
         素材：{{ writeModeTarget.title.slice(0, 60) }}{{ writeModeTarget.title.length > 60 ? '...' : '' }}
       </div>
       <p class="mb-0 text-xs leading-5 text-editorial-text-muted">
-        v2 管线会根据普通人相关性、现实证据和读者任务自适应结构，不再选择 A/B/C 写作模式。
+        写作前会先读取账号适配度；未评估素材会当场评估，低适配需要再次确认。
       </p>
+      <a-alert
+        v-if="writeModeTarget?.accountFitLevel"
+        class="mt-3"
+        :type="writeModeTarget.accountFitLevel === 'high' ? 'success' : writeModeTarget.accountFitLevel === 'medium' ? 'warning' : 'error'"
+        :message="accountFitLabel(writeModeTarget.accountFitLevel)"
+        :description="writeModeTarget.accountFitReason || undefined"
+        show-icon
+      />
       <div class="mt-4">
         <div class="mb-1 text-xs font-medium text-editorial-text-muted">核心立意（可选）</div>
         <a-input

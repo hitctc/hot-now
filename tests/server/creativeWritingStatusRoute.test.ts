@@ -75,3 +75,71 @@ describe("POST /actions/creative/source-items/:id/writing-status", () => {
     await app.close();
   });
 });
+
+describe("PUT /actions/creative/source-items/:id/account-fit", () => {
+  it("persists account fit without changing writing status in shadow mode", async () => {
+    const handle = await createTestDatabase("hot-now-account-fit-route-");
+    handles.push(handle);
+    const item = insertCreativeSourceItem(handle.db, {
+      externalId: "route-fit-1",
+      collectorAgent: "route-test",
+      title: "豆包开始收费",
+      url: "https://example.com/route-fit-1"
+    });
+    const app = createServer({ db: handle.db, creativeApiToken: "test-token" });
+
+    const response = await app.inject({
+      method: "PUT",
+      url: `/actions/creative/source-items/${item.id}/account-fit`,
+      headers: { "x-creative-token": "test-token" },
+      payload: {
+        level: "high",
+        reason: "直接影响轻度用户的订阅选择",
+        details: {
+          targetReader: "偶尔使用豆包的普通职场人",
+          readerScenario: "正在判断是否订阅",
+          ordinaryImpact: "新增订阅成本",
+          articleValue: "判断是否值得付费"
+        },
+        ruleVersion: "v1",
+        updateWritingStatus: false
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(findCreativeSourceItemById(handle.db, item.id)).toMatchObject({
+      writingStatus: "ready",
+      accountFitLevel: "high",
+      accountFitRuleVersion: "v1"
+    });
+    await app.close();
+  });
+
+  it("rejects unsupported account fit levels", async () => {
+    const handle = await createTestDatabase("hot-now-account-fit-route-");
+    handles.push(handle);
+    const item = insertCreativeSourceItem(handle.db, {
+      externalId: "route-fit-2",
+      collectorAgent: "route-test",
+      title: "测试素材",
+      url: "https://example.com/route-fit-2"
+    });
+    const app = createServer({ db: handle.db, creativeApiToken: "test-token" });
+
+    const response = await app.inject({
+      method: "PUT",
+      url: `/actions/creative/source-items/${item.id}/account-fit`,
+      headers: { "x-creative-token": "test-token" },
+      payload: {
+        level: "unknown",
+        reason: "invalid",
+        details: {},
+        ruleVersion: "v1"
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ ok: false, reason: "invalid-account-fit-payload" });
+    await app.close();
+  });
+});

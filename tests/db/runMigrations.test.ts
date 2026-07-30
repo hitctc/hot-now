@@ -80,7 +80,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(31);
+    expect(schemaVersion).toBe(42);
 
     const appliedMigrations = db
       .prepare(
@@ -123,7 +123,18 @@ describe("runMigrations", () => {
       { version: 28, name: "add_title_index" },
       { version: 29, name: "add_intro_fields" },
       { version: 30, name: "add_summary_index" },
-      { version: 31, name: "031_daily_digests" }
+      { version: 31, name: "031_daily_digests" },
+      { version: 32, name: "032_finished_articles_publishable" },
+      { version: 33, name: "033_finished_articles_image_prompts" },
+      { version: 34, name: "034_finished_articles_similarity" },
+      { version: 35, name: "035_finished_articles_step_trace" },
+      { version: 36, name: "036_direction_and_short_content_fields" },
+      { version: 37, name: "037_finished_articles_comments" },
+      { version: 38, name: "038_finished_articles_author_extensions" },
+      { version: 39, name: "039_seq_number_by_direction" },
+      { version: 40, name: "040_finished_articles_human_markdown" },
+      { version: 41, name: "041_finished_articles_performance_feedback" },
+      { version: 42, name: "042_finished_articles_writing_pipeline_v2" }
     ]);
 
     const hiddenAggregates = db
@@ -176,6 +187,38 @@ describe("runMigrations", () => {
       .all() as Array<{ name: string }>;
 
     expect(contentItemColumns.map((column) => column.name)).toContain("metadata_json");
+
+    const finishedArticleColumns = db
+      .prepare(
+        `
+          PRAGMA table_info(creative_finished_articles)
+        `
+      )
+      .all() as Array<{ name: string }>;
+
+    expect(finishedArticleColumns.map((column) => column.name)).toEqual(
+      expect.arrayContaining([
+        "performance_delivered_users",
+        "performance_read_users",
+        "performance_share_users",
+        "performance_new_followers",
+        "performance_rewrite_level",
+        "performance_title_snapshot",
+        "performance_recorded_at",
+        "pipeline_version",
+        "reader_task",
+        "reader_relevance",
+        "evidence_pack",
+        "reader_value_plan",
+        "fact_skeleton",
+        "oral_draft",
+        "title_candidates",
+        "fact_source_checklist",
+        "title_selection_confirmed",
+        "performance_title_group_snapshot",
+        "performance_reader_task_snapshot"
+      ])
+    );
 
     const twitterAccountColumns = db
       .prepare(
@@ -454,7 +497,7 @@ describe("runMigrations", () => {
     expect(verifyPassword("wrong-password", adminRow?.password_hash ?? "")).toBe(false);
   });
 
-  it("keeps the juya row aligned with legacy config.source.rssUrl while refreshing built-in catalog URLs", async () => {
+  it("refreshes built-in RSS catalog URLs during seed updates", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-db-"));
     const dbPath = path.join(tempDir, "hot-now.sqlite");
     const db = openDatabase(dbPath);
@@ -493,7 +536,7 @@ describe("runMigrations", () => {
       .all() as Array<{ kind: string; rss_url: string }>;
 
     expect(rows).toEqual([
-      { kind: "juya", rss_url: "https://legacy.example.com/custom-juya.xml" },
+      { kind: "juya", rss_url: "https://daily.juya.uk/rss.xml" },
       { kind: "openai", rss_url: "https://openai.com/news/rss.xml" }
     ]);
   });
@@ -524,7 +567,7 @@ describe("runMigrations", () => {
     expect(evidenceTable).toBeTruthy();
     expect(sourceRunsTable).toBeTruthy();
     expect(notificationsTable).toBeTruthy();
-    expect(db.pragma("user_version", { simple: true })).toBe(31);
+    expect(db.pragma("user_version", { simple: true })).toBe(42);
 
     // daily_digests 表验证
     const digestTable = db

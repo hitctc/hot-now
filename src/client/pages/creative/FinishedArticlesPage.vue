@@ -19,6 +19,7 @@ import {
 import { readWechatMpAccounts, type WechatMpAccountSummary } from "../../services/settingsApi.js";
 import ArticlePushFloatWidget from "../../components/creative/ArticlePushFloatWidget.vue";
 import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
+import ArticlePerformanceFeedbackModal from "../../components/creative/ArticlePerformanceFeedbackModal.vue";
 import SourceItemDetailModal from "../../components/creative/SourceItemDetailModal.vue";
 import { getStatusLabel, getAvailableActions, checkPublishConditions, type ArticleAction } from "../../components/creative/articleStatusShared.js";
 
@@ -100,6 +101,9 @@ const statusOptions = [
 
 // 文章详情全屏弹窗
 const detailArticle = ref<CreativeFinishedArticle | null>(null);
+
+// 第一阶段文章效果反馈弹窗
+const performanceArticle = ref<CreativeFinishedArticle | null>(null);
 
 // 素材详情弹窗
 const sourceItemModalOpen = ref(false);
@@ -321,6 +325,21 @@ function closeDetail(): void {
   detailArticle.value = null;
 }
 
+/**
+ * 打开发布后效果反馈弹窗，已有数据会在弹窗中自动回填。
+ */
+function openPerformanceFeedback(article: CreativeFinishedArticle): void {
+  performanceArticle.value = article;
+}
+
+/**
+ * 保存反馈后刷新列表，使“已记录”状态和数据保持一致。
+ */
+async function handlePerformanceSaved(): Promise<void> {
+  await loadItems();
+  performanceArticle.value = null;
+}
+
 // ─── 素材详情弹窗 ───
 
 async function openSourceItemModal(sourceItemId: number): Promise<void> {
@@ -487,6 +506,7 @@ const columns = [
   { title: "相似度", key: "similarity", width: 56, ellipsis: true },
   { title: "模式", key: "mode", width: 48, ellipsis: true },
   { title: "耗时/时间", key: "timeInfo", width: 130, ellipsis: true },
+  { title: "效果", key: "performance", width: 72 },
   { title: "操作", key: "actions", width: 60, fixed: "right" as const },
 ];
 
@@ -647,6 +667,23 @@ const pagination = computed(() => ({
             >恢复</a-button>
           </template>
 
+          <!-- 第一阶段文章效果反馈：仅提供快速录入入口，不阻断发布流程 -->
+          <template v-else-if="column.key === 'performance'">
+            <div class="flex flex-col items-start gap-1">
+              <a-tag
+                v-if="record.performanceRecordedAt"
+                color="green"
+                class="!m-0 !text-[10px] !leading-4"
+              >已记录</a-tag>
+              <a-button
+                size="small"
+                type="link"
+                class="!h-auto !px-0 !py-0 !text-[11px]"
+                @click="openPerformanceFeedback(record)"
+              >{{ record.performanceRecordedAt ? "修改" : "录入" }}</a-button>
+            </div>
+          </template>
+
 
 
           <!-- 来源列 -->
@@ -734,6 +771,13 @@ const pagination = computed(() => ({
 
     <!-- 素材详情弹窗 -->
     <SourceItemDetailModal v-model:visible="sourceItemModalOpen" :source-item-id="sourceItemModalId" />
+
+    <ArticlePerformanceFeedbackModal
+      :open="performanceArticle !== null"
+      :article="performanceArticle"
+      @update:open="(val) => { if (!val) performanceArticle = null; }"
+      @saved="handlePerformanceSaved"
+    />
 
     <!-- 推送悬浮组件（teleport 到 body，避免被 modal 层叠上下文遮挡） -->
     <Teleport to="body">

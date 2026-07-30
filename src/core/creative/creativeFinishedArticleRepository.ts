@@ -49,6 +49,25 @@ const SELECT_COLUMNS = `
   image_prompts,
   comments,
   author_extensions,
+  pipeline_version,
+  reader_task,
+  reader_relevance,
+  evidence_pack,
+  reader_value_plan,
+  fact_skeleton,
+  oral_draft,
+  title_candidates,
+  fact_source_checklist,
+  title_selection_confirmed,
+  performance_delivered_users,
+  performance_read_users,
+  performance_share_users,
+  performance_new_followers,
+  performance_rewrite_level,
+  performance_title_snapshot,
+  performance_title_group_snapshot,
+  performance_reader_task_snapshot,
+  performance_recorded_at,
   created_at,
   updated_at,
   (SELECT COUNT(*) FROM wechat_draft_push_log WHERE article_id = creative_finished_articles.id AND status = 'success') AS push_count
@@ -99,6 +118,25 @@ type ArticleRow = {
   image_prompts: string | null;
   comments: string | null;
   author_extensions: string | null;
+  pipeline_version: string | null;
+  reader_task: string | null;
+  reader_relevance: string | null;
+  evidence_pack: string | null;
+  reader_value_plan: string | null;
+  fact_skeleton: string | null;
+  oral_draft: string | null;
+  title_candidates: string | null;
+  fact_source_checklist: string | null;
+  title_selection_confirmed: number;
+  performance_delivered_users: number | null;
+  performance_read_users: number | null;
+  performance_share_users: number | null;
+  performance_new_followers: number | null;
+  performance_rewrite_level: string | null;
+  performance_title_snapshot: string | null;
+  performance_title_group_snapshot: string | null;
+  performance_reader_task_snapshot: string | null;
+  performance_recorded_at: string | null;
   push_count: number;
   created_at: string;
   updated_at: string;
@@ -173,6 +211,25 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     imagePrompts: row.image_prompts ? JSON.parse(row.image_prompts) : null,
     comments: row.comments ? JSON.parse(row.comments) : null,
     authorExtensions: row.author_extensions ? JSON.parse(row.author_extensions) : null,
+    pipelineVersion: row.pipeline_version,
+    readerTask: row.reader_task,
+    readerRelevance: row.reader_relevance ? JSON.parse(row.reader_relevance) : null,
+    evidencePack: row.evidence_pack ? JSON.parse(row.evidence_pack) : null,
+    readerValuePlan: row.reader_value_plan ? JSON.parse(row.reader_value_plan) : null,
+    factSkeleton: row.fact_skeleton ? JSON.parse(row.fact_skeleton) : null,
+    oralDraft: row.oral_draft,
+    titleCandidates: row.title_candidates ? JSON.parse(row.title_candidates) : null,
+    factSourceChecklist: row.fact_source_checklist ? JSON.parse(row.fact_source_checklist) : null,
+    titleSelectionConfirmed: row.title_selection_confirmed === 1,
+    performanceDeliveredUsers: row.performance_delivered_users,
+    performanceReadUsers: row.performance_read_users,
+    performanceShareUsers: row.performance_share_users,
+    performanceNewFollowers: row.performance_new_followers,
+    performanceRewriteLevel: row.performance_rewrite_level as ArticleRewriteLevel | null,
+    performanceTitleSnapshot: row.performance_title_snapshot,
+    performanceTitleGroupSnapshot: row.performance_title_group_snapshot,
+    performanceReaderTaskSnapshot: row.performance_reader_task_snapshot,
+    performanceRecordedAt: row.performance_recorded_at,
     pushCount: row.push_count ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -192,6 +249,20 @@ export type StepTraceEntry = {
   summary?: string;
   error?: string;
   meta?: Record<string, unknown>;
+};
+
+export type ArticleRewriteLevel = "light" | "medium" | "heavy";
+
+export type TitleCandidate = {
+  title: string;
+  group: "impact" | "risk" | "counterintuitive" | "action";
+  group_label: string;
+  target_reader: string;
+  click_reason: string;
+  content_payoff: string;
+  clickbait_risk: "low" | "medium" | "high";
+  recommendation: "high" | "medium" | "low" | "fallback";
+  reader_task?: string;
 };
 
 export type CreativeFinishedArticleRecord = {
@@ -240,6 +311,25 @@ export type CreativeFinishedArticleRecord = {
   imagePrompts: string[] | null;
   comments: { reader: string; author_reply: string }[] | null;
   authorExtensions: string[] | null;
+  pipelineVersion: string | null;
+  readerTask: string | null;
+  readerRelevance: Record<string, unknown> | null;
+  evidencePack: Record<string, unknown> | null;
+  readerValuePlan: Record<string, unknown> | null;
+  factSkeleton: Record<string, unknown> | null;
+  oralDraft: string | null;
+  titleCandidates: TitleCandidate[] | null;
+  factSourceChecklist: unknown[] | null;
+  titleSelectionConfirmed: boolean;
+  performanceDeliveredUsers: number | null;
+  performanceReadUsers: number | null;
+  performanceShareUsers: number | null;
+  performanceNewFollowers: number | null;
+  performanceRewriteLevel: ArticleRewriteLevel | null;
+  performanceTitleSnapshot: string | null;
+  performanceTitleGroupSnapshot: string | null;
+  performanceReaderTaskSnapshot: string | null;
+  performanceRecordedAt: string | null;
   pushCount: number;
   createdAt: string;
   updatedAt: string;
@@ -278,6 +368,16 @@ export type InsertCreativeFinishedArticleInput = {
   imagePrompts?: string[];
   comments?: { reader: string; author_reply: string }[];
   authorExtensions?: string[];
+  pipelineVersion?: string;
+  readerTask?: string;
+  readerRelevance?: Record<string, unknown>;
+  evidencePack?: Record<string, unknown>;
+  readerValuePlan?: Record<string, unknown>;
+  factSkeleton?: Record<string, unknown>;
+  oralDraft?: string;
+  titleCandidates?: TitleCandidate[];
+  factSourceChecklist?: unknown[];
+  titleSelectionConfirmed?: boolean;
 };
 
 export type EditCreativeFinishedArticleInput = {
@@ -315,6 +415,8 @@ export type EditCreativeFinishedArticleInput = {
   stopStep?: number;
   reasonCode?: string;
   reasonText?: string;
+  titleCandidates?: TitleCandidate[];
+  titleSelectionConfirmed?: boolean;
 };
 
 export type ListCreativeFinishedArticlesFilters = {
@@ -332,6 +434,14 @@ export type ListCreativeFinishedArticlesResult = {
   total: number;
   page: number;
   pageSize: number;
+};
+
+export type SaveArticlePerformanceFeedbackInput = {
+  deliveredUsers: number;
+  readUsers: number;
+  shareUsers: number;
+  newFollowers?: number | null;
+  rewriteLevel: ArticleRewriteLevel;
 };
 
 // ── Insert ──────────────────────────────────────────────────────────────────
@@ -381,9 +491,19 @@ export function insertCreativeFinishedArticle(
         reversal_angle,
         image_prompts,
         comments,
-        author_extensions
+        author_extensions,
+        pipeline_version,
+        reader_task,
+        reader_relevance,
+        evidence_pack,
+        reader_value_plan,
+        fact_skeleton,
+        oral_draft,
+        title_candidates,
+        fact_source_checklist,
+        title_selection_confirmed
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
   ).run(
     input.sourceItemId,
@@ -418,7 +538,17 @@ export function insertCreativeFinishedArticle(
     input.reversalAngle ?? null,
     input.imagePrompts ? JSON.stringify(input.imagePrompts) : null,
     input.comments ? JSON.stringify(input.comments) : null,
-    input.authorExtensions ? JSON.stringify(input.authorExtensions) : null
+    input.authorExtensions ? JSON.stringify(input.authorExtensions) : null,
+    input.pipelineVersion ?? null,
+    input.readerTask ?? null,
+    input.readerRelevance ? JSON.stringify(input.readerRelevance) : null,
+    input.evidencePack ? JSON.stringify(input.evidencePack) : null,
+    input.readerValuePlan ? JSON.stringify(input.readerValuePlan) : null,
+    input.factSkeleton ? JSON.stringify(input.factSkeleton) : null,
+    input.oralDraft ?? null,
+    input.titleCandidates ? JSON.stringify(input.titleCandidates) : null,
+    input.factSourceChecklist ? JSON.stringify(input.factSourceChecklist) : null,
+    input.titleSelectionConfirmed === undefined ? 1 : (input.titleSelectionConfirmed ? 1 : 0)
   );
 
   const row = db
@@ -530,11 +660,14 @@ const STATUS_TRANSITIONS: Record<string, Record<string, "publish_conditions" | "
   anomaly:           { ready_for_publish: "publish_conditions" },
 };
 
-/** 检查文章是否满足推送前置条件（封面图 + 标题 + 正文） */
+/** 检查文章是否满足推送前置条件；v2 文章还必须由用户确认最终标题。 */
 export function checkPublishConditions(article: CreativeFinishedArticleRecord): { qualified: boolean; missing: string[] } {
   const missing: string[] = [];
   if (!article.coverImage || article.coverImage.length === 0) missing.push("缺少封面图");
   if (!article.titles || article.titles.length === 0) missing.push("缺少标题");
+  if (article.pipelineVersion === "v2" && !article.titleSelectionConfirmed) {
+    missing.push("尚未人工确认发布标题");
+  }
   if (!article.contentMarkdown || article.contentMarkdown.length <= 50) missing.push("缺少正文");
   return { qualified: missing.length === 0, missing };
 }
@@ -647,6 +780,14 @@ export function editCreativeFinishedArticle(
     setClauses.push("title_index = ?");
     params.push(input.titleIndex);
   }
+  if (input.titleCandidates !== undefined) {
+    setClauses.push("title_candidates = ?");
+    params.push(JSON.stringify(input.titleCandidates));
+  }
+  if (input.titleSelectionConfirmed !== undefined) {
+    setClauses.push("title_selection_confirmed = ?");
+    params.push(input.titleSelectionConfirmed ? 1 : 0);
+  }
   if (input.introIndex !== undefined) {
     setClauses.push("intro_index = ?");
     params.push(input.introIndex);
@@ -742,6 +883,52 @@ export function editCreativeFinishedArticle(
   db.prepare(`UPDATE creative_finished_articles SET ${setClauses.join(", ")} WHERE id = ?`).run(...params);
 
   return { ok: true };
+}
+
+/**
+ * 保存公众号文章发布后的最小效果反馈，并由服务端锁定标题、标题组和读者任务快照。
+ * 该记录只用于前 10 篇人工试验，不参与文章状态流转，也不会修改正文。
+ */
+export function saveArticlePerformanceFeedback(
+  db: SqliteDatabase,
+  id: number,
+  input: SaveArticlePerformanceFeedbackInput
+): CreativeFinishedArticleRecord | null {
+  const current = findCreativeFinishedArticleById(db, id);
+  if (!current) return null;
+
+  const selectedTitle = current.titles?.[current.titleIndex] ?? current.titles?.[0] ?? null;
+  const selectedCandidate = current.titleCandidates?.find((item) => item.title === selectedTitle)
+    ?? current.titleCandidates?.[current.titleIndex]
+    ?? null;
+  db.prepare(
+    `
+      UPDATE creative_finished_articles
+      SET performance_delivered_users = ?,
+          performance_read_users = ?,
+          performance_share_users = ?,
+          performance_new_followers = ?,
+          performance_rewrite_level = ?,
+          performance_title_snapshot = ?,
+          performance_title_group_snapshot = ?,
+          performance_reader_task_snapshot = ?,
+          performance_recorded_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `
+  ).run(
+    input.deliveredUsers,
+    input.readUsers,
+    input.shareUsers,
+    input.newFollowers ?? null,
+    input.rewriteLevel,
+    selectedTitle,
+    selectedCandidate?.group ?? null,
+    current.readerTask,
+    id
+  );
+
+  return findCreativeFinishedArticleById(db, id);
 }
 
 // ── Toggle WeChat published status ─────────────────────────────────────────

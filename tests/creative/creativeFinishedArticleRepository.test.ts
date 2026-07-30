@@ -4,7 +4,9 @@ import {
   findCreativeFinishedArticleById,
   findCreativeFinishedArticleBySourceItemId,
   listCreativeFinishedArticles,
-  editCreativeFinishedArticle
+  editCreativeFinishedArticle,
+  saveArticlePerformanceFeedback,
+  checkPublishConditions
 } from "../../src/core/creative/creativeFinishedArticleRepository.js";
 import { insertCreativeSourceItem, findCreativeSourceItemById } from "../../src/core/creative/creativeSourceItemRepository.js";
 import { type TestDatabaseHandle, createTestDatabase } from "../helpers/testDatabase.js";
@@ -56,7 +58,7 @@ describe("insertCreativeFinishedArticle", () => {
     expect(article.titles).toEqual(["Title 1", "Title 2"]);
     expect(article.hooks).toEqual(["Hook 1"]);
     expect(article.quotes).toEqual(["Quote 1"]);
-    expect(article.summary100).toBe("Short summary");
+    expect(article.summary100).toEqual(["Short summary"]);
     expect(article.imagesJson).toEqual([{ url: "https://img.example.com/1.jpg", alt: "test" }]);
     expect(article.rawResponseText).toBe("raw LLM output");
   });
@@ -93,6 +95,7 @@ describe("insertCreativeFinishedArticle", () => {
     expect(article.summary100).toBeNull();
     expect(article.imagesJson).toBeNull();
     expect(article.rawResponseText).toBeNull();
+    expect(article.performanceRecordedAt).toBeNull();
   });
 });
 
@@ -216,7 +219,7 @@ describe("editCreativeFinishedArticle", () => {
 
     const updated = findCreativeFinishedArticleById(handle.db, article.id)!;
     expect(updated.thesis).toBe("new thesis");
-    expect(updated.summary100).toBe("new summary");
+    expect(updated.summary100).toEqual(["new summary"]);
   });
 });
 
@@ -291,5 +294,106 @@ describe("listCreativeFinishedArticles", () => {
     const claudeResult = listCreativeFinishedArticles(handle.db, { search: "Claude" });
     expect(claudeResult.total).toBe(1);
     expect(claudeResult.items[0].sourceItemId).toBe(s2.id);
+  });
+});
+
+describe("saveArticlePerformanceFeedback", () => {
+  it("stores metrics and snapshots the selected title group and reader task", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+
+    const source = createSourceItem(handle.db);
+    const article = insertCreativeFinishedArticle(handle.db, {
+      sourceItemId: source.id,
+      contentMarkdown: "performance test",
+      titles: ["first title", "selected title"],
+      pipelineVersion: "v2",
+      readerTask: "避坑",
+      titleCandidates: [
+        {
+          title: "first title",
+          group: "impact",
+          group_label: "现实影响",
+          target_reader: "普通职场人",
+          click_reason: "影响工作",
+          content_payoff: "解释影响",
+          clickbait_risk: "low",
+          recommendation: "medium"
+        },
+        {
+          title: "selected title",
+          group: "risk",
+          group_label: "损失风险",
+          target_reader: "普通职场人",
+          click_reason: "避免损失",
+          content_payoff: "给出边界",
+          clickbait_risk: "low",
+          recommendation: "high"
+        }
+      ]
+    });
+    editCreativeFinishedArticle(handle.db, article.id, { titleIndex: 1 });
+
+    const updated = saveArticlePerformanceFeedback(handle.db, article.id, {
+      deliveredUsers: 1200,
+      readUsers: 360,
+      shareUsers: 18,
+      newFollowers: 4,
+      rewriteLevel: "medium"
+    });
+
+    expect(updated).not.toBeNull();
+    expect(updated!.performanceDeliveredUsers).toBe(1200);
+    expect(updated!.performanceReadUsers).toBe(360);
+    expect(updated!.performanceShareUsers).toBe(18);
+    expect(updated!.performanceNewFollowers).toBe(4);
+    expect(updated!.performanceRewriteLevel).toBe("medium");
+    expect(updated!.performanceTitleSnapshot).toBe("selected title");
+    expect(updated!.performanceTitleGroupSnapshot).toBe("risk");
+    expect(updated!.performanceReaderTaskSnapshot).toBe("避坑");
+    expect(updated!.performanceRecordedAt).toBeTruthy();
+  });
+});
+
+describe("writing pipeline v2 publishing", () => {
+  it("persists stage products and requires explicit title confirmation", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+
+    const source = createSourceItem(handle.db);
+    const article = insertCreativeFinishedArticle(handle.db, {
+      sourceItemId: source.id,
+      contentMarkdown: `# 候选标题\n\n${"正文内容".repeat(20)}`,
+      titles: ["候选标题"],
+      coverImage: ["https://img.example.com/cover.jpg"],
+      pipelineVersion: "v2",
+      readerTask: "做选择",
+      readerRelevance: { target_reader: "普通家庭决策者" },
+      oralDraft: "这是口述底稿",
+      titleCandidates: [{
+        title: "候选标题",
+        group: "action",
+        group_label: "选择行动",
+        target_reader: "普通家庭决策者",
+        click_reason: "需要作决定",
+        content_payoff: "提供判断步骤",
+        clickbait_risk: "low",
+        recommendation: "high"
+      }],
+      factSourceChecklist: [{ fact: "事实", source: "官方" }],
+      titleSelectionConfirmed: false
+    });
+
+    expect(article.pipelineVersion).toBe("v2");
+    expect(article.readerTask).toBe("做选择");
+    expect(article.oralDraft).toBe("这是口述底稿");
+    expect(checkPublishConditions(article).missing).toContain("尚未人工确认发布标题");
+
+    editCreativeFinishedArticle(handle.db, article.id, {
+      titleIndex: 0,
+      titleSelectionConfirmed: true
+    });
+    const confirmed = findCreativeFinishedArticleById(handle.db, article.id)!;
+    expect(checkPublishConditions(confirmed)).toEqual({ qualified: true, missing: [] });
   });
 });

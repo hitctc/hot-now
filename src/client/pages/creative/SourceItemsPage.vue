@@ -328,16 +328,8 @@ function setWritingIds(ids: Set<number>): void {
 }
 const writeModeVisible = ref(false);
 const writeModeTarget = ref<CreativeSourceItem | null>(null);
-const writeModeValue = ref<string | null>(null);
 const writeModeThesis = ref("");
 const writeModeConfirming = ref(false);
-
-const writeModeOptions = [
-  { value: null, label: "自动判断（LLM 选择最合适的模式）" },
-  { value: "A", label: "短篇观点文（A）— 600~1500 字" },
-  { value: "B", label: "短篇随笔（B）— 600~1500 字" },
-  { value: "C", label: "长篇观点文（C）— 3000~6000 字" },
-];
 
 // ─── 手动写作弹窗 ───
 const manualWriteVisible = ref(false);
@@ -345,7 +337,6 @@ const manualWriteSubmitting = ref(false);
 const manualContentType = ref<"viewpoint" | "article">("viewpoint");
 const manualTitle = ref("");
 const manualContent = ref("");
-const manualMode = ref<string | null>(null);
 const manualThesis = ref("");
 
 const contentTypeOptions = [
@@ -357,7 +348,6 @@ function openManualWriteModal(): void {
   manualContentType.value = "viewpoint";
   manualTitle.value = "";
   manualContent.value = "";
-  manualMode.value = null;
   manualThesis.value = "";
   manualWriteVisible.value = true;
 }
@@ -373,7 +363,6 @@ async function confirmManualWrite(): Promise<void> {
       title: manualTitle.value.trim() || undefined,
       content: manualContent.value.trim(),
       contentType: manualContentType.value,
-      mode: (manualMode.value as "A" | "B" | "C") ?? undefined,
       thesis: manualThesis.value.trim() || undefined,
     });
     if (result.ok && result.sourceItemId) {
@@ -454,7 +443,6 @@ function stopTracePoll(): void {
 
 function openWriteModeModal(item: CreativeSourceItem): void {
   writeModeTarget.value = item;
-  writeModeValue.value = null;
   writeModeThesis.value = "";
   writeModeVisible.value = true;
 }
@@ -521,7 +509,7 @@ async function confirmWriteMode(): Promise<void> {
   if (!item) return;
   writeModeConfirming.value = true;
   try {
-    const result = await writeSourceItemArticle(item.id, writeModeValue.value ?? undefined, writeModeThesis.value.trim() || undefined);
+    const result = await writeSourceItemArticle(item.id, writeModeThesis.value.trim() || undefined);
     if (result.ok) {
       writeModeVisible.value = false;
       addWritingId(item.id);
@@ -945,10 +933,10 @@ const pagination = computed(() => ({
       @saved="loadItems"
     />
 
-    <!-- 写文章模式选择弹窗 -->
+    <!-- 写文章确认弹窗 -->
     <a-modal
       :open="writeModeVisible"
-      title="选择写作模式"
+      title="开始写作"
       :confirm-loading="writeModeConfirming"
       ok-text="开始写作"
       cancel-text="取消"
@@ -961,11 +949,9 @@ const pagination = computed(() => ({
       <div v-if="writeModeTarget" class="mb-3 text-sm text-gray-500">
         素材：{{ writeModeTarget.title.slice(0, 60) }}{{ writeModeTarget.title.length > 60 ? '...' : '' }}
       </div>
-      <a-radio-group v-model:value="writeModeValue" class="flex flex-col gap-3">
-        <a-radio v-for="opt in writeModeOptions" :key="String(opt.value)" :value="opt.value">
-          {{ opt.label }}
-        </a-radio>
-      </a-radio-group>
+      <p class="mb-0 text-xs leading-5 text-editorial-text-muted">
+        v2 管线会根据普通人相关性、现实证据和读者任务自适应结构，不再选择 A/B/C 写作模式。
+      </p>
       <div class="mt-4">
         <div class="mb-1 text-xs font-medium text-editorial-text-muted">核心立意（可选）</div>
         <a-input
@@ -1018,17 +1004,6 @@ const pagination = computed(() => ({
             :rows="8"
             allow-clear
           />
-        </div>
-
-        <!-- 写作模式 -->
-        <div>
-          <div class="mb-1 text-xs font-medium text-editorial-text-muted">写作模式</div>
-          <a-radio-group v-model:value="manualMode" class="flex flex-col gap-1">
-            <a-radio :value="null">自动判断（观点默认随笔 B，文章默认观点文 A）</a-radio>
-            <a-radio value="A">短篇观点文（A）— 600~1500 字</a-radio>
-            <a-radio value="B">短篇随笔（B）— 600~1500 字</a-radio>
-            <a-radio value="C">长篇观点文（C）— 3000~6000 字</a-radio>
-          </a-radio-group>
         </div>
 
         <!-- 核心立意 -->

@@ -20,7 +20,7 @@
           @click="copyArticleId(article.id)"
         >#{{ article.id }}</span>
         <span class="text-base font-semibold">{{ getFirstTitle(article.titles) }}</span>
-        <span class="text-xs text-editorial-text-muted">{{ modeLabel(article.mode) }}</span>
+        <span class="text-xs text-editorial-text-muted">{{ pipelineLabel(article) }}</span>
         <span class="text-xs text-editorial-text-muted">{{ formatLocalTime(article.createdAt) }}</span>
         <a
           class="cursor-pointer text-xs text-editorial-link-active hover:underline"
@@ -93,7 +93,13 @@
         <!-- 备选标题 -->
         <section v-if="displayTitles.length > 0 || (!props.readonly && regenTitleLoading)">
           <div class="mb-2 flex items-center justify-between">
-            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">备选标题</h3>
+            <div>
+              <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">备选标题</h3>
+              <p
+                v-if="article.pipelineVersion === 'v2' && !article.titleSelectionConfirmed"
+                class="mb-0 mt-1 text-xs font-medium text-amber-600"
+              >请选择并确认一个发布标题；确认前不能进入可发布状态。</p>
+            </div>
             <div v-if="!props.readonly" class="flex items-center gap-3">
               <a-button
                 type="link"
@@ -127,16 +133,33 @@
                   @blur="saveTitleEdit(idx)"
                 />
               </div>
-              <span v-else class="flex-1 text-sm leading-6 text-editorial-text-main">{{ t }}</span>
+              <div v-else class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm leading-6 text-editorial-text-main">{{ t }}</span>
+                  <span
+                    v-if="titleCandidateAt(idx)?.group_label"
+                    class="rounded bg-editorial-surface-muted px-1.5 py-0.5 text-[10px] text-editorial-text-muted"
+                  >{{ titleCandidateAt(idx)?.group_label }}</span>
+                </div>
+                <div v-if="titleCandidateAt(idx)" class="mt-1 space-y-0.5 text-[11px] leading-5 text-editorial-text-muted">
+                  <p class="m-0">点击理由：{{ titleCandidateAt(idx)?.click_reason }}</p>
+                  <p class="m-0">正文兑现：{{ titleCandidateAt(idx)?.content_payoff }}</p>
+                  <p class="m-0">目标读者：{{ titleCandidateAt(idx)?.target_reader }} · 标题党风险：{{ titleRiskLabel(titleCandidateAt(idx)?.clickbait_risk) }}</p>
+                </div>
+              </div>
               <span class="flex-shrink-0 text-[10px] text-editorial-text-muted">{{ countWords(editingTitleIdx === idx ? editingTitleValue : t) }}字</span>
               <!-- 选中标记 -->
               <span
-                v-if="idx === activeTitleIndex"
+                v-if="idx === activeTitleIndex && article.titleSelectionConfirmed"
                 class="flex-shrink-0 rounded bg-editorial-accent px-1.5 py-0.5 text-[10px] font-semibold text-white"
               >✓ 发布标题</span>
+              <span
+                v-else-if="idx === activeTitleIndex"
+                class="flex-shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
+              >待确认</span>
               <span v-if="idx === 0 && idx !== activeTitleIndex" class="flex-shrink-0 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</span>
               <button
-                v-if="!props.readonly && idx !== activeTitleIndex && editingTitleIdx !== idx"
+                v-if="!props.readonly && (!article.titleSelectionConfirmed || idx !== activeTitleIndex) && editingTitleIdx !== idx"
                 class="flex-shrink-0 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white hover:!bg-black/70"
                 @click.stop="selectTitle(idx)"
               >设为发布标题</button>
@@ -960,6 +983,16 @@ const displayTitles = computed(() => {
   return localTitles.value.length > 0 ? localTitles.value : parseJsonArray(props.article?.titles ?? null);
 });
 
+/** 按标题索引读取 v2 元数据；旧文章没有候选元数据时返回空。 */
+function titleCandidateAt(idx: number) {
+  return props.article?.titleCandidates?.[idx] ?? null;
+}
+
+/** 把模型风险枚举转成编辑人员可直接理解的中文。 */
+function titleRiskLabel(risk?: string): string {
+  return ({ low: "低", medium: "中", high: "高" } as Record<string, string>)[risk ?? ""] ?? "未评估";
+}
+
 async function handleRegenTitle(): Promise<void> {
   if (!props.article || regenTitleLoading.value) return;
   regenTitleLoading.value = true;
@@ -970,30 +1003,10 @@ async function handleRegenTitle(): Promise<void> {
       activeTitleIndex.value = 0;
       props.article.titles = JSON.stringify(result.titles);
       props.article.titleIndex = 0;
+      props.article.titleCandidates = result.titleCandidates ?? null;
+      props.article.titleSelectionConfirmed = false;
 
-      // 联动：替换 markdown 中的 H1，渲染并保存 wechatHtml
-      const newTitle = result.titles[0] ?? "";
-      let md = editContent.value;
-      if (/^# .+/m.test(md)) {
-        md = md.replace(/^# .+/m, `# ${newTitle}`);
-      }
-      editContent.value = md;
-      props.article.contentMarkdown = md;
-      lastSavedContent = md;
-
-      const saveFields: Record<string, unknown> = {
-        titles: result.titles,
-        titleIndex: 0,
-        contentMarkdown: md,
-      };
-      if (activePreviewTheme.value !== "live" && md) {
-        const html = renderWechatThemePreview(md, themeIdMap[activePreviewTheme.value]);
-        props.article.wechatHtml = html;
-        saveFields.wechatHtml = html;
-      }
-      editFinishedArticle(props.article.id, saveFields).catch(() => {});
-
-      message.success("新标题已生成");
+      message.success("分组标题已生成，请选择发布标题");
     } else {
       message.error(result.reason ?? "标题生成失败");
     }
@@ -1009,9 +1022,9 @@ function replaceH1(md: string, newTitle: string): string {
   return /^# .+/m.test(md) ? md.replace(/^# .+/m, `# ${newTitle}`) : md;
 }
 
-// 选择发布标题：替换 markdown 中的 H1，保存 titleIndex + contentMarkdown
+// 选择发布标题：替换 markdown 中的 H1，并显式记录人工确认。
 async function selectTitle(idx: number): Promise<void> {
-  if (!props.article || idx === activeTitleIndex.value) return;
+  if (!props.article || (idx === activeTitleIndex.value && props.article.titleSelectionConfirmed)) return;
   const newTitle = displayTitles.value[idx];
 
   // 同步替换 AI 草稿和人工转写（发布内容）的 H1，只动 # 标题行不 replaceAll 正文
@@ -1026,6 +1039,7 @@ async function selectTitle(idx: number): Promise<void> {
   try {
     const saveFields: Record<string, unknown> = {
       titleIndex: idx,
+      titleSelectionConfirmed: true,
       contentMarkdown: content,
       humanMarkdown: humanMd,
     };
@@ -1039,6 +1053,7 @@ async function selectTitle(idx: number): Promise<void> {
 
     await editFinishedArticle(props.article.id, saveFields);
     props.article.titleIndex = idx;
+    props.article.titleSelectionConfirmed = true;
     props.article.contentMarkdown = content;
     props.article.humanMarkdown = humanMd;
     lastSavedContent = content;
@@ -1972,6 +1987,14 @@ const modeMap: Record<string, string> = {
 function modeLabel(mode: string | null): string {
   if (!mode) return "模式 -";
   return modeMap[mode] ?? `模式${mode}`;
+}
+
+/** v2 文章显示读者任务，历史文章继续显示 A/B 模式。 */
+function pipelineLabel(article: CreativeFinishedArticle): string {
+  if (article.pipelineVersion === "v2") {
+    return `v2 · ${article.readerTask || "读者任务未标注"}`;
+  }
+  return modeLabel(article.mode);
 }
 
 /** 计算中文字数：中文按字数计，英文按单词计 */

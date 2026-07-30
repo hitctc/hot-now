@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 40;
+const schemaVersion = 42;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -1390,6 +1390,54 @@ export function runMigrations(db: SqliteDatabase): void {
       db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN human_markdown TEXT`);
     }
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(40, humanMarkdownMigrationName);
+
+    // 041: 公众号文章发布后效果反馈试验，只保存最小人工录入指标和自动标题快照
+    const articlePerformanceFeedbackMigrationName = "041_finished_articles_performance_feedback";
+    if (!hasColumn(db, "creative_finished_articles", "performance_delivered_users")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN performance_delivered_users INTEGER`);
+    }
+    if (!hasColumn(db, "creative_finished_articles", "performance_read_users")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN performance_read_users INTEGER`);
+    }
+    if (!hasColumn(db, "creative_finished_articles", "performance_share_users")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN performance_share_users INTEGER`);
+    }
+    if (!hasColumn(db, "creative_finished_articles", "performance_new_followers")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN performance_new_followers INTEGER`);
+    }
+    if (!hasColumn(db, "creative_finished_articles", "performance_rewrite_level")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN performance_rewrite_level TEXT`);
+    }
+    if (!hasColumn(db, "creative_finished_articles", "performance_title_snapshot")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN performance_title_snapshot TEXT`);
+    }
+    if (!hasColumn(db, "creative_finished_articles", "performance_recorded_at")) {
+      db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN performance_recorded_at TEXT`);
+    }
+    db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(41, articlePerformanceFeedbackMigrationName);
+
+    // 042: 公众号写作管线 v2 的阶段产物、标题候选元数据和人工确认状态
+    const writingPipelineV2MigrationName = "042_finished_articles_writing_pipeline_v2";
+    const writingPipelineV2Columns = [
+      ["pipeline_version", "TEXT"],
+      ["reader_task", "TEXT"],
+      ["reader_relevance", "TEXT"],
+      ["evidence_pack", "TEXT"],
+      ["reader_value_plan", "TEXT"],
+      ["fact_skeleton", "TEXT"],
+      ["oral_draft", "TEXT"],
+      ["title_candidates", "TEXT"],
+      ["fact_source_checklist", "TEXT"],
+      ["title_selection_confirmed", "INTEGER NOT NULL DEFAULT 1"],
+      ["performance_title_group_snapshot", "TEXT"],
+      ["performance_reader_task_snapshot", "TEXT"],
+    ] as const;
+    for (const [columnName, columnType] of writingPipelineV2Columns) {
+      if (!hasColumn(db, "creative_finished_articles", columnName)) {
+        db.exec(`ALTER TABLE creative_finished_articles ADD COLUMN ${columnName} ${columnType}`);
+      }
+    }
+    db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(42, writingPipelineV2MigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

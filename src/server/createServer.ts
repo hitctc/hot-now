@@ -90,6 +90,7 @@ import {
   listCreativeFinishedArticles,
   findCreativeFinishedArticleById,
   editCreativeFinishedArticle,
+  saveArticlePerformanceFeedback,
   toggleWechatPublished,
   togglePublishable,
   softDeleteFinishedArticle,
@@ -856,6 +857,16 @@ export function createServer(deps: ServerDeps = {}) {
       authorExtensions: Array.isArray(body?.authorExtensions)
         ? body.authorExtensions.filter((s): s is string => typeof s === "string")
         : undefined,
+      pipelineVersion: typeof body?.pipelineVersion === "string" ? body.pipelineVersion : undefined,
+      readerTask: typeof body?.readerTask === "string" ? body.readerTask : undefined,
+      readerRelevance: body?.readerRelevance && typeof body.readerRelevance === "object" ? body.readerRelevance as Record<string, unknown> : undefined,
+      evidencePack: body?.evidencePack && typeof body.evidencePack === "object" ? body.evidencePack as Record<string, unknown> : undefined,
+      readerValuePlan: body?.readerValuePlan && typeof body.readerValuePlan === "object" ? body.readerValuePlan as Record<string, unknown> : undefined,
+      factSkeleton: body?.factSkeleton && typeof body.factSkeleton === "object" ? body.factSkeleton as Record<string, unknown> : undefined,
+      oralDraft: typeof body?.oralDraft === "string" ? body.oralDraft : undefined,
+      titleCandidates: Array.isArray(body?.titleCandidates) ? body.titleCandidates as any[] : undefined,
+      factSourceChecklist: Array.isArray(body?.factSourceChecklist) ? body.factSourceChecklist : undefined,
+      titleSelectionConfirmed: typeof body?.titleSelectionConfirmed === "boolean" ? body.titleSelectionConfirmed : undefined,
     });
 
     // 推送成品文章后，自动将素材写作状态标为 done
@@ -1123,6 +1134,14 @@ export function createServer(deps: ServerDeps = {}) {
       editInput.titleIndex = body.titleIndex;
       updatedFields.push("titleIndex");
     }
+    if (Array.isArray(body?.titleCandidates)) {
+      editInput.titleCandidates = body.titleCandidates;
+      updatedFields.push("titleCandidates");
+    }
+    if (typeof body?.titleSelectionConfirmed === "boolean") {
+      editInput.titleSelectionConfirmed = body.titleSelectionConfirmed;
+      updatedFields.push("titleSelectionConfirmed");
+    }
     if (body?.intros !== undefined) {
       editInput.intros = Array.isArray(body.intros) ? body.intros as string[] : [];
       updatedFields.push("intros");
@@ -1209,6 +1228,56 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.code(404).send({ message: "Finished article not found", statusCode: 404 });
     }
     return reply.send({ ok: true, wechatPublished: updated.wechatPublished });
+  });
+
+  // 公众号发布后效果反馈：只接收前 10 篇试验需要的最小人工指标
+  app.put("/actions/creative/finished-articles/:id/performance-feedback", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const body = request.body as Record<string, unknown> | undefined;
+    const requiredFields = ["deliveredUsers", "readUsers", "shareUsers"] as const;
+    const hasInvalidRequiredMetric = requiredFields.some((field) => (
+      typeof body?.[field] !== "number"
+      || !Number.isInteger(body[field])
+      || (body[field] as number) < 0
+    ));
+    const newFollowers = body?.newFollowers;
+    const hasInvalidOptionalMetric = newFollowers !== undefined
+      && newFollowers !== null
+      && (typeof newFollowers !== "number" || !Number.isInteger(newFollowers) || newFollowers < 0);
+    const rewriteLevel = body?.rewriteLevel;
+
+    if (hasInvalidRequiredMetric || hasInvalidOptionalMetric) {
+      return reply.code(400).send({ ok: false, reason: "metrics-must-be-non-negative-integers" });
+    }
+    if (rewriteLevel !== "light" && rewriteLevel !== "medium" && rewriteLevel !== "heavy") {
+      return reply.code(400).send({ ok: false, reason: "invalid-rewrite-level" });
+    }
+
+    const updated = saveArticlePerformanceFeedback(db, id, {
+      deliveredUsers: body!.deliveredUsers as number,
+      readUsers: body!.readUsers as number,
+      shareUsers: body!.shareUsers as number,
+      newFollowers: newFollowers as number | null | undefined,
+      rewriteLevel
+    });
+    if (!updated) {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+
+    return reply.send({
+      ok: true,
+      performanceRecordedAt: updated.performanceRecordedAt,
+      performanceTitleSnapshot: updated.performanceTitleSnapshot,
+      performanceTitleGroupSnapshot: updated.performanceTitleGroupSnapshot,
+      performanceReaderTaskSnapshot: updated.performanceReaderTaskSnapshot
+    });
   });
 
   app.post("/api/creative/finished-articles/:id/toggle-publishable", async (request, reply) => {
@@ -1621,18 +1690,25 @@ export function createServer(deps: ServerDeps = {}) {
         });
       }
 
-      const data = await res.json() as { success: boolean; title?: string; prompt?: string; error?: string };
-      if (!data.success || !data.title) {
+      const data = await res.json() as {
+        success: boolean;
+        titles?: string[];
+        titleCandidates?: unknown[];
+        prompt?: string;
+        error?: string;
+      };
+      if (!data.success || !data.titles?.length) {
         return reply.code(502).send({ ok: false, reason: data.error ?? "标题生成失败", hermesResponse: JSON.stringify(data) });
       }
 
-      // 新标题 prepend 到数组开头
-      const existingTitles = article.titles ?? [];
-      const updatedTitles = [data.title, ...existingTitles];
-      editCreativeFinishedArticle(db, id, { titles: updatedTitles });
-
+      // Hermes 已通过平台 PATCH 整组回写候选，这里重新读取，避免再次拼接。
       const updated = findCreativeFinishedArticleById(db, id);
-      return reply.send({ ok: true, titles: updated?.titles ?? updatedTitles, prompt: data.prompt });
+      return reply.send({
+        ok: true,
+        titles: updated?.titles ?? data.titles,
+        titleCandidates: updated?.titleCandidates ?? data.titleCandidates ?? [],
+        prompt: data.prompt,
+      });
     } catch (err) {
       const errMessage = (err as Error).message ?? String(err);
       if ((err as Error).name === "AbortError") {
@@ -2003,7 +2079,7 @@ export function createServer(deps: ServerDeps = {}) {
     if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
 
     const id = parseInt((request.params as { id: string }).id, 10);
-    const body = request.body as { mode?: string; thesis?: string } | undefined;
+    const body = request.body as { thesis?: string } | undefined;
     const item = findCreativeSourceItemById(db, id);
     if (!item) { return reply.code(404).send({ ok: false, reason: "source-item-not-found" }); }
 
@@ -2012,9 +2088,6 @@ export function createServer(deps: ServerDeps = {}) {
     if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
 
     const hermesBody: Record<string, unknown> = { sourceItemId: id };
-    if (body?.mode && ["A", "B", "C"].includes(body.mode)) {
-      hermesBody.mode = body.mode;
-    }
     if (typeof body?.thesis === "string" && body.thesis.trim()) {
       hermesBody.thesis = body.thesis.trim();
     }
@@ -2126,13 +2199,9 @@ export function createServer(deps: ServerDeps = {}) {
 
     // 调用 Hermes 写文章
     const hermesBody: Record<string, unknown> = { sourceItemId: result.id };
-    // 观点默认 mode B，文章默认 mode A
+    // mode 仅为短内容页面保留兼容；公众号 v2 页面不会再发送该字段。
     if (body?.mode && ["A", "B", "C"].includes(body.mode)) {
       hermesBody.mode = body.mode;
-    } else if (contentType === "viewpoint") {
-      hermesBody.mode = "B";
-    } else {
-      hermesBody.mode = "A";
     }
     if (typeof body?.thesis === "string" && body.thesis.trim()) {
       hermesBody.thesis = body.thesis.trim();
@@ -2603,6 +2672,8 @@ export function createServer(deps: ServerDeps = {}) {
       wechatHtml: typeof body?.wechatHtml === "string" ? body.wechatHtml : (body?.wechatHtml === null ? null : undefined),
       coverImageIndex: typeof body?.coverImageIndex === "number" ? body.coverImageIndex : undefined,
       titleIndex: typeof body?.titleIndex === "number" ? body.titleIndex : undefined,
+      titleCandidates: Array.isArray(body?.titleCandidates) ? body.titleCandidates as any[] : undefined,
+      titleSelectionConfirmed: typeof body?.titleSelectionConfirmed === "boolean" ? body.titleSelectionConfirmed : undefined,
       intros: Array.isArray(body?.intros) ? body.intros as string[] : undefined,
       introIndex: typeof body?.introIndex === "number" ? body.introIndex : undefined,
       status: typeof body?.status === "string" ? body.status : undefined,

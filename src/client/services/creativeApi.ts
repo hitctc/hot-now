@@ -73,6 +73,18 @@ export type StepTraceEntry = {
 };
 
 export type ArticleComment = { reader: string; author_reply: string };
+export type ArticleRewriteLevel = "light" | "medium" | "heavy";
+export type ArticleTitleCandidate = {
+  title: string;
+  group: "impact" | "risk" | "counterintuitive" | "action";
+  group_label: string;
+  target_reader: string;
+  click_reason: string;
+  content_payoff: string;
+  clickbait_risk: "low" | "medium" | "high";
+  recommendation: "high" | "medium" | "low" | "fallback";
+  reader_task?: string;
+};
 
 export type CreativeFinishedArticle = {
   id: number;
@@ -121,6 +133,25 @@ export type CreativeFinishedArticle = {
   imagePrompts?: string[] | null;
   comments?: ArticleComment[] | null;
   authorExtensions?: string[] | null;
+  pipelineVersion: string | null;
+  readerTask: string | null;
+  readerRelevance: Record<string, unknown> | null;
+  evidencePack: Record<string, unknown> | null;
+  readerValuePlan: Record<string, unknown> | null;
+  factSkeleton: Record<string, unknown> | null;
+  oralDraft: string | null;
+  titleCandidates: ArticleTitleCandidate[] | null;
+  factSourceChecklist: unknown[] | null;
+  titleSelectionConfirmed: boolean;
+  performanceDeliveredUsers: number | null;
+  performanceReadUsers: number | null;
+  performanceShareUsers: number | null;
+  performanceNewFollowers: number | null;
+  performanceRewriteLevel: ArticleRewriteLevel | null;
+  performanceTitleSnapshot: string | null;
+  performanceTitleGroupSnapshot: string | null;
+  performanceReaderTaskSnapshot: string | null;
+  performanceRecordedAt: string | null;
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
   sourceTitle: string | null;
@@ -243,6 +274,26 @@ export function toggleFinishedArticlePublishable(id: number): Promise<{ ok: bool
   });
 }
 
+/**
+ * 保存公众号发布约三天后的最小效果数据。
+ * 最终标题快照由服务端根据文章当前选择自动生成，不要求用户重复填写。
+ */
+export function saveArticlePerformanceFeedback(
+  id: number,
+  input: {
+    deliveredUsers: number;
+    readUsers: number;
+    shareUsers: number;
+    newFollowers?: number | null;
+    rewriteLevel: ArticleRewriteLevel;
+  }
+): Promise<{ ok: boolean; performanceRecordedAt: string; performanceTitleSnapshot: string | null }> {
+  return requestJson(`/actions/creative/finished-articles/${id}/performance-feedback`, {
+    method: "PUT",
+    body: JSON.stringify(input)
+  });
+}
+
 export type MissingImagesResponse = {
   missingCover?: Array<{ prompt: string }>;
   missingInline?: Array<{ imageIndex: number; prompt: string }>;
@@ -292,6 +343,8 @@ export function editFinishedArticle(
     coverImage?: string[];
     coverImageIndex?: number;
     titleIndex?: number;
+    titleCandidates?: ArticleTitleCandidate[];
+    titleSelectionConfirmed?: boolean;
     intros?: string[];
     introIndex?: number;
     summary100?: string[];
@@ -537,6 +590,7 @@ export function generateAuthorExtensions(id: number): Promise<GenerateAuthorExte
 export type RegenTitleResult = {
   ok: boolean;
   titles?: string[];
+  titleCandidates?: ArticleTitleCandidate[];
   prompt?: string;
   reason?: string;
 };
@@ -665,10 +719,9 @@ export type WriteArticleResult = {
   reason?: string;
 };
 
-/** 调用 Hermes write-article API（异步），可指定写作模式和核心立意 */
-export function writeSourceItemArticle(id: number, mode?: string, thesis?: string): Promise<WriteArticleResult> {
+/** 调用 Hermes v2 write-article API（异步），只允许人工锁定核心立意。 */
+export function writeSourceItemArticle(id: number, thesis?: string): Promise<WriteArticleResult> {
   const body: Record<string, unknown> = {};
-  if (mode) body.mode = mode;
   if (thesis) body.thesis = thesis;
   return requestJson<WriteArticleResult>(`/api/creative/source-items/${id}/write-article`, {
     method: "POST",
@@ -747,6 +800,7 @@ export type ManualWriteRequest = {
   title?: string;
   content: string;
   contentType: "viewpoint" | "article";
+  /** 短内容页面的兼容字段；公众号 v2 页面不再传递。 */
   mode?: "A" | "B" | "C";
   /** 可选：指定文章的核心观点/立意，锁定后不会被自动替换 */
   thesis?: string;

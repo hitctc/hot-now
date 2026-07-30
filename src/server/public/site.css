@@ -231,8 +231,8 @@ textarea:disabled {
 }
 
 ::selection {
-  background: var(--accent);
-  color: var(--text-on-accent);
+  background: #8b5cf6;
+  color: #ffffff;
 }
 
 code {

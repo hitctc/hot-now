@@ -382,6 +382,21 @@ function onDividerMouseDown(e: MouseEvent): void {
   overflow: hidden;
 }
 
+/* 三栏正文工作区用品牌紫形成完整外轮廓，避免内部栏位比整体容器更抢眼。 */
+.md-editor--3pane {
+  border: 2px solid var(--editorial-accent, #caa9fa);
+  border-radius: var(--editorial-radius-xl, 12px);
+  box-shadow: var(--editorial-shadow-accent, 0 16px 36px rgba(202, 169, 250, 0.18));
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.md-editor--3pane:focus-within {
+  border-color: #8b5cf6;
+  box-shadow:
+    0 0 0 3px rgba(139, 92, 246, 0.2),
+    0 18px 42px rgba(139, 92, 246, 0.24);
+}
+
 .md-editor__pane {
   flex: 1 1 0;
   display: flex;
@@ -469,10 +484,12 @@ function onDividerMouseDown(e: MouseEvent): void {
 
 /* 三栏模式：左栏静态分隔条（不拖拽）+ 中栏标签高亮（发布内容）+ 左栏灰底（AI 草稿） */
 .md-editor__divider--static {
+  flex: 0 0 3px;
+  background: rgba(202, 169, 250, 0.38);
   cursor: default;
 }
 .md-editor__divider--static:hover {
-  background: #e8e8e8;
+  background: rgba(202, 169, 250, 0.38);
 }
 .md-editor__label--human {
   background: #fff7e6;
@@ -495,6 +512,9 @@ function onDividerMouseDown(e: MouseEvent): void {
   .md-editor__divider {
     flex: 0 0 4px;
     cursor: row-resize;
+  }
+  .md-editor--3pane .md-editor__divider--static {
+    flex-basis: 3px;
   }
 }
 

@@ -160,6 +160,7 @@ export type AccountFitDetails = {
   missingCriteria?: string[];
   criteria?: Record<string, boolean>;
   supplemented?: boolean;
+  supplementDirectlyRelated?: boolean;
   searchQueries?: string[];
   technicalError?: string;
 };

@@ -2332,8 +2332,8 @@ onBeforeUnmount(() => {
 .article-detail-modal--focus .ant-modal {
   width: 100% !important;
   max-width: 100% !important;
-  height: calc(100dvh - 24px);
-  max-height: calc(100dvh - 24px);
+  height: 100dvh;
+  max-height: 100dvh;
   padding-bottom: 0;
 }
 /* 弹窗内容由 header/body/footer 三段组成，专注时 body 接管全部可用高度。 */
@@ -2343,8 +2343,8 @@ onBeforeUnmount(() => {
   flex-direction: column;
 }
 .article-detail-modal--focus .ant-modal-content {
-  height: calc(100dvh - 24px);
-  max-height: calc(100dvh - 24px);
+  height: 100dvh;
+  max-height: 100dvh;
 }
 .article-detail-modal .ant-modal-header {
   flex-shrink: 0;
@@ -2367,6 +2367,15 @@ onBeforeUnmount(() => {
 .article-detail-modal--focus .ant-modal-body {
   padding: 12px !important;
   overflow: hidden !important;
+}
+.article-detail-modal--focus .article-editor-wrapper {
+  overflow: visible;
+}
+.article-detail-modal--focus .md-editor--3pane,
+.article-detail-modal--focus .md-editor--3pane:focus-within {
+  box-shadow:
+    0 0 0 1px rgba(139, 92, 246, 0.08),
+    0 4px 12px rgba(139, 92, 246, 0.16);
 }
 .article-detail-modal .ant-modal-footer {
   flex-shrink: 0;

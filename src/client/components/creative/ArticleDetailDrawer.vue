@@ -67,7 +67,7 @@
     </template>
 
     <template v-if="article">
-      <div class="flex flex-col gap-6">
+      <div class="article-detail-content flex flex-col gap-6">
         <!-- 异常/审核信息（统一展示区） -->
         <section v-if="hasAnomalyInfo" class="rounded border bg-red-50 border-red-200 px-3 py-2.5 space-y-1">
           <div class="text-xs font-semibold text-red-700">
@@ -588,7 +588,13 @@
           <!-- 只读模式：渲染后的 HTML 预览 -->
           <div v-if="props.readonly" class="rounded border border-editorial-border bg-white p-4 overflow-auto" :style="{ height: dynamicEditorHeight + 'px' }" v-html="activePreviewHtml"></div>
           <!-- 编辑模式：左右分屏编辑器（全屏时隐藏而非卸载，避免退出全屏重挂载闪烁） -->
-          <div v-else v-show="!editorFullscreen" class="article-editor-wrapper" :style="{ height: dynamicEditorHeight + 'px' }">
+          <div
+            v-else
+            v-show="!editorFullscreen"
+            class="article-editor-wrapper"
+            data-article-editor-wrapper
+            :style="{ height: dynamicEditorHeight + 'px' }"
+          >
             <ArticleMarkdownEditor
               v-model="humanContent"
               human-mode
@@ -825,16 +831,17 @@ const editorSectionRef = ref<HTMLElement | null>(null);
 const dynamicEditorHeight = ref(400);
 let editorResizeObserver: ResizeObserver | null = null;
 
-/** 测量 modal body 可视区域高度，减去 padding 和正文标题栏 */
+/** 测量 modal body 可视区域高度；专注模式会释放标题栏空间并读取实时 padding。 */
 function measureEditorHeight(): void {
   const section = editorSectionRef.value;
   if (!section) return;
   const scrollParent = section.closest(".ant-modal-body") as HTMLElement;
   if (!scrollParent) return;
-  // scrollParent.clientHeight = modal body 可视区域高度（不含滚动溢出）
-  const bodyPadding = 48; // padding top 24 + bottom 24
+  // 读取计算样式，兼容桌面专注态和移动端不同的安全间距。
+  const bodyStyle = window.getComputedStyle(scrollParent);
+  const bodyPadding = Number.parseFloat(bodyStyle.paddingTop) + Number.parseFloat(bodyStyle.paddingBottom);
   const titleBar = section.querySelector("[data-editor-title]") as HTMLElement;
-  const titleBarH = titleBar?.offsetHeight ?? 40;
+  const titleBarH = focusMode.value ? 0 : (titleBar?.offsetHeight ?? 40);
   dynamicEditorHeight.value = Math.max(200, scrollParent.clientHeight - bodyPadding - titleBarH);
 }
 
@@ -888,6 +895,22 @@ function onEditorFocusOut(e: FocusEvent): void {
   if (focusModeTimer) { clearTimeout(focusModeTimer); focusModeTimer = null; }
   focusMode.value = false;
 }
+
+let savedFocusModalScrollTop = 0;
+
+/**
+ * 专注模式释放正文前的区块后，恢复退出前的弹窗位置，避免正文跳回详情顶部。
+ */
+watch(focusMode, (focused) => {
+  const body = editorSectionRef.value?.closest(".ant-modal-body") as HTMLElement | null;
+  if (!body) return;
+  if (focused) savedFocusModalScrollTop = body.scrollTop;
+
+  nextTick(() => {
+    measureEditorHeight();
+    if (!focused) body.scrollTop = savedFocusModalScrollTop;
+  });
+});
 
 function copyArticleId(id: number): void {
   navigator.clipboard.writeText(`【成品文章id: ${id}】`).then(() => {
@@ -2234,21 +2257,47 @@ onBeforeUnmount(() => {
 /* 专注模式：编辑区持续聚焦时渐隐弹窗 header/footer/其他 section 和正文标题栏，只凸显编辑器 */
 .article-detail-modal .ant-modal-header,
 .article-detail-modal .ant-modal-footer,
-.article-detail-modal .ant-modal-body > section,
-.article-detail-modal .editor-section > * {
+.article-detail-modal .article-detail-content > section,
+.article-detail-modal .editor-section > *:not(.article-editor-wrapper) {
   transition: opacity 0.8s ease;
 }
 .article-detail-modal--focus .ant-modal-header,
 .article-detail-modal--focus .ant-modal-footer,
-.article-detail-modal--focus .ant-modal-body > section:not(.editor-section),
+.article-detail-modal--focus .article-detail-content > section:not(.editor-section),
 .article-detail-modal--focus .editor-section > *:not(.article-editor-wrapper):not(.focus-save-hint) {
   opacity: 0;
   pointer-events: none;
 }
 
+/* 专注时把正文之外的区块移出布局，正文编辑器才能占用完整可视高度。 */
+.article-detail-content {
+  position: relative;
+}
+.article-detail-modal--focus .article-detail-content {
+  height: 100%;
+  gap: 0;
+}
+.article-detail-modal--focus .article-detail-content > section:not(.editor-section) {
+  position: absolute;
+  inset: 0;
+  max-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+
 /* 专注模式专属：保存状态浮在编辑器右上角，其余内容渐隐后淡入，给自动保存可见反馈 */
 .article-detail-modal .editor-section {
   position: relative;
+}
+.article-detail-modal--focus .editor-section {
+  height: 100%;
+}
+.article-detail-modal--focus [data-editor-title] {
+  position: absolute;
+  inset: 0;
+  max-height: 0;
+  overflow: hidden;
+  visibility: hidden;
 }
 .focus-save-hint {
   position: absolute;
@@ -2272,19 +2321,30 @@ onBeforeUnmount(() => {
 .article-detail-modal--focus .ant-modal-content {
   background: #ffffff !important;
 }
-/* 专注模式：弹窗宽度缓慢过渡到 100%，给编辑区更大横向空间 */
+/* 专注模式：弹窗宽度和编辑器高度统一用 0.8s ease 扩展。 */
 .article-detail-modal .ant-modal {
-  transition: width 0.8s ease, max-width 0.8s ease;
+  transition:
+    width 0.8s ease,
+    max-width 0.8s ease,
+    height 0.8s ease,
+    max-height 0.8s ease;
 }
 .article-detail-modal--focus .ant-modal {
   width: 100% !important;
   max-width: 100% !important;
+  height: calc(100dvh - 24px);
+  max-height: calc(100dvh - 24px);
+  padding-bottom: 0;
 }
-/* modal content 固定 90vh，body 内部滚动 */
+/* 弹窗内容由 header/body/footer 三段组成，专注时 body 接管全部可用高度。 */
 .article-detail-modal .ant-modal-content {
   max-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+.article-detail-modal--focus .ant-modal-content {
+  height: calc(100dvh - 24px);
+  max-height: calc(100dvh - 24px);
 }
 .article-detail-modal .ant-modal-header {
   flex-shrink: 0;
@@ -2293,6 +2353,20 @@ onBeforeUnmount(() => {
   background: #ffffff;
   flex: 1;
   overflow-y: auto;
+}
+.article-detail-modal--focus .ant-modal-header,
+.article-detail-modal--focus .ant-modal-footer {
+  min-height: 0;
+  max-height: 0;
+  margin: 0;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  overflow: hidden;
+  border: 0 !important;
+}
+.article-detail-modal--focus .ant-modal-body {
+  padding: 12px !important;
+  overflow: hidden !important;
 }
 .article-detail-modal .ant-modal-footer {
   flex-shrink: 0;
@@ -2314,9 +2388,17 @@ onBeforeUnmount(() => {
     padding: 0 !important;
     top: 0 !important;
   }
+  .article-detail-modal--focus .ant-modal {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
   .article-detail-modal .ant-modal-content {
     max-height: 100dvh;
     border-radius: 0;
+  }
+  .article-detail-modal--focus .ant-modal-content {
+    height: 100dvh;
+    max-height: 100dvh;
   }
   .article-detail-modal .ant-modal-body {
     padding: 12px !important;
@@ -2409,9 +2491,11 @@ onBeforeUnmount(() => {
   border-color: #52c41a;
 }
 
-/* 编辑器/预览区由 JS 动态设置高度 */
+/* 编辑器/预览区由 JS 动态设置高度；高度过渡与专注模式宽度保持同速。 */
 .article-editor-wrapper {
   min-height: 200px;
+  overflow: hidden;
+  transition: height 0.8s ease;
 }
 
 .article-markdown-body {

@@ -6,6 +6,7 @@ import { HttpError } from "../../services/http.js";
 import { usePipelineStatus } from "../../composables/usePipelineStatus.js";
 import { useSearchHistory } from "../../composables/useSearchHistory.js";
 import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
+import { resolveWritePollOutcome } from "../../utils/writePollOutcome.js";
 
 import {
   readCreativeSourceItems,
@@ -13,6 +14,7 @@ import {
   readCreativeFinishedArticle,
   updateSourceItemWritingStatus,
   writeSourceItemArticle,
+  fetchWriteQueueStatus,
   submitManualWrite,
   traceSourceItem,
   type CreativeSourceItem,
@@ -457,6 +459,14 @@ function cancelWriteMode(): void {
 // 写作状态轮询：10 秒间隔，10 分钟超时
 let writingPollTimer: ReturnType<typeof setInterval> | null = null;
 const writingTimers = new Map<number, number>(); // itemId -> startTime
+const writingTaskIds = new Map<number, string>(); // itemId -> Hermes taskId
+
+/** 清理单篇文章的轮询状态，避免终态任务继续占用定时器。 */
+function finishWritingPoll(itemId: number): void {
+  writingTimers.delete(itemId);
+  writingTaskIds.delete(itemId);
+  removeWritingId(itemId);
+}
 
 function startWritingPoll(item: CreativeSourceItem): void {
   writingTimers.set(item.id, Date.now());
@@ -467,24 +477,45 @@ function startWritingPoll(item: CreativeSourceItem): void {
     if (writingTimers.size === 0) { stopWritingPoll(); return; }
     const now = Date.now();
     const checkIds = [...writingTimers.entries()];
+    let queueStatus = null;
+    try {
+      queueStatus = await fetchWriteQueueStatus();
+    } catch {
+      // 队列状态偶发不可用时仍通过素材状态判断，不中断后续轮询。
+    }
     for (const [itemId, startTime] of checkIds) {
       if (now - startTime > TIMEOUT_MS) {
-        writingTimers.delete(itemId);
-        removeWritingId(itemId);
+        finishWritingPoll(itemId);
         message.info(`素材#${itemId} 写作超时（>10分钟），请稍后查看成品列表`);
         continue;
       }
       try {
         const updated = await readCreativeSourceItem(itemId);
-        if (updated.writingStatus === "done") {
-          writingTimers.delete(itemId);
-          removeWritingId(itemId);
+        const outcome = resolveWritePollOutcome(
+          itemId,
+          updated.writingStatus,
+          writingTaskIds.get(itemId),
+          queueStatus,
+        );
+        if (outcome.kind === "completed") {
+          finishWritingPoll(itemId);
           message.success(`素材#${itemId} 文章写作完成`);
           loadItems();
-        } else if (updated.writingStatus === "failed") {
-          writingTimers.delete(itemId);
-          removeWritingId(itemId);
-          message.error(`素材#${itemId} 写作失败，请重试`);
+        } else if (outcome.kind === "stopped") {
+          finishWritingPoll(itemId);
+          const stepText = outcome.step ? `第 ${outcome.step} 阶段` : "质量闸门";
+          message.warning({
+            content: `素材#${itemId} 已停止写作（${stepText}）：${outcome.reason}`,
+            duration: 12,
+          });
+          loadItems();
+        } else if (outcome.kind === "failed") {
+          finishWritingPoll(itemId);
+          message.error({
+            content: `素材#${itemId} 写作失败：${outcome.reason}`,
+            duration: 12,
+          });
+          loadItems();
         }
       } catch {
         // 单次轮询失败不中断
@@ -513,6 +544,7 @@ async function confirmWriteMode(): Promise<void> {
     if (result.ok) {
       writeModeVisible.value = false;
       addWritingId(item.id);
+      if (result.taskId) writingTaskIds.set(item.id, result.taskId);
       // 更新本地状态为 writing
       const local = items.value.find(i => i.id === item.id);
       if (local) local.writingStatus = "writing";

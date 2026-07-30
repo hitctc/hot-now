@@ -716,6 +716,7 @@ export function codexGenerateImage(articleId: number, action: ImageGenAction, im
 export type WriteArticleResult = {
   ok: boolean;
   status?: string;
+  taskId?: string;
   reason?: string;
 };
 
@@ -766,9 +767,13 @@ export type WriteQueueTask = {
   label: string;
   priority: "high" | "normal";
   source_item_id: number;
-  status: "writing" | "queued";
+  status: "writing" | "queued" | "done" | "stopped" | "failed";
   submitted_at: string;
   started_at: string | null;
+  finished_at?: string | null;
+  stop_step?: number;
+  reason_text?: string;
+  error?: string;
   /** 后端代理从本地素材表补充 */
   source_item_title?: string | null;
   source_item_source_name?: string | null;
@@ -778,12 +783,14 @@ export type WriteQueueStats = {
   total_submitted: number;
   total_completed: number;
   total_failed: number;
+  total_stopped?: number;
 };
 
 export type WriteQueueStatus = {
   current: WriteQueueTask | null;
   queue_length: number;
   queue: WriteQueueTask[];
+  recent?: WriteQueueTask[];
   stats: WriteQueueStats;
   /** 本次队列运行首次开始执行的时间（Hermes 提供，暂未上线时为 undefined） */
   run_started_at?: string | null;

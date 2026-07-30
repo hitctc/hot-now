@@ -2105,12 +2105,12 @@ export function createServer(deps: ServerDeps = {}) {
         return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, hermesResponse: errorBody });
       }
 
-      const data = await res.json() as { success: boolean; status?: string; message?: string; error?: string };
+      const data = await res.json() as { success: boolean; status?: string; task_id?: string; message?: string; error?: string };
       if (!data.success) {
         return reply.code(502).send({ ok: false, reason: data.error ?? "写文章失败", hermesResponse: JSON.stringify(data) });
       }
 
-      return reply.send({ ok: true, status: data.status ?? "writing" });
+      return reply.send({ ok: true, status: data.status ?? "writing", taskId: data.task_id });
     } catch (err) {
       const errMessage = (err as Error).message ?? String(err);
       return reply.code(502).send({ ok: false, reason: `Hermes 调用失败`, detail: errMessage });

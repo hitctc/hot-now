@@ -30,6 +30,10 @@ export type CreativeSourceItem = {
   publishedAt: string | null;
   collectorTimestamp: string | null;
   writingStatus: string;
+  writingStopStep: number | null;
+  writingStopStepName: string | null;
+  writingStopReason: string | null;
+  writingStoppedAt: string | null;
   rawPayloadJson: string;
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
@@ -772,6 +776,7 @@ export type WriteQueueTask = {
   started_at: string | null;
   finished_at?: string | null;
   stop_step?: number;
+  stop_step_name?: string;
   reason_text?: string;
   error?: string;
   /** 后端代理从本地素材表补充 */

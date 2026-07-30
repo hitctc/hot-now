@@ -2560,13 +2560,42 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     const params = request.params as { id: string };
-    const body = request.body as { writingStatus?: unknown } | undefined;
+    const body = request.body as {
+      writingStatus?: unknown;
+      stopStep?: unknown;
+      stopStepName?: unknown;
+      stopReason?: unknown;
+    } | undefined;
     const id = parseInt(params.id, 10);
     const status = typeof body?.writingStatus === "string" ? body.writingStatus : "";
     if (!["ready", "writing", "done", "skipped", "excluded"].includes(status)) {
       return reply.code(400).send({ ok: false, reason: "invalid-status" });
     }
-    const updated = updateCreativeSourceItemWritingStatus(db, id, status as "ready" | "writing" | "done" | "skipped" | "excluded");
+    const hasStopDetails = body?.stopStep !== undefined
+      || body?.stopStepName !== undefined
+      || body?.stopReason !== undefined;
+    const stopDetailsValid = typeof body?.stopStep === "number"
+      && Number.isInteger(body.stopStep)
+      && body.stopStep > 0
+      && typeof body?.stopStepName === "string"
+      && body.stopStepName.trim().length > 0
+      && typeof body?.stopReason === "string"
+      && body.stopReason.trim().length > 0;
+    if (hasStopDetails && (status !== "skipped" || !stopDetailsValid)) {
+      return reply.code(400).send({ ok: false, reason: "invalid-stop-details" });
+    }
+    const updated = updateCreativeSourceItemWritingStatus(
+      db,
+      id,
+      status as "ready" | "writing" | "done" | "skipped" | "excluded",
+      stopDetailsValid
+        ? {
+            step: body.stopStep as number,
+            stepName: (body.stopStepName as string).trim(),
+            reason: (body.stopReason as string).trim(),
+          }
+        : undefined
+    );
     if (!updated) {
       return reply.code(404).send({ ok: false, reason: "not-found" });
     }

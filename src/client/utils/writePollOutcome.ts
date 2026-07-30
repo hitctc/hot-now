@@ -3,7 +3,7 @@ import type { WriteQueueStatus } from "../services/creativeApi.js";
 export type WritePollOutcome =
   | { kind: "pending" }
   | { kind: "completed" }
-  | { kind: "stopped"; step?: number; reason: string }
+  | { kind: "stopped"; step?: number; stepName?: string; reason: string }
   | { kind: "failed"; reason: string };
 
 /**
@@ -28,6 +28,7 @@ export function resolveWritePollOutcome(
     return {
       kind: "stopped",
       step: terminal.stop_step,
+      stepName: terminal.stop_step_name,
       reason: terminal.reason_text || terminal.error || "未通过写作质量闸门",
     };
   }

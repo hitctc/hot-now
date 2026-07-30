@@ -19,6 +19,7 @@ function makeQueueStatus(): WriteQueueStatus {
         started_at: "2026-07-30T11:56:45+08:00",
         finished_at: "2026-07-30T11:56:54+08:00",
         stop_step: 2,
+        stop_step_name: "普通人相关性判断",
         reason_text: "与普通人没有现实关联",
       },
     ],
@@ -36,6 +37,7 @@ describe("resolveWritePollOutcome", () => {
     expect(resolveWritePollOutcome(10017, "ready", "h1", makeQueueStatus())).toEqual({
       kind: "stopped",
       step: 2,
+      stepName: "普通人相关性判断",
       reason: "与普通人没有现实关联",
     });
   });

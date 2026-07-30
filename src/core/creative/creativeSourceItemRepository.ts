@@ -22,6 +22,10 @@ const SELECT_COLUMNS = `
   published_at,
   collector_timestamp,
   writing_status,
+  writing_stop_step,
+  writing_stop_step_name,
+  writing_stop_reason,
+  writing_stopped_at,
   raw_payload_json,
   trend_score,
   trend_breakdown,
@@ -54,6 +58,10 @@ type SourceItemRow = {
   published_at: string | null;
   collector_timestamp: string | null;
   writing_status: string;
+  writing_stop_step: number | null;
+  writing_stop_step_name: string | null;
+  writing_stop_reason: string | null;
+  writing_stopped_at: string | null;
   raw_payload_json: string;
   trend_score: number | null;
   trend_breakdown: string | null;
@@ -87,6 +95,10 @@ function mapRow(row: SourceItemRow): CreativeSourceItemRecord {
     publishedAt: row.published_at,
     collectorTimestamp: row.collector_timestamp,
     writingStatus: row.writing_status as CreativeSourceItemWritingStatus,
+    writingStopStep: row.writing_stop_step,
+    writingStopStepName: row.writing_stop_step_name,
+    writingStopReason: row.writing_stop_reason,
+    writingStoppedAt: row.writing_stopped_at,
     rawPayloadJson: row.raw_payload_json,
     trendScore: row.trend_score,
     trendBreakdown: row.trend_breakdown ? JSON.parse(row.trend_breakdown) : null,
@@ -141,6 +153,10 @@ export type CreativeSourceItemRecord = {
   publishedAt: string | null;
   collectorTimestamp: string | null;
   writingStatus: CreativeSourceItemWritingStatus;
+  writingStopStep: number | null;
+  writingStopStepName: string | null;
+  writingStopReason: string | null;
+  writingStoppedAt: string | null;
   rawPayloadJson: string;
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
@@ -459,14 +475,53 @@ export function listCreativeSourceItems(
 
 // ── Update writing status ───────────────────────────────────────────────────
 
+export type CreativeSourceItemWritingStopDetails = {
+  step: number;
+  stepName: string;
+  reason: string;
+};
+
+/**
+ * 更新素材写作状态；开始新一轮写作或完成时清除上一轮停止说明。
+ */
 export function updateCreativeSourceItemWritingStatus(
   db: SqliteDatabase,
   id: number,
-  status: CreativeSourceItemWritingStatus
+  status: CreativeSourceItemWritingStatus,
+  stopDetails?: CreativeSourceItemWritingStopDetails
 ): boolean {
-  const result = db
-    .prepare("UPDATE creative_source_items SET writing_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-    .run(status, id);
+  let result;
+  if (status === "skipped" && stopDetails) {
+    result = db
+      .prepare(
+        `UPDATE creative_source_items
+         SET writing_status = ?,
+             writing_stop_step = ?,
+             writing_stop_step_name = ?,
+             writing_stop_reason = ?,
+             writing_stopped_at = CURRENT_TIMESTAMP,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`
+      )
+      .run(status, stopDetails.step, stopDetails.stepName, stopDetails.reason, id);
+  } else if (status !== "skipped") {
+    result = db
+      .prepare(
+        `UPDATE creative_source_items
+         SET writing_status = ?,
+             writing_stop_step = NULL,
+             writing_stop_step_name = NULL,
+             writing_stop_reason = NULL,
+             writing_stopped_at = NULL,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`
+      )
+      .run(status, id);
+  } else {
+    result = db
+      .prepare("UPDATE creative_source_items SET writing_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .run(status, id);
+  }
 
   return result.changes > 0;
 }

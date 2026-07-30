@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 42;
+const schemaVersion = 43;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -1438,6 +1438,21 @@ export function runMigrations(db: SqliteDatabase): void {
       }
     }
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(42, writingPipelineV2MigrationName);
+
+    // 043: 素材持久化记录写作停止步骤和原因，避免离开页面或自动写作后丢失说明
+    const sourceWritingStopDetailsMigrationName = "043_source_items_writing_stop_details";
+    const sourceWritingStopColumns = [
+      ["writing_stop_step", "INTEGER"],
+      ["writing_stop_step_name", "TEXT"],
+      ["writing_stop_reason", "TEXT"],
+      ["writing_stopped_at", "TEXT"],
+    ] as const;
+    for (const [columnName, columnType] of sourceWritingStopColumns) {
+      if (!hasColumn(db, "creative_source_items", columnName)) {
+        db.exec(`ALTER TABLE creative_source_items ADD COLUMN ${columnName} ${columnType}`);
+      }
+    }
+    db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(43, sourceWritingStopDetailsMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
   });

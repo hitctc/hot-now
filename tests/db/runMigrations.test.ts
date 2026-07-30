@@ -80,7 +80,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(42);
+    expect(schemaVersion).toBe(43);
 
     const appliedMigrations = db
       .prepare(
@@ -134,7 +134,8 @@ describe("runMigrations", () => {
       { version: 39, name: "039_seq_number_by_direction" },
       { version: 40, name: "040_finished_articles_human_markdown" },
       { version: 41, name: "041_finished_articles_performance_feedback" },
-      { version: 42, name: "042_finished_articles_writing_pipeline_v2" }
+      { version: 42, name: "042_finished_articles_writing_pipeline_v2" },
+      { version: 43, name: "043_source_items_writing_stop_details" }
     ]);
 
     const hiddenAggregates = db
@@ -176,6 +177,23 @@ describe("runMigrations", () => {
 
     expect(sourceColumns.map((column) => column.name)).toEqual(
       expect.arrayContaining(["show_all_when_selected", "source_type", "bridge_kind", "bridge_config_json"])
+    );
+
+    const creativeSourceItemColumns = db
+      .prepare(
+        `
+          PRAGMA table_info(creative_source_items)
+        `
+      )
+      .all() as Array<{ name: string }>;
+
+    expect(creativeSourceItemColumns.map((column) => column.name)).toEqual(
+      expect.arrayContaining([
+        "writing_stop_step",
+        "writing_stop_step_name",
+        "writing_stop_reason",
+        "writing_stopped_at"
+      ])
     );
 
     const contentItemColumns = db
@@ -567,7 +585,7 @@ describe("runMigrations", () => {
     expect(evidenceTable).toBeTruthy();
     expect(sourceRunsTable).toBeTruthy();
     expect(notificationsTable).toBeTruthy();
-    expect(db.pragma("user_version", { simple: true })).toBe(42);
+    expect(db.pragma("user_version", { simple: true })).toBe(43);
 
     // daily_digests 表验证
     const digestTable = db

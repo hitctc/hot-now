@@ -468,6 +468,9 @@ function finishWritingPoll(itemId: number): void {
   removeWritingId(itemId);
 }
 
+/**
+ * 轮询手动写作任务；当场提示终态，并刷新素材以展示持久化停止说明。
+ */
 function startWritingPoll(item: CreativeSourceItem): void {
   writingTimers.set(item.id, Date.now());
   if (writingPollTimer) return; // 已有全局轮询在跑
@@ -503,7 +506,9 @@ function startWritingPoll(item: CreativeSourceItem): void {
           loadItems();
         } else if (outcome.kind === "stopped") {
           finishWritingPoll(itemId);
-          const stepText = outcome.step ? `第 ${outcome.step} 阶段` : "质量闸门";
+          const stepText = outcome.step
+            ? `第 ${outcome.step} 阶段${outcome.stepName ? `「${outcome.stepName}」` : ""}`
+            : "质量闸门";
           message.warning({
             content: `素材#${itemId} 已停止写作（${stepText}）：${outcome.reason}`,
             duration: 12,
@@ -802,7 +807,29 @@ const pagination = computed(() => ({
           <!-- 写作状态列 -->
           <template v-else-if="column.key === 'writingStatus'">
             <div class="flex flex-col items-start gap-0.5 leading-tight">
-              <a-tag :color="writingStatusColor(record.writingStatus)">
+              <a-tooltip
+                v-if="record.writingStatus === 'skipped' && record.writingStopReason"
+                placement="topLeft"
+              >
+                <template #title>
+                  <div class="max-w-[420px] text-xs leading-5">
+                    <div class="font-semibold">
+                      第 {{ record.writingStopStep ?? "-" }} 阶段 · {{ record.writingStopStepName || "质量闸门" }}
+                    </div>
+                    <div class="mt-1">{{ record.writingStopReason }}</div>
+                    <div v-if="record.writingStoppedAt" class="mt-1 opacity-70">
+                      {{ formatPublishedAt(record.writingStoppedAt) }}
+                    </div>
+                  </div>
+                </template>
+                <a-tag
+                  :color="writingStatusColor(record.writingStatus)"
+                  class="!m-0 cursor-help !font-semibold"
+                >
+                  {{ writingStatusLabel(record.writingStatus) }} ⓘ
+                </a-tag>
+              </a-tooltip>
+              <a-tag v-else :color="writingStatusColor(record.writingStatus)" class="!m-0">
                 {{ writingStatusLabel(record.writingStatus) }}
               </a-tag>
               <a-tag v-if="record.writeCount > 0" color="green" class="!m-0 !text-[11px] !py-0">{{ record.writeCount }}次</a-tag>
@@ -828,6 +855,24 @@ const pagination = computed(() => ({
         <!-- 展开行 -->
         <template #expandedRowRender="{ record }">
           <div class="flex flex-col gap-4 rounded-editorial-md border border-editorial-border bg-editorial-panel/60 p-4">
+            <!-- 完整停止说明放在展开区顶部，避免表格截断隐藏关键原因。 -->
+            <div
+              v-if="record.writingStatus === 'skipped' && record.writingStopReason"
+              class="rounded-editorial-md border border-orange-300 bg-orange-50 px-4 py-3"
+            >
+              <div class="flex flex-wrap items-center gap-2 text-sm font-semibold text-orange-800">
+                <span>写作已停止</span>
+                <span>第 {{ record.writingStopStep ?? "-" }} 阶段</span>
+                <span>{{ record.writingStopStepName || "质量闸门" }}</span>
+                <span v-if="record.writingStoppedAt" class="text-xs font-normal text-orange-600">
+                  {{ formatPublishedAt(record.writingStoppedAt) }}
+                </span>
+              </div>
+              <div class="mt-2 whitespace-pre-wrap text-sm leading-6 text-orange-900">
+                {{ record.writingStopReason }}
+              </div>
+            </div>
+
             <!-- 摘要 -->
             <div v-if="record.summary">
               <p class="m-0 mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">摘要 <span class="font-normal opacity-70">{{ record.summary.length }} 字</span></p>

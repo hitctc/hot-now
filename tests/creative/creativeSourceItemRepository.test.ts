@@ -215,6 +215,37 @@ describe("updateCreativeSourceItemWritingStatus", () => {
     const updated = updateCreativeSourceItemWritingStatus(handle.db, 99999, "skipped");
     expect(updated).toBe(false);
   });
+
+  it("persists stop details and clears them when writing restarts", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+
+    const inserted = insertCreativeSourceItem(handle.db, baseInput);
+    updateCreativeSourceItemWritingStatus(handle.db, inserted.id, "skipped", {
+      step: 2,
+      stepName: "普通人相关性判断",
+      reason: "与普通人的现实工作和消费没有直接关联"
+    });
+
+    const stopped = findCreativeSourceItemById(handle.db, inserted.id);
+    expect(stopped).toMatchObject({
+      writingStatus: "skipped",
+      writingStopStep: 2,
+      writingStopStepName: "普通人相关性判断",
+      writingStopReason: "与普通人的现实工作和消费没有直接关联"
+    });
+    expect(stopped!.writingStoppedAt).toBeTruthy();
+
+    updateCreativeSourceItemWritingStatus(handle.db, inserted.id, "writing");
+    const restarted = findCreativeSourceItemById(handle.db, inserted.id);
+    expect(restarted).toMatchObject({
+      writingStatus: "writing",
+      writingStopStep: null,
+      writingStopStepName: null,
+      writingStopReason: null,
+      writingStoppedAt: null
+    });
+  });
 });
 
 describe("updateCreativeSourceItemLinkedArticle", () => {

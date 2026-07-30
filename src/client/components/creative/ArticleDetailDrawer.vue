@@ -1789,10 +1789,10 @@ watch(() => props.open, (val) => {
     editorFullscreen.value = false;
     document.body.style.overflow = "";
     document.addEventListener("keydown", handleFullscreenEsc);
-    // 恢复文章保存的主题偏好，无记录时默认 classic
+    // 恢复文章保存的主题偏好，无记录时默认使用落日胶片。
     const saved = props.article.wechatThemeId;
     const previewKey = saved ? reverseThemeIdMap[saved] : undefined;
-    activePreviewTheme.value = previewKey ?? "classic";
+    activePreviewTheme.value = previewKey ?? "sunsetFilm";
     // 弹窗打开后测量编辑器可用高度
     nextTick(() => setupEditorResize());
   } else {
@@ -1919,7 +1919,7 @@ const previewThemeOptions: { key: PreviewThemeKey; label: string }[] = [
   { key: "live", label: "实时预览" },
 ];
 
-const activePreviewTheme = ref<PreviewThemeKey>("live");
+const activePreviewTheme = ref<PreviewThemeKey>("sunsetFilm");
 
 const themeIdMap: Record<Exclude<PreviewThemeKey, "live">, WechatThemeId> = {
   classic: "classic",
@@ -2034,7 +2034,7 @@ const currentWechatThemeId = computed<WechatThemeId>(() => {
     return themeIdMap[activePreviewTheme.value as Exclude<PreviewThemeKey, "live">];
   }
   // 实时预览模式下回退到文章保存的主题
-  return (props.article?.wechatThemeId as WechatThemeId) ?? "classic";
+  return (props.article?.wechatThemeId as WechatThemeId) ?? "sunset-film";
 });
 
 // ─── 微信公众号格式复制 ───

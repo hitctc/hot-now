@@ -603,10 +603,10 @@
               :preview-html="activePreviewHtml"
               :preview-label="activePreviewLabel"
               :sync-scroll="syncScrollEnabled"
+              :save-status="focusMode ? (savedAtLabel || '未触发保存') : ''"
+              :save-status-state="savedAtLabel ? 'saved' : 'idle'"
             />
           </div>
-          <!-- 专注模式专属：保存状态浮层（其余内容渐隐后淡入，给自动保存可见反馈） -->
-          <span class="focus-save-hint" :class="{ 'focus-save-hint--idle': !savedAtLabel }">{{ savedAtLabel || "未触发保存" }}</span>
         </section>
       </div>
     </template>
@@ -2264,7 +2264,7 @@ onBeforeUnmount(() => {
 .article-detail-modal--focus .ant-modal-header,
 .article-detail-modal--focus .ant-modal-footer,
 .article-detail-modal--focus .article-detail-content > section:not(.editor-section),
-.article-detail-modal--focus .editor-section > *:not(.article-editor-wrapper):not(.focus-save-hint) {
+.article-detail-modal--focus .editor-section > *:not(.article-editor-wrapper) {
   opacity: 0;
   pointer-events: none;
 }
@@ -2285,7 +2285,7 @@ onBeforeUnmount(() => {
   visibility: hidden;
 }
 
-/* 专注模式专属：保存状态浮在编辑器右上角，其余内容渐隐后淡入，给自动保存可见反馈 */
+/* 专注模式下隐藏正文标题栏，只保留三栏编辑器。 */
 .article-detail-modal .editor-section {
   position: relative;
 }
@@ -2298,24 +2298,6 @@ onBeforeUnmount(() => {
   max-height: 0;
   overflow: hidden;
   visibility: hidden;
-}
-.focus-save-hint {
-  position: absolute;
-  top: 6px;
-  left: 10px;
-  z-index: 5;
-  font-size: 11px;
-  font-weight: 500;
-  color: #16a34a;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.8s ease;
-}
-.focus-save-hint--idle {
-  color: #999;
-}
-.article-detail-modal--focus .focus-save-hint {
-  opacity: 1;
 }
 /* 专注模式：modal-content 强制纯白不透明，覆盖主题半透明白，确保整体纯白 */
 .article-detail-modal--focus .ant-modal-content {

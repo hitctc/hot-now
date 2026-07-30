@@ -24,7 +24,14 @@
       <div class="md-editor__divider md-editor__divider--static" />
       <!-- 中栏：人工转写（发布内容），滚动同步驱动右栏预览 -->
       <div class="md-editor__pane">
-        <div class="md-editor__label md-editor__label--human">人工转写（发布内容）<span class="md-editor__word-count">{{ countWords(modelValue) }}字</span></div>
+        <div class="md-editor__label md-editor__label--human">
+          <span>人工转写（发布内容）<span class="md-editor__word-count">{{ countWords(modelValue) }}字</span></span>
+          <span
+            v-if="saveStatus"
+            class="md-editor__save-status"
+            :class="{ 'md-editor__save-status--idle': saveStatusState === 'idle' }"
+          >{{ saveStatus }}</span>
+        </div>
         <div class="md-editor__textarea-wrap">
           <div ref="humanHighlightRef" class="md-editor__line-highlight" />
           <textarea
@@ -97,12 +104,18 @@ const props = withDefaults(defineProps<{
   humanMode?: boolean;
   /** 三栏模式下的左栏 AI 草稿内容（content_markdown），独立编辑、不联动预览 */
   aiDraft?: string;
+  /** 三栏中栏标题右侧的保存状态；为空时不占位。 */
+  saveStatus?: string;
+  /** 保存状态的视觉类型，仅区分尚未保存和已经保存。 */
+  saveStatusState?: "idle" | "saved";
 }>(), {
   previewHtml: "",
   previewLabel: "预览",
   syncScroll: true,
   humanMode: false,
   aiDraft: "",
+  saveStatus: "",
+  saveStatusState: "idle",
 });
 
 const emit = defineEmits<{
@@ -421,6 +434,21 @@ function onDividerMouseDown(e: MouseEvent): void {
   font-variant-numeric: tabular-nums;
 }
 
+.md-editor__save-status {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  color: #16a34a;
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.md-editor__save-status--idle {
+  color: #a3a3a3;
+}
+
 /* textarea 外层：承载光标行高亮条（absolute 定位在透明 textarea 之下） */
 .md-editor__textarea-wrap {
   position: relative;
@@ -492,6 +520,9 @@ function onDividerMouseDown(e: MouseEvent): void {
   background: rgba(202, 169, 250, 0.38);
 }
 .md-editor__label--human {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   background: #fff7e6;
   color: #d46b08;
   font-weight: 600;

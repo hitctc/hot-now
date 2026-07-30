@@ -159,6 +159,7 @@ export type AccountFitDetails = {
   evidenceBasis?: string[];
   missingCriteria?: string[];
   criteria?: Record<string, boolean>;
+  impactMaturity?: "current" | "near_term" | "simulation" | "future_vision" | "indirect";
   supplemented?: boolean;
   supplementDirectlyRelated?: boolean;
   searchQueries?: string[];

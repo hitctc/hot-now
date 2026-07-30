@@ -373,6 +373,7 @@ function onDividerMouseDown(e: MouseEvent): void {
 
 <style scoped>
 .md-editor {
+  position: relative;
   display: flex;
   height: 100%;
   min-height: 400px;

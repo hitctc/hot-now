@@ -36,8 +36,8 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer); });
       <template v-else-if="data">
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <div v-for="item in [
-            { label: '总素材', value: data.total },
-            { label: '总文章', value: data.total_articles },
+            { label: '总素材', value: data.total, highlight: false },
+            { label: '总文章', value: data.total_articles, highlight: false },
             { label: '待评分', value: data.pending_score, highlight: true },
             { label: '待趋势', value: data.pending_trend, highlight: true },
             { label: '待写作', value: data.pending_write, highlight: true },

@@ -298,6 +298,14 @@ cp .deploy.local.env.example .deploy.local.env
 
 `deploy/nginx/hot-now.conf` 包含 `80 -> 443` 跳转、`now.achuan.cc` HTTPS 反代，以及 `/client/assets/` 下 Vite hash 资源的 Nginx 直出、gzip 与长缓存；安装或更新该模板后需要在服务器执行 `nginx -t` 和 reload，避免静态资源请求继续绕到 Node 进程后被业务接口阻塞。
 
+历史生产配置如果仍为 HTTP/1.1，可在代码部署后执行一次：
+
+```bash
+sudo bash /srv/hot-now/app/scripts/enable-nginx-http2.sh
+```
+
+脚本只修改 HotNow 的两个 TLS `listen` 指令，会先备份原配置、执行 `nginx -t`，验证通过才 reload；验证或 reload 失败时自动恢复备份。
+
 部署脚本不会触碰：
 
 - `/srv/hot-now/shared/data`

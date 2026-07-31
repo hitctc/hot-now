@@ -4,6 +4,10 @@ import { message } from "ant-design-vue";
 
 import { useSearchHistory } from "../../composables/useSearchHistory.js";
 import { createLatestRequestGuard } from "../../utils/latestRequestGuard.js";
+import {
+  createLatestAbortController,
+  isAbortError
+} from "../../utils/latestAbortController.js";
 
 import {
   readCreativeFinishedArticles,
@@ -23,6 +27,7 @@ import {
 import { readWechatMpAccounts, type WechatMpAccountSummary } from "../../services/settingsApi.js";
 import ArticlePushFloatWidget from "../../components/creative/ArticlePushFloatWidget.vue";
 import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
+import CreativeCoverThumbnail from "../../components/creative/CreativeCoverThumbnail.vue";
 import ArticlePerformanceFeedbackModal from "../../components/creative/ArticlePerformanceFeedbackModal.vue";
 import SourceItemDetailModal from "../../components/creative/SourceItemDetailModal.vue";
 import { getStatusLabel, getAvailableActions, checkPublishConditions, type ArticleAction } from "../../components/creative/articleStatusShared.js";
@@ -180,7 +185,11 @@ function handlePushSuccess(): void {
 
 // ─── 数据加载 ───
 
+const listRequests = createLatestAbortController();
+
+/** 加载当前成品页，并取消仍在等待的旧分页请求。 */
 async function loadItems(): Promise<void> {
+  const controller = listRequests.begin();
   isLoading.value = true;
   try {
     const res = await readCreativeFinishedArticles({
@@ -190,14 +199,23 @@ async function loadItems(): Promise<void> {
       status: statusFilter.value || undefined,
       search: searchText.value || undefined,
       publishable: publishableOnly.value ? "1" : undefined,
-      includeDeleted: showDeleted.value ? "1" : undefined
+      includeDeleted: showDeleted.value ? "1" : undefined,
+      signal: controller.signal
     });
+    if (!listRequests.isCurrent(controller)) return;
     items.value = res.items;
     total.value = res.total;
+  } catch (error) {
+    if (!isAbortError(error)) throw error;
   } finally {
-    isLoading.value = false;
+    if (listRequests.isCurrent(controller)) {
+      listRequests.finish(controller);
+      isLoading.value = false;
+    }
   }
 }
+
+onBeforeUnmount(() => listRequests.cancel());
 
 /** 创建独立手动文章后直接打开共用详情弹窗，避免多一次列表查找。 */
 async function handleCreateManualArticle(): Promise<void> {
@@ -670,12 +688,7 @@ const pagination = computed(() => ({
           <template v-else-if="column.key === 'coverImage'">
             <div class="flex items-center gap-1">
               <a-tooltip v-if="record.coverImage && record.coverImage.length > 0" title="打开详情查看封面提示词" placement="topLeft">
-                <a-image
-                  :src="record.coverImage[0]"
-                  :width="44"
-                  class="!rounded !border !border-editorial-border !object-contain"
-                  style="max-height:44px;"
-                />
+                <CreativeCoverThumbnail :original-url="record.coverImage[0]" />
               </a-tooltip>
               <span v-else class="text-xs text-editorial-text-muted">无</span>
             </div>

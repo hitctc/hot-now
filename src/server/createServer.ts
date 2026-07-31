@@ -5,6 +5,10 @@ import {
   installPerformanceMonitoring,
   resolveSlowRequestThreshold
 } from "./performanceMonitoring.js";
+import {
+  createHermesWriteQueueStatusReader,
+  type HermesWriteQueueStatus
+} from "./hermesWriteQueueStatus.js";
 import { registerCreativeListRoutes } from "./routes/creativeListRoutes.js";
 import type { AiTimelineFeedReadResult } from "../core/aiTimeline/aiTimelineFeedFile.js";
 import { LatestReportEmailError, type LatestReportEmailErrorReason } from "../core/pipeline/sendLatestReportEmail.js";
@@ -117,7 +121,12 @@ import {
   replaceDailyDigest
 } from "../core/dailyDigest/dailyDigestRepository.js";
 
-import { downloadAndStoreImage, storeImageBuffer, readStoredImage } from "../core/storage/imageStore.js";
+import {
+  downloadAndStoreImage,
+  readStoredImage,
+  readStoredImageThumbnail,
+  storeImageBuffer
+} from "../core/storage/imageStore.js";
 import { readNextCollectionRunAt } from "../core/scheduler/readNextCollectionRunAt.js";
 import {
   createSessionToken,
@@ -603,6 +612,25 @@ export function createServer(deps: ServerDeps = {}) {
   const db = deps.db;
   const creativeApiToken = deps.creativeApiToken;
   const creativeImageDir = deps.creativeImageDir;
+  const hermesWriteQueueStatusReader = createHermesWriteQueueStatusReader({
+    fetchStatus: async () => {
+      const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+      const hermesApiToken = process.env.HERMES_API_TOKEN;
+      if (!hermesApiUrl || !hermesApiToken) {
+        throw new Error("Hermes API is not configured");
+      }
+
+      const response = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/write-queue/status`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${hermesApiToken}` },
+        signal: AbortSignal.timeout(3_000)
+      });
+      if (!response.ok) {
+        throw new Error(`Hermes HTTP ${response.status}`);
+      }
+      return await response.json() as HermesWriteQueueStatus;
+    }
+  });
   const hasUnifiedShellDeps = Boolean(
     deps.listContentView || deps.getViewRulesWorkbenchData || deps.listSources || deps.getCurrentUserProfile
   );
@@ -1978,44 +2006,30 @@ export function createServer(deps: ServerDeps = {}) {
     const hermesApiToken = process.env.HERMES_API_TOKEN;
     if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
 
-    try {
-      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/write-queue/status`, {
-        method: "GET",
-        headers: { "Authorization": `Bearer ${hermesApiToken}` },
-        signal: AbortSignal.timeout(10_000),
-      });
-      if (!res.ok) {
-        const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
-        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, detail: errorBody });
-      }
-      const data = await res.json();
+    const data = await hermesWriteQueueStatusReader.read();
 
-      // 从队列中收集所有 source_item_id，批量查本地素材表补充标题和来源
-      if (db) {
-        const tasks = [data.current, ...(data.queue ?? [])].filter(Boolean);
-        const sourceItemIds = [...new Set(tasks.map((t: any) => Number(t.source_item_id)).filter(Boolean))];
-        if (sourceItemIds.length > 0) {
-          const placeholders = sourceItemIds.map(() => "?").join(",");
-          const rows = db.prepare(
-            `SELECT id, title, source_name FROM creative_source_items WHERE id IN (${placeholders})`
-          ).all(...sourceItemIds) as { id: number; title: string; source_name: string | null }[];
-          const lookup = new Map(rows.map(r => [r.id, r]));
-          for (const task of tasks) {
-            const sid = Number(task.source_item_id);
-            if (sid && lookup.has(sid)) {
-              const info = lookup.get(sid)!;
-              task.source_item_title = info.title ?? null;
-              task.source_item_source_name = info.source_name ?? null;
-            }
+    // 从队列中收集所有 source_item_id，批量查本地素材表补充标题和来源
+    if (db) {
+      const tasks = [data.current, ...(data.queue ?? [])].filter(Boolean) as Array<Record<string, unknown>>;
+      const sourceItemIds = [...new Set(tasks.map((task) => Number(task.source_item_id)).filter(Boolean))];
+      if (sourceItemIds.length > 0) {
+        const placeholders = sourceItemIds.map(() => "?").join(",");
+        const rows = db.prepare(
+          `SELECT id, title, source_name FROM creative_source_items WHERE id IN (${placeholders})`
+        ).all(...sourceItemIds) as { id: number; title: string; source_name: string | null }[];
+        const lookup = new Map(rows.map((row) => [row.id, row]));
+        for (const task of tasks) {
+          const sourceItemId = Number(task.source_item_id);
+          if (sourceItemId && lookup.has(sourceItemId)) {
+            const info = lookup.get(sourceItemId)!;
+            task.source_item_title = info.title ?? null;
+            task.source_item_source_name = info.source_name ?? null;
           }
         }
       }
-
-      return reply.send(data);
-    } catch (err) {
-      const errMessage = (err as Error).message ?? String(err);
-      return reply.code(502).send({ ok: false, reason: "Hermes 调用失败", detail: errMessage });
     }
+
+    return reply.send(data);
   });
 
   // ─── Hermes 监控 API 代理 ───
@@ -3266,6 +3280,7 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     const params = request.params as { date: string; file: string };
+    const query = request.query as { variant?: string };
     const dateDir = params.date;
     const fileName = params.file;
 
@@ -3273,13 +3288,17 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.code(400).type("text/plain").send("Invalid date");
     }
 
-    const result = await readStoredImage(creativeImageDir, dateDir, fileName);
+    const isThumbnail = query.variant === "thumbnail";
+    const result = isThumbnail
+      ? await readStoredImageThumbnail(creativeImageDir, dateDir, fileName)
+      : await readStoredImage(creativeImageDir, dateDir, fileName);
     if (!result) {
       return reply.code(404).type("text/plain").send("Not Found");
     }
 
     return reply
       .type(result.contentType)
+      .header("x-hot-now-image-variant", isThumbnail ? "thumbnail" : "original")
       .header("cache-control", "public, max-age=31536000, immutable")
       .send(result.buffer);
   });

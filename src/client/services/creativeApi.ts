@@ -629,6 +629,11 @@ export type WriteQueueStatus = {
   stats: WriteQueueStats;
   /** 本次队列运行首次开始执行的时间（Hermes 提供，暂未上线时为 undefined） */
   run_started_at?: string | null;
+  /** Hermes 超时后由 HotNow 返回最近一次成功状态。 */
+  status_delayed?: boolean;
+  status_unavailable?: boolean;
+  status_message?: string;
+  status_cached_at?: string;
 };
 
 /** 查询 Hermes 写作队列状态 */

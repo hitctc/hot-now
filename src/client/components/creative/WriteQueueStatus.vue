@@ -16,6 +16,7 @@ const data = ref<WriteQueueStatusType | null>(null);
 const loading = ref(false);
 const expanded = ref(false);
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+let refreshRequest: Promise<void> | null = null;
 
 // 实时耗时计时驱动（每秒刷新）
 const elapsedNow = ref(Date.now());
@@ -43,11 +44,32 @@ const hasActiveWork = computed(() => {
   return data.value.current !== null || data.value.queue_length > 0;
 });
 
-async function refresh(): Promise<void> {
+/** 合并重叠刷新；页面隐藏时由轮询入口直接跳过，不占用后台连接。 */
+function refresh(): Promise<void> {
+  if (refreshRequest) return refreshRequest;
   loading.value = true;
-  try { data.value = await fetchWriteQueueStatus(); }
-  catch { /* 静默 */ }
-  finally { loading.value = false; }
+  refreshRequest = fetchWriteQueueStatus()
+    .then((status) => {
+      data.value = status;
+    })
+    .catch(() => {
+      // 服务端无法提供降级状态时保留当前显示，避免浮标闪烁。
+    })
+    .finally(() => {
+      loading.value = false;
+      refreshRequest = null;
+    });
+  return refreshRequest;
+}
+
+/** 仅在页面可见时执行定时刷新。 */
+function refreshWhenVisible(): void {
+  if (!document.hidden) void refresh();
+}
+
+/** 从后台切回页面时立即刷新一次状态。 */
+function handleVisibilityChange(): void {
+  if (!document.hidden) void refresh();
 }
 
 function toggleExpand(): void {
@@ -60,13 +82,15 @@ function openSourceItem(id: number): void {
 }
 
 onMounted(() => {
-  refresh();
-  pollTimer = setInterval(refresh, 15_000);
+  void refresh();
+  pollTimer = setInterval(refreshWhenVisible, 15_000);
+  document.addEventListener("visibilitychange", handleVisibilityChange);
   elapsedTimer = setInterval(() => { elapsedNow.value = Date.now(); }, 1000);
 });
 onBeforeUnmount(() => {
   if (pollTimer) clearInterval(pollTimer);
   if (elapsedTimer) clearInterval(elapsedTimer);
+  document.removeEventListener("visibilitychange", handleVisibilityChange);
 });
 </script>
 
@@ -74,8 +98,16 @@ onBeforeUnmount(() => {
   <Teleport to="body">
     <div v-if="data" class="write-queue-float">
       <!-- 折叠态：呼吸圆点 -->
-      <button v-if="!expanded" class="write-queue-dot-btn" @click="toggleExpand">
-        <span class="write-queue-dot" :class="hasActiveWork ? 'write-queue-dot--active' : 'write-queue-dot--idle'" />
+      <button
+        v-if="!expanded"
+        class="write-queue-dot-btn"
+        :title="data.status_message"
+        @click="toggleExpand"
+      >
+        <span
+          class="write-queue-dot"
+          :class="data.status_delayed ? 'write-queue-dot--delayed' : (hasActiveWork ? 'write-queue-dot--active' : 'write-queue-dot--idle')"
+        />
       </button>
 
       <!-- 展开态 -->
@@ -98,6 +130,10 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
+        <div v-if="data.status_delayed" class="write-queue-delay">
+          {{ data.status_message || "写作队列状态延迟" }}
+        </div>
+
         <!-- 排队列表 -->
         <div v-if="data.queue.length > 0" class="write-queue-list">
           <div v-for="task in data.queue" :key="task.task_id" class="write-queue-task">
@@ -109,7 +145,10 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- 空闲 -->
-        <div v-if="!data.current && data.queue.length === 0" class="write-queue-idle">队列空闲</div>
+        <div
+          v-if="!data.status_unavailable && !data.current && data.queue.length === 0"
+          class="write-queue-idle"
+        >队列空闲</div>
 
         <!-- 统计 + 刷新 -->
         <div class="write-queue-footer">
@@ -165,6 +204,9 @@ onBeforeUnmount(() => {
 .write-queue-dot--idle {
   background: #d1d5db;
 }
+.write-queue-dot--delayed {
+  background: #f59e0b;
+}
 @keyframes wq-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
@@ -219,6 +261,14 @@ onBeforeUnmount(() => {
   font-size: 11px;
   color: #9ca3af;
   padding: 8px 0;
+}
+.write-queue-delay {
+  margin: 5px 8px;
+  border-radius: 4px;
+  background: #fffbeb;
+  padding: 5px 7px;
+  color: #b45309;
+  font-size: 10px;
 }
 .write-queue-footer {
   display: flex;

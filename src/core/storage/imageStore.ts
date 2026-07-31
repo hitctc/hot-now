@@ -1,6 +1,7 @@
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import sharp from "sharp";
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
@@ -10,6 +11,9 @@ const CONTENT_TYPE_MAP: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".webp": "image/webp"
 };
+const THUMBNAIL_MAX_EDGE = 96;
+const THUMBNAIL_WEBP_QUALITY = 72;
+const thumbnailRequests = new Map<string, Promise<Buffer | null>>();
 
 export type StoreImageResult = {
   /** 存储后的相对路径：{date}/{uuid}.{ext} */
@@ -62,8 +66,9 @@ export async function storeImageBuffer(
   await mkdir(dayDir, { recursive: true });
 
   const filePath = path.join(dayDir, fileName);
-  const { writeFile } = await import("node:fs/promises");
   await writeFile(filePath, buffer);
+  // 缩略图失败不能影响原图上传；列表会显示占位，详情仍可继续使用原图。
+  await createStoredImageThumbnail(imageDir, dateDir, fileName, buffer).catch(() => null);
 
   return {
     relativePath: `${dateDir}/${fileName}`,
@@ -90,6 +95,78 @@ export async function readStoredImage(
   } catch {
     return null;
   }
+}
+
+/** 返回与原图同目录的稳定缩略图文件名。 */
+export function getStoredImageThumbnailFileName(fileName: string): string {
+  return `${path.basename(fileName, path.extname(fileName))}.thumb.webp`;
+}
+
+/**
+ * 读取缩略图；历史图片没有缓存时只生成一次并原子落盘。
+ * 生成失败返回 null，调用方不得回退传输大尺寸原图。
+ */
+export async function readStoredImageThumbnail(
+  imageDir: string,
+  date: string,
+  fileName: string
+): Promise<{ buffer: Buffer; contentType: "image/webp" } | null> {
+  const ext = path.extname(fileName).toLowerCase();
+  if (!ALLOWED_EXTENSIONS.has(ext) || fileName.endsWith(".thumb.webp")) {
+    return null;
+  }
+
+  const dayDir = resolveWithinRoot(imageDir, date);
+  const thumbnailPath = resolveWithinRoot(dayDir, getStoredImageThumbnailFileName(fileName));
+  try {
+    return { buffer: await readFile(thumbnailPath), contentType: "image/webp" };
+  } catch {
+    // 历史文件没有缩略图时在首次访问生成，后续请求直接命中上面的磁盘缓存。
+  }
+
+  const originalPath = resolveWithinRoot(dayDir, fileName);
+  let request = thumbnailRequests.get(thumbnailPath);
+  if (!request) {
+    request = readFile(originalPath)
+      .then((buffer) => createStoredImageThumbnail(imageDir, date, fileName, buffer))
+      .catch(() => null)
+      .finally(() => thumbnailRequests.delete(thumbnailPath));
+    thumbnailRequests.set(thumbnailPath, request);
+  }
+
+  const buffer = await request;
+  return buffer ? { buffer, contentType: "image/webp" } : null;
+}
+
+/** 将原图转换为小尺寸 WebP，并通过临时文件避免并发读取半成品。 */
+async function createStoredImageThumbnail(
+  imageDir: string,
+  date: string,
+  fileName: string,
+  sourceBuffer: Buffer
+): Promise<Buffer> {
+  const dayDir = resolveWithinRoot(imageDir, date);
+  const thumbnailPath = resolveWithinRoot(dayDir, getStoredImageThumbnailFileName(fileName));
+  const thumbnailBuffer = await sharp(sourceBuffer)
+    .rotate()
+    .resize({
+      width: THUMBNAIL_MAX_EDGE,
+      height: THUMBNAIL_MAX_EDGE,
+      fit: "inside",
+      withoutEnlargement: true
+    })
+    .webp({ quality: THUMBNAIL_WEBP_QUALITY, effort: 4 })
+    .toBuffer();
+  const temporaryPath = `${thumbnailPath}.${randomUUID()}.tmp`;
+
+  await writeFile(temporaryPath, thumbnailBuffer);
+  try {
+    await rename(temporaryPath, thumbnailPath);
+  } catch (error) {
+    await unlink(temporaryPath).catch(() => undefined);
+    throw error;
+  }
+  return thumbnailBuffer;
 }
 
 function resolveExtension(url: string, contentType: string | null): string | null {

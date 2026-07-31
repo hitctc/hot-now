@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 46;
+const schemaVersion = 47;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -1503,6 +1503,19 @@ export function runMigrations(db: SqliteDatabase): void {
         ON wechat_draft_push_log(article_id, status);
     `);
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(46, creativeListPerformanceMigrationName);
+
+    // 047: “显示已废弃”移除 deleted_at 条件后仍按方向和置顶顺序直接读取，避免临时排序。
+    const allFinishedArticlesPerformanceMigrationName = "047_all_finished_articles_performance_index";
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_creative_finished_articles_direction_all_pinned_created_at
+        ON creative_finished_articles(
+          direction,
+          (pinned_at IS NOT NULL) DESC,
+          pinned_at DESC,
+          created_at DESC
+        );
+    `);
+    db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(47, allFinishedArticlesPerformanceMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
     // 历史库可能已有悬空引用；本次迁移只阻止新增错误，避免误删既有文章或阻断启动。

@@ -219,6 +219,7 @@ export function readCreativeSourceItems(params?: {
   minTrendScore?: number;
   accountFitLevel?: AccountFitLevel | "unassessed";
   direction?: string;
+  signal?: AbortSignal;
 }): Promise<SourceItemListResponse> {
   const query = new URLSearchParams();
   query.set("view", "summary");
@@ -233,7 +234,10 @@ export function readCreativeSourceItems(params?: {
   if (params?.accountFitLevel) query.set("accountFitLevel", params.accountFitLevel);
   if (params?.direction) query.set("direction", params.direction);
   const qs = query.toString();
-  return requestJson<SourceItemListResponse>(`/api/creative/source-items${qs ? `?${qs}` : ""}`);
+  const url = `/api/creative/source-items${qs ? `?${qs}` : ""}`;
+  return params?.signal
+    ? requestJson<SourceItemListResponse>(url, { signal: params.signal })
+    : requestJson<SourceItemListResponse>(url);
 }
 
 /** 读取单条素材的完整字段。 */
@@ -257,6 +261,7 @@ export function readCreativeFinishedArticles(params?: {
   publishable?: string;
   includeDeleted?: string;
   direction?: string;
+  signal?: AbortSignal;
 }): Promise<FinishedArticleListResponse> {
   const query = new URLSearchParams();
   query.set("view", "summary");
@@ -268,7 +273,10 @@ export function readCreativeFinishedArticles(params?: {
   if (params?.includeDeleted) query.set("includeDeleted", params.includeDeleted);
   if (params?.direction) query.set("direction", params.direction);
   const qs = query.toString();
-  return requestJson<FinishedArticleListResponse>(`/api/creative/finished-articles${qs ? `?${qs}` : ""}`);
+  const url = `/api/creative/finished-articles${qs ? `?${qs}` : ""}`;
+  return params?.signal
+    ? requestJson<FinishedArticleListResponse>(url, { signal: params.signal })
+    : requestJson<FinishedArticleListResponse>(url);
 }
 
 /** 读取单篇成品的完整编辑数据。 */

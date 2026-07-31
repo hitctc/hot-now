@@ -4,6 +4,10 @@ import { message } from "ant-design-vue";
 
 import { useSearchHistory } from "../../composables/useSearchHistory.js";
 import { createLatestRequestGuard } from "../../utils/latestRequestGuard.js";
+import {
+  createLatestAbortController,
+  isAbortError
+} from "../../utils/latestAbortController.js";
 
 import {
   readCreativeFinishedArticles,
@@ -23,6 +27,7 @@ import {
 import { readWechatMpAccounts, type WechatMpAccountSummary } from "../../services/settingsApi.js";
 import ArticlePushFloatWidget from "../../components/creative/ArticlePushFloatWidget.vue";
 import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
+import CreativeCoverThumbnail from "../../components/creative/CreativeCoverThumbnail.vue";
 import SourceItemDetailModal from "../../components/creative/SourceItemDetailModal.vue";
 import { getStatusLabel, getAvailableActions, checkPublishConditions, type ArticleAction } from "../../components/creative/articleStatusShared.js";
 
@@ -177,7 +182,11 @@ function handlePushSuccess(): void {
 
 // ─── 数据加载 ───
 
+const listRequests = createLatestAbortController();
+
+/** 加载当前短内容页，并取消仍在等待的旧分页请求。 */
 async function loadItems(): Promise<void> {
+  const controller = listRequests.begin();
   isLoading.value = true;
   try {
     const res = await readCreativeFinishedArticles({
@@ -187,14 +196,23 @@ async function loadItems(): Promise<void> {
       status: statusFilter.value || undefined,
       search: searchText.value || undefined,
       publishable: publishableOnly.value ? "1" : undefined,
-      includeDeleted: showDeleted.value ? "1" : undefined
+      includeDeleted: showDeleted.value ? "1" : undefined,
+      signal: controller.signal
     });
+    if (!listRequests.isCurrent(controller)) return;
     items.value = res.items;
     total.value = res.total;
+  } catch (error) {
+    if (!isAbortError(error)) throw error;
   } finally {
-    isLoading.value = false;
+    if (listRequests.isCurrent(controller)) {
+      listRequests.finish(controller);
+      isLoading.value = false;
+    }
   }
 }
+
+onBeforeUnmount(() => listRequests.cancel());
 
 /** 创建独立短内容，并直接进入与管线成品共用的三栏编辑器。 */
 async function handleCreateManualShortContent(): Promise<void> {
@@ -672,12 +690,9 @@ const pagination = computed(() => ({
                   {{ record.imagePrompts[0] }}
                 </div>
               </a-tooltip>
-              <a-image
+              <CreativeCoverThumbnail
                 v-else-if="record.coverImage && record.coverImage.length > 0"
-                :src="record.coverImage[0]"
-                :width="44"
-                class="!rounded !border !border-editorial-border !object-contain"
-                style="max-height:44px;"
+                :original-url="record.coverImage[0]"
               />
               <span v-else class="text-xs text-editorial-text-muted">—</span>
             </div>

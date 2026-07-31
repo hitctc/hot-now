@@ -13,6 +13,7 @@ import { fetchWriteQueueStatus, readCreativeFinishedArticle, type WriteQueueStat
 // ─── 写作队列状态 ───
 const queueData = ref<WriteQueueStatus | null>(null);
 let queueTimer: ReturnType<typeof setInterval> | null = null;
+let queueRefreshRequest: Promise<void> | null = null;
 
 // 实时耗时计时驱动（每秒刷新）
 const elapsedNow = ref(Date.now());
@@ -31,10 +32,30 @@ function formatElapsed(iso: string | null | undefined): string {
   return `${sec}秒`;
 }
 
-async function refreshQueue(): Promise<void> {
-  try {
-    queueData.value = await fetchWriteQueueStatus();
-  } catch { /* 静默 */ }
+/** 合并重叠的队列刷新；请求失败时保留最后一次可用状态。 */
+function refreshQueue(): Promise<void> {
+  if (queueRefreshRequest) return queueRefreshRequest;
+  queueRefreshRequest = fetchWriteQueueStatus()
+    .then((status) => {
+      queueData.value = status;
+    })
+    .catch(() => {
+      // 服务端无法提供降级状态时保留当前显示，避免监控页误报空闲。
+    })
+    .finally(() => {
+      queueRefreshRequest = null;
+    });
+  return queueRefreshRequest;
+}
+
+/** 页面隐藏时停止队列轮询，避免后台请求占用同源连接。 */
+function refreshQueueWhenVisible(): void {
+  if (!document.hidden) void refreshQueue();
+}
+
+/** 用户回到监控页时立即刷新队列状态。 */
+function handleQueueVisibilityChange(): void {
+  if (!document.hidden) void refreshQueue();
 }
 
 // 素材详情弹窗
@@ -70,13 +91,15 @@ function closeArticleDetail(): void {
 }
 
 onMounted(() => {
-  refreshQueue();
-  queueTimer = setInterval(refreshQueue, 15_000);
+  void refreshQueue();
+  queueTimer = setInterval(refreshQueueWhenVisible, 15_000);
+  document.addEventListener("visibilitychange", handleQueueVisibilityChange);
   elapsedTimer = setInterval(() => { elapsedNow.value = Date.now(); }, 1000);
 });
 onBeforeUnmount(() => {
   if (queueTimer) clearInterval(queueTimer);
   if (elapsedTimer) clearInterval(elapsedTimer);
+  document.removeEventListener("visibilitychange", handleQueueVisibilityChange);
 });
 </script>
 
@@ -113,7 +136,10 @@ onBeforeUnmount(() => {
             <span class="shrink-0 text-[10px]" :class="task.priority === 'high' ? 'text-yellow-600' : 'text-gray-400'">{{ task.priority }}</span>
           </div>
         </div>
-        <div v-if="!queueData.current && queueData.queue.length === 0" class="text-xs text-editorial-text-muted">队列空闲</div>
+        <div v-if="queueData.status_delayed" class="mb-2 rounded border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700">
+          {{ queueData.status_message || "写作队列状态延迟" }}
+        </div>
+        <div v-if="!queueData.status_unavailable && !queueData.current && queueData.queue.length === 0" class="text-xs text-editorial-text-muted">队列空闲</div>
         <div class="mt-2 text-[10px] text-editorial-text-muted">
           完成 {{ queueData.stats.total_completed }} · 失败 {{ queueData.stats.total_failed }} · 总提交 {{ queueData.stats.total_submitted }}
         </div>

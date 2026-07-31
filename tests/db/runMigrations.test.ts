@@ -80,7 +80,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(46);
+    expect(schemaVersion).toBe(47);
 
     const appliedMigrations = db
       .prepare(
@@ -138,7 +138,8 @@ describe("runMigrations", () => {
       { version: 43, name: "043_source_items_writing_stop_details" },
       { version: 44, name: "044_source_items_account_fit" },
       { version: 45, name: "045_finished_articles_manual_and_pinning" },
-      { version: 46, name: "046_creative_list_performance_indexes" }
+      { version: 46, name: "046_creative_list_performance_indexes" },
+      { version: 47, name: "047_all_finished_articles_performance_index" }
     ]);
 
     const performanceIndexes = db
@@ -150,6 +151,7 @@ describe("runMigrations", () => {
             AND name IN (
               'idx_creative_source_items_direction_created_at',
               'idx_creative_finished_articles_direction_pinned_created_at',
+              'idx_creative_finished_articles_direction_all_pinned_created_at',
               'idx_wechat_draft_push_log_article_status'
             )
           ORDER BY name
@@ -157,6 +159,7 @@ describe("runMigrations", () => {
       )
       .all() as Array<{ name: string }>;
     expect(performanceIndexes.map((row) => row.name)).toEqual([
+      "idx_creative_finished_articles_direction_all_pinned_created_at",
       "idx_creative_finished_articles_direction_pinned_created_at",
       "idx_creative_source_items_direction_created_at",
       "idx_wechat_draft_push_log_article_status"
@@ -609,7 +612,7 @@ describe("runMigrations", () => {
     expect(evidenceTable).toBeTruthy();
     expect(sourceRunsTable).toBeTruthy();
     expect(notificationsTable).toBeTruthy();
-    expect(db.pragma("user_version", { simple: true })).toBe(46);
+    expect(db.pragma("user_version", { simple: true })).toBe(47);
 
     // daily_digests 表验证
     const digestTable = db

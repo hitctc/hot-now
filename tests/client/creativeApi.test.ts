@@ -34,6 +34,25 @@ describe("creativeApi list requests", () => {
       "/api/creative/finished-articles?view=summary&page=1&pageSize=30&direction=article"
     );
   });
+
+  it("forwards abort signals so list pages can cancel stale requests", async () => {
+    requestJson.mockResolvedValue({ items: [], total: 0, page: 21, pageSize: 30 });
+    const controller = new AbortController();
+
+    await readCreativeSourceItems({ page: 21, signal: controller.signal });
+    await readCreativeFinishedArticles({ page: 21, signal: controller.signal });
+
+    expect(requestJson).toHaveBeenNthCalledWith(
+      1,
+      "/api/creative/source-items?view=summary&page=21",
+      { signal: controller.signal }
+    );
+    expect(requestJson).toHaveBeenNthCalledWith(
+      2,
+      "/api/creative/finished-articles?view=summary&page=21",
+      { signal: controller.signal }
+    );
+  });
 });
 
 describe("creativeApi write queue status", () => {

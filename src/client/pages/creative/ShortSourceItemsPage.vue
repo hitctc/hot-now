@@ -6,6 +6,10 @@ import { HttpError } from "../../services/http.js";
 import { usePipelineStatus } from "../../composables/usePipelineStatus.js";
 import { useSearchHistory } from "../../composables/useSearchHistory.js";
 import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
+import {
+  createLatestAbortController,
+  isAbortError
+} from "../../utils/latestAbortController.js";
 
 import {
   readCreativeSourceItems,
@@ -95,7 +99,11 @@ const writingStatusOptions = [
 
 // ─── 数据加载 ───
 
+const listRequests = createLatestAbortController();
+
+/** 加载当前筛选结果，并取消仍在等待的旧分页请求。 */
 async function loadItems(): Promise<void> {
+  const controller = listRequests.begin();
   isLoading.value = true;
   try {
     const res = await readCreativeSourceItems({
@@ -106,8 +114,10 @@ async function loadItems(): Promise<void> {
       sourceName: sourceNameFilter.value.trim() || undefined,
       writable: writableOnly.value || undefined,
       search: searchText.value || undefined,
-      minTrendScore: minTrendScore.value ?? undefined
+      minTrendScore: minTrendScore.value ?? undefined,
+      signal: controller.signal
     });
+    if (!listRequests.isCurrent(controller)) return;
     items.value = res.items;
     loadedDetailIds.clear();
     for (const id of expandedRowKeys.value) {
@@ -120,10 +130,17 @@ async function loadItems(): Promise<void> {
       setWritingIds(new Set([...writingIds.value, ...writingItems.map(wi => wi.id)]));
       for (const wi of writingItems) startWritingPoll(wi);
     }
+  } catch (error) {
+    if (!isAbortError(error)) throw error;
   } finally {
-    isLoading.value = false;
+    if (listRequests.isCurrent(controller)) {
+      listRequests.finish(controller);
+      isLoading.value = false;
+    }
   }
 }
+
+onBeforeUnmount(() => listRequests.cancel());
 
 onMounted(() => {
   void loadItems();

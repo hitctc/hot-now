@@ -1,6 +1,10 @@
-import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
+import Fastify, { LogController, type FastifyReply, type FastifyRequest } from "fastify";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import {
+  installPerformanceMonitoring,
+  resolveSlowRequestThreshold
+} from "./performanceMonitoring.js";
 import type { AiTimelineFeedReadResult } from "../core/aiTimeline/aiTimelineFeedFile.js";
 import { LatestReportEmailError, type LatestReportEmailErrorReason } from "../core/pipeline/sendLatestReportEmail.js";
 import type { BuildContentPageModelOptions } from "../core/content/buildContentPageModel.js";
@@ -588,7 +592,13 @@ type ServerDeps = {
 
 // This server keeps the old health route intact and layers report pages on top through dependency injection.
 export function createServer(deps: ServerDeps = {}) {
-  const app = Fastify({ logger: true });
+  const app = Fastify({
+    logger: true,
+    logController: new LogController({ disableRequestLogging: true })
+  });
+  installPerformanceMonitoring(app, {
+    slowRequestMs: resolveSlowRequestThreshold(process.env.HOT_NOW_SLOW_REQUEST_MS)
+  });
   const authConfig = deps.auth;
   const authEnabled = authConfig?.requireLogin === true;
   const db = deps.db;

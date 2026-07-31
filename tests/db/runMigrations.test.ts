@@ -80,7 +80,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(44);
+    expect(schemaVersion).toBe(45);
 
     const appliedMigrations = db
       .prepare(
@@ -136,7 +136,8 @@ describe("runMigrations", () => {
       { version: 41, name: "041_finished_articles_performance_feedback" },
       { version: 42, name: "042_finished_articles_writing_pipeline_v2" },
       { version: 43, name: "043_source_items_writing_stop_details" },
-      { version: 44, name: "044_source_items_account_fit" }
+      { version: 44, name: "044_source_items_account_fit" },
+      { version: 45, name: "045_finished_articles_manual_and_pinning" }
     ]);
 
     const hiddenAggregates = db
@@ -586,7 +587,7 @@ describe("runMigrations", () => {
     expect(evidenceTable).toBeTruthy();
     expect(sourceRunsTable).toBeTruthy();
     expect(notificationsTable).toBeTruthy();
-    expect(db.pragma("user_version", { simple: true })).toBe(44);
+    expect(db.pragma("user_version", { simple: true })).toBe(45);
 
     // daily_digests 表验证
     const digestTable = db

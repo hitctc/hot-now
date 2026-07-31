@@ -40,6 +40,13 @@ cd "${REPO_ROOT}"
 echo "Building locally..."
 npm run build
 
+# 在覆盖生产代码之前，用生产现有依赖只读检查数据库并生成可恢复快照。
+echo "Checking and snapshotting production database before syncing code..."
+ssh "${REMOTE_TARGET}" \
+  "set -euo pipefail
+  cd '${DEPLOY_APP_DIR}'
+  node --input-type=module" < "${REPO_ROOT}/scripts/deploy-db-preflight.mjs"
+
 echo "Syncing code + dist to server..."
 rsync -az --delete \
   --exclude ".git" \

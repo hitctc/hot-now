@@ -95,9 +95,15 @@ import {
   saveArticlePerformanceFeedback,
   toggleWechatPublished,
   togglePublishable,
+  togglePinnedFinishedArticle,
   softDeleteFinishedArticle,
-  restoreFinishedArticle
+  restoreFinishedArticle,
+  type CreativeFinishedArticleRecord
 } from "../core/creative/creativeFinishedArticleRepository.js";
+import {
+  buildInlinePromptSource,
+  planInlineImagePlaceholders,
+} from "../core/creative/inlineImagePromptPlanner.js";
 import {
   insertDailyDigest,
   findDailyDigestById,
@@ -148,6 +154,75 @@ type ReportSummary = {
 type ParseRatingScoresResult =
   | { ok: true; scores: Record<string, number> }
   | { ok: false; reason: "invalid-ratings-payload" };
+
+type HermesImagePromptResult =
+  | { ok: true; status: 200; coverPrompt: string | null; inlinePrompts: Record<string, string> | null }
+  | { ok: false; status: number; reason: string };
+
+/**
+ * 调用 Hermes 只生成指定范围的提示词；结果不由 Hermes 回写，调用路由负责原子保存。
+ */
+async function requestImagePromptsFromHermes(
+  article: CreativeFinishedArticleRecord,
+  input: { scope: "cover" | "inline"; content: string; inlineIndex?: number }
+): Promise<HermesImagePromptResult> {
+  const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+  const hermesApiToken = process.env.HERMES_API_TOKEN;
+  if (!hermesApiUrl || !hermesApiToken) {
+    return { ok: false, status: 503, reason: "hermes-api-not-configured" };
+  }
+
+  const titleIndex = Math.min(article.titleIndex ?? 0, Math.max(0, (article.titles?.length ?? 1) - 1));
+  const title = article.titles?.[titleIndex] ?? article.titles?.[0] ?? "未命名文章";
+  try {
+    const response = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/articles/regen-image-prompts`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${hermesApiToken}`,
+      },
+      body: JSON.stringify({
+        articleId: article.id,
+        scope: input.scope,
+        content: input.content,
+        title,
+        thesis: article.thesis || undefined,
+        summary: article.summary100?.[0] || undefined,
+        inlineIndex: input.inlineIndex,
+        writeBack: false,
+      }),
+      signal: AbortSignal.timeout(300_000),
+    });
+    const data = await response.json().catch(() => ({})) as {
+      success?: boolean;
+      error?: string;
+      coverPrompt?: unknown;
+      inlinePrompts?: unknown;
+    };
+    if (!response.ok || !data.success) {
+      return {
+        ok: false,
+        status: response.status >= 500 ? 502 : response.status,
+        reason: data.error ?? `Hermes HTTP ${response.status}`,
+      };
+    }
+
+    return {
+      ok: true,
+      status: 200,
+      coverPrompt: typeof data.coverPrompt === "string" ? data.coverPrompt : null,
+      inlinePrompts: data.inlinePrompts && typeof data.inlinePrompts === "object"
+        ? data.inlinePrompts as Record<string, string>
+        : null,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 502,
+      reason: `Hermes 调用失败: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
 type SourceCard = {
   kind: string;
   name: string;
@@ -1047,15 +1122,17 @@ export function createServer(deps: ServerDeps = {}) {
     });
 
     // 批量查询关联素材的 trendScore/trendBreakdown/publishedAt
-    if (result.items.length > 0) {
-      const sourceItemIds = result.items.map(a => a.sourceItemId);
+    const sourceItemIds = result.items
+      .map((article) => article.sourceItemId)
+      .filter((id): id is number => id !== null);
+    if (sourceItemIds.length > 0) {
       const idPlaceholders = sourceItemIds.map(() => "?").join(",");
       const sourceRows = db.prepare(
         `SELECT id, trend_score, trend_breakdown, published_at, title, source_name FROM creative_source_items WHERE id IN (${idPlaceholders})`
       ).all(...sourceItemIds) as Array<{ id: number; trend_score: number | null; trend_breakdown: string | null; published_at: string | null; title: string | null; source_name: string | null }>;
       const sourceMap = new Map(sourceRows.map(r => [r.id, r]));
       for (const article of result.items) {
-        const source = sourceMap.get(article.sourceItemId);
+        const source = article.sourceItemId === null ? undefined : sourceMap.get(article.sourceItemId);
         (article as any).trendScore = source?.trend_score ?? null;
         (article as any).trendBreakdown = source?.trend_breakdown ? JSON.parse(source.trend_breakdown) : null;
         (article as any).publishedAt = source?.published_at ?? null;
@@ -1086,9 +1163,11 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     // 关联查询 source item 的 trendScore/trendBreakdown/publishedAt/title
-    const sourceRow = db.prepare(
-      "SELECT trend_score, trend_breakdown, published_at, title FROM creative_source_items WHERE id = ?"
-    ).get(article.sourceItemId) as { trend_score: number | null; trend_breakdown: string | null; published_at: string | null; title: string } | undefined;
+    const sourceRow = article.sourceItemId === null
+      ? undefined
+      : db.prepare(
+          "SELECT trend_score, trend_breakdown, published_at, title FROM creative_source_items WHERE id = ?"
+        ).get(article.sourceItemId) as { trend_score: number | null; trend_breakdown: string | null; published_at: string | null; title: string } | undefined;
     if (sourceRow) {
       (article as any).trendScore = sourceRow.trend_score ?? null;
       (article as any).trendBreakdown = sourceRow.trend_breakdown ? JSON.parse(sourceRow.trend_breakdown) : null;
@@ -1196,6 +1275,9 @@ export function createServer(deps: ServerDeps = {}) {
 
     // trendScore / trendBreakdown 存在 source_items 表，需关联更新
     if (body?.trendScore !== undefined || body?.trendBreakdown !== undefined) {
+      if (article.sourceItemId === null) {
+        return reply.code(400).send({ ok: false, reason: "manual-article-has-no-source-score" });
+      }
       if (body?.trendScore !== undefined) updatedFields.push("trendScore");
       if (body?.trendBreakdown !== undefined) updatedFields.push("trendBreakdown");
       const trendScore = typeof body.trendScore === "number" ? body.trendScore : 0;
@@ -1648,6 +1730,95 @@ export function createServer(deps: ServerDeps = {}) {
     } catch (err) {
       return reply.code(502).send({ ok: false, reason: "Hermes 调用失败", detail: (err as Error).message });
     }
+  });
+
+  // 单独生成封面提示词，不触碰正文、正文配图位置或已有图片。
+  app.post("/actions/creative/finished-articles/:id/generate-cover-prompt", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+    if (!db) return reply.code(503).send({ ok: false, reason: "database-not-available" });
+
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const article = findCreativeFinishedArticleById(db, id);
+    if (!article) return reply.code(404).send({ ok: false, reason: "article-not-found" });
+
+    const generated = await requestImagePromptsFromHermes(article, {
+      scope: "cover",
+      content: article.humanMarkdown || article.contentMarkdown,
+    });
+    if (!generated.ok) {
+      return reply.code(generated.status).send({ ok: false, reason: generated.reason });
+    }
+    if (!generated.coverPrompt) {
+      return reply.code(502).send({ ok: false, reason: "封面提示词生成失败" });
+    }
+
+    editCreativeFinishedArticle(db, id, { coverImagePrompt: generated.coverPrompt });
+    return reply.send({ ok: true, article: findCreativeFinishedArticleById(db, id) });
+  });
+
+  // 正文配图提示词成功后才把提示词和首次规划的占位符一次性落库。
+  app.post("/actions/creative/finished-articles/:id/generate-inline-prompts", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+    if (!db) return reply.code(503).send({ ok: false, reason: "database-not-available" });
+
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const article = findCreativeFinishedArticleById(db, id);
+    if (!article) return reply.code(404).send({ ok: false, reason: "article-not-found" });
+
+    const body = request.body as { index?: unknown } | undefined;
+    const inlineIndex = typeof body?.index === "number" && Number.isInteger(body.index) && body.index > 0
+      ? body.index
+      : undefined;
+    const formalMarkdown = article.humanMarkdown || article.contentMarkdown;
+    if (!formalMarkdown.trim()) {
+      return reply.code(400).send({ ok: false, reason: "formal-content-required" });
+    }
+
+    const planned = planInlineImagePlaceholders(
+      formalMarkdown,
+      article.direction === "short_content" ? "short_content" : "article"
+    );
+    if (planned.count === 0) {
+      return reply.code(400).send({ ok: false, reason: "no-suitable-inline-image-position" });
+    }
+
+    const generated = await requestImagePromptsFromHermes(article, {
+      scope: "inline",
+      content: buildInlinePromptSource(planned.markdown),
+      inlineIndex,
+    });
+    if (!generated.ok) {
+      return reply.code(generated.status).send({ ok: false, reason: generated.reason });
+    }
+    if (!generated.inlinePrompts || Object.keys(generated.inlinePrompts).length === 0) {
+      return reply.code(502).send({ ok: false, reason: "正文配图提示词生成失败" });
+    }
+    const requiredIndexes = inlineIndex
+      ? [inlineIndex]
+      : Array.from({ length: planned.count }, (_, index) => index + 1);
+    const missingPromptIndexes = requiredIndexes.filter((index) => {
+      const prompt = generated.inlinePrompts?.[String(index)];
+      return typeof prompt !== "string" || prompt.trim().length === 0;
+    });
+    if (missingPromptIndexes.length > 0) {
+      return reply.code(502).send({
+        ok: false,
+        reason: `正文配图提示词缺少编号: ${missingPromptIndexes.join(",")}`,
+      });
+    }
+
+    const inlineImagePrompts = inlineIndex
+      ? { ...(article.inlineImagePrompts ?? {}), ...generated.inlinePrompts }
+      : generated.inlinePrompts;
+    editCreativeFinishedArticle(db, id, {
+      inlineImagePrompts,
+      ...(planned.changed ? { humanMarkdown: planned.markdown } : {}),
+    });
+    return reply.send({ ok: true, article: findCreativeFinishedArticleById(db, id) });
   });
 
   app.post("/api/creative/finished-articles/:id/regen-title", async (request, reply) => {
@@ -2778,6 +2949,11 @@ export function createServer(deps: ServerDeps = {}) {
       summary100: Array.isArray(body?.summary100) ? body.summary100 as string[] : (typeof body?.summary100 === "string" ? [body.summary100] : undefined),
       images: Array.isArray(body?.images) ? body.images as any[] : undefined,
       coverImage: Array.isArray(body?.coverImage) ? body.coverImage as string[] : undefined,
+      coverImagePrompt: typeof body?.coverImagePrompt === "string" ? body.coverImagePrompt : undefined,
+      inlineImagePrompts: body?.inlineImagePrompts && typeof body.inlineImagePrompts === "object"
+        ? body.inlineImagePrompts as Record<string, string>
+        : undefined,
+      imagePrompts: Array.isArray(body?.imagePrompts) ? body.imagePrompts.filter((item): item is string => typeof item === "string") : undefined,
       wechatThemeId: typeof body?.wechatThemeId === "string" ? body.wechatThemeId : (body?.wechatThemeId === null ? null : undefined),
       wechatHtml: typeof body?.wechatHtml === "string" ? body.wechatHtml : (body?.wechatHtml === null ? null : undefined),
       coverImageIndex: typeof body?.coverImageIndex === "number" ? body.coverImageIndex : undefined,
@@ -2796,6 +2972,57 @@ export function createServer(deps: ServerDeps = {}) {
       return reply.code(400).send({ ok: false, reason: result.reason });
     }
     return reply.send({ ok: true });
+  });
+
+  // 手动成品直接进入编辑器，不创建素材，也不经过写作管线。
+  app.post("/actions/creative/finished-articles/manual", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const body = request.body as { title?: unknown; direction?: unknown; form?: unknown } | undefined;
+    const title = typeof body?.title === "string" ? body.title.trim() : "";
+    const direction = body?.direction === "short_content" ? "short_content" : body?.direction === "article" ? "article" : "";
+    const form = body?.form === "tuwen" || body?.form === "duanwen" ? body.form : undefined;
+    if (!title) {
+      return reply.code(400).send({ ok: false, reason: "title-required" });
+    }
+    if (!direction || (direction === "short_content" && !form)) {
+      return reply.code(400).send({ ok: false, reason: "invalid-manual-article-type" });
+    }
+
+    const article = insertCreativeFinishedArticle(db, {
+      sourceItemId: null,
+      contentMarkdown: "",
+      humanMarkdown: `# ${title}\n\n`,
+      titles: [title],
+      status: "manual_draft",
+      originType: "manual",
+      direction,
+      form: direction === "short_content" ? form : undefined,
+      titleSelectionConfirmed: true,
+    });
+    return reply.code(201).send(article);
+  });
+
+  // 置顶状态使用时间戳持久化，刷新或重新登录后仍保持同一排序。
+  app.post("/actions/creative/finished-articles/:id/toggle-pin", async (request, reply) => {
+    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
+      return;
+    }
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const article = togglePinnedFinishedArticle(db, id);
+    if (!article) {
+      return reply.code(404).send({ ok: false, reason: "not-found" });
+    }
+    return reply.send(article);
   });
 
   // ─── 微信公众号：推送到草稿箱（session 鉴权） ───

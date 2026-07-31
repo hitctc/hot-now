@@ -68,6 +68,8 @@ const SELECT_COLUMNS = `
   performance_title_group_snapshot,
   performance_reader_task_snapshot,
   performance_recorded_at,
+  origin_type,
+  pinned_at,
   created_at,
   updated_at,
   (SELECT COUNT(*) FROM wechat_draft_push_log WHERE article_id = creative_finished_articles.id AND status = 'success') AS push_count
@@ -75,7 +77,7 @@ const SELECT_COLUMNS = `
 
 type ArticleRow = {
   id: number;
-  source_item_id: number;
+  source_item_id: number | null;
   mode: string | null;
   thesis: string | null;
   intros: string | null;
@@ -137,6 +139,8 @@ type ArticleRow = {
   performance_title_group_snapshot: string | null;
   performance_reader_task_snapshot: string | null;
   performance_recorded_at: string | null;
+  origin_type: "pipeline" | "manual";
+  pinned_at: string | null;
   push_count: number;
   created_at: string;
   updated_at: string;
@@ -230,6 +234,8 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     performanceTitleGroupSnapshot: row.performance_title_group_snapshot,
     performanceReaderTaskSnapshot: row.performance_reader_task_snapshot,
     performanceRecordedAt: row.performance_recorded_at,
+    originType: row.origin_type,
+    pinnedAt: row.pinned_at,
     pushCount: row.push_count ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -267,7 +273,7 @@ export type TitleCandidate = {
 
 export type CreativeFinishedArticleRecord = {
   id: number;
-  sourceItemId: number;
+  sourceItemId: number | null;
   mode: CreativeFinishedArticleMode | null;
   thesis: string | null;
   intros: string[] | null;
@@ -330,17 +336,20 @@ export type CreativeFinishedArticleRecord = {
   performanceTitleGroupSnapshot: string | null;
   performanceReaderTaskSnapshot: string | null;
   performanceRecordedAt: string | null;
+  originType: "pipeline" | "manual";
+  pinnedAt: string | null;
   pushCount: number;
   createdAt: string;
   updatedAt: string;
 };
 
 export type InsertCreativeFinishedArticleInput = {
-  sourceItemId: number;
+  sourceItemId?: number | null;
   mode?: CreativeFinishedArticleMode;
   thesis?: string;
   intros?: string[];
   contentMarkdown: string;
+  humanMarkdown?: string | null;
   titles?: string[];
   hooks?: string[];
   quotes?: string[];
@@ -378,6 +387,7 @@ export type InsertCreativeFinishedArticleInput = {
   titleCandidates?: TitleCandidate[];
   factSourceChecklist?: unknown[];
   titleSelectionConfirmed?: boolean;
+  originType?: "pipeline" | "manual";
 };
 
 export type EditCreativeFinishedArticleInput = {
@@ -456,7 +466,7 @@ export function insertCreativeFinishedArticle(
     "SELECT COALESCE(MAX(seq_number), 0) + 1 AS next FROM creative_finished_articles WHERE direction = ?"
   ).get(direction) as { next: number };
 
-  db.prepare(
+  const insertResult = db.prepare(
     `
       INSERT INTO creative_finished_articles (
         source_item_id,
@@ -501,9 +511,11 @@ export function insertCreativeFinishedArticle(
         oral_draft,
         title_candidates,
         fact_source_checklist,
-        title_selection_confirmed
+        title_selection_confirmed,
+        human_markdown,
+        origin_type
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
   ).run(
     input.sourceItemId,
@@ -548,21 +560,22 @@ export function insertCreativeFinishedArticle(
     input.oralDraft ?? null,
     input.titleCandidates ? JSON.stringify(input.titleCandidates) : null,
     input.factSourceChecklist ? JSON.stringify(input.factSourceChecklist) : null,
-    input.titleSelectionConfirmed === undefined ? 1 : (input.titleSelectionConfirmed ? 1 : 0)
+    input.titleSelectionConfirmed === undefined ? 1 : (input.titleSelectionConfirmed ? 1 : 0),
+    input.humanMarkdown ?? null,
+    input.originType ?? "pipeline"
   );
 
-  const row = db
-    .prepare("SELECT id FROM creative_finished_articles WHERE source_item_id = ? ORDER BY id DESC LIMIT 1")
-    .get(input.sourceItemId) as { id: number } | undefined;
-
-  if (!row) {
+  const id = Number(insertResult.lastInsertRowid);
+  if (!Number.isInteger(id) || id <= 0) {
     throw new Error("creative finished article insert did not return a persisted row");
   }
 
   // Backlink the source item so the relationship is bidirectional.
-  updateCreativeSourceItemLinkedArticle(db, input.sourceItemId, row.id);
+  if (input.sourceItemId != null) {
+    updateCreativeSourceItemLinkedArticle(db, input.sourceItemId, id);
+  }
 
-  return findCreativeFinishedArticleById(db, row.id)!;
+  return findCreativeFinishedArticleById(db, id)!;
 }
 
 // ── Find by id ──────────────────────────────────────────────────────────────
@@ -614,9 +627,9 @@ export function listCreativeFinishedArticles(
   }
 
   if (filters.search) {
-    whereClauses.push("(content_markdown LIKE ? OR thesis LIKE ?)");
+    whereClauses.push("(content_markdown LIKE ? OR human_markdown LIKE ? OR titles LIKE ? OR thesis LIKE ?)");
     const term = `%${filters.search}%`;
-    params.push(term, term);
+    params.push(term, term, term, term);
   }
 
   if (filters.publishable === true) {
@@ -637,7 +650,9 @@ export function listCreativeFinishedArticles(
   const offset = (page - 1) * pageSize;
   const items = db
     .prepare(
-      `SELECT ${SELECT_COLUMNS} FROM creative_finished_articles ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+      `SELECT ${SELECT_COLUMNS} FROM creative_finished_articles ${whereClause}
+       ORDER BY (pinned_at IS NOT NULL) DESC, pinned_at DESC, created_at DESC
+       LIMIT ? OFFSET ?`
     )
     .all(...params, pageSize, offset) as ArticleRow[];
 
@@ -658,17 +673,27 @@ const STATUS_TRANSITIONS: Record<string, Record<string, "publish_conditions" | "
   ready_for_publish: { generated: "none", wechat_draft: "none" },
   needs_review:      { ready_for_publish: "none", soft_deleted: "none" },
   anomaly:           { ready_for_publish: "publish_conditions" },
+  manual_draft:      { wechat_draft: "publish_conditions" },
 };
 
-/** 检查文章是否满足推送前置条件；v2 文章还必须由用户确认最终标题。 */
+/** 检查文章是否满足推送前置条件；手动稿只认中栏正式正文，不设置最低字数。 */
 export function checkPublishConditions(article: CreativeFinishedArticleRecord): { qualified: boolean; missing: string[] } {
   const missing: string[] = [];
   if (!article.coverImage || article.coverImage.length === 0) missing.push("缺少封面图");
   if (!article.titles || article.titles.length === 0) missing.push("缺少标题");
-  if (article.pipelineVersion === "v2" && !article.titleSelectionConfirmed) {
+  if (article.originType !== "manual" && article.pipelineVersion === "v2" && !article.titleSelectionConfirmed) {
     missing.push("尚未人工确认发布标题");
   }
-  if (!article.contentMarkdown || article.contentMarkdown.length <= 50) missing.push("缺少正文");
+  if (article.originType === "manual") {
+    const bodyWithoutTitle = (article.humanMarkdown ?? "")
+      .replace(/^!\[封面图[^\]]*\]\([^)]+\)\s*$/gm, "")
+      .replace(/^\s*#\s+.+(?:\r?\n|$)/m, "")
+      .replace(/^\s*\[IMAGE\d+\]\s*$/gm, "")
+      .trim();
+    if (!bodyWithoutTitle) missing.push("缺少正文");
+  } else if (!article.contentMarkdown || article.contentMarkdown.length <= 50) {
+    missing.push("缺少正文");
+  }
   return { qualified: missing.length === 0, missing };
 }
 
@@ -962,7 +987,7 @@ export function togglePublishable(db: SqliteDatabase, id: number): CreativeFinis
 // 软删除成品文章
 export function softDeleteFinishedArticle(db: SqliteDatabase, id: number): boolean {
   const result = db.prepare(
-    "UPDATE creative_finished_articles SET deleted_at = datetime('now'), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL"
+    "UPDATE creative_finished_articles SET deleted_at = datetime('now'), pinned_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL"
   ).run(id);
   return result.changes > 0;
 }
@@ -973,4 +998,23 @@ export function restoreFinishedArticle(db: SqliteDatabase, id: number): boolean 
     "UPDATE creative_finished_articles SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NOT NULL"
   ).run(id);
   return result.changes > 0;
+}
+
+// 置顶时间既是开关也是排序依据；再次置顶会刷新到所有置顶项的最前面。
+export function togglePinnedFinishedArticle(
+  db: SqliteDatabase,
+  id: number
+): CreativeFinishedArticleRecord | null {
+  const current = db
+    .prepare("SELECT pinned_at FROM creative_finished_articles WHERE id = ? AND deleted_at IS NULL")
+    .get(id) as { pinned_at: string | null } | undefined;
+  if (!current) return null;
+
+  db.prepare(
+    `UPDATE creative_finished_articles
+     SET pinned_at = CASE WHEN pinned_at IS NULL THEN strftime('%Y-%m-%d %H:%M:%f', 'now') ELSE NULL END,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?`
+  ).run(id);
+  return findCreativeFinishedArticleById(db, id);
 }

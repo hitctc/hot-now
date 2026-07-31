@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 44;
+const schemaVersion = 45;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -1474,14 +1474,154 @@ export function runMigrations(db: SqliteDatabase): void {
     `);
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(44, sourceAccountFitMigrationName);
 
+    // 045: 手动成品不依赖素材记录，同时为长短内容共用的置顶能力保留持久状态。
+    const manualFinishedArticlesMigrationName = "045_finished_articles_manual_and_pinning";
+    if (
+      !hasColumn(db, "creative_finished_articles", "origin_type")
+      || !hasColumn(db, "creative_finished_articles", "pinned_at")
+      || isColumnNotNull(db, "creative_finished_articles", "source_item_id")
+    ) {
+      rebuildFinishedArticlesForManualCreation(db);
+    }
+    db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(45, manualFinishedArticlesMigrationName);
+
     db.pragma(`user_version = ${schemaVersion}`);
+    // 表重建产生任何悬空引用都必须让本次事务整体回滚，不能留下已升级的 user_version。
+    const foreignKeyErrors = db.pragma("foreign_key_check") as unknown[];
+    if (foreignKeyErrors.length > 0) {
+      throw new Error(`foreign key check failed after migrations: ${JSON.stringify(foreignKeyErrors)}`);
+    }
   });
 
-  migrate();
+  // SQLite 只有重建表才能移除 NOT NULL；迁移期间暂时关闭外键，完成后立即恢复并校验。
+  const foreignKeysEnabled = db.pragma("foreign_keys", { simple: true }) === 1;
+  if (foreignKeysEnabled) db.pragma("foreign_keys = OFF");
+  try {
+    migrate();
+  } finally {
+    if (foreignKeysEnabled) db.pragma("foreign_keys = ON");
+  }
 }
 
 function hasColumn(db: SqliteDatabase, tableName: string, columnName: string): boolean {
   // PRAGMA table_info is the safest way to detect additive SQLite migrations without relying on exception flow.
   const rows = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
   return rows.some((row) => row.name === columnName);
+}
+
+function isColumnNotNull(db: SqliteDatabase, tableName: string, columnName: string): boolean {
+  const rows = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string; notnull: number }>;
+  return rows.some((row) => row.name === columnName && row.notnull === 1);
+}
+
+/**
+ * 重建成品文章表，保留已有列、索引和外键语义，只放宽素材关联并增加手动来源与置顶时间。
+ */
+function rebuildFinishedArticlesForManualCreation(db: SqliteDatabase): void {
+  const existingColumns = [
+    "id", "source_item_id", "mode", "thesis", "content_markdown", "titles", "hooks", "quotes",
+    "summary_100", "images_json", "status", "raw_response_text", "created_at", "updated_at",
+    "cover_image_url", "anomaly_reason", "content_html_bauhaus", "content_html_sunset_film",
+    "content_html_receipt", "wechat_published", "wechat_theme_id", "wechat_html", "cover_image_index",
+    "title_index", "intros", "intro_index", "summary_index", "publishable", "cover_image_prompt",
+    "inline_image_prompts", "similarity_check", "needs_manual_review", "manual_review_reason",
+    "manual_review_reasons", "step_trace", "current_step", "stop_step", "reason_code", "reason_text",
+    "deleted_at", "direction", "form", "reversal_score", "reversal_angle", "image_prompts", "comments",
+    "author_extensions", "seq_number", "human_markdown", "performance_delivered_users",
+    "performance_read_users", "performance_share_users", "performance_new_followers",
+    "performance_rewrite_level", "performance_title_snapshot", "performance_recorded_at",
+    "pipeline_version", "reader_task", "reader_relevance", "evidence_pack", "reader_value_plan",
+    "fact_skeleton", "oral_draft", "title_candidates", "fact_source_checklist",
+    "title_selection_confirmed", "performance_title_group_snapshot", "performance_reader_task_snapshot",
+  ].join(", ");
+
+  db.exec(`
+    CREATE TABLE creative_finished_articles_v45 (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source_item_id INTEGER,
+      mode TEXT,
+      thesis TEXT,
+      content_markdown TEXT NOT NULL,
+      titles TEXT,
+      hooks TEXT,
+      quotes TEXT,
+      summary_100 TEXT,
+      images_json TEXT,
+      status TEXT NOT NULL DEFAULT 'generated',
+      raw_response_text TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      cover_image_url TEXT DEFAULT NULL,
+      anomaly_reason TEXT DEFAULT NULL,
+      content_html_bauhaus TEXT DEFAULT NULL,
+      content_html_sunset_film TEXT DEFAULT NULL,
+      content_html_receipt TEXT DEFAULT NULL,
+      wechat_published INTEGER DEFAULT 0,
+      wechat_theme_id TEXT DEFAULT NULL,
+      wechat_html TEXT DEFAULT NULL,
+      cover_image_index INTEGER NOT NULL DEFAULT 0,
+      title_index INTEGER NOT NULL DEFAULT 0,
+      intros TEXT DEFAULT NULL,
+      intro_index INTEGER NOT NULL DEFAULT 0,
+      summary_index INTEGER NOT NULL DEFAULT 0,
+      publishable INTEGER NOT NULL DEFAULT 0,
+      cover_image_prompt TEXT,
+      inline_image_prompts TEXT,
+      similarity_check TEXT,
+      needs_manual_review INTEGER NOT NULL DEFAULT 0,
+      manual_review_reason TEXT,
+      manual_review_reasons TEXT,
+      step_trace TEXT,
+      current_step INTEGER,
+      stop_step INTEGER,
+      reason_code TEXT,
+      reason_text TEXT,
+      deleted_at TEXT,
+      direction TEXT NOT NULL DEFAULT 'article',
+      form TEXT,
+      reversal_score REAL,
+      reversal_angle TEXT,
+      image_prompts TEXT,
+      comments TEXT,
+      author_extensions TEXT,
+      seq_number INTEGER,
+      human_markdown TEXT,
+      performance_delivered_users INTEGER,
+      performance_read_users INTEGER,
+      performance_share_users INTEGER,
+      performance_new_followers INTEGER,
+      performance_rewrite_level TEXT,
+      performance_title_snapshot TEXT,
+      performance_recorded_at TEXT,
+      pipeline_version TEXT,
+      reader_task TEXT,
+      reader_relevance TEXT,
+      evidence_pack TEXT,
+      reader_value_plan TEXT,
+      fact_skeleton TEXT,
+      oral_draft TEXT,
+      title_candidates TEXT,
+      fact_source_checklist TEXT,
+      title_selection_confirmed INTEGER NOT NULL DEFAULT 1,
+      performance_title_group_snapshot TEXT,
+      performance_reader_task_snapshot TEXT,
+      origin_type TEXT NOT NULL DEFAULT 'pipeline',
+      pinned_at TEXT,
+      FOREIGN KEY (source_item_id) REFERENCES creative_source_items(id)
+    );
+
+    INSERT INTO creative_finished_articles_v45 (${existingColumns})
+    SELECT ${existingColumns} FROM creative_finished_articles;
+
+    DROP TABLE creative_finished_articles;
+    ALTER TABLE creative_finished_articles_v45 RENAME TO creative_finished_articles;
+
+    CREATE INDEX idx_creative_finished_articles_status ON creative_finished_articles(status);
+    CREATE INDEX idx_creative_finished_articles_source_item_id ON creative_finished_articles(source_item_id);
+    CREATE INDEX idx_creative_finished_articles_created_at ON creative_finished_articles(created_at DESC);
+    CREATE INDEX idx_creative_finished_articles_direction ON creative_finished_articles(direction);
+    CREATE UNIQUE INDEX idx_finished_articles_direction_seq ON creative_finished_articles(direction, seq_number);
+    CREATE INDEX idx_finished_articles_pinned
+      ON creative_finished_articles(direction, pinned_at DESC, created_at DESC);
+  `);
 }

@@ -6,7 +6,9 @@ import {
   listCreativeFinishedArticles,
   editCreativeFinishedArticle,
   saveArticlePerformanceFeedback,
-  checkPublishConditions
+  checkPublishConditions,
+  softDeleteFinishedArticle,
+  togglePinnedFinishedArticle
 } from "../../src/core/creative/creativeFinishedArticleRepository.js";
 import { insertCreativeSourceItem, findCreativeSourceItemById } from "../../src/core/creative/creativeSourceItemRepository.js";
 import { type TestDatabaseHandle, createTestDatabase } from "../helpers/testDatabase.js";
@@ -75,6 +77,24 @@ describe("insertCreativeFinishedArticle", () => {
 
     const updatedSource = findCreativeSourceItemById(handle.db, source.id);
     expect(updatedSource!.linkedArticleId).toBe(article.id);
+  });
+
+  it("creates an independent manual draft without a source item", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+
+    const article = insertCreativeFinishedArticle(handle.db, {
+      contentMarkdown: "",
+      humanMarkdown: "# 我自己想写的文章\n\n",
+      titles: ["我自己想写的文章"],
+      status: "manual_draft",
+      originType: "manual",
+      direction: "article"
+    });
+
+    expect(article.sourceItemId).toBeNull();
+    expect(article.originType).toBe("manual");
+    expect(article.status).toBe("manual_draft");
   });
 
   it("defaults optional fields to null", async () => {
@@ -294,6 +314,61 @@ describe("listCreativeFinishedArticles", () => {
     const claudeResult = listCreativeFinishedArticles(handle.db, { search: "Claude" });
     expect(claudeResult.total).toBe(1);
     expect(claudeResult.items[0].sourceItemId).toBe(s2.id);
+  });
+
+  it("sorts pinned records before newer unpinned records and clears pin on delete", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+
+    const first = insertCreativeFinishedArticle(handle.db, {
+      contentMarkdown: "",
+      humanMarkdown: "# 第一篇\n\n正文",
+      titles: ["第一篇"],
+      status: "manual_draft",
+      originType: "manual"
+    });
+    const second = insertCreativeFinishedArticle(handle.db, {
+      contentMarkdown: "",
+      humanMarkdown: "# 第二篇\n\n正文",
+      titles: ["第二篇"],
+      status: "manual_draft",
+      originType: "manual"
+    });
+
+    const pinned = togglePinnedFinishedArticle(handle.db, first.id);
+    expect(pinned?.pinnedAt).not.toBeNull();
+    expect(listCreativeFinishedArticles(handle.db).items[0].id).toBe(first.id);
+
+    expect(softDeleteFinishedArticle(handle.db, first.id)).toBe(true);
+    const deleted = findCreativeFinishedArticleById(handle.db, first.id);
+    expect(deleted?.pinnedAt).toBeNull();
+    expect(listCreativeFinishedArticles(handle.db).items[0].id).toBe(second.id);
+  });
+});
+
+describe("checkPublishConditions", () => {
+  it("accepts a short manual body but rejects an empty middle pane", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+
+    const article = insertCreativeFinishedArticle(handle.db, {
+      contentMarkdown: "左栏内容不会用于发布",
+      humanMarkdown: "# 手动标题\n\n短正文",
+      titles: ["手动标题"],
+      coverImage: ["https://img.example.com/cover.jpg"],
+      status: "manual_draft",
+      originType: "manual"
+    });
+    expect(checkPublishConditions(article)).toEqual({ qualified: true, missing: [] });
+
+    const emptyMiddle = { ...article, humanMarkdown: "# 手动标题\n\n" };
+    expect(checkPublishConditions(emptyMiddle).missing).toContain("缺少正文");
+
+    const headerOnly = {
+      ...article,
+      humanMarkdown: "![封面图](https://img.example.com/cover.jpg)\n\n# 手动标题\n\n[IMAGE1]\n"
+    };
+    expect(checkPublishConditions(headerOnly).missing).toContain("缺少正文");
   });
 });
 

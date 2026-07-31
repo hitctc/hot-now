@@ -2,9 +2,9 @@
 <template>
   <div class="md-editor" :class="{ 'md-editor--3pane': humanMode }">
     <template v-if="humanMode">
-      <!-- 左栏：AI 生成的草稿（可编辑，独立滚动，不参与预览联动） -->
+      <!-- 左栏：管线稿显示 AI 草稿，手动稿由父级改为素材和草稿。 -->
       <div class="md-editor__pane md-editor__pane--ai-draft">
-        <div class="md-editor__label">AI 生成的草稿<span class="md-editor__word-count">{{ countWords(aiDraft) }}字</span></div>
+        <div class="md-editor__label">{{ draftLabel }}<span class="md-editor__word-count">{{ countWords(aiDraft) }}字</span></div>
         <div class="md-editor__textarea-wrap">
           <div ref="aiDraftHighlightRef" class="md-editor__line-highlight" />
           <textarea
@@ -17,7 +17,7 @@
             @scroll="scrollAiDraftLineHighlight"
             @focus="updateAiDraftLineHighlight"
             @blur="hideLineHighlight(aiDraftHighlightRef)"
-            placeholder="AI 生成的草稿（可编辑）..."
+            :placeholder="draftPlaceholder"
           />
         </div>
       </div>
@@ -104,6 +104,9 @@ const props = withDefaults(defineProps<{
   humanMode?: boolean;
   /** 三栏模式下的左栏 AI 草稿内容（content_markdown），独立编辑、不联动预览 */
   aiDraft?: string;
+  /** 手动稿可将左栏改称“素材和草稿”，避免把用户内容误标为 AI 生成。 */
+  draftLabel?: string;
+  draftPlaceholder?: string;
   /** 三栏中栏标题右侧的保存状态；为空时不占位。 */
   saveStatus?: string;
   /** 保存状态的视觉类型，仅区分尚未保存和已经保存。 */
@@ -114,6 +117,8 @@ const props = withDefaults(defineProps<{
   syncScroll: true,
   humanMode: false,
   aiDraft: "",
+  draftLabel: "AI 生成的草稿",
+  draftPlaceholder: "AI 生成的草稿（可编辑）...",
   saveStatus: "",
   saveStatusState: "idle",
 });

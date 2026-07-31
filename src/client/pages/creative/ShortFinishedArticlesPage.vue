@@ -6,6 +6,8 @@ import { useSearchHistory } from "../../composables/useSearchHistory.js";
 
 import {
   readCreativeFinishedArticles,
+  createManualFinishedArticle,
+  toggleFinishedArticlePin,
   editFinishedArticle,
   deleteFinishedArticle,
   restoreFinishedArticle,
@@ -88,6 +90,7 @@ const statusOptions = [
   { label: "排队中", value: "queued" },
   { label: "写作中", value: "writing" },
   { label: "已生成", value: "generated" },
+  { label: "手动草稿", value: "manual_draft" },
   { label: "待审核", value: "needs_review" },
   { label: "可推送", value: "ready_for_publish" },
   { label: "已推送草稿", value: "wechat_draft" },
@@ -100,6 +103,10 @@ const statusOptions = [
 
 // 文章详情全屏弹窗
 const detailArticle = ref<CreativeFinishedArticle | null>(null);
+const manualCreateOpen = ref(false);
+const manualTitle = ref("");
+const manualForm = ref<"tuwen" | "duanwen">("tuwen");
+const manualCreating = ref(false);
 
 // 素材详情弹窗
 const sourceItemModalOpen = ref(false);
@@ -121,7 +128,10 @@ const defaultAccountName = computed(() => {
 // 推送前置条件检查：文章必须标题、封面图、正文齐全 + 处于可推送/已推送状态
 function canPush(article: CreativeFinishedArticle | null): boolean {
   if (!article) return false;
-  if (article.status !== 'ready_for_publish' && article.status !== 'wechat_draft') return false;
+  const allowed = article.originType === "manual"
+    ? article.status === "manual_draft" || article.status === "wechat_draft"
+    : article.status === "ready_for_publish" || article.status === "wechat_draft";
+  if (!allowed) return false;
   return checkPublishConditions(article).qualified;
 }
 
@@ -129,7 +139,10 @@ function canPush(article: CreativeFinishedArticle | null): boolean {
 function getMissingConditions(article: CreativeFinishedArticle | null): string[] {
   if (!article) return ['文章不存在'];
   const missing: string[] = [];
-  if (article.status !== 'ready_for_publish' && article.status !== 'wechat_draft') missing.push('状态不允许推送');
+  const allowed = article.originType === "manual"
+    ? article.status === "manual_draft" || article.status === "wechat_draft"
+    : article.status === "ready_for_publish" || article.status === "wechat_draft";
+  if (!allowed) missing.push('状态不允许推送');
   missing.push(...checkPublishConditions(article).missing);
   return missing;
 }
@@ -179,6 +192,54 @@ async function loadItems(): Promise<void> {
   } finally {
     isLoading.value = false;
   }
+}
+
+/** 创建独立短内容，并直接进入与管线成品共用的三栏编辑器。 */
+async function handleCreateManualShortContent(): Promise<void> {
+  const title = manualTitle.value.trim();
+  if (!title) {
+    message.warning("请先输入短内容标题");
+    return;
+  }
+  manualCreating.value = true;
+  try {
+    const article = await createManualFinishedArticle({
+      title,
+      direction: "short_content",
+      form: manualForm.value
+    });
+    manualCreateOpen.value = false;
+    manualTitle.value = "";
+    manualForm.value = "tuwen";
+    currentPage.value = 1;
+    await loadItems();
+    detailArticle.value = article;
+  } catch {
+    message.error("新建短内容失败");
+  } finally {
+    manualCreating.value = false;
+  }
+}
+
+/** 置顶后回到第一页，确保结果立即可见。 */
+async function handleTogglePin(article: CreativeFinishedArticle): Promise<void> {
+  try {
+    const updated = await toggleFinishedArticlePin(article.id);
+    currentPage.value = 1;
+    await loadItems();
+    message.success(updated.pinnedAt ? "已置顶" : "已取消置顶");
+  } catch {
+    message.error("置顶操作失败");
+  }
+}
+
+/** 置顶底色优先于业务状态色，删除状态保持最高优先级。 */
+function getArticleRowClass(record: CreativeFinishedArticle): string {
+  if (record.deletedAt) return "discarded-row";
+  if (record.pinnedAt) return "pinned-row";
+  if (record.status === "needs_review" || record.status === "ready_for_publish") return "review-highlight";
+  if (record.status === "wechat_draft") return "completed-row";
+  return "";
 }
 
 onMounted(() => {
@@ -495,7 +556,7 @@ const columns = [
   { title: "相似度", key: "similarity", width: 56, ellipsis: true },
   { title: "形态", key: "form", width: 72 },
   { title: "耗时/时间", key: "timeInfo", width: 130, ellipsis: true },
-  { title: "操作", key: "actions", width: 60, fixed: "right" as const },
+  { title: "操作", key: "actions", width: 86, fixed: "right" as const },
 ];
 
 const pagination = computed(() => ({
@@ -511,6 +572,7 @@ const pagination = computed(() => ({
   <div class="flex w-full flex-col gap-2" data-page="creative-finished-articles">
     <!-- 筛选栏 -->
     <div class="flex flex-wrap items-center gap-3">
+      <a-button type="primary" @click="manualCreateOpen = true">新建短内容</a-button>
       <a-select
         v-model:value="statusFilter"
         :options="statusOptions"
@@ -559,7 +621,7 @@ const pagination = computed(() => ({
         row-key="id"
         data-article-table
         size="small"
-        :row-class-name="(record: CreativeFinishedArticle) => record.deletedAt ? 'discarded-row' : (record.status === 'needs_review' || record.status === 'ready_for_publish') ? 'review-highlight' : record.status === 'wechat_draft' ? 'completed-row' : ''"
+        :row-class-name="getArticleRowClass"
         @change="handleTableChange"
       >
         <template #bodyCell="{ column, record }">
@@ -572,12 +634,14 @@ const pagination = computed(() => ({
           </template>
           <!-- 标题列：点击标题打开详情，点击素材链接打开来源素材弹窗，互不影响 -->
           <template v-if="column.key === 'title'">
-            <span
-              class="line-clamp-2 cursor-pointer text-[13px] leading-tight font-medium text-editorial-text-main transition-colors hover:text-editorial-link-active"
-              @click="openDetail(record)"
-            >
-              {{ getFirstTitle(record.titles) }}
-            </span>
+            <div class="flex items-start gap-1">
+              <span v-if="record.pinnedAt" class="shrink-0 text-[13px] text-purple-600" title="已置顶">◆</span>
+              <span
+                class="line-clamp-2 cursor-pointer text-[13px] leading-tight font-medium text-editorial-text-main transition-colors hover:text-editorial-link-active"
+                @click="openDetail(record)"
+              >{{ getFirstTitle(record.titles) }}</span>
+            </div>
+            <a-tag v-if="record.originType === 'manual'" color="purple" class="!m-0 mt-1 !text-[10px] !leading-4">手动新建</a-tag>
             <a
               v-if="record.sourceItemId"
               class="mt-0.5 inline-block cursor-pointer text-[10px] text-editorial-link-active hover:underline"
@@ -646,14 +710,12 @@ const pagination = computed(() => ({
 
           <!-- 操作列：废弃/恢复 -->
           <template v-else-if="column.key === 'actions'">
-            <a-button
-              v-if="!record.deletedAt"
-              size="small"
-              danger
-              ghost
-              class="!text-[10px] !px-1.5 !py-0"
-              @click="handleDiscardArticle(record)"
-            >废弃</a-button>
+            <div v-if="!record.deletedAt" class="flex flex-col items-start gap-0.5">
+              <a-button size="small" type="link" class="!h-auto !px-0 !py-0 !text-[10px]" @click="handleTogglePin(record)">
+                {{ record.pinnedAt ? "取消置顶" : "置顶" }}
+              </a-button>
+              <a-button size="small" danger ghost class="!text-[10px] !px-1.5 !py-0" @click="handleDiscardArticle(record)">废弃</a-button>
+            </div>
             <a-button
               v-else
               size="small"
@@ -681,14 +743,16 @@ const pagination = computed(() => ({
 
           <!-- 来源列 -->
           <template v-else-if="column.key === 'sourceName'">
-            <a-tooltip :title="(record.sourceName || '').replace('微信公众号', 'WX')" placement="topLeft" :mouse-enter-delay="0.3">
+            <a-tag v-if="record.originType === 'manual'" color="purple" class="!m-0 !text-[10px]">手动新建</a-tag>
+            <a-tooltip v-else :title="(record.sourceName || '').replace('微信公众号', 'WX')" placement="topLeft" :mouse-enter-delay="0.3">
               <span class="line-clamp-3 text-[10px] leading-tight text-editorial-text-body">{{ (record.sourceName || "-").replace("微信公众号", "WX") }}</span>
             </a-tooltip>
           </template>
 
           <!-- 爆文列：分数 + 维度柱状图 两行紧凑展示 -->
           <template v-else-if="column.key === 'trend'">
-            <div class="flex flex-col gap-0.5 leading-tight">
+            <span v-if="record.originType === 'manual'" class="text-xs text-editorial-text-muted">—</span>
+            <div v-else class="flex flex-col gap-0.5 leading-tight">
               <span v-if="record.reversalScore != null" class="inline-flex items-center self-start rounded-editorial-pill border px-1.5 py-0 text-[10px] font-bold" :class="record.reversalScore >= 90 ? 'border-purple-600 bg-purple-600 text-white shadow-sm' : record.reversalScore >= 80 ? 'border-red-500 bg-red-500 text-white shadow-sm' : 'border-orange-300 bg-orange-50 text-orange-700'">{{ record.reversalScore }}</span>
               <span v-else class="text-[10px] text-editorial-text-muted">未评分</span>
               <a-tooltip v-if="record.trendBreakdown && getBreakdownBars(record.trendBreakdown).length > 0" :mouse-enter-delay="0.3">
@@ -709,7 +773,8 @@ const pagination = computed(() => ({
 
           <!-- 相似度列 -->
           <template v-else-if="column.key === 'similarity'">
-            <template v-if="record.similarityCheck && (record.similarityCheck as any).literal_similarity != null">
+            <span v-if="record.originType === 'manual'" class="text-xs text-editorial-text-muted">—</span>
+            <template v-else-if="record.similarityCheck && (record.similarityCheck as any).literal_similarity != null">
               <a-tooltip placement="topLeft">
                 <template #title>
                   <div class="text-xs leading-5">
@@ -743,14 +808,36 @@ const pagination = computed(() => ({
           <!-- 耗时/时间列：写作耗时 + 发布时间 + 创建时间 三行紧凑展示 -->
           <template v-else-if="column.key === 'timeInfo'">
             <div class="flex flex-col gap-0 leading-tight">
-              <span class="text-[10px] text-editorial-text-body">耗时 {{ formatDuration(calcWritingDuration(record.stepTrace)) }}</span>
-              <span class="text-[10px] text-editorial-text-muted">发 {{ formatLocalTime(record.publishedAt || record.createdAt) }}</span>
+              <span class="text-[10px] text-editorial-text-body">耗时 {{ record.originType === "manual" ? "—" : formatDuration(calcWritingDuration(record.stepTrace)) }}</span>
+              <span class="text-[10px] text-editorial-text-muted">发 {{ record.originType === "manual" ? "—" : formatLocalTime(record.publishedAt || record.createdAt) }}</span>
               <span class="text-[10px] text-editorial-text-muted">建 {{ formatLocalTime(record.createdAt) }}</span>
             </div>
           </template>
         </template>
       </a-table>
     </a-spin>
+
+    <a-modal
+      v-model:open="manualCreateOpen"
+      title="新建短内容"
+      ok-text="创建并开始编辑"
+      cancel-text="取消"
+      :confirm-loading="manualCreating"
+      @ok="handleCreateManualShortContent"
+      @cancel="manualTitle = ''"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="短内容标题" required>
+          <a-input v-model:value="manualTitle" placeholder="输入你想写的短内容标题" />
+        </a-form-item>
+        <a-form-item label="写作形态" required>
+          <a-radio-group v-model:value="manualForm">
+            <a-radio value="tuwen">贴图</a-radio>
+            <a-radio value="duanwen">反转文</a-radio>
+          </a-radio-group>
+        </a-form-item>
+      </a-form>
+    </a-modal>
 
     <!-- 文章详情弹窗 -->
     <ArticleDetailDrawer
@@ -797,6 +884,12 @@ const pagination = computed(() => ({
 .completed-row .ant-table-cell-fix-left,
 .completed-row .ant-table-cell-fix-right {
   background-color: #f6fbed !important;
+}
+/* 置顶只使用极浅紫底，不新增表格列。 */
+.pinned-row td,
+.pinned-row .ant-table-cell-fix-left,
+.pinned-row .ant-table-cell-fix-right {
+  background-color: #faf7ff !important;
 }
 /* 已废弃行置灰（优先级最高，覆盖 review-highlight 等） */
 .discarded-row td {

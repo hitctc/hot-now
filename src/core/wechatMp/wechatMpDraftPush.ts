@@ -6,7 +6,11 @@ import { findDefaultWechatMpAccount } from "./wechatMpAccountRepository.js";
 import { getAccessToken } from "./wechatMpAccessToken.js";
 import { uploadPermanentImage, uploadContentImage, createDraft, WechatApiCallError } from "./wechatMpApiClient.js";
 import { makeWechatCompatible, type WechatThemeId } from "../creative/wechatFormat/wechatCompat.js";
-import { findCreativeFinishedArticleById, editCreativeFinishedArticle } from "../creative/creativeFinishedArticleRepository.js";
+import {
+  checkPublishConditions,
+  editCreativeFinishedArticle,
+  findCreativeFinishedArticleById,
+} from "../creative/creativeFinishedArticleRepository.js";
 import { type DraftPushResult } from "./types.js";
 import type { SqliteDatabase } from "../db/openDatabase.js";
 
@@ -102,13 +106,17 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
     await onProgress?.("validate", "error");
     return { ok: false, errorCode: "article-not-found", errorMessage: "文章不存在" };
   }
-  if (article.status !== "ready_for_publish") {
+  const allowedStatuses = article.originType === "manual"
+    ? ["manual_draft", "wechat_draft"]
+    : ["ready_for_publish", "wechat_draft"];
+  if (!allowedStatuses.includes(article.status)) {
     await onProgress?.("validate", "error");
-    return { ok: false, errorCode: "invalid-status", errorMessage: `当前状态「${article.status}」不允许推送，仅「可推送」状态可操作` };
+    return { ok: false, errorCode: "invalid-status", errorMessage: `当前状态「${article.status}」不允许推送` };
   }
-  if (!article.contentMarkdown) {
+  const publishConditions = checkPublishConditions(article);
+  if (!publishConditions.qualified) {
     await onProgress?.("validate", "error");
-    return { ok: false, errorCode: "no-content", errorMessage: "文章无 Markdown 内容" };
+    return { ok: false, errorCode: "missing-content", errorMessage: publishConditions.missing.join("、") };
   }
   if (!params.wechatHtml) {
     await onProgress?.("validate", "error");

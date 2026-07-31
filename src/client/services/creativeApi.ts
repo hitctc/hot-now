@@ -114,7 +114,7 @@ export type ArticleTitleCandidate = {
 
 export type CreativeFinishedArticle = {
   id: number;
-  sourceItemId: number;
+  sourceItemId: number | null;
   mode: string | null;
   thesis: string | null;
   intros: string[] | null;
@@ -178,6 +178,8 @@ export type CreativeFinishedArticle = {
   performanceTitleGroupSnapshot: string | null;
   performanceReaderTaskSnapshot: string | null;
   performanceRecordedAt: string | null;
+  originType: "pipeline" | "manual";
+  pinnedAt: string | null;
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
   sourceTitle: string | null;
@@ -289,6 +291,43 @@ export function readCreativeFinishedArticle(id: number): Promise<CreativeFinishe
   return requestJson<CreativeFinishedArticle>(`/api/creative/finished-articles/${id}`);
 }
 
+/** 新建不经过素材库和写作管线的手动成品。 */
+export function createManualFinishedArticle(input: {
+  title: string;
+  direction: "article" | "short_content";
+  form?: "tuwen" | "duanwen";
+}): Promise<CreativeFinishedArticle> {
+  return requestJson<CreativeFinishedArticle>("/actions/creative/finished-articles/manual", {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+}
+
+/** 切换持久置顶状态，服务端返回更新后的完整记录。 */
+export function toggleFinishedArticlePin(id: number): Promise<CreativeFinishedArticle> {
+  return requestJson<CreativeFinishedArticle>(`/actions/creative/finished-articles/${id}/toggle-pin`, {
+    method: "POST"
+  });
+}
+
+export function generateFinishedArticleCoverPrompt(
+  id: number
+): Promise<{ ok: boolean; article: CreativeFinishedArticle }> {
+  return requestJson(`/actions/creative/finished-articles/${id}/generate-cover-prompt`, {
+    method: "POST"
+  });
+}
+
+export function generateFinishedArticleInlinePrompts(
+  id: number,
+  index?: number
+): Promise<{ ok: boolean; article: CreativeFinishedArticle }> {
+  return requestJson(`/actions/creative/finished-articles/${id}/generate-inline-prompts`, {
+    method: "POST",
+    body: JSON.stringify(index ? { index } : {})
+  });
+}
+
 // 切换成品文章的公众号发布状态
 export function toggleFinishedArticlePublished(id: number): Promise<{ ok: boolean; wechatPublished: boolean }> {
   return requestJson<{ ok: boolean; wechatPublished: boolean }>(`/api/creative/finished-articles/${id}/toggle-published`, {
@@ -379,6 +418,7 @@ export function editFinishedArticle(
     summaryIndex?: number;
     coverImagePrompt?: string;
     inlineImagePrompts?: Record<string, string>;
+    imagePrompts?: string[];
     similarityCheck?: Record<string, unknown>;
     needsManualReview?: boolean;
     manualReviewReason?: string;

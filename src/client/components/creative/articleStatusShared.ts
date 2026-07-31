@@ -11,6 +11,7 @@ export type ArticleStatus =
   | "queued"
   | "writing"
   | "generated"
+  | "manual_draft"
   | "needs_review"
   | "ready_for_publish"
   | "wechat_draft"
@@ -24,6 +25,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   queued:            { label: "排队中",     color: "blue" },
   writing:           { label: "写作中",     color: "processing" },
   generated:         { label: "已生成",     color: "blue" },
+  manual_draft:      { label: "手动草稿",   color: "purple" },
   needs_review:      { label: "待审核",     color: "orange" },
   ready_for_publish: { label: "可推送",     color: "green" },
   wechat_draft:      { label: "已推送草稿", color: "#87cf84" },
@@ -51,14 +53,23 @@ function parseJsonArray(raw: string | string[] | null): string[] {
 
 /**
  * 检查文章是否满足标记推送的前置条件。
- * 三条件：封面图 + 标题 + 正文 (>50字符)
+ * 管线稿保持原有 50 字门槛；手动稿只要求中栏存在非标题正文。
  */
 export function checkPublishConditions(article: CreativeFinishedArticle): { qualified: boolean; missing: string[] } {
   const missing: string[] = [];
   if (!article.coverImage || article.coverImage.length === 0) missing.push("缺少封面图");
   const titles = parseJsonArray(article.titles);
   if (titles.length === 0 || !titles[0]) missing.push("缺少标题");
-  if (!article.contentMarkdown || article.contentMarkdown.length <= 50) missing.push("缺少正文");
+  if (article.originType === "manual") {
+    const bodyWithoutTitle = (article.humanMarkdown ?? "")
+      .replace(/^!\[封面图[^\]]*\]\([^)]+\)\s*$/gm, "")
+      .replace(/^\s*#\s+.+(?:\r?\n|$)/m, "")
+      .replace(/^\s*\[IMAGE\d+\]\s*$/gm, "")
+      .trim();
+    if (!bodyWithoutTitle) missing.push("缺少正文");
+  } else if (!article.contentMarkdown || article.contentMarkdown.length <= 50) {
+    missing.push("缺少正文");
+  }
   return { qualified: missing.length === 0, missing };
 }
 
@@ -75,6 +86,7 @@ export type ArticleAction =
  * 列表页和详情页的按钮都从这里取。
  */
 export function getAvailableActions(article: CreativeFinishedArticle): ArticleAction[] {
+  if (article.originType === "manual") return [];
   const status = article.status;
   const actions: ArticleAction[] = [];
 
@@ -92,4 +104,12 @@ export function getAvailableActions(article: CreativeFinishedArticle): ArticleAc
   }
 
   return actions;
+}
+
+/** 手动稿无需“标记可推送”，满足条件后可直接推送或再次推送。 */
+export function canDirectlyPush(article: CreativeFinishedArticle): boolean {
+  const statuses = article.originType === "manual"
+    ? ["manual_draft", "wechat_draft"]
+    : ["ready_for_publish", "wechat_draft"];
+  return statuses.includes(article.status) && checkPublishConditions(article).qualified;
 }

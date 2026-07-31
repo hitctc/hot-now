@@ -44,6 +44,48 @@ const SELECT_COLUMNS = `
   (SELECT COUNT(*) FROM creative_finished_articles WHERE source_item_id = creative_source_items.id) AS write_count
 ` as const;
 
+// 列表不读取正文、原始采集包和详情 JSON；展开行再通过详情接口按需加载。
+const LIST_SELECT_COLUMNS = `
+  id,
+  external_id,
+  collector_agent,
+  title,
+  url,
+  source_name,
+  summary,
+  NULL AS full_content,
+  author,
+  cover_image_url,
+  tags,
+  language,
+  word_count,
+  content_type,
+  score,
+  published_at,
+  collector_timestamp,
+  writing_status,
+  writing_stop_step,
+  writing_stop_step_name,
+  writing_stop_reason,
+  writing_stopped_at,
+  '' AS raw_payload_json,
+  trend_score,
+  trend_breakdown,
+  account_fit_level,
+  account_fit_reason,
+  NULL AS account_fit_details_json,
+  account_fit_rule_version,
+  account_fit_evaluated_at,
+  NULL AS traced_sources_json,
+  writable,
+  direction,
+  seq_number,
+  linked_article_id,
+  created_at,
+  updated_at,
+  (SELECT COUNT(*) FROM creative_finished_articles WHERE source_item_id = creative_source_items.id) AS write_count
+` as const;
+
 type SourceItemRow = {
   id: number;
   external_id: string;
@@ -243,6 +285,7 @@ export type ListCreativeSourceItemsFilters = {
   last24h?: boolean;
   sourceFeed?: string;
   direction?: string;
+  summaryOnly?: boolean;
 };
 
 export type ListCreativeSourceItemsResult = {
@@ -482,6 +525,7 @@ export function listCreativeSourceItems(
   }
 
   const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
+  const selectedColumns = filters.summaryOnly ? LIST_SELECT_COLUMNS : SELECT_COLUMNS;
 
   const countRow = db
     .prepare(`SELECT COUNT(*) AS total FROM creative_source_items ${whereClause}`)
@@ -491,7 +535,7 @@ export function listCreativeSourceItems(
   if (filters.last24h) {
     // 不分页，一次返回全部
     items = db
-      .prepare(`SELECT ${SELECT_COLUMNS} FROM creative_source_items ${whereClause} ORDER BY created_at DESC`)
+      .prepare(`SELECT ${selectedColumns} FROM creative_source_items ${whereClause} ORDER BY created_at DESC`)
       .all(...params) as SourceItemRow[];
   } else {
     const page = Math.max(1, filters.page ?? 1);
@@ -499,7 +543,7 @@ export function listCreativeSourceItems(
     const offset = (page - 1) * pageSize;
     items = db
       .prepare(
-        `SELECT ${SELECT_COLUMNS} FROM creative_source_items ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+        `SELECT ${selectedColumns} FROM creative_source_items ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
       )
       .all(...params, pageSize, offset) as SourceItemRow[];
     return {

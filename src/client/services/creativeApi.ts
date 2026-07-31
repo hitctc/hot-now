@@ -238,6 +238,7 @@ export function readCreativeSourceItems(params?: {
   direction?: string;
 }): Promise<SourceItemListResponse> {
   const query = new URLSearchParams();
+  query.set("view", "summary");
   if (params?.page) query.set("page", String(params.page));
   if (params?.pageSize) query.set("pageSize", String(params.pageSize));
   if (params?.writingStatus) query.set("writingStatus", params.writingStatus);
@@ -276,6 +277,7 @@ export function readCreativeFinishedArticles(params?: {
   direction?: string;
 }): Promise<FinishedArticleListResponse> {
   const query = new URLSearchParams();
+  query.set("view", "summary");
   if (params?.page) query.set("page", String(params.page));
   if (params?.pageSize) query.set("pageSize", String(params.pageSize));
   if (params?.status) query.set("status", params.status);
@@ -885,8 +887,31 @@ export type WriteQueueStatus = {
 };
 
 /** 查询 Hermes 写作队列状态 */
+const WRITE_QUEUE_STATUS_CACHE_MS = 2_000;
+let writeQueueStatusCache: { value: WriteQueueStatus; expiresAt: number } | null = null;
+let writeQueueStatusRequest: Promise<WriteQueueStatus> | null = null;
+
+/** 合并同一时刻的队列轮询，并用两秒短缓存吸收多个页面组件的重复请求。 */
 export function fetchWriteQueueStatus(): Promise<WriteQueueStatus> {
-  return requestJson<WriteQueueStatus>("/api/creative/write-queue/status");
+  const now = Date.now();
+  if (writeQueueStatusCache && writeQueueStatusCache.expiresAt > now) {
+    return Promise.resolve(writeQueueStatusCache.value);
+  }
+  if (writeQueueStatusRequest) return writeQueueStatusRequest;
+
+  writeQueueStatusRequest = requestJson<WriteQueueStatus>("/api/creative/write-queue/status")
+    .then((value) => {
+      writeQueueStatusCache = {
+        value,
+        expiresAt: Date.now() + WRITE_QUEUE_STATUS_CACHE_MS
+      };
+      return value;
+    })
+    .finally(() => {
+      writeQueueStatusRequest = null;
+    });
+
+  return writeQueueStatusRequest;
 }
 
 // ─── 手动输入内容写文章 ───

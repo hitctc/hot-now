@@ -284,6 +284,27 @@ describe("listCreativeFinishedArticles", () => {
     expect(result.page).toBe(2);
   });
 
+  it("returns only list fields in summary mode while preserving full detail", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+
+    const content = "正文".repeat(100);
+    const article = insertCreativeFinishedArticle(handle.db, {
+      contentMarkdown: content,
+      evidencePack: { source: "detail-only" },
+      oralDraft: "口述底稿"
+    });
+
+    const summary = listCreativeFinishedArticles(handle.db, { summaryOnly: true }).items[0];
+    const detail = findCreativeFinishedArticleById(handle.db, article.id);
+
+    expect(summary.contentMarkdown).toHaveLength(51);
+    expect(summary.evidencePack).toBeNull();
+    expect(summary.oralDraft).toBeNull();
+    expect(detail?.contentMarkdown).toBe(content);
+    expect(detail?.evidencePack).toEqual({ source: "detail-only" });
+  });
+
   it("filters by search matching content_markdown or thesis", async () => {
     const handle = await makeHandle();
     handles.push(handle);

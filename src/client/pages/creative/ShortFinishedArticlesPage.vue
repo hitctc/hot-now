@@ -3,9 +3,11 @@ import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { message } from "ant-design-vue";
 
 import { useSearchHistory } from "../../composables/useSearchHistory.js";
+import { createLatestRequestGuard } from "../../utils/latestRequestGuard.js";
 
 import {
   readCreativeFinishedArticles,
+  readCreativeFinishedArticle,
   createManualFinishedArticle,
   toggleFinishedArticlePin,
   editFinishedArticle,
@@ -43,7 +45,7 @@ const isLoading = ref(false);
 const items = ref<CreativeFinishedArticle[]>([]);
 const total = ref(0);
 const currentPage = ref(1);
-const pageSize = ref(50);
+const pageSize = ref(30);
 
 // 筛选条件缓存 key
 const FINISHED_FILTERS_KEY = "creative-short-finished-filters";
@@ -374,11 +376,21 @@ function handleTableChange(pagination: { current?: number; pageSize?: number }):
 
 // ─── 文章详情弹窗 ───
 
-function openDetail(article: CreativeFinishedArticle): void {
-  detailArticle.value = article;
+const detailRequestGuard = createLatestRequestGuard();
+
+/** 只接收最后一次点击的详情响应，避免旧请求覆盖用户刚选择的文章。 */
+async function openDetail(article: CreativeFinishedArticle): Promise<void> {
+  const requestId = detailRequestGuard.begin();
+  try {
+    const detail = await readCreativeFinishedArticle(article.id);
+    if (detailRequestGuard.isCurrent(requestId)) detailArticle.value = detail;
+  } catch {
+    if (detailRequestGuard.isCurrent(requestId)) message.error("加载文章详情失败");
+  }
 }
 
 function closeDetail(): void {
+  detailRequestGuard.invalidate();
   detailArticle.value = null;
 }
 
@@ -398,8 +410,7 @@ function closeSourceItemModal(): void {
 async function onDetailSaved(): Promise<void> {
   await loadItems();
   if (detailArticle.value) {
-    const updated = items.value.find(a => a.id === detailArticle.value!.id);
-    if (updated) detailArticle.value = updated;
+    detailArticle.value = await readCreativeFinishedArticle(detailArticle.value.id);
   }
 }
 

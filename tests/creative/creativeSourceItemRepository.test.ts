@@ -149,6 +149,24 @@ describe("listCreativeSourceItems", () => {
     expect(result.page).toBe(2);
   });
 
+  it("omits detail-only payloads from summary lists", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+
+    const inserted = insertCreativeSourceItem(handle.db, {
+      ...baseInput,
+      fullContent: "完整正文".repeat(100)
+    });
+
+    const summary = listCreativeSourceItems(handle.db, { summaryOnly: true }).items[0];
+    const detail = findCreativeSourceItemById(handle.db, inserted.id);
+
+    expect(summary.fullContent).toBeNull();
+    expect(summary.rawPayloadJson).toBe("");
+    expect(detail?.fullContent).toContain("完整正文");
+    expect(detail?.rawPayloadJson).not.toBe("");
+  });
+
   it("filters by writingStatus", async () => {
     const handle = await makeHandle();
     handles.push(handle);

@@ -75,6 +75,107 @@ const SELECT_COLUMNS = `
   (SELECT COUNT(*) FROM wechat_draft_push_log WHERE article_id = creative_finished_articles.id AND status = 'success') AS push_count
 ` as const;
 
+// 列表保留表格和状态判断所需字段，正文只取 51 字用于既有发布条件判断。
+const LIST_SELECT_COLUMNS = `
+  id,
+  source_item_id,
+  mode,
+  NULL AS thesis,
+  NULL AS intros,
+  SUBSTR(content_markdown, 1, 51) AS content_markdown,
+  NULL AS human_markdown,
+  titles,
+  NULL AS hooks,
+  NULL AS quotes,
+  NULL AS summary_100,
+  NULL AS images_json,
+  cover_image_url,
+  cover_image_index,
+  title_index,
+  intro_index,
+  summary_index,
+  status,
+  anomaly_reason,
+  NULL AS raw_response_text,
+  wechat_published,
+  publishable,
+  NULL AS cover_image_prompt,
+  NULL AS inline_image_prompts,
+  CASE
+    WHEN json_valid(similarity_check)
+    THEN json_object('literal_similarity', json_extract(similarity_check, '$.literal_similarity'))
+    ELSE NULL
+  END AS similarity_check,
+  needs_manual_review,
+  manual_review_reason,
+  manual_review_reasons,
+  CASE
+    WHEN json_valid(step_trace)
+    THEN json_array(
+      json_object(
+        'startedAt',
+        (
+          SELECT json_extract(trace.value, '$.startedAt')
+          FROM json_each(creative_finished_articles.step_trace) AS trace
+          WHERE json_extract(trace.value, '$.startedAt') IS NOT NULL
+          ORDER BY trace.key ASC
+          LIMIT 1
+        )
+      ),
+      json_object(
+        'finishedAt',
+        (
+          SELECT json_extract(trace.value, '$.finishedAt')
+          FROM json_each(creative_finished_articles.step_trace) AS trace
+          WHERE json_extract(trace.value, '$.finishedAt') IS NOT NULL
+          ORDER BY trace.key DESC
+          LIMIT 1
+        )
+      )
+    )
+    ELSE NULL
+  END AS step_trace,
+  current_step,
+  stop_step,
+  reason_code,
+  reason_text,
+  deleted_at,
+  wechat_theme_id,
+  NULL AS wechat_html,
+  direction,
+  seq_number,
+  form,
+  reversal_score,
+  reversal_angle,
+  image_prompts,
+  NULL AS comments,
+  NULL AS author_extensions,
+  pipeline_version,
+  NULL AS reader_task,
+  NULL AS reader_relevance,
+  NULL AS evidence_pack,
+  NULL AS reader_value_plan,
+  NULL AS fact_skeleton,
+  NULL AS oral_draft,
+  NULL AS title_candidates,
+  NULL AS fact_source_checklist,
+  title_selection_confirmed,
+  performance_delivered_users,
+  performance_read_users,
+  performance_share_users,
+  performance_new_followers,
+  performance_rewrite_level,
+  performance_title_snapshot,
+  performance_title_group_snapshot,
+  performance_reader_task_snapshot,
+  performance_recorded_at,
+  origin_type,
+  pinned_at,
+  created_at,
+  updated_at,
+  (SELECT COUNT(*) FROM wechat_draft_push_log WHERE article_id = creative_finished_articles.id AND status = 'success') AS push_count
+` as const;
+
 type ArticleRow = {
   id: number;
   source_item_id: number | null;
@@ -437,6 +538,7 @@ export type ListCreativeFinishedArticlesFilters = {
   publishable?: boolean;
   includeDeleted?: boolean;
   direction?: string;
+  summaryOnly?: boolean;
 };
 
 export type ListCreativeFinishedArticlesResult = {
@@ -648,9 +750,10 @@ export function listCreativeFinishedArticles(
     .get(...params) as { total: number };
 
   const offset = (page - 1) * pageSize;
+  const selectedColumns = filters.summaryOnly ? LIST_SELECT_COLUMNS : SELECT_COLUMNS;
   const items = db
     .prepare(
-      `SELECT ${SELECT_COLUMNS} FROM creative_finished_articles ${whereClause}
+      `SELECT ${selectedColumns} FROM creative_finished_articles ${whereClause}
        ORDER BY (pinned_at IS NOT NULL) DESC, pinned_at DESC, created_at DESC
        LIMIT ? OFFSET ?`
     )

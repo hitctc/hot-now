@@ -31,7 +31,7 @@ const isLoading = ref(false);
 const items = ref<CreativeSourceItem[]>([]);
 const total = ref(0);
 const currentPage = ref(1);
-const pageSize = ref(50);
+const pageSize = ref(30);
 
 // 筛选条件缓存 key
 const SOURCE_FILTERS_KEY = "creative-source-filters";
@@ -131,6 +131,10 @@ async function loadItems(): Promise<void> {
       minTrendScore: minTrendScore.value ?? undefined
     });
     items.value = res.items;
+    loadedDetailIds.clear();
+    for (const id of expandedRowKeys.value) {
+      void loadSourceItemDetail(id).catch(() => collapseExpandedRow(id));
+    }
     total.value = res.total;
     // 页面切回时自动恢复处于 writing 状态的轮询
     const writingItems = res.items.filter(i => i.writingStatus === "writing" && !writingIds.value.has(i.id));
@@ -188,7 +192,35 @@ function handleTableChange(pagination: { current?: number; pageSize?: number }):
 
 // ─── 展开控制 ───
 
-function toggleExpand(id: number): void {
+const loadedDetailIds = new Set<number>();
+const sourceDetailRequests = new Map<number, Promise<void>>();
+
+/** 把单条详情合并回当前页，避免展开区域长期持有另一份重复状态。 */
+function loadSourceItemDetail(id: number): Promise<void> {
+  const existingRequest = sourceDetailRequests.get(id);
+  if (existingRequest) return existingRequest;
+
+  const request = readCreativeSourceItem(id)
+    .then((detail) => {
+      const itemIndex = items.value.findIndex((item) => item.id === id);
+      if (itemIndex >= 0) items.value[itemIndex] = detail;
+      loadedDetailIds.add(id);
+    })
+    .finally(() => {
+      if (sourceDetailRequests.get(id) === request) sourceDetailRequests.delete(id);
+    });
+  sourceDetailRequests.set(id, request);
+  return request;
+}
+
+/** 详情加载失败时撤销空展开行，让用户可以再次点击重试。 */
+function collapseExpandedRow(id: number): void {
+  const index = expandedRowKeys.value.indexOf(id);
+  if (index >= 0) expandedRowKeys.value.splice(index, 1);
+}
+
+/** 首次展开时再加载正文和调试字段，列表请求保持轻量。 */
+async function toggleExpand(id: number): Promise<void> {
   // 锚定被点击行：记录其视口纵坐标，展开/折叠后拉回原位。
   // 这样长内容展开/折叠导致页面高度变化时，用户正在看的那行不会跑偏，无需重新找位置。
   const rowEl = document.querySelector(`tr.ant-table-row[data-row-key="${id}"]`) as HTMLElement | null;
@@ -199,6 +231,14 @@ function toggleExpand(id: number): void {
     expandedRowKeys.value.splice(idx, 1);
   } else {
     expandedRowKeys.value.push(id);
+    if (!loadedDetailIds.has(id)) {
+      try {
+        await loadSourceItemDetail(id);
+      } catch {
+        collapseExpandedRow(id);
+        message.error("加载素材详情失败");
+      }
+    }
   }
 
   if (anchorTop != null && rowEl) {

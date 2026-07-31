@@ -1052,7 +1052,8 @@ export function createServer(deps: ServerDeps = {}) {
       accountFitLevel: query.accountFitLevel as "high" | "medium" | "low" | "insufficient" | "error" | "unassessed" | undefined,
       sourceFeed: query.sourceFeed || undefined,
       last24h: query.sourceFeed ? true : undefined,
-      direction: query.direction as string | undefined
+      direction: query.direction as string | undefined,
+      summaryOnly: query.view === "summary"
     });
 
     // 批量查询关联成品文章的创建时间和公众号发布状态
@@ -1128,7 +1129,8 @@ export function createServer(deps: ServerDeps = {}) {
       search: query.search,
       publishable: query.publishable === "1" ? true : undefined,
       includeDeleted: query.includeDeleted === "1" ? true : undefined,
-      direction: query.direction as string | undefined
+      direction: query.direction as string | undefined,
+      summaryOnly: query.view === "summary"
     });
 
     // 批量查询关联素材的 trendScore/trendBreakdown/publishedAt

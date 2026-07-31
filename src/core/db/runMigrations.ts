@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 
-const schemaVersion = 45;
+const schemaVersion = 46;
 const baselineMigrationName = "001_unified_site_baseline";
 const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
 const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
@@ -1485,6 +1485,24 @@ export function runMigrations(db: SqliteDatabase): void {
       rebuildFinishedArticlesForManualCreation(db);
     }
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(45, manualFinishedArticlesMigrationName);
+
+    // 046: 核心创作列表按方向和展示顺序读取，避免扫描同方向全部大字段后临时排序。
+    const creativeListPerformanceMigrationName = "046_creative_list_performance_indexes";
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_creative_source_items_direction_created_at
+        ON creative_source_items(direction, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_creative_finished_articles_direction_pinned_created_at
+        ON creative_finished_articles(
+          direction,
+          (pinned_at IS NOT NULL) DESC,
+          pinned_at DESC,
+          created_at DESC
+        )
+        WHERE deleted_at IS NULL;
+      CREATE INDEX IF NOT EXISTS idx_wechat_draft_push_log_article_status
+        ON wechat_draft_push_log(article_id, status);
+    `);
+    db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(46, creativeListPerformanceMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
     // 历史库可能已有悬空引用；本次迁移只阻止新增错误，避免误删既有文章或阻断启动。

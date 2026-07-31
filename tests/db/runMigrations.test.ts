@@ -80,7 +80,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(45);
+    expect(schemaVersion).toBe(46);
 
     const appliedMigrations = db
       .prepare(
@@ -137,7 +137,29 @@ describe("runMigrations", () => {
       { version: 42, name: "042_finished_articles_writing_pipeline_v2" },
       { version: 43, name: "043_source_items_writing_stop_details" },
       { version: 44, name: "044_source_items_account_fit" },
-      { version: 45, name: "045_finished_articles_manual_and_pinning" }
+      { version: 45, name: "045_finished_articles_manual_and_pinning" },
+      { version: 46, name: "046_creative_list_performance_indexes" }
+    ]);
+
+    const performanceIndexes = db
+      .prepare(
+        `
+          SELECT name
+          FROM sqlite_master
+          WHERE type = 'index'
+            AND name IN (
+              'idx_creative_source_items_direction_created_at',
+              'idx_creative_finished_articles_direction_pinned_created_at',
+              'idx_wechat_draft_push_log_article_status'
+            )
+          ORDER BY name
+        `
+      )
+      .all() as Array<{ name: string }>;
+    expect(performanceIndexes.map((row) => row.name)).toEqual([
+      "idx_creative_finished_articles_direction_pinned_created_at",
+      "idx_creative_source_items_direction_created_at",
+      "idx_wechat_draft_push_log_article_status"
     ]);
 
     const hiddenAggregates = db
@@ -587,7 +609,7 @@ describe("runMigrations", () => {
     expect(evidenceTable).toBeTruthy();
     expect(sourceRunsTable).toBeTruthy();
     expect(notificationsTable).toBeTruthy();
-    expect(db.pragma("user_version", { simple: true })).toBe(45);
+    expect(db.pragma("user_version", { simple: true })).toBe(46);
 
     // daily_digests 表验证
     const digestTable = db

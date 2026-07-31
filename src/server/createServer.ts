@@ -5,6 +5,7 @@ import {
   installPerformanceMonitoring,
   resolveSlowRequestThreshold
 } from "./performanceMonitoring.js";
+import { registerCreativeListRoutes } from "./routes/creativeListRoutes.js";
 import type { AiTimelineFeedReadResult } from "../core/aiTimeline/aiTimelineFeedFile.js";
 import { LatestReportEmailError, type LatestReportEmailErrorReason } from "../core/pipeline/sendLatestReportEmail.js";
 import type { BuildContentPageModelOptions } from "../core/content/buildContentPageModel.js";
@@ -80,7 +81,6 @@ import type { SqliteDatabase } from "../core/db/openDatabase.js";
 import {
   insertCreativeSourceItem,
   findCreativeSourceItemByExternalId,
-  listCreativeSourceItems,
   findCreativeSourceItemById,
   updateCreativeSourceItemWritingStatus,
   updateCreativeSourceItemLinkedArticle,
@@ -93,7 +93,6 @@ import {
 import {
   insertCreativeFinishedArticle,
   findCreativeFinishedArticleBySourceItemId,
-  listCreativeFinishedArticles,
   findCreativeFinishedArticleById,
   editCreativeFinishedArticle,
   saveArticlePerformanceFeedback,
@@ -1024,173 +1023,19 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.send({ ok: true, total: candidates.length, items: candidates });
   });
 
-  // ─── Creative: Query API (session-authenticated) ───
-
-  app.get("/api/creative/source-items", async (request, reply) => {
-    // 支持两种认证：token（外部 Agent）或 session（管理 UI）
-    const hasToken = creativeApiToken && request.headers["x-creative-token"] === creativeApiToken;
-    if (!hasToken) {
-      const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-      if (session === undefined) { return; }
-    }
-
-    if (!db) {
-      return reply.code(503).send({ ok: false, reason: "database-not-available" });
-    }
-
-    const query = request.query as Record<string, string | undefined>;
-
-    const result = listCreativeSourceItems(db, {
-      page: query.page ? parseInt(query.page, 10) : undefined,
-      pageSize: query.pageSize ? parseInt(query.pageSize, 10) : undefined,
-      writingStatus: query.writingStatus as "pending" | "ready" | "queued" | "writing" | "done" | "skipped" | "excluded" | "failed" | undefined,
-      collectorAgent: query.collectorAgent,
-      sourceName: query.sourceName,
-      writable: query.writable === "1" ? true : undefined,
-      search: query.search,
-      trendScoreMin: query.trendScoreMin ? parseInt(query.trendScoreMin, 10) : undefined,
-      accountFitLevel: query.accountFitLevel as "high" | "medium" | "low" | "insufficient" | "error" | "unassessed" | undefined,
-      sourceFeed: query.sourceFeed || undefined,
-      last24h: query.sourceFeed ? true : undefined,
-      direction: query.direction as string | undefined,
-      summaryOnly: query.view === "summary"
-    });
-
-    // 批量查询关联成品文章的创建时间和公众号发布状态
-    const linkedIds = result.items.filter(i => i.linkedArticleId != null).map(i => i.linkedArticleId!);
-    if (linkedIds.length > 0) {
-      const placeholders = linkedIds.map(() => "?").join(",");
-      const articleRows = db.prepare(
-        `SELECT id, created_at, wechat_published FROM creative_finished_articles WHERE id IN (${placeholders})`
-      ).all(...linkedIds) as Array<{ id: number; created_at: string; wechat_published: number }>;
-      const articleMap = new Map(articleRows.map(r => [r.id, r]));
-      for (const item of result.items) {
-        if (item.linkedArticleId != null) {
-          const row = articleMap.get(item.linkedArticleId);
-          (item as any).linkedArticleCreatedAt = row?.created_at ?? null;
-          (item as any).linkedArticlePublished = row?.wechat_published === 1;
-        }
-      }
-    }
-
-    return reply.send(result);
+  // 创作列表与详情保持原鉴权语义，由独立路由模块集中维护。
+  registerCreativeListRoutes(app, {
+    db,
+    creativeApiToken,
+    authorizeSession: (request, reply) =>
+      readSettingsApiSession(
+        request,
+        reply,
+        authEnabled,
+        authConfig?.sessionSecret ?? ""
+      ) !== undefined
   });
 
-  // ─── 素材来源名称列表（去重，用于筛选下拉） ───
-  app.get("/api/creative/source-names", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-    if (session === undefined) { return; }
-    if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
-
-    const rows = db.prepare(
-      "SELECT DISTINCT source_name FROM creative_source_items WHERE source_name IS NOT NULL AND source_name != '' ORDER BY source_name"
-    ).all() as Array<{ source_name: string }>;
-    return reply.send(rows.map(r => r.source_name));
-  });
-
-  app.get("/api/creative/source-items/:id", async (request, reply) => {
-    // 支持两种认证：token（外部 Agent）或 session（管理 UI）
-    const hasToken = creativeApiToken && request.headers["x-creative-token"] === creativeApiToken;
-    if (!hasToken) {
-      const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-      if (session === undefined) { return; }
-    }
-
-    if (!db) {
-      return reply.code(503).send({ ok: false, reason: "database-not-available" });
-    }
-
-    const params = request.params as { id: string };
-    const id = parseInt(params.id, 10);
-    const item = findCreativeSourceItemById(db, id);
-    if (!item) {
-      return reply.code(404).send({ ok: false, reason: "not-found" });
-    }
-    return reply.send(item);
-  });
-
-  app.get("/api/creative/finished-articles", async (request, reply) => {
-    // 支持两种认证：token（外部 Agent）或 session（管理 UI）
-    const hasToken = creativeApiToken && request.headers["x-creative-token"] === creativeApiToken;
-    if (!hasToken) {
-      const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-      if (session === undefined) { return; }
-    }
-
-    if (!db) {
-      return reply.code(503).send({ ok: false, reason: "database-not-available" });
-    }
-
-    const query = request.query as Record<string, string | undefined>;
-    const result = listCreativeFinishedArticles(db, {
-      page: query.page ? parseInt(query.page, 10) : undefined,
-      pageSize: query.pageSize ? parseInt(query.pageSize, 10) : undefined,
-      status: query.status,
-      search: query.search,
-      publishable: query.publishable === "1" ? true : undefined,
-      includeDeleted: query.includeDeleted === "1" ? true : undefined,
-      direction: query.direction as string | undefined,
-      summaryOnly: query.view === "summary"
-    });
-
-    // 批量查询关联素材的 trendScore/trendBreakdown/publishedAt
-    const sourceItemIds = result.items
-      .map((article) => article.sourceItemId)
-      .filter((id): id is number => id !== null);
-    if (sourceItemIds.length > 0) {
-      const idPlaceholders = sourceItemIds.map(() => "?").join(",");
-      const sourceRows = db.prepare(
-        `SELECT id, trend_score, trend_breakdown, published_at, title, source_name FROM creative_source_items WHERE id IN (${idPlaceholders})`
-      ).all(...sourceItemIds) as Array<{ id: number; trend_score: number | null; trend_breakdown: string | null; published_at: string | null; title: string | null; source_name: string | null }>;
-      const sourceMap = new Map(sourceRows.map(r => [r.id, r]));
-      for (const article of result.items) {
-        const source = article.sourceItemId === null ? undefined : sourceMap.get(article.sourceItemId);
-        (article as any).trendScore = source?.trend_score ?? null;
-        (article as any).trendBreakdown = source?.trend_breakdown ? JSON.parse(source.trend_breakdown) : null;
-        (article as any).publishedAt = source?.published_at ?? null;
-        (article as any).sourceTitle = source?.title ?? null;
-        (article as any).sourceName = source?.source_name ?? null;
-      }
-    }
-    return reply.send(result);
-  });
-
-  app.get("/api/creative/finished-articles/:id", async (request, reply) => {
-    // 支持两种认证：token（外部 Agent）或 session（管理 UI）
-    const hasToken = creativeApiToken && request.headers["x-creative-token"] === creativeApiToken;
-    if (!hasToken) {
-      const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-      if (session === undefined) { return; }
-    }
-
-    if (!db) {
-      return reply.code(503).send({ ok: false, reason: "database-not-available" });
-    }
-
-    const params = request.params as { id: string };
-    const id = parseInt(params.id, 10);
-    const article = findCreativeFinishedArticleById(db, id);
-    if (!article) {
-      return reply.code(404).send({ ok: false, reason: "not-found" });
-    }
-
-    // 关联查询 source item 的 trendScore/trendBreakdown/publishedAt/title
-    const sourceRow = article.sourceItemId === null
-      ? undefined
-      : db.prepare(
-          "SELECT trend_score, trend_breakdown, published_at, title FROM creative_source_items WHERE id = ?"
-        ).get(article.sourceItemId) as { trend_score: number | null; trend_breakdown: string | null; published_at: string | null; title: string } | undefined;
-    if (sourceRow) {
-      (article as any).trendScore = sourceRow.trend_score ?? null;
-      (article as any).trendBreakdown = sourceRow.trend_breakdown ? JSON.parse(sourceRow.trend_breakdown) : null;
-      (article as any).publishedAt = sourceRow.published_at ?? null;
-      (article as any).sourceTitle = sourceRow.title ?? null;
-    }
-
-    return reply.send(article);
-  });
-
-  // 成品文章局部更新：评分重跑、补图等场景
   app.patch("/api/creative/finished-articles/:id", async (request, reply) => {
     const hasToken = creativeApiToken && request.headers["x-creative-token"] === creativeApiToken;
     if (!hasToken) {

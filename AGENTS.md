@@ -82,7 +82,7 @@
 - `src/core/scheduler/`
   负责按配置启动每日定时任务。
 - `src/server/`
-  负责页面路由、legacy 服务端渲染 HTML，以及 `/settings/*` 的客户端入口分发和系统页读模型 API。
+  负责页面路由、legacy 服务端渲染 HTML，以及 `/settings/*` 的客户端入口分发和系统页读模型 API。`createServer.ts` 正在逐步收口为服务装配入口；本批只把边界稳定的创作列表和详情只读接口集中到 `src/server/routes/creativeListRoutes.ts`，其余内联路由仍按可独立命名、可验证的原则逐步迁移。
 - `src/wechatResolver/`
   负责本地开发时自动启动的公众号解析 sidecar；当前默认先尝试公开索引，再用“文章页元数据 + 搜狗文章检索”做 fallback，最终把标准 `rss_url` 返回给主应用。
 - `tests/`

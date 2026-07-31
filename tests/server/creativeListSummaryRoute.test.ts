@@ -53,4 +53,46 @@ describe("creative list summary routes", () => {
 
     await app.close();
   });
+
+  it("preserves token and session boundaries after route extraction", async () => {
+    const handle = await createTestDatabase("hot-now-creative-list-auth-");
+    handles.push(handle);
+    const source = insertCreativeSourceItem(handle.db, {
+      externalId: "route-auth-source",
+      collectorAgent: "test",
+      title: "路由鉴权测试",
+      url: "https://example.com/route-auth-source"
+    });
+    const app = createServer({
+      db: handle.db,
+      creativeApiToken: "test-token",
+      auth: {
+        requireLogin: true,
+        sessionSecret: "test-session-secret"
+      }
+    });
+
+    const tokenHeaders = { "x-creative-token": "test-token" };
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/api/creative/source-items?view=summary",
+      headers: tokenHeaders
+    });
+    const detailResponse = await app.inject({
+      method: "GET",
+      url: `/api/creative/source-items/${source.id}`,
+      headers: tokenHeaders
+    });
+    const sourceNamesResponse = await app.inject({
+      method: "GET",
+      url: "/api/creative/source-names",
+      headers: tokenHeaders
+    });
+
+    expect(listResponse.statusCode).toBe(200);
+    expect(detailResponse.statusCode).toBe(200);
+    expect(sourceNamesResponse.statusCode).toBe(401);
+
+    await app.close();
+  });
 });

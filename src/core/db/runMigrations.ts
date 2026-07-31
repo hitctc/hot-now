@@ -233,6 +233,7 @@ const feedbackAndLlmWorkbenchStatements = [
 export function runMigrations(db: SqliteDatabase): void {
   // Migrations stay idempotent because existing local SQLite files must be upgraded in place
   // without forcing developers to rebuild data or drop historical reports.
+  const existingForeignKeyErrors = db.pragma("foreign_key_check") as ForeignKeyCheckRow[];
   const migrate = db.transaction(() => {
     for (const statement of migrationStatements) {
       db.exec(statement);
@@ -1486,10 +1487,11 @@ export function runMigrations(db: SqliteDatabase): void {
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(45, manualFinishedArticlesMigrationName);
 
     db.pragma(`user_version = ${schemaVersion}`);
-    // 表重建产生任何悬空引用都必须让本次事务整体回滚，不能留下已升级的 user_version。
-    const foreignKeyErrors = db.pragma("foreign_key_check") as unknown[];
-    if (foreignKeyErrors.length > 0) {
-      throw new Error(`foreign key check failed after migrations: ${JSON.stringify(foreignKeyErrors)}`);
+    // 历史库可能已有悬空引用；本次迁移只阻止新增错误，避免误删既有文章或阻断启动。
+    const foreignKeyErrors = db.pragma("foreign_key_check") as ForeignKeyCheckRow[];
+    const newForeignKeyErrors = findNewForeignKeyErrors(existingForeignKeyErrors, foreignKeyErrors);
+    if (newForeignKeyErrors.length > 0) {
+      throw new Error(`foreign key check found new errors after migrations: ${JSON.stringify(newForeignKeyErrors)}`);
     }
   });
 
@@ -1501,6 +1503,26 @@ export function runMigrations(db: SqliteDatabase): void {
   } finally {
     if (foreignKeysEnabled) db.pragma("foreign_keys = ON");
   }
+}
+
+type ForeignKeyCheckRow = {
+  table: string;
+  rowid: number | null;
+  parent: string;
+  fkid: number;
+};
+
+/** 比较迁移前后外键检查结果，只返回由本次迁移新增的错误。 */
+export function findNewForeignKeyErrors(
+  before: ForeignKeyCheckRow[],
+  after: ForeignKeyCheckRow[]
+): ForeignKeyCheckRow[] {
+  const existing = new Set(before.map(foreignKeyErrorKey));
+  return after.filter((row) => !existing.has(foreignKeyErrorKey(row)));
+}
+
+function foreignKeyErrorKey(row: ForeignKeyCheckRow): string {
+  return `${row.table}\u0000${row.rowid ?? "null"}\u0000${row.parent}\u0000${row.fkid}`;
 }
 
 function hasColumn(db: SqliteDatabase, tableName: string, columnName: string): boolean {

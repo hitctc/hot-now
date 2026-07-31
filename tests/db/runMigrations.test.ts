@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { verifyPassword } from "../../src/core/auth/passwords.js";
 import { openDatabase } from "../../src/core/db/openDatabase.js";
-import { runMigrations } from "../../src/core/db/runMigrations.js";
+import { findNewForeignKeyErrors, runMigrations } from "../../src/core/db/runMigrations.js";
 import { seedInitialData } from "../../src/core/db/seedInitialData.js";
 
 const expectedTables = [
@@ -599,5 +599,15 @@ describe("runMigrations", () => {
     const dateCol = digestColumns.find((c) => c.name === "date");
     expect(dateCol).toBeTruthy();
     expect(dateCol!.notnull).toBe(1);
+  });
+});
+
+describe("findNewForeignKeyErrors", () => {
+  it("allows historical violations but reports violations introduced by a migration", () => {
+    const historical = { table: "creative_finished_articles", rowid: 38, parent: "creative_source_items", fkid: 0 };
+    const introduced = { table: "creative_finished_articles", rowid: 39, parent: "creative_source_items", fkid: 0 };
+
+    expect(findNewForeignKeyErrors([historical], [historical])).toEqual([]);
+    expect(findNewForeignKeyErrors([historical], [historical, introduced])).toEqual([introduced]);
   });
 });

@@ -24,8 +24,9 @@ function assertHealthy(db, label) {
 const appDir = process.cwd();
 const configPath = path.join(appDir, "config", "hot-now.config.json");
 const fileConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
+const envFile = process.env.HOT_NOW_ENV_FILE || path.join(appDir, ".env");
 const configuredDatabase = process.env.HOT_NOW_DATABASE_FILE
-  || readEnvValue(path.join(appDir, ".env"), "HOT_NOW_DATABASE_FILE");
+  || readEnvValue(envFile, "HOT_NOW_DATABASE_FILE");
 const databaseFile = configuredDatabase
   ? path.resolve(configuredDatabase)
   : path.resolve(path.dirname(configPath), fileConfig.database.file);

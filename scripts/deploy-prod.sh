@@ -16,6 +16,7 @@ fi
 DEPLOY_HOST="${HOT_NOW_DEPLOY_HOST:-}"
 DEPLOY_USER="${HOT_NOW_DEPLOY_USER:-}"
 DEPLOY_APP_DIR="${HOT_NOW_DEPLOY_APP_DIR:-/srv/hot-now/app}"
+DEPLOY_ENV_FILE="${HOT_NOW_DEPLOY_ENV_FILE:-$(dirname "${DEPLOY_APP_DIR}")/shared/.env}"
 DEPLOY_SERVICE="${HOT_NOW_DEPLOY_SERVICE:-hot-now}"
 DEPLOY_HEALTH_URL="${HOT_NOW_DEPLOY_HEALTH_URL:-http://127.0.0.1:3030/health}"
 # 健康检查重试窗口：低配服务器冷启动偏慢，默认 15 次 × 3 秒（≈45s）避免误报"重启失败"
@@ -45,7 +46,7 @@ echo "Checking and snapshotting production database before syncing code..."
 ssh "${REMOTE_TARGET}" \
   "set -euo pipefail
   cd '${DEPLOY_APP_DIR}'
-  node --input-type=module" < "${REPO_ROOT}/scripts/deploy-db-preflight.mjs"
+  HOT_NOW_ENV_FILE='${DEPLOY_ENV_FILE}' node --input-type=module" < "${REPO_ROOT}/scripts/deploy-db-preflight.mjs"
 
 echo "Syncing code + dist to server..."
 rsync -az --delete \

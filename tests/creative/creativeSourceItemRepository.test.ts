@@ -122,9 +122,9 @@ describe("listCreativeSourceItems", () => {
     const handle = await makeHandle();
     handles.push(handle);
 
-    insertCreativeSourceItem(handle.db, { ...baseInput, externalId: "p1", title: "Page 1" });
-    insertCreativeSourceItem(handle.db, { ...baseInput, externalId: "p2", title: "Page 2" });
-    insertCreativeSourceItem(handle.db, { ...baseInput, externalId: "p3", title: "Page 3" });
+    insertCreativeSourceItem(handle.db, { ...baseInput, externalId: "p1", title: "Page 1", url: "https://example.com/page-1" });
+    insertCreativeSourceItem(handle.db, { ...baseInput, externalId: "p2", title: "Page 2", url: "https://example.com/page-2" });
+    insertCreativeSourceItem(handle.db, { ...baseInput, externalId: "p3", title: "Page 3", url: "https://example.com/page-3" });
 
     const result = listCreativeSourceItems(handle.db, { page: 1, pageSize: 2 });
 
@@ -138,9 +138,9 @@ describe("listCreativeSourceItems", () => {
     const handle = await makeHandle();
     handles.push(handle);
 
-    insertCreativeSourceItem(handle.db, { ...baseInput, externalId: "p1", title: "Page 1" });
-    insertCreativeSourceItem(handle.db, { ...baseInput, externalId: "p2", title: "Page 2" });
-    insertCreativeSourceItem(handle.db, { ...baseInput, externalId: "p3", title: "Page 3" });
+    insertCreativeSourceItem(handle.db, { ...baseInput, externalId: "p1", title: "Page 1", url: "https://example.com/page-1" });
+    insertCreativeSourceItem(handle.db, { ...baseInput, externalId: "p2", title: "Page 2", url: "https://example.com/page-2" });
+    insertCreativeSourceItem(handle.db, { ...baseInput, externalId: "p3", title: "Page 3", url: "https://example.com/page-3" });
 
     const result = listCreativeSourceItems(handle.db, { page: 2, pageSize: 2 });
 
@@ -189,18 +189,21 @@ describe("listCreativeSourceItems", () => {
     insertCreativeSourceItem(handle.db, {
       ...baseInput,
       externalId: "s1",
-      title: "GPT-5 发布"
+      title: "GPT-5 发布",
+      url: "https://example.com/search-1"
     });
     insertCreativeSourceItem(handle.db, {
       ...baseInput,
       externalId: "s2",
       title: "其他新闻",
-      summary: "Claude 更新了模型"
+      summary: "Claude 更新了模型",
+      url: "https://example.com/search-2"
     });
     insertCreativeSourceItem(handle.db, {
       ...baseInput,
       externalId: "s3",
-      title: "不相关的文章"
+      title: "不相关的文章",
+      url: "https://example.com/search-3"
     });
 
     const gptResult = listCreativeSourceItems(handle.db, { search: "GPT" });

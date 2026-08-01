@@ -83,6 +83,7 @@
   负责按配置启动每日定时任务。
 - `src/server/`
   负责页面路由、legacy 服务端渲染 HTML，以及 `/settings/*` 的客户端入口分发和系统页读模型 API。`createServer.ts` 正在逐步收口为服务装配入口；边界稳定的创作列表和详情只读接口集中到 `src/server/routes/creativeListRoutes.ts`，图片上传、转存和公开读取集中到 `src/server/routes/creativeImageRoutes.ts`，其余内联路由仍按可独立命名、可验证的原则逐步迁移。
+- 大文件治理按“先地图、后分批、每批可回滚”执行。`createServer.ts` 只保留 Fastify 创建、配置/中间件、依赖注入和路由注册；Vue 页面只做页面编排，查询、状态和轮询进入 composable（组合式逻辑），视觉区域进入组件；服务端路由按业务域拆分，不按单个 endpoint（端点）机械切片。具体完成标准、拆分地图和当前进度以 `docs/性能优化基线.md` 为准。
 - `src/wechatResolver/`
   负责本地开发时自动启动的公众号解析 sidecar；当前默认先尝试公开索引，再用“文章页元数据 + 搜狗文章检索”做 fallback，最终把标准 `rss_url` 返回给主应用。
 - `tests/`

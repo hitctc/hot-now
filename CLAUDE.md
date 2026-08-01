@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-本文件为 Claude Code（claude.ai/code）提供操作本代码仓库的指导。
+本文件只保留 Claude Code 的专用补充。协作规则见 [AGENTS.md](./AGENTS.md)，当前模块边界见 [docs/开发与模块化规范.md](./docs/开发与模块化规范.md)，启动与部署见 [README.md](./README.md)。
 
 ## 项目概述
 
@@ -50,14 +50,18 @@ npm run db:restore -- data/recovery-backups/<timestamp>/hot-now.sqlite
 
 ```
 src/
-  main.ts              # 应用入口：加载配置、打开数据库、执行迁移、填充种子数据、注册全部路由、启动调度器
+  main.ts              # 运行时启动：配置、数据库、锁、调度、监听和退出
+  app/
+    createRuntimeServerDeps.ts # HTTP 层依赖装配
   server/
-    createServer.ts    # Fastify 实例工厂与所有路由处理器（页面、API、动作、健康检查、feed）
+    createServer.ts    # Fastify 实例、全局配置、依赖装配和业务路由注册
+    routes/            # 按业务域组织的 HTTP 路由
     public/            # Fastify 托管的静态资源
   core/
     db/                # SQLite 全生命周期：openDatabase、runMigrations、seedInitialData、sqliteHealth、snapshots
     pipeline/          # runCollectionCycle：RSS 抓取、文章提取、主题聚类、报告生成
     content/           # 内容查询/构建器：listContentView、buildContentPageModel、buildContentViewSelection、contentRepository
+    creative/          # 创作素材、成品文章、图片与发布相关领域逻辑
     source/            # 来源目录管理：listContentSources、loadEnabledSourceIssues、sourceMutationRepository
     topics/            # 主题聚类逻辑
     ratings/           # 评分维度仓库
@@ -79,7 +83,7 @@ src/
     types/             # 共享的 RuntimeConfig 与应用级类型
   client/              # Vue 3 SPA
     main.ts            # 应用引导：注册 AntD 组件、挂载路由
-    router.ts          # 路由定义与页面元数据（ai-new、ai-hot、ai-timeline、settings/*）
+    router.ts          # 当前启用的内容、创作和系统路由定义与页面元数据
     App.vue            # 根布局包装器
     pages/             # 路由级页面组件（content/*、settings/*）
     components/        # 可复用组件（content/*、settings/*）
@@ -98,77 +102,10 @@ scripts/
   pull-prod-data.sh    # 将生产环境 SQLite 和 reports 拉到本地 data/prod-sync/
 ```
 
-## 关键架构决策
+## Claude Code 专用架构补充
 
-### 双层 TypeScript 编译
-
-项目存在两套 TypeScript 编译目标：
-- **服务端**：`tsconfig.json` —— `module: NodeNext`，`moduleResolution: NodeNext`，输出到 `dist/server`
-- **客户端**：`tsconfig.client.json` —— `module: ESNext`，`moduleResolution: Bundler`，由 Vite 消费
-
-所有源码中的 import 都使用 `.js` 扩展名，以兼容 NodeNext。Vite 负责编译 `.vue` 单文件组件。
-
-### 数据库
-
-使用 `better-sqlite3`。迁移脚本按版本号顺序增量执行，位于 `src/core/db/runMigrations.ts`。应用在启动时通过 `PRAGMA quick_check` 校验数据库完整性；若损坏则抛出包含恢复指引的错误。首次运行时会自动填充内置 RSS 来源和认证引导数据。
-
-### 内容采集流水线
-
-`runCollectionCycle` 负责端到端采集：拉取已启用的 RSS 来源，提取文章，向 SQLite 写入/更新内容项，进行主题聚类，生成日报（JSON + HTML），并保存到本地。它**不**负责发邮件——邮件由独立调度器或手动触发处理。
-
-### 内容页（AI 新讯 / AI 热点）
-
-两个页面均由 `buildContentPageModel` 驱动，内部按以下顺序应用逻辑：
-1. 视图规则过滤（来自 `viewRules` 的 `ai_new` 或 `ai_hot` 门规则）
-2. 来源种类过滤（用户在内容页勾选的来源，持久化在 `localStorage`）
-3. 实体子过滤（Twitter 账号、Twitter 关键词、微信公众号 RSS——也持久化在 `localStorage`）
-4. 标题搜索
-5. 排序（按发布时间或按评分）
-6. 分页（固定 50 条/页）
-
-后端返回 `ContentPageModel`；前端通过共享的 `ContentFeedPageShell` 渲染卡片列表。
-
-### AI 时间线
-
-与普通内容流水线完全解耦。后端读取外部 Markdown 文件（`config.hot-now.config.json` 中的 `aiTimelineFeed.file`），提取第一个 `json ai-timeline-feed` 代码块，解析事件，并通过 `/api/ai-timeline` 提供。事件包含类型、公司、重要性等级、可靠性状态和可见状态。S 级事件触发独立的告警轮询，向飞书 webhook 和邮件发送通知。
-
-### Vue 前端规范
-
-- **页面**负责路由级编排：数据加载、动作协调、弹窗开关和少量状态管理
-- **组件**放在 `src/client/components/<domain>/`；设置页组件放在 `src/client/components/settings/<domain>/`
-- 同一页面出现多个表格/弹窗/卡片，或模板明显超过约 500 行时，优先抽组件
-- 共享的 columns、表单类型、格式化函数和选项列表放到同域 `*Shared.ts` 中
-- 展示组件通过 props / emits 协作；API 请求收口在页面、composable 或 service 层，不要让展示组件直接调接口
-- 拆组件时必须保留稳定的 `data-*` 测试锚点
-
-### 主题系统
-
-自定义编辑主题基于 CSS 变量实现，变量定义在 `src/client/theme/editorialTokens.ts`。Tailwind 的 base 层根据 `data-theme="light"` / `data-theme="dark"` 切换。`UnifiedShellLayout` 提供共享导航壳层和深浅主题切换按钮。
-
-### 环境变量与配置
-
-`config/hot-now.config.json` 存放非敏感运行时配置。敏感值（SMTP、认证、API key、webhook）通过环境变量提供，由 `scripts/dev.sh` 从 `.env` 加载。开发脚本**只读 `.env**，不再读取 `.env.local`。
-
-关键环境变量：
-- `BASE_URL`、`PUBLIC_BASE_URL` —— 对外可点击的站点地址（用于邮件和提醒中的链接）
-- `AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` —— 登录壳层必填
-- `AUTH_SESSION_TTL_SECONDS` —— 可选会话有效期（默认 7 天）
-- `SMTP_HOST`、`SMTP_PORT`、`SMTP_USER`、`SMTP_PASS`、`MAIL_TO` —— 邮件投递
-- `TWITTER_API_KEY` —— TwitterAPI.io 密钥（Twitter 账号/关键词采集必需）
-- `FEISHU_ALERT_WEBHOOK_URL` —— S 级 AI 时间线事件的飞书机器人 webhook
-- `LLM_SETTINGS_MASTER_KEY` —— 可选：用于加密保存厂商 API key（未配置时回退到 `SESSION_SECRET`）
-- `HOT_NOW_DATABASE_FILE`、`HOT_NOW_REPORT_DATA_DIR` —— 可选生产路径覆盖项
-- `AI_TIMELINE_FEED_URL`、`AI_TIMELINE_FEED_FILE`、`AI_TIMELINE_FEED_MANIFEST_FILE` —— 外部 AI 时间线 feed 配置
-- `CREATIVE_API_TOKEN` —— 创作模块 API 访问令牌（成品文章接口鉴权）
-
-### 公众号解析 Sidecar
-
-微信公众号文章解析由 `src/wechatResolver/` 中的独立微服务处理。本地开发时，`npm run dev` 会自动在 4040 端口拉起它。生产环境可通过 `WECHAT_RESOLVER_BASE_URL` 和 `WECHAT_RESOLVER_TOKEN` 覆盖到远端 relay。
-
-### 部署
-
-生产部署使用 `scripts/deploy-prod.sh`，它会通过 rsync 将代码同步到 `/srv/hot-now/app`，在服务器上执行 `npm ci && npm run build`，然后重启 `hot-now` systemd 服务。部署脚本**不会**触碰数据目录（`/srv/hot-now/shared/data`）和环境文件（`/srv/hot-now/shared/.env`）。
-
-### 开发完成自动提交推送
-
-代码开发完成并部署到服务器后，如果改动无异常、无未处理事项，应自动执行 ship commit push 流程（触发 ship skill 统一提交规范），不需要等待用户明确要求。只有用户明确说"先不提交"或存在未解决的验证失败时，才跳过提交推送。
+- 服务端使用 `tsconfig.json` 的 NodeNext；客户端使用 `tsconfig.client.json` 的 Bundler，由 Vite 编译 `.vue`。
+- 服务端源码 import 使用 `.js` 扩展名以兼容 NodeNext。
+- AI 时间线页面 `/ai-timeline` 与 `/settings/ai-timeline` 当前下架；不要恢复菜单、路由或来源页入口，除非同批补齐路由、测试和项目文档。feed、API 与提醒链路仍可维护。
+- 本地运行产物、数据库、凭据和 `.deploy.local.env` 不得提交；部署前后按 `AGENTS.md` 运行最相关验证。
+- 新模块的长期边界、迁移规则和测试策略不在本文件重复，统一遵循 `docs/开发与模块化规范.md`。

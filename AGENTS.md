@@ -22,10 +22,10 @@
   - `B 站链路`：`后台维护 query 列表 -> 手动执行 B 站搜索 -> 去重入库 / 合并 query 命中 -> 内容页查看`
   - `微信公众号 RSS 链路`：`后台批量维护 RSS 链接 -> 手动执行公众号 RSS 采集 -> 去重入库 / 按 RSS 来源筛选 -> 内容页查看`
   - `微博热搜链路`：`固定 AI 关键词 -> 手动执行微博热搜榜匹配 -> 热搜命中入库 -> AI 热点查看`
-  - `AI 时间线链路`：`Codex 自动化生成官方发布时间线 Markdown -> 上传本地稳定 feed 并暴露公网入口 -> 应用优先读取本地 feed / 必要时用公网 URL 兜底 -> 解析 json ai-timeline-feed -> AI 时间线查看 / feed 后台只读查看`
+  - `AI 时间线链路`：`Codex 自动化生成官方发布时间线 Markdown -> 上传本地稳定 feed 并暴露公网入口 -> 应用优先读取本地 feed / 必要时用公网 URL 兜底 -> 解析 json ai-timeline-feed -> 提供 API 与 feed 摘要`；Vue 页面当前暂时下架
   - `AI 时间线提醒链路`：`定时读取 AI 时间线 feed -> 筛选新增 S 级官方事件 -> 按 eventKey 去重 -> 飞书主通道 + 邮件备份通道推送`
   - `发信链路`：`手动发信 -> 读取最新一份已生成报告 -> SMTP 发邮件`；每日早报发信默认关闭，SMTP 同时作为 S 级事件邮件备份通道
-- 当前数据源：内置 RSS 库已扩展到 `21` 个，覆盖聚合日报、国际官方 AI 博客、国内科技媒体、创投资讯、开发者社区与综合新闻；Twitter 已拆成两类独立来源类型：账号采集配置保存在 `twitter_accounts`，关键词搜索配置保存在 `twitter_search_keywords`；Hacker News 搜索配置保存在 `hackernews_queries`；B 站搜索配置保存在 `bilibili_queries`；微信公众号 RSS 配置保存在 `wechat_rss_sources`；微博热搜榜匹配使用固定 AI 关键词，不提供独立配置表；AI 时间线不再维护应用内官方源白名单和采集规则，服务端优先读取 `AI_TIMELINE_FEED_FILE` 指向的本地 Markdown feed，必要时再用 `AI_TIMELINE_FEED_URL` 指向的公网 Markdown feed 兜底，解析其中唯一的 `json ai-timeline-feed` 代码块，并按 feed 内的官方证据、官方发布时间、重要级别和可见状态渲染 `/ai-timeline`。这些扩展链路除 AI 时间线 feed 外都只支持后台手动执行，完整清单和边界见本文第 `9` 节阶段快照和 `README.md`
+- 当前数据源：内置 RSS 库已扩展到 `21` 个，覆盖聚合日报、国际官方 AI 博客、国内科技媒体、创投资讯、开发者社区与综合新闻；Twitter 已拆成两类独立来源类型：账号采集配置保存在 `twitter_accounts`，关键词搜索配置保存在 `twitter_search_keywords`；Hacker News 搜索配置保存在 `hackernews_queries`；B 站搜索配置保存在 `bilibili_queries`；微信公众号 RSS 配置保存在 `wechat_rss_sources`；微博热搜榜匹配使用固定 AI 关键词，不提供独立配置表；AI 时间线不再维护应用内官方源白名单和采集规则，服务端优先读取 `AI_TIMELINE_FEED_FILE` 指向的本地 Markdown feed，必要时再用 `AI_TIMELINE_FEED_URL` 指向的公网 Markdown feed 兜底，解析其中唯一的 `json ai-timeline-feed` 代码块并提供 API 与提醒数据。这些扩展链路除 AI 时间线 feed 外都只支持后台手动执行，完整清单和边界见 `README.md`
 - 当前采集语义：以 `is_enabled` 为准决定是否参与采集；`is_active` 仅保留兼容，不再作为系统菜单主语义
 - 当前技术栈：`Node.js + TypeScript + Fastify + Vue 3 + Vite + Ant Design Vue + Tailwind CSS + Vitest`
 
@@ -34,9 +34,9 @@
 ## 3. 关键目录与职责
 
 - `src/main.ts`
-  负责启动配置加载、运行锁、Fastify 服务和定时任务，并装配 unified shell、内容筛选工作台、反馈池工作台与来源工作台，是应用入口。
+  负责运行时配置、数据库初始化、运行锁、任务调度、监听和优雅退出；HTTP 依赖装配在 `src/app/createRuntimeServerDeps.ts`。
 - `src/client/`
-  负责 `/settings/*` 系统页的 Vue 3 客户端入口、路由、页面组件、主题和前端 service 封装。
+  负责内容、创作和 `/settings/*` 系统页的 Vue 3 客户端入口、路由、页面组件、主题和前端 service 封装。
   `src/client/pages/*` 只保留路由级页面编排；可复用或大块 UI 下沉到 `src/client/components/*`，其中数据来源工作台的分区卡片、表格、弹窗和共享格式化逻辑集中在 `src/client/components/settings/sources/`。
   客户端样式栈固定为 `Vue 3 + Vite + Ant Design Vue + Tailwind CSS`；统一主题源收口到 `src/client/theme/editorialTokens.ts`，`src/client/styles/tailwind.css` 只保留基础样式、主题变量和少量 AntD 深层覆写，不要再长出新的大型 CSS 皮肤文件。
 - `src/core/config/`
@@ -82,8 +82,7 @@
 - `src/core/scheduler/`
   负责按配置启动每日定时任务。
 - `src/server/`
-  负责页面路由、legacy 服务端渲染 HTML，以及 `/settings/*` 的客户端入口分发和系统页读模型 API。`createServer.ts` 正在逐步收口为服务装配入口；边界稳定的创作列表和详情只读接口集中到 `src/server/routes/creativeListRoutes.ts`，图片上传、转存和公开读取集中到 `src/server/routes/creativeImageRoutes.ts`，其余内联路由仍按可独立命名、可验证的原则逐步迁移。
-- 大文件治理按“先地图、后分批、每批可回滚”执行。`createServer.ts` 只保留 Fastify 创建、配置/中间件、依赖注入和路由注册；Vue 页面只做页面编排，查询、状态和轮询进入 composable（组合式逻辑），视觉区域进入组件；服务端路由按业务域拆分，不按单个 endpoint（端点）机械切片。具体完成标准、拆分地图和当前进度以 `docs/性能优化基线.md` 为准。
+  负责 HTTP 协议适配、页面分发和业务域路由；`createServer.ts` 只做 Fastify 创建、全局配置、依赖装配与路由注册。路由域、核心层和客户端的长期边界以 `docs/开发与模块化规范.md` 为准，历史治理过程见 `docs/性能优化基线.md`。
 - `src/wechatResolver/`
   负责本地开发时自动启动的公众号解析 sidecar；当前默认先尝试公开索引，再用“文章页元数据 + 搜狗文章检索”做 fallback，最终把标准 `rss_url` 返回给主应用。
 - `tests/`
@@ -97,90 +96,14 @@
 
 ## 4. 当前页面与产物约定
 
-当前页面：
+当前可访问入口：
 
-- `/health`：健康检查
-- `/feeds/ai-timeline-feed.md`：外部 AI 官方发布时间线 Markdown feed 公开入口；读取 `AI_TIMELINE_FEED_FILE`，如果稳定文件缺失、损坏或 JSON 不可解析，会按 `AI_TIMELINE_FEED_MANIFEST_FILE` 和同目录版本文件回退；该路由只暴露一份指定 Markdown，不要把整个 `/srv/hot-now/shared/data` 暴露给 Nginx
-- `/login`：登录页（GET）与登录提交（POST）
-- `/logout`：退出登录（POST）
-- `/assets/site.css`：统一站点样式
-- `/`：统一站点 AI 新讯首页（未登录也可访问，等同 `/ai-new`）
-- `/ai-new`：统一站点 AI 新讯页（未登录也可访问）
-- `/ai-hot`：统一站点 AI 热点页（未登录也可访问）
-- `/ai-timeline`：统一站点 AI 时间线页（未登录也可访问），读取 `/api/ai-timeline`，默认按发布时间倒序展示最近 `7` 天、未隐藏且有官方证据的 feed 官方事件，支持事件类型、公司和标题搜索筛选；事件类型固定为 `要闻`、`模型发布`、`开发生态`、`产品应用`、`行业动态`、`官方前瞻`；官方前瞻允许进入时间线，但必须标注尚未正式发布；卡片优先展示中文重要性摘要，说明这件事为什么重要，并展示官方证据数量和可靠性状态
-- `/settings/view-rules`：统一站点内容筛选工作台（登录后，由 `Vue 3 + Ant Design Vue` 驱动；页面会先解释 `AI 新讯 / AI 热点` 当前真实筛选方向，再提供分页面开关控制 `24 小时窗口 / 来源偏置 / AI 关键词 / 热点关键词 / 新鲜度 / 评分排序`，同时保留 `反馈池` 与标记为 `暂未使用` 的 `LLM 设置`）
-- `/settings/sources`：统一站点数据迭代收集页（登录后，由 `Vue 3 + Ant Design Vue` 驱动，可启用/停用 source、切换“选中该来源时全量展示”，并支持可视化新增 / 编辑 / 删除自定义 RSS 来源；普通“新增来源”弹窗只支持 RSS，只需要填写 `RSS URL`；RSS 来源保存成功后会立即自动补拉这条来源的首批内容；页面同时提供独立 Twitter 账号分区、独立 Twitter 关键词搜索分区、独立 Hacker News 搜索分区、独立 B 站搜索分区、独立微信公众号 RSS 分区、独立微博热搜榜匹配分区和 `AI 时间线 feed 摘要` 卡片；Twitter、Hacker News 和 B 站分区可新增 / 编辑 / 删除 / 手动采集，并查看最近成功和最近结果状态；微信公众号 RSS 分区支持批量新增 RSS 链接、单条编辑、删除配置和手动采集，不支持在普通 source 库存中配置公众号；微博热搜榜匹配分区只展示固定 AI 关键词、最近抓取 / 最近成功 / 最近结果和手动执行入口，不提供关键词 CRUD；AI 时间线 feed 卡片展示公网 feed、最近 7 天事件数和最新事件时间，并提供进入 `/settings/ai-timeline` 的入口，不再提供应用内官方源采集按钮；Twitter 关键词分区额外支持 `采集启用`、`展示启用` 双开关，分类统一映射为中文文案，搜索固定追加 `lang:zh` 并在入库前排除日文假名 / 韩文内容；Hacker News 分区当前固定按最近 7 天、每轮最多 5 个 query、每个 query 最多 10 条结果执行；B 站分区第一版只搜视频，固定每轮最多 5 个 query、每个 query 最多 10 条结果执行；微信公众号 RSS 结果进入 `AI 新讯` 与 `AI 热点`，并在内容页提供二级 RSS 来源筛选；微博热搜榜匹配第一版只匹配热搜榜，不做微博全文搜索，结果固定只进入 `AI 热点`；页面会用“来源库存与统计”合并表展示启停、选中时全量、总条数、今天发布、今天抓取和最近抓取状态，展开单个 source 后展示 `AI 新讯 / AI 热点` 入池、展示、占比统计和来源链接，并按真实调度回显 `下一次采集：18:40（还有 6 分钟）` 这类分钟级文案）
-- `/settings/ai-timeline`：统一站点 AI 时间线 feed 查看页（登录后，由 `Vue 3 + Ant Design Vue` 驱动，展示主时间线状态、feed 来源状态、feed 事件池和规则说明；事件池支持按类型、公司、等级、可见状态和最近天数筛选；页面只读，不再支持隐藏、恢复、人工确认或本地修正）
-- `/settings/profile`：统一站点当前登录用户页（登录后，由 `Vue 3 + Ant Design Vue` 驱动，展示会话状态、账号摘要和联系邮箱）
-- `/creative/source-items`：公众号素材工作台；爆文分只展示和手动筛选，不作为自动写作门槛。账号适配度分为 `high / medium / low / insufficient / error`，不新增表格列，而是在原评分列显示彩色标签、悬停理由和规则版本，并提供独立筛选与单条手动评估。未评估素材点击写作时先评估，高/中适配可继续，低适配需二次确认，信息不足或评估失败会阻止。业务中止保持 `skipped`，技术失败使用可重试的 `failed`；两者都持久化阶段、名称、原因和时间，鼠标移入带 `ⓘ` 的状态标签或展开素材可查看完整说明
-- `/creative/finished-articles`：公众号成品文章工作台；写作 v2 文章展示四组标题候选及目标读者、点击理由、正文兑现和标题党风险，必须人工确认发布标题后才能进入可发布状态。页面同时提供第一阶段“文章效果”人工反馈入口，建议发布约 3 天后记录送达/曝光、阅读、分享、新增关注（可选）和人工复述程度；平台自动保存标题、标题组、读者任务快照与记录时间。试验只计划观察前 10 篇，不包含微信公众号数据自动拉取、提醒或效果看板
-- 统一站点左侧导航底部支持深色 / 浅色主题切换，偏好写入浏览器本地 `localStorage` 并在刷新后保持
-- `unified shell` 页面（`/`、`/ai-new`、`/ai-hot`、`/settings/*`）已完整切换到借鉴 Canva 的冷感科技聚光双主题
-- 内容导航已收口为 AI-first：`/` 与 `/ai-new` 等同 `AI 新讯`，`/ai-hot` 承接 `AI 热点`，`/articles` 已移除
-- `AI 时间线` 是官方事件流，不参与 `AI 新讯 / AI 热点` 的 source filter、评分、热点归并或反馈池
-- `AI 时间线` 可靠性状态固定为 `single_source`、`multi_source`、`source_degraded`、`manual_verified`；事件证据、发布时间、重要级别、可见状态都来自外部 Markdown feed，历史数据库表只保留迁移兼容，不再作为运行时数据源
-- `/`、`/ai-new`、`/ai-hot` 顶部新增共享 source 复选过滤条，支持 `全选 / 全不选`，浏览偏好写入浏览器本地 `localStorage['hot-now-content-sources']`
-- 内容页 source 复选过滤条会暴露 `Twitter 账号`、`Twitter 关键词搜索`、`Hacker News`、`B 站搜索`、`微信公众号 RSS` 这些扩展聚合来源；`微博热搜` 只在已有热点内容时出现在 `AI 热点`
-- 当内容页来源筛选勾选 `Twitter 账号` 时，工具栏下方会展开二级“账号筛选”；勾选 `Twitter 关键词搜索` 时会展开二级“关键词筛选”；勾选 `微信公众号 RSS` 时会展开二级“公众号 RSS 筛选”。三组都支持多选、默认全选，并分别写入 `localStorage['hot-now-twitter-account-filter']`、`localStorage['hot-now-twitter-keyword-filter']`、`localStorage['hot-now-wechat-rss-filter']`
-- `/`、`/ai-new`、`/ai-hot` 同时提供共享排序切换：`按发布时间`、`按评分`，偏好写入浏览器本地 `localStorage['hot-now-content-sort']`
-- `/`、`/ai-new`、`/ai-hot` 顶部还提供共享标题搜索框；搜索只匹配标题，按回车或点击按钮才生效，关键词写入浏览器本地 `localStorage['hot-now-content-search']`
-- `/`、`/ai-new`、`/ai-hot` 现在通过 Fastify 返回统一客户端入口，再由 `Vue 3 + Vite + Ant Design Vue` 内容页读取 `/api/content/ai-new`、`/api/content/ai-hot` 渲染
-- `/`、`/ai-new`、`/ai-hot` 现在还会在顶部工具栏下方显示当前内容筛选策略摘要，方便对照 `/settings/view-rules` 中已保存的开关结果
-- `/api/content/ai-new?page=<n>` 与 `/api/content/ai-hot?page=<n>` 现在支持分页，固定 `50` 条 / 页；前端 `AI 新讯 / AI 热点` 页面不再提供上一页 / 下一页按钮，而是在条目上方显示总条数，并在触底时自动追加下一页
-- `AI 新讯` 固定按最近 `24` 小时窗口和 `ai_new` 门规则构建结果集；`AI 热点` 固定按 `ai_hot` 门规则与热点形成逻辑构建结果集，不会被额外压成 `24` 小时
-- `AI 新讯`、`AI 热点` 与 `AI 时间线` 的条目卡片会在标题左侧显示连续排序序号；触底加载更多时序号按当前已加载列表连续递增
-- 内容卡片现在只保留局部 `补充反馈` 面板；反馈词进入反馈池，不会直接修改正式策略或生成草稿
-- 如果本地 `data/hot-now.sqlite` 内容库损坏，内容页会降级显示提示，不再直接以 `500` 打断 unified shell
-- `/history`：历史报告（legacy，当前仍保留）
-- `/reports/:date`：指定日期报告（legacy，当前仍保留）
-- `/control`：控制台（legacy，当前仍保留）
-- legacy `/history`、`/control` 与 `/reports/:date` 的 fallback notice 轻量跟随共享主题资源
-- `POST /actions/collect`：手动触发一次采集任务（会对所有 enabled 普通 RSS sources 执行采集）
-- `POST /actions/send-latest-email`：手动发送最新一份已生成报告
-- `POST /actions/run`：`/actions/collect` 的兼容别名（legacy，当前仍保留）
-- `POST /actions/twitter-accounts/collect`：手动触发一次 Twitter 账号采集（只处理 enabled Twitter accounts，不生成日报产物）
-- `POST /actions/twitter-keywords/collect`：手动触发一次 Twitter 关键词搜索（只处理 `is_collect_enabled=1` 的关键词，不生成日报产物）
-- `POST /actions/hackernews/collect`：手动触发一次 Hacker News 搜索（只处理 `is_enabled=1` 的 HN query，不生成日报产物）
-- `POST /actions/bilibili/collect`：手动触发一次 B 站搜索（只处理 `is_enabled=1` 的 B 站 query，不生成日报产物）
-- `POST /actions/wechat-rss/collect`：手动触发一次微信公众号 RSS 采集（只处理 `is_enabled=1` 的公众号 RSS 链接，不生成日报产物）
-- `POST /actions/weibo/collect`：手动触发一次微博热搜榜匹配（固定 AI 关键词，只写入 `AI 热点` 候选，不生成日报产物）
-- `POST /actions/ai-timeline/collect`：兼容旧入口，当前返回 `410`，AI 时间线只能由外部 Codex 自动化生成并上传 Markdown feed
-- `GET /api/settings/ai-timeline`：登录后读取 AI 时间线 feed 查看页聚合读模型，包含主时间线状态、feed 来源状态、筛选选项和 feed 事件池
-- `GET /api/settings/ai-timeline/events`：登录后读取 AI 时间线 feed 事件池，支持类型、公司、等级、可见状态、最近天数和分页筛选
-- `GET /api/settings/ai-timeline-events`：登录后读取 AI 时间线后台候选事件的兼容旧入口，内部复用新读模型
-- `POST /actions/ai-timeline/events/:id/update`：兼容旧入口，当前返回 `410`，feed 事件在应用内只读
-- `POST /actions/content/:id/feedback-pool`：保存或覆盖当前内容卡片的反馈池条目
-- `POST /actions/view-rules/provider-settings`：按厂商保存或更新 API key
-- `POST /actions/view-rules/provider-settings/activation`：单独启用 / 停用某个已保存厂商，系统同一时间只保留一个启用厂商
-- `POST /actions/view-rules/provider-settings/delete`：删除指定厂商配置
-- `POST /actions/view-rules/content-filters`：按页面保存 `AI 新讯 / AI 热点` 的筛选开关配置
-- `PUT /actions/creative/finished-articles/:id/performance-feedback`：登录后保存公众号文章效果试验的最小人工指标；只接受非负整数和 `light / medium / heavy` 三档人工复述程度，标题、标题分组和读者任务快照由服务端按文章当前选择自动生成
-- `POST /actions/sources/create`、`POST /actions/sources/update`、`POST /actions/sources/delete`：新增、编辑、删除自定义 source；当前页面上的普通“新增来源”入口只提交 RSS payload，已有公众号来源暂时只保留库存展示、启停和删除能力
-- `POST /actions/twitter-accounts/create`、`POST /actions/twitter-accounts/update`、`POST /actions/twitter-accounts/delete`、`POST /actions/twitter-accounts/toggle`：新增、编辑、删除、启停 Twitter 账号配置；API key 不通过页面录入，只读取环境变量 `TWITTER_API_KEY`
-- Twitter 账号状态约定：`最近成功` 表示最近一次请求成功时间，`最近结果` 既可能是失败原因，也可能是“成功但 0 条可入库推文”这类结果提示
-- `POST /actions/twitter-keywords/create`、`POST /actions/twitter-keywords/update`、`POST /actions/twitter-keywords/delete`、`POST /actions/twitter-keywords/toggle-collect`、`POST /actions/twitter-keywords/toggle-visible`：新增、编辑、删除、切换关键词的 `采集启用` / `展示启用`；API key 不通过页面录入，只读取环境变量 `TWITTER_API_KEY`
-- Twitter 关键词状态约定：`最近成功` 表示最近一次搜索成功时间，`最近结果` 既可能是失败原因，也可能是“成功但 0 条可入库推文”这类结果提示；搜索 query 固定追加 `lang:zh`，并在入库前过滤掉日文假名 / 韩文内容；关闭 `展示启用` 后，只会隐藏该关键词命中的内容，不会删除历史数据
-- `POST /actions/hackernews/create`、`POST /actions/hackernews/update`、`POST /actions/hackernews/delete`、`POST /actions/hackernews/toggle`：新增、编辑、删除、切换 HN query 的 `采集启用`
-- Hacker News query 状态约定：`最近成功` 表示最近一次搜索成功时间，`最近结果` 既可能是失败原因，也可能是“成功但 0 条可入库候选内容”这类结果提示；第一版不支持单 query 的展示开关，也不支持内容页二级 HN query 筛选
-- `POST /actions/bilibili/create`、`POST /actions/bilibili/update`、`POST /actions/bilibili/delete`、`POST /actions/bilibili/toggle`：新增、编辑、删除、切换 B 站 query 的 `采集启用`
-- B 站 query 状态约定：`最近成功` 表示最近一次搜索成功时间，`最近结果` 既可能是失败原因，也可能是“成功但 0 条可入库候选视频”这类结果提示；第一版只搜视频，不支持单 query 的展示开关，也不支持内容页二级 B 站 query 筛选
-- `POST /actions/wechat-rss/create`、`POST /actions/wechat-rss/update`、`POST /actions/wechat-rss/delete`：批量新增、单条编辑、删除微信公众号 RSS 配置；新增 payload 支持换行或逗号分隔的多个 RSS 链接
-- 微信公众号 RSS 状态约定：`最近成功` 表示最近一次 RSS 请求成功时间，`最近结果` 既可能是失败原因，也可能是“成功但 0 条可入库候选内容”这类结果提示；删除 RSS 配置不会删除历史已入库内容
-- 微博热搜榜匹配状态约定：`最近成功` 表示最近一次微博热搜榜请求成功时间，`最近结果` 既可能是失败原因，也可能是“成功但没有命中 AI 相关微博热搜”这类结果提示；第一版固定 AI 关键词、不支持后台编辑，也不支持内容页二级微博关键词筛选
-- `POST /actions/feedback-pool/:id/delete`、`POST /actions/feedback-pool/clear`：删除单条反馈词、清空全部反馈池
-- 兼容约定：真实应用默认启用 `requireLogin=true` 的 unified shell；auth 开启时内容菜单仍允许匿名查看，但系统菜单、legacy 路由和所有写操作都需要登录；测试或未注入 auth 的场景仍可保持 legacy `/ -> 最新报告` 与 legacy 路由公开行为
+- 公开内容：`/`、`/ai-new`、`/ai-hot`；系统页：`/settings/view-rules`、`/settings/sources`、`/settings/wechat-mp`、`/settings/profile`；创作页：`/creative/*`、`/daily-digest`、`/monitor`。
+- 运维和兼容入口：`/health`、`/login`、`/logout`、`/history`、`/reports/:date`、`/control`。
+- AI 时间线 Markdown feed 公开入口为 `/feeds/ai-timeline-feed.md`；页面路由 `/ai-timeline` 与 `/settings/ai-timeline` 当前暂时下架，API、feed 回退和提醒链路继续运行。
+- 运行产物仅保留在 `data/`：报告位于 `data/reports/<YYYY-MM-DD>/`，已验证快照位于 `data/recovery-backups/<timestamp>/`，不得提交 Git。
 
-当前报告产物目录：
-
-- `data/reports/<YYYY-MM-DD>/report.json`：包含 `sourceKinds`、`issueUrls`、`sourceFailureCount`、`failedSourceKinds`
-- `data/reports/<YYYY-MM-DD>/report.html`：多源热点汇总 HTML 报告
-- `data/reports/<YYYY-MM-DD>/run-meta.json`：包含 `mailStatus`；collection-only 任务会写入 `not-sent-by-collection`
-- `data/recovery-backups/<YYYYMMDD-HHmmss>/hot-now.sqlite`：已通过完整性校验的 verified snapshot
-- `data/recovery-backups/<YYYYMMDD-HHmmss>/manifest.json`：快照时间、源库路径、完整性结果和表计数摘要
-
-当前仓库不再跟踪 `data/` 目录下的任何运行产物；live `data/hot-now.sqlite`、`data/reports/*` 和 `data/recovery-backups/*` 都只保留在本地。跨设备和服务器初始化如需使用快照，统一手动复制 verified snapshot。如果后续重新改回提交策略，必须同步更新本文档、`README.md` 和 `.gitignore`。
-
-如果你改了页面入口、路由、产物路径或产物格式，必须同步更新本文档和 `README.md`。
+页面细节、接口契约和配置说明以 `README.md` 为准；模块边界以 `docs/开发与模块化规范.md` 为准。
 
 ## 5. 运行与验证
 
@@ -228,9 +151,9 @@ SQLite 可靠性约定：
 2. 启动 `npm run dev`
 3. 打开 `/login` 并完成登录
 4. 如需验证内容筛选工作台，先进入 `/settings/view-rules` 检查 `AI 新讯 / AI 热点` 的筛选总览与开关保存，再检查 `反馈池` 的复制 / 删除 / 清空是否正常；`LLM 设置` 当前只保留配置入口，不会触发策略或重算
-5. 进入 `/settings/sources` 或 legacy `/control`，先手动执行一次普通 RSS 采集；如果已配置 `TWITTER_API_KEY`，再到 `/settings/sources` 的 Twitter 分区单独执行一次 Twitter 账号采集，并确认账号“最近成功 / 最近结果”回写；如需验证关键词搜索，再新增一个已启用且可展示的 Twitter 关键词，执行一次“手动采集 Twitter 关键词”，确认关键词“最近成功 / 最近结果”回写，并到 `/ai-new`、`/ai-hot` 检查结果可见性；如需验证 Hacker News 搜索，再新增一个已启用的 HN query，执行一次“手动采集 Hacker News”，确认 query“最近成功 / 最近结果”回写，并到 `/ai-new`、`/ai-hot` 检查结果可见性；如需验证 B 站搜索，再新增一个已启用的 B 站 query，执行一次“手动采集 B 站搜索”，确认 query“最近成功 / 最近结果”回写，并到 `/ai-new`、`/ai-hot` 检查结果可见性；如需验证微信公众号 RSS，再批量新增 RSS 链接，执行一次“手动采集公众号 RSS”，确认 RSS 行“最近成功 / 最近结果”回写，并到 `/ai-new`、`/ai-hot` 检查父级 `微信公众号 RSS` 与二级 RSS 筛选；如需验证微博热搜榜匹配，直接点击“手动匹配微博热搜榜”，确认“最近抓取 / 最近成功 / 最近结果”已回写，并到 `/ai-hot` 检查结果可见性、确认它不会进入 `/ai-new`；如需验证 AI 时间线，先确认 `AI_TIMELINE_FEED_URL` 或默认 `https://now.achuan.cc/feeds/ai-timeline-feed.md` 可访问且包含 `json ai-timeline-feed`，再到 `/settings/sources` 检查 feed 摘要卡片和入口，到 `/settings/ai-timeline` 检查只读 feed 状态与事件池，最后到 `/ai-timeline` 检查最近 7 天 feed 事件列表、官方来源链接、官方证据数量、可靠性状态、官方前瞻标注和中文重要性摘要；需要验证发信时，再单独触发一次“发送最新报告”
+5. 进入 `/settings/sources` 或 legacy `/control`，先手动执行一次普通 RSS 采集；如果已配置 `TWITTER_API_KEY`，再到 `/settings/sources` 的 Twitter 分区单独执行一次 Twitter 账号采集，并确认账号“最近成功 / 最近结果”回写；如需验证关键词搜索、Hacker News、B站、微信公众号 RSS 或微博热搜，分别使用该页对应手动入口并在 `/ai-new`、`/ai-hot` 检查结果可见性。AI 时间线页面当前下架，只验证 `AI_TIMELINE_FEED_URL` 或默认 `https://now.achuan.cc/feeds/ai-timeline-feed.md` 可访问且包含 `json ai-timeline-feed`，以及相关 API 返回有效数据；需要验证发信时，再单独触发一次“发送最新报告”
 6. 检查是否生成报告目录与 `report.json`、`report.html`、`run-meta.json`
-7. 检查 `/`、`/ai-new`、`/ai-hot`、`/ai-timeline`、`/settings/view-rules`、`/settings/sources`、`/settings/ai-timeline`、`/history`、`/reports/:date` 是否正常显示，并验证内容页 source 过滤条、共享排序切换、共享标题搜索、内容页策略摘要、内容卡片反馈面板、反馈池、AI 时间线筛选、AI 时间线 feed 事件池、feed 来源状态和 LLM 设置占位文案
+7. 检查 `/`、`/ai-new`、`/ai-hot`、`/settings/view-rules`、`/settings/sources`、`/settings/wechat-mp`、`/settings/profile`、`/history`、`/reports/:date` 是否正常显示，并验证内容页 source 过滤条、共享排序切换、共享标题搜索、内容页策略摘要、内容卡片反馈面板、反馈池和 LLM 设置占位文案
 
 ## 6. 配置与安全约束
 
@@ -334,58 +257,8 @@ SQLite 可靠性约定：
 
 ## 9. 当前阶段快照
 
-截至 `2026-04-24`，仓库状态可按下面理解：
-
-- 已有设计文档和实现计划
-- 已有主体实现与测试文件
-- Git 主分支已建立并同步远端
-- 当前工作区已完成 unified site 与多源采集阶段的最终验证：
-  - `npm run test` 通过，结果为 `91` 个测试文件、`500` 个测试全部通过
-  - `npm run build` 通过
-  - Playwright MCP 本地验收已跑通：`/login` 登录成功；`/`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常
-  - 浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持
-  - 内容页来源筛选写入 `localStorage['hot-now-content-sources']`，Twitter 二级筛选写入 `localStorage['hot-now-twitter-account-filter']` / `localStorage['hot-now-twitter-keyword-filter']`，微信公众号 RSS 二级筛选写入 `localStorage['hot-now-wechat-rss-filter']`
-- 真实 SMTP 发信已验证通过；当前采集链路与发信链路已拆开，采集只生成报告，发信单独读取最新报告；每日早报发信默认关闭，S 级 AI 时间线事件改为独立 5 分钟轮询并推送飞书 + 邮件
-- 原文抓取过程中出现过一次 `jsdom` 的 `Could not parse CSS stylesheet` 日志噪音，未阻断本轮任务完成；如果后续要收口发布质量，可以继续评估是否需要单独治理
-- Task4（single-user login + unified app shell）已落地：新增 `passwords/session` auth helper、登录页与统一壳层菜单路由，且保留 legacy 报告路由兼容
-- 真实入口已收口为“内容公开、系统受保护”：`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET` 现在是必填；auth 开启时 `/`、`/ai-new`、`/ai-hot` 允许匿名查看，但 `/settings/*`、legacy 路由和 `POST /actions/collect`、`POST /actions/send-latest-email`、`POST /actions/run` 都要求登录
-- 内容页评分已切为系统自动百分制，页面只保留 `补充反馈` 面板，不再提供收藏 / 点赞 / 点踩或手工评分表单
-- 多源采集后端已完成：`loadEnabledSourceIssues` / `runDailyDigest` 已接入多源并行汇总，单个 feed 失败不会阻断整次日报，只有全部 enabled sources 都失败时才会硬失败
-- 内置 RSS 源已扩展到 21 个，覆盖聚合日报、国际官方 AI 博客、国内热点资讯 / 快讯、科技媒体、开发者社区、创投资讯与综合新闻；新增内置源会作为 built-in source 写入 `content_sources`
-- Twitter 账号采集第一阶段已落地：账号配置独立存入 `twitter_accounts`，支持分类、优先级、是否采集回复、启停、最近成功和最近结果状态；推文采集通过 TwitterAPI.io `GET /twitter/user/last_tweets`，缺少 `TWITTER_API_KEY` 时只标记 Twitter 账号采集不可用，不影响普通 RSS 和微信公众号 RSS 采集
-- Twitter 关键词搜索第一阶段已落地：关键词配置独立存入 `twitter_search_keywords`，支持分类、优先级、`采集启用`、`展示启用`、最近成功和最近结果状态；搜索通过 TwitterAPI.io `GET /twitter/tweet/advanced_search`，当前只支持后台手动执行，query 固定追加 `lang:zh` 并在入库前排除日文假名 / 韩文内容，同时固定做 `5 × 10` 的成本限制：每次最多处理 5 个已启用关键词、每个关键词最多取前 10 条中文结果
-- Hacker News 搜索第一阶段已落地：query 配置独立存入 `hackernews_queries`，支持优先级、`采集启用`、最近成功和最近结果状态；搜索通过 Algolia `https://hn.algolia.com/api/v1/search`，当前只支持后台手动执行，并固定做“最近 7 天、每次最多处理 5 个已启用 query、每个 query 最多取前 10 条结果”的成本限制
-- B 站搜索第一阶段已落地：query 配置独立存入 `bilibili_queries`，支持优先级、`采集启用`、最近成功和最近结果状态；搜索通过 B 站公开搜索接口 `GET https://api.bilibili.com/x/web-interface/search/type`，当前只支持后台手动执行，并固定做 `5 × 10` 的成本限制：每次最多处理 5 个已启用 query、每个 query 最多取前 10 条视频结果；第一版只搜视频，结果同时进入 `AI 新讯` 与 `AI 热点`
-- 微信公众号 RSS 第一阶段已落地：RSS 链接配置独立存入 `wechat_rss_sources`，支持批量新增、单条编辑、删除、最近成功和最近结果状态；当前只支持后台手动执行，RSS 条目写入 `content_items` 后同时进入 `AI 新讯` 与 `AI 热点`，内容页支持 `微信公众号 RSS` 父级筛选和单个 RSS 二级筛选
-- 微博热搜榜匹配第一阶段已落地：不维护独立配置表，固定 AI 关键词直接匹配微博公开热搜接口 `GET https://weibo.com/ajax/side/hotSearch` 的 `realtime` 结果；当前只支持后台手动执行，不做微博全文搜索，命中内容只进入 `AI 热点`
-- 公众号写作管线 v2 已接入：`creative_source_items` 通过数据库迁移 44 保存账号适配等级、理由、详情、规则版本和评估时间；传播趋势分不再改变写作状态。`creative_finished_articles` 保存 `pipeline_version`、读者任务、账号适配上下文、证据包、读者价值方案、事实骨架、口述底稿、分组标题候选、事实来源清单和标题确认状态；旧文章的确认状态默认兼容为已确认。账号适配当前先以 `shadow` 模式评估和展示，不自动写作；正式启用后只允许高适配素材自动进入八阶段文章生产并按时间倒序处理。公众号写作入口不再展示或传递 A/B/C，短内容入口不受影响。效果反馈指标继续保存于 `performance_*`，前端由 `ArticlePerformanceFeedbackModal.vue` 快速录入；当前不做自动抓取、提醒和看板。权威需求与实施状态见 `/Users/tc-nihao/.hermes/scripts/prd/公众号写作管线-v2.md`
-- 创作列表性能治理已接入：数据库迁移 `46` 增加核心列表复合索引，迁移 `47` 补齐“显示已废弃”路径；Vue 列表使用 `view=summary`、每页默认 `30` 条，并取消仍在等待的旧分页请求。成品列表只加载 `96px` WebP 缩略图，点击预览时才读取原图；素材展开与文章弹窗继续按 ID 读取完整详情。未传 `view=summary` 的外部 Agent 仍获得完整响应，不得破坏这条兼容边界。
-- 2026-07-30 已完成依赖安全升级：生产依赖使用 Fastify 5.10、Markdown-it 14.3、Nodemailer 9.0 和安全补丁后的间接依赖，`npm audit --omit=dev` 为 0；开发链升级到 Vite 6.4、Vitest 3.2.7、Vue TSC 3.3.8。升级前后完整测试基线保持 21 个存量失败、548 个通过、1 个跳过，没有新增失败；`@vue/test-utils -> js-beautify` 仍有上游暂无兼容修复的仅开发态审计告警，不得用强制覆盖内部主版本的方式伪清零。
-- AI 时间线已切换为外部 Markdown feed 驱动：Codex 自动化负责联网查找官方事件、验证官方来源和官方发布时间、按 feed 契约生成事件并上传 `ai-timeline-feed.md`；应用侧优先读取 `AI_TIMELINE_FEED_FILE` 本地稳定文件，必要时再用 `AI_TIMELINE_FEED_URL` 兜底，解析唯一 `json ai-timeline-feed` 代码块并渲染 `/ai-timeline`、`/settings/sources` 的 feed 摘要和 `/settings/ai-timeline` 的只读事件池。应用内不再维护官方源白名单、官方源采集、重要性规则、事件证据表、源健康表或人工修正流程；历史 `ai_timeline_*` 表只保留迁移兼容，当前运行时不再读取。
-- Twitter / Hacker News / B 站 / 微信公众号 RSS / 微博热搜匹配内容统一写入现有 `content_items`，并在 `content_items.metadata_json` 保存 metrics、author、collector 和 matchedQueries 信息；为满足 `content_items.source_id` 外键，会维护六个隐藏的内部聚合 source：`twitter_accounts`、`twitter_keyword_search`、`hackernews_search`、`bilibili_search`、`wechat_rss` 和 `weibo_trending`，它们都不承载实际配置，也不会出现在 `/settings/sources` 的普通 source 库存表中；这些聚合 source 会作为内容页来源筛选项暴露，Twitter 账号、Twitter 关键词和微信公众号 RSS 额外支持二级筛选，关键词聚合 source 的内容是否展示还受关键词 `is_visible` 命中关系控制，Hacker News 和 B 站聚合 source 当前都不提供内容页二级 query 筛选，微博热搜聚合 source 只用于 `AI 热点`
-- 采集和发信已拆成两个独立功能：默认配置下采集每 `10` 分钟执行一次，发信每天 `10:00` 执行一次；两者都支持手动触发，并共用同一把运行锁
-- 系统菜单已收口到多源语义：`/settings/sources` 支持 source 启用/停用、source 级“选中时全量展示”策略、逐 source 最近抓取状态展示，以及统一站点内手动执行普通 RSS 采集、手动发送最新报告；当前普通“新增来源”入口只支持可视化新增 / 编辑 / 删除自定义 RSS 来源，RSS 只要求录入 `RSS URL`；公众号 RSS 现在由单独“微信公众号 RSS”分区维护，支持批量新增链接、单条编辑、删除配置和手动采集；页面还支持独立维护 Twitter 账号列表并单独执行 Twitter 手动采集、独立维护 Twitter 关键词列表并单独执行 Twitter 关键词搜索、独立维护 Hacker News query 列表并单独执行 Hacker News 搜索、独立维护 B 站 query 列表并单独执行 B 站搜索，也支持独立执行微博热搜榜匹配；这些扩展入口都不会混入普通 source 库存表；AI 时间线 feed 摘要、只读事件池和规则说明已独立到 `/settings/ai-timeline`；RSS 来源保存成功后会立即自动补拉这条来源的首批内容；本地开发默认仍会启动仓库内置公众号解析 sidecar，后续如需 IP 隔离再切远端 relay；`/settings/view-rules` 现在会解释并控制 `AI 新讯 / AI 热点` 的真实筛选开关，同时保留 `反馈池` 与 `LLM 设置（暂未使用）`；当前登录用户信息已并到侧边栏底部
-- 本地开发入口已收口到 `npm run dev`：脚本会自动拉起 Fastify、Vite dev server 和公众号解析 sidecar；`npm run dev:local` 只保留兼容转发，不再作为主调试入口
-- `/settings/sources` 现在会基于共享内容选择器实时展示“来源库存与统计”合并表，主表口径包含启停、选中时全量、总条数、今天发布、今天抓取和最近抓取状态；展开行展示 `AI 新讯 / AI 热点` 的入池、展示、占比统计和来源链接
-- `/settings/sources` 现在还会根据真实采集调度展示下一次自动采集时间；前端只做分钟级剩余时间回显，不自己推算调度边界
-- unified shell 已去掉顶部 header，页面信息和账号区都收进左侧侧边栏；视觉母版已切到借鉴 Canva 的冷感科技聚光双主题，主题切换与 localStorage 持久化已落地
-- `/settings/*` 现在统一走 Fastify 返回的客户端入口，由 `src/client/` 下的 `Vue 3 + Vite + Ant Design Vue` 页面接管，不再继续叠加新的服务端拼表单 HTML
-- `/`、`/ai-new`、`/ai-hot` 现在也统一走 Fastify 返回的客户端入口，由 `src/client/pages/content/` 下的 Vue 页面读取内容 API 渲染；`/articles` 已移除
-- unified shell 内容页已切到“聚光舞台 + 指挥台 + 卡片流”的层级；系统页、legacy 页面和登录页也统一收口到同一套冷感科技玻璃面板语义
-- 内容页顶部现在会渲染共享 source 过滤条与共享排序切换；勾选结果通过 `localStorage['hot-now-content-sources'] + x-hot-now-source-filter` header 驱动内容 API 过滤，Twitter 与微信公众号 RSS 的二级筛选分别通过对应 localStorage 和 header 驱动，排序偏好通过 `localStorage['hot-now-content-sort'] + x-hot-now-content-sort` header 驱动内容 API 排序，只影响当前浏览结果，不参与系统页统计口径
-- 当来源筛选命中 `twitter_accounts` 或 `twitter_keyword_search` 时，内容页还会额外通过 `localStorage['hot-now-twitter-account-filter'] + x-hot-now-twitter-account-filter`、`localStorage['hot-now-twitter-keyword-filter'] + x-hot-now-twitter-keyword-filter` 驱动二级账号 / 关键词过滤；如果第一层未选中对应 Twitter 聚合来源，后端会忽略对应二级筛选参数
-- 内容页顶部现在还会渲染共享标题搜索框；生效关键词通过 `localStorage['hot-now-content-search'] + x-hot-now-content-search` header 驱动内容 API 做标题过滤，再进入分页切片
-- 内容页 API 仍支持 `page` query 分页；前端浏览改为触底自动加载下一页，筛选、排序或搜索变化后会自动回到第一页重新累计列表
-- 开启“选中时全量展示”的 source 在内容页首次进入时默认不勾选；只有用户显式勾选后，该 source 才会免受普通 view limit 截断
-- 内容页现在会把当前反馈池条目回填到局部反馈面板，内容交互形成 `补充反馈 -> 反馈池` 的轻量闭环
-- `/settings/view-rules` 不再提供正式自然语言策略、草稿池或重算入口；当前内容页筛选改由 `view_rule_configs` 中的页面级开关控制，`LLM 设置` 当前仍只保留配置，不参与内容页筛选和采集后的自动评估
-- 内容页现在对本地内容库损坏做了降级兜底：检测到 `SQLITE_CORRUPT` / `SQLITE_NOTADB` 时继续渲染统一站点，并提示修复或重建 `data/hot-now.sqlite`
-- 启动入口现在会对 `data/hot-now.sqlite` 做 SQLite 健康检查；如果主库损坏，会提示最近的 verified snapshot 和 `npm run db:restore -- <snapshot-file>` 恢复命令
-- graceful shutdown 现在会执行真实的 `wal_checkpoint(TRUNCATE)`，减少把 live 库直接当普通文件同步时产生坏快照的风险
-- 已新增 `npm run db:check`、`npm run db:snapshot`、`npm run db:restore -- <snapshot-file>`，并把 verified snapshot 目录收口为 `data/recovery-backups/<timestamp>/`
-- `data/` 目录下的 live 库、报告产物和 verified snapshot 都已收口为本地运行文件，不再作为常规 git 产物；跨设备和服务器如需使用快照，改为手动复制 verified snapshot
-- 已接入 `DeepSeek`、`MiniMax`、`Kimi` 三个厂商配置项；每个厂商会分别保存自己的 API key，但同一时间只允许一个启用厂商；API key 通过页面录入后会优先使用 `LLM_SETTINGS_MASTER_KEY` 加密落库；当前版本先只保留配置入口，不参与内容筛选
-- 报告层已切到多源语义：`report.json` / `report.html` / 邮件正文会保留 `sourceKinds`、`issueUrls`、失败 source 数量等信息，不再把输出描述成单一日报
-- legacy `/history`、`/reports/:date`、`/control` 与 unified shell 共存，且相关测试和文档已同步
-
-如果后续有人补充了更完整的端到端验证、继续扩展 source adapter，或确认上述日志噪音属于需要修复的问题，请同步更新这一节，避免误导下一位协作者。
+- 结构治理已完成服务端业务域收口、核心 repository 读写边界、`main.ts` 启动装配，以及来源工作台表单生命周期拆分；不再为了行数继续机械拆分。
+- 数据库历史迁移保持兼容：`001`–`013` 使用独立文件，`014`–`047` 保留现有实现，下一次真实迁移从 `048` 起独立归档。
+- AI 时间线 feed 与提醒链路仍运行，但 Vue 页面路由暂时下架；恢复必须同步代码、测试、`README.md`、本文和 `CLAUDE.md`。
+- 测试通过情况以本次实际执行的命令和 CI 结果为准，不在本文件维护会过期的测试数量。
+- 大文件治理的历史过程、基线和部署记录见 `docs/性能优化基线.md`；公众号写作管线以 Hermes PRD 为准。

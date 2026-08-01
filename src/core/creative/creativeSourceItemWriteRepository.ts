@@ -64,6 +64,8 @@ export function insertCreativeSourceItem(
 
   const rawPayloadJson = JSON.stringify(input);
   const direction = input.direction ?? "article";
+  // 长内容必须先过账号适配门禁，外部调用方传入 ready 也不能绕过。
+  const writingStatus = direction === "article" ? "pending" : (input.writingStatus ?? "ready");
   // seq_number：同 direction 内从 1 递增（幂等命中已走 UPDATE 分支，这里是新建）
   const seqRow = db.prepare(
     "SELECT COALESCE(MAX(seq_number), 0) + 1 AS next FROM creative_source_items WHERE direction = ?"
@@ -114,7 +116,7 @@ export function insertCreativeSourceItem(
     input.score ?? null,
     input.publishedAt ?? null,
     input.collectorTimestamp ?? null,
-    input.writingStatus ?? "ready",
+    writingStatus,
     rawPayloadJson,
     input.trendScore ?? null,
     input.trendBreakdown ? JSON.stringify(input.trendBreakdown) : null,
@@ -198,7 +200,7 @@ export function updateCreativeSourceItemTrendScore(
 }
 
 /**
- * 保存账号适配度；只有正式准入模式才同步写作状态，影子评估不会改变现有队列。
+ * 保存账号适配度；队列服务决定准入后的写作状态，回写只保存评估事实。
  */
 export function updateCreativeSourceItemAccountFit(
   db: SqliteDatabase,

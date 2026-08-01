@@ -14,6 +14,9 @@ const expectedTables = [
   "content_nl_evaluations",
   "content_ratings",
   "content_sources",
+  "creative_automation_alert_state",
+  "creative_automation_jobs",
+  "creative_automation_settings",
   "creative_finished_articles",
   "creative_source_items",
   "daily_digests",
@@ -80,7 +83,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(47);
+    expect(schemaVersion).toBe(48);
 
     const appliedMigrations = db
       .prepare(
@@ -139,7 +142,8 @@ describe("runMigrations", () => {
       { version: 44, name: "044_source_items_account_fit" },
       { version: 45, name: "045_finished_articles_manual_and_pinning" },
       { version: 46, name: "046_creative_list_performance_indexes" },
-      { version: 47, name: "047_all_finished_articles_performance_index" }
+      { version: 47, name: "047_all_finished_articles_performance_index" },
+      { version: 48, name: "048_creative_account_fit_automation" }
     ]);
 
     const performanceIndexes = db
@@ -653,7 +657,7 @@ describe("runMigrations", () => {
     expect(evidenceTable).toBeTruthy();
     expect(sourceRunsTable).toBeTruthy();
     expect(notificationsTable).toBeTruthy();
-    expect(db.pragma("user_version", { simple: true })).toBe(47);
+    expect(db.pragma("user_version", { simple: true })).toBe(48);
 
     // daily_digests 表验证
     const digestTable = db

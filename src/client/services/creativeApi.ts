@@ -548,19 +548,40 @@ export function writeSourceItemArticle(id: number, thesis?: string, forceAccount
 
 export type EvaluateAccountFitResult = {
   ok: boolean;
-  accountFit?: {
-    level: AccountFitLevel;
-    reason: string;
-    details: AccountFitDetails;
-    ruleVersion: string;
-  };
+  status?: "queued";
+  taskId?: number;
   reason?: string;
 };
 
-/** 立即评估并持久化单条素材的账号适配度。 */
+/** 将单条适配度评估加入持久化队列；完成后由素材列表轮询刷新结果。 */
 export function evaluateSourceItemAccountFit(id: number): Promise<EvaluateAccountFitResult> {
   return requestJson<EvaluateAccountFitResult>(`/api/creative/source-items/${id}/evaluate-account-fit`, {
     method: "POST"
+  });
+}
+
+export type CreativeAutomationStatus = {
+  ok: boolean;
+  autoEvaluateEnabled: boolean;
+  autoWriteEnabled: boolean;
+  pendingEvaluationCount: number;
+  pendingWriteCount: number;
+  retryingJobCount: number;
+  expiredAutomaticWriteCount: number;
+  automaticWriteDispatchedToday: number;
+  latestErrors: Array<{ jobType: "evaluate" | "write"; sourceItemId: number; error: string; updatedAt: string }>;
+};
+
+/** 读取 HotNow 本地账号适配/写作队列状态，不代理 Hermes 内部内存队列。 */
+export function fetchCreativeAutomationStatus(): Promise<CreativeAutomationStatus> {
+  return requestJson<CreativeAutomationStatus>("/api/creative/automation/status");
+}
+
+/** 分别控制自动评估或自动写作，关闭后不会影响人工操作。 */
+export function updateCreativeAutomationEnabled(kind: "evaluate" | "write", enabled: boolean): Promise<CreativeAutomationStatus> {
+  return requestJson<CreativeAutomationStatus>(`/api/creative/automation/${kind}/enabled`, {
+    method: "POST",
+    body: JSON.stringify({ enabled }),
   });
 }
 

@@ -8,12 +8,22 @@ import CodexTaskQueue from "../../components/monitor/CodexTaskQueue.vue";
 import CodexConsumption from "../../components/monitor/CodexConsumption.vue";
 import SourceItemDetailModal from "../../components/creative/SourceItemDetailModal.vue";
 import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
-import { fetchWriteQueueStatus, readCreativeFinishedArticle, type WriteQueueStatus, type CreativeFinishedArticle } from "../../services/creativeApi.js";
+import {
+  fetchCreativeAutomationStatus,
+  fetchWriteQueueStatus,
+  readCreativeFinishedArticle,
+  updateCreativeAutomationEnabled,
+  type CreativeAutomationStatus,
+  type WriteQueueStatus,
+  type CreativeFinishedArticle,
+} from "../../services/creativeApi.js";
 
 // ─── 写作队列状态 ───
 const queueData = ref<WriteQueueStatus | null>(null);
 let queueTimer: ReturnType<typeof setInterval> | null = null;
 let queueRefreshRequest: Promise<void> | null = null;
+const automationData = ref<CreativeAutomationStatus | null>(null);
+let automationUpdating = false;
 
 // 实时耗时计时驱动（每秒刷新）
 const elapsedNow = ref(Date.now());
@@ -33,6 +43,25 @@ function formatElapsed(iso: string | null | undefined): string {
 }
 
 /** 合并重叠的队列刷新；请求失败时保留最后一次可用状态。 */
+/** 本地队列与 Hermes 队列分别读取，避免将外部内存状态误当作恢复依据。 */
+async function refreshAutomation(): Promise<void> {
+  try {
+    automationData.value = await fetchCreativeAutomationStatus();
+  } catch {
+    // Hermes 监控短暂不可用时，本地自动化状态仍可独立失败，不清空上次结果。
+  }
+}
+
+async function setAutomationEnabled(kind: "evaluate" | "write", enabled: boolean): Promise<void> {
+  if (automationUpdating) return;
+  automationUpdating = true;
+  try {
+    automationData.value = await updateCreativeAutomationEnabled(kind, enabled);
+  } finally {
+    automationUpdating = false;
+  }
+}
+
 function refreshQueue(): Promise<void> {
   if (queueRefreshRequest) return queueRefreshRequest;
   queueRefreshRequest = fetchWriteQueueStatus()
@@ -50,12 +79,18 @@ function refreshQueue(): Promise<void> {
 
 /** 页面隐藏时停止队列轮询，避免后台请求占用同源连接。 */
 function refreshQueueWhenVisible(): void {
-  if (!document.hidden) void refreshQueue();
+  if (!document.hidden) {
+    void refreshQueue();
+    void refreshAutomation();
+  }
 }
 
 /** 用户回到监控页时立即刷新队列状态。 */
 function handleQueueVisibilityChange(): void {
-  if (!document.hidden) void refreshQueue();
+  if (!document.hidden) {
+    void refreshQueue();
+    void refreshAutomation();
+  }
 }
 
 // 素材详情弹窗
@@ -92,6 +127,7 @@ function closeArticleDetail(): void {
 
 onMounted(() => {
   void refreshQueue();
+  void refreshAutomation();
   queueTimer = setInterval(refreshQueueWhenVisible, 15_000);
   document.addEventListener("visibilitychange", handleQueueVisibilityChange);
   elapsedTimer = setInterval(() => { elapsedNow.value = Date.now(); }, 1000);
@@ -110,6 +146,28 @@ onBeforeUnmount(() => {
       <MonitorStatsCards />
       <MonitorSwitches />
     </div>
+
+    <!-- HotNow 本地准入队列：任务重试、过期和日配额均以 SQLite 为准。 -->
+    <section v-if="automationData" class="rounded-lg border border-editorial-border bg-white p-4">
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">账号适配自动化</h3>
+        <div class="flex items-center gap-2 text-xs">
+          <a-switch :checked="automationData.autoEvaluateEnabled" :loading="automationUpdating" checked-children="自动评估" un-checked-children="评估暂停" @change="setAutomationEnabled('evaluate', $event)" />
+          <a-switch :checked="automationData.autoWriteEnabled" :loading="automationUpdating" checked-children="自动写作" un-checked-children="写作暂停" @change="setAutomationEnabled('write', $event)" />
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div class="rounded border border-gray-100 bg-gray-50 px-3 py-2 text-center"><div class="text-lg font-bold">{{ automationData.pendingEvaluationCount }}</div><div class="text-[11px] text-editorial-text-muted">待评估</div></div>
+        <div class="rounded border border-gray-100 bg-gray-50 px-3 py-2 text-center"><div class="text-lg font-bold">{{ automationData.pendingWriteCount }}</div><div class="text-[11px] text-editorial-text-muted">待写作</div></div>
+        <div class="rounded border border-gray-100 bg-gray-50 px-3 py-2 text-center"><div class="text-lg font-bold">{{ automationData.retryingJobCount }}</div><div class="text-[11px] text-editorial-text-muted">重试中</div></div>
+        <div class="rounded border border-gray-100 bg-gray-50 px-3 py-2 text-center"><div class="text-lg font-bold">{{ automationData.expiredAutomaticWriteCount }}</div><div class="text-[11px] text-editorial-text-muted">自动过期</div></div>
+        <div class="rounded border border-gray-100 bg-gray-50 px-3 py-2 text-center"><div class="text-lg font-bold">{{ automationData.automaticWriteDispatchedToday }}/10</div><div class="text-[11px] text-editorial-text-muted">今日自动投递</div></div>
+        <div class="rounded border border-gray-100 bg-gray-50 px-3 py-2 text-center"><div class="text-lg font-bold">{{ automationData.latestErrors.length }}</div><div class="text-[11px] text-editorial-text-muted">最近异常</div></div>
+      </div>
+      <div v-if="automationData.latestErrors.length" class="mt-3 space-y-1 text-xs text-orange-700">
+        <div v-for="error in automationData.latestErrors" :key="`${error.jobType}-${error.sourceItemId}-${error.updatedAt}`">{{ error.jobType === 'evaluate' ? '评估' : '写作' }} #{{ error.sourceItemId }}：{{ error.error }}</div>
+      </div>
+    </section>
 
     <!-- 写作队列 -->
     <section class="rounded-lg border border-editorial-border bg-white p-4">

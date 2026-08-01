@@ -439,7 +439,7 @@ describe("accountFit", () => {
     });
 
     expect(findCreativeSourceItemById(handle.db, item.id)).toMatchObject({
-      writingStatus: "ready",
+      writingStatus: "pending",
       accountFitLevel: "high",
       accountFitReason: "直接影响轻度用户的订阅选择",
       accountFitRuleVersion: "v1",

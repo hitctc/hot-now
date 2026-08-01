@@ -108,7 +108,7 @@ describe("PUT /actions/creative/source-items/:id/account-fit", () => {
 
     expect(response.statusCode).toBe(200);
     expect(findCreativeSourceItemById(handle.db, item.id)).toMatchObject({
-      writingStatus: "ready",
+      writingStatus: "pending",
       accountFitLevel: "high",
       accountFitRuleVersion: "v1"
     });

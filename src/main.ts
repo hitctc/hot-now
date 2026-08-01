@@ -25,6 +25,7 @@ import { runBilibiliCollection } from "./core/bilibili/runBilibiliCollection.js"
 import { runWechatRssCollection } from "./core/wechatRss/runWechatRssCollection.js";
 import { runWeiboTrendingCollection } from "./core/weibo/runWeiboTrendingCollection.js";
 import { createServer } from "./server/createServer.js";
+import { CreativeAutomationService } from "./core/creative/creativeAutomationService.js";
 
 // 本地直接跑 tsx watch src/main.ts 时也要和 npm run dev 一样吃到根目录 .env。
 loadRootEnvFile();
@@ -49,6 +50,13 @@ const hackerNewsLock = createRunLock();
 const bilibiliLock = createRunLock();
 const weiboLock = createRunLock();
 const juyaLock = createRunLock();
+const creativeAutomation = new CreativeAutomationService(
+  db,
+  config,
+  process.env.HERMES_API_BASE_URL?.trim() && process.env.HERMES_API_TOKEN?.trim()
+    ? { baseUrl: process.env.HERMES_API_BASE_URL.trim(), token: process.env.HERMES_API_TOKEN.trim() }
+    : null,
+);
 // Collection runs now stop after report generation so recurring fetches no longer send mail as a side effect.
 async function runCollectionTask(triggerType: DailyReportTrigger) {
   return await runCollectionCycle(config, triggerType, {
@@ -200,6 +208,7 @@ const app = createServer(createRuntimeServerDeps({
   db,
   config,
   creativeApiToken: process.env.CREATIVE_API_TOKEN,
+  creativeAutomation,
   clientDevOrigin: process.env.HOT_NOW_CLIENT_DEV_ORIGIN?.trim() || undefined,
   hasTwitterApiKey: Boolean(process.env.TWITTER_API_KEY?.trim()),
   isRunning: () => lock.isRunning(),
@@ -222,6 +231,9 @@ if (!existsSync(clientIndexPath)) {
     "未找到客户端入口文件，/settings/* 将回退到最小 HTML 兜底，请先执行 npm run build:client"
   );
 }
+
+// 账号适配和写作各自单 worker；任务状态已落 SQLite，重启后由首轮恢复扫描续跑。
+creativeAutomation.start();
 
 const collectionScheduler = startCollectionScheduler(config, async () => {
   try {
@@ -280,6 +292,7 @@ installGracefulShutdown({
     }
   },
   closeServer: async () => {
+    creativeAutomation.stop();
     await app.close();
   },
   checkpointDatabase: () => {

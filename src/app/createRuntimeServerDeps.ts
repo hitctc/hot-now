@@ -49,6 +49,7 @@ export type RuntimeServerActionDeps = Pick<ServerDeps,
   | "triggerManualWechatRssCollect"
   | "triggerManualWeiboTrendingCollect"
   | "triggerManualJuyaCollect"
+  | "creativeAutomation"
 >;
 
 export type RuntimeServerDepsInput = RuntimeServerActionDeps & {

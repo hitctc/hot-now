@@ -86,7 +86,7 @@ async function handleWritingAction(
   }
 }
 
-// ─── 素材库写文章（支持多篇并行） ───
+// ─── 素材库写文章：请求进入持久化准入/写作队列 ───
 const writingIds = ref<Set<number>>(new Set());
 
 // Vue 3 ref<Set> 的 delete 不自动触发响应式，需要替换整个 Set
@@ -140,7 +140,7 @@ async function confirmManualWrite(): Promise<void> {
       thesis: manualThesis.value.trim() || undefined,
     });
     if (result.ok && result.sourceItemId) {
-      message.success(`已提交写作（素材#${result.sourceItemId}）`);
+      message.success(`已加入写作准入队列（素材#${result.sourceItemId}）`);
       manualWriteVisible.value = false;
       loadItems();
     } else {
@@ -352,55 +352,25 @@ async function confirmWriteMode(): Promise<void> {
   if (!item) return;
   writeModeConfirming.value = true;
   try {
-    if (!item.accountFitLevel) {
-      const evaluated = await evaluateSourceItemAccountFit(item.id);
-      if (!evaluated.ok || !evaluated.accountFit) {
-        message.error(evaluated.reason ?? "账号适配度评估失败");
-        return;
-      }
-      Object.assign(item, {
-        accountFitLevel: evaluated.accountFit.level,
-        accountFitReason: evaluated.accountFit.reason,
-        accountFitDetails: evaluated.accountFit.details,
-        accountFitRuleVersion: evaluated.accountFit.ruleVersion,
-        accountFitEvaluatedAt: new Date().toISOString()
-      });
-    }
-    if (item.accountFitLevel === "error") {
-      message.error(item.accountFitReason || "账号适配度评估失败，请重试");
-      return;
-    }
-    if (item.accountFitLevel === "insufficient") {
-      message.warning(item.accountFitReason || "素材信息仍然不足，暂不进入写作");
-      return;
-    }
-    if (item.accountFitLevel === "low" && !writeModeLowConfirmed.value) {
-      writeModeLowConfirmed.value = true;
-      message.warning("该素材为低适配；请查看原因，再次点击“仍然写作”即可强制继续");
-      return;
-    }
-
     const result = await writeSourceItemArticle(
       item.id,
       writeModeThesis.value.trim() || undefined,
-      item.accountFitLevel === "low" && writeModeLowConfirmed.value
+      item.accountFitLevel === "low" && writeModeLowConfirmed.value,
     );
     if (result.ok) {
       writeModeVisible.value = false;
-      addWritingId(item.id);
-      if (result.taskId) writingTaskIds.set(item.id, result.taskId);
-      // 更新本地状态为 writing
-      const local = items.value.find(i => i.id === item.id);
-      if (local) local.writingStatus = "writing";
-      startWritingPoll(item);
+      message.success(item.accountFitLevel ? "已加入手动写作队列" : "已加入账号适配队列，符合条件后会自动续接写作");
+      await loadItems();
+    } else if (result.reason === "account-fit-low-confirmation-required" && !writeModeLowConfirmed.value) {
+      writeModeLowConfirmed.value = true;
+      message.warning("该素材为低适配；请查看原因，再次点击“仍然写作”即可强制继续");
     } else {
       message.error(result.reason ?? "文章生成失败");
     }
   } catch (err) {
-    if (err instanceof HttpError && err.status === 409) {
-      const detail = (err.body as { error?: string })?.error ?? "该素材正在写作中";
-      message.warning(detail);
-      writeModeVisible.value = false;
+    if (err instanceof HttpError && err.status === 422 && !writeModeLowConfirmed.value) {
+      writeModeLowConfirmed.value = true;
+      message.warning("该素材为低适配；请查看原因，再次点击“仍然写作”即可强制继续");
     } else {
       message.error("写文章请求失败");
     }
@@ -409,23 +379,17 @@ async function confirmWriteMode(): Promise<void> {
   }
 }
 
-/** 手动重评单条素材，适用于历史素材和需要重新判断的边界案例。 */
+/** 手动重评单条素材，和自动评估共享持久化单 worker。 */
 async function handleAccountFitEvaluation(item: CreativeSourceItem): Promise<void> {
   actionPendingId.value = item.id;
   try {
-    const evaluated = await evaluateSourceItemAccountFit(item.id);
-    if (!evaluated.ok || !evaluated.accountFit) {
-      message.error(evaluated.reason ?? "账号适配度评估失败");
+    const result = await evaluateSourceItemAccountFit(item.id);
+    if (!result.ok) {
+      message.error(result.reason ?? "账号适配度评估请求失败");
       return;
     }
-    Object.assign(item, {
-      accountFitLevel: evaluated.accountFit.level,
-      accountFitReason: evaluated.accountFit.reason,
-      accountFitDetails: evaluated.accountFit.details,
-      accountFitRuleVersion: evaluated.accountFit.ruleVersion,
-      accountFitEvaluatedAt: new Date().toISOString()
-    });
-    message.success(`账号适配度：${accountFitLabel(evaluated.accountFit.level)}`);
+    message.success(result.reason === "job-already-active" ? "该素材已在评估队列中" : "已加入账号适配评估队列");
+    await loadItems();
   } catch {
     message.error("账号适配度评估请求失败");
   } finally {
@@ -514,7 +478,7 @@ const pagination = computed(() => ({
         素材：{{ writeModeTarget.title.slice(0, 60) }}{{ writeModeTarget.title.length > 60 ? '...' : '' }}
       </div>
       <p class="mb-0 text-xs leading-5 text-editorial-text-muted">
-        写作前会先读取账号适配度；未评估素材会当场评估，低适配需要再次确认。
+        写作前会经过账号适配队列；未评估素材完成后，高/中适配会自动续接，低适配需要再次确认。
       </p>
       <a-alert
         v-if="writeModeTarget?.accountFitLevel"

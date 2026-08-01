@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import type { SqliteDatabase } from "../../core/db/openDatabase.js";
+import type { CreativeAutomationService } from "../../core/creative/creativeAutomationService.js";
 import {
   findCreativeSourceItemById,
   insertCreativeSourceItem,
@@ -14,6 +15,7 @@ import {
 
 export type CreativeSourceActionRouteOptions = {
   db?: SqliteDatabase;
+  automation?: CreativeAutomationService;
   authorizeCreativeApiToken: (request: FastifyRequest, reply: FastifyReply) => boolean;
   hasCreativeApiToken: (request: FastifyRequest) => boolean;
   authorizeSession: (request: FastifyRequest, reply: FastifyReply) => boolean;
@@ -77,6 +79,10 @@ export function registerCreativeSourceActionRoutes(
       direction: typeof body?.direction === "string" ? body.direction : undefined
     });
 
+    if (result.created) {
+      // 长内容创建后立即唤醒持久化评估队列；重复采集不会新增任务。
+      options.automation?.onSourceCreated(result.id);
+    }
     return reply.code(result.created ? 201 : 200).send({
       id: result.id,
       externalId,
@@ -84,87 +90,51 @@ export function registerCreativeSourceActionRoutes(
     });
   });
 
-  // ─── 素材库写文章：调用 Hermes write-article API，异步执行 ───
+  // ─── 本地自动化状态与开关：只控制 HotNow 的自动任务，人工动作始终可用 ───
+  app.get("/api/creative/automation/status", async (request, reply) => {
+    if (!options.authorizeSession(request, reply)) return;
+    if (!options.automation) return reply.code(503).send({ ok: false, reason: "creative-automation-not-available" });
+    return reply.send({ ok: true, ...options.automation.getStatus() });
+  });
+
+  app.post("/api/creative/automation/:kind/enabled", async (request, reply) => {
+    if (!options.authorizeSession(request, reply)) return;
+    if (!options.automation) return reply.code(503).send({ ok: false, reason: "creative-automation-not-available" });
+    const kind = (request.params as { kind: string }).kind;
+    const enabled = (request.body as { enabled?: unknown } | undefined)?.enabled;
+    if ((kind !== "evaluate" && kind !== "write") || typeof enabled !== "boolean") return reply.code(400).send({ ok: false, reason: "invalid-automation-setting" });
+    options.automation.setEnabled(kind, enabled);
+    return reply.send({ ok: true, ...options.automation.getStatus() });
+  });
+
+  // ─── 素材库写文章：先进入 HotNow 持久化队列，再由单 worker 投递 Hermes ───
   app.post("/api/creative/source-items/:id/write-article", async (request, reply) => {
-    if (!options.authorizeSession(request, reply)) { return; }
-    if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
+    if (!options.authorizeSession(request, reply)) return;
+    if (!db || !options.automation) return reply.code(503).send({ ok: false, reason: "creative-automation-not-available" });
 
     const id = parseInt((request.params as { id: string }).id, 10);
     const body = request.body as { thesis?: string; forceAccountFit?: boolean } | undefined;
-    const item = findCreativeSourceItemById(db, id);
-    if (!item) { return reply.code(404).send({ ok: false, reason: "source-item-not-found" }); }
-
-    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
-    const hermesApiToken = process.env.HERMES_API_TOKEN;
-    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
-
-    const hermesBody: Record<string, unknown> = { sourceItemId: id };
-    if (typeof body?.thesis === "string" && body.thesis.trim()) {
-      hermesBody.thesis = body.thesis.trim();
+    const result = options.automation.enqueueManualWrite(
+      id,
+      typeof body?.thesis === "string" ? body.thesis.trim() || undefined : undefined,
+      body?.forceAccountFit === true,
+    );
+    if (!result.accepted) {
+      const status = result.reason === "account-fit-low-confirmation-required" ? 422 : result.reason === "source-item-not-found" ? 404 : 409;
+      return reply.code(status).send({ ok: false, reason: result.reason });
     }
-    if (body?.forceAccountFit === true) {
-      hermesBody.forceAccountFit = true;
-    }
-
-    try {
-      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/write-article`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
-        body: JSON.stringify(hermesBody),
-        signal: AbortSignal.timeout(15_000),
-      });
-
-      if (!res.ok) {
-        const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
-        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, hermesResponse: errorBody });
-      }
-
-      const data = await res.json() as { success: boolean; status?: string; task_id?: string; message?: string; error?: string };
-      if (!data.success) {
-        return reply.code(502).send({ ok: false, reason: data.error ?? "写文章失败", hermesResponse: JSON.stringify(data) });
-      }
-
-      return reply.send({ ok: true, status: data.status ?? "writing", taskId: data.task_id });
-    } catch (err) {
-      const errMessage = (err as Error).message ?? String(err);
-      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败`, detail: errMessage });
-    }
+    return reply.code(202).send({ ok: true, status: "queued", taskId: result.jobId });
   });
 
-  // ─── 手动评估账号适配度：由 Hermes 完成判断并回写本素材 ───
+  // ─── 手动评估账号适配度：与自动任务共用单 worker，不阻塞页面请求 ───
   app.post("/api/creative/source-items/:id/evaluate-account-fit", async (request, reply) => {
-    if (!options.authorizeSession(request, reply)) { return; }
-    if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
-
+    if (!options.authorizeSession(request, reply)) return;
+    if (!db || !options.automation) return reply.code(503).send({ ok: false, reason: "creative-automation-not-available" });
     const id = parseInt((request.params as { id: string }).id, 10);
-    if (!findCreativeSourceItemById(db, id)) {
-      return reply.code(404).send({ ok: false, reason: "source-item-not-found" });
-    }
-    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
-    const hermesApiToken = process.env.HERMES_API_TOKEN;
-    if (!hermesApiUrl || !hermesApiToken) {
-      return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" });
-    }
-
-    try {
-      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/evaluate-account-fit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
-        body: JSON.stringify({ sourceItemId: id }),
-        signal: AbortSignal.timeout(120_000),
-      });
-      const responseBody = await res.text();
-      return reply
-        .code(res.status >= 500 ? 502 : res.status)
-        .header("Content-Type", "application/json; charset=utf-8")
-        .send(responseBody);
-    } catch (err) {
-      return reply.code(502).send({
-        ok: false,
-        reason: "Hermes 适配度评估失败",
-        detail: (err as Error).message
-      });
-    }
+    if (!findCreativeSourceItemById(db, id)) return reply.code(404).send({ ok: false, reason: "source-item-not-found" });
+    const result = options.automation.enqueueManualEvaluation(id);
+    if (!result.accepted && result.reason !== "job-already-active") return reply.code(409).send({ ok: false, reason: result.reason });
+    return reply.code(202).send({ ok: true, status: "queued", taskId: result.jobId, reason: result.reason });
   });
 
   // ─── 短内容素材写短内容：调用 Hermes /api/short/write，异步执行 ───
@@ -226,10 +196,6 @@ export function registerCreativeSourceActionRoutes(
       return reply.code(400).send({ ok: false, reason: "content-required" });
     }
 
-    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
-    const hermesApiToken = process.env.HERMES_API_TOKEN;
-    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
-
     // 生成素材字段
     const title = typeof body?.title === "string" && body.title.trim() ? body.title.trim() : content.slice(0, 50).replace(/\n/g, " ");
     const externalId = `manual-${Date.now()}`;
@@ -242,42 +208,12 @@ export function registerCreativeSourceActionRoutes(
       sourceName: "手动输入",
       summary: contentType === "viewpoint" ? content : content.slice(0, 300),
       fullContent: content,
-      writingStatus: "writing",
     });
 
-    // 调用 Hermes 写文章
-    const hermesBody: Record<string, unknown> = { sourceItemId: result.id };
-    // mode 仅为短内容页面保留兼容；公众号 v2 页面不会再发送该字段。
-    if (body?.mode && ["A", "B", "C"].includes(body.mode)) {
-      hermesBody.mode = body.mode;
-    }
-    if (typeof body?.thesis === "string" && body.thesis.trim()) {
-      hermesBody.thesis = body.thesis.trim();
-    }
-
-    try {
-      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/write-article`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
-        body: JSON.stringify(hermesBody),
-        signal: AbortSignal.timeout(15_000),
-      });
-
-      if (!res.ok) {
-        const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
-        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, hermesResponse: errorBody });
-      }
-
-      const data = await res.json() as { success: boolean; status?: string; message?: string; error?: string };
-      if (!data.success) {
-        return reply.code(502).send({ ok: false, reason: data.error ?? "写文章失败", hermesResponse: JSON.stringify(data) });
-      }
-
-      return reply.send({ ok: true, sourceItemId: result.id });
-    } catch (err) {
-      const errMessage = (err as Error).message ?? String(err);
-      return reply.code(502).send({ ok: false, reason: "Hermes 调用失败", detail: errMessage });
-    }
+    if (!options.automation) return reply.code(503).send({ ok: false, reason: "creative-automation-not-available" });
+    const queued = options.automation.enqueueManualWrite(result.id, typeof body?.thesis === "string" ? body.thesis.trim() || undefined : undefined);
+    if (!queued.accepted) return reply.code(409).send({ ok: false, reason: queued.reason });
+    return reply.code(202).send({ ok: true, sourceItemId: result.id, taskId: queued.jobId, status: "queued" });
   });
 
   // ─── 素材溯源：调用 Hermes 搜索原始来源 ───
@@ -496,11 +432,13 @@ export function registerCreativeSourceActionRoutes(
       reason: body.reason,
       details: body.details as AccountFitDetails,
       ruleVersion: body.ruleVersion,
-      updateWritingStatus: body.updateWritingStatus === true,
+      updateWritingStatus: false,
     });
     if (!updated) {
       return reply.code(404).send({ ok: false, reason: "not-found" });
     }
+    // 规则版本漂移时只撤销未开始的自动写作，并重评最近窗口内的未完成长素材。
+    options.automation?.recordAccountFitRuleVersion(body.ruleVersion, id);
     return reply.send({ ok: true });
   });
 

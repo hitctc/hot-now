@@ -12,9 +12,10 @@ import { hackerNewsQueriesMigration } from "./migrations/010_hackernews_queries.
 import { bilibiliQueriesMigration } from "./migrations/011_bilibili_queries.js";
 import { weiboTrendingMigration } from "./migrations/012_weibo_trending.js";
 import { wechatRssSourcesMigration } from "./migrations/013_wechat_rss_sources.js";
+import { creativeAccountFitAutomationMigration } from "./migrations/048_creative_account_fit_automation.js";
 import { hasColumn } from "./migrations/columnHelpers.js";
 
-const schemaVersion = 47;
+const schemaVersion = 48;
 const aiTimelineEventsMigrationName = "014_ai_timeline_events";
 const aiTimelineEventImportanceMigrationName = "015_ai_timeline_event_importance";
 const aiTimelineReliabilityWorkspaceMigrationName = "016_ai_timeline_reliability_workspace";
@@ -964,6 +965,12 @@ export function runMigrations(db: SqliteDatabase): void {
         );
     `);
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(47, allFinishedArticlesPerformanceMigrationName);
+
+    creativeAccountFitAutomationMigration.apply(db);
+    db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(
+      creativeAccountFitAutomationMigration.version,
+      creativeAccountFitAutomationMigration.name
+    );
 
     db.pragma(`user_version = ${schemaVersion}`);
     // 历史库可能已有悬空引用；本次迁移只阻止新增错误，避免误删既有文章或阻断启动。

@@ -133,7 +133,10 @@ export function registerSitePageRoutes(app: FastifyInstance, options: SitePageRo
 
     try {
       const assetBody = readFileSync(resolvedAssetPath);
-      return reply.type("image/png").send(assetBody);
+      return reply
+        .header("Cache-Control", resolveBrandCacheControl(request))
+        .type("image/png")
+        .send(assetBody);
     } catch {
       return reply.code(404).type("text/plain; charset=utf-8").send("Not Found");
     }
@@ -614,6 +617,15 @@ async function serveClientContentShell(
 ) {
   // Content routes use the same live client entry and recover as soon as a client build exists.
   return reply.type("text/html; charset=utf-8").send(await readClientEntryHtml(clientIndexPath, options));
+}
+
+function resolveBrandCacheControl(request: FastifyRequest): string {
+  // 页面引用使用版本参数，可安全长期缓存；未版本化直链保留短缓存，避免未来品牌更新长期滞后。
+  const requestUrl = new URL(request.raw.url ?? request.url, "http://hot-now.local");
+
+  return requestUrl.searchParams.has("v")
+    ? "public, max-age=31536000, immutable"
+    : "public, max-age=86400";
 }
 
 function normalizeClientAssetPath(rawAssetPath: string): string | null {
@@ -1318,7 +1330,7 @@ function renderLoginPage(redirectTarget?: string) {
         <div class="login-stage__halo" aria-hidden="true"></div>
         <p class="login-kicker">Spotlight Feed</p>
         <div class="login-stage__brandlock">
-          <img class="login-stage__logo" src="/brand/hotnow-logo-mark.png" alt="HotNow logo" />
+          <img class="login-stage__logo" src="/brand/hotnow-logo-mark.png?v=1" alt="HotNow logo" />
           <div>
             <p class="login-stage__title">HotNow</p>
             <p class="login-stage__eyebrow">AI 热点与新讯</p>

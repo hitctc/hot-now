@@ -104,7 +104,7 @@ describe("client app shell", () => {
     expect(wrapper.get("[data-shell-system-menu-section]").classes()).toEqual(expect.arrayContaining(["shrink-0"]));
     expect(wrapper.get("[data-shell-sidebar-footer]").classes()).toEqual(expect.arrayContaining(["shrink-0"]));
     expect(wrapper.get("[data-workspace-brand]").text()).toContain("热讯");
-    expect(wrapper.get("[data-workspace-brand-logo]").attributes("src")).toBe("/brand/hotnow-logo-mark.png");
+    expect(wrapper.get("[data-workspace-brand-logo]").attributes("src")).toBe("/brand/hotnow-logo-mark.png?v=1");
     expect(wrapper.get("[data-workspace-brand-logo]").attributes("alt")).toBe("HotNow logo");
     expect(wrapper.get("[data-workspace-brand-logo]").classes()).not.toEqual(
       expect.arrayContaining(["border", "border-editorial-border", "bg-editorial-panel/90", "shadow-editorial-floating"])

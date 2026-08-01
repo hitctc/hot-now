@@ -795,12 +795,17 @@ describe("createServer", () => {
     const app = createServer();
 
     const brandResponse = await app.inject({ method: "GET", url: "/brand/hotnow-logo-mark.png" });
+    const versionedBrandResponse = await app.inject({ method: "GET", url: "/brand/hotnow-logo-mark.png?v=1" });
     const faviconAssetResponse = await app.inject({ method: "GET", url: "/brand/hotnow-favicon.png" });
     const faviconResponse = await app.inject({ method: "GET", url: "/favicon.ico" });
 
     expect(brandResponse.statusCode).toBe(200);
     expect(brandResponse.headers["content-type"]).toContain("image/png");
-    expect(brandResponse.rawPayload.length).toBeGreaterThan(0);
+    expect(brandResponse.headers["cache-control"]).toBe("public, max-age=86400");
+    expect(brandResponse.rawPayload.length).toBeLessThan(50 * 1024);
+    expect(versionedBrandResponse.statusCode).toBe(200);
+    expect(versionedBrandResponse.headers["cache-control"]).toBe("public, max-age=31536000, immutable");
+    expect(versionedBrandResponse.rawPayload).toEqual(brandResponse.rawPayload);
     expect(faviconAssetResponse.statusCode).toBe(200);
     expect(faviconAssetResponse.headers["content-type"]).toContain("image/png");
     expect(faviconAssetResponse.rawPayload.length).toBeGreaterThan(0);

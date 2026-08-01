@@ -142,7 +142,7 @@ function renderLegacyDocument(config: LegacyDocumentConfig) {
     <main class="legacy-shell legacy-shell--${config.pageKind}">
       <header class="legacy-header legacy-header--${config.pageKind}">
         <div class="legacy-brand-lock">
-          <img src="/brand/hotnow-logo-mark.png" alt="HotNow logo" class="legacy-brand-lock__logo" />
+          <img src="/brand/hotnow-logo-mark.png?v=1" alt="HotNow logo" class="legacy-brand-lock__logo" />
           <span class="legacy-brand-lock__text">HotNow</span>
         </div>
         <p class="legacy-eyebrow">${escapeHtml(config.eyebrow)}</p>
@@ -308,7 +308,7 @@ export function renderNotFoundPage(requestPath: string) {
         <button onclick="history.back()" class="not-found__btn not-found__btn--secondary">返回上页</button>
       </div>
       <div class="not-found__brand">
-        <img src="/brand/hotnow-logo-mark.png" alt="" />
+        <img src="/brand/hotnow-logo-mark.png?v=1" alt="" />
         热讯平台HotNow
       </div>
     </div>

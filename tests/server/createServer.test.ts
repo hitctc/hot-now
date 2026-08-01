@@ -508,7 +508,7 @@ describe("createServer", () => {
     const response = await app.inject({ method: "GET", url: "/settings/profile" });
 
     expect(response.statusCode).toBe(302);
-    expect(response.headers.location).toBe("/login");
+    expect(response.headers.location).toBe("/login?redirect=%2Fsettings%2Fprofile");
 
     const loginResponse = await app.inject({
       method: "POST",
@@ -549,7 +549,7 @@ describe("createServer", () => {
     const response = await app.inject({ method: "GET", url: "/settings/profile" });
 
     expect(response.statusCode).toBe(302);
-    expect(response.headers.location).toBe("/login");
+    expect(response.headers.location).toBe("/login?redirect=%2Fsettings%2Fprofile");
   });
 
   it("renders the shared workspace login page when auth is enabled", async () => {
@@ -876,7 +876,7 @@ describe("createServer", () => {
     expect(logoutResponse.headers.location).toBe("/login");
     expect(clearedCookie).toBe(`${sessionCookieName}=`);
     expect(protectedResponse.statusCode).toBe(302);
-    expect(protectedResponse.headers.location).toBe("/login");
+    expect(protectedResponse.headers.location).toBe("/login?redirect=%2Fsettings%2Fprofile");
   });
 
   it("returns json for async logout requests that accept application/json", async () => {
@@ -920,11 +920,11 @@ describe("createServer", () => {
     const controlResponse = await app.inject({ method: "GET", url: "/control" });
 
     expect(historyResponse.statusCode).toBe(302);
-    expect(historyResponse.headers.location).toBe("/login");
+    expect(historyResponse.headers.location).toBe("/login?redirect=%2Fhistory");
     expect(reportResponse.statusCode).toBe(302);
-    expect(reportResponse.headers.location).toBe("/login");
+    expect(reportResponse.headers.location).toBe("/login?redirect=%2Freports%2F2026-03-26");
     expect(controlResponse.statusCode).toBe(302);
-    expect(controlResponse.headers.location).toBe("/login");
+    expect(controlResponse.headers.location).toBe("/login?redirect=%2Fcontrol");
   });
 
   it("rejects anonymous manual run route with unauthorized when auth is enabled", async () => {

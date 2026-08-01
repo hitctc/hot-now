@@ -5,7 +5,13 @@ import { CheckCircleFilled, CloseCircleFilled, LoadingOutlined } from "@ant-desi
 
 import ArticleMarkdownEditor from "./ArticleMarkdownEditor.vue";
 import type { DailyDigestRecord, DailyDigestStatus } from "../../services/dailyDigestApi.js";
-import { editDailyDigest, streamPushDigestToDraft, type DigestPushStepId, type DigestPushProgressEvent } from "../../services/dailyDigestApi.js";
+import {
+  editDailyDigest,
+  streamPushDigestToDraft,
+  updateDailyDigestStatus,
+  type DigestPushStepId,
+  type DigestPushProgressEvent
+} from "../../services/dailyDigestApi.js";
 import {
   wechatThemeOptions,
   type WechatThemeId,
@@ -128,7 +134,6 @@ async function startPush() {
 
   // 更新状态为推送中
   try {
-    const { updateDailyDigestStatus } = await import("../../services/dailyDigestApi.js");
     await updateDailyDigestStatus(props.digest.id, "publishing");
   } catch { /* 静默 */ }
 

@@ -5,6 +5,7 @@ import type { TableProps } from "ant-design-vue";
 
 import DailyDigestDetailDrawer from "../../components/creative/DailyDigestDetailDrawer.vue";
 import {
+  readDailyDigest,
   readDailyDigests,
   triggerGenerateDigest,
   type DailyDigestListItem,
@@ -101,7 +102,6 @@ async function openDetail(item: DailyDigestListItem): Promise<void> {
   detailLoading.value = true;
 
   try {
-    const { readDailyDigest } = await import("../../services/dailyDigestApi.js");
     detailDigest.value = await readDailyDigest(item.id);
   } catch {
     message.error("加载日报详情失败");

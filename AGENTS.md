@@ -2,7 +2,7 @@
 
 ## 1. 文档目标
 
-这份 `AGENTS.md` 约束本项目内的协作方式，优先级高于上层通用约定中那些不够具体的部分。
+这份 `AGENTS.md` 是本项目唯一的协作约束入口，优先级高于上层通用约定中那些不够具体的部分。不再单独维护其他项目级协作文档；原有仍有效的通用规则已并入本文。
 
 它解决三件事：
 
@@ -94,6 +94,11 @@
 - `docs/superpowers/`
   保存现阶段的设计文档和实现计划，后续重大变更要一起维护。
 
+### TypeScript 与构建约束
+
+- 服务端使用 `tsconfig.json` 的 NodeNext 配置，源码内部导入必须保留 `.js` 扩展名。
+- 客户端使用 `tsconfig.client.json` 的 Bundler/Vite 配置，`.vue` 文件由 Vite 处理；不要把服务端的模块解析约束直接套到客户端代码。
+
 ## 4. 当前页面与产物约定
 
 当前可访问入口：
@@ -115,6 +120,7 @@
 - 系统页客户端构建：`npm run build:client`
 - 开发启动：`npm run dev`
 - 仅启动 Vite 客户端调试：`npm run dev:client`
+- 仅启动公众号解析 sidecar：`npm run dev:wechat-resolver`
 - 兼容入口：`npm run dev:local`
 - 数据库检查：`npm run db:check`
 - 生成 verified snapshot：`npm run db:snapshot`
@@ -124,6 +130,7 @@
 - 拉取生产数据副本：`./scripts/pull-prod-data.sh`（默认从生产服务器拉 `hot-now.sqlite + reports/` 到本地 `data/prod-sync/`）
 - 基于生产副本启动本地开发：`./scripts/dev-prod-sync.sh`（固定使用本地 `data/prod-sync/`，不直连服务器 live 数据）
 - 类型构建：`npm run build`
+- 客户端类型检查：`npm run typecheck:client`
 - 测试：`npm run test`
 
 `npm run dev` 现在是唯一主开发入口：启动前会准备最新 client bundle，并同时拉起 Fastify、Vite dev server 和本地公众号解析 sidecar。脚本现在只读取根目录 `.env`；`.env.local` 已不再参与启动加载，若仓库里还残留旧文件，脚本会明确提示它已被忽略。后续开发统一把共享配置和每台设备自己的敏感项都维护在 `.env`。未显式配置 `WECHAT_RESOLVER_BASE_URL` / `WECHAT_RESOLVER_TOKEN` 时，`npm run dev` 会自动注入本地默认值并启动 sidecar；只有想改接远端 relay 时才需要覆盖这两个环境变量。`HOT_NOW_CLIENT_DEV_ORIGIN` 未显式配置时，默认使用 `http://127.0.0.1:35173`，避免和常见本地前端服务抢占 `5173`。每次执行 `npm run dev` 都会先清理后端端口、Vite 调试端口和自动 sidecar 端口，再启动新进程，不复用旧的 Vite dev server。`npm run dev:local` 已退回兼容入口，只负责转发到 `npm run dev` 并提示后续统一使用 `dev`。当前 `3030` 页面会优先尝试接入 `HOT_NOW_CLIENT_DEV_ORIGIN` 指向的 Vite dev server，成功时可直接使用 Vue DevTools，失败时自动回退到 `dist/client` 构建产物；`npm run dev:client` 仍保留给只调前端时单独使用。
@@ -140,7 +147,7 @@ SQLite 可靠性约定：
 
 推荐验证顺序：
 
-1. 只改了局部逻辑时，先跑最相关的单测文件。
+1. 只改了局部逻辑时，先跑最相关的单测文件（`npx vitest run tests/<path>.test.ts`）。
 2. 改动涉及 `/settings/*` 客户端页面时，先跑最相关的前端单测，再跑 `npm run build:client`。
 3. 改动影响运行时类型或入口时，再跑 `npm run build`。
 4. 改动影响任务链路、页面或配置时，最后做一次手动 smoke test。
@@ -259,6 +266,6 @@ SQLite 可靠性约定：
 
 - 结构治理已完成服务端业务域收口、核心 repository 读写边界、`main.ts` 启动装配，以及来源工作台表单生命周期拆分；不再为了行数继续机械拆分。
 - 数据库历史迁移保持兼容：`001`–`013` 使用独立文件，`014`–`047` 保留现有实现，下一次真实迁移从 `048` 起独立归档。
-- AI 时间线 feed 与提醒链路仍运行，但 Vue 页面路由暂时下架；恢复必须同步代码、测试、`README.md`、本文和 `CLAUDE.md`。
+- AI 时间线 feed 与提醒链路仍运行，但 Vue 页面路由暂时下架；恢复必须同步代码、测试、`README.md`、`docs/开发与模块化规范.md` 与本文。
 - 测试通过情况以本次实际执行的命令和 CI 结果为准，不在本文件维护会过期的测试数量。
 - 大文件治理的历史过程、基线和部署记录见 `docs/性能优化基线.md`；公众号写作管线以 Hermes PRD 为准。

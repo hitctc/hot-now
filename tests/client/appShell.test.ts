@@ -5,6 +5,26 @@ import Antd from "ant-design-vue";
 import { APP_ROUTE_BASE, CLIENT_ASSET_BASE } from "../../src/client/appBases";
 import App from "../../src/client/App.vue";
 import { createAppRouter } from "../../src/client/router";
+import type { ContentPageKey, ContentPageModel } from "../../src/client/services/contentApi";
+
+// 壳层挂载会加载默认内容页；这里提供真实接口模型的最小空态，避免无关的异步请求污染壳层断言。
+function createEmptyContentPage(pageKey: ContentPageKey): ContentPageModel {
+  return {
+    pageKey,
+    featuredCard: null,
+    cards: [],
+    strategySummary: {
+      pageKey,
+      items: []
+    },
+    pagination: null,
+    emptyState: {
+      title: "当前没有内容",
+      description: "测试空态。",
+      tone: "default"
+    }
+  };
+}
 
 const settingsApiMocks = vi.hoisted(() => ({
   readSettingsProfile: vi.fn(),
@@ -48,7 +68,17 @@ describe("client app shell", () => {
       email: "admin@example.com",
       loggedIn: true
     });
-    httpMocks.requestJson.mockResolvedValue({ ok: true });
+    httpMocks.requestJson.mockImplementation((url: string) => {
+      if (url.startsWith("/api/content/ai-new")) {
+        return Promise.resolve(createEmptyContentPage("ai-new"));
+      }
+
+      if (url.startsWith("/api/content/ai-hot")) {
+        return Promise.resolve(createEmptyContentPage("ai-hot"));
+      }
+
+      return Promise.resolve({ ok: true });
+    });
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: vi.fn().mockImplementation((query: string) => ({
@@ -85,7 +115,6 @@ describe("client app shell", () => {
     expect(wrapper.text()).toContain("HotNow");
     expect(wrapper.text()).toContain("热讯");
     expect(wrapper.text()).toContain("当前用户");
-    expect(wrapper.text()).toContain("当前登录账号、会话状态和联系信息。");
     expect(wrapper.get("[data-shell-root]").classes()).toEqual(
       expect.arrayContaining(["min-h-screen", "bg-editorial-page", "text-editorial-text-main"])
     );
@@ -110,9 +139,8 @@ describe("client app shell", () => {
       expect.arrayContaining(["border", "border-editorial-border", "bg-editorial-panel/90", "shadow-editorial-floating"])
     );
     expect(wrapper.get("[data-shell-brand-stage]").text()).toContain("HotNow");
-    expect(wrapper.get("[data-shell-brand-stage]").text()).toContain("AI 热点与新讯");
+    expect(wrapper.get("[data-shell-brand-stage]").text()).toContain("热讯平台");
     expect(wrapper.find("[data-page-header-title]").text()).toBe("当前用户");
-    expect(wrapper.find("[data-page-header-description]").text()).toContain("当前登录账号");
     expect(wrapper.find("[data-page-header-logo]").exists()).toBe(false);
     expect(wrapper.find("[data-shell-theme-toggle]").exists()).toBe(true);
     expect(wrapper.text()).toContain("当前：浅色");
@@ -125,9 +153,15 @@ describe("client app shell", () => {
     expect(navLinks.map((node) => node.attributes("href"))).toEqual([
       "/ai-new",
       "/ai-hot",
-      "/ai-timeline",
+      "/creative/source-items",
+      "/creative/finished-articles",
+      "/creative/short-source-items",
+      "/creative/short-finished-articles",
+      "/daily-digest",
+      "/monitor",
       "/settings/sources",
       "/settings/view-rules",
+      "/settings/wechat-mp",
       "/settings/profile"
     ]);
 
@@ -136,14 +170,20 @@ describe("client app shell", () => {
     ).toEqual([
       "AI 新讯",
       "AI 热点",
-      "AI 时间线",
+      "素材库",
+      "成品文章",
+      "短内容素材",
+      "短内容成品",
+      "AI日报",
+      "监控面板",
       "数据收集",
       "筛选策略",
+      "公众号配置",
       "当前用户"
     ]);
 
     expect(sidebar.classes()).toEqual(
-      expect.arrayContaining(["min-[901px]:flex", "min-[901px]:w-[244px]", "border-r"])
+      expect.arrayContaining(["min-[901px]:flex", "min-[901px]:w-[180px]", "border-r"])
     );
 
     expect(activeNavLink.classes()).toEqual(
@@ -154,9 +194,6 @@ describe("client app shell", () => {
         "text-editorial-text-main",
         "rounded-editorial-sm"
       ])
-    );
-    expect(activeNavLink.find("span.text-xs").classes()).toEqual(
-      expect.arrayContaining(["text-editorial-text-body"])
     );
   });
 
@@ -203,13 +240,27 @@ describe("client app shell", () => {
     expect(router.getRoutes().some((route) => route.path === "/")).toBe(true);
     expect(router.getRoutes().some((route) => route.path === "/ai-new")).toBe(true);
     expect(router.getRoutes().some((route) => route.path === "/ai-hot")).toBe(true);
-    expect(router.getRoutes().some((route) => route.path === "/ai-timeline")).toBe(true);
+    expect(router.getRoutes().some((route) => route.path === "/ai-timeline")).toBe(false);
     expect(router.getRoutes().some((route) => route.path === "/articles")).toBe(false);
   });
 
   it("registers shell pages as lazy route components so the client build can split them into separate chunks", async () => {
     const router = createAppRouter();
-    const shellRoutePaths = ["/", "/ai-new", "/ai-hot", "/ai-timeline", "/settings/view-rules", "/settings/sources", "/settings/profile"];
+    const shellRoutePaths = [
+      "/",
+      "/ai-new",
+      "/ai-hot",
+      "/creative/source-items",
+      "/creative/finished-articles",
+      "/creative/short-source-items",
+      "/creative/short-finished-articles",
+      "/daily-digest",
+      "/monitor",
+      "/settings/view-rules",
+      "/settings/sources",
+      "/settings/wechat-mp",
+      "/settings/profile"
+    ];
 
     for (const path of shellRoutePaths) {
       const route = router.getRoutes().find((item) => item.path === path);
@@ -219,7 +270,7 @@ describe("client app shell", () => {
     }
   });
 
-  it("renders the mobile AI-first tabs and closes the system drawer after navigation", async () => {
+  it("renders mobile workspace links and closes the system drawer after navigation", async () => {
     const router = createAppRouter();
 
     await router.push("/settings/profile");
@@ -236,7 +287,20 @@ describe("client app shell", () => {
     expect(wrapper.find("[data-mobile-shell-nav]").exists()).toBe(true);
     expect(
       wrapper.findAll("[data-mobile-content-tab]").map((node) => node.text().trim())
-    ).toEqual(["AI 新讯", "AI 热点", "AI 时间线"]);
+    ).toEqual([
+      "AI 新讯",
+      "AI 热点",
+      "素材库",
+      "成品文章",
+      "短内容素材",
+      "短内容成品",
+      "AI日报",
+      "监控面板",
+      "数据收集",
+      "筛选策略",
+      "公众号配置",
+      "当前用户"
+    ]);
     expect(wrapper.get("[data-mobile-system-toggle]").classes()).toEqual(
       expect.arrayContaining(["select-none", "rounded-editorial-sm"])
     );

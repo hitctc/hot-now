@@ -16,6 +16,7 @@ import { registerManualCollectionRoutes } from "./routes/manualCollectionRoutes.
 import { registerSourceManagementRoutes } from "./routes/sourceManagementRoutes.js";
 import { registerTwitterSourceRoutes } from "./routes/twitterSourceRoutes.js";
 import { registerQuerySourceRoutes } from "./routes/querySourceRoutes.js";
+import { registerWechatRssRoutes } from "./routes/wechatRssRoutes.js";
 import type { AiTimelineFeedReadResult } from "../core/aiTimeline/aiTimelineFeedFile.js";
 import { LatestReportEmailError, type LatestReportEmailErrorReason } from "../core/pipeline/sendLatestReportEmail.js";
 import type { BuildContentPageModelOptions } from "../core/content/buildContentPageModel.js";
@@ -882,6 +883,12 @@ export function createServer(deps: ServerDeps = {}) {
     deleteBilibiliQuery: deps.deleteBilibiliQuery, toggleBilibiliQuery: deps.toggleBilibiliQuery,
   });
 
+  // 公众号 RSS 使用独立来源表，只注入本域写入回调。
+  registerWechatRssRoutes(app, {
+    authorizeStateAction: (request, reply) => ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? ""),
+    createWechatRssSources: deps.createWechatRssSources, updateWechatRssSource: deps.updateWechatRssSource, deleteWechatRssSource: deps.deleteWechatRssSource,
+  });
+
   // Creative 图片路由集中到独立模块，避免服务装配入口继续承载上传细节。
   registerCreativeImageRoutes(app, {
     creativeImageDir,
@@ -1307,66 +1314,6 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.send({ ok: true, cleared });
   });
 
-  app.post("/actions/wechat-rss/create", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.createWechatRssSources) {
-      return reply.code(503).send({ ok: false, reason: "wechat-rss-disabled" });
-    }
-
-    const payload = parseWechatRssCreatePayload(request.body);
-
-    if (!payload) {
-      return reply.code(400).send({ ok: false, reason: "invalid-wechat-rss-payload" });
-    }
-
-    return sendWechatRssCreateResult(reply, await deps.createWechatRssSources(payload));
-  });
-
-  app.post("/actions/wechat-rss/update", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.updateWechatRssSource) {
-      return reply.code(503).send({ ok: false, reason: "wechat-rss-disabled" });
-    }
-
-    const payload = parseWechatRssUpdatePayload(request.body);
-
-    if (!payload) {
-      return reply.code(400).send({ ok: false, reason: "invalid-wechat-rss-payload" });
-    }
-
-    return sendWechatRssUpdateResult(reply, await deps.updateWechatRssSource(payload));
-  });
-
-  app.post("/actions/wechat-rss/delete", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.deleteWechatRssSource) {
-      return reply.code(503).send({ ok: false, reason: "wechat-rss-disabled" });
-    }
-
-    const id = parsePositiveInteger((request.body as { id?: unknown } | undefined)?.id);
-
-    if (id === null) {
-      return reply.code(400).send({ ok: false, reason: "invalid-wechat-rss-source-id" });
-    }
-
-    const result = await deps.deleteWechatRssSource(id);
-
-    if (!result.ok) {
-      return reply.code(result.reason === "not-found" ? 404 : 400).send({ ok: false, reason: result.reason });
-    }
-
-    return reply.send({ ok: true, id: result.id });
-  });
-
   // ─── 404 fallback ───
 
   app.setNotFoundHandler((request, reply) => {
@@ -1388,106 +1335,6 @@ function parsePositiveInteger(value: unknown): number | null {
   }
 
   return value;
-}
-
-function parseWechatRssCreatePayload(body: unknown): CreateWechatRssSourcesInput | null {
-  if (!body || typeof body !== "object") {
-    return null;
-  }
-
-  const payload = body as Record<string, unknown>;
-  const rssUrls = payload.rssUrls;
-
-  if (typeof rssUrls === "string") {
-    return { rssUrls };
-  }
-
-  if (Array.isArray(rssUrls) && rssUrls.every((value) => typeof value === "string")) {
-    return { rssUrls };
-  }
-
-  return null;
-}
-
-function parseWechatRssUpdatePayload(body: unknown): UpdateWechatRssSourceInput | null {
-  if (!body || typeof body !== "object") {
-    return null;
-  }
-
-  const payload = body as Record<string, unknown>;
-  const id = parsePositiveInteger(payload.id);
-  const rssUrl = payload.rssUrl;
-  const displayName = payload.displayName;
-
-  if (id === null || typeof rssUrl !== "string") {
-    return null;
-  }
-
-  return {
-    id,
-    rssUrl,
-    displayName: typeof displayName === "string" ? displayName : null
-  };
-}
-
-function sendHackerNewsQuerySaveResult(reply: FastifyReply, result: SaveHackerNewsQueryResult) {
-  if (result.ok) {
-    return reply.send({ ok: true, query: result.query });
-  }
-
-  if (result.reason === "not-found") {
-    return reply.code(404).send({ ok: false, reason: result.reason });
-  }
-
-  if (result.reason === "duplicate-query") {
-    return reply.code(409).send({ ok: false, reason: result.reason });
-  }
-
-  return reply.code(400).send({ ok: false, reason: result.reason });
-}
-
-function sendBilibiliQuerySaveResult(reply: FastifyReply, result: SaveBilibiliQueryResult) {
-  if (result.ok) {
-    return reply.send({ ok: true, query: result.query });
-  }
-
-  if (result.reason === "not-found") {
-    return reply.code(404).send({ ok: false, reason: result.reason });
-  }
-
-  if (result.reason === "duplicate-query") {
-    return reply.code(409).send({ ok: false, reason: result.reason });
-  }
-
-  return reply.code(400).send({ ok: false, reason: result.reason });
-}
-
-function sendWechatRssCreateResult(reply: FastifyReply, result: CreateWechatRssSourcesResult) {
-  if (result.ok) {
-    return reply.send({
-      ok: true,
-      created: result.created,
-      skippedDuplicateUrls: result.skippedDuplicateUrls
-    });
-  }
-
-  return reply.code(400).send({ ok: false, reason: result.reason });
-}
-
-function sendWechatRssUpdateResult(reply: FastifyReply, result: UpdateWechatRssSourceResult) {
-  if (result.ok) {
-    return reply.send({ ok: true, source: result.source });
-  }
-
-  if (result.reason === "not-found") {
-    return reply.code(404).send({ ok: false, reason: result.reason });
-  }
-
-  if (result.reason === "duplicate-rss-url") {
-    return reply.code(409).send({ ok: false, reason: result.reason });
-  }
-
-  return reply.code(400).send({ ok: false, reason: result.reason });
 }
 
 function readAuthenticatedSession(cookieHeader: string | undefined, sessionSecret: string) {

@@ -17,6 +17,7 @@ import { registerSourceManagementRoutes } from "./routes/sourceManagementRoutes.
 import { registerTwitterSourceRoutes } from "./routes/twitterSourceRoutes.js";
 import { registerQuerySourceRoutes } from "./routes/querySourceRoutes.js";
 import { registerWechatRssRoutes } from "./routes/wechatRssRoutes.js";
+import { registerContentFeedbackRoutes } from "./routes/contentFeedbackRoutes.js";
 import type { AiTimelineFeedReadResult } from "../core/aiTimeline/aiTimelineFeedFile.js";
 import { LatestReportEmailError, type LatestReportEmailErrorReason } from "../core/pipeline/sendLatestReportEmail.js";
 import type { BuildContentPageModelOptions } from "../core/content/buildContentPageModel.js";
@@ -889,6 +890,12 @@ export function createServer(deps: ServerDeps = {}) {
     createWechatRssSources: deps.createWechatRssSources, updateWechatRssSource: deps.updateWechatRssSource, deleteWechatRssSource: deps.deleteWechatRssSource,
   });
 
+  registerContentFeedbackRoutes(app, {
+    authorizeStateAction: (request, reply) => ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? ""),
+    saveContentFeedback: deps.saveContentFeedback, saveRatings: deps.saveRatings,
+    deleteFeedbackEntry: deps.deleteFeedbackEntry, clearAllFeedback: deps.clearAllFeedback,
+  });
+
   // Creative 图片路由集中到独立模块，避免服务装配入口继续承载上传细节。
   registerCreativeImageRoutes(app, {
     creativeImageDir,
@@ -1119,86 +1126,6 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.code(410).send({ ok: false, reason: "ai-timeline-feed-is-read-only" });
   });
 
-  app.post("/actions/content/:id/feedback-pool", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.saveContentFeedback) {
-      return reply.code(503).send({ ok: false, reason: "content-feedback-disabled" });
-    }
-
-    const contentItemId = parseContentItemId(request.params);
-
-    if (!contentItemId) {
-      return reply.code(400).send({ ok: false, reason: "invalid-content-id" });
-    }
-
-    const body = request.body as Record<string, unknown> | undefined;
-    const positiveKeywords = parseStringArray(body?.positiveKeywords);
-    const negativeKeywords = parseStringArray(body?.negativeKeywords);
-
-    if (!positiveKeywords.ok || !negativeKeywords.ok) {
-      return reply.code(400).send({ ok: false, reason: "invalid-feedback-payload" });
-    }
-
-    const input = {
-      freeText: typeof body?.freeText === "string" ? body.freeText : null,
-      suggestedEffect: isSuggestedEffect(body?.suggestedEffect) ? body.suggestedEffect : null,
-      strengthLevel: isStrengthLevel(body?.strengthLevel) ? body.strengthLevel : null,
-      positiveKeywords: positiveKeywords.values,
-      negativeKeywords: negativeKeywords.values
-    } satisfies Omit<SaveFeedbackPoolEntryInput, "contentItemId">;
-
-    const result = await deps.saveContentFeedback(contentItemId, input);
-
-    if (!result.ok) {
-      return reply.code(404).send({ ok: false, reason: "not-found" });
-    }
-
-    return reply.send({ ok: true, contentItemId, entryId: result.entryId });
-  });
-
-  app.post("/actions/content/:id/ratings", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.saveRatings) {
-      return reply.code(503).send({ ok: false, reason: "content-actions-disabled" });
-    }
-
-    const contentItemId = parseContentItemId(request.params);
-
-    if (!contentItemId) {
-      return reply.code(400).send({ ok: false, reason: "invalid-content-id" });
-    }
-
-    const body = request.body as { scores?: unknown } | undefined;
-    const parsedScores = parseRatingScores(body?.scores);
-
-    if (!parsedScores.ok) {
-      return reply.code(400).send({ ok: false, reason: "invalid-ratings-payload" });
-    }
-
-    const result = await deps.saveRatings(contentItemId, parsedScores.scores);
-
-    if (!result.ok && result.reason === "not-found") {
-      return reply.code(404).send({ ok: false, reason: "not-found" });
-    }
-
-    if (!result.ok && result.reason === "unknown-dimensions") {
-      return reply.code(400).send({ ok: false, reason: "unknown-dimensions", unknownKeys: result.unknownKeys });
-    }
-
-    return reply.send({
-      ok: true,
-      contentItemId,
-      saved: result.saved,
-      averageRating: result.averageRating
-    });
-  });
-
   app.post("/actions/view-rules/provider-settings", async (request, reply) => {
     if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
       return;
@@ -1275,43 +1202,6 @@ export function createServer(deps: ServerDeps = {}) {
 
     await deps.deleteProviderSettings(providerKind);
     return reply.send({ ok: true });
-  });
-
-  app.post("/actions/feedback-pool/:id/delete", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.deleteFeedbackEntry) {
-      return reply.code(503).send({ ok: false, reason: "feedback-pool-disabled" });
-    }
-
-    const feedbackId = parseNumericRouteId(request.params, "id");
-
-    if (!feedbackId) {
-      return reply.code(400).send({ ok: false, reason: "invalid-feedback-id" });
-    }
-
-    const deleted = await deps.deleteFeedbackEntry(feedbackId);
-
-    if (!deleted) {
-      return reply.code(404).send({ ok: false, reason: "not-found" });
-    }
-
-    return reply.send({ ok: true, feedbackId });
-  });
-
-  app.post("/actions/feedback-pool/clear", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.clearAllFeedback) {
-      return reply.code(503).send({ ok: false, reason: "feedback-pool-disabled" });
-    }
-
-    const cleared = await deps.clearAllFeedback();
-    return reply.send({ ok: true, cleared });
   });
 
   // ─── 404 fallback ───
@@ -2805,77 +2695,8 @@ function mapLatestEmailReasonToStatus(reason: LatestReportEmailErrorReason) {
   return 502;
 }
 
-function parseContentItemId(params: unknown): number | null {
-  // Action routes accept ids from path params only, so we enforce positive integer parsing here once.
-  const idCandidate = (params as { id?: unknown } | undefined)?.id;
-  const parsedId = Number(idCandidate);
-
-  if (!Number.isInteger(parsedId) || parsedId <= 0) {
-    return null;
-  }
-
-  return parsedId;
-}
-
-function parseNumericRouteId(params: unknown, key: string): number | null {
-  const value = (params as Record<string, unknown> | undefined)?.[key];
-  const parsed = Number(value);
-
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    return null;
-  }
-
-  return parsed;
-}
-
-function isSuggestedEffect(value: unknown): value is NonNullable<SaveFeedbackPoolEntryInput["suggestedEffect"]> {
-  return value === "boost" || value === "penalize" || value === "block" || value === "neutral";
-}
-
-function isStrengthLevel(value: unknown): value is NonNullable<SaveFeedbackPoolEntryInput["strengthLevel"]> {
-  return value === "low" || value === "medium" || value === "high";
-}
-
 function isProviderKind(value: unknown): value is SaveProviderSettingsInput["providerKind"] {
   return value === "deepseek" || value === "minimax" || value === "kimi";
-}
-
-function parseRatingScores(value: unknown): ParseRatingScoresResult {
-  // Ratings payload is strict: one invalid entry invalidates the full request, so partial writes never happen.
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return { ok: false, reason: "invalid-ratings-payload" };
-  }
-
-  const parsedScores: Record<string, number> = {};
-
-  for (const [dimensionKey, rawScore] of Object.entries(value)) {
-    if (typeof dimensionKey !== "string" || !dimensionKey.trim()) {
-      return { ok: false, reason: "invalid-ratings-payload" };
-    }
-
-    const score = Number(rawScore);
-
-    if (!Number.isFinite(score) || score < 1 || score > 5) {
-      return { ok: false, reason: "invalid-ratings-payload" };
-    }
-
-    parsedScores[dimensionKey] = score;
-  }
-
-  if (Object.keys(parsedScores).length === 0) {
-    return { ok: false, reason: "invalid-ratings-payload" };
-  }
-
-  return { ok: true, scores: parsedScores };
-}
-
-function parseStringArray(value: unknown): { ok: true; values: string[] } | { ok: false } {
-  if (!Array.isArray(value)) {
-    return { ok: false };
-  }
-
-  const values = value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean);
-  return values.length === value.length ? { ok: true, values } : { ok: false };
 }
 
 // 登录回跳白名单：只允许同源相对路径，挡 //evil.com 协议相对、/\ 反斜杠绕过、<> 脚本注入、CRLF

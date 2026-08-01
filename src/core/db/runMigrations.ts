@@ -5,10 +5,10 @@ import { feedbackAndLlmStrategyWorkbenchMigration } from "./migrations/003_feedb
 import { sourceDisplayModeMigration } from "./migrations/004_source_display_mode.js";
 import { nlRuleEnabledFlagMigration } from "./migrations/005_nl_rule_enabled_flag.js";
 import { providerSettingsMultiSaveMigration } from "./migrations/006_provider_settings_multi_save.js";
+import { sourceBridgeMetadataMigration } from "./migrations/007_source_bridge_metadata.js";
 import { hasColumn } from "./migrations/columnHelpers.js";
 
 const schemaVersion = 47;
-const sourceBridgeMetadataMigrationName = "007_source_bridge_metadata";
 const twitterAccountsMigrationName = "008_twitter_accounts";
 const twitterSearchKeywordsMigrationName = "009_twitter_search_keywords";
 const hackerNewsQueriesMigrationName = "010_hackernews_queries";
@@ -94,19 +94,7 @@ export function runMigrations(db: SqliteDatabase): void {
       `
     ).run(providerSettingsMultiSaveMigration.version, providerSettingsMultiSaveMigration.name);
 
-    // Bridge-backed sources still save a final rss_url, but source rows now need explicit type and
-    // bridge metadata so the sources workbench can manage RSS and WeChat sources in one table.
-    if (!hasColumn(db, "content_sources", "source_type")) {
-      db.exec("ALTER TABLE content_sources ADD COLUMN source_type TEXT NOT NULL DEFAULT 'rss'");
-    }
-
-    if (!hasColumn(db, "content_sources", "bridge_kind")) {
-      db.exec("ALTER TABLE content_sources ADD COLUMN bridge_kind TEXT");
-    }
-
-    if (!hasColumn(db, "content_sources", "bridge_config_json")) {
-      db.exec("ALTER TABLE content_sources ADD COLUMN bridge_config_json TEXT");
-    }
+    sourceBridgeMetadataMigration.apply(db);
 
     db.prepare(
       `
@@ -114,7 +102,7 @@ export function runMigrations(db: SqliteDatabase): void {
         VALUES (?, ?)
         ON CONFLICT(version) DO NOTHING
       `
-    ).run(7, sourceBridgeMetadataMigrationName);
+    ).run(sourceBridgeMetadataMigration.version, sourceBridgeMetadataMigration.name);
 
     // Twitter account collection has its own configuration table because account sources need
     // platform-specific fields and should not be mixed into the RSS source inventory.

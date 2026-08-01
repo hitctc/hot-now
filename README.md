@@ -23,6 +23,9 @@ export SESSION_SECRET="replace-with-long-random-secret"
 export AUTH_SESSION_TTL_SECONDS="604800"
 export HOT_NOW_SLOW_REQUEST_MS="500"
 export LLM_SETTINGS_MASTER_KEY="replace-with-local-master-key"
+export CREATIVE_API_TOKEN="replace-with-creative-api-token"
+export HERMES_API_BASE_URL="https://hermes.example.com"
+export HERMES_API_TOKEN="replace-with-hermes-api-token"
 export TWITTER_API_KEY=""
 export HOT_NOW_DATABASE_FILE="/srv/hot-now/shared/data/hot-now.sqlite"
 export HOT_NOW_REPORT_DATA_DIR="/srv/hot-now/shared/data/reports"
@@ -35,6 +38,7 @@ export HOT_NOW_CLIENT_DEV_ORIGIN="http://127.0.0.1:35173"
 ```
 
 `LLM_SETTINGS_MASTER_KEY` 现在是可选覆盖项；如果你不单独配置，系统会回退使用 `SESSION_SECRET` 继续加密保存厂商 API key。
+`CREATIVE_API_TOKEN` 只用于外部智能体调用创作 API；调用方从自己的密钥管理注入，不要读取其他设备的 `.env` 或写入 prompt。`HERMES_API_BASE_URL`、`HERMES_API_TOKEN` 只在使用 Hermes 写作、溯源、图片或监控链路时需要。
 `TWITTER_API_KEY` 是 TwitterAPI.io 的敏感密钥，只在需要执行 Twitter 账号采集或 Twitter 关键词搜索时配置；不配置时仍可在后台维护账号和关键词列表，但两类 Twitter 手动采集都会不可用，RSS、微信公众号 RSS、Hacker News、B 站和微博热搜不受影响。
 `AUTH_SESSION_TTL_SECONDS` 是可选的登录会话固定有效期，单位为秒；不配置时默认 `604800` 秒，也就是 7 天。当前登录态不是滑动续期，到期后需要重新登录。
 `HOT_NOW_SLOW_REQUEST_MS` 是可选的服务端慢请求阈值，单位为毫秒；默认只记录耗时不低于 `500` 毫秒的请求。日志只包含路由模板、状态码、耗时和可用时的响应字节数，不记录查询参数或正文。
@@ -101,7 +105,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 ## 配置
 
 - `config/hot-now.config.json`：服务端口、`collectionSchedule` 采集周期、`mailSchedule` 发信时间、`aiTimelineAlerts` S 级事件提醒周期和通道开关、`manualActions` 手动动作开关、报告目录，以及兼容旧逻辑的 `source.rssUrl`
-- 环境变量：SMTP 主机、端口、发件人、授权码、收件人、网页基础地址 `BASE_URL`、用户可点击的正式站点地址 `PUBLIC_BASE_URL`、统一站点登录凭据、会话密钥与可选会话有效期 `AUTH_SESSION_TTL_SECONDS`、慢请求阈值 `HOT_NOW_SLOW_REQUEST_MS`、作为独立覆盖项的 `LLM_SETTINGS_MASTER_KEY`、TwitterAPI.io 账号采集 / 关键词搜索密钥 `TWITTER_API_KEY`、S 级 AI 时间线事件飞书 webhook `FEISHU_ALERT_WEBHOOK_URL`、生产路径覆盖项 `HOT_NOW_DATABASE_FILE` / `HOT_NOW_REPORT_DATA_DIR`，以及用于覆盖本地公众号解析 sidecar 或接入远端 relay 的 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`
+- 环境变量：SMTP 主机、端口、发件人、授权码、收件人、网页基础地址 `BASE_URL`、用户可点击的正式站点地址 `PUBLIC_BASE_URL`、统一站点登录凭据、会话密钥与可选会话有效期 `AUTH_SESSION_TTL_SECONDS`、慢请求阈值 `HOT_NOW_SLOW_REQUEST_MS`、作为独立覆盖项的 `LLM_SETTINGS_MASTER_KEY`、外部创作智能体 token `CREATIVE_API_TOKEN`、Hermes 对接地址与 token `HERMES_API_BASE_URL` / `HERMES_API_TOKEN`、TwitterAPI.io 账号采集 / 关键词搜索密钥 `TWITTER_API_KEY`、S 级 AI 时间线事件飞书 webhook `FEISHU_ALERT_WEBHOOK_URL`、生产路径覆盖项 `HOT_NOW_DATABASE_FILE` / `HOT_NOW_REPORT_DATA_DIR`，以及用于覆盖本地公众号解析 sidecar 或接入远端 relay 的 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`
 
 默认配置下：
 
@@ -138,7 +142,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 代码目录：`/srv/hot-now/app`
 - 数据目录：`/srv/hot-now/shared/data`
 - 生产环境变量：`/srv/hot-now/shared/.env`
-- 发布方式：本地 `rsync` 上传源码，服务器本机构建，再由 `systemd` 重启
+- 发布方式：本地 `npm run build` 后用 `rsync` 上传源码和 `dist`，服务器安装 production 依赖后由 `systemd` 重启
 
 生产环境至少需要补齐这两个路径覆盖项：
 
@@ -162,7 +166,7 @@ AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS=10
 
 如果需要按这次真实踩坑顺序逐步复现，详细操作记录见：
 
-- `docs/production-deploy-runbook.md`
+- `docs/生产部署手册.md`
 
 ### 首次部署准备
 
@@ -195,9 +199,9 @@ cp .deploy.local.env.example .deploy.local.env
 
 这条脚本会：
 
-- 只同步代码到 `/srv/hot-now/app`
-- 明确排除 `.git`、`node_modules`、`dist`、`data`、`.env`
-- 在服务器执行 `npm ci` 和 `npm run build`
+- 本地先执行 `npm run build`，再同步代码和 `dist` 到 `/srv/hot-now/app`
+- 明确排除 `.git`、`node_modules`、`data`、`.env`
+- 在服务器执行 `npm ci --prefer-offline --production`
 - 通过免密 `sudo -n systemctl` 重启并检查 `hot-now` 服务
 - 最后调用 `http://127.0.0.1:3030/health` 做健康检查
 

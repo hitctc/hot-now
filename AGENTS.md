@@ -182,6 +182,8 @@ SQLite 可靠性约定：
 - `SESSION_SECRET`
 - `AUTH_SESSION_TTL_SECONDS`（可选登录会话固定有效期，单位秒；默认 `604800`，即 7 天，不做滑动续期）
 - `LLM_SETTINGS_MASTER_KEY`
+- `CREATIVE_API_TOKEN`（外部智能体调用创作素材、成品和 feed 接口时需要；只通过调用方自己的密钥管理提供）
+- `HERMES_API_BASE_URL`、`HERMES_API_TOKEN`（写作、溯源、图片和监控代理等 Hermes 对接链路需要）
 - `TWITTER_API_KEY`（可选 TwitterAPI.io 密钥；在 Twitter 账号采集和 Twitter 关键词搜索时需要，缺失时不阻断普通 RSS、微信公众号 RSS、Hacker News、B 站或微博热搜采集）
 - `FEISHU_ALERT_WEBHOOK_URL`（可选 S 级 AI 时间线事件飞书提醒 webhook；缺失时飞书通道失败但邮件备份仍会尝试发送）
 - `HOT_NOW_DATABASE_FILE`（可选生产覆盖项；显式指定生产 SQLite 文件路径，例如 `/srv/hot-now/shared/data/hot-now.sqlite`）

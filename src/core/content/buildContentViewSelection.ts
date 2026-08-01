@@ -1,11 +1,12 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
-import { scoreContentItem, type ContentScoreBreakdown } from "./contentScoring.js";
 import {
-  listTwitterAccountContentItemIds,
-  listVisibleTwitterKeywordMatchContentItemIds,
-  listVisibleTwitterKeywordMatchContentItemIdsByKeywordIds,
-  listWechatRssContentItemIds
-} from "./contentRepository.js";
+  filterSecondarySourceScopedRows,
+  twitterAccountsSourceKind,
+  twitterKeywordSearchSourceKind,
+  wechatRssSourceKind,
+  type ContentCardRow
+} from "./contentViewSelectionSourceScope.js";
+import { scoreContentItem, type ContentScoreBreakdown } from "./contentScoring.js";
 import { BUILTIN_SOURCES } from "../source/sourceCatalog.js";
 import {
   getInternalViewRuleConfig,
@@ -59,34 +60,7 @@ type RankedContentCardCandidate = RankedContentCardView & {
   showAllWhenSelected: boolean;
 };
 
-type ContentCardRow = {
-  id: number;
-  title: string;
-  summary: string | null;
-  bodyMarkdown: string | null;
-  metadataJson: string | null;
-  sourceName: string;
-  sourceKind: string;
-  showAllWhenSelected: number;
-  canonicalUrl: string;
-  publishedAt: string | null;
-  feedbackEntryId: number | null;
-  feedbackFreeText: string | null;
-  feedbackSuggestedEffect: string | null;
-  feedbackStrengthLevel: string | null;
-  feedbackPositiveKeywordsJson: string | null;
-  feedbackNegativeKeywordsJson: string | null;
-  rankingTimestamp: string | null;
-  baseDecision: string | null;
-  baseScoreDelta: number | null;
-  viewDecision: string | null;
-  viewScoreDelta: number | null;
-};
-
 const matchingSourceViewBonus = 120;
-const twitterAccountsSourceKind = "twitter_accounts";
-const twitterKeywordSearchSourceKind = "twitter_keyword_search";
-const wechatRssSourceKind = "wechat_rss";
 const bilibiliSourceKind = "bilibili_search";
 const hackerNewsSourceKind = "hackernews_search";
 const hotOnlySourceKinds = new Set(["weibo_trending"]);
@@ -140,7 +114,7 @@ export function buildContentViewSelection(
   const rows = db
     .prepare(contentSelectSql)
     .all({ viewScope: mapViewScope(viewKey) }) as ContentCardRow[];
-  const visibleRows = filterTwitterScopedRows(db, rows, {
+  const visibleRows = filterSecondarySourceScopedRows(db, rows, {
     selectedTwitterAccountIds: options.selectedTwitterAccountIds,
     selectedTwitterKeywordIds: options.selectedTwitterKeywordIds,
     selectedWechatRssSourceIds: options.selectedWechatRssSourceIds
@@ -297,7 +271,7 @@ export function collectIndependentStatsBySourceForView(
   const rows = db
     .prepare(contentSelectSql)
     .all({ viewScope: mapViewScope(viewKey) }) as ContentCardRow[];
-  const visibleRows = filterTwitterScopedRows(db, rows, {
+  const visibleRows = filterSecondarySourceScopedRows(db, rows, {
     selectedTwitterAccountIds: options.selectedTwitterAccountIds,
     selectedTwitterKeywordIds: options.selectedTwitterKeywordIds,
     selectedWechatRssSourceIds: options.selectedWechatRssSourceIds
@@ -385,79 +359,6 @@ function countCardsForWindow(
   }
 
   return countCardsWithinShanghaiDay(cards, shanghaiDayStart, shanghaiNextDayStart);
-}
-
-// 隐藏聚合来源的二级筛选都在这里统一处理，避免内容页和统计页各自解析 metadata。
-function filterTwitterScopedRows(
-  db: SqliteDatabase,
-  rows: ContentCardRow[],
-  options: {
-    selectedTwitterAccountIds?: number[];
-    selectedTwitterKeywordIds?: number[];
-    selectedWechatRssSourceIds?: number[];
-  }
-) {
-  const twitterAccountRows = rows.filter((row) => row.sourceKind === twitterAccountsSourceKind);
-  const twitterKeywordRows = rows.filter((row) => row.sourceKind === twitterKeywordSearchSourceKind);
-  const wechatRssRows = rows.filter((row) => row.sourceKind === wechatRssSourceKind);
-
-  if (twitterAccountRows.length === 0 && twitterKeywordRows.length === 0 && wechatRssRows.length === 0) {
-    return rows;
-  }
-
-  const visibleTwitterKeywordContentItemIdSet = new Set(
-    listVisibleTwitterKeywordMatchContentItemIds(
-      db,
-      twitterKeywordRows.map((row) => row.id)
-    )
-  );
-  const selectedTwitterAccountContentItemIdSet = options.selectedTwitterAccountIds === undefined
-    ? null
-    : new Set(
-        listTwitterAccountContentItemIds(
-          db,
-          twitterAccountRows.map((row) => row.id),
-          options.selectedTwitterAccountIds
-        )
-      );
-  const selectedTwitterKeywordContentItemIdSet = options.selectedTwitterKeywordIds === undefined
-    ? null
-    : new Set(
-        listVisibleTwitterKeywordMatchContentItemIdsByKeywordIds(
-          db,
-          twitterKeywordRows.map((row) => row.id),
-          options.selectedTwitterKeywordIds
-        )
-      );
-  const selectedWechatRssContentItemIdSet = options.selectedWechatRssSourceIds === undefined
-    ? null
-    : new Set(
-        listWechatRssContentItemIds(
-          db,
-          wechatRssRows.map((row) => row.id),
-          options.selectedWechatRssSourceIds
-        )
-      );
-
-  return rows.filter((row) => {
-    if (row.sourceKind === twitterAccountsSourceKind) {
-      return selectedTwitterAccountContentItemIdSet === null || selectedTwitterAccountContentItemIdSet.has(row.id);
-    }
-
-    if (row.sourceKind === twitterKeywordSearchSourceKind) {
-      if (!visibleTwitterKeywordContentItemIdSet.has(row.id)) {
-        return false;
-      }
-
-      return selectedTwitterKeywordContentItemIdSet === null || selectedTwitterKeywordContentItemIdSet.has(row.id);
-    }
-
-    if (row.sourceKind === wechatRssSourceKind) {
-      return selectedWechatRssContentItemIdSet === null || selectedWechatRssContentItemIdSet.has(row.id);
-    }
-
-    return true;
-  });
 }
 
 function countStableVisibleCardsBySourceKind(

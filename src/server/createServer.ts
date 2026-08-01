@@ -13,6 +13,7 @@ import { registerCreativeImageRoutes } from "./routes/creativeImageRoutes.js";
 import { registerCreativeSourceActionRoutes } from "./routes/creativeSourceActionRoutes.js";
 import { registerCreativeFinishedArticleRoutes } from "./routes/creativeFinishedArticleRoutes.js";
 import { registerManualCollectionRoutes } from "./routes/manualCollectionRoutes.js";
+import { registerSourceManagementRoutes } from "./routes/sourceManagementRoutes.js";
 import type { AiTimelineFeedReadResult } from "../core/aiTimeline/aiTimelineFeedFile.js";
 import { LatestReportEmailError, type LatestReportEmailErrorReason } from "../core/pipeline/sendLatestReportEmail.js";
 import type { BuildContentPageModelOptions } from "../core/content/buildContentPageModel.js";
@@ -836,6 +837,21 @@ export function createServer(deps: ServerDeps = {}) {
     ),
   });
 
+  // 通用来源配置只注入写入能力和既有状态鉴权，来源采集与社交来源仍保持独立边界。
+  registerSourceManagementRoutes(app, {
+    authorizeStateAction: (request, reply) => ensureStateActionAuthorized(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? ""
+    ),
+    createSource: deps.createSource,
+    updateSource: deps.updateSource,
+    deleteSource: deps.deleteSource,
+    toggleSource: deps.toggleSource,
+    updateSourceDisplayMode: deps.updateSourceDisplayMode,
+  });
+
   // Creative 图片路由集中到独立模块，避免服务装配入口继续承载上传细节。
   registerCreativeImageRoutes(app, {
     creativeImageDir,
@@ -1259,133 +1275,6 @@ export function createServer(deps: ServerDeps = {}) {
 
     const cleared = await deps.clearAllFeedback();
     return reply.send({ ok: true, cleared });
-  });
-
-  app.post("/actions/sources/toggle", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.toggleSource) {
-      return reply.code(503).send({ ok: false, reason: "sources-disabled" });
-    }
-
-    const body = request.body as { kind?: unknown; enable?: unknown } | undefined;
-    const kind = typeof body?.kind === "string" ? body.kind.trim() : "";
-    const enable = typeof body?.enable === "boolean" ? body.enable : null;
-
-    if (!kind) {
-      return reply.code(400).send({ ok: false, reason: "invalid-source-kind" });
-    }
-
-    if (enable === null) {
-      return reply.code(400).send({ ok: false, reason: "invalid-source-enable" });
-    }
-
-    const result = await deps.toggleSource(kind, enable);
-
-    if (!result.ok && result.reason === "not-found") {
-      return reply.code(404).send({ ok: false, reason: "not-found" });
-    }
-
-    return reply.send({ ok: true, kind, enable });
-  });
-
-  app.post("/actions/sources/create", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.createSource) {
-      return reply.code(503).send({ ok: false, reason: "sources-disabled" });
-    }
-
-    const payload = parseSourceSavePayload(request.body, "create");
-
-    if (!payload) {
-      return reply.code(400).send({ ok: false, reason: "invalid-source-payload" });
-    }
-
-    const result = await deps.createSource(payload);
-    return sendSourceSaveResult(reply, result);
-  });
-
-  app.post("/actions/sources/update", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.updateSource) {
-      return reply.code(503).send({ ok: false, reason: "sources-disabled" });
-    }
-
-    const payload = parseSourceSavePayload(request.body, "update");
-
-    if (!payload) {
-      return reply.code(400).send({ ok: false, reason: "invalid-source-payload" });
-    }
-
-    const result = await deps.updateSource(payload);
-    return sendSourceSaveResult(reply, result);
-  });
-
-  app.post("/actions/sources/delete", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.deleteSource) {
-      return reply.code(503).send({ ok: false, reason: "sources-disabled" });
-    }
-
-    const body = request.body as { kind?: unknown } | undefined;
-    const kind = typeof body?.kind === "string" ? body.kind.trim() : "";
-
-    if (!kind) {
-      return reply.code(400).send({ ok: false, reason: "invalid-source-payload" });
-    }
-
-    const result = await deps.deleteSource(kind);
-
-    if (!result.ok) {
-      if (result.reason === "not-found") {
-        return reply.code(404).send({ ok: false, reason: "not-found" });
-      }
-
-      return reply.code(409).send({ ok: false, reason: result.reason });
-    }
-
-    return reply.send({ ok: true, kind: result.kind });
-  });
-
-  app.post("/actions/sources/display-mode", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.updateSourceDisplayMode) {
-      return reply.code(503).send({ ok: false, reason: "sources-disabled" });
-    }
-
-    const body = request.body as { kind?: unknown; showAllWhenSelected?: unknown } | undefined;
-    const kind = typeof body?.kind === "string" ? body.kind.trim() : "";
-    const showAllWhenSelected = typeof body?.showAllWhenSelected === "boolean" ? body.showAllWhenSelected : null;
-
-    if (!kind) {
-      return reply.code(400).send({ ok: false, reason: "invalid-source-kind" });
-    }
-
-    if (showAllWhenSelected === null) {
-      return reply.code(400).send({ ok: false, reason: "invalid-source-display-mode" });
-    }
-
-    const result = await deps.updateSourceDisplayMode(kind, showAllWhenSelected);
-
-    if (!result.ok && result.reason === "not-found") {
-      return reply.code(404).send({ ok: false, reason: "not-found" });
-    }
-
-    return reply.send({ ok: true, kind, showAllWhenSelected });
   });
 
   app.post("/actions/twitter-accounts/create", async (request, reply) => {
@@ -2114,105 +2003,6 @@ function sendWechatRssUpdateResult(reply: FastifyReply, result: UpdateWechatRssS
   }
 
   return reply.code(400).send({ ok: false, reason: result.reason });
-}
-
-function parseSourceSavePayload(
-  body: unknown,
-  mode: "create" | "update"
-): SaveSourceInput | null {
-  if (!body || typeof body !== "object") {
-    return null;
-  }
-
-  const payload = body as Record<string, unknown>;
-  const sourceType = typeof payload.sourceType === "string" ? payload.sourceType.trim() : "";
-
-  if (sourceType === "rss") {
-    const rssUrl = typeof payload.rssUrl === "string" ? payload.rssUrl.trim() : "";
-
-    if (!rssUrl) {
-      return null;
-    }
-
-    const kind = typeof payload.kind === "string" ? payload.kind.trim() : "";
-
-    if (mode === "update") {
-      return kind
-        ? {
-            mode: "update",
-            sourceType: "rss",
-            kind,
-            rssUrl
-          }
-        : null;
-    }
-
-    return {
-      mode: "create",
-      sourceType: "rss",
-      rssUrl
-    };
-  }
-
-  if (sourceType !== "wechat_bridge") {
-    return null;
-  }
-
-  const wechatName = typeof payload.wechatName === "string" ? payload.wechatName.trim() : "";
-
-  if (!wechatName) {
-    return null;
-  }
-
-  const articleUrl = typeof payload.articleUrl === "string" ? payload.articleUrl.trim() : "";
-  const kind = typeof payload.kind === "string" ? payload.kind.trim() : "";
-
-  if (mode === "update") {
-    return kind
-      ? {
-          mode: "update",
-          sourceType: "wechat_bridge",
-          kind,
-          wechatName,
-          ...(articleUrl ? { articleUrl } : {})
-        }
-      : null;
-  }
-
-  return {
-    mode: "create",
-    sourceType: "wechat_bridge",
-    wechatName,
-    ...(articleUrl ? { articleUrl } : {})
-  };
-}
-
-function sendSourceSaveResult(reply: FastifyReply, result: SaveSourceResult) {
-  if (!result.ok) {
-    if (result.reason === "not-found") {
-      return reply.code(404).send({ ok: false, reason: "not-found" });
-    }
-
-    if (result.reason === "wechat-resolver-disabled") {
-      return reply.code(503).send({ ok: false, reason: "wechat-resolver-disabled" });
-    }
-
-    if (result.reason === "wechat-resolver-not-found") {
-      return reply.code(404).send({ ok: false, reason: "wechat-resolver-not-found" });
-    }
-
-    if (result.reason === "resolver-unavailable") {
-      return reply.code(502).send({ ok: false, reason: "resolver-unavailable" });
-    }
-
-    if (result.reason === "invalid-rss-feed") {
-      return reply.code(400).send({ ok: false, reason: "invalid-rss-feed" });
-    }
-
-    return reply.code(409).send({ ok: false, reason: result.reason });
-  }
-
-  return reply.send({ ok: true, kind: result.kind });
 }
 
 function readAuthenticatedSession(cookieHeader: string | undefined, sessionSecret: string) {

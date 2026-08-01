@@ -7,6 +7,7 @@ import {
 } from "./performanceMonitoring.js";
 import { registerHermesOperationalRoutes } from "./routes/hermesOperationalRoutes.js";
 import { registerCreativeDailyDigestRoutes } from "./routes/creativeDailyDigestRoutes.js";
+import { registerSettingsApiRoutes } from "./routes/settingsApiRoutes.js";
 import { registerCreativeListRoutes } from "./routes/creativeListRoutes.js";
 import { registerCreativeImageRoutes } from "./routes/creativeImageRoutes.js";
 import { registerCreativeSourceActionRoutes } from "./routes/creativeSourceActionRoutes.js";
@@ -607,102 +608,6 @@ export function createServer(deps: ServerDeps = {}) {
     }
   });
 
-  app.get("/api/settings/view-rules", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-
-    if (session === undefined) {
-      return;
-    }
-
-    return reply.send(await readSettingsViewRulesApiData(deps));
-  });
-
-  app.post("/actions/view-rules/content-filters", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    const body = request.body as { ruleKey?: unknown; toggles?: unknown; weights?: unknown } | undefined;
-    const ruleKey = typeof body?.ruleKey === "string" ? body.ruleKey.trim() : "";
-    const result = await deps.saveContentFilterRule?.({
-      ruleKey,
-      toggles: body?.toggles,
-      weights: body?.weights
-    });
-
-    if (!result || result.ok === false) {
-      return reply.code(400).send({ ok: false, reason: "invalid-content-filter-config" });
-    }
-
-    return reply.send({ ok: true, ruleKey: result.ruleKey });
-  });
-
-  app.get("/api/settings/sources", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-
-    if (session === undefined) {
-      return;
-    }
-
-    return reply.send(await readSettingsSourcesApiData(deps));
-  });
-
-  app.get("/api/settings/profile", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-
-    if (session === undefined) {
-      return;
-    }
-
-    return reply.send({ profile: await readSettingsProfileApiData(deps, session) });
-  });
-
-  app.put("/api/settings/profile/password", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-
-    if (session === undefined) {
-      return;
-    }
-
-    const body = request.body as Record<string, unknown> | undefined;
-    const currentPassword = typeof body?.currentPassword === "string" ? body.currentPassword : "";
-    const newPassword = typeof body?.newPassword === "string" ? body.newPassword : "";
-
-    if (!currentPassword || !newPassword) {
-      return reply.status(400).send({ ok: false, error: "当前密码和新密码不能为空" });
-    }
-
-    if (newPassword.length < 6) {
-      return reply.status(400).send({ ok: false, error: "新密码至少 6 位" });
-    }
-
-    if (!authConfig?.verifyLogin) {
-      return reply.status(503).send({ ok: false, error: "服务未配置登录验证" });
-    }
-
-    const user = await authConfig.verifyLogin(session!.username, currentPassword);
-
-    if (!user) {
-      return reply.status(401).send({ ok: false, error: "当前密码不正确" });
-    }
-
-    if (!deps.updatePassword) {
-      return reply.status(503).send({ ok: false, error: "服务未配置密码更新" });
-    }
-
-    await deps.updatePassword(newPassword);
-    return reply.send({ ok: true });
-  });
-
-  app.get("/api/settings/ai-timeline", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-
-    if (session === undefined) {
-      return;
-    }
-
-    return reply.send(await readSettingsAiTimelineAdminApiData(deps, request));
-  });
 
   app.get("/api/content/ai-new", async (request, reply) => {
     return reply.send(await readContentPageModelApiData(deps, request, "ai-new"));
@@ -716,25 +621,6 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.send(await readAiTimelineApiData(deps, request));
   });
 
-  app.get("/api/settings/ai-timeline-events", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-
-    if (session === undefined) {
-      return;
-    }
-
-    return reply.send(await readAiTimelineAdminApiData(deps, request));
-  });
-
-  app.get("/api/settings/ai-timeline/events", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-
-    if (session === undefined) {
-      return;
-    }
-
-    return reply.send(await readAiTimelineAdminApiData(deps, request));
-  });
 
 
   // ─── Creative: Feed API（为外部 Agent 暴露高分 AI 新讯候选，token 鉴权） ───
@@ -846,82 +732,26 @@ export function createServer(deps: ServerDeps = {}) {
     pushDailyDigestToWechatDraft: deps.pushDailyDigestToWechatDraft,
   });
 
-  // ─── 微信公众号配置管理（session 鉴权） ───
 
-  app.get("/api/settings/wechat-mp", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-    if (session === undefined) return;
-
-    if (!deps.listWechatMpAccounts) {
-      return reply.code(503).send({ ok: false, reason: "wechat-mp-not-configured" });
-    }
-    const accounts = deps.listWechatMpAccounts();
-    return reply.send({ ok: true, accounts });
-  });
-
-  app.post("/actions/wechat-mp/save", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-    if (!deps.saveWechatMpAccount) {
-      return reply.code(503).send({ ok: false, reason: "wechat-mp-not-configured" });
-    }
-
-    const body = request.body as {
-      id?: number;
-      name: string;
-      appId: string;
-      appSecret?: string;
-      notes?: string;
-      isDefault?: boolean;
-      isEnabled?: boolean;
-    };
-
-    if (!body.name || !body.appId) {
-      return reply.code(400).send({ ok: false, reason: "name-and-appid-required" });
-    }
-
-    try {
-      const result = await deps.saveWechatMpAccount(body);
-      return reply.send(result);
-    } catch (err) {
-      request.log.error(err, "Save wechat mp account failed");
-      return reply.code(500).send({ ok: false, reason: "save-failed" });
-    }
-  });
-
-  app.post("/actions/wechat-mp/delete", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-    if (!deps.deleteWechatMpAccount) {
-      return reply.code(503).send({ ok: false, reason: "wechat-mp-not-configured" });
-    }
-
-    const body = request.body as { id: number };
-    if (!body.id) {
-      return reply.code(400).send({ ok: false, reason: "id-required" });
-    }
-
-    const deleted = deps.deleteWechatMpAccount(body.id);
-    return reply.send({ ok: deleted });
-  });
-
-  app.post("/actions/wechat-mp/set-default", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-    if (!deps.setDefaultWechatMpAccount) {
-      return reply.code(503).send({ ok: false, reason: "wechat-mp-not-configured" });
-    }
-
-    const body = request.body as { id: number };
-    if (!body.id) {
-      return reply.code(400).send({ ok: false, reason: "id-required" });
-    }
-
-    const result = deps.setDefaultWechatMpAccount(body.id);
-    return reply.send({ ok: result });
+  // 设置域通过小型回调接收读取、保存和鉴权能力，不持有整个 ServerDeps。
+  registerSettingsApiRoutes(app, {
+    readSession: (request, reply) => (
+      readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "")
+    ),
+    authorizeStateAction: (request, reply) => (
+      ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")
+    ),
+    readViewRules: () => readSettingsViewRulesApiData(deps),
+    saveContentFilterRule: deps.saveContentFilterRule,
+    readSources: () => readSettingsSourcesApiData(deps),
+    readProfile: (session) => readSettingsProfileApiData(deps, session),
+    verifyLogin: authConfig?.verifyLogin,
+    updatePassword: deps.updatePassword,
+    readAiTimelineAdmin: (request) => readSettingsAiTimelineAdminApiData(deps, request),
+    listWechatMpAccounts: deps.listWechatMpAccounts,
+    saveWechatMpAccount: deps.saveWechatMpAccount,
+    deleteWechatMpAccount: deps.deleteWechatMpAccount,
+    setDefaultWechatMpAccount: deps.setDefaultWechatMpAccount,
   });
 
   // Creative 图片路由集中到独立模块，避免服务装配入口继续承载上传细节。

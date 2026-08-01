@@ -182,12 +182,12 @@ export class CreativeAutomationService {
     await this.alertWhenQueueStalled();
   }
 
-  /** 只补 72 小时内、未评估的长素材；历史素材不会被这一步批量回填。 */
+  /** 只补 72 小时内、未评估且未产生成品的长素材；兼容接入前已写为 ready 的新素材。 */
   private recoverAndFillAutomaticEvaluation(): void {
     if (this.getSetting("account_fit_auto_evaluate_enabled") !== "true") return;
     const rows = this.db.prepare(`
       SELECT id FROM creative_source_items
-      WHERE direction = 'article' AND writing_status = 'pending' AND account_fit_level IS NULL
+      WHERE direction = 'article' AND linked_article_id IS NULL AND writing_status IN ('pending', 'ready') AND account_fit_level IS NULL
         AND datetime(created_at) >= datetime('now', '-72 hours')
       ORDER BY datetime(created_at) DESC
       LIMIT 100

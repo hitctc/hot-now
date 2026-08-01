@@ -84,4 +84,24 @@ describe("CreativeAutomationService", () => {
     expect(jobs.count).toBe(0);
     expect(findCreativeSourceItemById(handle.db, old.id)?.writingStatus).toBe("pending");
   });
+
+  it("补偿扫描会接管窗口内已 ready 的未评估素材，但跳过已有成品的素材", async () => {
+    const handle = await createTestDatabase("hot-now-automation-");
+    handles.push(handle);
+    const ready = insertCreativeSourceItem(handle.db, {
+      externalId: "recent-ready", collectorAgent: "test", title: "接入前已就绪的新素材", url: "https://example.com/ready",
+    });
+    const linked = insertCreativeSourceItem(handle.db, {
+      externalId: "recent-linked", collectorAgent: "test", title: "已有成品的素材", url: "https://example.com/linked",
+    });
+    const article = handle.db.prepare("INSERT INTO creative_finished_articles (source_item_id, content_markdown) VALUES (?, ?)").run(linked.id, "content");
+    handle.db.prepare("UPDATE creative_source_items SET writing_status = 'ready', linked_article_id = ? WHERE id = ?").run(article.lastInsertRowid, linked.id);
+    handle.db.prepare("UPDATE creative_source_items SET writing_status = 'ready' WHERE id = ?").run(ready.id);
+    const service = new CreativeAutomationService(handle.db, null, null);
+
+    await service.runNow();
+
+    const jobs = handle.db.prepare("SELECT source_item_id FROM creative_automation_jobs WHERE job_type = 'evaluate' ORDER BY source_item_id").all() as Array<{ source_item_id: number }>;
+    expect(jobs).toEqual([{ source_item_id: ready.id }]);
+  });
 });

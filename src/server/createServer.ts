@@ -15,6 +15,7 @@ import { registerCreativeFinishedArticleRoutes } from "./routes/creativeFinished
 import { registerManualCollectionRoutes } from "./routes/manualCollectionRoutes.js";
 import { registerSourceManagementRoutes } from "./routes/sourceManagementRoutes.js";
 import { registerTwitterSourceRoutes } from "./routes/twitterSourceRoutes.js";
+import { registerQuerySourceRoutes } from "./routes/querySourceRoutes.js";
 import type { AiTimelineFeedReadResult } from "../core/aiTimeline/aiTimelineFeedFile.js";
 import { LatestReportEmailError, type LatestReportEmailErrorReason } from "../core/pipeline/sendLatestReportEmail.js";
 import type { BuildContentPageModelOptions } from "../core/content/buildContentPageModel.js";
@@ -872,6 +873,15 @@ export function createServer(deps: ServerDeps = {}) {
     toggleTwitterSearchKeywordVisible: deps.toggleTwitterSearchKeywordVisible,
   });
 
+  // 两类查询来源共享稳定的增改删与启停协议，但保留各自的仓储回调。
+  registerQuerySourceRoutes(app, {
+    authorizeStateAction: (request, reply) => ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? ""),
+    createHackerNewsQuery: deps.createHackerNewsQuery, updateHackerNewsQuery: deps.updateHackerNewsQuery,
+    deleteHackerNewsQuery: deps.deleteHackerNewsQuery, toggleHackerNewsQuery: deps.toggleHackerNewsQuery,
+    createBilibiliQuery: deps.createBilibiliQuery, updateBilibiliQuery: deps.updateBilibiliQuery,
+    deleteBilibiliQuery: deps.deleteBilibiliQuery, toggleBilibiliQuery: deps.toggleBilibiliQuery,
+  });
+
   // Creative 图片路由集中到独立模块，避免服务装配入口继续承载上传细节。
   registerCreativeImageRoutes(app, {
     creativeImageDir,
@@ -1297,186 +1307,6 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.send({ ok: true, cleared });
   });
 
-  app.post("/actions/hackernews/create", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.createHackerNewsQuery) {
-      return reply.code(503).send({ ok: false, reason: "hackernews-disabled" });
-    }
-
-    const payload = parseHackerNewsQuerySavePayload(request.body, "create");
-
-    if (!payload) {
-      return reply.code(400).send({ ok: false, reason: "invalid-hackernews-query-payload" });
-    }
-
-    return sendHackerNewsQuerySaveResult(reply, await deps.createHackerNewsQuery(payload));
-  });
-
-  app.post("/actions/hackernews/update", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.updateHackerNewsQuery) {
-      return reply.code(503).send({ ok: false, reason: "hackernews-disabled" });
-    }
-
-    const payload = parseHackerNewsQuerySavePayload(request.body, "update");
-
-    if (!payload) {
-      return reply.code(400).send({ ok: false, reason: "invalid-hackernews-query-payload" });
-    }
-
-    return sendHackerNewsQuerySaveResult(reply, await deps.updateHackerNewsQuery(payload));
-  });
-
-  app.post("/actions/hackernews/delete", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.deleteHackerNewsQuery) {
-      return reply.code(503).send({ ok: false, reason: "hackernews-disabled" });
-    }
-
-    const id = parsePositiveInteger((request.body as { id?: unknown } | undefined)?.id);
-
-    if (id === null) {
-      return reply.code(400).send({ ok: false, reason: "invalid-hackernews-query-id" });
-    }
-
-    const result = await deps.deleteHackerNewsQuery(id);
-
-    if (!result.ok) {
-      return reply.code(result.reason === "not-found" ? 404 : 400).send({ ok: false, reason: result.reason });
-    }
-
-    return reply.send({ ok: true, id: result.id });
-  });
-
-  app.post("/actions/hackernews/toggle", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.toggleHackerNewsQuery) {
-      return reply.code(503).send({ ok: false, reason: "hackernews-disabled" });
-    }
-
-    const body = request.body as { id?: unknown; enable?: unknown } | undefined;
-    const id = parsePositiveInteger(body?.id);
-    const enable = typeof body?.enable === "boolean" ? body.enable : null;
-
-    if (id === null) {
-      return reply.code(400).send({ ok: false, reason: "invalid-hackernews-query-id" });
-    }
-
-    if (enable === null) {
-      return reply.code(400).send({ ok: false, reason: "invalid-hackernews-query-enable" });
-    }
-
-    const result = await deps.toggleHackerNewsQuery(id, enable);
-
-    if (!result.ok) {
-      return reply.code(result.reason === "not-found" ? 404 : 400).send({ ok: false, reason: result.reason });
-    }
-
-    return reply.send({ ok: true, id: result.query.id, enable: result.query.isEnabled });
-  });
-
-  app.post("/actions/bilibili/create", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.createBilibiliQuery) {
-      return reply.code(503).send({ ok: false, reason: "bilibili-disabled" });
-    }
-
-    const payload = parseBilibiliQuerySavePayload(request.body, "create");
-
-    if (!payload) {
-      return reply.code(400).send({ ok: false, reason: "invalid-bilibili-query-payload" });
-    }
-
-    return sendBilibiliQuerySaveResult(reply, await deps.createBilibiliQuery(payload));
-  });
-
-  app.post("/actions/bilibili/update", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.updateBilibiliQuery) {
-      return reply.code(503).send({ ok: false, reason: "bilibili-disabled" });
-    }
-
-    const payload = parseBilibiliQuerySavePayload(request.body, "update");
-
-    if (!payload) {
-      return reply.code(400).send({ ok: false, reason: "invalid-bilibili-query-payload" });
-    }
-
-    return sendBilibiliQuerySaveResult(reply, await deps.updateBilibiliQuery(payload));
-  });
-
-  app.post("/actions/bilibili/delete", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.deleteBilibiliQuery) {
-      return reply.code(503).send({ ok: false, reason: "bilibili-disabled" });
-    }
-
-    const id = parsePositiveInteger((request.body as { id?: unknown } | undefined)?.id);
-
-    if (id === null) {
-      return reply.code(400).send({ ok: false, reason: "invalid-bilibili-query-id" });
-    }
-
-    const result = await deps.deleteBilibiliQuery(id);
-
-    if (!result.ok) {
-      return reply.code(result.reason === "not-found" ? 404 : 400).send({ ok: false, reason: result.reason });
-    }
-
-    return reply.send({ ok: true, id: result.id });
-  });
-
-  app.post("/actions/bilibili/toggle", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.toggleBilibiliQuery) {
-      return reply.code(503).send({ ok: false, reason: "bilibili-disabled" });
-    }
-
-    const body = request.body as { id?: unknown; enable?: unknown } | undefined;
-    const id = parsePositiveInteger(body?.id);
-    const enable = typeof body?.enable === "boolean" ? body.enable : null;
-
-    if (id === null) {
-      return reply.code(400).send({ ok: false, reason: "invalid-bilibili-query-id" });
-    }
-
-    if (enable === null) {
-      return reply.code(400).send({ ok: false, reason: "invalid-bilibili-query-enable" });
-    }
-
-    const result = await deps.toggleBilibiliQuery(id, enable);
-
-    if (!result.ok) {
-      return reply.code(result.reason === "not-found" ? 404 : 400).send({ ok: false, reason: result.reason });
-    }
-
-    return reply.send({ ok: true, id: result.query.id, enable: result.query.isEnabled });
-  });
-
   app.post("/actions/wechat-rss/create", async (request, reply) => {
     if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
       return;
@@ -1558,66 +1388,6 @@ function parsePositiveInteger(value: unknown): number | null {
   }
 
   return value;
-}
-
-function parseHackerNewsQuerySavePayload(
-  body: unknown,
-  mode: "create" | "update"
-): SaveHackerNewsQueryInput | null {
-  if (!body || typeof body !== "object") {
-    return null;
-  }
-
-  const payload = body as Record<string, unknown>;
-  const query = typeof payload.query === "string" ? payload.query.trim() : "";
-
-  if (!query) {
-    return null;
-  }
-
-  const id = mode === "update" ? parsePositiveInteger(payload.id) : null;
-
-  if (mode === "update" && id === null) {
-    return null;
-  }
-
-  return {
-    ...(id !== null ? { id } : {}),
-    query,
-    priority: typeof payload.priority === "number" ? payload.priority : null,
-    isEnabled: typeof payload.isEnabled === "boolean" ? payload.isEnabled : null,
-    notes: typeof payload.notes === "string" ? payload.notes : null
-  };
-}
-
-function parseBilibiliQuerySavePayload(
-  body: unknown,
-  mode: "create" | "update"
-): SaveBilibiliQueryInput | null {
-  if (!body || typeof body !== "object") {
-    return null;
-  }
-
-  const payload = body as Record<string, unknown>;
-  const query = typeof payload.query === "string" ? payload.query.trim() : "";
-
-  if (!query) {
-    return null;
-  }
-
-  const id = mode === "update" ? parsePositiveInteger(payload.id) : null;
-
-  if (mode === "update" && id === null) {
-    return null;
-  }
-
-  return {
-    ...(id !== null ? { id } : {}),
-    query,
-    priority: typeof payload.priority === "number" ? payload.priority : null,
-    isEnabled: typeof payload.isEnabled === "boolean" ? payload.isEnabled : null,
-    notes: typeof payload.notes === "string" ? payload.notes : null
-  };
 }
 
 function parseWechatRssCreatePayload(body: unknown): CreateWechatRssSourcesInput | null {

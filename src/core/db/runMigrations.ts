@@ -1,11 +1,12 @@
 import type { SqliteDatabase } from "./openDatabase.js";
 import { unifiedSiteBaselineMigration } from "./migrations/001_unified_site_baseline.js";
+import { digestReportMailAttemptMigration } from "./migrations/002_digest_report_mail_attempts.js";
+import { feedbackAndLlmStrategyWorkbenchMigration } from "./migrations/003_feedback_and_llm_strategy_workbench.js";
+import { sourceDisplayModeMigration } from "./migrations/004_source_display_mode.js";
+import { nlRuleEnabledFlagMigration } from "./migrations/005_nl_rule_enabled_flag.js";
+import { hasColumn } from "./migrations/columnHelpers.js";
 
 const schemaVersion = 47;
-const digestReportMailAttemptMigrationName = "002_digest_report_mail_attempts";
-const feedbackAndLlmStrategyWorkbenchMigrationName = "003_feedback_and_llm_strategy_workbench";
-const sourceDisplayModeMigrationName = "004_source_display_mode";
-const nlRuleEnabledFlagMigrationName = "005_nl_rule_enabled_flag";
 const providerSettingsMultiSaveMigrationName = "006_provider_settings_multi_save";
 const sourceBridgeMetadataMigrationName = "007_source_bridge_metadata";
 const twitterAccountsMigrationName = "008_twitter_accounts";
@@ -26,88 +27,6 @@ const themeHtmlColumnsMigrationName = "022_theme_html_columns";
 const wechatPublishedMigrationName = "023_wechat_published";
 const wechatMpDraftPushMigrationName = "024_wechat_mp_draft_push";
 
-const feedbackAndLlmWorkbenchStatements = [
-  `
-    CREATE TABLE IF NOT EXISTS feedback_pool (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      content_item_id INTEGER NOT NULL UNIQUE,
-      reaction_snapshot TEXT,
-      free_text TEXT,
-      suggested_effect TEXT,
-      strength_level TEXT,
-      positive_keywords_json TEXT NOT NULL DEFAULT '[]',
-      negative_keywords_json TEXT NOT NULL DEFAULT '[]',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (content_item_id) REFERENCES content_items(id) ON DELETE CASCADE
-    )
-  `,
-  `
-    CREATE TABLE IF NOT EXISTS strategy_drafts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      source_feedback_id INTEGER,
-      draft_text TEXT NOT NULL,
-      suggested_scope TEXT NOT NULL DEFAULT 'unspecified',
-      draft_effect_summary TEXT,
-      positive_keywords_json TEXT NOT NULL DEFAULT '[]',
-      negative_keywords_json TEXT NOT NULL DEFAULT '[]',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (source_feedback_id) REFERENCES feedback_pool(id) ON DELETE SET NULL
-    )
-  `,
-  `
-    CREATE TABLE IF NOT EXISTS llm_provider_settings (
-      provider_kind TEXT PRIMARY KEY,
-      encrypted_api_key TEXT NOT NULL,
-      api_key_last4 TEXT NOT NULL,
-      is_enabled INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )
-  `,
-  `
-    CREATE TABLE IF NOT EXISTS nl_rule_sets (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      scope TEXT NOT NULL UNIQUE,
-      rule_text TEXT NOT NULL DEFAULT '',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )
-  `,
-  `
-    CREATE TABLE IF NOT EXISTS content_nl_evaluations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      content_item_id INTEGER NOT NULL,
-      scope TEXT NOT NULL,
-      decision TEXT NOT NULL,
-      strength_level TEXT,
-      score_delta INTEGER NOT NULL DEFAULT 0,
-      matched_keywords_json TEXT NOT NULL DEFAULT '[]',
-      reason TEXT,
-      provider_kind TEXT NOT NULL,
-      evaluated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(content_item_id, scope),
-      FOREIGN KEY (content_item_id) REFERENCES content_items(id) ON DELETE CASCADE
-    )
-  `,
-  `
-    CREATE TABLE IF NOT EXISTS nl_evaluation_runs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      run_type TEXT NOT NULL,
-      status TEXT NOT NULL,
-      provider_kind TEXT,
-      started_at TEXT NOT NULL,
-      finished_at TEXT,
-      item_count INTEGER NOT NULL DEFAULT 0,
-      success_count INTEGER NOT NULL DEFAULT 0,
-      failure_count INTEGER NOT NULL DEFAULT 0,
-      notes TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )
-  `
-] as const;
-
 export function runMigrations(db: SqliteDatabase): void {
   // Migrations stay idempotent because existing local SQLite files must be upgraded in place
   // without forcing developers to rebuild data or drop historical reports.
@@ -125,9 +44,7 @@ export function runMigrations(db: SqliteDatabase): void {
       `
     ).run(unifiedSiteBaselineMigration.version, unifiedSiteBaselineMigration.name);
 
-    if (!hasColumn(db, "digest_reports", "last_email_attempted_at")) {
-      db.exec(`ALTER TABLE digest_reports ADD COLUMN last_email_attempted_at TEXT`);
-    }
+    digestReportMailAttemptMigration.apply(db);
 
     db.prepare(
       `
@@ -135,13 +52,9 @@ export function runMigrations(db: SqliteDatabase): void {
         VALUES (?, ?)
         ON CONFLICT(version) DO NOTHING
       `
-    ).run(2, digestReportMailAttemptMigrationName);
+    ).run(digestReportMailAttemptMigration.version, digestReportMailAttemptMigration.name);
 
-    // The feedback workbench upgrade is additive only, so existing local databases can pick it up
-    // in place and keep historic content, reactions and report data untouched.
-    for (const statement of feedbackAndLlmWorkbenchStatements) {
-      db.exec(statement);
-    }
+    feedbackAndLlmStrategyWorkbenchMigration.apply(db);
 
     db.prepare(
       `
@@ -149,13 +62,9 @@ export function runMigrations(db: SqliteDatabase): void {
         VALUES (?, ?)
         ON CONFLICT(version) DO NOTHING
       `
-    ).run(3, feedbackAndLlmStrategyWorkbenchMigrationName);
+    ).run(feedbackAndLlmStrategyWorkbenchMigration.version, feedbackAndLlmStrategyWorkbenchMigration.name);
 
-    // Source display mode stays additive so older SQLite files can gain the new setting without
-    // rebuilding the local database or losing any collected content and report history.
-    if (!hasColumn(db, "content_sources", "show_all_when_selected")) {
-      db.exec("ALTER TABLE content_sources ADD COLUMN show_all_when_selected INTEGER NOT NULL DEFAULT 0");
-    }
+    sourceDisplayModeMigration.apply(db);
 
     db.prepare(
       `
@@ -163,13 +72,9 @@ export function runMigrations(db: SqliteDatabase): void {
         VALUES (?, ?)
         ON CONFLICT(version) DO NOTHING
       `
-    ).run(4, sourceDisplayModeMigrationName);
+    ).run(sourceDisplayModeMigration.version, sourceDisplayModeMigration.name);
 
-    // Gate rules need an explicit enable flag so each natural-language gate can be paused without
-    // clearing its text and losing the authored rule.
-    if (!hasColumn(db, "nl_rule_sets", "is_enabled")) {
-      db.exec("ALTER TABLE nl_rule_sets ADD COLUMN is_enabled INTEGER NOT NULL DEFAULT 1");
-    }
+    nlRuleEnabledFlagMigration.apply(db);
 
     db.prepare(
       `
@@ -177,7 +82,7 @@ export function runMigrations(db: SqliteDatabase): void {
         VALUES (?, ?)
         ON CONFLICT(version) DO NOTHING
       `
-    ).run(5, nlRuleEnabledFlagMigrationName);
+    ).run(nlRuleEnabledFlagMigration.version, nlRuleEnabledFlagMigration.name);
 
     // LLM 厂商配置现在要支持“分别保存 + 独立启用”，所以旧的单行表需要就地转成按厂商存储。
     if (hasColumn(db, "llm_provider_settings", "id")) {
@@ -1432,12 +1337,6 @@ export function findNewForeignKeyErrors(
 
 function foreignKeyErrorKey(row: ForeignKeyCheckRow): string {
   return `${row.table}\u0000${row.rowid ?? "null"}\u0000${row.parent}\u0000${row.fkid}`;
-}
-
-function hasColumn(db: SqliteDatabase, tableName: string, columnName: string): boolean {
-  // PRAGMA table_info is the safest way to detect additive SQLite migrations without relying on exception flow.
-  const rows = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
-  return rows.some((row) => row.name === columnName);
 }
 
 function isColumnNotNull(db: SqliteDatabase, tableName: string, columnName: string): boolean {

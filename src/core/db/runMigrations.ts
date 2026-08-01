@@ -6,15 +6,15 @@ import { sourceDisplayModeMigration } from "./migrations/004_source_display_mode
 import { nlRuleEnabledFlagMigration } from "./migrations/005_nl_rule_enabled_flag.js";
 import { providerSettingsMultiSaveMigration } from "./migrations/006_provider_settings_multi_save.js";
 import { sourceBridgeMetadataMigration } from "./migrations/007_source_bridge_metadata.js";
+import { twitterAccountsMigration } from "./migrations/008_twitter_accounts.js";
+import { twitterSearchKeywordsMigration } from "./migrations/009_twitter_search_keywords.js";
+import { hackerNewsQueriesMigration } from "./migrations/010_hackernews_queries.js";
+import { bilibiliQueriesMigration } from "./migrations/011_bilibili_queries.js";
+import { weiboTrendingMigration } from "./migrations/012_weibo_trending.js";
+import { wechatRssSourcesMigration } from "./migrations/013_wechat_rss_sources.js";
 import { hasColumn } from "./migrations/columnHelpers.js";
 
 const schemaVersion = 47;
-const twitterAccountsMigrationName = "008_twitter_accounts";
-const twitterSearchKeywordsMigrationName = "009_twitter_search_keywords";
-const hackerNewsQueriesMigrationName = "010_hackernews_queries";
-const bilibiliQueriesMigrationName = "011_bilibili_queries";
-const weiboTrendingMigrationName = "012_weibo_trending";
-const wechatRssSourcesMigrationName = "013_wechat_rss_sources";
 const aiTimelineEventsMigrationName = "014_ai_timeline_events";
 const aiTimelineEventImportanceMigrationName = "015_ai_timeline_event_importance";
 const aiTimelineReliabilityWorkspaceMigrationName = "016_ai_timeline_reliability_workspace";
@@ -104,35 +104,7 @@ export function runMigrations(db: SqliteDatabase): void {
       `
     ).run(sourceBridgeMetadataMigration.version, sourceBridgeMetadataMigration.name);
 
-    // Twitter account collection has its own configuration table because account sources need
-    // platform-specific fields and should not be mixed into the RSS source inventory.
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS twitter_accounts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT NOT NULL UNIQUE,
-        user_id TEXT,
-        display_name TEXT NOT NULL,
-        category TEXT NOT NULL,
-        priority INTEGER NOT NULL DEFAULT 50,
-        include_replies INTEGER NOT NULL DEFAULT 0,
-        is_enabled INTEGER NOT NULL DEFAULT 1,
-        notes TEXT,
-        last_fetched_at TEXT,
-        last_success_at TEXT,
-        last_error TEXT,
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_twitter_accounts_enabled
-      ON twitter_accounts(is_enabled)
-    `);
-
-    if (!hasColumn(db, "content_items", "metadata_json")) {
-      db.exec("ALTER TABLE content_items ADD COLUMN metadata_json TEXT");
-    }
+    twitterAccountsMigration.apply(db);
 
     db.prepare(
       `
@@ -140,83 +112,9 @@ export function runMigrations(db: SqliteDatabase): void {
         VALUES (?, ?)
         ON CONFLICT(version) DO NOTHING
       `
-    ).run(8, twitterAccountsMigrationName);
+    ).run(twitterAccountsMigration.version, twitterAccountsMigration.name);
 
-    // Twitter keyword search uses its own config and match tables, while collected tweets still
-    // need one hidden aggregate source row to satisfy the existing content_items foreign key.
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS twitter_search_keywords (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        keyword TEXT NOT NULL COLLATE NOCASE UNIQUE,
-        category TEXT NOT NULL,
-        priority INTEGER NOT NULL DEFAULT 60,
-        is_collect_enabled INTEGER NOT NULL DEFAULT 1,
-        is_visible INTEGER NOT NULL DEFAULT 1,
-        notes TEXT,
-        last_fetched_at TEXT,
-        last_success_at TEXT,
-        last_result TEXT,
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_twitter_search_keywords_collect_enabled
-      ON twitter_search_keywords(is_collect_enabled)
-    `);
-    db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_twitter_search_keywords_visible
-      ON twitter_search_keywords(is_visible)
-    `);
-
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS twitter_search_keyword_matches (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        keyword_id INTEGER NOT NULL,
-        tweet_external_id TEXT NOT NULL,
-        content_item_id INTEGER NOT NULL,
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(keyword_id, tweet_external_id),
-        FOREIGN KEY (keyword_id) REFERENCES twitter_search_keywords(id) ON DELETE CASCADE,
-        FOREIGN KEY (content_item_id) REFERENCES content_items(id) ON DELETE CASCADE
-      )
-    `);
-
-    db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_twitter_search_keyword_matches_content_item
-      ON twitter_search_keyword_matches(content_item_id)
-    `);
-
-    db.prepare(
-      `
-        INSERT INTO content_sources (
-          kind,
-          name,
-          site_url,
-          rss_url,
-          is_enabled,
-          is_builtin,
-          source_type,
-          show_all_when_selected,
-          updated_at
-        )
-        VALUES (?, ?, ?, ?, 0, 0, ?, 0, CURRENT_TIMESTAMP)
-        ON CONFLICT(kind) DO UPDATE SET
-          name = excluded.name,
-          site_url = excluded.site_url,
-          source_type = excluded.source_type,
-          show_all_when_selected = 0,
-          updated_at = CURRENT_TIMESTAMP
-      `
-    ).run(
-      "twitter_keyword_search",
-      "Twitter 关键词搜索",
-      "https://x.com",
-      null,
-      "twitter_keyword_aggregate"
-    );
+    twitterSearchKeywordsMigration.apply(db);
 
     db.prepare(
       `
@@ -224,63 +122,9 @@ export function runMigrations(db: SqliteDatabase): void {
         VALUES (?, ?)
         ON CONFLICT(version) DO NOTHING
       `
-    ).run(9, twitterSearchKeywordsMigrationName);
+    ).run(twitterSearchKeywordsMigration.version, twitterSearchKeywordsMigration.name);
 
-    // Hacker News search stays on a dedicated config table so query management can evolve
-    // without overloading the generic content_sources inventory semantics.
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS hackernews_queries (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        query TEXT NOT NULL COLLATE NOCASE UNIQUE,
-        priority INTEGER NOT NULL DEFAULT 60,
-        is_enabled INTEGER NOT NULL DEFAULT 1,
-        notes TEXT,
-        last_fetched_at TEXT,
-        last_success_at TEXT,
-        last_result TEXT,
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_hackernews_queries_enabled
-      ON hackernews_queries(is_enabled)
-    `);
-
-    db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_hackernews_queries_priority
-      ON hackernews_queries(priority)
-    `);
-
-    db.prepare(
-      `
-        INSERT INTO content_sources (
-          kind,
-          name,
-          site_url,
-          rss_url,
-          is_enabled,
-          is_builtin,
-          source_type,
-          show_all_when_selected,
-          updated_at
-        )
-        VALUES (?, ?, ?, ?, 0, 0, ?, 0, CURRENT_TIMESTAMP)
-        ON CONFLICT(kind) DO UPDATE SET
-          name = excluded.name,
-          site_url = excluded.site_url,
-          source_type = excluded.source_type,
-          show_all_when_selected = 0,
-          updated_at = CURRENT_TIMESTAMP
-      `
-    ).run(
-      "hackernews_search",
-      "Hacker News 搜索",
-      "https://news.ycombinator.com",
-      null,
-      "hackernews_aggregate"
-    );
+    hackerNewsQueriesMigration.apply(db);
 
     db.prepare(
       `
@@ -288,58 +132,9 @@ export function runMigrations(db: SqliteDatabase): void {
         VALUES (?, ?)
         ON CONFLICT(version) DO NOTHING
       `
-    ).run(10, hackerNewsQueriesMigrationName);
+    ).run(hackerNewsQueriesMigration.version, hackerNewsQueriesMigration.name);
 
-    // B 站搜索沿用独立 query 配置表，这样视频搜索不会污染普通 RSS 来源库存语义。
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS bilibili_queries (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        query TEXT NOT NULL COLLATE NOCASE UNIQUE,
-        priority INTEGER NOT NULL DEFAULT 60,
-        is_enabled INTEGER NOT NULL DEFAULT 1,
-        notes TEXT,
-        last_fetched_at TEXT,
-        last_success_at TEXT,
-        last_result TEXT,
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_bilibili_queries_enabled
-      ON bilibili_queries(is_enabled)
-    `);
-
-    db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_bilibili_queries_priority
-      ON bilibili_queries(priority)
-    `);
-
-    db.prepare(
-      `
-        INSERT INTO content_sources (
-          kind,
-          name,
-          site_url,
-          rss_url,
-          is_enabled,
-          is_builtin,
-          source_type,
-          show_all_when_selected,
-          updated_at
-        )
-        VALUES (?, ?, ?, ?, 0, 0, ?, 0, CURRENT_TIMESTAMP)
-        ON CONFLICT(kind) DO UPDATE SET
-          name = excluded.name,
-          site_url = excluded.site_url,
-          source_type = excluded.source_type,
-          is_enabled = 0,
-          is_builtin = 0,
-          show_all_when_selected = 0,
-          updated_at = CURRENT_TIMESTAMP
-      `
-    ).run("bilibili_search", "B 站搜索", "https://search.bilibili.com", null, "bilibili_search_aggregate");
+    bilibiliQueriesMigration.apply(db);
 
     db.prepare(
       `
@@ -347,40 +142,9 @@ export function runMigrations(db: SqliteDatabase): void {
         VALUES (?, ?)
         ON CONFLICT(version) DO NOTHING
       `
-    ).run(11, bilibiliQueriesMigrationName);
+    ).run(bilibiliQueriesMigration.version, bilibiliQueriesMigration.name);
 
-    // 微博热搜第一版只有固定关键词匹配，没有单独配置表，但仍需要一个隐藏聚合 source
-    // 来承接 content_items 外键。
-    db.prepare(
-      `
-        INSERT INTO content_sources (
-          kind,
-          name,
-          site_url,
-          rss_url,
-          is_enabled,
-          is_builtin,
-          source_type,
-          show_all_when_selected,
-          updated_at
-        )
-        VALUES (?, ?, ?, ?, 0, 0, ?, 0, CURRENT_TIMESTAMP)
-        ON CONFLICT(kind) DO UPDATE SET
-          name = excluded.name,
-          site_url = excluded.site_url,
-          source_type = excluded.source_type,
-          is_enabled = 0,
-          is_builtin = 0,
-          show_all_when_selected = 0,
-          updated_at = CURRENT_TIMESTAMP
-      `
-    ).run(
-      "weibo_trending",
-      "微博热搜榜匹配",
-      "https://s.weibo.com/top/summary",
-      null,
-      "weibo_trending_aggregate"
-    );
+    weiboTrendingMigration.apply(db);
 
     db.prepare(
       `
@@ -388,58 +152,9 @@ export function runMigrations(db: SqliteDatabase): void {
         VALUES (?, ?)
         ON CONFLICT(version) DO NOTHING
       `
-    ).run(12, weiboTrendingMigrationName);
+    ).run(weiboTrendingMigration.version, weiboTrendingMigration.name);
 
-    // 微信公众号 RSS 进入独立配置表，避免把每个公众号 feed 混进普通 RSS 库存。
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS wechat_rss_sources (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        rss_url TEXT NOT NULL UNIQUE,
-        display_name TEXT,
-        is_enabled INTEGER NOT NULL DEFAULT 1,
-        last_fetched_at TEXT,
-        last_success_at TEXT,
-        last_result TEXT,
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_wechat_rss_sources_enabled
-      ON wechat_rss_sources(is_enabled)
-    `);
-
-    db.prepare(
-      `
-        INSERT INTO content_sources (
-          kind,
-          name,
-          site_url,
-          rss_url,
-          is_enabled,
-          is_builtin,
-          source_type,
-          show_all_when_selected,
-          updated_at
-        )
-        VALUES (?, ?, ?, ?, 0, 0, ?, 0, CURRENT_TIMESTAMP)
-        ON CONFLICT(kind) DO UPDATE SET
-          name = excluded.name,
-          site_url = excluded.site_url,
-          source_type = excluded.source_type,
-          is_enabled = 0,
-          is_builtin = 0,
-          show_all_when_selected = 0,
-          updated_at = CURRENT_TIMESTAMP
-      `
-    ).run(
-      "wechat_rss",
-      "微信公众号 RSS",
-      "https://mp.weixin.qq.com/",
-      null,
-      "wechat_rss_aggregate"
-    );
+    wechatRssSourcesMigration.apply(db);
 
     db.prepare(
       `
@@ -447,7 +162,7 @@ export function runMigrations(db: SqliteDatabase): void {
         VALUES (?, ?)
         ON CONFLICT(version) DO NOTHING
       `
-    ).run(13, wechatRssSourcesMigrationName);
+    ).run(wechatRssSourcesMigration.version, wechatRssSourcesMigration.name);
 
     // AI 时间线单独保存官方发布事件，不复用普通内容流，避免官方事件被新闻评分和热点归并污染。
     db.exec(`

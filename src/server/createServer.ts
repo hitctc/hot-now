@@ -12,6 +12,7 @@ import { registerCreativeListRoutes } from "./routes/creativeListRoutes.js";
 import { registerCreativeImageRoutes } from "./routes/creativeImageRoutes.js";
 import { registerCreativeSourceActionRoutes } from "./routes/creativeSourceActionRoutes.js";
 import { registerCreativeFinishedArticleRoutes } from "./routes/creativeFinishedArticleRoutes.js";
+import { registerManualCollectionRoutes } from "./routes/manualCollectionRoutes.js";
 import type { AiTimelineFeedReadResult } from "../core/aiTimeline/aiTimelineFeedFile.js";
 import { LatestReportEmailError, type LatestReportEmailErrorReason } from "../core/pipeline/sendLatestReportEmail.js";
 import type { BuildContentPageModelOptions } from "../core/content/buildContentPageModel.js";
@@ -754,6 +755,87 @@ export function createServer(deps: ServerDeps = {}) {
     setDefaultWechatMpAccount: deps.setDefaultWechatMpAccount,
   });
 
+  // 手动采集路由只接收既有处理函数，保障鉴权、运行锁和响应语义均不变。
+  registerManualCollectionRoutes(app, {
+    runCollect: (request, reply) => handleManualCollectAction(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? "",
+      deps.isRunning?.() ?? false,
+      deps.triggerManualCollect ?? deps.triggerManualRun
+    ),
+    sendLatestEmail: (request, reply) => handleManualSendLatestEmailAction(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? "",
+      deps.isRunning?.() ?? false,
+      deps.triggerManualSendLatestEmail
+    ),
+    collectTwitterAccounts: (request, reply) => handleManualTwitterCollectAction(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? "",
+      deps.isRunning?.() ?? false,
+      deps.triggerManualTwitterCollect
+    ),
+    collectTwitterKeywords: (request, reply) => handleManualTwitterKeywordCollectAction(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? "",
+      deps.isRunning?.() ?? false,
+      deps.triggerManualTwitterKeywordCollect
+    ),
+    collectHackerNews: (request, reply) => handleManualHackerNewsCollectAction(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? "",
+      deps.isRunning?.() ?? false,
+      deps.triggerManualHackerNewsCollect
+    ),
+    collectBilibili: (request, reply) => handleManualBilibiliCollectAction(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? "",
+      deps.isRunning?.() ?? false,
+      deps.triggerManualBilibiliCollect
+    ),
+    collectWechatRss: (request, reply) => handleManualWechatRssCollectAction(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? "",
+      deps.isRunning?.() ?? false,
+      deps.triggerManualWechatRssCollect
+    ),
+    collectWeibo: (request, reply) => handleManualWeiboTrendingCollectAction(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? "",
+      deps.isRunning?.() ?? false,
+      deps.triggerManualWeiboTrendingCollect
+    ),
+    collectJuya: (request, reply) => handleManualJuyaCollectAction(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? "",
+      deps.triggerManualJuyaCollect
+    ),
+    authorizeManualAction: (request, reply) => ensureManualActionAuthorized(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? ""
+    ),
+  });
+
   // Creative 图片路由集中到独立模块，避免服务装配入口继续承载上传细节。
   registerCreativeImageRoutes(app, {
     creativeImageDir,
@@ -974,126 +1056,6 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     return reply.type("text/html").send(renderControlPage(deps.config, deps.isRunning?.() ?? false));
-  });
-
-  app.post("/actions/run", async (request, reply) => {
-    return await handleManualCollectAction(
-      request,
-      reply,
-      authEnabled,
-      authConfig?.sessionSecret ?? "",
-      deps.isRunning?.() ?? false,
-      deps.triggerManualCollect ?? deps.triggerManualRun
-    );
-  });
-
-  app.post("/actions/collect", async (request, reply) => {
-    return await handleManualCollectAction(
-      request,
-      reply,
-      authEnabled,
-      authConfig?.sessionSecret ?? "",
-      deps.isRunning?.() ?? false,
-      deps.triggerManualCollect ?? deps.triggerManualRun
-    );
-  });
-
-  app.post("/actions/send-latest-email", async (request, reply) => {
-    return await handleManualSendLatestEmailAction(
-      request,
-      reply,
-      authEnabled,
-      authConfig?.sessionSecret ?? "",
-      deps.isRunning?.() ?? false,
-      deps.triggerManualSendLatestEmail
-    );
-  });
-
-  app.post("/actions/twitter-accounts/collect", async (request, reply) => {
-    return await handleManualTwitterCollectAction(
-      request,
-      reply,
-      authEnabled,
-      authConfig?.sessionSecret ?? "",
-      deps.isRunning?.() ?? false,
-      deps.triggerManualTwitterCollect
-    );
-  });
-
-  app.post("/actions/twitter-keywords/collect", async (request, reply) => {
-    return await handleManualTwitterKeywordCollectAction(
-      request,
-      reply,
-      authEnabled,
-      authConfig?.sessionSecret ?? "",
-      deps.isRunning?.() ?? false,
-      deps.triggerManualTwitterKeywordCollect
-    );
-  });
-
-  app.post("/actions/hackernews/collect", async (request, reply) => {
-    return await handleManualHackerNewsCollectAction(
-      request,
-      reply,
-      authEnabled,
-      authConfig?.sessionSecret ?? "",
-      deps.isRunning?.() ?? false,
-      deps.triggerManualHackerNewsCollect
-    );
-  });
-
-  app.post("/actions/bilibili/collect", async (request, reply) => {
-    return await handleManualBilibiliCollectAction(
-      request,
-      reply,
-      authEnabled,
-      authConfig?.sessionSecret ?? "",
-      deps.isRunning?.() ?? false,
-      deps.triggerManualBilibiliCollect
-    );
-  });
-
-  app.post("/actions/wechat-rss/collect", async (request, reply) => {
-    return await handleManualWechatRssCollectAction(
-      request,
-      reply,
-      authEnabled,
-      authConfig?.sessionSecret ?? "",
-      deps.isRunning?.() ?? false,
-      deps.triggerManualWechatRssCollect
-    );
-  });
-
-  app.post("/actions/weibo/collect", async (request, reply) => {
-    return await handleManualWeiboTrendingCollectAction(
-      request,
-      reply,
-      authEnabled,
-      authConfig?.sessionSecret ?? "",
-      deps.isRunning?.() ?? false,
-      deps.triggerManualWeiboTrendingCollect
-    );
-  });
-
-  app.post("/actions/sources/juya/collect", async (request, reply) => {
-    return await handleManualJuyaCollectAction(
-      request,
-      reply,
-      authEnabled,
-      authConfig?.sessionSecret ?? "",
-      deps.triggerManualJuyaCollect
-    );
-  });
-
-  app.post("/actions/ai-timeline/collect", async (request, reply) => {
-    if (!ensureManualActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    return reply.code(410).send({
-      accepted: false,
-      reason: "ai-timeline-feed-automation-only"
-    });
   });
 
   app.post("/actions/ai-timeline/events/:id/update", async (request, reply) => {

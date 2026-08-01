@@ -13,6 +13,8 @@ import {
   type ViewRuleConfigValues
 } from "../viewRules/viewRuleConfig.js";
 import type { ContentCardView, ContentViewKey } from "./listContentView.js";
+import type { ContentSortMode, RankedContentCardCandidate, RankedContentCardView } from "./contentViewSelectionTypes.js";
+export type { ContentSortMode, RankedContentCardView } from "./contentViewSelectionTypes.js";
 import type { NlEvaluationDecision } from "../strategy/nlEvaluationRepository.js";
 import type { StrategyGateScope } from "../strategy/strategyGateScopes.js";
 
@@ -26,13 +28,6 @@ export type ContentViewSelectionOptions = {
   limitOverride?: number;
   sortMode?: ContentSortMode;
   ruleConfig?: ViewRuleConfigValues;
-};
-
-export type ContentSortMode = "published_at" | "content_score";
-
-export type RankedContentCardView = ContentCardView & {
-  rankingScore: number;
-  rankingTimestamp: string | null;
 };
 
 export type CurrentPageSourceMetrics = {
@@ -53,11 +48,6 @@ export type ContentViewSelection = {
   visibleCountsBySourceKind: Record<string, number>;
   currentPageMetricsBySourceKind: Record<string, CurrentPageSourceMetrics>;
   currentPageTodayVisibleCount: number;
-};
-
-type RankedContentCardCandidate = RankedContentCardView & {
-  isBlocked: boolean;
-  showAllWhenSelected: boolean;
 };
 
 const matchingSourceViewBonus = 120;

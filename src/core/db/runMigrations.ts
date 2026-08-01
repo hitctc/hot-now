@@ -4,10 +4,10 @@ import { digestReportMailAttemptMigration } from "./migrations/002_digest_report
 import { feedbackAndLlmStrategyWorkbenchMigration } from "./migrations/003_feedback_and_llm_strategy_workbench.js";
 import { sourceDisplayModeMigration } from "./migrations/004_source_display_mode.js";
 import { nlRuleEnabledFlagMigration } from "./migrations/005_nl_rule_enabled_flag.js";
+import { providerSettingsMultiSaveMigration } from "./migrations/006_provider_settings_multi_save.js";
 import { hasColumn } from "./migrations/columnHelpers.js";
 
 const schemaVersion = 47;
-const providerSettingsMultiSaveMigrationName = "006_provider_settings_multi_save";
 const sourceBridgeMetadataMigrationName = "007_source_bridge_metadata";
 const twitterAccountsMigrationName = "008_twitter_accounts";
 const twitterSearchKeywordsMigrationName = "009_twitter_search_keywords";
@@ -84,45 +84,7 @@ export function runMigrations(db: SqliteDatabase): void {
       `
     ).run(nlRuleEnabledFlagMigration.version, nlRuleEnabledFlagMigration.name);
 
-    // LLM 厂商配置现在要支持“分别保存 + 独立启用”，所以旧的单行表需要就地转成按厂商存储。
-    if (hasColumn(db, "llm_provider_settings", "id")) {
-      db.exec("ALTER TABLE llm_provider_settings RENAME TO llm_provider_settings_legacy");
-      db.exec(`
-        CREATE TABLE llm_provider_settings (
-          provider_kind TEXT PRIMARY KEY,
-          encrypted_api_key TEXT NOT NULL,
-          api_key_last4 TEXT NOT NULL,
-          is_enabled INTEGER NOT NULL DEFAULT 0,
-          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      db.exec(`
-        INSERT INTO llm_provider_settings (
-          provider_kind,
-          encrypted_api_key,
-          api_key_last4,
-          is_enabled,
-          created_at,
-          updated_at
-        )
-        SELECT
-          provider_kind,
-          encrypted_api_key,
-          api_key_last4,
-          is_enabled,
-          created_at,
-          updated_at
-        FROM llm_provider_settings_legacy
-      `);
-      db.exec("DROP TABLE llm_provider_settings_legacy");
-    }
-
-    db.exec(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_llm_provider_settings_single_enabled
-      ON llm_provider_settings(is_enabled)
-      WHERE is_enabled = 1
-    `);
+    providerSettingsMultiSaveMigration.apply(db);
 
     db.prepare(
       `
@@ -130,7 +92,7 @@ export function runMigrations(db: SqliteDatabase): void {
         VALUES (?, ?)
         ON CONFLICT(version) DO NOTHING
       `
-    ).run(6, providerSettingsMultiSaveMigrationName);
+    ).run(providerSettingsMultiSaveMigration.version, providerSettingsMultiSaveMigration.name);
 
     // Bridge-backed sources still save a final rss_url, but source rows now need explicit type and
     // bridge metadata so the sources workbench can manage RSS and WeChat sources in one table.

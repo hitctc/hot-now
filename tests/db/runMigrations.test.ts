@@ -542,6 +542,47 @@ describe("runMigrations", () => {
     expect(verifyPassword("wrong-password", adminRow?.password_hash ?? "")).toBe(false);
   });
 
+  it("upgrades legacy provider settings without losing the saved provider", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-db-"));
+    const dbPath = path.join(tempDir, "hot-now.sqlite");
+    const db = openDatabase(dbPath);
+    databasesToClose.push(db);
+
+    db.exec(`
+      CREATE TABLE llm_provider_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        provider_kind TEXT NOT NULL,
+        encrypted_api_key TEXT NOT NULL,
+        api_key_last4 TEXT NOT NULL,
+        is_enabled INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    db.prepare(
+      `INSERT INTO llm_provider_settings (provider_kind, encrypted_api_key, api_key_last4, is_enabled)
+       VALUES (?, ?, ?, ?)`
+    ).run("deepseek", "encrypted-legacy-key", "1234", 1);
+
+    runMigrations(db);
+
+    expect(
+      db.prepare(
+        `SELECT provider_kind, encrypted_api_key, api_key_last4, is_enabled
+         FROM llm_provider_settings`
+      ).get()
+    ).toEqual({
+      provider_kind: "deepseek",
+      encrypted_api_key: "encrypted-legacy-key",
+      api_key_last4: "1234",
+      is_enabled: 1
+    });
+    expect(
+      (db.prepare("PRAGMA index_list(llm_provider_settings)").all() as Array<{ name: string }>)
+        .map((index) => index.name)
+    ).toContain("idx_llm_provider_settings_single_enabled");
+  });
+
   it("refreshes built-in RSS catalog URLs during seed updates", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-db-"));
     const dbPath = path.join(tempDir, "hot-now.sqlite");

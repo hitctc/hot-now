@@ -18,6 +18,8 @@ import { registerTwitterSourceRoutes } from "./routes/twitterSourceRoutes.js";
 import { registerQuerySourceRoutes } from "./routes/querySourceRoutes.js";
 import { registerWechatRssRoutes } from "./routes/wechatRssRoutes.js";
 import { registerContentFeedbackRoutes } from "./routes/contentFeedbackRoutes.js";
+import { readAiTimelineApiData } from "./aiTimelineApiData.js";
+import { registerAiTimelineRoutes } from "./routes/aiTimelineRoutes.js";
 import type { AiTimelineFeedReadResult } from "../core/aiTimeline/aiTimelineFeedFile.js";
 import { LatestReportEmailError, type LatestReportEmailErrorReason } from "../core/pipeline/sendLatestReportEmail.js";
 import type { BuildContentPageModelOptions } from "../core/content/buildContentPageModel.js";
@@ -521,6 +523,8 @@ export function createServer(deps: ServerDeps = {}) {
     ),
   });
 
+  registerAiTimelineRoutes(app, { readFeed: deps.readAiTimelineFeed, readPage: deps.readAiTimelinePage, authorize: (request, reply) => ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "") });
+
   const hasUnifiedShellDeps = Boolean(
     deps.listContentView || deps.getViewRulesWorkbenchData || deps.listSources || deps.getCurrentUserProfile
   );
@@ -532,23 +536,6 @@ export function createServer(deps: ServerDeps = {}) {
   const clientDevOrigin = normalizeClientDevOrigin(deps.clientDevOrigin ?? null);
 
   app.get("/health", async () => ({ ok: true }));
-  app.get("/feeds/ai-timeline-feed.md", async (_request, reply) => {
-    if (!deps.readAiTimelineFeed) {
-      return reply.code(404).type("text/plain; charset=utf-8").send("AI timeline feed is not configured");
-    }
-
-    try {
-      const feed = await deps.readAiTimelineFeed();
-      return reply
-        .header("x-hot-now-feed-source", feed.sourcePath)
-        .header("x-hot-now-feed-fallback", String(feed.isFallback))
-        .type("text/markdown; charset=utf-8")
-        .send(feed.content);
-    } catch (error) {
-      app.log.warn({ error }, "AI timeline feed is unavailable");
-      return reply.code(503).type("text/plain; charset=utf-8").send("AI timeline feed is unavailable");
-    }
-  });
   app.get("/assets/site.css", async (_request, reply) => reply.type("text/css; charset=utf-8").send(siteCss));
   app.get("/assets/site.js", async (_request, reply) => reply.type("application/javascript; charset=utf-8").send(siteJs));
   app.get("/favicon.ico", async (_request, reply) => {
@@ -623,9 +610,6 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.send(await readContentPageModelApiData(deps, request, "ai-hot"));
   });
 
-  app.get("/api/ai-timeline", async (request, reply) => {
-    return reply.send(await readAiTimelineApiData(deps, request));
-  });
 
 
 
@@ -1116,14 +1100,6 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     return reply.type("text/html").send(renderControlPage(deps.config, deps.isRunning?.() ?? false));
-  });
-
-  app.post("/actions/ai-timeline/events/:id/update", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    return reply.code(410).send({ ok: false, reason: "ai-timeline-feed-is-read-only" });
   });
 
   app.post("/actions/view-rules/provider-settings", async (request, reply) => {
@@ -1661,39 +1637,8 @@ async function readContentPageModelApiData(
   return buildContentPageModelFromDependencies(deps, request, pageKey);
 }
 
-async function readAiTimelineApiData(deps: ServerDeps, request: FastifyRequest) {
-  const query = readAiTimelineQuery(request);
-
-  if (!deps.readAiTimelinePage) {
-    return {
-      page: query.page ?? 1,
-      pageSize: 50,
-      totalResults: 0,
-      totalPages: 0,
-      filters: {
-        eventTypes: [...aiTimelineEventTypes],
-        companies: []
-      },
-      generatedAt: null,
-      events: []
-    };
-  }
-
-  const model = await deps.readAiTimelinePage(query);
-
-  return {
-    page: model.pagination.page,
-    pageSize: model.pagination.pageSize,
-    totalResults: model.pagination.totalResults,
-    totalPages: model.pagination.totalPages,
-    filters: model.filters,
-    generatedAt: model.generatedAt,
-    events: model.events
-  };
-}
-
 async function readAiTimelineAdminApiData(deps: ServerDeps, request: FastifyRequest) {
-  return await readAiTimelineApiData(deps, request);
+  return await readAiTimelineApiData({ readAiTimelinePage: deps.readAiTimelinePage }, request);
 }
 
 async function readSettingsAiTimelineAdminApiData(
@@ -1748,62 +1693,6 @@ async function readSettingsAiTimelineHealthOverview(deps: ServerDeps): Promise<A
 
 async function readSettingsAiTimelineSourceHealth(deps: ServerDeps): Promise<AiTimelineSourceHealthRecord[]> {
   return [];
-}
-
-function readAiTimelineQuery(request: FastifyRequest): AiTimelineListQuery {
-  const query = request.query as Record<string, unknown>;
-  const eventType = readQueryString(query.eventType);
-  const companyKey = readQueryString(query.company);
-  const searchKeyword = readQueryString(query.q);
-  const importanceLevels = parseAiTimelineImportanceLevels(readQueryString(query.importance));
-  const visibilityStatuses = parseAiTimelineVisibilityStatuses(readQueryString(query.visibility));
-  const recentDays = readPositiveQueryInteger(query.recentDays);
-  const page = readPositiveQueryInteger(query.page);
-  const pageSize = readPositiveQueryInteger(query.pageSize);
-
-  return {
-    ...(eventType ? { eventType } : {}),
-    ...(companyKey ? { companyKey } : {}),
-    ...(searchKeyword ? { searchKeyword } : {}),
-    ...(importanceLevels ? { importanceLevels } : {}),
-    ...(visibilityStatuses ? { visibilityStatuses } : {}),
-    ...(recentDays ? { recentDays } : {}),
-    ...(page ? { page } : {}),
-    ...(pageSize ? { pageSize } : {})
-  };
-}
-
-function parseAiTimelineImportanceLevels(value: string | undefined) {
-  if (!value) {
-    return undefined;
-  }
-
-  const values = value.split(",").map((item) => item.trim()).filter(isAiTimelineImportanceLevel);
-  return values.length > 0 ? values : undefined;
-}
-
-function parseAiTimelineVisibilityStatuses(value: string | undefined) {
-  if (!value) {
-    return undefined;
-  }
-
-  const values = value.split(",").map((item) => item.trim()).filter(isAiTimelineVisibilityStatus);
-  return values.length > 0 ? values : undefined;
-}
-
-function readQueryString(value: unknown): string | undefined {
-  const normalized = typeof value === "string" ? value.trim() : "";
-  return normalized || undefined;
-}
-
-function readPositiveQueryInteger(value: unknown): number | undefined {
-  const parsed = Number(value);
-
-  if (!Number.isFinite(parsed) || parsed < 1) {
-    return undefined;
-  }
-
-  return Math.floor(parsed);
 }
 
 async function buildContentPageModelFromDependencies(

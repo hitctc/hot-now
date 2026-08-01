@@ -14,327 +14,69 @@
     @cancel="handleClose"
   >
     <template #title>
-      <span v-if="article" class="flex flex-wrap items-baseline gap-x-2">
-        <span
-          class="cursor-pointer text-xs text-editorial-link-active hover:underline"
-          @click="copyArticleId(article.id)"
-        >#{{ article.id }}</span>
-        <span class="text-base font-semibold">{{ getFirstTitle(article.titles) }}</span>
-        <span class="text-xs text-editorial-text-muted">{{ pipelineLabel(article) }}</span>
-        <span class="text-xs text-editorial-text-muted">{{ formatLocalTime(article.createdAt) }}</span>
-        <a
-          v-if="article.sourceItemId !== null"
-          class="cursor-pointer text-xs text-editorial-link-active hover:underline"
-          @click.prevent="$emit('openSourceItem', article.sourceItemId)"
-        >素材 #{{ article.sourceItemId }}{{ (article as any).sourceTitle ? ' · ' + (article as any).sourceTitle : '' }}{{ (article as any).sourceName ? ' · ' + (article as any).sourceName : '' }}</a>
-      </span>
+      <ArticleDetailHeader
+        v-if="article"
+        :article="article"
+        @copy-id="copyArticleId"
+        @open-source="$emit('openSourceItem', $event)"
+      />
     </template>
 
     <template #footer>
-      <div v-if="article && !props.readonly" class="article-detail-footer">
-        <!-- 第一组：编辑操作（直接生效） -->
-        <div class="article-detail-footer__group footer-group--edit">
-          <a-tooltip :mouse-enter-delay="0.5" title="保存正文内容到数据库">
-            <a-button :loading="saving" @click="handleSave">保存</a-button>
-          </a-tooltip>
-          <a-tooltip :mouse-enter-delay="0.5" title="按选定主题渲染后复制到剪贴板，可粘贴到公众号编辑器">
-            <a-button :loading="wechatCopying" @click="copyAsWechatFormat">复制格式</a-button>
-          </a-tooltip>
-        </div>
-
-        <div class="article-detail-footer__divider" />
-
-        <!-- 第二组：弹窗确认（二次操作） -->
-        <div class="article-detail-footer__group footer-group--flow">
-          <a-button v-if="article.status === 'needs_review'" @click="reviewModalVisible = true">审核</a-button>
-          <a-button v-if="getAvailableActions(article).some(a => a.type === 'mark_publishable')" @click="handleDetailMarkPublishable">标记可推送</a-button>
-          <a-tooltip v-else-if="getAvailableActions(article).some(a => a.type === 'mark_publishable_disabled')" :title="getAvailableActions(article).find(a => a.type === 'mark_publishable_disabled')!.missing.join('、')">
-            <a-button disabled>不可推送</a-button>
-          </a-tooltip>
-          <a-button v-if="getAvailableActions(article).some(a => a.type === 'cancel_publishable')" @click="handleDetailCancelPublishable">取消推送</a-button>
-          <a-button v-if="article.deletedAt" type="primary" @click="handleDetailRestore">恢复</a-button>
-          <a-button v-else danger @click="handleDetailDiscard">废弃</a-button>
-          <a-tooltip v-if="canPush" :mouse-enter-delay="0.5" title="自动保存正文后推送到微信公众号草稿箱">
-            <a-button :loading="saving" @click="saveAndPush">推送草稿箱</a-button>
-          </a-tooltip>
-          <a-tooltip v-else-if="article.status !== 'needs_review'" :mouse-enter-delay="0.3">
-            <template #title>{{ missingConditions.join('；') }}</template>
-            <a-button disabled>推送草稿箱</a-button>
-          </a-tooltip>
-        </div>
-      </div>
+      <ArticleDetailFooter
+        v-if="article"
+        :article="article"
+        :readonly="props.readonly"
+        :saving="saving"
+        :wechat-copying="wechatCopying"
+        :can-push="canPush"
+        :missing-conditions="missingConditions"
+        @save="handleSave"
+        @copy-format="copyAsWechatFormat"
+        @review="reviewModalVisible = true"
+        @mark-publishable="handleDetailMarkPublishable"
+        @cancel-publishable="handleDetailCancelPublishable"
+        @restore="handleDetailRestore"
+        @discard="handleDetailDiscard"
+        @push="saveAndPush"
+      />
     </template>
 
     <template v-if="article">
       <div class="article-detail-content flex flex-col gap-6">
-        <!-- 手动成品只有一个标题，和中栏第一个 H1 双向同步。 -->
-        <section v-if="isManualArticle">
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">文章标题</h3>
-            <span class="text-[11px] text-editorial-text-muted">与中栏一级标题同步</span>
-          </div>
-          <a-input v-model:value="manualTitle" :disabled="props.readonly" @blur="saveManualTitle" @press-enter="saveManualTitle" />
-        </section>
+        <ArticlePlanningSections
+          :article="article"
+          :readonly="props.readonly"
+          :is-manual-article="isManualArticle"
+          :manual-title="manualTitle"
+          :display-titles="displayTitles"
+          :active-title-index="activeTitleIndex"
+          :editing-title-index="editingTitleIdx"
+          :editing-title-value="editingTitleValue"
+          :regen-title-loading="regenTitleLoading"
+          :display-intros="displayIntros"
+          :active-intro-index="activeIntroIndex"
+          :regen-intro-loading="regenIntroLoading"
+          :display-summaries="displaySummaries"
+          :title-candidate-at="titleCandidateAt"
+          @update:manual-title="manualTitle = $event"
+          @save-manual-title="saveManualTitle"
+          @regenerate-title="handleRegenTitle"
+          @copy="copyText"
+          @select-title="selectTitle"
+          @start-title-edit="startEditTitle"
+          @save-title-edit="saveTitleEdit"
+          @cancel-title-edit="cancelEditTitle"
+          @update:editing-title-value="editingTitleValue = $event"
+          @regenerate-intro="handleRegenIntro"
+          @select-intro="selectIntro"
+        />
 
-        <!-- 异常/审核信息（统一展示区） -->
-        <section v-if="!isManualArticle && hasAnomalyInfo" class="rounded border bg-red-50 border-red-200 px-3 py-2.5 space-y-1">
-          <div class="text-xs font-semibold text-red-700">
-            {{ article.status === 'anomaly' ? '⚠ 异常' : article.status === 'needs_review' ? '⚠ 待审核' : '⚠ 警告' }}
-          </div>
-          <div v-if="article.anomalyReason" class="text-xs text-red-600">
-            <span class="text-editorial-text-muted">异常原因：</span>{{ formatAnomalyReason(article.anomalyReason) }}
-          </div>
-          <div v-if="article.reasonCode" class="text-xs text-red-500">
-            <span class="text-editorial-text-muted">异常代码：</span>
-            <span class="font-mono">{{ article.reasonCode }}</span>
-          </div>
-          <div v-if="article.reasonText" class="text-xs text-red-500">
-            <span class="text-editorial-text-muted">异常说明：</span>{{ article.reasonText }}
-          </div>
-          <div v-if="article.manualReviewReason || (article.manualReviewReasons?.length ?? 0) > 0" class="text-xs text-yellow-700">
-            <span class="text-editorial-text-muted">审核标记：</span>
-            <span v-if="article.manualReviewReason">{{ manualReviewReasonText }}</span>
-            <span v-for="(r, i) in (article.manualReviewReasons ?? [])" :key="r">{{ i > 0 || article.manualReviewReason ? '、' : '' }}{{ formatReviewReason(r) }}</span>
-          </div>
-        </section>
-
-        <!-- 备选标题 -->
-        <section v-if="!isManualArticle && (displayTitles.length > 0 || (!props.readonly && regenTitleLoading))">
-          <div class="mb-2 flex items-center justify-between">
-            <div>
-              <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">备选标题</h3>
-              <p
-                v-if="article.pipelineVersion === 'v2' && !article.titleSelectionConfirmed"
-                class="mb-0 mt-1 text-xs font-medium text-amber-600"
-              >请选择并确认一个发布标题；确认前不能进入可发布状态。</p>
-            </div>
-            <div v-if="!props.readonly" class="flex items-center gap-3">
-              <a-button
-                type="link"
-                size="small"
-                class="!h-auto !px-2 !py-1 !text-[11px]"
-                :loading="regenTitleLoading"
-                :disabled="regenTitleLoading"
-                @click="handleRegenTitle"
-              >{{ regenTitleLoading ? '生成中...' : '生成新标题' }}</a-button>
-              <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText(displayTitles.join('\n'))">复制全部</a-button>
-            </div>
-          </div>
-          <ul class="m-0 list-none space-y-1 pl-0">
-            <li
-              v-for="(t, idx) in displayTitles"
-              :key="idx"
-              class="group/title relative flex items-center gap-3 rounded-editorial-sm border px-3 py-2 transition-colors"
-              :class="idx === activeTitleIndex
-                ? 'border-editorial-accent ring-2 ring-editorial-ring'
-                : 'border-editorial-border hover:border-editorial-link-active/40'"
-            >
-              <span class="flex-shrink-0 text-[11px] font-bold tabular-nums text-editorial-text-muted">{{ idx + 1 }}</span>
-              <!-- 编辑态：输入框；非编辑态：纯文本 -->
-              <div v-if="editingTitleIdx === idx" class="flex-1">
-                <a-input
-                  ref="editingInputRef"
-                  v-model:value="editingTitleValue"
-                  size="small"
-                  @keyup.enter="saveTitleEdit(idx)"
-                  @keyup.esc="cancelEditTitle"
-                  @blur="saveTitleEdit(idx)"
-                />
-              </div>
-              <div v-else class="flex-1">
-                <div class="flex items-center gap-2">
-                  <span class="text-sm leading-6 text-editorial-text-main">{{ t }}</span>
-                  <span
-                    v-if="titleCandidateAt(idx)?.group_label"
-                    class="rounded bg-editorial-surface-muted px-1.5 py-0.5 text-[10px] text-editorial-text-muted"
-                  >{{ titleCandidateAt(idx)?.group_label }}</span>
-                </div>
-                <div v-if="titleCandidateAt(idx)" class="mt-1 space-y-0.5 text-[11px] leading-5 text-editorial-text-muted">
-                  <p class="m-0">点击理由：{{ titleCandidateAt(idx)?.click_reason }}</p>
-                  <p class="m-0">正文兑现：{{ titleCandidateAt(idx)?.content_payoff }}</p>
-                  <p class="m-0">目标读者：{{ titleCandidateAt(idx)?.target_reader }} · 标题党风险：{{ titleRiskLabel(titleCandidateAt(idx)?.clickbait_risk) }}</p>
-                </div>
-              </div>
-              <span class="flex-shrink-0 text-[10px] text-editorial-text-muted">{{ countWords(editingTitleIdx === idx ? editingTitleValue : t) }}字</span>
-              <!-- 选中标记 -->
-              <span
-                v-if="idx === activeTitleIndex && article.titleSelectionConfirmed"
-                class="flex-shrink-0 rounded bg-editorial-accent px-1.5 py-0.5 text-[10px] font-semibold text-white"
-              >✓ 发布标题</span>
-              <span
-                v-else-if="idx === activeTitleIndex"
-                class="flex-shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
-              >待确认</span>
-              <span v-if="idx === 0 && idx !== activeTitleIndex" class="flex-shrink-0 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</span>
-              <button
-                v-if="!props.readonly && (!article.titleSelectionConfirmed || idx !== activeTitleIndex) && editingTitleIdx !== idx"
-                class="flex-shrink-0 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white hover:!bg-black/70"
-                @click.stop="selectTitle(idx)"
-              >设为发布标题</button>
-              <button
-                v-if="!props.readonly && editingTitleIdx !== idx"
-                class="flex-shrink-0 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white hover:!bg-black/70"
-                @click.stop="startEditTitle(idx)"
-              >编辑</button>
-              <a-button v-if="!props.readonly && editingTitleIdx !== idx" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText(t)">复制</a-button>
-            </li>
-          </ul>
-        </section>
-
-        <!-- 核心立意（只读） -->
-        <section v-if="!isManualArticle && article.thesis">
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">核心立意</h3>
-            <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText(article.thesis!)">复制</a-button>
-          </div>
-          <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ article.thesis }}</p>
-        </section>
-
-        <!-- 导语（始终显示，可重新生成） -->
-        <section v-if="!isManualArticle">
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">导语</h3>
-            <div v-if="!props.readonly" class="flex items-center gap-3">
-              <a-button
-                type="link"
-                size="small"
-                class="!h-auto !px-2 !py-1 !text-[11px]"
-                :loading="regenIntroLoading"
-                :disabled="regenIntroLoading"
-                @click="handleRegenIntro"
-              >{{ regenIntroLoading ? '生成中...' : '生成新导语' }}</a-button>
-              <a-button v-if="displayIntros.length > 0" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText(displayIntros[activeIntroIndex] ?? '')">复制</a-button>
-            </div>
-          </div>
-          <p v-if="displayIntros.length === 0" class="m-0 text-sm text-editorial-text-muted">暂无导语，点击上方按钮生成</p>
-          <ul v-else class="m-0 list-none space-y-1 pl-0">
-            <li
-              v-for="(text, idx) in displayIntros"
-              :key="idx"
-              class="group/intro relative flex items-center gap-3 rounded-editorial-sm border px-3 py-2 transition-colors"
-              :class="idx === activeIntroIndex
-                ? 'border-editorial-accent ring-2 ring-editorial-ring'
-                : 'border-editorial-border hover:border-editorial-link-active/40'"
-            >
-              <span class="flex-shrink-0 text-[11px] font-bold tabular-nums text-editorial-text-muted">{{ idx + 1 }}</span>
-              <span class="flex-1 text-sm leading-6 text-editorial-text-main">{{ text }}</span>
-              <span class="flex-shrink-0 text-[10px] text-editorial-text-muted">{{ countWords(text) }}字</span>
-              <span
-                v-if="idx === activeIntroIndex"
-                class="flex-shrink-0 rounded bg-editorial-accent px-1.5 py-0.5 text-[10px] font-semibold text-white"
-              >✓ 发布</span>
-              <span v-if="idx === 0 && idx !== activeIntroIndex" class="flex-shrink-0 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</span>
-              <button
-                v-if="!props.readonly && idx !== activeIntroIndex"
-                class="flex-shrink-0 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white hover:!bg-black/70"
-                @click.stop="selectIntro(idx)"
-              >设为发布</button>
-            </li>
-          </ul>
-        </section>
-
-        <!-- 百字摘要（只读展示） -->
-        <section v-if="!isManualArticle && displaySummaries.length > 0">
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">百字摘要 <span class="font-normal text-[11px] text-editorial-text-muted/60">{{ charCount(displaySummaries[0]) }}字</span></h3>
-            <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText(displaySummaries[0] ?? '')">复制</a-button>
-          </div>
-          <p class="m-0 text-sm leading-7 text-editorial-text-body">{{ displaySummaries[0] }}</p>
-        </section>
-
-        <!-- 相似度检测 -->
-        <section v-if="!isManualArticle && article?.similarityCheck">
-          <div class="mb-2">
-            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">相似度检测</h3>
-          </div>
-          <template v-if="sc">
-            <!-- 左中右三列布局 -->
-            <div class="grid grid-cols-3 gap-3">
-              <!-- 左：总览 + 规则检测 -->
-              <div class="space-y-2">
-                <div class="rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs space-y-1">
-                  <div class="font-medium text-editorial-text-body mb-1">总览</div>
-                  <div class="flex justify-between"><span class="text-editorial-text-muted">风险等级</span><span class="font-medium" :class="sc.risk_level === 'high' ? 'text-red-500' : sc.risk_level === 'medium' ? 'text-yellow-600' : 'text-green-600'">{{ riskLevelLabel }}</span></div>
-                  <div class="flex justify-between"><span class="text-editorial-text-muted">字面重复率</span><span>{{ Math.round((sc.literal_similarity ?? 0) * 100) }}%</span></div>
-                </div>
-                <!-- 规则检测 -->
-                <div v-if="sc.rule_based" class="rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs space-y-1">
-                  <div class="font-medium text-editorial-text-body mb-1">规则检测</div>
-                  <div class="flex justify-between"><span class="text-editorial-text-muted">字面重复率</span><span>{{ Math.round((sc.rule_based.literal_similarity ?? 0) * 100) }}%</span></div>
-                  <div class="flex justify-between"><span class="text-editorial-text-muted">结构相似度</span><span>{{ Math.round((sc.rule_based.literal_structure_similarity ?? 0) * 100) }}%</span></div>
-                  <div class="flex justify-between"><span class="text-editorial-text-muted">原文摘要相似度</span><span>{{ Math.round((sc.rule_based.source_content_similarity ?? 0) * 100) }}%</span></div>
-                  <div class="flex justify-between"><span class="text-editorial-text-muted">最长连续重叠</span><span>{{ sc.rule_based.max_continuous_overlap_chars ?? 0 }} 字</span></div>
-                  <div class="flex justify-between"><span class="text-editorial-text-muted">规则风险</span><span :class="sc.rule_based.risk_level === 'high' ? 'text-red-500' : sc.rule_based.risk_level === 'medium' ? 'text-yellow-600' : 'text-green-600'">{{ sc.rule_based.risk_level ?? '未知' }}</span></div>
-                </div>
-              </div>
-
-              <!-- 中：LLM 实质审查 -->
-              <div class="space-y-2">
-                <template v-if="sc.llm_review && sc.llm_review.status === 'success'">
-                  <div class="rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs space-y-1">
-                    <div class="font-medium text-editorial-text-body mb-1">LLM 实质审查</div>
-                    <div class="flex justify-between"><span class="text-editorial-text-muted">来源依赖</span><span :class="riskDimClass(sc.llm_review.source_dependency)">{{ sc.llm_review.source_dependency }}</span></div>
-                    <div class="flex justify-between"><span class="text-editorial-text-muted">叙事相似度</span><span :class="riskDimClass(sc.llm_review.narrative_similarity)">{{ sc.llm_review.narrative_similarity }}</span></div>
-                    <div class="flex justify-between"><span class="text-editorial-text-muted">观点重叠</span><span :class="riskDimClass(sc.llm_review.claim_overlap)">{{ sc.llm_review.claim_overlap }}</span></div>
-                    <div class="flex justify-between"><span class="text-editorial-text-muted">实体重叠</span><span :class="riskDimClass(sc.llm_review.entity_overlap)">{{ sc.llm_review.entity_overlap }}</span></div>
-                    <div class="flex justify-between"><span class="text-editorial-text-muted">案例复用</span><span :class="riskDimClass(sc.llm_review.case_reuse)">{{ sc.llm_review.case_reuse }}</span></div>
-                    <div class="flex justify-between"><span class="text-editorial-text-muted">第一人称风险</span><span :class="riskDimClass(sc.llm_review.first_person_risk)">{{ sc.llm_review.first_person_risk }}</span></div>
-                    <div class="flex justify-between"><span class="text-editorial-text-muted">LLM 综合风险</span><span class="font-medium" :class="riskDimClass(sc.llm_review.overall_risk)">{{ sc.llm_review.overall_risk }}</span></div>
-                    <div class="flex justify-between"><span class="text-editorial-text-muted">建议操作</span><span>{{ llmActionLabel }}</span></div>
-                    <template v-if="sc.llm_review.reason">
-                      <div class="mt-1 pt-1 border-t border-editorial-border">
-                        <div class="text-editorial-text-muted mb-0.5">原因</div>
-                        <a-tooltip :title="sc.llm_review.reason" placement="topLeft"><div class="line-clamp-2">{{ sc.llm_review.reason }}</div></a-tooltip>
-                      </div>
-                    </template>
-                  </div>
-                </template>
-                <template v-else-if="sc.llm_review && sc.llm_review.status === 'failed'">
-                  <div class="rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs text-editorial-text-muted">LLM 审查失败{{ sc.llm_review.error ? `：${sc.llm_review.error}` : '' }}</div>
-                </template>
-                <template v-else-if="sc.llm_review">
-                  <div class="rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs text-editorial-text-muted">LLM 审查已跳过</div>
-                </template>
-              </div>
-
-              <!-- 右：风险点（完整展示） -->
-              <div class="space-y-2">
-                <!-- 字面重复片段 -->
-                <template v-if="sc.rule_based && (sc.rule_based.high_risk_segments?.length ?? 0) > 0">
-                  <div class="rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs">
-                    <div class="font-medium text-editorial-text-body mb-1.5">字面重复片段（{{ sc.rule_based.high_risk_segments!.length }}）</div>
-                    <div class="space-y-1.5">
-                      <div v-for="(seg, i) in sc.rule_based.high_risk_segments" :key="i" class="rounded bg-white px-2 py-1.5 text-[11px] leading-relaxed border border-editorial-border">
-                        <a-tooltip :title="seg.article_segment" placement="topLeft"><div class="line-clamp-2 text-editorial-text-muted">文章：<span class="text-editorial-text-body">{{ seg.article_segment }}</span></div></a-tooltip>
-                        <a-tooltip :title="seg.source_segment" placement="topLeft"><div class="line-clamp-2 text-editorial-text-muted mt-0.5">原文：<span class="text-editorial-text-body">{{ seg.source_segment }}</span></div></a-tooltip>
-                        <div class="text-editorial-text-muted mt-0.5">相似度：{{ Math.round((seg.similarity ?? 0) * 100) }}%</div>
-                      </div>
-                    </div>
-                  </div>
-                </template>
-                <!-- LLM 高风险点（完整展示） -->
-                <template v-if="sc.llm_review && sc.llm_review.status === 'success' && (sc.llm_review.high_risk_points?.length ?? 0) > 0">
-                  <div class="rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs">
-                    <div class="font-medium text-editorial-text-body mb-1.5">高风险点（{{ sc.llm_review.high_risk_points!.length }}）</div>
-                    <div class="space-y-1">
-                      <div v-for="(point, i) in sc.llm_review.high_risk_points" :key="i" class="rounded bg-white px-2 py-1.5 text-[11px] leading-relaxed border border-editorial-border">{{ point }}</div>
-                    </div>
-                  </div>
-                </template>
-                <!-- 无风险点时的占位 -->
-                <template v-if="(!sc.rule_based?.high_risk_segments?.length) && (!sc.llm_review?.high_risk_points?.length)">
-                  <div class="rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs text-editorial-text-muted">无风险片段</div>
-                </template>
-              </div>
-            </div>
-          </template>
-        </section>
-        <section v-else-if="!isManualArticle && article?.similarityCheck === null && article?.id">
-          <div class="mb-2">
-            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">相似度检测</h3>
-          </div>
-          <div class="text-xs text-editorial-text-muted">未检测</div>
-        </section>
+        <ArticleSimilaritySection
+          :is-manual-article="isManualArticle"
+          :article-id="article.id"
+          :similarity-check="article.similarityCheck"
+        />
 
         <!-- 写作流程时间线 -->
         <StepTraceTimeline
@@ -344,350 +86,80 @@
           :reason-text="article?.reasonText"
         />
 
-        <!-- 开头钩子（只读） -->
-        <section v-if="!isManualArticle && parseJsonArray(article.hooks).length > 0">
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">开头钩子</h3>
-            <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText(parseJsonArray(article.hooks).join('\n'))">复制全部</a-button>
-          </div>
-          <ul class="m-0 list-none space-y-1 pl-0">
-            <li
-              v-for="(h, idx) in parseJsonArray(article.hooks)"
-              :key="idx"
-              class="group flex items-start gap-3 rounded-editorial-sm bg-editorial-panel/40 px-3 py-2"
-            >
-              <span class="flex-1 text-sm leading-6 text-editorial-text-body">{{ h }}</span>
-              <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px] opacity-0 group-hover:opacity-100" @click="copyText(h)">复制</a-button>
-            </li>
-          </ul>
-        </section>
+        <ArticleSupplementalSections
+          :article="article"
+          :readonly="props.readonly"
+          :is-manual-article="isManualArticle"
+          :source-cover-url="sourceCoverUrl"
+          :generating-comments="generatingComments"
+          :generating-author-extensions="generatingAuthorExtensions"
+          @copy="copyText"
+          @generate-comments="handleGenerateComments"
+          @generate-author-extensions="handleGenerateAuthorExtensions"
+        />
 
-        <!-- 可摘句（只读） -->
-        <section v-if="!isManualArticle && parseJsonArray(article.quotes).length > 0">
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">可摘句</h3>
-            <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText(parseJsonArray(article.quotes).join('\n'))">复制全部</a-button>
-          </div>
-          <ul class="m-0 list-inside list-disc pl-1">
-            <li v-for="(q, idx) in parseJsonArray(article.quotes)" :key="idx" class="text-sm leading-6 text-editorial-text-body">{{ q }}</li>
-          </ul>
-        </section>
+        <ArticleShortImagePromptSection
+          :prompts="article.imagePrompts ?? []"
+          :readonly="props.readonly"
+          @copy="copyPrompt"
+          @save="saveLegacyShortPrompt"
+          @dirty-change="setPromptDirty"
+        />
 
-        <!-- 素材原图：外链展示素材 cover，右键另存后上传成品用（不转存自己服务器） -->
-        <section v-if="!isManualArticle && sourceCoverUrl">
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">素材原图</h3>
-            <a :href="sourceCoverUrl" target="_blank" rel="noopener noreferrer" class="text-[11px] text-editorial-link-active hover:underline">在新标签打开原图</a>
-          </div>
-          <img :src="sourceCoverUrl" referrerpolicy="no-referrer" alt="素材原图" loading="lazy" class="block w-1/5 cursor-pointer rounded-editorial-md border border-editorial-border object-cover transition-opacity hover:opacity-80" @click="sourceCoverPreviewOpen = true" />
-          <p class="m-0 mt-1 text-[11px] text-editorial-text-muted/70">素材原文封面图（外链，点击图片预览，右键另存后上传到成品）</p>
-          <a-modal v-model:open="sourceCoverPreviewOpen" :footer="null" :width="760" :body-style="{ padding: '24px' }" destroy-on-close>
-            <img :src="sourceCoverUrl" referrerpolicy="no-referrer" alt="素材原图预览" class="mx-auto block max-h-[72vh] max-w-full object-contain" />
-          </a-modal>
-        </section>
+        <ArticleImageWorkflowSections
+          :article="article"
+          :readonly="props.readonly"
+          :article-images="articleImages"
+          :display-cover-images="displayCoverImages"
+          :active-cover-index="activeCoverIndex"
+          :inline-image-slot-count="inlineImageSlotCount"
+          :total-image-slot-count="totalImageSlotCount"
+          :cover-prompt-generating="coverPromptGenerating"
+          :inline-prompts-generating="inlinePromptsGenerating"
+          :inline-prompt-generating-index="inlinePromptGeneratingIndex"
+          :uploading-cover="uploadingCover"
+          :uploading-inline="uploadingInline"
+          @copy-prompt="copyPrompt"
+          @prompt-dirty="setPromptDirty"
+          @generate-cover-prompt="handleGenerateCoverPrompt"
+          @upload-cover="handleUploadCover"
+          @select-cover="selectCoverImage"
+          @save-cover-prompt="saveCoverPrompt"
+          @generate-inline-prompts="handleGenerateInlinePrompts"
+          @upload-inline="handleUploadInlineImage"
+          @save-inline-prompt="saveInlinePrompt"
+        />
 
-        <!-- 配图提示词（短内容线：只产出提示词不出图，手动出图用） -->
-        <section v-if="article?.imagePrompts && article.imagePrompts.length">
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">配图提示词</h3>
-          </div>
-          <div class="flex flex-col gap-1.5">
-            <EditablePromptRow
-              v-for="(p, i) in article.imagePrompts"
-              :key="i"
-              :label="`短内容配图${i + 1}`"
-              :value="p"
-              :readonly="props.readonly"
-              :regeneratable="false"
-              @copy="copyPrompt"
-              @save="saveLegacyShortPrompt(i, $event)"
-              @dirty-change="setPromptDirty(`short-${i}`, $event)"
-            />
-          </div>
-        </section>
-
-        <!-- 读者评论 + 作者回复（写作时生成，可复制用于发布互动；可按需补生成） -->
-        <section v-if="!isManualArticle && (!props.readonly || (article?.comments && article.comments.length))">
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">读者评论 + 作者回复</h3>
-            <div class="flex items-center gap-2">
-              <a-button v-if="article?.comments && article.comments.length" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText((article?.comments ?? []).map(formatCommentPair).join('\n\n'))">复制全部</a-button>
-              <a-button v-if="!props.readonly" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" :loading="generatingComments" :disabled="generatingComments" @click="handleGenerateComments">{{ generatingComments ? '生成中...' : (article?.comments && article.comments.length ? '重新生成评论' : '生成评论') }}</a-button>
-            </div>
-          </div>
-          <div v-if="article?.comments && article.comments.length" class="flex flex-col gap-1.5">
-            <div v-for="(c, i) in article.comments" :key="i" class="rounded border border-editorial-border bg-editorial-bg-page px-2 py-1.5">
-              <div class="flex items-start gap-1.5">
-                <span class="shrink-0 text-[10px] font-medium text-editorial-text-muted">读者</span>
-                <span class="flex-1 text-[12px] leading-relaxed text-editorial-text-body">{{ c.reader }}</span>
-                <button class="shrink-0 px-2 py-1 text-[11px] text-editorial-link-active hover:underline" @click="copyText(c.reader)">复制</button>
-              </div>
-              <div class="mt-1 flex items-start gap-1.5">
-                <span class="shrink-0 text-[10px] font-medium text-editorial-text-muted">作者</span>
-                <span class="flex-1 text-[12px] leading-relaxed text-editorial-text-body">{{ c.author_reply }}</span>
-                <button class="shrink-0 px-2 py-1 text-[11px] text-editorial-link-active hover:underline" @click="copyText(c.author_reply)">复制</button>
-              </div>
-            </div>
-          </div>
-          <p v-else class="m-0 text-[12px] leading-relaxed text-editorial-text-muted">暂无评论，点击右上「生成评论」按需补生成。</p>
-        </section>
-
-        <!-- 作者拓展（作者视角的延伸评论：总结/隐喻/感悟/延伸/反问，5 条长短不一） -->
-        <section v-if="!isManualArticle && (!props.readonly || (article?.authorExtensions && article.authorExtensions.length))">
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">作者拓展</h3>
-            <div class="flex items-center gap-2">
-              <a-button v-if="article?.authorExtensions && article.authorExtensions.length" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText((article?.authorExtensions ?? []).join('\n\n'))">复制全部</a-button>
-              <a-button v-if="!props.readonly" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" :loading="generatingAuthorExtensions" :disabled="generatingAuthorExtensions" @click="handleGenerateAuthorExtensions">{{ generatingAuthorExtensions ? '生成中...' : (article?.authorExtensions && article.authorExtensions.length ? '重新生成拓展' : '生成拓展') }}</a-button>
-            </div>
-          </div>
-          <div v-if="article?.authorExtensions && article.authorExtensions.length" class="flex flex-col gap-1.5">
-            <div v-for="(ext, i) in article.authorExtensions" :key="i" class="flex items-start gap-1.5 rounded border border-editorial-border bg-editorial-bg-page px-2 py-1.5">
-              <span class="flex-1 text-[12px] leading-relaxed text-editorial-text-body">{{ ext }}</span>
-              <button class="shrink-0 px-2 py-1 text-[11px] text-editorial-link-active hover:underline" @click="copyText(ext)">复制</button>
-            </div>
-          </div>
-          <p v-else class="m-0 text-[12px] leading-relaxed text-editorial-text-muted">暂无作者拓展，点击右上「生成拓展」按需补生成。</p>
-        </section>
-
-        <!-- 封面图 -->
-        <section>
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">封面图</h3>
-            <div v-if="!props.readonly" class="flex items-center gap-3">
-              <a-button
-                type="link"
-                size="small"
-                class="!h-auto !px-2 !py-1 !text-[11px]"
-                :loading="coverPromptGenerating"
-                :disabled="coverPromptGenerating"
-                @click="handleGenerateCoverPrompt"
-              >{{ coverPromptGenerating ? '生成中...' : '生成封面提示词' }}</a-button>
-              <label class="cursor-pointer text-[11px] text-editorial-link-active hover:underline">
-                <span v-if="uploadingCover">上传中...</span>
-                <span v-else>上传封面图</span>
-                <input type="file" accept="image/*" class="hidden" @change="handleUploadCover" />
-              </label>
-            </div>
-          </div>
-          <template v-if="displayCoverImages.length > 0">
-            <a-image-preview-group>
-              <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <template v-for="(url, idx) in displayCoverImages" :key="idx">
-                <div
-                  v-if="url"
-                  class="relative overflow-hidden rounded-editorial-md border transition-all"
-                  :class="idx === activeCoverIndex
-                    ? 'border-editorial-accent ring-2 ring-editorial-ring'
-                    : 'border-editorial-border opacity-60 hover:opacity-100 hover:border-editorial-link-active/40'"
-                >
-                  <a-image
-                    :src="url"
-                    :alt="`封面图 ${idx + 1}`"
-                    class="block w-full object-cover"
-                    loading="lazy"
-                  />
-                  <!-- 选中标记 / 最新标记 -->
-                  <div
-                    v-if="idx === activeCoverIndex"
-                    class="absolute right-1 top-1 flex items-center gap-0.5 rounded bg-editorial-accent px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm"
-                  >
-                    <span class="inline-block h-3 w-3 leading-none text-center">✓</span> 发布封面
-                  </div>
-                  <div v-if="idx === 0 && idx !== activeCoverIndex" class="absolute left-1 top-1 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</div>
-                  <!-- 设为发布：始终可见，不遮挡图片 -->
-                  <button
-                    v-if="!props.readonly && idx !== activeCoverIndex"
-                    class="absolute right-1 bottom-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white hover:bg-black/80"
-                    @click.stop="selectCoverImage(idx)"
-                  >设为发布封面</button>
-                </div>
-                </template>
-              </div>
-            </a-image-preview-group>
-          </template>
-          <div v-else class="flex items-center justify-center rounded-editorial-md border border-dashed border-editorial-border bg-editorial-bg-page px-4 py-6 text-xs text-editorial-text-muted">
-            暂无封面图，请先在外部生图后上传
-          </div>
-          <EditablePromptRow
-            class="mt-1.5"
-            label="封面 Prompt"
-            :value="article.coverImagePrompt ?? ''"
-            :readonly="props.readonly"
-            :regenerating="coverPromptGenerating"
-            @copy="copyPrompt"
-            @save="saveCoverPrompt"
-            @regenerate="handleGenerateCoverPrompt"
-            @dirty-change="setPromptDirty('cover', $event)"
-          />
-        </section>
-
-        <!-- 正文配图 -->
-        <section v-if="!props.readonly || articleImages.length > 0 || inlineImageSlotCount > 0 || Object.keys(article.inlineImagePrompts ?? {}).length > 0">
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文配图</h3>
-            <div v-if="!props.readonly" class="flex items-center gap-1">
-              <a-button
-                type="link"
-                size="small"
-                class="!h-auto !px-2 !py-1 !text-[11px]"
-                :loading="inlinePromptsGenerating"
-                :disabled="inlinePromptsGenerating"
-                @click="handleGenerateInlinePrompts()"
-              >{{ inlinePromptsGenerating ? '生成中...' : '生成正文配图提示词' }}</a-button>
-              <template v-for="idx in totalImageSlotCount" :key="idx">
-                <span class="inline-flex items-center gap-1">
-                  <label class="cursor-pointer text-[11px] text-editorial-link-active hover:underline">
-                    <span v-if="uploadingInline.has(idx)">上传中...</span>
-                    <span v-else>上传配图{{ idx }}</span>
-                    <input type="file" accept="image/*" class="hidden" @change="handleUploadInlineImage(idx, $event)" />
-                  </label>
-                  <span v-if="idx < totalImageSlotCount" class="text-editorial-text-muted/40">|</span>
-                </span>
-              </template>
-            </div>
-          </div>
-          <template v-if="articleImages.length > 0">
-            <a-image-preview-group>
-              <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div
-                  v-for="(img, idx) in articleImages"
-                  :key="idx"
-                  class="relative overflow-hidden rounded-editorial-md border border-editorial-border"
-                >
-                  <a-image
-                    :src="extractImageUrl(img)"
-                    :alt="typeof img === 'object' && img.alt ? img.alt : `配图 ${idx + 1}`"
-                    class="block w-full object-cover"
-                    loading="lazy"
-                  />
-                  <div v-if="typeof img === 'object' && img.purpose" class="absolute right-1 top-1 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
-                    {{ img.purpose }}
-                  </div>
-                </div>
-              </div>
-            </a-image-preview-group>
-          </template>
-          <div v-else class="flex items-center justify-center rounded-editorial-md border border-dashed border-editorial-border bg-editorial-bg-page px-4 py-6 text-xs text-editorial-text-muted">
-            正文含 {{ inlineImageSlotCount }} 张配图占位符未生成，点击上方按钮逐张补图
-          </div>
-          <template v-if="article?.inlineImagePrompts && Object.keys(article.inlineImagePrompts).length > 0">
-            <div class="mt-1.5 space-y-1">
-              <EditablePromptRow
-                v-for="(prompt, idx) in article.inlineImagePrompts"
-                :key="idx"
-                :label="`配图${idx} Prompt`"
-                :value="String(prompt)"
-                :readonly="props.readonly"
-                :regenerating="inlinePromptGeneratingIndex === Number(idx)"
-                @copy="copyPrompt"
-                @save="saveInlinePrompt(String(idx), $event)"
-                @regenerate="handleGenerateInlinePrompts(Number(idx))"
-                @dirty-change="setPromptDirty(`inline-${idx}`, $event)"
-              />
-            </div>
-          </template>
-        </section>
-
-        <!-- 正文：编辑器或只读预览 -->
+        <!-- 正文编辑器：普通态与全屏态共用同一份编辑状态。 -->
         <section v-if="article.contentMarkdown || article.humanMarkdown || isManualArticle" ref="editorSectionRef" class="editor-section">
-          <div class="mb-2 flex items-center justify-between" data-editor-title>
-            <div class="flex items-center gap-2">
-              <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文</h3>
-              <span v-if="savedAtLabel" class="text-[11px] font-medium text-green-600">{{ savedAtLabel }}</span>
-            </div>
-            <template v-if="!props.readonly">
-              <div class="flex flex-wrap items-center gap-2 max-[768px]:flex-nowrap max-[768px]:overflow-x-auto">
-                <div class="flex flex-wrap gap-1 max-[768px]:flex-nowrap">
-                  <a-button
-                    v-for="opt in previewThemeOptions"
-                    :key="opt.key"
-                    :type="activePreviewTheme === opt.key ? 'primary' : 'default'"
-                    size="small"
-                    class="!text-[11px] !px-2 !py-0.5"
-                    @click="switchPreviewTheme(opt.key)"
-                  >{{ opt.label }}</a-button>
-                </div>
-                <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText(editContent)">复制原文</a-button>
-                <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyMarkdownAsPlainText(editContent)">复制纯文本</a-button>
-                <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="toggleSyncScroll">{{ syncScrollEnabled ? '同步滚动：开' : '同步滚动：关' }}</a-button>
-                <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="toggleEditorFullscreen">{{ editorFullscreen ? '退出全屏' : '全屏' }}</a-button>
-              </div>
-            </template>
-          </div>
-          <!-- 只读模式：渲染后的 HTML 预览 -->
-          <div v-if="props.readonly" class="rounded border border-editorial-border bg-white p-4 overflow-auto" :style="{ height: dynamicEditorHeight + 'px' }" v-html="activePreviewHtml"></div>
-          <!-- 编辑模式：左右分屏编辑器（全屏时隐藏而非卸载，避免退出全屏重挂载闪烁） -->
-          <div
-            v-else
-            v-show="!editorFullscreen"
-            class="article-editor-wrapper"
-            data-article-editor-wrapper
-            :style="{ height: dynamicEditorHeight + 'px' }"
-          >
-            <ArticleMarkdownEditor
-              v-model="humanContent"
-              human-mode
-              :ai-draft="editContent"
-              :draft-label="isManualArticle ? '素材和草稿' : 'AI 生成的草稿'"
-              :draft-placeholder="isManualArticle ? '在此收集素材和整理草稿...' : 'AI 生成的草稿（可编辑）...'"
-              @update:ai-draft="editContent = $event"
-              :preview-html="activePreviewHtml"
-              :preview-label="activePreviewLabel"
-              :sync-scroll="syncScrollEnabled"
-              :save-status="focusMode ? (savedAtLabel || '未触发保存') : ''"
-              :save-status-state="savedAtLabel ? 'saved' : 'idle'"
-            />
-          </div>
+          <ArticleEditorPanel
+            :readonly="props.readonly"
+            :is-manual-article="isManualArticle"
+            :human-content="humanContent"
+            :ai-draft="editContent"
+            :preview-html="activePreviewHtml"
+            :preview-label="activePreviewLabel"
+            :preview-theme-options="previewThemeOptions"
+            :active-preview-theme="activePreviewTheme"
+            :sync-scroll-enabled="syncScrollEnabled"
+            :saved-at-label="savedAtLabel"
+            :focus-mode="focusMode"
+            :saving="saving"
+            :dynamic-height="dynamicEditorHeight"
+            :editor-fullscreen="editorFullscreen"
+            @update:human-content="humanContent = $event"
+            @update:ai-draft="editContent = $event"
+            @select-theme="handlePreviewThemeSelection"
+            @copy-ai="copyAiDraft"
+            @copy-plain="copyAiDraftAsPlainText"
+            @toggle-sync-scroll="toggleSyncScroll"
+            @toggle-fullscreen="toggleEditorFullscreen"
+            @save="handleSave"
+          />
         </section>
       </div>
     </template>
 
-    <!-- 全屏编辑器覆盖层 -->
-    <Teleport to="body">
-      <div
-        v-if="editorFullscreen && article && !props.readonly"
-        class="fixed inset-0 z-[9999] flex flex-col"
-        :style="{ background: focusMode ? '#ffffff' : 'var(--editorial-bg-page)', transition: 'background-color 0.8s ease' }"
-      >
-        <div class="fullscreen-toolbar flex flex-col gap-2 border-b px-3 py-2 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-x-4 md:gap-y-2 md:px-4" style="border-color: var(--editorial-border);">
-          <div class="flex flex-wrap items-center gap-2">
-            <h3 class="m-0 text-sm font-semibold" style="color: var(--editorial-text-main);">正文编辑（全屏）</h3>
-            <span v-if="savedAtLabel" class="text-[11px] font-medium text-green-600">{{ savedAtLabel }}</span>
-          </div>
-          <div class="flex flex-wrap items-center gap-x-2 gap-y-1 max-[768px]:flex-nowrap max-[768px]:overflow-x-auto">
-            <div class="flex flex-wrap gap-1 max-[768px]:flex-nowrap">
-              <a-button
-                v-for="opt in previewThemeOptions"
-                :key="opt.key"
-                :type="activePreviewTheme === opt.key ? 'primary' : 'default'"
-                size="small"
-                class="!text-[11px] !px-2 !py-0.5"
-                @click="switchPreviewTheme(opt.key)"
-              >{{ opt.label }}</a-button>
-            </div>
-            <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyText(editContent)">复制原文</a-button>
-            <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="copyMarkdownAsPlainText(editContent)">复制纯文本</a-button>
-            <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="toggleSyncScroll">{{ syncScrollEnabled ? '同步滚动：开' : '同步滚动：关' }}</a-button>
-            <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="handleSave" :loading="saving">保存</a-button>
-            <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="toggleEditorFullscreen">退出全屏</a-button>
-          </div>
-        </div>
-        <div class="flex-1 overflow-hidden p-2 md:p-4">
-          <ArticleMarkdownEditor
-            v-model="humanContent"
-            human-mode
-            :ai-draft="editContent"
-            :draft-label="isManualArticle ? '素材和草稿' : 'AI 生成的草稿'"
-            :draft-placeholder="isManualArticle ? '在此收集素材和整理草稿...' : 'AI 生成的草稿（可编辑）...'"
-            @update:ai-draft="editContent = $event"
-            :preview-html="activePreviewHtml"
-            :preview-label="activePreviewLabel"
-            :sync-scroll="syncScrollEnabled"
-          />
-        </div>
-      </div>
-    </Teleport>
   </a-modal>
 
   <!-- 审核弹窗（独立于详情弹窗，z-index 更高） -->
@@ -711,12 +183,19 @@
 import { ref, watch, computed, nextTick, onBeforeUnmount } from "vue";
 import { message } from "ant-design-vue";
 
-import ArticleMarkdownEditor from "./ArticleMarkdownEditor.vue";
-import EditablePromptRow from "./EditablePromptRow.vue";
+import ArticleEditorPanel from "./article-detail/ArticleEditorPanel.vue";
+import ArticlePlanningSections from "./article-detail/ArticlePlanningSections.vue";
+import ArticleSimilaritySection from "./article-detail/ArticleSimilaritySection.vue";
+import ArticleSupplementalSections from "./article-detail/ArticleSupplementalSections.vue";
+import { useArticleEditorViewport } from "./article-detail/useArticleEditorViewport.js";
+import ArticleImageWorkflowSections from "./article-detail/ArticleImageWorkflowSections.vue";
+import ArticleShortImagePromptSection from "./article-detail/ArticleShortImagePromptSection.vue";
+import ArticleDetailFooter from "./article-detail/ArticleDetailFooter.vue";
+import ArticleDetailHeader from "./article-detail/ArticleDetailHeader.vue";
 import StepTraceTimeline from "./StepTraceTimeline.vue";
 import ArticleReviewModal from "./ArticleReviewModal.vue";
 import ImageActionModal from "./ImageActionModal.vue";
-import { checkPublishConditions, getAvailableActions } from "./articleStatusShared.js";
+import { checkPublishConditions } from "./articleStatusShared.js";
 import {
   editFinishedArticle,
   generateFinishedArticleCoverPrompt,
@@ -739,6 +218,12 @@ import {
   type WechatThemeId,
 } from "../../services/creativeApi.js";
 import { renderWechatThemePreview } from "../../services/wechatRenderer.js";
+import { formatRelativeTime, parseJsonArray } from "./article-detail/articleDetailPresentation.js";
+import {
+  buildArticleTitleSync,
+  readFirstH1,
+  replaceFirstH1 as replaceH1,
+} from "./article-detail/articleTitleSync.js";
 
 const props = defineProps<{
   open: boolean;
@@ -792,165 +277,22 @@ async function handleRegenImagePrompts(): Promise<void> {
   }
 }
 
-// ─── 异常信息翻译 ───
-
-const ANOMALY_REASON_MAP: Record<string, string> = {
-  originality_risk_high: "原创风险过高",
-  c_mode_word_count_insufficient: "C 模式字数不足",
-  image_prompt_missing: "图片提示词缺失",
-  image_prompt_count_mismatch: "图片提示词数量不匹配",
-  image_prompt_parse_failed: "图片提示词解析失败",
-};
-
-const REVIEW_REASON_MAP: Record<string, string> = {
-  originality_risk_high: "原创风险过高（originality_risk_high）",
-  similarity_high: "相似度过高（similarity_high）",
-  first_person_risk: "第一人称风险（first_person_risk）",
-  c_mode_word_count_insufficient: "C 模式字数不足（c_mode_word_count_insufficient）",
-};
-
-/** 异常原因中文翻译 + 英文原文 */
-function formatAnomalyReason(raw: string): string {
-  for (const [key, cn] of Object.entries(ANOMALY_REASON_MAP)) {
-    if (raw === key) return `${cn}（${key}）`;
-    if (raw.startsWith(key + ":") || raw.startsWith(key + " - ")) {
-      const rest = raw.slice(key.length).replace(/^[: -]+/, "");
-      return `${cn}（${key}）${rest ? "——" + rest : ""}`;
-    }
-  }
-  return raw;
-}
-
-/** 审核标记翻译 */
-function formatReviewReason(raw: string): string {
-  return REVIEW_REASON_MAP[raw] ?? raw;
-}
-
-/** 是否有任何异常信息需要展示 */
-const hasAnomalyInfo = computed(() => {
-  if (!props.article) return false;
-  const a = props.article;
-  return a.status === "anomaly" || a.status === "needs_review"
-    || !!a.anomalyReason || !!a.reasonCode || !!a.reasonText
-    || !!a.manualReviewReason || (a.manualReviewReasons?.length ?? 0) > 0;
-});
-
-// ─── 正文全屏编辑 ───
-const editorFullscreen = ref(false);
-
-// ─── 专注模式：编辑区持续聚焦时渐隐弹窗其余内容 + mask 加深 ───
-const focusMode = ref(false);
-let focusModeTimer: ReturnType<typeof setTimeout> | null = null;
-const articleDetailWrapClass = computed(() => `article-detail-modal${focusMode.value ? " article-detail-modal--focus" : ""}`);
-// 专注时遮罩由半透明黑缓慢过渡到纯白，凸显编辑器；非专注保持 antd 默认半透明黑
-const articleDetailMaskStyle = computed(() => focusMode.value
-  ? { backgroundColor: "#ffffff", opacity: 1, transition: "background-color 0.8s ease, opacity 0.8s ease" }
-  : { backgroundColor: "rgba(0, 0, 0, 0.45)", transition: "background-color 0.8s ease, opacity 0.8s ease" });
-
-// ─── 编辑/预览同步滚动开关：持久化，跨详情弹窗共享 ───
-const SYNC_SCROLL_KEY = "md-editor-sync-scroll";
-function loadSyncScroll(): boolean {
-  try {
-    const saved = localStorage.getItem(SYNC_SCROLL_KEY);
-    // 未设置过时默认开启
-    return saved === null ? true : saved === "1";
-  } catch {
-    return true;
-  }
-}
-const syncScrollEnabled = ref(loadSyncScroll());
-function toggleSyncScroll(): void {
-  syncScrollEnabled.value = !syncScrollEnabled.value;
-  try {
-    localStorage.setItem(SYNC_SCROLL_KEY, syncScrollEnabled.value ? "1" : "0");
-  } catch { /* quota 忽略 */ }
-}
-
-// ─── 编辑器动态高度：测量 modal body 可视区域 ───
-const editorSectionRef = ref<HTMLElement | null>(null);
-const dynamicEditorHeight = ref(400);
-let editorResizeObserver: ResizeObserver | null = null;
-
-/** 测量 modal body 可视区域高度；专注模式会释放标题栏空间并读取实时 padding。 */
-function measureEditorHeight(): void {
-  const section = editorSectionRef.value;
-  if (!section) return;
-  const scrollParent = section.closest(".ant-modal-body") as HTMLElement;
-  if (!scrollParent) return;
-  // 读取计算样式，兼容桌面专注态和移动端不同的安全间距。
-  const bodyStyle = window.getComputedStyle(scrollParent);
-  const bodyPadding = Number.parseFloat(bodyStyle.paddingTop) + Number.parseFloat(bodyStyle.paddingBottom);
-  const titleBar = section.querySelector("[data-editor-title]") as HTMLElement;
-  const titleBarH = focusMode.value ? 0 : (titleBar?.offsetHeight ?? 40);
-  dynamicEditorHeight.value = Math.max(200, scrollParent.clientHeight - bodyPadding - titleBarH);
-}
-
-/** 弹窗打开后启动测量 */
-function setupEditorResize(): void {
-  const section = editorSectionRef.value;
-  if (!section) return;
-  const scrollParent = section.closest(".ant-modal-body") as HTMLElement;
-  if (!scrollParent) return;
-  measureEditorHeight();
-  editorResizeObserver = new ResizeObserver(() => measureEditorHeight());
-  editorResizeObserver.observe(scrollParent);
-  scrollParent.addEventListener("wheel", onModalBodyWheel, { passive: false });
-  scrollParent.addEventListener("focusin", onEditorFocusIn);
-  scrollParent.addEventListener("focusout", onEditorFocusOut);
-}
-
-function teardownEditorResize(): void {
-  if (editorResizeObserver) { editorResizeObserver.disconnect(); editorResizeObserver = null; }
-  const scrollParent = editorSectionRef.value?.closest(".ant-modal-body") as HTMLElement | null;
-  scrollParent?.removeEventListener("wheel", onModalBodyWheel);
-  scrollParent?.removeEventListener("focusin", onEditorFocusIn);
-  scrollParent?.removeEventListener("focusout", onEditorFocusOut);
-  if (focusModeTimer) { clearTimeout(focusModeTimer); focusModeTimer = null; }
-  focusMode.value = false;
-}
-
-/** 编辑区 textarea 聚焦时，编辑区外的滚轮锁住 modal body（避免滚详情弹窗），编辑区内仍可正常滚 */
-function onModalBodyWheel(e: WheelEvent): void {
-  const active = document.activeElement as HTMLElement | null;
-  if (!active || !active.classList.contains("md-editor__textarea")) return;
-  const target = e.target as HTMLElement;
-  if (target.closest(".md-editor__textarea-wrap, .md-editor__preview")) return;
-  e.preventDefault();
-}
-
-/** 编辑区聚焦停留 1.2s 进入专注模式；失焦（且没切到另一个编辑区）退出 */
-function onEditorFocusIn(e: FocusEvent): void {
-  const t = e.target as HTMLElement;
-  if (!t.classList || !t.classList.contains("md-editor__textarea")) return;
-  if (focusModeTimer) clearTimeout(focusModeTimer);
-  focusModeTimer = setTimeout(() => { focusModeTimer = null; focusMode.value = true; }, 1200);
-}
-
-function onEditorFocusOut(e: FocusEvent): void {
-  const t = e.target as HTMLElement;
-  if (!t.classList || !t.classList.contains("md-editor__textarea")) return;
-  // 切到另一个编辑区（中栏↔AI 草稿）保持专注，不退出
-  const related = e.relatedTarget as HTMLElement | null;
-  if (related && related.classList.contains("md-editor__textarea")) return;
-  if (focusModeTimer) { clearTimeout(focusModeTimer); focusModeTimer = null; }
-  focusMode.value = false;
-}
-
-let savedFocusModalScrollTop = 0;
-
-/**
- * 专注模式释放正文前的区块后，恢复退出前的弹窗位置，避免正文跳回详情顶部。
- */
-watch(focusMode, (focused) => {
-  const body = editorSectionRef.value?.closest(".ant-modal-body") as HTMLElement | null;
-  if (!body) return;
-  if (focused) savedFocusModalScrollTop = body.scrollTop;
-
-  nextTick(() => {
-    measureEditorHeight();
-    if (!focused) body.scrollTop = savedFocusModalScrollTop;
-  });
-});
+// 编辑器可视区由组合式逻辑管理，抽屉只负责在打开/关闭时调用其生命周期方法。
+const {
+  articleDetailMaskStyle,
+  articleDetailWrapClass,
+  dynamicEditorHeight,
+  editorFullscreen,
+  editorSectionRef,
+  focusMode,
+  handleFullscreenEsc,
+  resetEditorFullscreen,
+  setupEditorResize,
+  syncScrollEnabled,
+  teardownEditorResize,
+  toggleEditorFullscreen,
+  toggleSyncScroll,
+} = useArticleEditorViewport();
 
 function copyArticleId(id: number): void {
   navigator.clipboard.writeText(`【成品文章id: ${id}】`).then(() => {
@@ -1058,39 +400,6 @@ async function saveLegacyShortPrompt(index: number, value: string): Promise<void
   }
 }
 
-// 统计中文字符数（去掉空格、标点后的纯文字长度）
-function charCount(text: string | null | undefined): number {
-  if (!text) return 0;
-  return text.replace(/[\s\n]/g, "").length;
-}
-
-// 进入全屏前存 modal body 滚动位置：正文节 v-show 全屏时 display:none 会让 modal body 重排丢失 scrollTop
-let savedModalScrollTop = 0;
-
-function toggleEditorFullscreen(): void {
-  if (!editorFullscreen.value) {
-    const body = editorSectionRef.value?.closest(".ant-modal-body") as HTMLElement | null;
-    savedModalScrollTop = body?.scrollTop ?? 0;
-    editorFullscreen.value = true;
-    document.body.style.overflow = "hidden";
-  } else {
-    editorFullscreen.value = false;
-    document.body.style.overflow = "";
-    // 等正文节重新显示、modal body 重排完成后，恢复进入全屏前的滚动位置
-    nextTick(() => {
-      const body = editorSectionRef.value?.closest(".ant-modal-body") as HTMLElement | null;
-      if (body) body.scrollTop = savedModalScrollTop;
-    });
-  }
-}
-
-// ESC 退出全屏
-function handleFullscreenEsc(e: KeyboardEvent): void {
-  if (e.key === "Escape" && editorFullscreen.value) {
-    toggleEditorFullscreen();
-  }
-}
-
 // ─── 正文编辑 ───
 
 const editContent = ref("");
@@ -1105,18 +414,6 @@ let relativeTimer: ReturnType<typeof setInterval> | null = null;
 let lastSavedContent = "";
 let lastSavedHuman = "";
 let humanAutoSaveTimer: ReturnType<typeof setTimeout> | null = null;
-
-// 保存时间相对格式化：60秒内显示秒前，60分钟内分钟前，24小时内小时前，否则天前
-function formatRelativeTime(ts: number): string {
-  const diff = Math.max(0, Date.now() - ts);
-  const sec = Math.floor(diff / 1000);
-  if (sec < 60) return `${sec}秒前`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}分钟前`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}小时前`;
-  return `${Math.floor(hr / 24)}天前`;
-}
 
 const savedAtLabel = computed(() => {
   // 依赖 relativeTick 触发重算
@@ -1133,8 +430,6 @@ const localTitles = ref<string[]>([]);
 // 备选标题原地编辑态：editingTitleIdx 为正在编辑的下标，null 表示无
 const editingTitleIdx = ref<number | null>(null);
 const editingTitleValue = ref("");
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const editingInputRef = ref<any>(null);
 
 const displayTitles = computed(() => {
   return localTitles.value.length > 0 ? localTitles.value : parseJsonArray(props.article?.titles ?? null);
@@ -1143,11 +438,6 @@ const displayTitles = computed(() => {
 /** 按标题索引读取 v2 元数据；旧文章没有候选元数据时返回空。 */
 function titleCandidateAt(idx: number) {
   return props.article?.titleCandidates?.[idx] ?? null;
-}
-
-/** 把模型风险枚举转成编辑人员可直接理解的中文。 */
-function titleRiskLabel(risk?: string): string {
-  return ({ low: "低", medium: "中", high: "高" } as Record<string, string>)[risk ?? ""] ?? "未评估";
 }
 
 async function handleRegenTitle(): Promise<void> {
@@ -1174,48 +464,15 @@ async function handleRegenTitle(): Promise<void> {
   }
 }
 
-/** 替换 markdown 第一个 H1 标题行（# 开头）为新标题，不动正文，避免误改正文里出现的标题文字 */
-function replaceH1(md: string, newTitle: string): string {
-  return /^# .+/m.test(md) ? md.replace(/^# .+/m, `# ${newTitle}`) : `# ${newTitle}\n\n${md}`;
-}
-
-function readFirstH1(md: string): string {
-  return md.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? "";
-}
-
-/**
- * 中栏是发布真源：手动稿同步唯一标题；管线稿同步当前选中的发布标题，并让左栏 H1 跟随。
- */
-function buildTitleSync(content: string): {
-  fields: Record<string, unknown>;
-  humanMarkdown: string;
-  title: string;
-  titles: string[];
-  contentMarkdown?: string;
-} {
-  const titles = [...displayTitles.value];
-  const index = isManualArticle.value ? 0 : activeTitleIndex.value;
-  let title = readFirstH1(content);
-  if (!title) title = titles[index] ?? titles[0] ?? "";
-  const humanMarkdown = title ? replaceH1(content, title) : content;
-
-  if (title) {
-    while (titles.length <= index) titles.push("");
-    titles[index] = title;
-  }
-
-  const contentMarkdown = !isManualArticle.value && title ? replaceH1(editContent.value, title) : undefined;
-  return {
-    fields: {
-      humanMarkdown,
-      ...(title ? { titles } : {}),
-      ...(contentMarkdown !== undefined ? { contentMarkdown } : {}),
-    },
-    humanMarkdown,
-    title,
-    titles,
-    contentMarkdown,
-  };
+/** 将当前抽屉状态交给纯标题同步函数，保存行为保持在组件内。 */
+function buildTitleSync(content: string) {
+  return buildArticleTitleSync({
+    isManualArticle: isManualArticle.value,
+    titles: displayTitles.value,
+    activeTitleIndex: activeTitleIndex.value,
+    humanMarkdown: content,
+    contentMarkdown: editContent.value,
+  });
 }
 
 /** 请求成功后再更新本地标题和正文快照，失败时保留未保存状态供自动重试。 */
@@ -1306,7 +563,6 @@ function startEditTitle(idx: number): void {
   }
   editingTitleIdx.value = idx;
   editingTitleValue.value = localTitles.value[idx] ?? "";
-  nextTick(() => editingInputRef.value?.focus());
 }
 
 function cancelEditTitle(): void {
@@ -1364,6 +620,10 @@ const localIntros = ref<string[]>([]);
 
 const displayIntros = computed(() => {
   return localIntros.value.length > 0 ? localIntros.value : (props.article?.intros ?? []);
+});
+
+const displaySummaries = computed(() => {
+  return props.article?.summary100 ?? [];
 });
 
 async function handleRegenIntro(): Promise<void> {
@@ -1464,78 +724,6 @@ async function selectIntro(idx: number): Promise<void> {
 
     emit("saved");
   } catch { /* 静默失败，本地状态已更新 */ }
-}
-
-// ─── 百字摘要（只读展示） ───
-
-const displaySummaries = computed(() => {
-  return props.article?.summary100 ?? [];
-});
-
-// 相似度检测数据
-const sc = computed(() => {
-  const raw = props.article?.similarityCheck;
-  if (!raw || typeof raw !== "object") return null;
-  return raw as {
-    literal_similarity?: number;
-    risk_level?: string;
-    rule_based?: {
-      literal_similarity?: number;
-      literal_structure_similarity?: number;
-      source_content_similarity?: number;
-      max_continuous_overlap_chars?: number;
-      high_risk_segments?: Array<{ article_segment: string; source_segment: string; similarity: number }>;
-      risk_level?: string;
-    };
-    llm_review?: {
-      source_dependency?: string;
-      narrative_similarity?: string;
-      claim_overlap?: string;
-      entity_overlap?: string;
-      case_reuse?: string;
-      first_person_risk?: string;
-      overall_risk?: string;
-      suggested_action?: string;
-      reason?: string;
-      high_risk_points?: string[];
-      status?: string;
-      error?: string;
-    };
-  };
-});
-
-const riskLevelLabel = computed(() => {
-  const level = sc.value?.risk_level;
-  if (level === "low") return "低";
-  if (level === "medium") return "中";
-  if (level === "high") return "高";
-  return "未知";
-});
-
-// 人工审核原因可读文本
-const manualReviewReasonText = computed(() => {
-  const reason = props.article?.manualReviewReason;
-  if (reason === "originality_risk_high") return "原创风险过高";
-  if (reason === "similarity_high") return "相似度过高";
-  if (reason === "first_person_risk") return "第一人称风险";
-  if (reason === "c_mode_word_count_insufficient") return "C 模式字数不足";
-  return reason ?? "";
-});
-
-// LLM 建议操作可读文本
-const llmActionLabel = computed(() => {
-  const action = sc.value?.llm_review?.suggested_action;
-  if (action === "pass") return "通过";
-  if (action === "revise") return "建议修改";
-  if (action === "manual_review") return "人工审核";
-  return action ?? "未知";
-});
-
-// 风险维度颜色
-function riskDimClass(level: string | undefined): string {
-  if (level === "high") return "text-red-500";
-  if (level === "medium") return "text-yellow-600";
-  return "text-green-600";
 }
 
 // 审核弹窗
@@ -1995,7 +1183,6 @@ watch(humanContent, (val) => {
 
 // ─── 素材原图：按 sourceItemId 取素材 cover 外链展示（不转存，no-referrer 绕防盗链）───
 const sourceCoverUrl = ref<string | null>(null);
-const sourceCoverPreviewOpen = ref(false);
 watch(() => props.article?.sourceItemId, (sid) => {
   if (!sid) { sourceCoverUrl.value = null; return; }
   readCreativeSourceItem(sid)
@@ -2027,8 +1214,7 @@ watch(() => props.open, (val) => {
     editingTitleIdx.value = null;
     editingTitleValue.value = "";
     if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
-    editorFullscreen.value = false;
-    document.body.style.overflow = "";
+    resetEditorFullscreen();
     document.addEventListener("keydown", handleFullscreenEsc);
     // 恢复文章保存的主题偏好，无记录时默认使用落日胶片。
     const saved = props.article.wechatThemeId;
@@ -2143,8 +1329,7 @@ async function saveAndPush(): Promise<void> {
 async function handleClose(): Promise<void> {
   // 全屏状态下 ESC/关闭只退出全屏，不连带关闭详情弹窗
   if (editorFullscreen.value) {
-    editorFullscreen.value = false;
-    document.body.style.overflow = "";
+    resetEditorFullscreen();
     return;
   }
   if (promptDirtyKeys.value.size > 0) {
@@ -2226,67 +1411,11 @@ const activePreviewLabel = computed(() => {
   return opt?.label ?? "预览";
 });
 
-// ─── 辅助函数 ───
-
-function parseJsonArray(raw: string | string[] | null): string[] {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+/** 编辑器面板传回字符串键；父抽屉保留主题枚举约束。 */
+function handlePreviewThemeSelection(key: string): void {
+  if (previewThemeOptions.some((option) => option.key === key)) {
+    switchPreviewTheme(key as PreviewThemeKey);
   }
-}
-
-const modeMap: Record<string, string> = {
-  A: "模式A · 短篇观点文",
-  B: "模式B · 短篇观察随笔",
-};
-
-function modeLabel(mode: string | null): string {
-  if (!mode) return "模式 -";
-  return modeMap[mode] ?? `模式${mode}`;
-}
-
-/** v2 文章显示读者任务，历史文章继续显示 A/B 模式。 */
-function pipelineLabel(article: CreativeFinishedArticle): string {
-  if (article.originType === "manual") return "手动创作";
-  if (article.pipelineVersion === "v2") {
-    return `v2 · ${article.readerTask || "读者任务未标注"}`;
-  }
-  return modeLabel(article.mode);
-}
-
-/** 计算中文字数：中文按字数计，英文按单词计 */
-function countWords(text: string): number {
-  const chinese = text.match(/[一-鿿㐀-䶿]/g);
-  const chineseCount = chinese ? chinese.length : 0;
-  const withoutChinese = text.replace(/[一-鿿㐀-䶿]/g, " ");
-  const englishWords = withoutChinese.match(/[a-zA-Z0-9]+/g);
-  const englishCount = englishWords ? englishWords.length : 0;
-  return chineseCount + englishCount;
-}
-
-function getFirstTitle(titles: string | null): string {
-  const parsed = parseJsonArray(titles);
-  return parsed.length > 0 ? parsed[0] : "无标题";
-}
-
-function formatLocalTime(value: string): string {
-  const fixed = /^[0-9]{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(value) && !/[Zz+\-]\d{0,4}$/.test(value)
-    ? value.replace(" ", "T") + "Z"
-    : value;
-  const date = new Date(fixed);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleString("zh-CN", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
 }
 
 // 当前主题对应的 WechatThemeId（用于复制公众号格式和推送）
@@ -2331,9 +1460,14 @@ async function copyText(text: string): Promise<void> {
   message.success("已复制到剪贴板");
 }
 
-// 格式化一条评论+回复（单条/整块复制都用）
-function formatCommentPair(c: { reader: string; author_reply: string }): string {
-  return `读者：${c.reader}\n作者回复：${c.author_reply}`;
+/** 编辑器操作区复制 AI 草稿，避免子组件了解父级文本状态。 */
+function copyAiDraft(): void {
+  void copyText(editContent.value);
+}
+
+/** 编辑器操作区复制清洗后的 AI 草稿。 */
+function copyAiDraftAsPlainText(): void {
+  void copyMarkdownAsPlainText(editContent.value);
 }
 
 async function copyMarkdownAsPlainText(mdText: string): Promise<void> {

@@ -14,6 +14,7 @@ import { registerCreativeSourceActionRoutes } from "./routes/creativeSourceActio
 import { registerCreativeFinishedArticleRoutes } from "./routes/creativeFinishedArticleRoutes.js";
 import { registerManualCollectionRoutes } from "./routes/manualCollectionRoutes.js";
 import { registerSourceManagementRoutes } from "./routes/sourceManagementRoutes.js";
+import { registerTwitterSourceRoutes } from "./routes/twitterSourceRoutes.js";
 import type { AiTimelineFeedReadResult } from "../core/aiTimeline/aiTimelineFeedFile.js";
 import { LatestReportEmailError, type LatestReportEmailErrorReason } from "../core/pipeline/sendLatestReportEmail.js";
 import type { BuildContentPageModelOptions } from "../core/content/buildContentPageModel.js";
@@ -852,6 +853,25 @@ export function createServer(deps: ServerDeps = {}) {
     updateSourceDisplayMode: deps.updateSourceDisplayMode,
   });
 
+  // Twitter 账号和关键词都有独立数据模型，统一由专用模块维护其写入接口。
+  registerTwitterSourceRoutes(app, {
+    authorizeStateAction: (request, reply) => ensureStateActionAuthorized(
+      request,
+      reply,
+      authEnabled,
+      authConfig?.sessionSecret ?? ""
+    ),
+    createTwitterAccount: deps.createTwitterAccount,
+    updateTwitterAccount: deps.updateTwitterAccount,
+    deleteTwitterAccount: deps.deleteTwitterAccount,
+    toggleTwitterAccount: deps.toggleTwitterAccount,
+    createTwitterSearchKeyword: deps.createTwitterSearchKeyword,
+    updateTwitterSearchKeyword: deps.updateTwitterSearchKeyword,
+    deleteTwitterSearchKeyword: deps.deleteTwitterSearchKeyword,
+    toggleTwitterSearchKeywordCollect: deps.toggleTwitterSearchKeywordCollect,
+    toggleTwitterSearchKeywordVisible: deps.toggleTwitterSearchKeywordVisible,
+  });
+
   // Creative 图片路由集中到独立模块，避免服务装配入口继续承载上传细节。
   registerCreativeImageRoutes(app, {
     creativeImageDir,
@@ -1277,216 +1297,6 @@ export function createServer(deps: ServerDeps = {}) {
     return reply.send({ ok: true, cleared });
   });
 
-  app.post("/actions/twitter-accounts/create", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.createTwitterAccount) {
-      return reply.code(503).send({ ok: false, reason: "twitter-accounts-disabled" });
-    }
-
-    const payload = parseTwitterAccountSavePayload(request.body, "create");
-
-    if (!payload) {
-      return reply.code(400).send({ ok: false, reason: "invalid-twitter-account-payload" });
-    }
-
-    return sendTwitterAccountSaveResult(reply, await deps.createTwitterAccount(payload));
-  });
-
-  app.post("/actions/twitter-accounts/update", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.updateTwitterAccount) {
-      return reply.code(503).send({ ok: false, reason: "twitter-accounts-disabled" });
-    }
-
-    const payload = parseTwitterAccountSavePayload(request.body, "update");
-
-    if (!payload) {
-      return reply.code(400).send({ ok: false, reason: "invalid-twitter-account-payload" });
-    }
-
-    return sendTwitterAccountSaveResult(reply, await deps.updateTwitterAccount(payload));
-  });
-
-  app.post("/actions/twitter-accounts/delete", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.deleteTwitterAccount) {
-      return reply.code(503).send({ ok: false, reason: "twitter-accounts-disabled" });
-    }
-
-    const id = parsePositiveInteger((request.body as { id?: unknown } | undefined)?.id);
-
-    if (id === null) {
-      return reply.code(400).send({ ok: false, reason: "invalid-twitter-account-id" });
-    }
-
-    const result = await deps.deleteTwitterAccount(id);
-
-    if (!result.ok) {
-      return reply.code(result.reason === "not-found" ? 404 : 400).send({ ok: false, reason: result.reason });
-    }
-
-    return reply.send({ ok: true, id: result.id });
-  });
-
-  app.post("/actions/twitter-accounts/toggle", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.toggleTwitterAccount) {
-      return reply.code(503).send({ ok: false, reason: "twitter-accounts-disabled" });
-    }
-
-    const body = request.body as { id?: unknown; enable?: unknown } | undefined;
-    const id = parsePositiveInteger(body?.id);
-    const enable = typeof body?.enable === "boolean" ? body.enable : null;
-
-    if (id === null) {
-      return reply.code(400).send({ ok: false, reason: "invalid-twitter-account-id" });
-    }
-
-    if (enable === null) {
-      return reply.code(400).send({ ok: false, reason: "invalid-twitter-account-enable" });
-    }
-
-    const result = await deps.toggleTwitterAccount(id, enable);
-
-    if (!result.ok) {
-      return reply.code(result.reason === "not-found" ? 404 : 400).send({ ok: false, reason: result.reason });
-    }
-
-    return reply.send({ ok: true, id: result.account.id, enable: result.account.isEnabled });
-  });
-
-  app.post("/actions/twitter-keywords/create", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.createTwitterSearchKeyword) {
-      return reply.code(503).send({ ok: false, reason: "twitter-keywords-disabled" });
-    }
-
-    const payload = parseTwitterKeywordSavePayload(request.body, "create");
-
-    if (!payload) {
-      return reply.code(400).send({ ok: false, reason: "invalid-twitter-keyword-payload" });
-    }
-
-    return sendTwitterKeywordSaveResult(reply, await deps.createTwitterSearchKeyword(payload));
-  });
-
-  app.post("/actions/twitter-keywords/update", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.updateTwitterSearchKeyword) {
-      return reply.code(503).send({ ok: false, reason: "twitter-keywords-disabled" });
-    }
-
-    const payload = parseTwitterKeywordSavePayload(request.body, "update");
-
-    if (!payload) {
-      return reply.code(400).send({ ok: false, reason: "invalid-twitter-keyword-payload" });
-    }
-
-    return sendTwitterKeywordSaveResult(reply, await deps.updateTwitterSearchKeyword(payload));
-  });
-
-  app.post("/actions/twitter-keywords/delete", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.deleteTwitterSearchKeyword) {
-      return reply.code(503).send({ ok: false, reason: "twitter-keywords-disabled" });
-    }
-
-    const id = parsePositiveInteger((request.body as { id?: unknown } | undefined)?.id);
-
-    if (id === null) {
-      return reply.code(400).send({ ok: false, reason: "invalid-twitter-keyword-id" });
-    }
-
-    const result = await deps.deleteTwitterSearchKeyword(id);
-
-    if (!result.ok) {
-      return reply.code(result.reason === "not-found" ? 404 : 400).send({ ok: false, reason: result.reason });
-    }
-
-    return reply.send({ ok: true, id: result.id });
-  });
-
-  app.post("/actions/twitter-keywords/toggle-collect", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.toggleTwitterSearchKeywordCollect) {
-      return reply.code(503).send({ ok: false, reason: "twitter-keywords-disabled" });
-    }
-
-    const body = request.body as { id?: unknown; enable?: unknown } | undefined;
-    const id = parsePositiveInteger(body?.id);
-    const enable = typeof body?.enable === "boolean" ? body.enable : null;
-
-    if (id === null) {
-      return reply.code(400).send({ ok: false, reason: "invalid-twitter-keyword-id" });
-    }
-
-    if (enable === null) {
-      return reply.code(400).send({ ok: false, reason: "invalid-twitter-keyword-collect-enable" });
-    }
-
-    const result = await deps.toggleTwitterSearchKeywordCollect(id, enable);
-
-    if (!result.ok) {
-      return reply.code(result.reason === "not-found" ? 404 : 400).send({ ok: false, reason: result.reason });
-    }
-
-    return reply.send({ ok: true, id: result.keyword.id, enable: result.keyword.isCollectEnabled });
-  });
-
-  app.post("/actions/twitter-keywords/toggle-visible", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.toggleTwitterSearchKeywordVisible) {
-      return reply.code(503).send({ ok: false, reason: "twitter-keywords-disabled" });
-    }
-
-    const body = request.body as { id?: unknown; enable?: unknown } | undefined;
-    const id = parsePositiveInteger(body?.id);
-    const enable = typeof body?.enable === "boolean" ? body.enable : null;
-
-    if (id === null) {
-      return reply.code(400).send({ ok: false, reason: "invalid-twitter-keyword-id" });
-    }
-
-    if (enable === null) {
-      return reply.code(400).send({ ok: false, reason: "invalid-twitter-keyword-visible-enable" });
-    }
-
-    const result = await deps.toggleTwitterSearchKeywordVisible(id, enable);
-
-    if (!result.ok) {
-      return reply.code(result.reason === "not-found" ? 404 : 400).send({ ok: false, reason: result.reason });
-    }
-
-    return reply.send({ ok: true, id: result.keyword.id, enable: result.keyword.isVisible });
-  });
-
   app.post("/actions/hackernews/create", async (request, reply) => {
     if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
       return;
@@ -1750,69 +1560,6 @@ function parsePositiveInteger(value: unknown): number | null {
   return value;
 }
 
-function parseTwitterAccountSavePayload(body: unknown, mode: "create" | "update"): SaveTwitterAccountInput | null {
-  if (!body || typeof body !== "object") {
-    return null;
-  }
-
-  const payload = body as Record<string, unknown>;
-  const username = typeof payload.username === "string" ? payload.username.trim() : "";
-
-  if (!username) {
-    return null;
-  }
-
-  const id = mode === "update" ? parsePositiveInteger(payload.id) : null;
-
-  if (mode === "update" && id === null) {
-    return null;
-  }
-
-  return {
-    ...(id !== null ? { id } : {}),
-    username,
-    userId: typeof payload.userId === "string" ? payload.userId : null,
-    displayName: typeof payload.displayName === "string" ? payload.displayName : null,
-    category: typeof payload.category === "string" ? payload.category : null,
-    priority: typeof payload.priority === "number" ? payload.priority : null,
-    includeReplies: typeof payload.includeReplies === "boolean" ? payload.includeReplies : null,
-    isEnabled: typeof payload.isEnabled === "boolean" ? payload.isEnabled : null,
-    notes: typeof payload.notes === "string" ? payload.notes : null
-  };
-}
-
-function parseTwitterKeywordSavePayload(
-  body: unknown,
-  mode: "create" | "update"
-): SaveTwitterSearchKeywordInput | null {
-  if (!body || typeof body !== "object") {
-    return null;
-  }
-
-  const payload = body as Record<string, unknown>;
-  const keyword = typeof payload.keyword === "string" ? payload.keyword.trim() : "";
-
-  if (!keyword) {
-    return null;
-  }
-
-  const id = mode === "update" ? parsePositiveInteger(payload.id) : null;
-
-  if (mode === "update" && id === null) {
-    return null;
-  }
-
-  return {
-    ...(id !== null ? { id } : {}),
-    keyword,
-    category: typeof payload.category === "string" ? payload.category : null,
-    priority: typeof payload.priority === "number" ? payload.priority : null,
-    isCollectEnabled: typeof payload.isCollectEnabled === "boolean" ? payload.isCollectEnabled : null,
-    isVisible: typeof payload.isVisible === "boolean" ? payload.isVisible : null,
-    notes: typeof payload.notes === "string" ? payload.notes : null
-  };
-}
-
 function parseHackerNewsQuerySavePayload(
   body: unknown,
   mode: "create" | "update"
@@ -1911,38 +1658,6 @@ function parseWechatRssUpdatePayload(body: unknown): UpdateWechatRssSourceInput 
     rssUrl,
     displayName: typeof displayName === "string" ? displayName : null
   };
-}
-
-function sendTwitterAccountSaveResult(reply: FastifyReply, result: SaveTwitterAccountResult) {
-  if (result.ok) {
-    return reply.send({ ok: true, account: result.account });
-  }
-
-  if (result.reason === "not-found") {
-    return reply.code(404).send({ ok: false, reason: result.reason });
-  }
-
-  if (result.reason === "duplicate-username") {
-    return reply.code(409).send({ ok: false, reason: result.reason });
-  }
-
-  return reply.code(400).send({ ok: false, reason: result.reason });
-}
-
-function sendTwitterKeywordSaveResult(reply: FastifyReply, result: SaveTwitterSearchKeywordResult) {
-  if (result.ok) {
-    return reply.send({ ok: true, keyword: result.keyword });
-  }
-
-  if (result.reason === "not-found") {
-    return reply.code(404).send({ ok: false, reason: result.reason });
-  }
-
-  if (result.reason === "duplicate-keyword") {
-    return reply.code(409).send({ ok: false, reason: result.reason });
-  }
-
-  return reply.code(400).send({ ok: false, reason: result.reason });
 }
 
 function sendHackerNewsQuerySaveResult(reply: FastifyReply, result: SaveHackerNewsQueryResult) {

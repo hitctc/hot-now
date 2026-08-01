@@ -5,10 +5,8 @@ import {
   installPerformanceMonitoring,
   resolveSlowRequestThreshold
 } from "./performanceMonitoring.js";
-import {
-  createHermesWriteQueueStatusReader,
-  type HermesWriteQueueStatus
-} from "./hermesWriteQueueStatus.js";
+import { registerHermesOperationalRoutes } from "./routes/hermesOperationalRoutes.js";
+import { registerCreativeDailyDigestRoutes } from "./routes/creativeDailyDigestRoutes.js";
 import { registerCreativeListRoutes } from "./routes/creativeListRoutes.js";
 import { registerCreativeImageRoutes } from "./routes/creativeImageRoutes.js";
 import { registerCreativeSourceActionRoutes } from "./routes/creativeSourceActionRoutes.js";
@@ -85,16 +83,6 @@ import type {
 import type { WeiboTrendingRunState } from "../core/weibo/runWeiboTrendingCollection.js";
 import type { RuntimeConfig } from "../core/types/appConfig.js";
 import type { SqliteDatabase } from "../core/db/openDatabase.js";
-import {
-  insertDailyDigest,
-  findDailyDigestById,
-  listDailyDigests,
-  updateDailyDigestStatus,
-  findDailyDigestByDate,
-  editDailyDigest,
-  replaceDailyDigest
-} from "../core/dailyDigest/dailyDigestRepository.js";
-
 import { readNextCollectionRunAt } from "../core/scheduler/readNextCollectionRunAt.js";
 import {
   createSessionToken,
@@ -512,25 +500,6 @@ export function createServer(deps: ServerDeps = {}) {
   const db = deps.db;
   const creativeApiToken = deps.creativeApiToken;
   const creativeImageDir = deps.creativeImageDir;
-  const hermesWriteQueueStatusReader = createHermesWriteQueueStatusReader({
-    fetchStatus: async () => {
-      const hermesApiUrl = process.env.HERMES_API_BASE_URL;
-      const hermesApiToken = process.env.HERMES_API_TOKEN;
-      if (!hermesApiUrl || !hermesApiToken) {
-        throw new Error("Hermes API is not configured");
-      }
-
-      const response = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/write-queue/status`, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${hermesApiToken}` },
-        signal: AbortSignal.timeout(3_000)
-      });
-      if (!response.ok) {
-        throw new Error(`Hermes HTTP ${response.status}`);
-      }
-      return await response.json() as HermesWriteQueueStatus;
-    }
-  });
   registerCreativeSourceActionRoutes(app, {
     db,
     authorizeCreativeApiToken: (request, reply) => validateCreativeApiToken(request, reply, creativeApiToken),
@@ -854,380 +823,28 @@ export function createServer(deps: ServerDeps = {}) {
   });
 
 
-  // ─── 写作队列状态：代理 Hermes GET /api/write-queue/status ───
-  app.get("/api/creative/write-queue/status", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-    if (session === undefined) { return; }
-
-    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
-    const hermesApiToken = process.env.HERMES_API_TOKEN;
-    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
-
-    const data = await hermesWriteQueueStatusReader.read();
-
-    // 从队列中收集所有 source_item_id，批量查本地素材表补充标题和来源
-    if (db) {
-      const tasks = [data.current, ...(data.queue ?? [])].filter(Boolean) as Array<Record<string, unknown>>;
-      const sourceItemIds = [...new Set(tasks.map((task) => Number(task.source_item_id)).filter(Boolean))];
-      if (sourceItemIds.length > 0) {
-        const placeholders = sourceItemIds.map(() => "?").join(",");
-        const rows = db.prepare(
-          `SELECT id, title, source_name FROM creative_source_items WHERE id IN (${placeholders})`
-        ).all(...sourceItemIds) as { id: number; title: string; source_name: string | null }[];
-        const lookup = new Map(rows.map((row) => [row.id, row]));
-        for (const task of tasks) {
-          const sourceItemId = Number(task.source_item_id);
-          if (sourceItemId && lookup.has(sourceItemId)) {
-            const info = lookup.get(sourceItemId)!;
-            task.source_item_title = info.title ?? null;
-            task.source_item_source_name = info.source_name ?? null;
-          }
-        }
-      }
-    }
-
-    return reply.send(data);
+  // 运行域使用与原入口相同的 session 读取语义，避免改变未登录时的响应行为。
+  registerHermesOperationalRoutes(app, {
+    db,
+    readSession: (request, reply) => (
+      readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "")
+    ),
   });
 
-  // ─── Hermes 监控 API 代理 ───
-  // 统一鉴权 + 转发到 Hermes /api/monitor/*
-  const hermesMonitorProxy = async (request: any, reply: any, hermesPath: string, method: string = "GET") => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-    if (session === undefined) { return; }
-    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
-    const hermesApiToken = process.env.HERMES_API_TOKEN;
-    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
-    try {
-      const fetchOpts: RequestInit = {
-        method,
-        headers: { "Authorization": `Bearer ${hermesApiToken}`, "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(15_000),
-      };
-      // GET 请求把 query string 原样传递
-      const qs = request.url.split("?")[1] || "";
-      const fullPath = `${hermesApiUrl.replace(/\/+$/, "")}${hermesPath}${qs ? `?${qs}` : ""}`;
-      if (method === "POST" && request.body) {
-        fetchOpts.body = JSON.stringify(request.body);
-      }
-      const res = await fetch(fullPath, fetchOpts);
-      const body = await res.text();
-      return reply.code(res.status).header("Content-Type", "application/json; charset=utf-8").send(body);
-    } catch (err) {
-      const errMessage = (err as Error).message ?? String(err);
-      return reply.code(502).send({ ok: false, reason: "Hermes 调用失败", detail: errMessage });
-    }
-  };
-
-  app.get("/api/monitor/stats", async (req, reply) => hermesMonitorProxy(req, reply, "/api/monitor/stats"));
-  app.get("/api/monitor/platform-stats", async (req, reply) => hermesMonitorProxy(req, reply, "/api/monitor/platform-stats"));
-  app.get("/api/monitor/runs-with-steps", async (req, reply) => hermesMonitorProxy(req, reply, "/api/monitor/runs-with-steps"));
-  app.get("/api/monitor/runs", async (req, reply) => hermesMonitorProxy(req, reply, "/api/monitor/runs"));
-  app.get("/api/monitor/runs/:id", async (req, reply) => hermesMonitorProxy(req, reply, `/api/monitor/runs/${(req.params as { id: string }).id}`));
-  app.get("/api/monitor/items", async (req, reply) => hermesMonitorProxy(req, reply, "/api/monitor/items"));
-  app.get("/api/monitor/switch/:key", async (req, reply) => hermesMonitorProxy(req, reply, `/api/monitor/switch/${(req.params as { key: string }).key}`));
-  app.post("/api/monitor/switch/:key", async (req, reply) => hermesMonitorProxy(req, reply, `/api/monitor/switch/${(req.params as { key: string }).key}`, "POST"));
-
-  // ─── Codex 生图可观测性 ───
-  app.get("/api/codex/tasks", async (req, reply) => hermesMonitorProxy(req, reply, "/api/codex/tasks"));
-  app.get("/api/codex/consumption", async (req, reply) => hermesMonitorProxy(req, reply, "/api/codex/consumption"));
-
-  // ─── 定时任务立即触发 ───
-  app.post("/api/monitor/trigger/pipeline", async (req, reply) => hermesMonitorProxy(req, reply, "/api/monitor/trigger/pipeline", "POST"));
-  app.post("/api/monitor/trigger/codex-generate", async (req, reply) => hermesMonitorProxy(req, reply, "/api/monitor/trigger/codex-generate", "POST"));
-  app.post("/api/monitor/trigger/codex-consume", async (req, reply) => hermesMonitorProxy(req, reply, "/api/monitor/trigger/codex-consume", "POST"));
-
-  // ─── 手动生图 API 代理（provider-manual / codex-manual） ───
-  app.post("/api/provider/generate-image", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-    if (session === undefined) { return; }
-    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
-    const hermesApiToken = process.env.HERMES_API_TOKEN;
-    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
-    try {
-      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/provider/generate-image`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
-        body: JSON.stringify(request.body),
-        signal: AbortSignal.timeout(120_000),
-      });
-      const body = await res.text();
-      return reply.code(res.status).header("Content-Type", "application/json; charset=utf-8").send(body);
-    } catch (err) {
-      return reply.code(502).send({ ok: false, reason: "Hermes 调用失败", detail: (err as Error).message });
-    }
+  registerCreativeDailyDigestRoutes(app, {
+    db,
+    authorizeCreativeApiToken: (request, reply) => validateCreativeApiToken(request, reply, creativeApiToken),
+    hasCreativeApiToken: (request) => Boolean(
+      creativeApiToken && request.headers["x-creative-token"] === creativeApiToken
+    ),
+    readSession: (request, reply) => (
+      readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "")
+    ),
+    authorizeStateAction: (request, reply) => (
+      ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")
+    ),
+    pushDailyDigestToWechatDraft: deps.pushDailyDigestToWechatDraft,
   });
-
-  app.post("/api/codex/generate-image-tasks", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-    if (session === undefined) { return; }
-    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
-    const hermesApiToken = process.env.HERMES_API_TOKEN;
-    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
-    try {
-      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/codex/generate-image-tasks`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
-        body: JSON.stringify(request.body),
-        signal: AbortSignal.timeout(120_000),
-      });
-      const body = await res.text();
-      return reply.code(res.status).header("Content-Type", "application/json; charset=utf-8").send(body);
-    } catch (err) {
-      return reply.code(502).send({ ok: false, reason: "Hermes 调用失败", detail: (err as Error).message });
-    }
-  });
-
-  // ─── Daily Digest: Hermes 推送日报（token 鉴权） ───
-
-  app.post("/api/creative/daily-digests", async (request, reply) => {
-    if (!validateCreativeApiToken(request, reply, creativeApiToken)) {
-      return;
-    }
-
-    if (!db) {
-      return reply.code(503).send({ ok: false, reason: "database-not-available" });
-    }
-
-    const body = request.body as Record<string, unknown> | undefined;
-    const date = typeof body?.date === "string" ? body.date.trim() : "";
-    const title = typeof body?.title === "string" ? body.title.trim() : "";
-    const contentMarkdown = typeof body?.contentMarkdown === "string" ? body.contentMarkdown : "";
-    const totalItems = typeof body?.totalItems === "number" ? body.totalItems : 0;
-    const categories = Array.isArray(body?.categories) ? body.categories as string[] : [];
-    const collectorAgent = typeof body?.collectorAgent === "string" ? body.collectorAgent.trim() : "";
-    const coverImage = typeof body?.coverImage === "string" ? body.coverImage : undefined;
-
-    if (!date || !title || !contentMarkdown || !collectorAgent) {
-      return reply.code(400).send({ ok: false, reason: "missing-required-fields" });
-    }
-
-    // 同一天幂等：已存在则全量覆盖（Hermes 改进日报后可重新 POST 更新）
-    const existing = findDailyDigestByDate(db, date);
-    if (existing) {
-      const replaced = replaceDailyDigest(db, date, {
-        date,
-        title,
-        contentMarkdown,
-        coverImage,
-        totalItems,
-        categories,
-        collectorAgent
-      });
-      return reply.send(replaced);
-    }
-
-    const record = insertDailyDigest(db, {
-      date,
-      title,
-      contentMarkdown,
-      coverImage,
-      totalItems,
-      categories,
-      collectorAgent
-    });
-
-    return reply.code(201).send(record);
-  });
-
-  // ─── Daily Digest: 前端查询列表（session 鉴权） ───
-
-  app.get("/api/creative/daily-digests", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-    if (session === undefined) { return; }
-
-    if (!db) {
-      return reply.code(503).send({ ok: false, reason: "database-not-available" });
-    }
-
-    const query = request.query as Record<string, string | undefined>;
-    const result = listDailyDigests(db, {
-      page: query.page ? parseInt(query.page, 10) : undefined,
-      pageSize: query.pageSize ? parseInt(query.pageSize, 10) : undefined,
-      status: query.status,
-      dateFrom: query.dateFrom,
-      dateTo: query.dateTo
-    });
-
-    return reply.send(result);
-  });
-
-  // ─── Daily Digest: 前端查询详情（session 鉴权） ───
-
-  app.get("/api/creative/daily-digests/:id", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-    if (session === undefined) { return; }
-
-    if (!db) {
-      return reply.code(503).send({ ok: false, reason: "database-not-available" });
-    }
-
-    const params = request.params as { id: string };
-    const id = parseInt(params.id, 10);
-    const record = findDailyDigestById(db, id);
-    if (!record) {
-      return reply.code(404).send({ ok: false, reason: "not-found" });
-    }
-
-    return reply.send(record);
-  });
-
-  // ─── Daily Digest: 更新状态（session 鉴权） ───
-
-  app.patch("/api/creative/daily-digests/:id", async (request, reply) => {
-    // 支持两种认证：token（外部 Agent）或 session（管理 UI）
-    const hasToken = creativeApiToken && request.headers["x-creative-token"] === creativeApiToken;
-    if (!hasToken) {
-      const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-      if (session === undefined) { return; }
-    }
-
-    if (!db) {
-      return reply.code(503).send({ ok: false, reason: "database-not-available" });
-    }
-
-    const params = request.params as { id: string };
-    const id = parseInt(params.id, 10);
-    const body = request.body as Record<string, unknown> | undefined;
-
-    // 更新状态
-    if (typeof body?.status === "string") {
-      const status = body.status;
-      if (!["generated", "publishing", "published", "failed"].includes(status)) {
-        return reply.code(400).send({ ok: false, reason: "invalid-status" });
-      }
-      const updated = updateDailyDigestStatus(db, id, status as "generated" | "publishing" | "published" | "failed");
-      if (!updated) {
-        return reply.code(404).send({ ok: false, reason: "not-found" });
-      }
-      return reply.send(updated);
-    }
-
-    // 编辑内容
-    const contentMarkdown = typeof body?.contentMarkdown === "string" ? body.contentMarkdown : undefined;
-    const title = typeof body?.title === "string" ? body.title : undefined;
-
-    if (contentMarkdown === undefined && title === undefined) {
-      return reply.code(400).send({ ok: false, reason: "no-fields-to-update" });
-    }
-
-    const updated = editDailyDigest(db, id, { contentMarkdown, title });
-    if (!updated) {
-      return reply.code(404).send({ ok: false, reason: "not-found" });
-    }
-
-    return reply.send(updated);
-  });
-
-  // ─── Daily Digest: 手动触发生成（代理调用 Hermes） ───
-
-  app.post("/api/creative/daily-digests/generate", async (request, reply) => {
-    const session = readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "");
-    if (session === undefined) { return; }
-
-    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
-    const hermesApiToken = process.env.HERMES_API_TOKEN;
-    if (!hermesApiUrl || !hermesApiToken) {
-      return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" });
-    }
-
-    const body = request.body as { date?: unknown } | undefined;
-    const requestBody: Record<string, string> = {};
-    if (typeof body?.date === "string" && body.date) {
-      requestBody.date = body.date;
-    }
-
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 300_000);
-
-      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/generate-digest`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${hermesApiToken}`,
-        },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({ error: `Hermes HTTP ${res.status}` }));
-        return reply.code(res.status >= 500 ? 502 : res.status).send({
-          ok: false,
-          reason: errorBody.error ?? `Hermes HTTP ${res.status}`,
-        });
-      }
-
-      const data = await res.json() as { success?: boolean; detail?: string; error?: string };
-      return reply.send({ ok: true, detail: data.detail ?? "生成请求已发送" });
-    } catch (err) {
-      if ((err as Error).name === "AbortError") {
-        return reply.code(504).send({ ok: false, reason: "生成超时（>300s），请稍后刷新查看" });
-      }
-      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
-    }
-  });
-
-  // ─── Daily Digest: 推送公众号草稿（SSE 流式推送） ───
-
-  app.post("/api/creative/daily-digests/:id/push-draft", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-    if (!deps.pushDailyDigestToWechatDraft) {
-      return reply.code(503).send({ ok: false, reason: "wechat-push-not-configured" });
-    }
-
-    const params = request.params as { id: string };
-    const body = request.body as { themeId?: string; wechatHtml?: string } | undefined;
-    const id = parseInt(params.id, 10);
-    const themeId = body?.themeId ?? "bauhaus";
-    const wechatHtml = body?.wechatHtml ?? "";
-
-    if (!wechatHtml) {
-      return reply.code(400).send({ ok: false, reason: "missing-wechat-html" });
-    }
-
-    reply.hijack();
-    const res = reply.raw;
-    res.writeHead(200, {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      "X-Accel-Buffering": "no",
-      Connection: "keep-alive",
-    });
-    res.flushHeaders();
-    res.socket?.setNoDelay(true);
-
-    const sendEvent = (data: Record<string, unknown>) => {
-      res.write(`data: ${JSON.stringify(data)}\n\n`);
-    };
-
-    const onProgress = async (step: string, status: "running" | "done" | "error", detail?: string) => {
-      const event: Record<string, unknown> = { step, status };
-      if (detail) event.detail = detail;
-      sendEvent(event);
-      if (status === "done" || status === "running") {
-        await new Promise(r => setTimeout(r, 100));
-      }
-    };
-
-    try {
-      const result = await deps.pushDailyDigestToWechatDraft(id, themeId, wechatHtml, onProgress);
-      if (result.ok) {
-        sendEvent({ step: "complete", status: "done", mediaId: result.mediaId });
-      } else {
-        sendEvent({ step: "complete", status: "error", errorCode: result.errorCode, errorMessage: result.errorMessage });
-      }
-    } catch (err) {
-      sendEvent({ step: "complete", status: "error", errorMessage: (err as Error).message });
-    } finally {
-      res.end();
-    }
-  });
-
 
   // ─── 微信公众号配置管理（session 鉴权） ───
 

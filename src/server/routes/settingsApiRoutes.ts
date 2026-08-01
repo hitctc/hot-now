@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { SaveProviderSettingsInput, SaveProviderSettingsResult, UpdateProviderSettingsActivationResult } from "../../core/llm/providerSettingsRepository.js";
 
 export type SettingsApiSession = { username: string; displayName: string; role: string; issuedAt: number; expiresAt: number } | null;
 
@@ -26,6 +27,9 @@ export type SettingsApiRouteOptions = {
   }) => Promise<{ ok: boolean; id: number }>;
   deleteWechatMpAccount?: (id: number) => boolean;
   setDefaultWechatMpAccount?: (id: number) => boolean;
+  saveProviderSettings?: (input: SaveProviderSettingsInput) => Promise<SaveProviderSettingsResult> | SaveProviderSettingsResult;
+  updateProviderSettingsActivation?: (input: { providerKind: SaveProviderSettingsInput["providerKind"]; enable: boolean }) => Promise<UpdateProviderSettingsActivationResult> | UpdateProviderSettingsActivationResult;
+  deleteProviderSettings?: (providerKind: SaveProviderSettingsInput["providerKind"]) => Promise<boolean> | boolean;
 };
 
 /** 注册视图规则、来源、个人资料、时间线和公众号账号设置接口。 */
@@ -224,4 +228,41 @@ export function registerSettingsApiRoutes(
     const result = options.setDefaultWechatMpAccount(body.id);
     return reply.send({ ok: result });
   });
+
+  app.post("/actions/view-rules/provider-settings", async (request, reply) => {
+    if (!options.authorizeStateAction(request, reply)) return;
+    if (!options.saveProviderSettings) return reply.code(503).send({ ok: false, reason: "provider-settings-disabled" });
+    const body = request.body as Record<string, unknown> | undefined;
+    const providerKind = typeof body?.providerKind === "string" ? body.providerKind.trim() : "";
+    const apiKey = typeof body?.apiKey === "string" ? body.apiKey.trim() : "";
+    if (!isProviderKind(providerKind) || !apiKey) return reply.code(400).send({ ok: false, reason: "invalid-provider-settings" });
+    const result = await options.saveProviderSettings({ providerKind, apiKey });
+    if (!result.ok && result.reason === "master-key-required") return reply.code(409).send({ ok: false, reason: "master-key-required" });
+    return reply.send({ ok: true, providerKind });
+  });
+
+  app.post("/actions/view-rules/provider-settings/activation", async (request, reply) => {
+    if (!options.authorizeStateAction(request, reply)) return;
+    if (!options.updateProviderSettingsActivation) return reply.code(503).send({ ok: false, reason: "provider-settings-disabled" });
+    const body = request.body as Record<string, unknown> | undefined;
+    const providerKind = typeof body?.providerKind === "string" ? body.providerKind.trim() : "";
+    const enable = typeof body?.enable === "boolean" ? body.enable : null;
+    if (!isProviderKind(providerKind) || enable === null) return reply.code(400).send({ ok: false, reason: "invalid-provider-activation" });
+    const result = await options.updateProviderSettingsActivation({ providerKind, enable });
+    if (!result.ok && result.reason === "not-found") return reply.code(409).send({ ok: false, reason: "provider-settings-not-found" });
+    return reply.send({ ok: true, providerKind, isEnabled: enable });
+  });
+
+  app.post("/actions/view-rules/provider-settings/delete", async (request, reply) => {
+    if (!options.authorizeStateAction(request, reply)) return;
+    if (!options.deleteProviderSettings) return reply.code(503).send({ ok: false, reason: "provider-settings-disabled" });
+    const body = request.body as Record<string, unknown> | undefined;
+    const providerKind = typeof body?.providerKind === "string" ? body.providerKind.trim() : "";
+    if (!isProviderKind(providerKind)) return reply.code(400).send({ ok: false, reason: "invalid-provider-settings" });
+    await options.deleteProviderSettings(providerKind);
+    return reply.send({ ok: true });
+  });
 }
+
+/** 仅接受当前配置仓储支持的供应商标识。 */
+function isProviderKind(value: string): value is SaveProviderSettingsInput["providerKind"] { return value === "deepseek" || value === "minimax" || value === "kimi"; }

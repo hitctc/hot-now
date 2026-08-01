@@ -742,6 +742,9 @@ export function createServer(deps: ServerDeps = {}) {
     saveWechatMpAccount: deps.saveWechatMpAccount,
     deleteWechatMpAccount: deps.deleteWechatMpAccount,
     setDefaultWechatMpAccount: deps.setDefaultWechatMpAccount,
+    saveProviderSettings: deps.saveProviderSettings,
+    updateProviderSettingsActivation: deps.updateProviderSettingsActivation,
+    deleteProviderSettings: deps.deleteProviderSettings,
   });
 
   // 手动采集路由只接收既有处理函数，保障鉴权、运行锁和响应语义均不变。
@@ -1100,84 +1103,6 @@ export function createServer(deps: ServerDeps = {}) {
     }
 
     return reply.type("text/html").send(renderControlPage(deps.config, deps.isRunning?.() ?? false));
-  });
-
-  app.post("/actions/view-rules/provider-settings", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.saveProviderSettings) {
-      return reply.code(503).send({ ok: false, reason: "provider-settings-disabled" });
-    }
-
-    const body = request.body as Record<string, unknown> | undefined;
-    const providerKind = typeof body?.providerKind === "string" ? body.providerKind.trim() : "";
-    const apiKey = typeof body?.apiKey === "string" ? body.apiKey.trim() : "";
-
-    if (!isProviderKind(providerKind) || !apiKey) {
-      return reply.code(400).send({ ok: false, reason: "invalid-provider-settings" });
-    }
-
-    const result = await deps.saveProviderSettings({
-      providerKind,
-      apiKey
-    });
-
-    if (!result.ok && result.reason === "master-key-required") {
-      return reply.code(409).send({ ok: false, reason: "master-key-required" });
-    }
-
-    return reply.send({ ok: true, providerKind });
-  });
-
-  app.post("/actions/view-rules/provider-settings/activation", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.updateProviderSettingsActivation) {
-      return reply.code(503).send({ ok: false, reason: "provider-settings-disabled" });
-    }
-
-    const body = request.body as Record<string, unknown> | undefined;
-    const providerKind = typeof body?.providerKind === "string" ? body.providerKind.trim() : "";
-    const enable = typeof body?.enable === "boolean" ? body.enable : null;
-
-    if (!isProviderKind(providerKind) || enable === null) {
-      return reply.code(400).send({ ok: false, reason: "invalid-provider-activation" });
-    }
-
-    const result = await deps.updateProviderSettingsActivation({
-      providerKind,
-      enable
-    });
-
-    if (!result.ok && result.reason === "not-found") {
-      return reply.code(409).send({ ok: false, reason: "provider-settings-not-found" });
-    }
-
-    return reply.send({ ok: true, providerKind, isEnabled: enable });
-  });
-
-  app.post("/actions/view-rules/provider-settings/delete", async (request, reply) => {
-    if (!ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")) {
-      return;
-    }
-
-    if (!deps.deleteProviderSettings) {
-      return reply.code(503).send({ ok: false, reason: "provider-settings-disabled" });
-    }
-
-    const body = request.body as Record<string, unknown> | undefined;
-    const providerKind = typeof body?.providerKind === "string" ? body.providerKind.trim() : "";
-
-    if (!isProviderKind(providerKind)) {
-      return reply.code(400).send({ ok: false, reason: "invalid-provider-settings" });
-    }
-
-    await deps.deleteProviderSettings(providerKind);
-    return reply.send({ ok: true });
   });
 
   // ─── 404 fallback ───
@@ -2584,11 +2509,6 @@ function mapLatestEmailReasonToStatus(reason: LatestReportEmailErrorReason) {
   return 502;
 }
 
-function isProviderKind(value: unknown): value is SaveProviderSettingsInput["providerKind"] {
-  return value === "deepseek" || value === "minimax" || value === "kimi";
-}
-
-// 登录回跳白名单：只允许同源相对路径，挡 //evil.com 协议相对、/\ 反斜杠绕过、<> 脚本注入、CRLF
 function safeRedirectTarget(target: unknown): string | null {
   if (typeof target !== "string") return null;
   if (!target.startsWith("/") || target.startsWith("//") || target.startsWith("/\\")) return null;

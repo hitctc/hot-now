@@ -20,6 +20,14 @@ const modeMap: Record<string, string> = {
   B: "模式B · 短篇观察随笔",
 };
 
+// v2 读者任务枚举的中文展示；未命中的值原样保留，避免丢失 LLM 写入的自定义标签
+const readerTaskMap: Record<string, string> = {
+  impact: "影响判断",
+  risk: "风险识别",
+  choice: "选择决策",
+  beginner_action: "入门行动",
+};
+
 /** 安全解析历史 JSON 数组字段，坏数据按空数组展示。 */
 export function parseJsonArray(raw: string | string[] | null): string[] {
   if (!raw) return [];
@@ -35,7 +43,11 @@ export function parseJsonArray(raw: string | string[] | null): string[] {
 /** v2 文章显示读者任务，历史文章继续显示既有 A/B 模式。 */
 export function pipelineLabel(article: CreativeFinishedArticle): string {
   if (article.originType === "manual") return "手动创作";
-  if (article.pipelineVersion === "v2") return `v2 · ${article.readerTask || "读者任务未标注"}`;
+  if (article.pipelineVersion === "v2") {
+    const task = article.readerTask;
+    const label = task ? (readerTaskMap[task] ?? task) : "";
+    return `v2 · ${label || "读者任务未标注"}`;
+  }
   if (!article.mode) return "模式 -";
   return modeMap[article.mode] ?? `模式${article.mode}`;
 }

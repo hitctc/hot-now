@@ -65,6 +65,41 @@ describe("insertCreativeFinishedArticle", () => {
     expect(article.rawResponseText).toBe("raw LLM output");
   });
 
+  it("persists recommended titleIndex on insert", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+
+    const source = createSourceItem(handle.db);
+    const article = insertCreativeFinishedArticle(handle.db, {
+      sourceItemId: source.id,
+      contentMarkdown: "content",
+      titles: ["候选一", "候选二", "候选三"],
+      titleIndex: 2,
+      titleSelectionConfirmed: true,
+    });
+
+    // 推荐标题索引和确认状态都应被持久化，读取后不受影响
+    expect(article.titleIndex).toBe(2);
+    expect(article.titleSelectionConfirmed).toBe(true);
+    const reloaded = findCreativeFinishedArticleById(handle.db, article.id);
+    expect(reloaded!.titleIndex).toBe(2);
+    expect(reloaded!.titleSelectionConfirmed).toBe(true);
+  });
+
+  it("defaults titleIndex to 0 when not provided", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+
+    const source = createSourceItem(handle.db);
+    const article = insertCreativeFinishedArticle(handle.db, {
+      sourceItemId: source.id,
+      contentMarkdown: "content",
+    });
+
+    // title_index 列为 NOT NULL DEFAULT 0，未提供时落库为 0
+    expect(article.titleIndex).toBe(0);
+  });
+
   it("backlinks source item linked_article_id", async () => {
     const handle = await makeHandle();
     handles.push(handle);

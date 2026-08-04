@@ -193,6 +193,7 @@ app.post("/api/creative/finished-articles", async (request, reply) => {
     titleCandidates: Array.isArray(body?.titleCandidates) ? body.titleCandidates as any[] : undefined,
     factSourceChecklist: Array.isArray(body?.factSourceChecklist) ? body.factSourceChecklist : undefined,
     titleSelectionConfirmed: typeof body?.titleSelectionConfirmed === "boolean" ? body.titleSelectionConfirmed : undefined,
+    titleIndex: typeof body?.titleIndex === "number" ? body.titleIndex : undefined,
   });
 
   // 推送成品文章后，自动将素材写作状态标为 done

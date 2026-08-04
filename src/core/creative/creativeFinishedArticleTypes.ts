@@ -143,6 +143,7 @@ export type InsertCreativeFinishedArticleInput = {
   titleCandidates?: TitleCandidate[];
   factSourceChecklist?: unknown[];
   titleSelectionConfirmed?: boolean;
+  titleIndex?: number;
   originType?: "pipeline" | "manual";
 };
 

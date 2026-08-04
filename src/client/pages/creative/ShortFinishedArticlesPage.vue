@@ -673,9 +673,10 @@ const pagination = computed(() => ({
             <a-tag v-if="record.originType === 'manual'" color="purple" class="!m-0 mt-1 !text-[10px] !leading-4">手动新建</a-tag>
             <a
               v-if="record.sourceItemId"
-              class="mt-0.5 inline-block cursor-pointer text-[10px] text-editorial-link-active hover:underline"
+              class="mt-0.5 block cursor-pointer truncate text-[10px] text-editorial-link-active hover:underline"
+              :title="record.sourceTitle ? `素材 #${record.sourceItemId} ${record.sourceTitle}` : `素材 #${record.sourceItemId}`"
               @click.prevent="openSourceItemModal(record.sourceItemId)"
-            >素材 #{{ record.sourceItemId }}</a>
+            >素材 #{{ record.sourceItemId }}<span v-if="record.sourceTitle"> {{ record.sourceTitle }}</span></a>
           </template>
 
           <!-- 封面图列 -->

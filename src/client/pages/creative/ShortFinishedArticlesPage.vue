@@ -676,7 +676,7 @@ const pagination = computed(() => ({
               class="mt-0.5 block cursor-pointer truncate text-[10px] text-editorial-link-active hover:underline"
               :title="record.sourceTitle ? `素材 #${record.sourceItemId} ${record.sourceTitle}` : `素材 #${record.sourceItemId}`"
               @click.prevent="openSourceItemModal(record.sourceItemId)"
-            >素材 #{{ record.sourceItemId }}<span v-if="record.sourceTitle"> {{ record.sourceTitle }}</span></a>
+            >素材 #{{ record.sourceItemId }} <span v-if="record.sourceTitle">{{ record.sourceTitle }}</span></a>
           </template>
 
           <!-- 封面图列 -->

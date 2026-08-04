@@ -29,7 +29,7 @@ import ArticlePushFloatWidget from "../../components/creative/ArticlePushFloatWi
 import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
 import CreativeCoverThumbnail from "../../components/creative/CreativeCoverThumbnail.vue";
 import SourceItemDetailModal from "../../components/creative/SourceItemDetailModal.vue";
-import { getStatusLabel, getAvailableActions, checkPublishConditions, type ArticleAction } from "../../components/creative/articleStatusShared.js";
+import { getStatusLabel, getAvailableActions, checkPublishConditions, getDisplayTitle, type ArticleAction } from "../../components/creative/articleStatusShared.js";
 
 // ─── JSON 解析辅助 ───
 
@@ -499,11 +499,6 @@ function formatLocalTime(value: string): string {
   });
 }
 
-function getFirstTitle(titles: string | null): string {
-  const parsed = parseJsonArray(titles);
-  return parsed.length > 0 ? parsed[0] : "无标题";
-}
-
 /** 从 stepTrace 计算总写作耗时（ms），返回 null 表示无数据 */
 function calcWritingDuration(stepTrace: Array<{ startedAt?: string; finishedAt?: string }> | null): number | null {
   if (!stepTrace || stepTrace.length === 0) return null;
@@ -668,7 +663,7 @@ const pagination = computed(() => ({
               <span
                 class="line-clamp-2 cursor-pointer text-[13px] leading-tight font-medium text-editorial-text-main transition-colors hover:text-editorial-link-active"
                 @click="openDetail(record)"
-              >{{ getFirstTitle(record.titles) }}</span>
+              >{{ getDisplayTitle(record.titles, record.titleIndex) }}</span>
             </div>
             <a-tag v-if="record.originType === 'manual'" color="purple" class="!m-0 mt-1 !text-[10px] !leading-4">手动新建</a-tag>
             <a

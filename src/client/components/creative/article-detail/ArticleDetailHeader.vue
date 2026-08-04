@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CreativeFinishedArticle } from "../../../services/creativeApi.js";
-import { formatLocalTime, getFirstTitle, pipelineLabel } from "./articleDetailPresentation.js";
+import { formatLocalTime, pipelineLabel } from "./articleDetailPresentation.js";
+import { getDisplayTitle } from "../articleStatusShared.js";
 
 defineProps<{ article: CreativeFinishedArticle }>();
 
@@ -16,7 +17,7 @@ const emit = defineEmits<{
       class="cursor-pointer text-xs text-editorial-link-active hover:underline"
       @click="emit('copy-id', article.id)"
     >#{{ article.id }}</span>
-    <span class="text-base font-semibold">{{ getFirstTitle(article.titles) }}</span>
+    <span class="text-base font-semibold">{{ getDisplayTitle(article.titles, article.titleIndex) }}</span>
     <span class="text-xs text-editorial-text-muted">{{ pipelineLabel(article) }}</span>
     <span class="text-xs text-editorial-text-muted">{{ formatLocalTime(article.createdAt) }}</span>
     <a

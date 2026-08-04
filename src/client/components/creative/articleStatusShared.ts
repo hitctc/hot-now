@@ -52,6 +52,16 @@ function parseJsonArray(raw: string | string[] | null): string[] {
 }
 
 /**
+ * 读取展示用标题：优先取用户选中的发布标题（titleIndex），
+ * 越界或为空时回退备选标题第一项，再为空显示“无标题”。
+ */
+export function getDisplayTitle(titles: string | string[] | null, titleIndex: number | null | undefined): string {
+  const parsed = parseJsonArray(titles);
+  const idx = typeof titleIndex === "number" && titleIndex >= 0 ? titleIndex : 0;
+  return parsed[idx] ?? parsed[0] ?? "无标题";
+}
+
+/**
  * 检查文章是否满足标记推送的前置条件。
  * 管线稿保持原有 50 字门槛；手动稿只要求中栏存在非标题正文。
  */

@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { Modal } from "ant-design-vue";
 import type { CreativeFinishedArticle } from "../../services/creativeApi";
 import {
   editFinishedArticle,
   deleteFinishedArticle,
 } from "../../services/creativeApi";
+import { getDisplayTitle } from "./articleStatusShared.js";
 import { message } from "ant-design-vue";
 
 const props = defineProps<{
@@ -19,6 +20,14 @@ const emit = defineEmits<{
 }>();
 
 const rejectReason = ref("");
+
+// 展示标题：优先发布标题，无标题时回退主旨
+const displayTitle = computed(() => {
+  const article = props.article;
+  if (!article) return "";
+  const title = getDisplayTitle(article.titles, article.titleIndex);
+  return title === "无标题" && article.thesis ? article.thesis : title;
+});
 const submitting = ref(false);
 
 function close(): void {
@@ -108,7 +117,7 @@ function handleDelete(): void {
     <template v-if="article">
       <!-- 文章基本信息 -->
       <div class="mb-3 space-y-1">
-        <div class="text-sm font-semibold">{{ article.titles?.[0] ?? article.thesis ?? '未命名' }}</div>
+        <div class="text-sm font-semibold">{{ displayTitle }}</div>
         <div class="text-xs text-editorial-text-muted">
           ID: {{ article.id }} · 模式: {{ article.mode || '-' }} · 来源: {{ article.sourceName || '-' }}
         </div>

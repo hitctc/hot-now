@@ -32,11 +32,6 @@ export function parseJsonArray(raw: string | string[] | null): string[] {
   }
 }
 
-/** 读取标题数组的首项，供详情标题栏使用。 */
-export function getFirstTitle(titles: string | null): string {
-  return parseJsonArray(titles)[0] ?? "无标题";
-}
-
 /** v2 文章显示读者任务，历史文章继续显示既有 A/B 模式。 */
 export function pipelineLabel(article: CreativeFinishedArticle): string {
   if (article.originType === "manual") return "手动创作";

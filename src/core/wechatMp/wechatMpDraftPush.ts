@@ -32,7 +32,7 @@ interface PushParams {
 
 // 下载远程图片，返回 Buffer
 async function downloadImage(url: string): Promise<Buffer> {
-  const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  const response = await fetch(url, { signal: AbortSignal.timeout(60000) });
   if (!response.ok) throw new Error(`下载图片失败 (${response.status}): ${url}`);
   return Buffer.from(await response.arrayBuffer());
 }

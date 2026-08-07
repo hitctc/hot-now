@@ -93,6 +93,22 @@ export function getArticlePushCount(db: SqliteDatabase, articleId: number): numb
 export async function pushArticleToWechatDraft(params: PushParams): Promise<DraftPushResult> {
   const { db, articleId, themeId, masterKey, onProgress } = params;
 
+  // SSE 心跳：图片下载/上传等耗时操作期间每 5 秒发一次心跳，防止浏览器或代理判定空闲超时断开
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  const startHeartbeat = () => {
+    if (heartbeatTimer) return;
+    heartbeatTimer = setInterval(() => {
+      Promise.resolve(onProgress?.("images", "running", "uploading")).catch(() => {});
+    }, 5000);
+  };
+  const stopHeartbeat = () => {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+  };
+
+  try {
   // ─── 步骤 1：校验文章数据和公众号配置 ───
   await onProgress?.("validate", "running");
   const account = findDefaultWechatMpAccount(db);
@@ -155,6 +171,7 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
     // ─── 步骤 4：上传封面图 ───
     currentStep = "cover";
     await onProgress?.("cover", "running");
+    startHeartbeat();
     let thumbMediaId = "";
     // 从 coverImage 数组中取用户选中的封面（coverImageIndex），回退到第 0 张
     const selectedCoverIdx = Math.min(article.coverImageIndex ?? 0, article.coverImage.length - 1);
@@ -168,6 +185,7 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
         html = replaceImageUrls(html, [coverUrl], [coverResult.url]);
       }
     }
+    stopHeartbeat();
     await onProgress?.("cover", "done");
 
     // ─── 步骤 5：逐张上传正文图片 ───
@@ -177,6 +195,7 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
     const imageUrls = collectImageUrlsFromHtml(html);
     if (imageUrls.length > 0) {
       await onProgress?.("images", "running", `0/${imageUrls.length}`);
+      startHeartbeat();
       const cdnUrls: string[] = [];
 
       for (let i = 0; i < imageUrls.length; i++) {
@@ -194,6 +213,7 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
 
       html = replaceImageUrls(html, imageUrls, cdnUrls);
     }
+    stopHeartbeat();
     await onProgress?.("images", "done");
 
     // ─── 步骤 6：创建草稿 ───
@@ -236,5 +256,8 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
     `).run(wechatErr.errorCode, wechatErr.errorMessage, logId);
 
     return { ok: false, ...wechatErr };
+  }
+  } finally {
+    stopHeartbeat();
   }
 }

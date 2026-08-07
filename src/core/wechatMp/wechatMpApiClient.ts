@@ -48,7 +48,7 @@ export async function uploadPermanentImage(
   const blob = new Blob([new Uint8Array(imageBuffer)]);
   formData.append("media", blob, filename);
 
-  const response = await fetch(url, { method: "POST", body: formData });
+  const response = await fetch(url, { method: "POST", body: formData, signal: AbortSignal.timeout(60000) });
   const data = await response.json() as { media_id?: string; url?: string } & WechatApiError;
 
   checkWechatResponse(data);
@@ -69,7 +69,7 @@ export async function uploadContentImage(
   const blob = new Blob([new Uint8Array(imageBuffer)]);
   formData.append("media", blob, filename);
 
-  const response = await fetch(url, { method: "POST", body: formData });
+  const response = await fetch(url, { method: "POST", body: formData, signal: AbortSignal.timeout(60000) });
   const data = await response.json() as { url?: string } & WechatApiError;
 
   checkWechatResponse(data);
@@ -109,6 +109,7 @@ export async function createDraft(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(60000),
   });
   const data = await response.json() as { media_id?: string } & WechatApiError;
 

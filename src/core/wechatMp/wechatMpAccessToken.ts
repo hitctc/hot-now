@@ -29,7 +29,7 @@ export async function getAccessToken(
   const secret = decryptAccountSecret(account, masterKey);
   const url = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${account.appId}&secret=${secret}`;
 
-  const response = await fetch(url);
+  const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
   const data = await response.json() as { access_token?: string; expires_in?: number } & WechatApiError;
 
   if (data.errcode) {

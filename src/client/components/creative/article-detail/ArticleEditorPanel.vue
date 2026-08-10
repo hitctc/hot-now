@@ -28,6 +28,7 @@ const emit = defineEmits<{
   (event: "copy-plain"): void;
   (event: "toggle-sync-scroll"): void;
   (event: "toggle-fullscreen"): void;
+  (event: "unlock-focus-mode"): void;
   (event: "save"): void;
 }>();
 </script>
@@ -74,6 +75,17 @@ const emit = defineEmits<{
     data-article-editor-wrapper
     :style="{ height: dynamicHeight + 'px' }"
   >
+    <button
+      v-if="focusMode"
+      type="button"
+      data-focus-mode-lock
+      aria-label="解锁并退出专注模式"
+      class="fixed right-4 top-4 z-[1100] inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-white/95 px-3 py-1.5 text-xs font-medium text-violet-700 shadow-md backdrop-blur transition hover:border-violet-300 hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 max-[640px]:right-3 max-[640px]:top-3"
+      @click="emit('unlock-focus-mode')"
+    >
+      <span aria-hidden="true">🔒</span>
+      <span>专注模式已锁定 · 点击解锁</span>
+    </button>
     <ArticleMarkdownEditor
       :model-value="humanContent"
       human-mode

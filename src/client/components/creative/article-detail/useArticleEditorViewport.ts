@@ -67,7 +67,7 @@ export function useArticleEditorViewport() {
     scrollParent.addEventListener("focusout", onEditorFocusOut);
   }
 
-  /** 关闭弹窗或卸载时释放观察器、事件和延迟进入专注模式的计时器。 */
+  /** 关闭弹窗或卸载时释放观察器与事件，并清空本次专注锁定。 */
   function teardownEditorResize(): void {
     if (editorResizeObserver) { editorResizeObserver.disconnect(); editorResizeObserver = null; }
     const scrollParent = editorSectionRef.value?.closest(".ant-modal-body") as HTMLElement | null;
@@ -95,12 +95,19 @@ export function useArticleEditorViewport() {
     focusModeTimer = setTimeout(() => { focusModeTimer = null; focusMode.value = true; }, 1200);
   }
 
-  /** 焦点转到另一文本区时保留专注模式，离开编辑器才退出。 */
+  /** 进入专注模式后忽略焦点移出；未触发时仍及时取消延迟计时。 */
   function onEditorFocusOut(event: FocusEvent): void {
     const target = event.target as HTMLElement;
     if (!target.classList?.contains("md-editor__textarea")) return;
     const related = event.relatedTarget as HTMLElement | null;
     if (related?.classList.contains("md-editor__textarea")) return;
+    if (focusModeTimer) { clearTimeout(focusModeTimer); focusModeTimer = null; }
+    if (focusMode.value) return;
+    focusMode.value = false;
+  }
+
+  /** 用户点击锁定提示时立即退出专注模式，不触发保存或其他业务动作。 */
+  function unlockFocusMode(): void {
     if (focusModeTimer) { clearTimeout(focusModeTimer); focusModeTimer = null; }
     focusMode.value = false;
   }
@@ -158,5 +165,6 @@ export function useArticleEditorViewport() {
     teardownEditorResize,
     toggleEditorFullscreen,
     toggleSyncScroll,
+    unlockFocusMode,
   };
 }

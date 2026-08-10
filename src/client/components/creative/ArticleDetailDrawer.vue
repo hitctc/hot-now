@@ -154,6 +154,7 @@
             @copy-plain="copyAiDraftAsPlainText"
             @toggle-sync-scroll="toggleSyncScroll"
             @toggle-fullscreen="toggleEditorFullscreen"
+            @unlock-focus-mode="unlockFocusMode"
             @save="handleSave"
           />
         </section>
@@ -292,6 +293,7 @@ const {
   teardownEditorResize,
   toggleEditorFullscreen,
   toggleSyncScroll,
+  unlockFocusMode,
 } = useArticleEditorViewport();
 
 function copyArticleId(id: number): void {

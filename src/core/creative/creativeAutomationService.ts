@@ -281,10 +281,16 @@ export class CreativeAutomationService {
         signal: AbortSignal.timeout(120_000),
       });
       if (!response.ok) return this.handleTechnicalFailure(job, `Hermes HTTP ${response.status}`);
-      const data = await response.json() as { ok?: boolean; reason?: string };
+      const data = await response.json() as { ok?: boolean; reason?: string; accountFit?: { level?: string; reason?: string } };
       if (!data.ok) return this.handleTechnicalFailure(job, data.reason ?? "Hermes 账号适配评估失败");
+      if (data.accountFit?.level === "error") {
+        return this.handleTechnicalFailure(job, data.accountFit.reason ?? "Hermes 账号适配评估返回技术错误");
+      }
       const evaluated = findCreativeSourceItemById(this.db, job.source_item_id);
-      if (!evaluated?.accountFitLevel || evaluated.accountFitLevel === "error") return this.handleTechnicalFailure(job, "Hermes 未回写有效账号适配结果");
+      if (!evaluated?.accountFitLevel) return this.handleTechnicalFailure(job, "Hermes 未回写账号适配结果");
+      if (evaluated.accountFitLevel === "error") {
+        return this.handleTechnicalFailure(job, evaluated.accountFitReason ?? "Hermes 账号适配评估回写技术错误");
+      }
       this.finish(job.id, "succeeded");
       this.recordSuccess("evaluate");
       if (evaluated.accountFitLevel === "high") {
@@ -392,42 +398,74 @@ export class CreativeAutomationService {
     this.db.prepare(`DELETE FROM creative_automation_jobs WHERE completed_at IS NOT NULL AND datetime(completed_at) < datetime('now', '-30 days')`).run();
   }
 
+  /** 只有已对外告警的故障才发送恢复，避免零散失败与成功交替时通知抖动。 */
   private recordSuccess(kind: JobType): void {
-    const row = this.db.prepare("SELECT consecutive_failures FROM creative_automation_alert_state WHERE failure_kind = ?").get(kind) as { consecutive_failures: number } | undefined;
-    if (row?.consecutive_failures && this.config) void this.sendAlert(`${kind === "evaluate" ? "账号适配评估" : "自动写作"}已恢复`, "连续技术失败已恢复。");
+    const row = this.db.prepare(`SELECT consecutive_failures,
+        CASE WHEN last_alert_at IS NOT NULL
+          AND (last_success_at IS NULL OR datetime(last_alert_at) > datetime(last_success_at))
+          THEN 1 ELSE 0 END AS alert_open
+      FROM creative_automation_alert_state WHERE failure_kind = ?`).get(kind) as { consecutive_failures: number; alert_open: number } | undefined;
+    if (row?.alert_open && this.config) void this.sendAlert(`${kind === "evaluate" ? "账号适配评估" : "自动写作"}已恢复`, "连续技术失败已恢复。");
     this.db.prepare(`INSERT INTO creative_automation_alert_state(failure_kind, consecutive_failures, last_success_at, updated_at)
       VALUES (?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT(failure_kind) DO UPDATE SET consecutive_failures = 0, last_success_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP`).run(kind);
   }
 
+  /** 冷却判断统一交给 SQLite 按 UTC 比较，不解析无时区的时间文本。 */
   private recordFailure(kind: JobType, reason: string): void {
-    const row = this.db.prepare("SELECT consecutive_failures, last_alert_at FROM creative_automation_alert_state WHERE failure_kind = ?").get(kind) as { consecutive_failures: number; last_alert_at: string | null } | undefined;
+    const row = this.db.prepare(`SELECT consecutive_failures,
+        CASE WHEN last_alert_at IS NULL OR datetime(last_alert_at) <= datetime('now', '-30 minutes')
+          THEN 1 ELSE 0 END AS cooldown_elapsed
+      FROM creative_automation_alert_state WHERE failure_kind = ?`).get(kind) as { consecutive_failures: number; cooldown_elapsed: number } | undefined;
     const failures = (row?.consecutive_failures ?? 0) + 1;
     this.db.prepare(`INSERT INTO creative_automation_alert_state(failure_kind, consecutive_failures, updated_at)
       VALUES (?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(failure_kind) DO UPDATE SET consecutive_failures = excluded.consecutive_failures, updated_at = CURRENT_TIMESTAMP`).run(kind, failures);
-    if (failures >= 3 && (!row?.last_alert_at || Date.now() - Date.parse(row.last_alert_at) >= 30 * 60_000)) {
+    if (failures >= 3 && (row?.cooldown_elapsed ?? 1)) {
       this.db.prepare("UPDATE creative_automation_alert_state SET last_alert_at = CURRENT_TIMESTAMP WHERE failure_kind = ?").run(kind);
       void this.sendAlert(`${kind === "evaluate" ? "账号适配评估" : "自动写作"}连续失败`, `已连续 ${failures} 次技术失败：${reason}`);
     }
   }
 
+  /** 从首次观测到无成功开始计时，队列失败清空不等于处理恢复。 */
   private async alertWhenQueueStalled(): Promise<void> {
     const queued = (this.db.prepare(`SELECT COUNT(*) AS count FROM creative_automation_jobs WHERE status IN ('pending', 'retrying')`).get() as { count: number }).count;
     const recent = (this.db.prepare(`SELECT COUNT(*) AS count FROM creative_automation_jobs WHERE status IN ('dispatched', 'succeeded') AND datetime(updated_at) >= datetime('now', '-15 minutes')`).get() as { count: number }).count;
-    const state = this.db.prepare("SELECT consecutive_failures, last_alert_at FROM creative_automation_alert_state WHERE failure_kind = 'queue-stall'").get() as { consecutive_failures: number; last_alert_at: string | null } | undefined;
-    if (queued === 0 || recent > 0) {
-      if (state?.consecutive_failures && this.config) await this.sendAlert("账号适配自动队列已恢复", "队列已重新出现成功处理。");
+    const state = this.db.prepare(`SELECT consecutive_failures,
+        CASE WHEN last_alert_at IS NOT NULL
+          AND (last_success_at IS NULL OR datetime(last_alert_at) > datetime(last_success_at))
+          THEN 1 ELSE 0 END AS alert_open,
+        CASE WHEN last_alert_at IS NULL OR datetime(last_alert_at) <= datetime('now', '-30 minutes')
+          THEN 1 ELSE 0 END AS cooldown_elapsed,
+        CASE WHEN datetime(updated_at) <= datetime('now', '-15 minutes') THEN 1 ELSE 0 END AS stalled_long_enough
+      FROM creative_automation_alert_state WHERE failure_kind = 'queue-stall'`).get() as {
+        consecutive_failures: number;
+        alert_open: number;
+        cooldown_elapsed: number;
+        stalled_long_enough: number;
+      } | undefined;
+    if (recent > 0) {
+      if (state?.alert_open && this.config) await this.sendAlert("账号适配自动队列已恢复", "队列已重新出现成功处理。");
       this.db.prepare(`INSERT INTO creative_automation_alert_state(failure_kind, consecutive_failures, last_success_at, updated_at)
         VALUES ('queue-stall', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT(failure_kind) DO UPDATE SET consecutive_failures = 0, last_success_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP`).run();
       return;
     }
+    if (queued === 0) {
+      this.db.prepare(`INSERT INTO creative_automation_alert_state(failure_kind, consecutive_failures, updated_at)
+        VALUES ('queue-stall', 0, CURRENT_TIMESTAMP)
+        ON CONFLICT(failure_kind) DO UPDATE SET consecutive_failures = 0, updated_at = CURRENT_TIMESTAMP`).run();
+      return;
+    }
+    if (!state || state.consecutive_failures === 0) {
+      this.db.prepare(`INSERT INTO creative_automation_alert_state(failure_kind, consecutive_failures, updated_at)
+        VALUES ('queue-stall', 1, CURRENT_TIMESTAMP)
+        ON CONFLICT(failure_kind) DO UPDATE SET consecutive_failures = 1, updated_at = CURRENT_TIMESTAMP`).run();
+      return;
+    }
     const failures = (state?.consecutive_failures ?? 0) + 1;
-    this.db.prepare(`INSERT INTO creative_automation_alert_state(failure_kind, consecutive_failures, updated_at)
-      VALUES ('queue-stall', ?, CURRENT_TIMESTAMP)
-      ON CONFLICT(failure_kind) DO UPDATE SET consecutive_failures = excluded.consecutive_failures, updated_at = CURRENT_TIMESTAMP`).run(failures);
-    if (!state?.last_alert_at || Date.now() - Date.parse(state.last_alert_at) >= 30 * 60_000) {
+    this.db.prepare("UPDATE creative_automation_alert_state SET consecutive_failures = ? WHERE failure_kind = 'queue-stall'").run(failures);
+    if (state.stalled_long_enough && state.cooldown_elapsed) {
       this.db.prepare("UPDATE creative_automation_alert_state SET last_alert_at = CURRENT_TIMESTAMP WHERE failure_kind = 'queue-stall'").run();
       await this.sendAlert("账号适配自动队列 15 分钟无成功", `当前仍有 ${queued} 个待处理任务，请检查 Hermes 与队列错误。`);
     }

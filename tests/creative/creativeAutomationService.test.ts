@@ -104,4 +104,103 @@ describe("CreativeAutomationService", () => {
     const jobs = handle.db.prepare("SELECT source_item_id FROM creative_automation_jobs WHERE job_type = 'evaluate' ORDER BY source_item_id").all() as Array<{ source_item_id: number }>;
     expect(jobs).toEqual([{ source_item_id: ready.id }]);
   });
+
+  it("上海时区下仍遵守 30 分钟失败告警冷却", async () => {
+    const handle = await createTestDatabase("hot-now-alert-cooldown-");
+    handles.push(handle);
+    const service = new CreativeAutomationService(handle.db, {} as never, null) as any;
+    const alerts: string[] = [];
+    service.sendAlert = async (subject: string) => alerts.push(subject);
+    handle.db.prepare(`INSERT INTO creative_automation_alert_state(failure_kind, consecutive_failures, last_alert_at)
+      VALUES ('evaluate', 3, CURRENT_TIMESTAMP)`).run();
+
+    service.recordFailure("evaluate", "补充搜索限额耗尽");
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(alerts).toEqual([]);
+
+    handle.db.prepare("UPDATE creative_automation_alert_state SET last_alert_at = datetime('now', '-31 minutes') WHERE failure_kind = 'evaluate'").run();
+    service.recordFailure("evaluate", "补充搜索限额耗尽");
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(alerts).toEqual(["账号适配评估连续失败"]);
+  });
+
+  it("只有已发出故障告警后的真实成功才发送一次恢复", async () => {
+    const handle = await createTestDatabase("hot-now-alert-recovery-");
+    handles.push(handle);
+    const service = new CreativeAutomationService(handle.db, {} as never, null) as any;
+    const alerts: string[] = [];
+    service.sendAlert = async (subject: string) => alerts.push(subject);
+    handle.db.prepare(`INSERT INTO creative_automation_alert_state(failure_kind, consecutive_failures)
+      VALUES ('evaluate', 2)`).run();
+
+    service.recordSuccess("evaluate");
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(alerts).toEqual([]);
+
+    handle.db.prepare(`UPDATE creative_automation_alert_state
+      SET consecutive_failures = 3, last_alert_at = CURRENT_TIMESTAMP, last_success_at = NULL
+      WHERE failure_kind = 'evaluate'`).run();
+    service.recordSuccess("evaluate");
+    service.recordSuccess("evaluate");
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(alerts).toEqual(["账号适配评估已恢复"]);
+  });
+
+  it("队列持续停滞满 15 分钟才告警，全失败清空不误报恢复", async () => {
+    const handle = await createTestDatabase("hot-now-queue-stall-");
+    handles.push(handle);
+    const item = insertCreativeSourceItem(handle.db, {
+      externalId: "queue-stall", collectorAgent: "test", title: "队列停滞", url: "https://example.com/queue-stall",
+    });
+    handle.db.prepare(`INSERT INTO creative_automation_jobs(job_type, source_item_id, trigger_kind, status)
+      VALUES ('evaluate', ?, 'automatic', 'pending')`).run(item.id);
+    const service = new CreativeAutomationService(handle.db, {} as never, null) as any;
+    const alerts: string[] = [];
+    service.sendAlert = async (subject: string) => alerts.push(subject);
+
+    await service.alertWhenQueueStalled();
+    expect(alerts).toEqual([]);
+
+    handle.db.prepare("UPDATE creative_automation_alert_state SET updated_at = datetime('now', '-16 minutes') WHERE failure_kind = 'queue-stall'").run();
+    await service.alertWhenQueueStalled();
+    expect(alerts).toEqual(["账号适配自动队列 15 分钟无成功"]);
+
+    handle.db.prepare("UPDATE creative_automation_jobs SET status = 'failed', completed_at = CURRENT_TIMESTAMP WHERE source_item_id = ?").run(item.id);
+    await service.alertWhenQueueStalled();
+    expect(alerts).toHaveLength(1);
+
+    handle.db.prepare(`INSERT INTO creative_automation_jobs(job_type, source_item_id, trigger_kind, status, completed_at)
+      VALUES ('evaluate', ?, 'automatic', 'succeeded', CURRENT_TIMESTAMP)`).run(item.id);
+    await service.alertWhenQueueStalled();
+    await service.alertWhenQueueStalled();
+    expect(alerts).toEqual([
+      "账号适配自动队列 15 分钟无成功",
+      "账号适配自动队列已恢复",
+    ]);
+  });
+
+  it("Hermes 回写 error 时保留真实技术失败原因", async () => {
+    const handle = await createTestDatabase("hot-now-evaluation-error-");
+    handles.push(handle);
+    const item = insertCreativeSourceItem(handle.db, {
+      externalId: "evaluation-error", collectorAgent: "test", title: "需要补充搜索", url: "https://example.com/evaluation-error",
+    });
+    handle.db.prepare(`INSERT INTO creative_automation_jobs(job_type, source_item_id, trigger_kind, status)
+      VALUES ('evaluate', ?, 'automatic', 'pending')`).run(item.id);
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      updateCreativeSourceItemAccountFit(handle.db, item.id, {
+        level: "error", reason: "补充搜索失败：每周使用上限", details: {}, ruleVersion: "v3", updateWritingStatus: false,
+      });
+      return new Response(JSON.stringify({
+        ok: true,
+        accountFit: { level: "error", reason: "补充搜索失败：每周使用上限" },
+      }), { status: 200 });
+    }));
+    const service = new CreativeAutomationService(handle.db, null, { baseUrl: "https://hermes.test", token: "token" });
+
+    await service.runNow();
+
+    const job = handle.db.prepare("SELECT status, last_error FROM creative_automation_jobs WHERE source_item_id = ?").get(item.id) as { status: string; last_error: string };
+    expect(job).toEqual({ status: "retrying", last_error: "补充搜索失败：每周使用上限" });
+  });
 });

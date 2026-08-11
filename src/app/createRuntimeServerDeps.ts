@@ -392,6 +392,7 @@ export function createRuntimeServerDeps(input: RuntimeServerDepsInput): ServerDe
   return {
   db,
     creativeApiToken: input.creativeApiToken,
+    creativeAutomation: input.creativeAutomation,
     creativeImageDir,
     config,
     clientDevOrigin: input.clientDevOrigin,

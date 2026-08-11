@@ -225,6 +225,7 @@ import {
   readFirstH1,
   replaceFirstH1 as replaceH1,
 } from "./article-detail/articleTitleSync.js";
+import { createLatestAutosaveQueue } from "./article-detail/latestAutosaveQueue.js";
 
 const props = defineProps<{
   open: boolean;
@@ -415,6 +416,7 @@ let relativeTimer: ReturnType<typeof setInterval> | null = null;
 // 记住打开时的原始内容，用于判断是否真正发生变化
 let lastSavedContent = "";
 let lastSavedHuman = "";
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let humanAutoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
 const savedAtLabel = computed(() => {
@@ -494,8 +496,10 @@ function applyTitleSync(result: ReturnType<typeof buildTitleSync>): void {
   }
 }
 
-/** 标题输入框只改变手动稿的发布标题与中栏 H1，左栏素材草稿保持独立。 */
+/** 手动稿标题保存后同步左右两栏 H1；只有显式标题操作允许改写编辑器内容。 */
 async function saveManualTitle(): Promise<void> {
+  if (!props.article || !isManualArticle.value) return;
+  await prepareExplicitContentSave();
   if (!props.article || !isManualArticle.value) return;
   const title = manualTitle.value.trim();
   if (!title) {
@@ -503,14 +507,18 @@ async function saveManualTitle(): Promise<void> {
     manualTitle.value = displayTitles.value[0] ?? "";
     return;
   }
+  const contentMarkdown = replaceH1(editContent.value, title);
   const humanMarkdown = replaceH1(humanContent.value, title);
   const titles = [title];
   try {
-    await editFinishedArticle(props.article.id, { titles, humanMarkdown });
+    await editFinishedArticle(props.article.id, { titles, contentMarkdown, humanMarkdown });
     localTitles.value = titles;
     props.article.titles = JSON.stringify(titles);
+    props.article.contentMarkdown = contentMarkdown;
     props.article.humanMarkdown = humanMarkdown;
+    editContent.value = contentMarkdown;
     humanContent.value = humanMarkdown;
+    lastSavedContent = contentMarkdown;
     lastSavedHuman = humanMarkdown;
     emit("saved");
   } catch {
@@ -520,6 +528,8 @@ async function saveManualTitle(): Promise<void> {
 
 // 选择发布标题：替换 markdown 中的 H1，并显式记录人工确认。
 async function selectTitle(idx: number): Promise<void> {
+  if (!props.article || (idx === activeTitleIndex.value && props.article.titleSelectionConfirmed)) return;
+  await prepareExplicitContentSave();
   if (!props.article || (idx === activeTitleIndex.value && props.article.titleSelectionConfirmed)) return;
   const newTitle = displayTitles.value[idx];
 
@@ -579,8 +589,13 @@ async function saveTitleEdit(idx: number): Promise<void> {
   const newTitle = editingTitleValue.value.trim();
   const titles = localTitles.value;
   const oldTitle = titles[idx] ?? "";
+  if (!props.article || !newTitle || newTitle === oldTitle) {
+    cancelEditTitle();
+    return;
+  }
+  await prepareExplicitContentSave();
   cancelEditTitle();
-  if (!props.article || !newTitle || newTitle === oldTitle) return;
+  if (!props.article) return;
 
   titles[idx] = newTitle;
   props.article.titles = JSON.stringify(titles);
@@ -1159,27 +1174,88 @@ async function selectCoverImage(idx: number): Promise<void> {
   } catch { /* 静默失败，本地状态已更新 */ }
 }
 
-// 5 秒防抖自动保存正文
-let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+type AutosavePayload = { articleId: number; content: string };
 
+/** 左栏自动保存只落盘草稿快照，不读取或改写当前编辑器状态。 */
+async function persistDraftAutosave(payload: AutosavePayload): Promise<void> {
+  saving.value = true;
+  try {
+    await editFinishedArticle(payload.articleId, { contentMarkdown: payload.content });
+    if (props.article?.id !== payload.articleId) return;
+    lastSavedContent = payload.content;
+    if (editContent.value === payload.content) lastSavedAt.value = Date.now();
+    emit("saved");
+  } catch (error) {
+    if (props.article?.id === payload.articleId) message.error("自动保存失败");
+    throw error;
+  } finally {
+    saving.value = false;
+  }
+}
+
+/** 中栏自动保存只落盘用户原文，标题同步留给显式标题操作、手动保存和推送。 */
+async function persistHumanAutosave(payload: AutosavePayload): Promise<void> {
+  try {
+    await editFinishedArticle(payload.articleId, { humanMarkdown: payload.content });
+    if (props.article?.id !== payload.articleId) return;
+    lastSavedHuman = payload.content;
+    if (humanContent.value === payload.content) lastSavedAt.value = Date.now();
+  } catch (error) {
+    if (props.article?.id === payload.articleId) message.error("人工转写保存失败");
+    throw error;
+  }
+}
+
+const draftAutosaveQueue = createLatestAutosaveQueue(persistDraftAutosave);
+const humanAutosaveQueue = createLatestAutosaveQueue(persistHumanAutosave);
+
+/** 清理尚未触发的防抖任务，显式保存和标题联动会先接管当前内容。 */
+function clearAutosaveTimers(): void {
+  if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+  if (humanAutoSaveTimer) { clearTimeout(humanAutoSaveTimer); humanAutoSaveTimer = null; }
+}
+
+/** 等待已经发出的自动保存结束，并丢弃失败遗留的旧快照。 */
+async function prepareExplicitContentSave(): Promise<void> {
+  clearAutosaveTimers();
+  await Promise.allSettled([
+    draftAutosaveQueue.waitForIdle(),
+    humanAutosaveQueue.waitForIdle(),
+  ]);
+  draftAutosaveQueue.clearPending();
+  humanAutosaveQueue.clearPending();
+}
+
+/** 将左栏当前最新版交给串行队列，错误已经在持久化边界提示。 */
+function enqueueDraftAutosave(content: string): void {
+  const articleId = props.article?.id;
+  if (!articleId) return;
+  void draftAutosaveQueue.enqueue({ articleId, content }).catch(() => {});
+}
+
+/** 将中栏当前最新版交给串行队列，不在响应后回写 humanContent。 */
+function enqueueHumanAutosave(content: string): void {
+  const articleId = props.article?.id;
+  if (!articleId) return;
+  void humanAutosaveQueue.enqueue({ articleId, content }).catch(() => {});
+}
+
+// 两栏均在停止输入 5 秒后入队；定时器触发时读取当前值，避免提交闭包中的旧版本。
 watch(editContent, (val) => {
   if (!props.open || props.readonly || val === lastSavedContent) return;
   if (autoSaveTimer) clearTimeout(autoSaveTimer);
   autoSaveTimer = setTimeout(() => {
-    if (val !== lastSavedContent && props.article) {
-      doSaveContent(val);
-    }
+    autoSaveTimer = null;
+    if (editContent.value !== lastSavedContent) enqueueDraftAutosave(editContent.value);
   }, 5_000);
 });
 
-// 5 秒防抖自动保存人工转写内容（中栏，human_markdown）
 watch(humanContent, (val) => {
   if (!props.open || props.readonly || val === lastSavedHuman) return;
   if (humanAutoSaveTimer) clearTimeout(humanAutoSaveTimer);
   humanAutoSaveTimer = setTimeout(() => {
-    if (val !== lastSavedHuman && props.article) {
-      void doSaveHumanContent(val);
-    }
+    humanAutoSaveTimer = null;
+    if (humanContent.value !== lastSavedHuman) enqueueHumanAutosave(humanContent.value);
   }, 5_000);
 });
 
@@ -1215,7 +1291,7 @@ watch(() => props.open, (val) => {
     // 重置标题编辑态，避免上一篇的编辑下标残留到当前文章
     editingTitleIdx.value = null;
     editingTitleValue.value = "";
-    if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+    clearAutosaveTimers();
     resetEditorFullscreen();
     document.addEventListener("keydown", handleFullscreenEsc);
     // 恢复文章保存的主题偏好，无记录时默认使用落日胶片。
@@ -1227,52 +1303,23 @@ watch(() => props.open, (val) => {
   } else {
     teardownEditorResize();
     // 关闭弹窗时如果有未保存的内容，立即保存一次，避免防抖定时器还没触发就丢失
-    if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
-    if (humanAutoSaveTimer) { clearTimeout(humanAutoSaveTimer); humanAutoSaveTimer = null; }
+    clearAutosaveTimers();
     if (props.article && editContent.value !== lastSavedContent) {
-      void doSaveContent(editContent.value);
+      enqueueDraftAutosave(editContent.value);
     }
     if (props.article && humanContent.value !== lastSavedHuman) {
-      void doSaveHumanContent(humanContent.value);
+      enqueueHumanAutosave(humanContent.value);
     }
   }
 });
 
-async function doSaveContent(content: string): Promise<void> {
-  if (!props.article) return;
+/** 手动保存等待自动队列收口后，再执行双栏正文和标题的完整同步。 */
+async function handleSave(): Promise<boolean> {
+  if (!props.article) return false;
   saving.value = true;
   try {
-    await editFinishedArticle(props.article.id, { contentMarkdown: content });
-    lastSavedContent = content;
-    lastSavedAt.value = Date.now();
-    emit("saved");
-  } catch {
-    message.error("自动保存失败");
-  } finally {
-    saving.value = false;
-  }
-}
-
-// 保存人工转写内容（中栏，human_markdown = 发布内容）
-async function doSaveHumanContent(content: string): Promise<void> {
-  if (!props.article) return;
-  try {
-    const sync = buildTitleSync(content);
-    await editFinishedArticle(props.article.id, sync.fields);
-    applyTitleSync(sync);
-    lastSavedHuman = sync.humanMarkdown;
-    tickArticleChange();
-    // 与 doSaveContent 一致：更新保存时间戳，驱动"保存成功·X前"标签反馈
-    lastSavedAt.value = Date.now();
-  } catch {
-    message.error("人工转写保存失败");
-  }
-}
-
-async function handleSave(): Promise<void> {
-  if (!props.article) return;
-  saving.value = true;
-  try {
+    await prepareExplicitContentSave();
+    if (!props.article) return false;
     const sync = buildTitleSync(humanContent.value);
     // 手动保存同时落盘左栏 AI 草稿（content_markdown）和中栏人工转写（human_markdown）
     await editFinishedArticle(props.article.id, {
@@ -1285,8 +1332,10 @@ async function handleSave(): Promise<void> {
     tickArticleChange();
     lastSavedAt.value = Date.now();
     emit("saved");
+    return true;
   } catch {
     message.error("保存失败");
+    return false;
   } finally {
     saving.value = false;
   }
@@ -1316,15 +1365,7 @@ async function saveAndPush(): Promise<void> {
     });
     if (!confirmed) return;
   }
-  // 取消自动保存定时器，手动触发一次保存
-  if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
-  if (humanAutoSaveTimer) { clearTimeout(humanAutoSaveTimer); humanAutoSaveTimer = null; }
-  if (editContent.value !== lastSavedContent) {
-    await doSaveContent(editContent.value);
-  }
-  if (humanContent.value !== lastSavedHuman) {
-    await doSaveHumanContent(humanContent.value);
-  }
+  if (!await handleSave()) return;
   emit("openPush", props.article, currentWechatThemeId.value);
 }
 
@@ -1623,7 +1664,7 @@ watch(lastSavedAt, (ts) => {
 
 onBeforeUnmount(() => {
   teardownEditorResize();
-  if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+  clearAutosaveTimers();
   if (relativeTimer) { clearInterval(relativeTimer); relativeTimer = null; }
 });
 </script>

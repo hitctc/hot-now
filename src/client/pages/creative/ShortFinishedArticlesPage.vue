@@ -733,10 +733,10 @@ const pagination = computed(() => ({
           <!-- 操作列：废弃/恢复 -->
           <template v-else-if="column.key === 'actions'">
             <div v-if="!record.deletedAt" class="flex flex-col items-start gap-0.5">
-              <a-button size="small" type="link" class="!h-auto !px-0 !py-0 !text-[10px]" @click="handleTogglePin(record)">
+              <a-button size="small" type="link" class="!h-auto !text-[10px]" @click="handleTogglePin(record)">
                 {{ record.pinnedAt ? "取消置顶" : "置顶" }}
               </a-button>
-              <a-button size="small" danger ghost class="!text-[10px] !px-1.5 !py-0" @click="handleDiscardArticle(record)">废弃</a-button>
+              <a-button size="small" type="link" danger class="!h-auto !text-[10px]" @click="handleDiscardArticle(record)">废弃</a-button>
             </div>
             <a-button
               v-else

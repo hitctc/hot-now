@@ -429,7 +429,11 @@ export class CreativeAutomationService {
 
   /** 从首次观测到无成功开始计时，队列失败清空不等于处理恢复。 */
   private async alertWhenQueueStalled(): Promise<void> {
-    const queued = (this.db.prepare(`SELECT COUNT(*) AS count FROM creative_automation_jobs WHERE status IN ('pending', 'retrying')`).get() as { count: number }).count;
+    // 等次日写作额度的任务会把 next_run_at 推到明天，属正常顺延而非停摆；
+    // 技术退避最长 30 分钟，超过 30 分钟的重试只可能是额度顺延，不计入停摆证据。
+    const queued = (this.db.prepare(`SELECT COUNT(*) AS count FROM creative_automation_jobs
+      WHERE status IN ('pending', 'retrying')
+        AND (next_run_at IS NULL OR datetime(next_run_at) <= datetime('now', '+30 minutes'))`).get() as { count: number }).count;
     const recent = (this.db.prepare(`SELECT COUNT(*) AS count FROM creative_automation_jobs WHERE status IN ('dispatched', 'succeeded') AND datetime(updated_at) >= datetime('now', '-15 minutes')`).get() as { count: number }).count;
     const state = this.db.prepare(`SELECT consecutive_failures,
         CASE WHEN last_alert_at IS NOT NULL

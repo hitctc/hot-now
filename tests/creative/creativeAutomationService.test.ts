@@ -179,6 +179,37 @@ describe("CreativeAutomationService", () => {
     ]);
   });
 
+  it("等次日写作额度的远期重试任务不算队列停摆", async () => {
+    const handle = await createTestDatabase("hot-now-queue-stall-quota-");
+    handles.push(handle);
+    const item = insertCreativeSourceItem(handle.db, {
+      externalId: "quota-deferred", collectorAgent: "test", title: "额度顺延", url: "https://example.com/quota-deferred",
+    });
+    // 额度顺延：next_run_at 推到次日（技术退避最长 30 分钟，不可能到明天）
+    handle.db.prepare(`INSERT INTO creative_automation_jobs(job_type, source_item_id, trigger_kind, status, next_run_at, last_error)
+      VALUES ('write', ?, 'automatic', 'retrying', datetime('now', '+8 hours'), '当日自动写作 10 篇额度已用完')`).run(item.id);
+    const service = new CreativeAutomationService(handle.db, {} as never, null) as any;
+    const alerts: string[] = [];
+    service.sendAlert = async (subject: string) => alerts.push(subject);
+
+    // 队列里只剩远期顺延任务：先进入观察，观察期满也不应告警
+    await service.alertWhenQueueStalled();
+    expect(alerts).toEqual([]);
+    handle.db.prepare("UPDATE creative_automation_alert_state SET updated_at = datetime('now', '-16 minutes') WHERE failure_kind = 'queue-stall'").run();
+    await service.alertWhenQueueStalled();
+    await service.alertWhenQueueStalled();
+    expect(alerts).toEqual([]);
+
+    // 出现一个 30 分钟内的技术退避任务时恢复停摆监测
+    handle.db.prepare(`INSERT INTO creative_automation_jobs(job_type, source_item_id, trigger_kind, status, next_run_at)
+      VALUES ('evaluate', ?, 'automatic', 'retrying', datetime('now', '+2 minutes'))`).run(item.id);
+    await service.alertWhenQueueStalled();
+    expect(alerts).toEqual([]);
+    handle.db.prepare("UPDATE creative_automation_alert_state SET updated_at = datetime('now', '-16 minutes') WHERE failure_kind = 'queue-stall'").run();
+    await service.alertWhenQueueStalled();
+    expect(alerts).toEqual(["账号适配自动队列 15 分钟无成功"]);
+  });
+
   it("Hermes 回写 error 时保留真实技术失败原因", async () => {
     const handle = await createTestDatabase("hot-now-evaluation-error-");
     handles.push(handle);

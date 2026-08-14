@@ -8,6 +8,14 @@ import {
 } from "../../src/core/creative/creativeSourceItemRepository.js";
 import { createTestDatabase, type TestDatabaseHandle } from "../helpers/testDatabase.js";
 
+// vi.mock 工厂被提升到模块顶部执行，共享数组必须用 vi.hoisted 创建
+const sentEmails = vi.hoisted(() => [] as Array<{ subject: string; html: string }>);
+vi.mock("../../src/core/mail/sendEmailMessage.js", () => ({
+  sendEmailMessage: vi.fn(async (_config, message) => {
+    sentEmails.push({ subject: message.subject, html: message.html });
+  }),
+}));
+
 const handles: TestDatabaseHandle[] = [];
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -110,7 +118,7 @@ describe("CreativeAutomationService", () => {
     handles.push(handle);
     const service = new CreativeAutomationService(handle.db, {} as never, null) as any;
     const alerts: string[] = [];
-    service.sendAlert = async (subject: string) => alerts.push(subject);
+    service.sendAlert = async (_kind: string, subject: string) => alerts.push(subject);
     handle.db.prepare(`INSERT INTO creative_automation_alert_state(failure_kind, consecutive_failures, last_alert_at)
       VALUES ('evaluate', 3, CURRENT_TIMESTAMP)`).run();
 
@@ -129,7 +137,7 @@ describe("CreativeAutomationService", () => {
     handles.push(handle);
     const service = new CreativeAutomationService(handle.db, {} as never, null) as any;
     const alerts: string[] = [];
-    service.sendAlert = async (subject: string) => alerts.push(subject);
+    service.sendAlert = async (_kind: string, subject: string) => alerts.push(subject);
     handle.db.prepare(`INSERT INTO creative_automation_alert_state(failure_kind, consecutive_failures)
       VALUES ('evaluate', 2)`).run();
 
@@ -156,7 +164,7 @@ describe("CreativeAutomationService", () => {
       VALUES ('evaluate', ?, 'automatic', 'pending')`).run(item.id);
     const service = new CreativeAutomationService(handle.db, {} as never, null) as any;
     const alerts: string[] = [];
-    service.sendAlert = async (subject: string) => alerts.push(subject);
+    service.sendAlert = async (_kind: string, subject: string) => alerts.push(subject);
 
     await service.alertWhenQueueStalled();
     expect(alerts).toEqual([]);
@@ -190,7 +198,7 @@ describe("CreativeAutomationService", () => {
       VALUES ('write', ?, 'automatic', 'retrying', datetime('now', '+8 hours'), '当日自动写作 10 篇额度已用完')`).run(item.id);
     const service = new CreativeAutomationService(handle.db, {} as never, null) as any;
     const alerts: string[] = [];
-    service.sendAlert = async (subject: string) => alerts.push(subject);
+    service.sendAlert = async (_kind: string, subject: string) => alerts.push(subject);
 
     // 队列里只剩远期顺延任务：先进入观察，观察期满也不应告警
     await service.alertWhenQueueStalled();
@@ -208,6 +216,45 @@ describe("CreativeAutomationService", () => {
     handle.db.prepare("UPDATE creative_automation_alert_state SET updated_at = datetime('now', '-16 minutes') WHERE failure_kind = 'queue-stall'").run();
     await service.alertWhenQueueStalled();
     expect(alerts).toEqual(["账号适配自动队列 15 分钟无成功"]);
+  });
+
+  it("告警先落库再发信：主题带 HN-ID、快照入库、恢复引用故障 ID", async () => {
+    const handle = await createTestDatabase("hot-now-alert-id-");
+    handles.push(handle);
+    sentEmails.length = 0;
+    const item = insertCreativeSourceItem(handle.db, {
+      externalId: "alert-id", collectorAgent: "test", title: "告警编号", url: "https://example.com/alert-id",
+    });
+    handle.db.prepare(`INSERT INTO creative_automation_jobs(job_type, source_item_id, trigger_kind, status, attempts, last_error)
+      VALUES ('evaluate', ?, 'automatic', 'retrying', 2, 'LLM调用失败: 测试失败原因')`).run(item.id);
+    const service = new CreativeAutomationService(handle.db, { smtp: { user: "from@test", to: "to@test" } } as never, null) as any;
+
+    // 连续失败告警：落库、主题尾部带 [HN-1]、现场快照包含失败任务原因
+    handle.db.prepare(`INSERT INTO creative_automation_alert_state(failure_kind, consecutive_failures, last_alert_at)
+      VALUES ('evaluate', 3, datetime('now', '-31 minutes'))`).run();
+    service.recordFailure("evaluate", "测试失败原因");
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const logged = handle.db.prepare("SELECT id, failure_kind, subject, detail, context_json, is_recovery FROM creative_automation_alerts ORDER BY id").all() as Array<{ id: number; failure_kind: string; subject: string; detail: string; context_json: string | null; is_recovery: number }>;
+    expect(logged).toHaveLength(1);
+    expect(logged[0].failure_kind).toBe("evaluate");
+    expect(logged[0].is_recovery).toBe(0);
+    expect(JSON.parse(logged[0].context_json ?? "[]")).toEqual(
+      expect.arrayContaining([expect.objectContaining({ last_error: "LLM调用失败: 测试失败原因" })]),
+    );
+    expect(sentEmails[0].subject).toBe("HotNow 告警：账号适配评估连续失败 [HN-1]");
+
+    // 恢复告警：另行落库标记 is_recovery，正文引用故障 HN-1
+    handle.db.prepare(`UPDATE creative_automation_alert_state
+      SET consecutive_failures = 3, last_alert_at = CURRENT_TIMESTAMP, last_success_at = NULL
+      WHERE failure_kind = 'evaluate'`).run();
+    service.recordSuccess("evaluate");
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const recovery = handle.db.prepare("SELECT is_recovery FROM creative_automation_alerts WHERE id = 2").get() as { is_recovery: number };
+    expect(recovery.is_recovery).toBe(1);
+    expect(sentEmails[1].subject).toBe("HotNow 告警：账号适配评估已恢复 [HN-2]");
+    expect(sentEmails[1].html).toContain("关联故障告警：HN-1");
   });
 
   it("Hermes 回写 error 时保留真实技术失败原因", async () => {

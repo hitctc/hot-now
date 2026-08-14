@@ -9,6 +9,7 @@ import {
 type JobType = "evaluate" | "write";
 type TriggerKind = "automatic" | "manual-evaluate" | "manual-write";
 type JobStatus = "pending" | "running" | "retrying" | "dispatched" | "succeeded" | "failed" | "uncertain" | "cancelled" | "expired";
+type AlertKind = JobType | "queue-stall";
 
 type AutomationJob = {
   id: number;
@@ -405,7 +406,7 @@ export class CreativeAutomationService {
           AND (last_success_at IS NULL OR datetime(last_alert_at) > datetime(last_success_at))
           THEN 1 ELSE 0 END AS alert_open
       FROM creative_automation_alert_state WHERE failure_kind = ?`).get(kind) as { consecutive_failures: number; alert_open: number } | undefined;
-    if (row?.alert_open && this.config) void this.sendAlert(`${kind === "evaluate" ? "账号适配评估" : "自动写作"}已恢复`, "连续技术失败已恢复。");
+    if (row?.alert_open && this.config) void this.sendAlert(kind, `${kind === "evaluate" ? "账号适配评估" : "自动写作"}已恢复`, "连续技术失败已恢复。", { recovery: true });
     this.db.prepare(`INSERT INTO creative_automation_alert_state(failure_kind, consecutive_failures, last_success_at, updated_at)
       VALUES (?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT(failure_kind) DO UPDATE SET consecutive_failures = 0, last_success_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP`).run(kind);
@@ -423,7 +424,7 @@ export class CreativeAutomationService {
       ON CONFLICT(failure_kind) DO UPDATE SET consecutive_failures = excluded.consecutive_failures, updated_at = CURRENT_TIMESTAMP`).run(kind, failures);
     if (failures >= 3 && (row?.cooldown_elapsed ?? 1)) {
       this.db.prepare("UPDATE creative_automation_alert_state SET last_alert_at = CURRENT_TIMESTAMP WHERE failure_kind = ?").run(kind);
-      void this.sendAlert(`${kind === "evaluate" ? "账号适配评估" : "自动写作"}连续失败`, `已连续 ${failures} 次技术失败：${reason}`);
+      void this.sendAlert(kind, `${kind === "evaluate" ? "账号适配评估" : "自动写作"}连续失败`, `已连续 ${failures} 次技术失败：${reason}`, { context: this.snapshotFailedJobs() });
     }
   }
 
@@ -449,7 +450,7 @@ export class CreativeAutomationService {
         stalled_long_enough: number;
       } | undefined;
     if (recent > 0) {
-      if (state?.alert_open && this.config) await this.sendAlert("账号适配自动队列已恢复", "队列已重新出现成功处理。");
+      if (state?.alert_open && this.config) await this.sendAlert("queue-stall", "账号适配自动队列已恢复", "队列已重新出现成功处理。", { recovery: true });
       this.db.prepare(`INSERT INTO creative_automation_alert_state(failure_kind, consecutive_failures, last_success_at, updated_at)
         VALUES ('queue-stall', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT(failure_kind) DO UPDATE SET consecutive_failures = 0, last_success_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP`).run();
@@ -471,22 +472,49 @@ export class CreativeAutomationService {
     this.db.prepare("UPDATE creative_automation_alert_state SET consecutive_failures = ? WHERE failure_kind = 'queue-stall'").run(failures);
     if (state.stalled_long_enough && state.cooldown_elapsed) {
       this.db.prepare("UPDATE creative_automation_alert_state SET last_alert_at = CURRENT_TIMESTAMP WHERE failure_kind = 'queue-stall'").run();
-      await this.sendAlert("账号适配自动队列 15 分钟无成功", `当前仍有 ${queued} 个待处理任务，请检查 Hermes 与队列错误。`);
+      await this.sendAlert("queue-stall", "账号适配自动队列 15 分钟无成功", `当前仍有 ${queued} 个待处理任务，请检查 Hermes 与队列错误。`, { context: this.snapshotFailedJobs() });
     }
   }
 
-  private async sendAlert(subject: string, detail: string): Promise<void> {
+  /**
+   * 每次告警先落库拿到唯一 ID 再发信；邮件主题携带 [HN-ID]，排查时凭 ID 查
+   * creative_automation_alerts 即可拿到当时的失败任务快照。落库失败不阻断发信。
+   */
+  private async sendAlert(failureKind: AlertKind, subject: string, detail: string, options: { recovery?: boolean; context?: unknown } = {}): Promise<void> {
+    let alertTag = "";
+    let referencedFailure = "";
+    try {
+      const result = this.db.prepare(`INSERT INTO creative_automation_alerts(failure_kind, subject, detail, context_json, is_recovery)
+        VALUES (?, ?, ?, ?, ?)`).run(failureKind, subject, detail, options.context ? JSON.stringify(options.context) : null, options.recovery ? 1 : 0);
+      const alertId = Number(result.lastInsertRowid);
+      alertTag = ` [HN-${alertId}]`;
+      // 恢复类告警在正文引用其对应的最近一次故障告警，形成排查闭环
+      if (options.recovery) {
+        const failure = this.db.prepare(`SELECT id FROM creative_automation_alerts WHERE failure_kind = ? AND is_recovery = 0 ORDER BY id DESC LIMIT 1`).get(failureKind) as { id: number } | undefined;
+        if (failure) referencedFailure = `<p>关联故障告警：HN-${failure.id}</p>`;
+      }
+    } catch (error) {
+      this.logger?.error(error, "creative automation alert log failed");
+    }
     if (!this.config) return;
     try {
       await sendEmailMessage(this.config, {
         from: this.config.smtp.user,
         to: this.config.smtp.to,
-        subject: `HotNow 告警：${subject}`,
-        html: `<p>${escapeHtml(detail)}</p><p>请在 HotNow 素材库或监控页检查任务状态。</p>`,
+        subject: `HotNow 告警：${subject}${alertTag}`,
+        html: `<p>${escapeHtml(detail)}</p>${referencedFailure}<p>请在 HotNow 素材库或监控页检查任务状态。</p>`,
       });
     } catch (error) {
       this.logger?.error(error, "creative automation alert email failed");
     }
+  }
+
+  /** 告警现场快照：记录发出时刻仍在失败/重试的任务及原因，随告警落库。 */
+  private snapshotFailedJobs(): Array<Record<string, unknown>> {
+    return this.db.prepare(`SELECT job_type, source_item_id, trigger_kind, status, attempts, last_error, next_run_at, updated_at
+      FROM creative_automation_jobs
+      WHERE status IN ('retrying', 'failed', 'uncertain')
+      ORDER BY updated_at DESC LIMIT 10`).all() as Array<Record<string, unknown>>;
   }
 }
 

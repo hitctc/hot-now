@@ -13,9 +13,10 @@ import { bilibiliQueriesMigration } from "./migrations/011_bilibili_queries.js";
 import { weiboTrendingMigration } from "./migrations/012_weibo_trending.js";
 import { wechatRssSourcesMigration } from "./migrations/013_wechat_rss_sources.js";
 import { creativeAccountFitAutomationMigration } from "./migrations/048_creative_account_fit_automation.js";
+import { creativeAutomationAlertLogMigration } from "./migrations/049_creative_automation_alert_log.js";
 import { hasColumn } from "./migrations/columnHelpers.js";
 
-const schemaVersion = 48;
+const schemaVersion = 49;
 const aiTimelineEventsMigrationName = "014_ai_timeline_events";
 const aiTimelineEventImportanceMigrationName = "015_ai_timeline_event_importance";
 const aiTimelineReliabilityWorkspaceMigrationName = "016_ai_timeline_reliability_workspace";
@@ -970,6 +971,12 @@ export function runMigrations(db: SqliteDatabase): void {
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(
       creativeAccountFitAutomationMigration.version,
       creativeAccountFitAutomationMigration.name
+    );
+
+    creativeAutomationAlertLogMigration.apply(db);
+    db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(
+      creativeAutomationAlertLogMigration.version,
+      creativeAutomationAlertLogMigration.name
     );
 
     db.pragma(`user_version = ${schemaVersion}`);

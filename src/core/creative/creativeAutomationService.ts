@@ -477,32 +477,44 @@ export class CreativeAutomationService {
   }
 
   /**
-   * 每次告警先落库拿到唯一 ID 再发信；邮件主题携带 [HN-ID]，排查时凭 ID 查
-   * creative_automation_alerts 即可拿到当时的失败任务快照。落库失败不阻断发信。
+   * 每次告警先落库拿到唯一 ID 再发信；邮件主题与正文首行都携带 [HN-ID]，
+   * 正文分字段（ID/类型/详情/现场/排查），凭 ID 查 creative_automation_alerts
+   * 可还原告警时刻的失败任务快照。落库失败不阻断发信。
    */
   private async sendAlert(failureKind: AlertKind, subject: string, detail: string, options: { recovery?: boolean; context?: unknown } = {}): Promise<void> {
-    let alertTag = "";
+    let alertId = 0;
     let referencedFailure = "";
+    let snapshotLines = "";
     try {
       const result = this.db.prepare(`INSERT INTO creative_automation_alerts(failure_kind, subject, detail, context_json, is_recovery)
         VALUES (?, ?, ?, ?, ?)`).run(failureKind, subject, detail, options.context ? JSON.stringify(options.context) : null, options.recovery ? 1 : 0);
-      const alertId = Number(result.lastInsertRowid);
-      alertTag = ` [HN-${alertId}]`;
+      alertId = Number(result.lastInsertRowid);
       // 恢复类告警在正文引用其对应的最近一次故障告警，形成排查闭环
       if (options.recovery) {
         const failure = this.db.prepare(`SELECT id FROM creative_automation_alerts WHERE failure_kind = ? AND is_recovery = 0 ORDER BY id DESC LIMIT 1`).get(failureKind) as { id: number } | undefined;
-        if (failure) referencedFailure = `<p>关联故障告警：HN-${failure.id}</p>`;
+        if (failure) referencedFailure = `<p><b>关联故障告警</b>：HN-${failure.id}</p>`;
       }
+      // 现场快照摘要在正文直接展示前 3 条失败任务的原因，不用查库就能初判
+      const jobs = Array.isArray(options.context) ? options.context as Array<{ job_type?: string; source_item_id?: number; last_error?: string }> : [];
+      snapshotLines = jobs.slice(0, 3).map((job) => `<li>${escapeHtml(String(job.job_type ?? ""))} #${escapeHtml(String(job.source_item_id ?? ""))}：${escapeHtml(String(job.last_error ?? ""))}</li>`).join("");
+      if (snapshotLines) snapshotLines = `<p><b>现场快照</b>（当时失败/重试任务）：</p><ul>${snapshotLines}</ul>`;
     } catch (error) {
       this.logger?.error(error, "creative automation alert log failed");
     }
     if (!this.config) return;
     try {
+      const kindLabel = failureKind === "evaluate" ? "账号适配评估" : failureKind === "write" ? "自动写作" : "自动队列";
       await sendEmailMessage(this.config, {
         from: this.config.smtp.user,
         to: this.config.smtp.to,
-        subject: `HotNow 告警：${subject}${alertTag}`,
-        html: `<p>${escapeHtml(detail)}</p>${referencedFailure}<p>请在 HotNow 素材库或监控页检查任务状态。</p>`,
+        subject: `HotNow 告警：${subject}${alertId ? ` [HN-${alertId}]` : ""}`,
+        html: `<p><b>告警ID</b>：${alertId ? `HN-${alertId}` : "未落库"}</p>`
+          + `<p><b>类型</b>：${kindLabel}${options.recovery ? "（恢复）" : ""}</p>`
+          + `<p><b>详情</b>：${escapeHtml(detail)}</p>`
+          + referencedFailure
+          + snapshotLines
+          + (alertId ? `<p><b>排查</b>：sqlite3 /srv/hot-now/shared/data/hot-now.sqlite "SELECT * FROM creative_automation_alerts WHERE id = ${alertId}"</p>` : "")
+          + `<p>请在 HotNow 素材库或监控页检查任务状态。</p>`,
       });
     } catch (error) {
       this.logger?.error(error, "creative automation alert email failed");

@@ -243,6 +243,8 @@ describe("CreativeAutomationService", () => {
       expect.arrayContaining([expect.objectContaining({ last_error: "LLM调用失败: 测试失败原因" })]),
     );
     expect(sentEmails[0].subject).toBe("HotNow 告警：账号适配评估连续失败 [HN-1]");
+    expect(sentEmails[0].html).toContain("<b>告警ID</b>：HN-1");
+    expect(sentEmails[0].html).toContain("LLM调用失败: 测试失败原因");
 
     // 恢复告警：另行落库标记 is_recovery，正文引用故障 HN-1
     handle.db.prepare(`UPDATE creative_automation_alert_state
@@ -254,7 +256,7 @@ describe("CreativeAutomationService", () => {
     const recovery = handle.db.prepare("SELECT is_recovery FROM creative_automation_alerts WHERE id = 2").get() as { is_recovery: number };
     expect(recovery.is_recovery).toBe(1);
     expect(sentEmails[1].subject).toBe("HotNow 告警：账号适配评估已恢复 [HN-2]");
-    expect(sentEmails[1].html).toContain("关联故障告警：HN-1");
+    expect(sentEmails[1].html).toContain("<b>关联故障告警</b>：HN-1");
   });
 
   it("Hermes 回写 error 时保留真实技术失败原因", async () => {

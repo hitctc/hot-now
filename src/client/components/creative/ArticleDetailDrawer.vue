@@ -194,6 +194,7 @@ import ArticleSupplementalSections from "./article-detail/ArticleSupplementalSec
 import { useArticleEditorViewport } from "./article-detail/useArticleEditorViewport.js";
 import { useArticleAutosave } from "./article-detail/useArticleAutosave.js";
 import { useArticleImageWorkflow } from "./article-detail/useArticleImageWorkflow.js";
+import { useArticlePlanningActions, type PreviewThemeKey } from "./article-detail/useArticlePlanningActions.js";
 import ArticleImageWorkflowSections from "./article-detail/ArticleImageWorkflowSections.vue";
 import ArticleShortImagePromptSection from "./article-detail/ArticleShortImagePromptSection.vue";
 import ArticleDetailFooter from "./article-detail/ArticleDetailFooter.vue";
@@ -209,18 +210,12 @@ import {
   restoreFinishedArticle,
   generateComments,
   generateAuthorExtensions,
-  regenTitle,
-  regenIntro,
   type CreativeFinishedArticle,
   type WechatThemeId,
 } from "../../services/creativeApi.js";
 import { renderWechatThemePreview } from "../../services/wechatRenderer.js";
 import { formatRelativeTime, parseJsonArray } from "./article-detail/articleDetailPresentation.js";
-import {
-  buildArticleTitleSync,
-  readFirstH1,
-  replaceFirstH1 as replaceH1,
-} from "./article-detail/articleTitleSync.js";
+import { readFirstH1 } from "./article-detail/articleTitleSync.js";
 
 const props = defineProps<{
   open: boolean;
@@ -229,7 +224,6 @@ const props = defineProps<{
 }>();
 
 const isManualArticle = computed(() => props.article?.originType === "manual");
-const manualTitle = ref("");
 
 const emit = defineEmits<{
   "update:open": [value: boolean];
@@ -241,8 +235,6 @@ const emit = defineEmits<{
 // 深层文章对象修改不会触发响应式，图片和保存组合式逻辑通过这个计数器通知发布条件重新计算。
 const articleChangeTick = ref(0);
 function tickArticleChange(): void { articleChangeTick.value++; }
-
-type PreviewThemeKey = "classic" | "live" | "bauhaus" | "sunsetFilm" | "receipt" | "blackGold";
 
 const previewThemeOptions: { key: PreviewThemeKey; label: string }[] = [
   { key: "classic", label: "默认" },
@@ -396,322 +388,44 @@ const savedAtLabel = computed(() => {
   return `保存成功 · ${formatRelativeTime(lastSavedAt.value)}`;
 });
 
-// ─── 标题选择 & 重新生成 ───
-
-const regenTitleLoading = ref(false);
-const activeTitleIndex = ref(0);
-const localTitles = ref<string[]>([]);
-// 备选标题原地编辑态：editingTitleIdx 为正在编辑的下标，null 表示无
-const editingTitleIdx = ref<number | null>(null);
-const editingTitleValue = ref("");
-
-const displayTitles = computed(() => {
-  return localTitles.value.length > 0 ? localTitles.value : parseJsonArray(props.article?.titles ?? null);
+const {
+  manualTitle,
+  regenTitleLoading,
+  activeTitleIndex,
+  localTitles,
+  editingTitleIdx,
+  editingTitleValue,
+  displayTitles,
+  titleCandidateAt,
+  handleRegenTitle,
+  buildTitleSync,
+  applyTitleSync,
+  saveManualTitle,
+  selectTitle,
+  startEditTitle,
+  cancelEditTitle,
+  saveTitleEdit,
+  regenIntroLoading,
+  activeIntroIndex,
+  localIntros,
+  displayIntros,
+  displaySummaries,
+  handleRegenIntro,
+  selectIntro,
+} = useArticlePlanningActions({
+  getArticle: () => props.article,
+  isManualArticle,
+  editContent,
+  humanContent,
+  activePreviewTheme,
+  themeIdMap,
+  prepareExplicitContentSave,
+  getLastSavedContent: () => lastSavedContent,
+  setLastSavedContent: (content) => { lastSavedContent = content; },
+  getLastSavedHuman: () => lastSavedHuman,
+  setLastSavedHuman: (content) => { lastSavedHuman = content; },
+  onSaved: () => emit("saved"),
 });
-
-/** 按标题索引读取 v2 元数据；旧文章没有候选元数据时返回空。 */
-function titleCandidateAt(idx: number) {
-  return props.article?.titleCandidates?.[idx] ?? null;
-}
-
-async function handleRegenTitle(): Promise<void> {
-  if (!props.article || regenTitleLoading.value) return;
-  regenTitleLoading.value = true;
-  try {
-    const result = await regenTitle(props.article.id);
-    if (result.ok && result.titles) {
-      localTitles.value = result.titles;
-      activeTitleIndex.value = 0;
-      props.article.titles = JSON.stringify(result.titles);
-      props.article.titleIndex = 0;
-      props.article.titleCandidates = result.titleCandidates ?? null;
-      props.article.titleSelectionConfirmed = false;
-
-      message.success("分组标题已生成，请选择发布标题");
-    } else {
-      message.error(result.reason ?? "标题生成失败");
-    }
-  } catch {
-    message.error("标题生成请求失败");
-  } finally {
-    regenTitleLoading.value = false;
-  }
-}
-
-/** 将当前抽屉状态交给纯标题同步函数，保存行为保持在组件内。 */
-function buildTitleSync(content: string) {
-  return buildArticleTitleSync({
-    isManualArticle: isManualArticle.value,
-    titles: displayTitles.value,
-    activeTitleIndex: activeTitleIndex.value,
-    humanMarkdown: content,
-    contentMarkdown: editContent.value,
-  });
-}
-
-/** 请求成功后再更新本地标题和正文快照，失败时保留未保存状态供自动重试。 */
-function applyTitleSync(result: ReturnType<typeof buildTitleSync>): void {
-  if (!props.article) return;
-  humanContent.value = result.humanMarkdown;
-  props.article.humanMarkdown = result.humanMarkdown;
-  if (result.title) {
-    localTitles.value = result.titles;
-    props.article.titles = JSON.stringify(result.titles);
-    manualTitle.value = result.title;
-  }
-  if (result.contentMarkdown !== undefined) {
-    editContent.value = result.contentMarkdown;
-    props.article.contentMarkdown = result.contentMarkdown;
-    lastSavedContent = result.contentMarkdown;
-  }
-}
-
-/** 手动稿标题保存后同步左右两栏 H1；只有显式标题操作允许改写编辑器内容。 */
-async function saveManualTitle(): Promise<void> {
-  if (!props.article || !isManualArticle.value) return;
-  await prepareExplicitContentSave();
-  if (!props.article || !isManualArticle.value) return;
-  const title = manualTitle.value.trim();
-  if (!title) {
-    message.warning("标题不能为空");
-    manualTitle.value = displayTitles.value[0] ?? "";
-    return;
-  }
-  const contentMarkdown = replaceH1(editContent.value, title);
-  const humanMarkdown = replaceH1(humanContent.value, title);
-  const titles = [title];
-  try {
-    await editFinishedArticle(props.article.id, { titles, contentMarkdown, humanMarkdown });
-    localTitles.value = titles;
-    props.article.titles = JSON.stringify(titles);
-    props.article.contentMarkdown = contentMarkdown;
-    props.article.humanMarkdown = humanMarkdown;
-    editContent.value = contentMarkdown;
-    humanContent.value = humanMarkdown;
-    lastSavedContent = contentMarkdown;
-    lastSavedHuman = humanMarkdown;
-    emit("saved");
-  } catch {
-    message.error("标题保存失败");
-  }
-}
-
-// 选择发布标题：替换 markdown 中的 H1，并显式记录人工确认。
-async function selectTitle(idx: number): Promise<void> {
-  if (!props.article || (idx === activeTitleIndex.value && props.article.titleSelectionConfirmed)) return;
-  await prepareExplicitContentSave();
-  if (!props.article || (idx === activeTitleIndex.value && props.article.titleSelectionConfirmed)) return;
-  const newTitle = displayTitles.value[idx];
-
-  // 同步替换 AI 草稿和人工转写（发布内容）的 H1，只动 # 标题行不 replaceAll 正文
-  const content = replaceH1(editContent.value, newTitle);
-  const humanMd = replaceH1(humanContent.value, newTitle);
-
-  activeTitleIndex.value = idx;
-  editContent.value = content;
-  humanContent.value = humanMd;
-  lastSavedHuman = humanMd;
-
-  try {
-    const saveFields: Record<string, unknown> = {
-      titleIndex: idx,
-      titleSelectionConfirmed: true,
-      contentMarkdown: content,
-      humanMarkdown: humanMd,
-    };
-
-    if (activePreviewTheme.value !== "live" && humanMd) {
-      const themeId = themeIdMap[activePreviewTheme.value];
-      const html = renderWechatThemePreview(humanMd, themeId);
-      props.article.wechatHtml = html;
-      saveFields.wechatHtml = html;
-    }
-
-    await editFinishedArticle(props.article.id, saveFields);
-    props.article.titleIndex = idx;
-    props.article.titleSelectionConfirmed = true;
-    props.article.contentMarkdown = content;
-    props.article.humanMarkdown = humanMd;
-    lastSavedContent = content;
-
-    emit("saved");
-  } catch { /* 静默失败，本地状态已更新 */ }
-}
-
-// 进入备选标题原地编辑：先把 displayTitles 整体固化进 localTitles（避免只改一项丢其他），再聚焦输入框
-function startEditTitle(idx: number): void {
-  if (localTitles.value.length === 0) {
-    localTitles.value = [...displayTitles.value];
-  }
-  editingTitleIdx.value = idx;
-  editingTitleValue.value = localTitles.value[idx] ?? "";
-}
-
-function cancelEditTitle(): void {
-  editingTitleIdx.value = null;
-  editingTitleValue.value = "";
-}
-
-// 保存编辑：更新标题数组；若改的是发布标题，同步替换正文 H1 + 重渲主题预览
-async function saveTitleEdit(idx: number): Promise<void> {
-  // 已保存或已取消则跳过，防 enter 触发后又 blur 重复保存
-  if (editingTitleIdx.value !== idx) return;
-  const newTitle = editingTitleValue.value.trim();
-  const titles = localTitles.value;
-  const oldTitle = titles[idx] ?? "";
-  if (!props.article || !newTitle || newTitle === oldTitle) {
-    cancelEditTitle();
-    return;
-  }
-  await prepareExplicitContentSave();
-  cancelEditTitle();
-  if (!props.article) return;
-
-  titles[idx] = newTitle;
-  props.article.titles = JSON.stringify(titles);
-
-  const saveFields: Record<string, unknown> = { titles };
-
-  // 发布标题：同步 AI 草稿和人工转写（发布内容）的 H1 + 主题预览
-  if (idx === activeTitleIndex.value) {
-    const content = replaceH1(editContent.value, newTitle);
-    const humanMd = replaceH1(humanContent.value, newTitle);
-    editContent.value = content;
-    humanContent.value = humanMd;
-    props.article.contentMarkdown = content;
-    props.article.humanMarkdown = humanMd;
-    lastSavedContent = content;
-    lastSavedHuman = humanMd;
-    saveFields.contentMarkdown = content;
-    saveFields.humanMarkdown = humanMd;
-
-    if (activePreviewTheme.value !== "live" && humanMd) {
-      const themeId = themeIdMap[activePreviewTheme.value];
-      const html = renderWechatThemePreview(humanMd, themeId);
-      props.article.wechatHtml = html;
-      saveFields.wechatHtml = html;
-    }
-  }
-
-  try {
-    await editFinishedArticle(props.article.id, saveFields);
-    emit("saved");
-  } catch { /* 静默失败，本地已更新 */ }
-}
-
-// ─── 导语选择 & 重新生成 ───
-
-const regenIntroLoading = ref(false);
-const activeIntroIndex = ref(0);
-const localIntros = ref<string[]>([]);
-
-const displayIntros = computed(() => {
-  return localIntros.value.length > 0 ? localIntros.value : (props.article?.intros ?? []);
-});
-
-const displaySummaries = computed(() => {
-  return props.article?.summary100 ?? [];
-});
-
-async function handleRegenIntro(): Promise<void> {
-  if (!props.article || regenIntroLoading.value) return;
-  regenIntroLoading.value = true;
-  try {
-    const result = await regenIntro(props.article.id);
-    if (result.ok && result.intros) {
-      localIntros.value = result.intros;
-      activeIntroIndex.value = 0;
-      props.article.intros = result.intros;
-      props.article.introIndex = 0;
-
-      // 联动：替换 markdown 中的 blockquote，渲染并保存 wechatHtml
-      const newIntro = result.intros[0] ?? "";
-      let md = editContent.value;
-      const bqMatch = md.match(/\n\n(> [^\n]+(?:\n> [^\n]+)*)\n\n/);
-      if (bqMatch) {
-        md = md.replace(bqMatch[1], `> ${newIntro}`);
-      }
-      editContent.value = md;
-      props.article.contentMarkdown = md;
-      lastSavedContent = md;
-
-      const saveFields: Record<string, unknown> = {
-        intros: result.intros,
-        introIndex: 0,
-        contentMarkdown: md,
-      };
-      if (activePreviewTheme.value !== "live" && md) {
-        const html = renderWechatThemePreview(md, themeIdMap[activePreviewTheme.value]);
-        props.article.wechatHtml = html;
-        saveFields.wechatHtml = html;
-      }
-      editFinishedArticle(props.article.id, saveFields).catch(() => {});
-
-      message.success("新导语已生成");
-    } else {
-      message.error(result.reason ?? "导语生成失败");
-    }
-  } catch {
-    message.error("导语生成请求失败");
-  } finally {
-    regenIntroLoading.value = false;
-  }
-}
-
-async function selectIntro(idx: number): Promise<void> {
-  if (!props.article || idx === activeIntroIndex.value) return;
-
-  const intros = displayIntros.value;
-  const selectedIntro = intros[idx];
-
-  // 在 markdown 中替换/插入导语 blockquote
-  let content = editContent.value;
-
-  // 查找已有 blockquote（> 开头的连续段落，通常在标题之后、### 之前）
-  const existingBqMatch = content.match(/\n\n(> [^\n]+(?:\n> [^\n]+)*)\n\n/);
-  if (existingBqMatch) {
-    content = content.replace(existingBqMatch[1], `> ${selectedIntro}`);
-  } else {
-    // 没有已有 blockquote，在 H1 标题后或封面图后插入
-    const h1Match = /^(#[^\n]+)\n/.exec(content);
-    if (h1Match) {
-      content = content.replace(h1Match[0], `${h1Match[1]}\n\n> ${selectedIntro}\n\n`);
-    } else {
-      // 没有标题，在封面图后插入（封面图是 ![...](...) 格式）
-      const coverMatch = /^!\[[^\]]*\]\([^)]+\)\n*/.exec(content);
-      if (coverMatch) {
-        content = content.slice(coverMatch[0].length);
-        content = `${coverMatch[0]}\n> ${selectedIntro}\n\n${content}`;
-      } else {
-        content = `> ${selectedIntro}\n\n${content}`;
-      }
-    }
-  }
-
-  activeIntroIndex.value = idx;
-  editContent.value = content;
-
-  try {
-    const saveFields: Record<string, unknown> = {
-      introIndex: idx,
-      contentMarkdown: content,
-    };
-
-    if (activePreviewTheme.value !== "live" && content) {
-      const themeId = themeIdMap[activePreviewTheme.value];
-      const html = renderWechatThemePreview(content, themeId);
-      props.article.wechatHtml = html;
-      saveFields.wechatHtml = html;
-    }
-
-    await editFinishedArticle(props.article.id, saveFields);
-    props.article.introIndex = idx;
-    props.article.contentMarkdown = content;
-    lastSavedContent = content;
-
-    emit("saved");
-  } catch { /* 静默失败，本地状态已更新 */ }
-}
 
 // 审核弹窗
 const reviewModalVisible = ref(false);
@@ -1150,298 +864,4 @@ onBeforeUnmount(() => {
 });
 </script>
 
-<style>
-/* 弹窗打开时禁止蒙层滚动 */
-.article-detail-modal {
-  overflow: hidden !important;
-}
-
-/* 专注模式：编辑区持续聚焦时渐隐弹窗 header/footer/其他 section 和正文标题栏，只凸显编辑器 */
-.article-detail-modal .ant-modal-header,
-.article-detail-modal .ant-modal-footer,
-.article-detail-modal .article-detail-content > section,
-.article-detail-modal .editor-section > *:not(.article-editor-wrapper) {
-  transition: opacity 0.8s ease;
-}
-.article-detail-modal--focus .ant-modal-header,
-.article-detail-modal--focus .ant-modal-footer,
-.article-detail-modal--focus .article-detail-content > section:not(.editor-section),
-.article-detail-modal--focus .editor-section > *:not(.article-editor-wrapper) {
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* 专注时把正文之外的区块移出布局，正文编辑器才能占用完整可视高度。 */
-.article-detail-content {
-  position: relative;
-}
-.article-detail-modal--focus .article-detail-content {
-  height: 100%;
-  gap: 0;
-}
-.article-detail-modal--focus .article-detail-content > section:not(.editor-section) {
-  position: absolute;
-  inset: 0;
-  max-height: 0;
-  overflow: hidden;
-  visibility: hidden;
-}
-
-/* 专注模式下隐藏正文标题栏，只保留三栏编辑器。 */
-.article-detail-modal .editor-section {
-  position: relative;
-}
-.article-detail-modal--focus .editor-section {
-  height: 100%;
-}
-.article-detail-modal--focus [data-editor-title] {
-  position: absolute;
-  inset: 0;
-  max-height: 0;
-  overflow: hidden;
-  visibility: hidden;
-}
-/* 专注模式：modal-content 强制纯白不透明，覆盖主题半透明白，确保整体纯白 */
-.article-detail-modal--focus .ant-modal-content {
-  background: #ffffff !important;
-}
-/* 专注模式：弹窗宽度和编辑器高度统一用 0.8s ease 扩展。 */
-.article-detail-modal .ant-modal {
-  transition:
-    width 0.8s ease,
-    max-width 0.8s ease,
-    height 0.8s ease,
-    max-height 0.8s ease;
-}
-.article-detail-modal--focus .ant-modal {
-  width: 100% !important;
-  max-width: 100% !important;
-  height: 100dvh;
-  max-height: 100dvh;
-  padding-bottom: 0;
-}
-/* 弹窗内容由 header/body/footer 三段组成，专注时 body 接管全部可用高度。 */
-.article-detail-modal .ant-modal-content {
-  max-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-.article-detail-modal--focus .ant-modal-content {
-  height: 100dvh;
-  max-height: 100dvh;
-}
-.article-detail-modal .ant-modal-header {
-  flex-shrink: 0;
-}
-.article-detail-modal .ant-modal-body {
-  background: #ffffff;
-  flex: 1;
-  overflow-y: auto;
-}
-.article-detail-modal--focus .ant-modal-header,
-.article-detail-modal--focus .ant-modal-footer {
-  min-height: 0;
-  max-height: 0;
-  margin: 0;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  overflow: hidden;
-  border: 0 !important;
-}
-.article-detail-modal--focus .ant-modal-body {
-  padding: 12px !important;
-  overflow: hidden !important;
-}
-.article-detail-modal--focus .article-editor-wrapper {
-  overflow: visible;
-}
-.article-detail-modal--focus .md-editor--3pane,
-.article-detail-modal--focus .md-editor--3pane:focus-within {
-  box-shadow:
-    0 0 0 1px rgba(139, 92, 246, 0.08),
-    0 4px 12px rgba(139, 92, 246, 0.16);
-}
-.article-detail-modal .ant-modal-footer {
-  flex-shrink: 0;
-  border-top: 1px solid #f0f0f0;
-  padding: 12px 24px;
-}
-
-/* ─── 移动端适配 ─── */
-@media (max-width: 768px) {
-  /* wrap 容器改为顶部对齐，覆盖 centered 的垂直居中 */
-  .article-detail-modal .ant-modal-wrap {
-    align-items: flex-start !important;
-    padding: 0 !important;
-  }
-  .article-detail-modal .ant-modal {
-    max-width: 100% !important;
-    width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    top: 0 !important;
-  }
-  .article-detail-modal--focus .ant-modal {
-    height: 100dvh;
-    max-height: 100dvh;
-  }
-  .article-detail-modal .ant-modal-content {
-    max-height: 100dvh;
-    border-radius: 0;
-  }
-  .article-detail-modal--focus .ant-modal-content {
-    height: 100dvh;
-    max-height: 100dvh;
-  }
-  .article-detail-modal .ant-modal-body {
-    padding: 12px !important;
-  }
-  .article-detail-modal .ant-modal-header {
-    padding: 12px 16px !important;
-  }
-  .article-detail-modal .ant-modal-footer {
-    padding: 8px 12px !important;
-  }
-  .article-detail-footer {
-    display: flex;
-    flex-wrap: nowrap !important;
-    overflow-x: auto;
-    gap: 8px !important;
-  }
-  .article-detail-footer__divider {
-    display: none;
-  }
-  .article-detail-footer__group {
-    flex-wrap: nowrap !important;
-    flex-shrink: 0;
-    gap: 4px;
-  }
-  .article-detail-footer .ant-btn {
-    font-size: 12px !important;
-    padding: 0 8px !important;
-    height: 28px !important;
-  }
-  .article-editor-wrapper {
-    min-height: 500px;
-  }
-  /* 全屏编辑器工具栏：移动端紧凑布局 */
-  .fullscreen-toolbar {
-    overflow: visible;
-  }
-  .fullscreen-toolbar .ant-btn {
-    font-size: 11px !important;
-    padding: 0 6px !important;
-    height: 24px !important;
-    line-height: 24px !important;
-  }
-}
-
-.article-detail-footer {
-  display: flex;
-  align-items: center;
-  gap: 0;
-}
-.article-detail-footer__group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.article-detail-footer__divider {
-  width: 1px;
-  height: 20px;
-  background: #e5e7eb;
-  margin: 0 12px;
-  flex-shrink: 0;
-}
-
-/* 第一组：编辑操作 — 蓝色线框 */
-.footer-group--edit .ant-btn:not(:disabled) {
-  color: #1677ff;
-  border-color: #1677ff;
-}
-.footer-group--edit .ant-btn:not(:disabled):hover {
-  color: #4096ff;
-  border-color: #4096ff;
-}
-
-/* 第二组：内容生成 — 紫色线框 */
-.footer-group--generate .ant-btn:not(:disabled) {
-  color: #722ed1;
-  border-color: #722ed1;
-}
-.footer-group--generate .ant-btn:not(:disabled):hover {
-  color: #9254de;
-  border-color: #9254de;
-}
-
-/* 第三组：弹窗确认 — 绿色线框 */
-.footer-group--flow .ant-btn:not(:disabled) {
-  color: #389e0d;
-  border-color: #389e0d;
-}
-.footer-group--flow .ant-btn:not(:disabled):hover {
-  color: #52c41a;
-  border-color: #52c41a;
-}
-
-/* 编辑器/预览区由 JS 动态设置高度；高度过渡与专注模式宽度保持同速。 */
-.article-editor-wrapper {
-  min-height: 200px;
-  overflow: hidden;
-  transition: height 0.8s ease;
-}
-
-.article-markdown-body {
-  font-size: 14px;
-  line-height: 1.75;
-  color: #374151;
-}
-.article-markdown-body h1,
-.article-markdown-body h2,
-.article-markdown-body h3,
-.article-markdown-body h4 {
-  margin: 1em 0 0.5em;
-  font-weight: 600;
-  color: #111827;
-}
-.article-markdown-body h1 { font-size: 1.25em; }
-.article-markdown-body h2 { font-size: 1.15em; }
-.article-markdown-body h3 { font-size: 1.05em; }
-.article-markdown-body p { margin: 0.5em 0; }
-.article-markdown-body ul,
-.article-markdown-body ol {
-  margin: 0.5em 0;
-  padding-left: 1.5em;
-}
-.article-markdown-body li { margin: 0.25em 0; }
-.article-markdown-body blockquote {
-  margin: 0.75em 0;
-  padding: 0.5em 1em;
-  border-left: 3px solid #d1d5db;
-  color: #6b7280;
-  background: #f9fafb;
-  border-radius: 0 4px 4px 0;
-}
-.article-markdown-body img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 6px;
-  margin: 0.75em 0;
-}
-.article-markdown-body a {
-  color: #caa9fa;
-  text-decoration: underline;
-}
-.article-markdown-body strong { font-weight: 600; }
-.article-markdown-body code {
-  background: #f3f4f6;
-  padding: 0.15em 0.35em;
-  border-radius: 3px;
-  font-size: 0.9em;
-}
-.article-markdown-body hr {
-  border: none;
-  border-top: 1px solid #e5e7eb;
-  margin: 1em 0;
-}
-</style>
+<style src="./article-detail/articleDetailDrawer.css"></style>

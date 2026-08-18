@@ -191,7 +191,8 @@ describe("loadEnabledSourceIssues", () => {
           sourceName: "Custom Feed",
           externalId: "custom-1",
           publishedAt: "2026-04-08T02:00:00.000Z",
-          summary: "来自自定义 RSS 来源。"
+          summary: "来自自定义 RSS 来源。",
+          contentHtml: "<p>来自自定义 RSS 来源。</p>"
         }
       ]
     });

@@ -32,7 +32,8 @@ describe("parseArticleFeed", () => {
         sourceName: "OpenAI",
         externalId: "openai-gpt-next",
         publishedAt: "2026-03-27T18:00:00.000Z",
-        summary: "Our latest model improves reasoning and instruction following."
+        summary: "Our latest model improves reasoning and instruction following.",
+        contentHtml: "Our latest model improves reasoning and instruction following."
       },
       {
         rank: 2,
@@ -42,7 +43,8 @@ describe("parseArticleFeed", () => {
         sourceName: "OpenAI",
         externalId: "openai-responses-api",
         publishedAt: "2026-03-26T16:30:00.000Z",
-        summary: "New tools make agentic workflows easier to build."
+        summary: "New tools make agentic workflows easier to build.",
+        contentHtml: "New tools make agentic workflows easier to build."
       }
     ]);
   });
@@ -101,7 +103,8 @@ describe("parseArticleFeed", () => {
           sourceName: "IT之家",
           externalId: "ithome-ai-chip",
           publishedAt: "2026-03-29T02:30:00.000Z",
-          summary: "新产品面向边缘推理场景。"
+          summary: "新产品面向边缘推理场景。",
+          contentHtml: "<p>新产品面向边缘推理场景。</p>"
         }
       ]
     });
@@ -272,7 +275,8 @@ describe("loadActiveSourceIssue", () => {
           sourceName: "Mystery Feed",
           externalId: "mystery-1",
           publishedAt: "2026-04-08T05:00:00.000Z",
-          summary: "自定义来源内容。"
+          summary: "自定义来源内容。",
+          contentHtml: "<p>自定义来源内容。</p>"
         }
       ]
     });

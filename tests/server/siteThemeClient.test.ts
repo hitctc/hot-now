@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 import { JSDOM } from "jsdom";
 import { describe, expect, it, vi } from "vitest";
 
-const siteScript = readFileSync(new URL("../../src/server/public/site.js", import.meta.url), "utf8");
+const siteScript = ["site.js", "site.actions.fragment.js", "site.shell.fragment.js"]
+  .map((name) => readFileSync(new URL(`../../src/server/public/${name}`, import.meta.url), "utf8"))
+  .join("");
 
 describe("site theme runtime", () => {
   it("falls back to light theme when localStorage has no saved preference", () => {

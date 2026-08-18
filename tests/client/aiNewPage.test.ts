@@ -213,7 +213,7 @@ describe("AiNewPage", () => {
       searchKeyword: ""
     });
     expect(wrapper.get("[data-content-page='ai-new']").classes()).toEqual(
-      expect.arrayContaining(["flex", "flex-col", "gap-8"])
+      expect.arrayContaining(["flex", "flex-col", "gap-6"])
     );
     expect(wrapper.find("[data-content-filter-shell]").exists()).toBe(false);
     expect(wrapper.find("[data-content-stage='ai-new']").exists()).toBe(true);

@@ -1,4 +1,4 @@
-import Fastify, { LogController, type FastifyReply, type FastifyRequest } from "fastify";
+import Fastify, { LogController } from "fastify";
 import {
   installPerformanceMonitoring,
   resolveSlowRequestThreshold
@@ -18,21 +18,35 @@ import { registerWechatRssRoutes } from "./routes/wechatRssRoutes.js";
 import { registerContentFeedbackRoutes } from "./routes/contentFeedbackRoutes.js";
 import { registerSitePageRoutes, readSettingsAiTimelineAdminApiData } from "./routes/sitePageRoutes.js";
 import { registerAiTimelineRoutes } from "./routes/aiTimelineRoutes.js";
+import {
+  ensureManualActionAuthorized,
+  ensureStateActionAuthorized,
+  readAuthenticatedSession,
+  readSettingsApiSession,
+  validateCreativeApiToken,
+} from "./createServerSession.js";
+import {
+  readSettingsProfileApiData,
+  readSettingsSourcesApiData,
+  readSettingsViewRulesApiData,
+} from "./createServerSettingsViewData.js";
+import {
+  handleManualBilibiliCollectAction,
+  handleManualCollectAction,
+  handleManualHackerNewsCollectAction,
+  handleManualJuyaCollectAction,
+  handleManualSendLatestEmailAction,
+  handleManualTwitterCollectAction,
+  handleManualTwitterKeywordCollectAction,
+  handleManualWeiboTrendingCollectAction,
+  handleManualWechatRssCollectAction,
+} from "./createServerManualCollectionActions.js";
 import type { AiTimelineFeedReadResult } from "../core/aiTimeline/aiTimelineFeedFile.js";
-import { LatestReportEmailError, type LatestReportEmailErrorReason } from "../core/pipeline/sendLatestReportEmail.js";
+import type { LatestReportEmailErrorReason } from "../core/pipeline/sendLatestReportEmail.js";
 import type { BuildContentPageModelOptions } from "../core/content/buildContentPageModel.js";
 import type { ContentViewSelectionOptions } from "../core/content/buildContentViewSelection.js";
 import type { ContentCardView, ContentViewKey } from "../core/content/listContentView.js";
-import {
-  aiTimelineEventTypes,
-  aiTimelineImportanceLevels,
-  aiTimelineReliabilityStatuses,
-  aiTimelineVisibilityStatuses,
-  type AiTimelineHealthOverview,
-  type AiTimelineListQuery,
-  type AiTimelinePageModel,
-  type AiTimelineSourceHealthRecord
-} from "../core/aiTimeline/aiTimelineTypes.js";
+import type { AiTimelineListQuery, AiTimelinePageModel } from "../core/aiTimeline/aiTimelineTypes.js";
 import type { SaveFeedbackPoolEntryInput, SaveFeedbackPoolEntryResult } from "../core/feedback/feedbackPoolRepository.js";
 import type {
   SaveProviderSettingsInput,
@@ -89,19 +103,7 @@ import type { WeiboTrendingRunState } from "../core/weibo/runWeiboTrendingCollec
 import type { RuntimeConfig } from "../core/types/appConfig.js";
 import type { SqliteDatabase } from "../core/db/openDatabase.js";
 import type { CreativeAutomationService } from "../core/creative/creativeAutomationService.js";
-import { readNextCollectionRunAt } from "../core/scheduler/readNextCollectionRunAt.js";
-import {
-  readSessionCookieToken,
-  readSessionToken,
-} from "../core/auth/session.js";
 import type {
-  BilibiliQuerySettingsView,
-  ProfileView,
-  SourcesSettingsView,
-  HackerNewsQuerySettingsView,
-  TwitterAccountSettingsView,
-  TwitterSearchKeywordSettingsView,
-  WeiboTrendingSettingsView,
   ViewRulesWorkbenchView
 } from "./renderSystemPages.js";
 
@@ -111,7 +113,7 @@ type ReportSummary = {
   degraded: boolean;
   mailStatus: string;
 };
-type SourceCard = {
+export type SourceCard = {
   kind: string;
   name: string;
   siteUrl: string;
@@ -749,489 +751,4 @@ export function createServer(deps: ServerDeps = {}) {
   });
 
   return app;
-}
-
-function readAuthenticatedSession(cookieHeader: string | undefined, sessionSecret: string) {
-  // Session parsing is centralized so every protected route shares one validation path.
-  const sessionToken = readSessionCookieToken(cookieHeader);
-
-  if (!sessionToken || !sessionSecret) {
-    return null;
-  }
-
-  return readSessionToken(sessionToken, sessionSecret);
-}
-
-function readSettingsApiSession(
-  request: FastifyRequest,
-  reply: FastifyReply,
-  authEnabled: boolean,
-  sessionSecret: string
-) {
-  // The read API mirrors the page-level auth rule, but API callers receive JSON 401 instead of a redirect.
-  const session = readAuthenticatedSession(request.headers.cookie, sessionSecret);
-
-  if (authEnabled && !session) {
-    reply.code(401).send({ ok: false, reason: "unauthorized" });
-    return undefined;
-  }
-
-  return session;
-}
-
-async function readSettingsViewRulesApiData(deps: ServerDeps): Promise<ViewRulesWorkbenchView> {
-  // The API reuses the exact workbench model the page renderer consumes so the Vue client does not need duplicate mapping.
-  const workbench = deps.getViewRulesWorkbenchData ? await deps.getViewRulesWorkbenchData() : null;
-
-  if (!workbench) {
-    return {
-      filterWorkbench: {
-        aiRule: {
-          ruleKey: "ai",
-          displayName: "AI 新讯筛选",
-          summary: "当前没有可读取的 AI 新讯筛选配置。",
-          toggles: {
-            enableTimeWindow: true,
-            enableSourceViewBonus: true,
-            enableAiKeywordWeight: true,
-            enableHeatKeywordWeight: true,
-            enableFreshnessWeight: true,
-            enableScoreRanking: true
-          },
-          weights: {
-            freshnessWeight: 0.1,
-            sourceWeight: 0.1,
-            completenessWeight: 0.15,
-            aiWeight: 0.5,
-            heatWeight: 0.15
-          }
-        },
-        hotRule: {
-          ruleKey: "hot",
-          displayName: "AI 热点筛选",
-          summary: "当前没有可读取的 AI 热点筛选配置。",
-          toggles: {
-            enableTimeWindow: false,
-            enableSourceViewBonus: true,
-            enableAiKeywordWeight: true,
-            enableHeatKeywordWeight: true,
-            enableFreshnessWeight: true,
-            enableScoreRanking: true
-          },
-          weights: {
-            freshnessWeight: 0.35,
-            sourceWeight: 0.1,
-            completenessWeight: 0.1,
-            aiWeight: 0.05,
-            heatWeight: 0.4
-          }
-        }
-      },
-      providerSettings: [],
-      providerCapability: {
-        hasMasterKey: false,
-        featureAvailable: false,
-        message: "当前没有可读取的反馈池数据。"
-      },
-      feedbackPool: []
-    };
-  }
-
-  return workbench;
-}
-
-async function readSettingsSourcesApiData(deps: ServerDeps): Promise<SourcesSettingsView> {
-  // Sources workbench uses独立来源统计，不再依赖内容页当前筛选上下文。
-  const sources = ((await deps.listSources?.()) ?? []) as SourceCard[];
-  const twitterAccounts = ((await deps.listTwitterAccounts?.()) ?? []) as TwitterAccountSettingsView[];
-  const twitterSearchKeywords = ((await deps.listTwitterSearchKeywords?.()) ?? []) as TwitterSearchKeywordSettingsView[];
-  const hackerNewsQueries = ((await deps.listHackerNewsQueries?.()) ?? []) as HackerNewsQuerySettingsView[];
-  const bilibiliQueries = ((await deps.listBilibiliQueries?.()) ?? []) as BilibiliQuerySettingsView[];
-  const wechatRssSources = ((await deps.listWechatRssSources?.()) ?? []) as WechatRssSourceRecord[];
-  const weiboTrending = (await deps.getWeiboTrendingState?.()) as WeiboTrendingSettingsView | undefined;
-  const operationSummary = deps.getSourcesOperationSummary
-    ? await deps.getSourcesOperationSummary()
-    : { lastCollectionRunAt: null, lastSendLatestEmailAt: null };
-  const nextCollectionRunAt = readNextCollectionRunAt(deps.config?.collectionSchedule);
-  const wechatResolverConfigured = Boolean(
-    deps.config?.wechatResolver?.baseUrl && deps.config?.wechatResolver?.token
-  );
-
-  return {
-    sources,
-    twitterAccounts,
-    twitterSearchKeywords,
-    hackerNewsQueries,
-    bilibiliQueries,
-    wechatRssSources,
-    weiboTrending,
-    operations: {
-      lastCollectionRunAt: operationSummary.lastCollectionRunAt,
-      lastSendLatestEmailAt: operationSummary.lastSendLatestEmailAt,
-      nextCollectionRunAt,
-      canTriggerManualCollect: typeof (deps.triggerManualCollect ?? deps.triggerManualRun) === "function",
-      canTriggerManualTwitterCollect: typeof deps.triggerManualTwitterCollect === "function",
-      canTriggerManualTwitterKeywordCollect: typeof deps.triggerManualTwitterKeywordCollect === "function",
-      canTriggerManualHackerNewsCollect: typeof deps.triggerManualHackerNewsCollect === "function",
-      canTriggerManualBilibiliCollect: typeof deps.triggerManualBilibiliCollect === "function",
-      canTriggerManualWechatRssCollect: typeof deps.triggerManualWechatRssCollect === "function",
-      canTriggerManualWeiboTrendingCollect: typeof deps.triggerManualWeiboTrendingCollect === "function",
-      canTriggerManualJuyaCollect: typeof deps.triggerManualJuyaCollect === "function",
-      canTriggerManualSendLatestEmail: typeof deps.triggerManualSendLatestEmail === "function",
-      isRunning: deps.isRunning?.() ?? false
-    },
-    capability: {
-      wechatArticleUrlEnabled: wechatResolverConfigured,
-      wechatArticleUrlMessage: wechatResolverConfigured
-        ? "公众号来源已开启，可直接填写公众号名称，或补一篇文章链接帮助系统更快定位来源。"
-        : "当前环境未启用公众号来源解析；RSS 仍可直接新增。",
-      twitterAccountCollectionEnabled: deps.hasTwitterApiKey === true,
-      twitterAccountCollectionMessage:
-        deps.hasTwitterApiKey === true
-          ? "Twitter 账号采集已配置 API key，可采集已启用账号。"
-          : "当前环境未配置 TWITTER_API_KEY；Twitter 账号可先维护，采集时会跳过。",
-      twitterKeywordSearchEnabled: deps.hasTwitterApiKey === true,
-      twitterKeywordSearchMessage:
-        deps.hasTwitterApiKey === true
-          ? "Twitter 关键词搜索已配置 API key，仅支持手动采集。"
-          : "当前环境未配置 TWITTER_API_KEY；Twitter 关键词可先维护，采集时会跳过。",
-      hackerNewsSearchEnabled: true,
-      hackerNewsSearchMessage: "Hacker News 搜索已就绪，可维护 query 并手动采集。",
-      bilibiliSearchEnabled: true,
-      bilibiliSearchMessage: "B 站搜索已就绪，可维护 query 并手动采集。",
-      wechatRssEnabled: true,
-      wechatRssMessage: "微信公众号 RSS 已就绪，可批量维护 RSS 链接并手动采集。",
-      weiboTrendingEnabled: true,
-      weiboTrendingMessage: "微博热搜榜匹配已就绪，固定 AI 关键词只进入 AI 热点。"
-    }
-  };
-}
-
-async function readSettingsProfileApiData(
-  deps: ServerDeps,
-  session: ReturnType<typeof readAuthenticatedSession> | null
-): Promise<ProfileView | null> {
-  // Profile uses the same single-user DB row as the page renderer, but strips HTML concerns out of the response.
-  const profile = deps.getCurrentUserProfile ? await deps.getCurrentUserProfile() : null;
-
-  if (!profile) {
-    return null;
-  }
-
-  return {
-    username: profile.username,
-    displayName: profile.displayName,
-    role: profile.role,
-    email: profile.email,
-    loggedIn: Boolean(session)
-  };
-}
-
-function ensureStateActionAuthorized(
-  request: FastifyRequest,
-  reply: FastifyReply,
-  authEnabled: boolean,
-  sessionSecret: string
-) {
-  // State-changing routes return hard 401 in auth mode, which keeps API-style actions script-friendly.
-  if (!authEnabled) {
-    return true;
-  }
-
-  const session = readAuthenticatedSession(request.headers.cookie, sessionSecret);
-
-  if (!session) {
-    void reply.code(401).send({ ok: false, reason: "unauthorized" });
-    return false;
-  }
-
-  return true;
-}
-
-function validateCreativeApiToken(
-  request: FastifyRequest,
-  reply: FastifyReply,
-  expectedToken: string | undefined
-): boolean {
-  if (!expectedToken) {
-    void reply.code(503).send({ ok: false, reason: "creative-api-token-not-configured" });
-    return false;
-  }
-  const token = request.headers["x-creative-token"];
-  if (token !== expectedToken) {
-    void reply.code(401).send({ ok: false, reason: "invalid-token" });
-    return false;
-  }
-  return true;
-}
-
-
-async function handleManualCollectAction(
-  request: FastifyRequest,
-  reply: FastifyReply,
-  authEnabled: boolean,
-  sessionSecret: string,
-  isRunning: boolean,
-  triggerManualCollect: ServerDeps["triggerManualCollect"] | ServerDeps["triggerManualRun"]
-) {
-  // Manual collection endpoints share the same auth, lock, and disabled semantics so the legacy alias stays behaviorally identical.
-  if (!ensureManualActionAuthorized(request, reply, authEnabled, sessionSecret)) {
-    return;
-  }
-
-  if (isRunning) {
-    return reply.code(409).send({ accepted: false, reason: "already-running" });
-  }
-
-  if (!triggerManualCollect) {
-    return reply.code(503).send({ accepted: false });
-  }
-
-  const result = await triggerManualCollect();
-  return reply.code(202).send(result);
-}
-
-async function handleManualTwitterCollectAction(
-  request: FastifyRequest,
-  reply: FastifyReply,
-  authEnabled: boolean,
-  sessionSecret: string,
-  isRunning: boolean,
-  triggerManualTwitterCollect: ServerDeps["triggerManualTwitterCollect"]
-) {
-  // Twitter 账号采集和常规采集共用一套权限与运行锁，但返回更细的账号采集结果摘要。
-  if (!ensureManualActionAuthorized(request, reply, authEnabled, sessionSecret)) {
-    return;
-  }
-
-  if (isRunning) {
-    return reply.code(409).send({ accepted: false, reason: "already-running" });
-  }
-
-  if (!triggerManualTwitterCollect) {
-    return reply.code(503).send({ accepted: false });
-  }
-
-  const result = await triggerManualTwitterCollect();
-  return reply.code(202).send(result);
-}
-
-async function handleManualTwitterKeywordCollectAction(
-  request: FastifyRequest,
-  reply: FastifyReply,
-  authEnabled: boolean,
-  sessionSecret: string,
-  isRunning: boolean,
-  triggerManualTwitterKeywordCollect: ServerDeps["triggerManualTwitterKeywordCollect"]
-) {
-  // Twitter 关键词搜索和账号采集共用锁与权限门，但单独返回关键词侧的命中统计。
-  if (!ensureManualActionAuthorized(request, reply, authEnabled, sessionSecret)) {
-    return;
-  }
-
-  if (isRunning) {
-    return reply.code(409).send({ accepted: false, reason: "already-running" });
-  }
-
-  if (!triggerManualTwitterKeywordCollect) {
-    return reply.code(503).send({ accepted: false });
-  }
-
-  const result = await triggerManualTwitterKeywordCollect();
-  return reply.code(202).send(result);
-}
-
-async function handleManualHackerNewsCollectAction(
-  request: FastifyRequest,
-  reply: FastifyReply,
-  authEnabled: boolean,
-  sessionSecret: string,
-  isRunning: boolean,
-  triggerManualHackerNewsCollect: ServerDeps["triggerManualHackerNewsCollect"]
-) {
-  // Hacker News 搜索沿用同一套手动动作权限和运行锁门禁，但单独返回 HN 侧结果摘要。
-  if (!ensureManualActionAuthorized(request, reply, authEnabled, sessionSecret)) {
-    return;
-  }
-
-  if (isRunning) {
-    return reply.code(409).send({ accepted: false, reason: "already-running" });
-  }
-
-  if (!triggerManualHackerNewsCollect) {
-    return reply.code(503).send({ accepted: false });
-  }
-
-  const result = await triggerManualHackerNewsCollect();
-  return reply.code(202).send(result);
-}
-
-async function handleManualBilibiliCollectAction(
-  request: FastifyRequest,
-  reply: FastifyReply,
-  authEnabled: boolean,
-  sessionSecret: string,
-  isRunning: boolean,
-  triggerManualBilibiliCollect: ServerDeps["triggerManualBilibiliCollect"]
-) {
-  // B 站搜索和 HN 一样只做手动触发，但返回的是视频搜索侧的单独统计。
-  if (!ensureManualActionAuthorized(request, reply, authEnabled, sessionSecret)) {
-    return;
-  }
-
-  if (isRunning) {
-    return reply.code(409).send({ accepted: false, reason: "already-running" });
-  }
-
-  if (!triggerManualBilibiliCollect) {
-    return reply.code(503).send({ accepted: false });
-  }
-
-  const result = await triggerManualBilibiliCollect();
-  return reply.code(202).send(result);
-}
-
-async function handleManualWechatRssCollectAction(
-  request: FastifyRequest,
-  reply: FastifyReply,
-  authEnabled: boolean,
-  sessionSecret: string,
-  isRunning: boolean,
-  triggerManualWechatRssCollect: ServerDeps["triggerManualWechatRssCollect"]
-) {
-  // 公众号 RSS 是独立来源表，手动入口只处理这组配置，不影响普通 RSS 的默认采集。
-  if (!ensureManualActionAuthorized(request, reply, authEnabled, sessionSecret)) {
-    return;
-  }
-
-  if (isRunning) {
-    return reply.code(409).send({ accepted: false, reason: "already-running" });
-  }
-
-  if (!triggerManualWechatRssCollect) {
-    return reply.code(503).send({ accepted: false });
-  }
-
-  const result = await triggerManualWechatRssCollect();
-  return reply.code(202).send(result);
-}
-
-async function handleManualWeiboTrendingCollectAction(
-  request: FastifyRequest,
-  reply: FastifyReply,
-  authEnabled: boolean,
-  sessionSecret: string,
-  isRunning: boolean,
-  triggerManualWeiboTrendingCollect: ServerDeps["triggerManualWeiboTrendingCollect"]
-) {
-  // 微博热搜榜匹配和其他手动采集保持同一套权限与运行锁，但只返回热点匹配侧摘要。
-  if (!ensureManualActionAuthorized(request, reply, authEnabled, sessionSecret)) {
-    return;
-  }
-
-  if (isRunning) {
-    return reply.code(409).send({ accepted: false, reason: "already-running" });
-  }
-
-  if (!triggerManualWeiboTrendingCollect) {
-    return reply.code(503).send({ accepted: false });
-  }
-
-  const result = await triggerManualWeiboTrendingCollect();
-  return reply.code(202).send(result);
-}
-
-// Juya RSS 独立采集：只抓 juya 一个源，独占锁，不生成日报，结果只回条目数。
-async function handleManualJuyaCollectAction(
-  request: FastifyRequest,
-  reply: FastifyReply,
-  authEnabled: boolean,
-  sessionSecret: string,
-  triggerManualJuyaCollect: ServerDeps["triggerManualJuyaCollect"]
-) {
-  if (!ensureManualActionAuthorized(request, reply, authEnabled, sessionSecret)) {
-    return;
-  }
-
-  if (!triggerManualJuyaCollect) {
-    return reply.code(503).send({ accepted: false });
-  }
-
-  const result = await triggerManualJuyaCollect();
-  return reply.code(202).send(result);
-}
-
-async function handleManualSendLatestEmailAction(
-  request: FastifyRequest,
-  reply: FastifyReply,
-  authEnabled: boolean,
-  sessionSecret: string,
-  isRunning: boolean,
-  triggerManualSendLatestEmail: ServerDeps["triggerManualSendLatestEmail"]
-) {
-  // Resend uses the same action gate as collection, but maps mail-specific pipeline errors to stable HTTP statuses.
-  if (!ensureManualActionAuthorized(request, reply, authEnabled, sessionSecret)) {
-    return;
-  }
-
-  if (isRunning) {
-    return reply.code(409).send({ accepted: false, reason: "already-running" });
-  }
-
-  if (!triggerManualSendLatestEmail) {
-    return reply.code(503).send({ accepted: false });
-  }
-
-  try {
-    const result = await triggerManualSendLatestEmail();
-
-    if (result.accepted) {
-      return reply.code(202).send(result);
-    }
-
-    return reply.code(mapLatestEmailReasonToStatus(result.reason)).send(result);
-  } catch (error) {
-    if (!(error instanceof LatestReportEmailError)) {
-      throw error;
-    }
-
-    return reply.code(mapLatestEmailReasonToStatus(error.reason)).send({
-      accepted: false,
-      reason: error.reason
-    });
-  }
-}
-
-function ensureManualActionAuthorized(
-  request: FastifyRequest,
-  reply: FastifyReply,
-  authEnabled: boolean,
-  sessionSecret: string
-) {
-  // Manual job actions return API-style unauthorized payloads instead of redirects so browser forms and scripts see the same contract.
-  if (!authEnabled) {
-    return true;
-  }
-
-  const session = readAuthenticatedSession(request.headers.cookie, sessionSecret);
-
-  if (!session) {
-    void reply.code(401).send({ accepted: false, reason: "unauthorized" });
-    return false;
-  }
-
-  return true;
-}
-
-function mapLatestEmailReasonToStatus(reason: LatestReportEmailErrorReason) {
-  // The resend endpoint exposes pipeline reason codes directly, so callers can distinguish missing reports from delivery failures.
-  if (reason === "not-found") {
-    return 404;
-  }
-
-  if (reason === "report-unavailable") {
-    return 503;
-  }
-
-  return 502;
 }

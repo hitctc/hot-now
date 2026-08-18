@@ -1,0 +1,293 @@
+/* 弹窗打开时禁止蒙层滚动 */
+.article-detail-modal {
+  overflow: hidden !important;
+}
+
+/* 专注模式：编辑区持续聚焦时渐隐弹窗 header/footer/其他 section 和正文标题栏，只凸显编辑器 */
+.article-detail-modal .ant-modal-header,
+.article-detail-modal .ant-modal-footer,
+.article-detail-modal .article-detail-content > section,
+.article-detail-modal .editor-section > *:not(.article-editor-wrapper) {
+  transition: opacity 0.8s ease;
+}
+.article-detail-modal--focus .ant-modal-header,
+.article-detail-modal--focus .ant-modal-footer,
+.article-detail-modal--focus .article-detail-content > section:not(.editor-section),
+.article-detail-modal--focus .editor-section > *:not(.article-editor-wrapper) {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 专注时把正文之外的区块移出布局，正文编辑器才能占用完整可视高度。 */
+.article-detail-content {
+  position: relative;
+}
+.article-detail-modal--focus .article-detail-content {
+  height: 100%;
+  gap: 0;
+}
+.article-detail-modal--focus .article-detail-content > section:not(.editor-section) {
+  position: absolute;
+  inset: 0;
+  max-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+
+/* 专注模式下隐藏正文标题栏，只保留三栏编辑器。 */
+.article-detail-modal .editor-section {
+  position: relative;
+}
+.article-detail-modal--focus .editor-section {
+  height: 100%;
+}
+.article-detail-modal--focus [data-editor-title] {
+  position: absolute;
+  inset: 0;
+  max-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+/* 专注模式：modal-content 强制纯白不透明，覆盖主题半透明白，确保整体纯白 */
+.article-detail-modal--focus .ant-modal-content {
+  background: #ffffff !important;
+}
+/* 专注模式：弹窗宽度和编辑器高度统一用 0.8s ease 扩展。 */
+.article-detail-modal .ant-modal {
+  transition:
+    width 0.8s ease,
+    max-width 0.8s ease,
+    height 0.8s ease,
+    max-height 0.8s ease;
+}
+.article-detail-modal--focus .ant-modal {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100dvh;
+  max-height: 100dvh;
+  padding-bottom: 0;
+}
+/* 弹窗内容由 header/body/footer 三段组成，专注时 body 接管全部可用高度。 */
+.article-detail-modal .ant-modal-content {
+  max-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.article-detail-modal--focus .ant-modal-content {
+  height: 100dvh;
+  max-height: 100dvh;
+}
+.article-detail-modal .ant-modal-header {
+  flex-shrink: 0;
+}
+.article-detail-modal .ant-modal-body {
+  background: #ffffff;
+  flex: 1;
+  overflow-y: auto;
+}
+.article-detail-modal--focus .ant-modal-header,
+.article-detail-modal--focus .ant-modal-footer {
+  min-height: 0;
+  max-height: 0;
+  margin: 0;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  overflow: hidden;
+  border: 0 !important;
+}
+.article-detail-modal--focus .ant-modal-body {
+  padding: 12px !important;
+  overflow: hidden !important;
+}
+.article-detail-modal--focus .article-editor-wrapper {
+  overflow: visible;
+}
+.article-detail-modal--focus .md-editor--3pane,
+.article-detail-modal--focus .md-editor--3pane:focus-within {
+  box-shadow:
+    0 0 0 1px rgba(139, 92, 246, 0.08),
+    0 4px 12px rgba(139, 92, 246, 0.16);
+}
+.article-detail-modal .ant-modal-footer {
+  flex-shrink: 0;
+  border-top: 1px solid #f0f0f0;
+  padding: 12px 24px;
+}
+
+/* ─── 移动端适配 ─── */
+@media (max-width: 768px) {
+  /* wrap 容器改为顶部对齐，覆盖 centered 的垂直居中 */
+  .article-detail-modal .ant-modal-wrap {
+    align-items: flex-start !important;
+    padding: 0 !important;
+  }
+  .article-detail-modal .ant-modal {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    top: 0 !important;
+  }
+  .article-detail-modal--focus .ant-modal {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+  .article-detail-modal .ant-modal-content {
+    max-height: 100dvh;
+    border-radius: 0;
+  }
+  .article-detail-modal--focus .ant-modal-content {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+  .article-detail-modal .ant-modal-body {
+    padding: 12px !important;
+  }
+  .article-detail-modal .ant-modal-header {
+    padding: 12px 16px !important;
+  }
+  .article-detail-modal .ant-modal-footer {
+    padding: 8px 12px !important;
+  }
+  .article-detail-footer {
+    display: flex;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    gap: 8px !important;
+  }
+  .article-detail-footer__divider {
+    display: none;
+  }
+  .article-detail-footer__group {
+    flex-wrap: nowrap !important;
+    flex-shrink: 0;
+    gap: 4px;
+  }
+  .article-detail-footer .ant-btn {
+    font-size: 12px !important;
+    padding: 0 8px !important;
+    height: 28px !important;
+  }
+  .article-editor-wrapper {
+    min-height: 500px;
+  }
+  /* 全屏编辑器工具栏：移动端紧凑布局 */
+  .fullscreen-toolbar {
+    overflow: visible;
+  }
+  .fullscreen-toolbar .ant-btn {
+    font-size: 11px !important;
+    padding: 0 6px !important;
+    height: 24px !important;
+    line-height: 24px !important;
+  }
+}
+
+.article-detail-footer {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.article-detail-footer__group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.article-detail-footer__divider {
+  width: 1px;
+  height: 20px;
+  background: #e5e7eb;
+  margin: 0 12px;
+  flex-shrink: 0;
+}
+
+/* 第一组：编辑操作 — 蓝色线框 */
+.footer-group--edit .ant-btn:not(:disabled) {
+  color: #1677ff;
+  border-color: #1677ff;
+}
+.footer-group--edit .ant-btn:not(:disabled):hover {
+  color: #4096ff;
+  border-color: #4096ff;
+}
+
+/* 第二组：内容生成 — 紫色线框 */
+.footer-group--generate .ant-btn:not(:disabled) {
+  color: #722ed1;
+  border-color: #722ed1;
+}
+.footer-group--generate .ant-btn:not(:disabled):hover {
+  color: #9254de;
+  border-color: #9254de;
+}
+
+/* 第三组：弹窗确认 — 绿色线框 */
+.footer-group--flow .ant-btn:not(:disabled) {
+  color: #389e0d;
+  border-color: #389e0d;
+}
+.footer-group--flow .ant-btn:not(:disabled):hover {
+  color: #52c41a;
+  border-color: #52c41a;
+}
+
+/* 编辑器/预览区由 JS 动态设置高度；高度过渡与专注模式宽度保持同速。 */
+.article-editor-wrapper {
+  min-height: 200px;
+  overflow: hidden;
+  transition: height 0.8s ease;
+}
+
+.article-markdown-body {
+  font-size: 14px;
+  line-height: 1.75;
+  color: #374151;
+}
+.article-markdown-body h1,
+.article-markdown-body h2,
+.article-markdown-body h3,
+.article-markdown-body h4 {
+  margin: 1em 0 0.5em;
+  font-weight: 600;
+  color: #111827;
+}
+.article-markdown-body h1 { font-size: 1.25em; }
+.article-markdown-body h2 { font-size: 1.15em; }
+.article-markdown-body h3 { font-size: 1.05em; }
+.article-markdown-body p { margin: 0.5em 0; }
+.article-markdown-body ul,
+.article-markdown-body ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+.article-markdown-body li { margin: 0.25em 0; }
+.article-markdown-body blockquote {
+  margin: 0.75em 0;
+  padding: 0.5em 1em;
+  border-left: 3px solid #d1d5db;
+  color: #6b7280;
+  background: #f9fafb;
+  border-radius: 0 4px 4px 0;
+}
+.article-markdown-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 0.75em 0;
+}
+.article-markdown-body a {
+  color: #caa9fa;
+  text-decoration: underline;
+}
+.article-markdown-body strong { font-weight: 600; }
+.article-markdown-body code {
+  background: #f3f4f6;
+  padding: 0.15em 0.35em;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+.article-markdown-body hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 1em 0;
+}

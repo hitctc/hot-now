@@ -354,7 +354,7 @@ describe("content routes", () => {
     expect(contentResponse.body).toContain('id="app"');
     expect(contentResponse.body).not.toContain('class="shell-root"');
     expect(systemResponse.statusCode).toBe(302);
-    expect(systemResponse.headers.location).toBe("/login");
+    expect(systemResponse.headers.location).toBe("/login?redirect=%2Fsettings%2Fprofile");
   });
 
   it("serves the signed-in system route through the client entry", async () => {

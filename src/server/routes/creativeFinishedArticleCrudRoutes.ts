@@ -136,6 +136,10 @@ export function registerCreativeFinishedArticleCrudRoutes(context: CreativeFinis
     // finished_articles 表字段
     const editInput: Record<string, unknown> = {};
     if (body?.contentMarkdown !== undefined) { editInput.contentMarkdown = body.contentMarkdown; updatedFields.push("contentMarkdown"); }
+    if (typeof body?.humanMarkdown === "string" || body?.humanMarkdown === null) {
+      editInput.humanMarkdown = body.humanMarkdown;
+      updatedFields.push("humanMarkdown");
+    }
     if (body?.images !== undefined) { editInput.images = body.images; updatedFields.push("images"); }
     if (body?.coverImage !== undefined) {
       // 兼容字符串和数组两种格式

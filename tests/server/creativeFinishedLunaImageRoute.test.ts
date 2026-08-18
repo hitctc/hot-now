@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { insertCreativeFinishedArticle } from "../../src/core/creative/creativeFinishedArticleRepository.js";
+import {
+  findCreativeFinishedArticleById,
+  insertCreativeFinishedArticle,
+} from "../../src/core/creative/creativeFinishedArticleRepository.js";
 import { insertCreativeSourceItem } from "../../src/core/creative/creativeSourceItemRepository.js";
 import { createServer } from "../../src/server/createServer.js";
 import { type TestDatabaseHandle, createTestDatabase } from "../helpers/testDatabase.js";
@@ -118,6 +121,29 @@ describe("GPT Luna 独立生图路由", () => {
         body: JSON.stringify({ articleId: article.id, target: "inline", imageIndex: 1, mode: "manual" }),
       }),
     );
+    await app.close();
+  });
+
+  it("accepts both article markdown fields for asynchronous Luna image backfill", async () => {
+    const { handle, article } = await createArticle([
+      { step: 8, meta: { writingProvider: "codex", writingModel: "gpt-5.6-luna" } },
+    ]);
+    const app = createServer({ db: handle.db, creativeApiToken: "test-token" });
+
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/api/creative/finished-articles/${article.id}`,
+      headers: { "x-creative-token": "test-token" },
+      payload: {
+        contentMarkdown: "![封面图](new-cover)\n\n正文",
+        humanMarkdown: "![封面图](new-cover)\n\n人工稿",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const saved = findCreativeFinishedArticleById(handle.db, article.id);
+    expect(saved?.contentMarkdown).toBe("![封面图](new-cover)\n\n正文");
+    expect(saved?.humanMarkdown).toBe("![封面图](new-cover)\n\n人工稿");
     await app.close();
   });
 });

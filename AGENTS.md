@@ -25,6 +25,7 @@
   - `AI 时间线链路`：`Codex 自动化生成官方发布时间线 Markdown -> 上传本地稳定 feed 并暴露公网入口 -> 应用优先读取本地 feed / 必要时用公网 URL 兜底 -> 解析 json ai-timeline-feed -> 提供 API 与 feed 摘要`；Vue 页面当前暂时下架
   - `AI 时间线提醒链路`：`定时读取 AI 时间线 feed -> 筛选新增 S 级官方事件 -> 按 eventKey 去重 -> 飞书主通道 + 邮件备份通道推送`
   - `发信链路`：`手动发信 -> 读取最新一份已生成报告 -> SMTP 发邮件`；每日早报发信默认关闭，SMTP 同时作为 S 级事件邮件备份通道
+  - `HotNow-Hermes 创作交付链路`：`Hermes 事实核验/写作 -> human-writing 只读终稿审改 -> 图片提示词/图片执行 -> 成品创建`；初次成品创建同时接收 `contentMarkdown` 与 `humanMarkdown`，`stepTrace.meta.humanWriting` 只保存审改状态摘要，不能把本地审改全文写入 trace
 - 当前数据源：内置 RSS 库已扩展到 `21` 个，覆盖聚合日报、国际官方 AI 博客、国内科技媒体、创投资讯、开发者社区与综合新闻；Twitter 已拆成两类独立来源类型：账号采集配置保存在 `twitter_accounts`，关键词搜索配置保存在 `twitter_search_keywords`；Hacker News 搜索配置保存在 `hackernews_queries`；B 站搜索配置保存在 `bilibili_queries`；微信公众号 RSS 配置保存在 `wechat_rss_sources`；微博热搜榜匹配使用固定 AI 关键词，不提供独立配置表；AI 时间线不再维护应用内官方源白名单和采集规则，服务端优先读取 `AI_TIMELINE_FEED_FILE` 指向的本地 Markdown feed，必要时再用 `AI_TIMELINE_FEED_URL` 指向的公网 Markdown feed 兜底，解析其中唯一的 `json ai-timeline-feed` 代码块并提供 API 与提醒数据。这些扩展链路除 AI 时间线 feed 外都只支持后台手动执行，完整清单和边界见 `README.md`
 - 当前采集语义：以 `is_enabled` 为准决定是否参与采集；`is_active` 仅保留兼容，不再作为系统菜单主语义
 - 当前技术栈：`Node.js + TypeScript + Fastify + Vue 3 + Vite + Ant Design Vue + Tailwind CSS + Vitest`

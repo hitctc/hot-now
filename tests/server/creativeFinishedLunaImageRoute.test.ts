@@ -146,4 +146,35 @@ describe("GPT Luna 独立生图路由", () => {
     expect(saved?.humanMarkdown).toBe("![封面图](new-cover)\n\n人工稿");
     await app.close();
   });
+
+  it("persists humanMarkdown when Hermes creates a finished article", async () => {
+    const handle = await createTestDatabase("hot-now-human-markdown-");
+    handles.push(handle);
+    const sourceExternalId = `human-markdown-${Date.now()}-${Math.random()}`;
+    insertCreativeSourceItem(handle.db, {
+      externalId: sourceExternalId,
+      collectorAgent: "test",
+      title: "humanMarkdown 创建回写测试",
+      url: "https://example.com/human-markdown",
+    });
+    const app = createServer({ db: handle.db, creativeApiToken: "test-token" });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/creative/finished-articles",
+      headers: { "x-creative-token": "test-token" },
+      payload: {
+        sourceExternalId,
+        collectorAgent: "test",
+        contentMarkdown: "正式稿",
+        humanMarkdown: "审改后的初始人工稿",
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+    const saved = findCreativeFinishedArticleById(handle.db, response.json().id);
+    expect(saved?.contentMarkdown).toBe("正式稿");
+    expect(saved?.humanMarkdown).toBe("审改后的初始人工稿");
+    await app.close();
+  });
 });

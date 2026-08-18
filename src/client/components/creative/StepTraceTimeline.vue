@@ -81,6 +81,7 @@ function formatMeta(meta: Record<string, unknown> | undefined): Array<{ key: str
     "detailedJudgments", "modifications", "disputes",
     "modelsUsed", "modelsFailed", "consensusCount", "disputeCount",
     "status", "result", "confidence",
+    "humanWriting",
     // Step13 图片生成
     "coverPromptGenerated", "inlineImageCount", "imageStatus",
     "designPlanFallbackUsed", "designPlanFallbackReason",
@@ -203,6 +204,42 @@ function parseDetailedJudgments(raw: unknown): ModelJudgment[] {
       return { model: dj.model ?? "", dimensions: {}, overallAssessment: resp.slice(0, 200), topConcerns: [] };
     }
   });
+}
+
+/** 读取 human-writing 的轻量 trace，不把本地审改全文带到前端。 */
+function getHumanWritingMeta(entry: StepTraceEntry): Record<string, any> {
+  const value = entry.meta?.humanWriting;
+  return value && typeof value === "object" ? value as Record<string, any> : {};
+}
+
+function humanWritingStatusLabel(status: unknown): string {
+  const labels: Record<string, string> = {
+    passed: "通过（无改动）",
+    corrected: "已修正",
+    fallback: "已回退原稿",
+    skipped: "已跳过",
+  };
+  return labels[String(status)] ?? String(status || "未知");
+}
+
+function humanWritingStatusClass(status: unknown): string {
+  if (status === "corrected") return "bg-blue-100 text-blue-700";
+  if (status === "fallback") return "bg-orange-100 text-orange-700";
+  if (status === "skipped") return "bg-gray-100 text-gray-500";
+  return "bg-green-100 text-green-700";
+}
+
+function formatHumanWritingUsage(usage: unknown): string {
+  if (!usage || typeof usage !== "object") return "未记录";
+  const values = usage as Record<string, unknown>;
+  const total = values.total_tokens;
+  if (typeof total === "number") return `${total.toLocaleString()} tokens`;
+  const input = values.input_tokens;
+  const output = values.output_tokens;
+  if (typeof input === "number" || typeof output === "number") {
+    return `输入 ${typeof input === "number" ? input.toLocaleString() : '-'} · 输出 ${typeof output === "number" ? output.toLocaleString() : '-'}`;
+  }
+  return "未记录";
 }
 </script>
 
@@ -454,6 +491,32 @@ function parseDetailedJudgments(raw: unknown): ModelJudgment[] {
                   <span class="shrink-0 rounded px-1 text-[9px] font-medium" :class="resultTypeStyle(ref.type)">{{ resultTypeLabel(ref.type) }}</span>
                   <a v-if="ref.url" :href="ref.url" target="_blank" class="truncate text-editorial-link-active hover:underline" :title="ref.name">{{ ref.name || ref.url }}</a>
                   <span v-else class="truncate text-editorial-text-body">{{ ref.name || '-' }}</span>
+                </div>
+              </div>
+            </template>
+
+            <!-- human-writing：展示状态和调用摘要，全文审计留在 Hermes 本地 -->
+            <template v-else-if="entry.meta?.humanWriting">
+              <div class="rounded border border-editorial-border bg-editorial-bg-page px-2.5 py-1.5 text-[11px] space-y-1">
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span class="rounded px-1.5 py-0.5 font-medium" :class="humanWritingStatusClass(getHumanWritingMeta(entry).reviewStatus)">
+                    {{ humanWritingStatusLabel(getHumanWritingMeta(entry).reviewStatus) }}
+                  </span>
+                  <span class="text-editorial-text-muted">{{ getHumanWritingMeta(entry).model || '-' }}</span>
+                  <span class="text-editorial-text-muted">尝试 {{ getHumanWritingMeta(entry).attempts ?? 0 }} 次</span>
+                  <span class="text-editorial-text-muted">{{ formatHumanWritingUsage(getHumanWritingMeta(entry).usage) }}</span>
+                </div>
+                <div class="text-editorial-text-muted">
+                  Skill {{ getHumanWritingMeta(entry).skill || 'human-writing' }} · 版本 {{ getHumanWritingMeta(entry).skillVersion || '-' }} · 推理 {{ getHumanWritingMeta(entry).reasoningEffort || '-' }}
+                </div>
+                <div v-if="getHumanWritingMeta(entry).fallbackReason" class="text-orange-600">
+                  ⚠ {{ getHumanWritingMeta(entry).fallbackReason }}
+                </div>
+                <div v-if="formatMeta(entry.meta).length > 0" class="border-t border-editorial-border pt-1">
+                  <div v-for="row in formatMeta(entry.meta)" :key="row.key" class="flex gap-2 leading-5">
+                    <span class="shrink-0 text-editorial-text-muted">{{ row.key }}</span>
+                    <span class="break-all text-editorial-text-body">{{ row.value }}</span>
+                  </div>
                 </div>
               </div>
             </template>

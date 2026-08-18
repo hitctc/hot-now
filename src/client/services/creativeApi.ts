@@ -526,6 +526,69 @@ export function codexGenerateImage(articleId: number, action: ImageGenAction, im
   });
 }
 
+// ─── GPT Luna 独立生图 ───
+
+export type LunaImageTarget = "cover" | "inline";
+export type LunaImageJobStatus = "queued" | "running" | "succeeded" | "failed" | "skipped";
+
+export type LunaImageJob = {
+  jobId: string;
+  articleId: number;
+  target: LunaImageTarget;
+  targetKey: string;
+  imageIndex?: number | null;
+  mode: "manual" | "auto-missing";
+  status: LunaImageJobStatus;
+  provider: "codex";
+  model: "gpt-5.6-luna";
+  imageUrl?: string;
+  coverImage?: string[];
+  images?: unknown[];
+  contentMarkdown?: string;
+  humanMarkdown?: string | null;
+  error?: string;
+  reason?: string;
+  optimized?: boolean;
+  sourceBytes?: number;
+  uploadedBytes?: number;
+  usage?: Record<string, number> | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type LunaImageJobResponse = {
+  ok: boolean;
+  eligible?: boolean;
+  job?: LunaImageJob;
+  reason?: string;
+};
+
+export type LunaImageJobsResponse = {
+  ok: boolean;
+  eligible?: boolean;
+  jobs: LunaImageJob[];
+  reason?: string;
+};
+
+/** 独立提交一个 Luna 图片提示词；提示词由服务端从文章读取。 */
+export function enqueueLunaImageJob(
+  articleId: number,
+  target: LunaImageTarget,
+  imageIndex?: number,
+): Promise<LunaImageJobResponse> {
+  const body: Record<string, unknown> = { target };
+  if (target === "inline" && imageIndex != null) body.imageIndex = imageIndex;
+  return requestJson<LunaImageJobResponse>(`/api/creative/finished-articles/${articleId}/luna-image`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** 读取当前文章每个 Luna 图片目标的异步任务状态。 */
+export function fetchLunaImageJobs(articleId: number): Promise<LunaImageJobsResponse> {
+  return requestJson<LunaImageJobsResponse>(`/api/creative/finished-articles/${articleId}/luna-image-jobs`);
+}
+
 // ─── 素材库写文章 ───
 
 export type WriteArticleResult = {

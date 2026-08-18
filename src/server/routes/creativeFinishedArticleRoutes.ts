@@ -109,6 +109,43 @@ async function requestImagePromptsFromHermes(
   }
 }
 
+/** 只认可文章最终写作 trace 中明确记录的 GPT Luna，不用当前环境变量推断。 */
+function articleUsesGptLuna(article: CreativeFinishedArticleRecord): boolean {
+  const trace = article.stepTrace;
+  if (!Array.isArray(trace)) return false;
+  return trace.some((entry) => {
+    const meta = entry.meta;
+    if (meta?.writingProvider === "codex" && meta.writingModel === "gpt-5.6-luna") {
+      return true;
+    }
+    // 短内容 trace 将实际模型写在“短内容写作”步骤顶层，兼容其既有留痕格式。
+    const shortTrace = entry as typeof entry & { provider?: string; model?: string };
+    return entry.stepName === "短内容写作"
+      && shortTrace.provider === "codex"
+      && shortTrace.model === "gpt-5.6-luna";
+  });
+}
+
+/** 从服务端文章字段读取目标提示词，前端只传目标位置，不传提示词内容。 */
+function readLunaPrompt(
+  article: CreativeFinishedArticleRecord,
+  target: "cover" | "inline",
+  imageIndex?: number,
+): string {
+  if (target === "cover") {
+    return typeof article.coverImagePrompt === "string" ? article.coverImagePrompt.trim() : "";
+  }
+  if (article.direction === "short_content") {
+    if (imageIndex == null || imageIndex < 1 || !article.imagePrompts) return "";
+    return typeof article.imagePrompts[imageIndex - 1] === "string"
+      ? article.imagePrompts[imageIndex - 1].trim()
+      : "";
+  }
+  if (imageIndex == null || !article.inlineImagePrompts) return "";
+  const prompt = article.inlineImagePrompts[String(imageIndex)];
+  return typeof prompt === "string" ? prompt.trim() : "";
+}
+
 /** 注册成品文章写入、编辑、发布与提示词路由，保持既有 HTTP 契约。 */
 export function registerCreativeFinishedArticleRoutes(
   app: FastifyInstance,
@@ -474,6 +511,97 @@ app.get("/api/creative/finished-articles/:id/missing-images", async (request, re
     return reply.send(data);
   } catch (err) {
     return reply.code(502).send({ ok: false, reason: "Hermes 调用失败", detail: (err as Error).message });
+  }
+});
+
+// ─── GPT Luna 独立生图：每次只提交一个提示词 ───
+app.post("/api/creative/finished-articles/:id/luna-image", async (request, reply) => {
+  const session = options.readSession(request, reply);
+  if (session === undefined) return;
+  if (!db) return reply.code(503).send({ ok: false, reason: "database-not-available" });
+
+  const id = parseInt((request.params as { id: string }).id, 10);
+  const article = findCreativeFinishedArticleById(db, id);
+  if (!article) return reply.code(404).send({ ok: false, reason: "article-not-found" });
+  if (!articleUsesGptLuna(article)) {
+    return reply.code(409).send({ ok: false, eligible: false, reason: "article-writing-model-is-not-gpt-5.6-luna" });
+  }
+
+  const body = request.body as { target?: unknown; imageIndex?: unknown } | undefined;
+  const target = body?.target === "cover" || body?.target === "inline" ? body.target : undefined;
+  const imageIndex = typeof body?.imageIndex === "number" && Number.isInteger(body.imageIndex)
+    ? body.imageIndex
+    : undefined;
+  if (!target) return reply.code(400).send({ ok: false, reason: "target must be cover or inline" });
+  if (target === "inline" && (imageIndex == null || imageIndex < 1)) {
+    return reply.code(400).send({ ok: false, reason: "imageIndex must start at 1" });
+  }
+  if (!readLunaPrompt(article, target, imageIndex)) {
+    return reply.code(400).send({ ok: false, reason: "target-image-prompt-is-empty" });
+  }
+
+  const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+  const hermesApiToken = process.env.HERMES_API_TOKEN;
+  if (!hermesApiUrl || !hermesApiToken) {
+    return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" });
+  }
+
+  try {
+    const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/luna-image-jobs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
+      body: JSON.stringify({ articleId: id, target, imageIndex, mode: "manual" }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    const data = await res.json().catch(() => ({})) as { success?: boolean; job?: unknown; error?: string };
+    if (!res.ok || !data.success) {
+      return reply.code(res.status >= 500 ? 502 : res.status).send({
+        ok: false,
+        reason: data.error ?? `Hermes HTTP ${res.status}`,
+      });
+    }
+    return reply.code(202).send({ ok: true, eligible: true, job: data.job });
+  } catch (error) {
+    if ((error as Error).name === "AbortError") {
+      return reply.code(504).send({ ok: false, reason: "Luna 生图任务提交超时" });
+    }
+    return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(error as Error).message}` });
+  }
+});
+
+// 查询 Luna 独立生图状态；状态由 Hermes 本机任务存储维护。
+app.get("/api/creative/finished-articles/:id/luna-image-jobs", async (request, reply) => {
+  const session = options.readSession(request, reply);
+  if (session === undefined) return;
+  if (!db) return reply.code(503).send({ ok: false, reason: "database-not-available" });
+
+  const id = parseInt((request.params as { id: string }).id, 10);
+  const article = findCreativeFinishedArticleById(db, id);
+  if (!article) return reply.code(404).send({ ok: false, reason: "article-not-found" });
+  if (!articleUsesGptLuna(article)) {
+    return reply.send({ ok: true, eligible: false, jobs: [] });
+  }
+
+  const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+  const hermesApiToken = process.env.HERMES_API_TOKEN;
+  if (!hermesApiUrl || !hermesApiToken) {
+    return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" });
+  }
+  try {
+    const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/luna-image-jobs?articleId=${id}`, {
+      headers: { "Authorization": `Bearer ${hermesApiToken}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    const data = await res.json().catch(() => ({})) as { success?: boolean; jobs?: unknown[]; error?: string };
+    if (!res.ok || !data.success) {
+      return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: data.error ?? `Hermes HTTP ${res.status}` });
+    }
+    return reply.send({ ok: true, eligible: true, jobs: data.jobs ?? [] });
+  } catch (error) {
+    if ((error as Error).name === "AbortError") {
+      return reply.code(504).send({ ok: false, reason: "Luna 生图状态查询超时" });
+    }
+    return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(error as Error).message}` });
   }
 });
 

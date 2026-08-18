@@ -119,6 +119,8 @@
           :inline-prompt-generating-index="inlinePromptGeneratingIndex"
           :uploading-cover="uploadingCover"
           :uploading-inline="uploadingInline"
+          :luna-image-eligible="lunaImageEligible"
+          :luna-image-jobs="lunaImageJobs"
           @copy-prompt="copyPrompt"
           @prompt-dirty="setPromptDirty"
           @generate-cover-prompt="handleGenerateCoverPrompt"
@@ -128,6 +130,7 @@
           @generate-inline-prompts="handleGenerateInlinePrompts"
           @upload-inline="handleUploadInlineImage"
           @save-inline-prompt="saveInlinePrompt"
+          @generate-luna-image="handleGenerateLunaImage"
         />
 
         <!-- 正文编辑器：普通态与全屏态共用同一份编辑状态。 -->
@@ -215,7 +218,11 @@ import {
   parseArticleImages,
   extractImageUrl,
   uploadImages,
+  enqueueLunaImageJob,
+  fetchLunaImageJobs,
   type CreativeFinishedArticle,
+  type LunaImageJob,
+  type LunaImageTarget,
   type WechatThemeId,
 } from "../../services/creativeApi.js";
 import { renderWechatThemePreview } from "../../services/wechatRenderer.js";
@@ -798,6 +805,134 @@ const articleImages = computed(() => {
   return parseArticleImages(props.article?.imagesJson ?? null);
 });
 
+// Luna 生图是独立任务，不复用旧 ImageActionModal 的 loading 或结果状态。
+const lunaImageJobs = ref<Record<string, LunaImageJob>>({});
+const appliedLunaJobIds = new Set<string>();
+let lunaImageJobsTimer: ReturnType<typeof setInterval> | null = null;
+
+/** 只有文章 trace 明确记录 codex/gpt-5.6-luna 时才展示独立按钮。 */
+const lunaImageEligible = computed(() => {
+  return Boolean(props.article?.stepTrace?.some((entry) => {
+    const meta = entry.meta;
+    if (meta?.writingProvider === "codex" && meta.writingModel === "gpt-5.6-luna") {
+      return true;
+    }
+    // 短内容 trace 将实际模型写在“短内容写作”步骤顶层，兼容其现有留痕格式。
+    const shortTrace = entry as typeof entry & { provider?: string; model?: string };
+    return entry.stepName === "短内容写作"
+      && shortTrace.provider === "codex"
+      && shortTrace.model === "gpt-5.6-luna";
+  }));
+});
+
+/** 将服务端任务按封面或正文下标映射到详情页的单个提示词。 */
+function lunaJobKey(target: LunaImageTarget, imageIndex?: number): string {
+  return target === "cover" ? "cover" : `inline-${imageIndex}`;
+}
+
+/** 只保留每个目标最新的一条任务，旧的失败记录仍留在 Hermes 状态文件中可审计。 */
+function mergeLunaImageJobs(jobs: LunaImageJob[]): Record<string, LunaImageJob> {
+  const next: Record<string, LunaImageJob> = {};
+  for (const job of jobs) {
+    const key = lunaJobKey(job.target, job.imageIndex ?? undefined);
+    const previous = next[key];
+    if (!previous || job.updatedAt > previous.updatedAt) next[key] = job;
+  }
+  return next;
+}
+
+/** 将独立任务的最终图片结果合并到当前文章视图，不触碰图片提示词。 */
+function applyLunaJobResult(job: LunaImageJob): void {
+  if (!props.article || job.status !== "succeeded" || !job.imageUrl) return;
+  if (appliedLunaJobIds.has(job.jobId)) return;
+  appliedLunaJobIds.add(job.jobId);
+
+  if (job.target === "cover") {
+    const covers = Array.isArray(job.coverImage)
+      ? job.coverImage
+      : [job.imageUrl, ...displayCoverImages.value];
+    localCoverImages.value = covers;
+    props.article.coverImage = covers;
+    props.article.coverImageIndex = 0;
+    activeCoverIndex.value = 0;
+  } else if (job.imageIndex != null) {
+    if (Array.isArray(job.images)) {
+      props.article.imagesJson = job.images as typeof props.article.imagesJson;
+    }
+    if (typeof job.contentMarkdown === "string") {
+      props.article.contentMarkdown = job.contentMarkdown;
+      const draftWasDirty = editContent.value !== lastSavedContent;
+      editContent.value = draftWasDirty
+        ? applyInlineImage(editContent.value, job.imageIndex, job.imageUrl)
+        : job.contentMarkdown;
+      if (!draftWasDirty) lastSavedContent = job.contentMarkdown;
+    }
+    if (typeof job.humanMarkdown === "string") {
+      props.article.humanMarkdown = job.humanMarkdown;
+      const humanWasDirty = humanContent.value !== lastSavedHuman;
+      humanContent.value = humanWasDirty
+        ? applyInlineImage(humanContent.value, job.imageIndex, job.imageUrl)
+        : job.humanMarkdown;
+      if (!humanWasDirty) lastSavedHuman = job.humanMarkdown;
+    }
+  }
+  tickArticleChange();
+  emit("saved");
+}
+
+/** 查询 Luna 任务并在没有活动任务时停止轮询，避免详情页常驻请求。 */
+async function loadLunaImageJobs(): Promise<void> {
+  if (!props.open || !props.article || !lunaImageEligible.value) return;
+  try {
+    const result = await fetchLunaImageJobs(props.article.id);
+    const next = mergeLunaImageJobs(result.jobs ?? []);
+    lunaImageJobs.value = next;
+    Object.values(next).forEach(applyLunaJobResult);
+    const hasActiveJob = Object.values(next).some(job => job.status === "queued" || job.status === "running");
+    if (hasActiveJob) {
+      startLunaImageJobsPolling();
+    } else if (lunaImageJobsTimer) {
+      clearInterval(lunaImageJobsTimer);
+      lunaImageJobsTimer = null;
+    }
+  } catch {
+    // 轮询失败不弹重复错误；下一次打开或用户点击时仍可继续请求。
+  }
+}
+
+/** 启动独立 Luna 状态轮询，间隔内不触发任何旧图片流程。 */
+function startLunaImageJobsPolling(): void {
+  if (lunaImageJobsTimer) return;
+  lunaImageJobsTimer = setInterval(() => { void loadLunaImageJobs(); }, 3_000);
+}
+
+/** 清理详情关闭或组件销毁时的 Luna 状态轮询。 */
+function stopLunaImageJobsPolling(): void {
+  if (!lunaImageJobsTimer) return;
+  clearInterval(lunaImageJobsTimer);
+  lunaImageJobsTimer = null;
+}
+
+/** 提交一个提示词对应的一张 Luna 图片；封面追加，正文由服务端覆盖对应位置。 */
+async function handleGenerateLunaImage(target: LunaImageTarget, imageIndex?: number): Promise<void> {
+  if (!props.article || !lunaImageEligible.value) return;
+  const key = lunaJobKey(target, imageIndex);
+  const current = lunaImageJobs.value[key];
+  if (current?.status === "queued" || current?.status === "running") return;
+  try {
+    const result = await enqueueLunaImageJob(props.article.id, target, imageIndex);
+    if (!result.job) {
+      message.error(result.reason ?? "Luna 生图任务提交失败");
+      return;
+    }
+    lunaImageJobs.value = { ...lunaImageJobs.value, [key]: result.job };
+    startLunaImageJobsPolling();
+    message.success(target === "cover" ? "Luna 封面图已排队，完成后追加到封面列表" : `Luna 配图${imageIndex}已排队，完成后覆盖对应图片`);
+  } catch {
+    message.error("Luna 生图任务提交失败");
+  }
+}
+
 // 检测正文中剩余的 [IMAGE1]/[IMAGE2] 占位符索引
 const remainingImageSlots = computed(() => {
   if (!humanContent.value) return [];
@@ -805,11 +940,22 @@ const remainingImageSlots = computed(() => {
   return matches.map(m => parseInt(m.replace(/\[IMAGE|\]/gi, ""), 10));
 });
 
-// 总配图槽数 = 已生成 + 未替换占位符的最大索引
+// 提示词数量也要纳入上传槽位，短内容没有正文占位符时才能显示对应的配图操作。
+const imagePromptSlotCount = computed(() => {
+  if (props.article?.direction === "short_content") {
+    return props.article.imagePrompts?.length ?? 0;
+  }
+  const indices = Object.keys(props.article?.inlineImagePrompts ?? {})
+    .map(Number)
+    .filter(Number.isInteger);
+  return indices.length > 0 ? Math.max(...indices) : 0;
+});
+
+// 总配图槽数 = 已生成 + 未替换占位符的最大索引 + 已保存提示词的最大索引
 const totalImageSlotCount = computed(() => {
   const fromImages = articleImages.value.length;
   const fromPlaceholders = remainingImageSlots.value.length > 0 ? Math.max(...remainingImageSlots.value) : 0;
-  return Math.max(fromImages, fromPlaceholders);
+  return Math.max(fromImages, fromPlaceholders, imagePromptSlotCount.value);
 });
 
 const inlineImageSlotCount = computed(() => remainingImageSlots.value.length);
@@ -1284,6 +1430,8 @@ watch(() => props.open, (val) => {
     localTitles.value = [];
     manualTitle.value = parseJsonArray(props.article.titles)[0] ?? readFirstH1(hm || md);
     promptDirtyKeys.value = new Set();
+    lunaImageJobs.value = {};
+    appliedLunaJobIds.clear();
     localIntros.value = [];
     activeCoverIndex.value = props.article.coverImageIndex ?? 0;
     activeTitleIndex.value = props.article.titleIndex ?? 0;
@@ -1300,7 +1448,9 @@ watch(() => props.open, (val) => {
     activePreviewTheme.value = previewKey ?? "sunsetFilm";
     // 弹窗打开后测量编辑器可用高度
     nextTick(() => setupEditorResize());
+    void loadLunaImageJobs();
   } else {
+    stopLunaImageJobsPolling();
     teardownEditorResize();
     // 关闭弹窗时如果有未保存的内容，立即保存一次，避免防抖定时器还没触发就丢失
     clearAutosaveTimers();
@@ -1665,6 +1815,7 @@ watch(lastSavedAt, (ts) => {
 onBeforeUnmount(() => {
   teardownEditorResize();
   clearAutosaveTimers();
+  stopLunaImageJobsPolling();
   if (relativeTimer) { clearInterval(relativeTimer); relativeTimer = null; }
 });
 </script>

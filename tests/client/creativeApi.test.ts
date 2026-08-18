@@ -9,6 +9,8 @@ vi.mock("../../src/client/services/http", () => ({
 }));
 
 import {
+  enqueueLunaImageJob,
+  fetchLunaImageJobs,
   fetchWriteQueueStatus,
   readCreativeFinishedArticles,
   readCreativeSourceItems
@@ -75,5 +77,31 @@ describe("creativeApi write queue status", () => {
     });
     await expect(first).resolves.toMatchObject({ current: null, queue_length: 0 });
     await expect(second).resolves.toMatchObject({ current: null, queue_length: 0 });
+  });
+});
+
+describe("creativeApi Luna image requests", () => {
+  it("submits one target without sending the prompt from the browser", async () => {
+    requestJson.mockResolvedValue({ ok: true, job: { jobId: "job-1" } });
+
+    await enqueueLunaImageJob(16212, "inline", 2);
+
+    expect(requestJson).toHaveBeenCalledWith(
+      "/api/creative/finished-articles/16212/luna-image",
+      {
+        method: "POST",
+        body: JSON.stringify({ target: "inline", imageIndex: 2 })
+      }
+    );
+  });
+
+  it("reads the independent Luna job list", async () => {
+    requestJson.mockResolvedValue({ ok: true, eligible: true, jobs: [] });
+
+    await fetchLunaImageJobs(16212);
+
+    expect(requestJson).toHaveBeenCalledWith(
+      "/api/creative/finished-articles/16212/luna-image-jobs"
+    );
   });
 });

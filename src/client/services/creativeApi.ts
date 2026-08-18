@@ -562,6 +562,7 @@ export function evaluateSourceItemAccountFit(id: number): Promise<EvaluateAccoun
 
 export type CreativeAutomationStatus = {
   ok: boolean;
+  automationEnabled: boolean;
   autoEvaluateEnabled: boolean;
   autoWriteEnabled: boolean;
   pendingEvaluationCount: number;
@@ -577,8 +578,8 @@ export function fetchCreativeAutomationStatus(): Promise<CreativeAutomationStatu
   return requestJson<CreativeAutomationStatus>("/api/creative/automation/status");
 }
 
-/** 分别控制自动评估或自动写作，关闭后不会影响人工操作。 */
-export function updateCreativeAutomationEnabled(kind: "evaluate" | "write", enabled: boolean): Promise<CreativeAutomationStatus> {
+/** 控制创作自动化总开关或评估/写作细分开关；人工操作不受总开关影响。 */
+export function updateCreativeAutomationEnabled(kind: "master" | "evaluate" | "write", enabled: boolean): Promise<CreativeAutomationStatus> {
   return requestJson<CreativeAutomationStatus>(`/api/creative/automation/${kind}/enabled`, {
     method: "POST",
     body: JSON.stringify({ enabled }),

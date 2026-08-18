@@ -11,6 +11,8 @@ type TriggerKind = "automatic" | "manual-evaluate" | "manual-write";
 type JobStatus = "pending" | "running" | "retrying" | "dispatched" | "succeeded" | "failed" | "uncertain" | "cancelled" | "expired";
 type AlertKind = JobType | "queue-stall";
 
+const AUTOMATION_STOPPED_REASON = "创作自动化总开关已关闭";
+
 type AutomationJob = {
   id: number;
   job_type: JobType;
@@ -24,6 +26,7 @@ type AutomationJob = {
 };
 
 export type CreativeAutomationStatus = {
+  automationEnabled: boolean;
   autoEvaluateEnabled: boolean;
   autoWriteEnabled: boolean;
   pendingEvaluationCount: number;
@@ -76,8 +79,9 @@ export class CreativeAutomationService {
     });
   }
 
-  /** 新建长内容默认自动评估；短内容不进入本队列。 */
+  /** 新建长内容默认自动评估；总开关关闭时只入素材库，不创建自动任务。 */
   enqueueAutomaticEvaluation(sourceItemId: number): EnqueueResult {
+    if (!this.isAutomationEnabled()) return { accepted: false, reason: "creative-automation-disabled" };
     const item = findCreativeSourceItemById(this.db, sourceItemId);
     if (!item || item.direction !== "article" || item.accountFitLevel || !isWithinAutomaticWindow(item.createdAt)) {
       return { accepted: false, reason: "not-eligible-for-automatic-evaluation" };
@@ -155,6 +159,7 @@ export class CreativeAutomationService {
       ORDER BY updated_at DESC LIMIT 5
     `).all() as Array<{ job_type: JobType; source_item_id: number; last_error: string; updated_at: string }>;
     return {
+      automationEnabled: setting("creative_automation_enabled"),
       autoEvaluateEnabled: setting("account_fit_auto_evaluate_enabled"),
       autoWriteEnabled: setting("account_fit_auto_write_enabled"),
       pendingEvaluationCount: count("job_type = 'evaluate' AND status IN ('pending', 'running', 'retrying')"),
@@ -166,15 +171,27 @@ export class CreativeAutomationService {
     };
   }
 
-  /** 两个运行期开关互不影响，关闭只暂停自动任务，既有任务仍保留。 */
+  /** 总开关关闭时取消未开始自动任务并清空告警状态，人工任务仍可继续领取。 */
+  setMasterEnabled(enabled: boolean): void {
+    this.setSetting("creative_automation_enabled", enabled);
+    if (!enabled) {
+      this.cancelPendingAutomaticJobs();
+      this.resetAlertStates();
+      return;
+    }
+    this.wake();
+  }
+
+  /** 两个运行期开关互不影响；开启时立即补偿，关闭时不影响人工动作。 */
   setEnabled(kind: "evaluate" | "write", enabled: boolean): void {
     const key = kind === "evaluate" ? "account_fit_auto_evaluate_enabled" : "account_fit_auto_write_enabled";
-    this.db.prepare(`INSERT INTO creative_automation_settings(key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`).run(key, String(enabled));
+    this.setSetting(key, enabled);
     if (enabled) this.wake();
   }
 
+  /** 每轮调度前先收口历史终态，避免任务表与素材列表状态长期分叉。 */
   private async runOnce(): Promise<void> {
+    this.reconcileTerminalWriteStatuses();
     this.recoverAndFillAutomaticEvaluation();
     this.recoverDispatchedWrites();
     this.expireOldAutomaticWrites();
@@ -185,7 +202,7 @@ export class CreativeAutomationService {
 
   /** 只补 72 小时内、未评估且未产生成品的长素材；兼容接入前已写为 ready 的新素材。 */
   private recoverAndFillAutomaticEvaluation(): void {
-    if (this.getSetting("account_fit_auto_evaluate_enabled") !== "true") return;
+    if (!this.isAutomaticTypeEnabled("evaluate")) return;
     const rows = this.db.prepare(`
       SELECT id FROM creative_source_items
       WHERE direction = 'article' AND linked_article_id IS NULL AND writing_status IN ('pending', 'ready') AND account_fit_level IS NULL
@@ -196,6 +213,31 @@ export class CreativeAutomationService {
     for (const row of rows) this.insertActiveJob("evaluate", row.id, "automatic");
   }
 
+  /** 将没有活动写作任务、但最新写作任务已失败的素材收口为技术失败。 */
+  private reconcileTerminalWriteStatuses(): void {
+    const rows = this.db.prepare(`
+      SELECT s.id
+      FROM creative_source_items s
+      JOIN creative_automation_jobs j ON j.source_item_id = s.id
+        AND j.job_type = 'write' AND j.status = 'failed'
+      WHERE s.linked_article_id IS NULL
+        AND s.writing_status IN ('queued', 'writing')
+        AND NOT EXISTS (
+          SELECT 1 FROM creative_automation_jobs active
+          WHERE active.source_item_id = s.id
+            AND active.job_type = 'write'
+            AND active.status IN ('pending', 'running', 'retrying', 'dispatched')
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM creative_automation_jobs newer
+          WHERE newer.source_item_id = s.id
+            AND newer.job_type = 'write'
+            AND newer.id > j.id
+        )
+    `).all() as Array<{ id: number }>;
+    for (const row of rows) updateCreativeSourceItemWritingStatus(this.db, row.id, "failed");
+  }
+
   /** 已成功投递给 Hermes 的任务只在明确终态失败且无成品时重试，未知响应绝不盲投。 */
   private recoverDispatchedWrites(): void {
     const jobs = this.db.prepare(`SELECT * FROM creative_automation_jobs WHERE job_type = 'write' AND status = 'dispatched'`).all() as AutomationJob[];
@@ -203,6 +245,13 @@ export class CreativeAutomationService {
       const item = findCreativeSourceItemById(this.db, job.source_item_id);
       if (!item) {
         this.finish(job.id, "failed", "source-item-not-found");
+      } else if (job.trigger_kind === "automatic" && !this.isAutomaticTypeEnabled("write")) {
+        // 总开关关闭时不再重试自动写作；已投递的任务只等外部结果，不主动制造后续动作。
+        if (item.writingStatus === "failed") {
+          this.finish(job.id, "failed", AUTOMATION_STOPPED_REASON);
+        } else if (item.linkedArticleId != null || item.writingStatus === "done") {
+          this.finish(job.id, "succeeded");
+        }
       } else if (item.linkedArticleId != null || item.writingStatus === "done") {
         this.finish(job.id, "succeeded");
       } else if (item.writingStatus === "failed" && job.attempts < 3) {
@@ -215,6 +264,7 @@ export class CreativeAutomationService {
 
   /** 高适配自动写作超过窗口未投递时回到人工待写，不丢弃已经得到的评估结论。 */
   private expireOldAutomaticWrites(): void {
+    if (!this.isAutomaticTypeEnabled("write")) return;
     const jobs = this.db.prepare(`
       SELECT j.* FROM creative_automation_jobs j
       JOIN creative_source_items s ON s.id = j.source_item_id
@@ -254,7 +304,7 @@ export class CreativeAutomationService {
   }
 
   private claimNext(type: JobType): AutomationJob | null {
-    const automaticEnabled = type === "evaluate" ? this.getSetting("account_fit_auto_evaluate_enabled") === "true" : this.getSetting("account_fit_auto_write_enabled") === "true";
+    const automaticEnabled = this.isAutomaticTypeEnabled(type);
     const row = this.db.prepare(`
       SELECT * FROM creative_automation_jobs
       WHERE job_type = ? AND status IN ('pending', 'retrying')
@@ -273,6 +323,7 @@ export class CreativeAutomationService {
   private async executeEvaluation(job: AutomationJob): Promise<void> {
     const item = findCreativeSourceItemById(this.db, job.source_item_id);
     if (!item) return this.finish(job.id, "failed", "source-item-not-found");
+    if (this.shouldStopAutomaticJob(job)) return this.finish(job.id, "cancelled", AUTOMATION_STOPPED_REASON);
     if (!this.hermes) return this.handleTechnicalFailure(job, "hermes-api-not-configured");
     try {
       const response = await fetch(`${this.hermes.baseUrl.replace(/\/+$/, "")}/api/evaluate-account-fit`, {
@@ -281,8 +332,10 @@ export class CreativeAutomationService {
         body: JSON.stringify({ sourceItemId: job.source_item_id }),
         signal: AbortSignal.timeout(120_000),
       });
+      if (this.shouldStopAutomaticJob(job)) return this.finish(job.id, "cancelled", AUTOMATION_STOPPED_REASON);
       if (!response.ok) return this.handleTechnicalFailure(job, `Hermes HTTP ${response.status}`);
       const data = await response.json() as { ok?: boolean; reason?: string; accountFit?: { level?: string; reason?: string } };
+      if (this.shouldStopAutomaticJob(job)) return this.finish(job.id, "cancelled", AUTOMATION_STOPPED_REASON);
       if (!data.ok) return this.handleTechnicalFailure(job, data.reason ?? "Hermes 账号适配评估失败");
       if (data.accountFit?.level === "error") {
         return this.handleTechnicalFailure(job, data.accountFit.reason ?? "Hermes 账号适配评估返回技术错误");
@@ -295,8 +348,13 @@ export class CreativeAutomationService {
       this.finish(job.id, "succeeded");
       this.recordSuccess("evaluate");
       if (evaluated.accountFitLevel === "high") {
-        updateCreativeSourceItemWritingStatus(this.db, evaluated.id, "queued");
-        this.insertActiveJob("write", evaluated.id, job.trigger_kind === "manual-write" ? "manual-write" : "automatic", job.thesis ?? undefined, Boolean(job.force_account_fit));
+        const writeTrigger = job.trigger_kind === "manual-write" ? "manual-write" : "automatic";
+        if (writeTrigger === "automatic" && !this.isAutomaticTypeEnabled("write")) {
+          updateCreativeSourceItemWritingStatus(this.db, evaluated.id, "ready");
+        } else {
+          updateCreativeSourceItemWritingStatus(this.db, evaluated.id, "queued");
+          this.insertActiveJob("write", evaluated.id, writeTrigger, job.thesis ?? undefined, Boolean(job.force_account_fit));
+        }
       } else if (evaluated.accountFitLevel === "medium") {
         updateCreativeSourceItemWritingStatus(this.db, evaluated.id, "ready");
         if (job.trigger_kind === "manual-write") {
@@ -307,6 +365,7 @@ export class CreativeAutomationService {
         updateCreativeSourceItemWritingStatus(this.db, evaluated.id, "excluded");
       }
     } catch (error) {
+      if (this.shouldStopAutomaticJob(job)) return this.finish(job.id, "cancelled", AUTOMATION_STOPPED_REASON);
       this.handleTechnicalFailure(job, errorMessage(error));
     }
   }
@@ -314,6 +373,7 @@ export class CreativeAutomationService {
   private async executeWrite(job: AutomationJob): Promise<void> {
     const item = findCreativeSourceItemById(this.db, job.source_item_id);
     if (!item) return this.finish(job.id, "failed", "source-item-not-found");
+    if (this.shouldStopAutomaticJob(job)) return this.finish(job.id, "cancelled", AUTOMATION_STOPPED_REASON);
     if (job.trigger_kind === "automatic" && !isWithinAutomaticWindow(item.createdAt)) {
       this.finish(job.id, "expired", "超过 72 小时未自动投递");
       updateCreativeSourceItemWritingStatus(this.db, item.id, "ready");
@@ -334,14 +394,20 @@ export class CreativeAutomationService {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.hermes.token}` },
         body: JSON.stringify(body), signal: AbortSignal.timeout(15_000),
       });
+      if (this.shouldStopAutomaticJob(job)) {
+        if (!response.ok) return this.finish(job.id, "cancelled", AUTOMATION_STOPPED_REASON);
+        const stoppedData = await response.json() as { success?: boolean };
+        if (!stoppedData.success) return this.finish(job.id, "cancelled", AUTOMATION_STOPPED_REASON);
+        this.markWriteDispatched(job, item);
+        return;
+      }
       if (!response.ok) return this.handleTechnicalFailure(job, `Hermes HTTP ${response.status}`);
       const data = await response.json() as { success?: boolean; error?: string };
       if (!data.success) return this.handleTechnicalFailure(job, data.error ?? "Hermes 写作提交失败");
-      this.db.prepare(`UPDATE creative_automation_jobs SET status = 'dispatched', dispatched_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(job.id);
-      // Hermes 已接受不等于真正开始执行；保持 queued，等 Hermes worker 开始时再回写 writing。
-      updateCreativeSourceItemWritingStatus(this.db, item.id, "queued");
+      this.markWriteDispatched(job, item);
       this.recordSuccess("write");
     } catch (error) {
+      if (this.shouldStopAutomaticJob(job)) return this.finish(job.id, "cancelled", AUTOMATION_STOPPED_REASON);
       // 请求超时后无法判断 Hermes 是否已经接受任务，必须终态标为不确定，不能自动重投。
       const message = errorMessage(error);
       if (message.includes("timeout") || message.includes("aborted")) {
@@ -353,13 +419,17 @@ export class CreativeAutomationService {
   }
 
   private handleTechnicalFailure(job: AutomationJob, reason: string): void {
+    if (this.shouldStopAutomaticJob(job)) {
+      this.finish(job.id, "cancelled", AUTOMATION_STOPPED_REASON);
+      return;
+    }
     if (job.attempts >= 3) {
       this.finish(job.id, "failed", reason);
-      this.recordFailure(job.job_type, reason);
+      if (job.trigger_kind === "automatic") this.recordFailure(job.job_type, reason);
       return;
     }
     this.retry(job.id, job.attempts, reason);
-    this.recordFailure(job.job_type, reason);
+    if (job.trigger_kind === "automatic") this.recordFailure(job.job_type, reason);
   }
 
   private retry(id: number, attempts: number, reason: string, nextRunAt = retryAt(attempts)): void {
@@ -367,12 +437,30 @@ export class CreativeAutomationService {
       .run(nextRunAt, reason, id);
   }
 
+  /** 终结任务并同步写作素材状态，避免技术失败后素材永久停留在排队中。 */
   private finish(id: number, status: Extract<JobStatus, "succeeded" | "failed" | "uncertain" | "cancelled" | "expired">, error?: string): void {
+    const job = this.db.prepare("SELECT job_type, source_item_id FROM creative_automation_jobs WHERE id = ?")
+      .get(id) as Pick<AutomationJob, "job_type" | "source_item_id"> | undefined;
     this.db.prepare(`UPDATE creative_automation_jobs SET status = ?, last_error = ?, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
       .run(status, error ?? null, id);
+    if (status !== "failed" || job?.job_type !== "write") return;
+    const item = findCreativeSourceItemById(this.db, job.source_item_id);
+    if (item && item.linkedArticleId == null && (item.writingStatus === "queued" || item.writingStatus === "writing")) {
+      updateCreativeSourceItemWritingStatus(this.db, item.id, "failed");
+    }
+  }
+
+  /** 记录 Hermes 已接受的写作任务；总开关只阻止后续调度，不伪造外部投递结果。 */
+  private markWriteDispatched(job: AutomationJob, item: NonNullable<ReturnType<typeof findCreativeSourceItemById>>): void {
+    this.db.prepare(`UPDATE creative_automation_jobs SET status = 'dispatched', dispatched_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(job.id);
+    // Hermes 已接受不等于真正开始执行；保持 queued，等 Hermes worker 开始时再回写 writing。
+    updateCreativeSourceItemWritingStatus(this.db, item.id, "queued");
   }
 
   private insertActiveJob(type: JobType, sourceItemId: number, trigger: TriggerKind, thesis?: string, forceAccountFit = false): EnqueueResult {
+    if (trigger === "automatic" && !this.isAutomaticTypeEnabled(type)) {
+      return { accepted: false, reason: "creative-automation-disabled" };
+    }
     try {
       const result = this.db.prepare(`INSERT INTO creative_automation_jobs(job_type, source_item_id, trigger_kind, status, thesis, force_account_fit)
         VALUES (?, ?, ?, 'pending', ?, ?)`)
@@ -395,6 +483,46 @@ export class CreativeAutomationService {
     return (this.db.prepare("SELECT value FROM creative_automation_settings WHERE key = ?").get(key) as { value: string } | undefined)?.value ?? null;
   }
 
+  private setSetting(key: string, enabled: boolean): void {
+    this.db.prepare(`INSERT INTO creative_automation_settings(key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`).run(key, String(enabled));
+  }
+
+  private isAutomationEnabled(): boolean {
+    return this.getSetting("creative_automation_enabled") === "true";
+  }
+
+  private isAutomaticTypeEnabled(type: JobType): boolean {
+    if (!this.isAutomationEnabled()) return false;
+    const key = type === "evaluate" ? "account_fit_auto_evaluate_enabled" : "account_fit_auto_write_enabled";
+    return this.getSetting(key) === "true";
+  }
+
+  private shouldStopAutomaticJob(job: AutomationJob): boolean {
+    return job.trigger_kind === "automatic" && !this.isAutomaticTypeEnabled(job.job_type);
+  }
+
+  /** 关闭总开关时只取消尚未开始的自动任务，running/dispatched 留给自然收口。 */
+  private cancelPendingAutomaticJobs(): void {
+    this.db.prepare(`UPDATE creative_automation_jobs
+      SET status = 'cancelled', completed_at = CURRENT_TIMESTAMP, last_error = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE trigger_kind = 'automatic' AND status IN ('pending', 'retrying')`).run(AUTOMATION_STOPPED_REASON);
+  }
+
+  /** 停机只关闭告警状态，不删除 creative_automation_alerts 中的历史记录。 */
+  private resetAlertStates(): void {
+    const reset = this.db.prepare(`
+      INSERT INTO creative_automation_alert_state(failure_kind, consecutive_failures, last_success_at, last_alert_at, updated_at)
+      VALUES (?, 0, NULL, NULL, CURRENT_TIMESTAMP)
+      ON CONFLICT(failure_kind) DO UPDATE SET
+        consecutive_failures = 0,
+        last_success_at = NULL,
+        last_alert_at = NULL,
+        updated_at = CURRENT_TIMESTAMP
+    `);
+    for (const kind of ["evaluate", "write", "queue-stall"] as const) reset.run(kind);
+  }
+
   private cleanupHistory(): void {
     this.db.prepare(`DELETE FROM creative_automation_jobs WHERE completed_at IS NOT NULL AND datetime(completed_at) < datetime('now', '-30 days')`).run();
   }
@@ -406,7 +534,7 @@ export class CreativeAutomationService {
           AND (last_success_at IS NULL OR datetime(last_alert_at) > datetime(last_success_at))
           THEN 1 ELSE 0 END AS alert_open
       FROM creative_automation_alert_state WHERE failure_kind = ?`).get(kind) as { consecutive_failures: number; alert_open: number } | undefined;
-    if (row?.alert_open && this.config) void this.sendAlert(kind, `${kind === "evaluate" ? "账号适配评估" : "自动写作"}已恢复`, "连续技术失败已恢复。", { recovery: true });
+    if (row?.alert_open && this.config && this.isAutomationEnabled()) void this.sendAlert(kind, `${kind === "evaluate" ? "账号适配评估" : "自动写作"}已恢复`, "连续技术失败已恢复。", { recovery: true });
     this.db.prepare(`INSERT INTO creative_automation_alert_state(failure_kind, consecutive_failures, last_success_at, updated_at)
       VALUES (?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT(failure_kind) DO UPDATE SET consecutive_failures = 0, last_success_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP`).run(kind);
@@ -414,6 +542,10 @@ export class CreativeAutomationService {
 
   /** 冷却判断统一交给 SQLite 按 UTC 比较，不解析无时区的时间文本。 */
   private recordFailure(kind: JobType, reason: string): void {
+    if (!this.isAutomationEnabled()) {
+      this.resetAlertStates();
+      return;
+    }
     const row = this.db.prepare(`SELECT consecutive_failures,
         CASE WHEN last_alert_at IS NULL OR datetime(last_alert_at) <= datetime('now', '-30 minutes')
           THEN 1 ELSE 0 END AS cooldown_elapsed
@@ -430,12 +562,16 @@ export class CreativeAutomationService {
 
   /** 从首次观测到无成功开始计时，队列失败清空不等于处理恢复。 */
   private async alertWhenQueueStalled(): Promise<void> {
+    if (!this.isAutomationEnabled()) {
+      this.resetAlertStates();
+      return;
+    }
     // 等次日写作额度的任务会把 next_run_at 推到明天，属正常顺延而非停摆；
     // 技术退避最长 30 分钟，超过 30 分钟的重试只可能是额度顺延，不计入停摆证据。
     const queued = (this.db.prepare(`SELECT COUNT(*) AS count FROM creative_automation_jobs
-      WHERE status IN ('pending', 'retrying')
+      WHERE trigger_kind = 'automatic' AND status IN ('pending', 'retrying')
         AND (next_run_at IS NULL OR datetime(next_run_at) <= datetime('now', '+30 minutes'))`).get() as { count: number }).count;
-    const recent = (this.db.prepare(`SELECT COUNT(*) AS count FROM creative_automation_jobs WHERE status IN ('dispatched', 'succeeded') AND datetime(updated_at) >= datetime('now', '-15 minutes')`).get() as { count: number }).count;
+    const recent = (this.db.prepare(`SELECT COUNT(*) AS count FROM creative_automation_jobs WHERE trigger_kind = 'automatic' AND status IN ('dispatched', 'succeeded') AND datetime(updated_at) >= datetime('now', '-15 minutes')`).get() as { count: number }).count;
     const state = this.db.prepare(`SELECT consecutive_failures,
         CASE WHEN last_alert_at IS NOT NULL
           AND (last_success_at IS NULL OR datetime(last_alert_at) > datetime(last_success_at))

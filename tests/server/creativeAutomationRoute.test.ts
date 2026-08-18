@@ -47,4 +47,26 @@ describe("creative automation routes", () => {
     expect(status.json().autoEvaluateEnabled).toBe(false);
     await app.close();
   });
+
+  it("总开关接口关闭创作自动化并保留细分开关状态", async () => {
+    const handle = await createTestDatabase("hot-now-automation-master-route-");
+    handles.push(handle);
+    const automation = new CreativeAutomationService(handle.db, null, null);
+    const app = createServer({ db: handle.db, creativeAutomation: automation });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/creative/automation/master/enabled",
+      payload: { enabled: false },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      ok: true,
+      automationEnabled: false,
+      autoEvaluateEnabled: true,
+      autoWriteEnabled: true,
+    });
+    await app.close();
+  });
 });

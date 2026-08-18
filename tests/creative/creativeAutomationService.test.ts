@@ -23,6 +23,76 @@ afterEach(() => {
 });
 
 describe("CreativeAutomationService", () => {
+  it("关闭总开关会取消未开始自动任务、清零告警状态，但保留人工任务", async () => {
+    const handle = await createTestDatabase("hot-now-automation-master-stop-");
+    handles.push(handle);
+    const evaluateItem = insertCreativeSourceItem(handle.db, {
+      externalId: "master-stop-evaluate", collectorAgent: "test", title: "总开关评估", url: "https://example.com/master-stop-evaluate",
+    });
+    const writeItem = insertCreativeSourceItem(handle.db, {
+      externalId: "master-stop-write", collectorAgent: "test", title: "总开关写作", url: "https://example.com/master-stop-write",
+    });
+    handle.db.prepare(`INSERT INTO creative_automation_jobs(job_type, source_item_id, trigger_kind, status)
+      VALUES ('evaluate', ?, 'automatic', 'pending'), ('write', ?, 'automatic', 'retrying')`).run(evaluateItem.id, writeItem.id);
+    handle.db.prepare(`INSERT INTO creative_automation_alert_state(failure_kind, consecutive_failures, last_alert_at)
+      VALUES ('evaluate', 1805, CURRENT_TIMESTAMP), ('write', 4, CURRENT_TIMESTAMP), ('queue-stall', 12, CURRENT_TIMESTAMP)`).run();
+    handle.db.prepare(`INSERT INTO creative_automation_alerts(failure_kind, subject, detail)
+      VALUES ('evaluate', '历史告警', '保留历史')`).run();
+    const service = new CreativeAutomationService(handle.db, null, { baseUrl: "https://hermes.test", token: "token" });
+
+    service.setMasterEnabled(false);
+
+    expect(service.getStatus().automationEnabled).toBe(false);
+    expect(handle.db.prepare("SELECT status, last_error FROM creative_automation_jobs ORDER BY id").all()).toEqual([
+      { status: "cancelled", last_error: "创作自动化总开关已关闭" },
+      { status: "cancelled", last_error: "创作自动化总开关已关闭" },
+    ]);
+    expect(handle.db.prepare("SELECT failure_kind, consecutive_failures, last_alert_at FROM creative_automation_alert_state ORDER BY failure_kind").all()).toEqual([
+      { failure_kind: "evaluate", consecutive_failures: 0, last_alert_at: null },
+      { failure_kind: "queue-stall", consecutive_failures: 0, last_alert_at: null },
+      { failure_kind: "write", consecutive_failures: 0, last_alert_at: null },
+    ]);
+    expect(handle.db.prepare("SELECT COUNT(*) AS count FROM creative_automation_alerts").get()).toEqual({ count: 1 });
+
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      updateCreativeSourceItemAccountFit(handle.db, evaluateItem.id, {
+        level: "medium", reason: "人工评估完成", details: {}, ruleVersion: "v3", updateWritingStatus: false,
+      });
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }));
+    expect(service.enqueueManualEvaluation(evaluateItem.id).accepted).toBe(true);
+    await service.runNow();
+    expect(handle.db.prepare("SELECT status FROM creative_automation_jobs WHERE trigger_kind = 'manual-evaluate'").get()).toEqual({ status: "succeeded" });
+  });
+
+  it("总开关关闭期间，已开始的自动评估只自然收口，不派生写作或发送告警", async () => {
+    const handle = await createTestDatabase("hot-now-automation-master-inflight-");
+    handles.push(handle);
+    const item = insertCreativeSourceItem(handle.db, {
+      externalId: "master-inflight", collectorAgent: "test", title: "进行中的评估", url: "https://example.com/master-inflight",
+    });
+    let resolveFetch!: (response: Response) => void;
+    const fetchMock = vi.fn(() => new Promise<Response>((resolve) => { resolveFetch = resolve; }));
+    vi.stubGlobal("fetch", fetchMock);
+    const service = new CreativeAutomationService(handle.db, null, { baseUrl: "https://hermes.test", token: "token" });
+    const runPromise = service.enqueueAutomaticEvaluation(item.id);
+    expect(runPromise.accepted).toBe(true);
+    const execution = service.runNow();
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const emailsBeforeStop = sentEmails.length;
+    service.setMasterEnabled(false);
+    resolveFetch(new Response(JSON.stringify({ ok: true, accountFit: { level: "high" } }), { status: 200 }));
+    await execution;
+
+    expect(handle.db.prepare("SELECT status, last_error FROM creative_automation_jobs WHERE source_item_id = ? ORDER BY id DESC LIMIT 1").get(item.id)).toEqual({
+      status: "cancelled", last_error: "创作自动化总开关已关闭",
+    });
+    expect(handle.db.prepare("SELECT COUNT(*) AS count FROM creative_automation_jobs WHERE source_item_id = ? AND job_type = 'write'").get(item.id)).toEqual({ count: 0 });
+    expect(sentEmails).toHaveLength(emailsBeforeStop);
+  });
+
   it("新长素材先待评估，高适配后再投递自动写作", async () => {
     const handle = await createTestDatabase("hot-now-automation-");
     handles.push(handle);
@@ -76,6 +146,70 @@ describe("CreativeAutomationService", () => {
 
     expect(findCreativeSourceItemById(handle.db, item.id)?.writingStatus).toBe("queued");
     expect(service.getStatus().automaticWriteDispatchedToday).toBe(0);
+  });
+
+  it("写作技术失败到达上限后收口素材状态，并允许再次人工入队", async () => {
+    const handle = await createTestDatabase("hot-now-automation-write-failed-");
+    handles.push(handle);
+    const item = insertCreativeSourceItem(handle.db, {
+      externalId: "manual-write-failed", collectorAgent: "test", title: "反代失败素材", url: "https://example.com/manual-write-failed",
+    });
+    updateCreativeSourceItemAccountFit(handle.db, item.id, {
+      level: "high", reason: "适配", details: {}, ruleVersion: "v3", updateWritingStatus: false,
+    });
+    handle.db.prepare("UPDATE creative_source_items SET writing_status = 'queued' WHERE id = ?").run(item.id);
+    handle.db.prepare(`INSERT INTO creative_automation_jobs(job_type, source_item_id, trigger_kind, status, attempts)
+      VALUES ('write', ?, 'manual-write', 'pending', 2)`).run(item.id);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("upstream unavailable", { status: 502 })));
+    const service = new CreativeAutomationService(handle.db, null, { baseUrl: "https://hermes.test", token: "token" });
+
+    await service.runNow();
+
+    expect(handle.db.prepare("SELECT status, last_error FROM creative_automation_jobs WHERE source_item_id = ?").get(item.id)).toEqual({
+      status: "failed", last_error: "Hermes HTTP 502",
+    });
+    expect(findCreativeSourceItemById(handle.db, item.id)?.writingStatus).toBe("failed");
+    expect(service.enqueueManualWrite(item.id).accepted).toBe(true);
+  });
+
+  it("创作自动化关闭时仍允许人工写作投递", async () => {
+    const handle = await createTestDatabase("hot-now-automation-manual-write-");
+    handles.push(handle);
+    const item = insertCreativeSourceItem(handle.db, {
+      externalId: "manual-write-while-auto-off", collectorAgent: "test", title: "自动化关闭时的人工写作", url: "https://example.com/manual-write-while-auto-off",
+    });
+    updateCreativeSourceItemAccountFit(handle.db, item.id, {
+      level: "high", reason: "适配", details: {}, ruleVersion: "v3", updateWritingStatus: false,
+    });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ success: true }), { status: 200 })));
+    const service = new CreativeAutomationService(handle.db, null, { baseUrl: "https://hermes.test", token: "token" });
+
+    service.setMasterEnabled(false);
+    expect(service.enqueueManualWrite(item.id).accepted).toBe(true);
+    await service.runNow();
+
+    expect(handle.db.prepare("SELECT status FROM creative_automation_jobs WHERE source_item_id = ?").get(item.id)).toEqual({ status: "dispatched" });
+    expect(findCreativeSourceItemById(handle.db, item.id)?.writingStatus).toBe("queued");
+  });
+
+  it("恢复扫描会收口历史失败但仍显示排队中的写作素材", async () => {
+    const handle = await createTestDatabase("hot-now-automation-write-reconcile-");
+    handles.push(handle);
+    const item = insertCreativeSourceItem(handle.db, {
+      externalId: "stale-queued-write", collectorAgent: "test", title: "历史失败素材", url: "https://example.com/stale-queued-write",
+    });
+    updateCreativeSourceItemAccountFit(handle.db, item.id, {
+      level: "high", reason: "适配", details: {}, ruleVersion: "v3", updateWritingStatus: false,
+    });
+    handle.db.prepare("UPDATE creative_source_items SET writing_status = 'queued' WHERE id = ?").run(item.id);
+    handle.db.prepare(`INSERT INTO creative_automation_jobs(job_type, source_item_id, trigger_kind, status, attempts, last_error)
+      VALUES ('write', ?, 'manual-write', 'failed', 3, 'Hermes HTTP 502')`).run(item.id);
+    const service = new CreativeAutomationService(handle.db, null, null);
+
+    await service.runNow();
+
+    expect(findCreativeSourceItemById(handle.db, item.id)?.writingStatus).toBe("failed");
+    expect(service.enqueueManualWrite(item.id).accepted).toBe(true);
   });
 
   it("自动评估只扫描最近 72 小时，历史待评估素材保持不动", async () => {

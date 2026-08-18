@@ -85,7 +85,7 @@ const allDefs = [...pipelineGroup, ...businessGroup, ...paramGroup, ...shortCont
 
 // 状态摘要
 const statusSummary = computed(() => {
-  if (!pipelineOn.value) return { text: "⚠️ 管线已紧急制动，所有流程已停止", type: "warning" as const };
+  if (!pipelineOn.value) return { text: "⚠️ 自动化管线已暂停，采集和自动任务停止；素材库人工写作仍可用", type: "warning" as const };
   if (!writeOn.value) return { text: "自动写作已暂停，采集评分正常运行", type: "info" as const };
   return { text: "管线正常运行中", type: "success" as const };
 });

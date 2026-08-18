@@ -102,8 +102,12 @@ export function registerCreativeSourceActionRoutes(
     if (!options.automation) return reply.code(503).send({ ok: false, reason: "creative-automation-not-available" });
     const kind = (request.params as { kind: string }).kind;
     const enabled = (request.body as { enabled?: unknown } | undefined)?.enabled;
-    if ((kind !== "evaluate" && kind !== "write") || typeof enabled !== "boolean") return reply.code(400).send({ ok: false, reason: "invalid-automation-setting" });
-    options.automation.setEnabled(kind, enabled);
+    if ((kind !== "master" && kind !== "evaluate" && kind !== "write") || typeof enabled !== "boolean") return reply.code(400).send({ ok: false, reason: "invalid-automation-setting" });
+    if (kind === "master") {
+      options.automation.setMasterEnabled(enabled);
+    } else {
+      options.automation.setEnabled(kind, enabled);
+    }
     return reply.send({ ok: true, ...options.automation.getStatus() });
   });
 

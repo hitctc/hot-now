@@ -62,6 +62,16 @@ async function setAutomationEnabled(kind: "evaluate" | "write", enabled: boolean
   }
 }
 
+async function setAutomationMasterEnabled(enabled: boolean): Promise<void> {
+  if (automationUpdating) return;
+  automationUpdating = true;
+  try {
+    automationData.value = await updateCreativeAutomationEnabled("master", enabled);
+  } finally {
+    automationUpdating = false;
+  }
+}
+
 function refreshQueue(): Promise<void> {
   if (queueRefreshRequest) return queueRefreshRequest;
   queueRefreshRequest = fetchWriteQueueStatus()
@@ -152,9 +162,13 @@ onBeforeUnmount(() => {
       <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">账号适配自动化</h3>
         <div class="flex items-center gap-2 text-xs">
+          <a-switch :checked="automationData.automationEnabled" :loading="automationUpdating" checked-children="自动化运行中" un-checked-children="自动化已停止" @change="setAutomationMasterEnabled($event)" />
           <a-switch :checked="automationData.autoEvaluateEnabled" :loading="automationUpdating" checked-children="自动评估" un-checked-children="评估暂停" @change="setAutomationEnabled('evaluate', $event)" />
           <a-switch :checked="automationData.autoWriteEnabled" :loading="automationUpdating" checked-children="自动写作" un-checked-children="写作暂停" @change="setAutomationEnabled('write', $event)" />
         </div>
+      </div>
+      <div v-if="!automationData.automationEnabled" class="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+        创作自动化已停止：未开始的自动任务已取消，人工评估和人工写作仍可使用。
       </div>
       <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <div class="rounded border border-gray-100 bg-gray-50 px-3 py-2 text-center"><div class="text-lg font-bold">{{ automationData.pendingEvaluationCount }}</div><div class="text-[11px] text-editorial-text-muted">待评估</div></div>

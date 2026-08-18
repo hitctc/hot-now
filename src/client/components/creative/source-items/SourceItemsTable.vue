@@ -253,10 +253,10 @@ function copyId(id: number): void {
         </div>
       </template>
 
-      <!-- 写文章列 -->
+      <!-- 写文章列；长文人工写作不受自动化/旧管线开关影响，短内容继续遵循原有开关。 -->
       <template v-else-if="column.key === 'quickCopy'">
-        <a-tooltip v-if="!pipelineOn" title="管线已紧急制动，请先恢复管线">
-          <a-button type="link" size="small" class="!p-0 !text-[11px]" disabled>{{ mode === "article" ? "写文章" : "写短内容" }}</a-button>
+        <a-tooltip v-if="!pipelineOn && mode === 'short_content'" title="短内容管线已紧急制动，请先恢复管线">
+          <a-button type="link" size="small" class="!p-0 !text-[11px]" disabled>写短内容</a-button>
         </a-tooltip>
         <a-button
           v-else

@@ -192,6 +192,8 @@ import ArticlePlanningSections from "./article-detail/ArticlePlanningSections.vu
 import ArticleSimilaritySection from "./article-detail/ArticleSimilaritySection.vue";
 import ArticleSupplementalSections from "./article-detail/ArticleSupplementalSections.vue";
 import { useArticleEditorViewport } from "./article-detail/useArticleEditorViewport.js";
+import { useArticleAutosave } from "./article-detail/useArticleAutosave.js";
+import { useArticleImageWorkflow } from "./article-detail/useArticleImageWorkflow.js";
 import ArticleImageWorkflowSections from "./article-detail/ArticleImageWorkflowSections.vue";
 import ArticleShortImagePromptSection from "./article-detail/ArticleShortImagePromptSection.vue";
 import ArticleDetailFooter from "./article-detail/ArticleDetailFooter.vue";
@@ -202,27 +204,14 @@ import ImageActionModal from "./ImageActionModal.vue";
 import { checkPublishConditions } from "./articleStatusShared.js";
 import {
   editFinishedArticle,
-  generateFinishedArticleCoverPrompt,
-  generateFinishedArticleInlinePrompts,
   readCreativeSourceItem,
   deleteFinishedArticle,
   restoreFinishedArticle,
-  regenCover,
   generateComments,
   generateAuthorExtensions,
   regenTitle,
   regenIntro,
-  regenInlineImage,
-  renderShortImage,
-  regenImagePrompts,
-  parseArticleImages,
-  extractImageUrl,
-  uploadImages,
-  enqueueLunaImageJob,
-  fetchLunaImageJobs,
   type CreativeFinishedArticle,
-  type LunaImageJob,
-  type LunaImageTarget,
   type WechatThemeId,
 } from "../../services/creativeApi.js";
 import { renderWechatThemePreview } from "../../services/wechatRenderer.js";
@@ -232,7 +221,6 @@ import {
   readFirstH1,
   replaceFirstH1 as replaceH1,
 } from "./article-detail/articleTitleSync.js";
-import { createLatestAutosaveQueue } from "./article-detail/latestAutosaveQueue.js";
 
 const props = defineProps<{
   open: boolean;
@@ -250,40 +238,43 @@ const emit = defineEmits<{
   openPush: [article: CreativeFinishedArticle, themeId: WechatThemeId];
 }>();
 
-// ─── 重试生成图片提示词 ───
+// 深层文章对象修改不会触发响应式，图片和保存组合式逻辑通过这个计数器通知发布条件重新计算。
+const articleChangeTick = ref(0);
+function tickArticleChange(): void { articleChangeTick.value++; }
 
-// ─── 重新生成图片提示词 ───
+type PreviewThemeKey = "classic" | "live" | "bauhaus" | "sunsetFilm" | "receipt" | "blackGold";
 
-const regenPromptsLoading = ref(false);
+const previewThemeOptions: { key: PreviewThemeKey; label: string }[] = [
+  { key: "classic", label: "默认" },
+  { key: "bauhaus", label: "包豪斯" },
+  { key: "sunsetFilm", label: "落日胶片" },
+  { key: "receipt", label: "购物小票" },
+  { key: "blackGold", label: "黑金主题" },
+  { key: "live", label: "实时预览" },
+];
 
-async function handleRegenImagePrompts(): Promise<void> {
-  if (!props.article) return;
-  const { Modal } = await import("ant-design-vue");
-  const confirmed = await new Promise<boolean>(resolve => {
-    Modal.confirm({
-      bodyStyle: { padding: '24px' },
-      title: "重新生成图片提示词",
-      content: "将根据当前正文重新生成所有图片提示词，原有提示词会被覆盖。预计需要 2~3 分钟，确认继续？",
-      okText: "确认生成", cancelText: "取消",
-      onOk: () => resolve(true), onCancel: () => resolve(false),
-    });
-  });
-  if (!confirmed) return;
+const activePreviewTheme = ref<PreviewThemeKey>("sunsetFilm");
 
-  regenPromptsLoading.value = true;
-  try {
-    const res = await regenImagePrompts(props.article.id);
-    if (res.ok) {
-      message.success("图片提示词已更新");
-      emit("saved");
-    } else {
-      message.error(res.reason ?? "图片提示词生成失败");
-    }
-  } catch {
-    message.error("图片提示词生成请求失败");
-  } finally {
-    regenPromptsLoading.value = false;
-  }
+const themeIdMap: Record<Exclude<PreviewThemeKey, "live">, WechatThemeId> = {
+  classic: "classic",
+  bauhaus: "bauhaus",
+  sunsetFilm: "sunset-film",
+  receipt: "receipt",
+  blackGold: "black-gold",
+};
+
+const reverseThemeIdMap: Record<string, Exclude<PreviewThemeKey, "live">> = {
+  classic: "classic",
+  bauhaus: "bauhaus",
+  "sunset-film": "sunsetFilm",
+  receipt: "receipt",
+  "black-gold": "blackGold",
+};
+
+/** 图片操作使用当前预览主题；实时预览没有固定主题时沿用原来的 classic 兜底。 */
+function getImagePreviewThemeId(): WechatThemeId {
+  if (activePreviewTheme.value !== "live") return themeIdMap[activePreviewTheme.value];
+  return "classic";
 }
 
 // 编辑器可视区由组合式逻辑管理，抽屉只负责在打开/关闭时调用其生命周期方法。
@@ -325,106 +316,78 @@ function setPromptDirty(key: string, dirty: boolean): void {
   promptDirtyKeys.value = next;
 }
 
-const coverPromptGenerating = ref(false);
-const inlinePromptsGenerating = ref(false);
-const inlinePromptGeneratingIndex = ref<number | null>(null);
-
-/** 只生成封面提示词，现有封面图和正文均不变。 */
-async function handleGenerateCoverPrompt(): Promise<void> {
-  if (!props.article || coverPromptGenerating.value) return;
-  coverPromptGenerating.value = true;
-  try {
-    const result = await generateFinishedArticleCoverPrompt(props.article.id);
-    props.article.coverImagePrompt = result.article.coverImagePrompt;
-    setPromptDirty("cover", false);
-    message.success("封面提示词已生成");
-    emit("saved");
-  } catch {
-    message.error("封面提示词生成失败");
-  } finally {
-    coverPromptGenerating.value = false;
-  }
-}
-
-/** 首次成功时接收占位符；再次或单条生成只更新提示词。 */
-async function handleGenerateInlinePrompts(index?: number): Promise<void> {
-  if (!props.article || inlinePromptsGenerating.value || inlinePromptGeneratingIndex.value !== null) return;
-  if (index) inlinePromptGeneratingIndex.value = index;
-  else inlinePromptsGenerating.value = true;
-  try {
-    const result = await generateFinishedArticleInlinePrompts(props.article.id, index);
-    props.article.inlineImagePrompts = result.article.inlineImagePrompts;
-    if (result.article.humanMarkdown !== null) {
-      props.article.humanMarkdown = result.article.humanMarkdown;
-      humanContent.value = result.article.humanMarkdown;
-      lastSavedHuman = result.article.humanMarkdown;
-    }
-    if (index) setPromptDirty(`inline-${index}`, false);
-    message.success(index ? `配图 ${index} 提示词已更新` : "正文配图提示词已生成");
-    tickArticleChange();
-    emit("saved");
-  } catch {
-    message.error("正文配图提示词生成失败");
-  } finally {
-    inlinePromptsGenerating.value = false;
-    inlinePromptGeneratingIndex.value = null;
-  }
-}
-
-async function saveCoverPrompt(value: string): Promise<void> {
-  if (!props.article) return;
-  try {
-    await editFinishedArticle(props.article.id, { coverImagePrompt: value });
-    props.article.coverImagePrompt = value;
-    setPromptDirty("cover", false);
-    emit("saved");
-  } catch {
-    message.error("封面提示词保存失败");
-  }
-}
-
-async function saveInlinePrompt(key: string, value: string): Promise<void> {
-  if (!props.article) return;
-  const prompts = { ...(props.article.inlineImagePrompts ?? {}), [key]: value };
-  try {
-    await editFinishedArticle(props.article.id, { inlineImagePrompts: prompts });
-    props.article.inlineImagePrompts = prompts;
-    setPromptDirty(`inline-${key}`, false);
-    emit("saved");
-  } catch {
-    message.error("正文配图提示词保存失败");
-  }
-}
-
-async function saveLegacyShortPrompt(index: number, value: string): Promise<void> {
-  if (!props.article) return;
-  const prompts = [...(props.article.imagePrompts ?? [])];
-  prompts[index] = value;
-  try {
-    await editFinishedArticle(props.article.id, { imagePrompts: prompts });
-    props.article.imagePrompts = prompts;
-    setPromptDirty(`short-${index}`, false);
-    emit("saved");
-  } catch {
-    message.error("短内容提示词保存失败");
-  }
-}
-
 // ─── 正文编辑 ───
 
 const editContent = ref("");
 // 人工转写内容（中栏 = 发布内容）：注入真人 token 过朱雀；打开时初始预填 AI 草稿副本
 const humanContent = ref("");
-const saving = ref(false);
-const lastSavedAt = ref<number | null>(null);
 // 相对时间展示需要每秒刷新，用 tick 驱动 computed 重算
 const relativeTick = ref(0);
 let relativeTimer: ReturnType<typeof setInterval> | null = null;
 // 记住打开时的原始内容，用于判断是否真正发生变化
 let lastSavedContent = "";
 let lastSavedHuman = "";
-let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
-let humanAutoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+const {
+  saving,
+  lastSavedAt,
+  clearAutosaveTimers,
+  prepareExplicitContentSave,
+  enqueueDraftAutosave,
+  enqueueHumanAutosave,
+} = useArticleAutosave({
+  getArticle: () => props.article,
+  editContent,
+  humanContent,
+  getLastSavedContent: () => lastSavedContent,
+  setLastSavedContent: (content) => { lastSavedContent = content; },
+  getLastSavedHuman: () => lastSavedHuman,
+  setLastSavedHuman: (content) => { lastSavedHuman = content; },
+  isOpen: () => props.open,
+  isReadonly: () => Boolean(props.readonly),
+  onSaved: () => emit("saved"),
+});
+
+const {
+  articleImages,
+  displayCoverImages,
+  activeCoverIndex,
+  inlineImageSlotCount,
+  totalImageSlotCount,
+  coverPromptGenerating,
+  inlinePromptsGenerating,
+  inlinePromptGeneratingIndex,
+  uploadingCover,
+  uploadingInline,
+  lunaImageEligible,
+  lunaImageJobs,
+  handleGenerateCoverPrompt,
+  handleUploadCover,
+  selectCoverImage,
+  saveCoverPrompt,
+  handleGenerateInlinePrompts,
+  handleUploadInlineImage,
+  saveInlinePrompt,
+  saveLegacyShortPrompt,
+  handleGenerateLunaImage,
+  loadLunaImageJobs,
+  stopLunaImageJobsPolling,
+  resetImageState,
+} = useArticleImageWorkflow({
+  getArticle: () => props.article,
+  isOpen: () => props.open,
+  editContent,
+  humanContent,
+  getLastSavedContent: () => lastSavedContent,
+  setLastSavedContent: (content) => { lastSavedContent = content; },
+  getLastSavedHuman: () => lastSavedHuman,
+  setLastSavedHuman: (content) => { lastSavedHuman = content; },
+  setPromptDirty,
+  isLivePreview: () => activePreviewTheme.value === "live",
+  getPreviewThemeId: getImagePreviewThemeId,
+  tickArticleChange,
+  onSaved: () => emit("saved"),
+});
 
 const savedAtLabel = computed(() => {
   // 依赖 relativeTick 触发重算
@@ -765,415 +728,8 @@ function handleImageActionDone(): void {
   emit("saved");
 }
 
-/** 在 markdown 中替换第 imageIndex 个配图：先占位符 [IMAGEN]，再第 N 个 ![配图N]，都没有则追加到末尾 */
-function applyInlineImage(md: string, imageIndex: number, newUrl: string): string {
-  if (new RegExp(`\\[IMAGE${imageIndex}\\]`).test(md)) {
-    return md.replace(new RegExp(`\\[IMAGE${imageIndex}\\]`, "g"), `![配图${imageIndex}](${newUrl})`);
-  }
-  const imgPattern = /!\[配图[^\]]*\]\([^)]+\)/g;
-  if ([...md.matchAll(imgPattern)][imageIndex - 1]) {
-    let count = 0;
-    return md.replace(imgPattern, (full) => {
-      count++;
-      return count === imageIndex ? `![配图${imageIndex}](${newUrl})` : full;
-    });
-  }
-  return `${md}\n\n![配图${imageIndex}](${newUrl})`;
-}
-
-/** 从 markdown 提取第 imageIndex 个配图 URL（用于 regen 后端回写 contentMarkdown 后定位新图） */
-function extractInlineImageUrl(md: string, imageIndex: number): string | null {
-  const matches = [...md.matchAll(/!\[配图[^\]]*\]\(([^)]+)\)/g)];
-  return matches[imageIndex - 1]?.[1] ?? null;
-}
-
-/** 替换 markdown 中的封面图行；newUrl 为空则不动，无封面图行则在开头插入 */
-function applyCoverImage(md: string, newUrl: string): string {
-  if (!newUrl) return md;
-  const coverRegex = /^!\[封面图[^\]]*\]\([^)]+\)/m;
-  if (coverRegex.test(md)) {
-    return md.replace(coverRegex, `![封面图](${newUrl})`);
-  }
-  return `![封面图](${newUrl})\n\n${md}`;
-}
-
-// ─── 正文配图重新生成 ───
-
-const regenInlineImageLoading = ref<Set<number>>(new Set());
-
-const articleImages = computed(() => {
-  return parseArticleImages(props.article?.imagesJson ?? null);
-});
-
-// Luna 生图是独立任务，不复用旧 ImageActionModal 的 loading 或结果状态。
-const lunaImageJobs = ref<Record<string, LunaImageJob>>({});
-const appliedLunaJobIds = new Set<string>();
-let lunaImageJobsTimer: ReturnType<typeof setInterval> | null = null;
-
-/** 只有文章 trace 明确记录 codex/gpt-5.6-luna 时才展示独立按钮。 */
-const lunaImageEligible = computed(() => {
-  return Boolean(props.article?.stepTrace?.some((entry) => {
-    const meta = entry.meta;
-    if (meta?.writingProvider === "codex" && meta.writingModel === "gpt-5.6-luna") {
-      return true;
-    }
-    // 短内容 trace 将实际模型写在“短内容写作”步骤顶层，兼容其现有留痕格式。
-    const shortTrace = entry as typeof entry & { provider?: string; model?: string };
-    return entry.stepName === "短内容写作"
-      && shortTrace.provider === "codex"
-      && shortTrace.model === "gpt-5.6-luna";
-  }));
-});
-
-/** 将服务端任务按封面或正文下标映射到详情页的单个提示词。 */
-function lunaJobKey(target: LunaImageTarget, imageIndex?: number): string {
-  return target === "cover" ? "cover" : `inline-${imageIndex}`;
-}
-
-/** 只保留每个目标最新的一条任务，旧的失败记录仍留在 Hermes 状态文件中可审计。 */
-function mergeLunaImageJobs(jobs: LunaImageJob[]): Record<string, LunaImageJob> {
-  const next: Record<string, LunaImageJob> = {};
-  for (const job of jobs) {
-    const key = lunaJobKey(job.target, job.imageIndex ?? undefined);
-    const previous = next[key];
-    if (!previous || job.updatedAt > previous.updatedAt) next[key] = job;
-  }
-  return next;
-}
-
-/** 将独立任务的最终图片结果合并到当前文章视图，不触碰图片提示词。 */
-function applyLunaJobResult(job: LunaImageJob): void {
-  if (!props.article || job.status !== "succeeded" || !job.imageUrl) return;
-  if (appliedLunaJobIds.has(job.jobId)) return;
-  appliedLunaJobIds.add(job.jobId);
-
-  if (job.target === "cover") {
-    const covers = Array.isArray(job.coverImage)
-      ? job.coverImage
-      : [job.imageUrl, ...displayCoverImages.value];
-    localCoverImages.value = covers;
-    props.article.coverImage = covers;
-    props.article.coverImageIndex = 0;
-    activeCoverIndex.value = 0;
-  } else if (job.imageIndex != null) {
-    if (Array.isArray(job.images)) {
-      props.article.imagesJson = job.images as typeof props.article.imagesJson;
-    }
-    if (typeof job.contentMarkdown === "string") {
-      props.article.contentMarkdown = job.contentMarkdown;
-      const draftWasDirty = editContent.value !== lastSavedContent;
-      editContent.value = draftWasDirty
-        ? applyInlineImage(editContent.value, job.imageIndex, job.imageUrl)
-        : job.contentMarkdown;
-      if (!draftWasDirty) lastSavedContent = job.contentMarkdown;
-    }
-    if (typeof job.humanMarkdown === "string") {
-      props.article.humanMarkdown = job.humanMarkdown;
-      const humanWasDirty = humanContent.value !== lastSavedHuman;
-      humanContent.value = humanWasDirty
-        ? applyInlineImage(humanContent.value, job.imageIndex, job.imageUrl)
-        : job.humanMarkdown;
-      if (!humanWasDirty) lastSavedHuman = job.humanMarkdown;
-    }
-  }
-  tickArticleChange();
-  emit("saved");
-}
-
-/** 查询 Luna 任务并在没有活动任务时停止轮询，避免详情页常驻请求。 */
-async function loadLunaImageJobs(): Promise<void> {
-  if (!props.open || !props.article || !lunaImageEligible.value) return;
-  try {
-    const result = await fetchLunaImageJobs(props.article.id);
-    const next = mergeLunaImageJobs(result.jobs ?? []);
-    lunaImageJobs.value = next;
-    Object.values(next).forEach(applyLunaJobResult);
-    const hasActiveJob = Object.values(next).some(job => job.status === "queued" || job.status === "running");
-    if (hasActiveJob) {
-      startLunaImageJobsPolling();
-    } else if (lunaImageJobsTimer) {
-      clearInterval(lunaImageJobsTimer);
-      lunaImageJobsTimer = null;
-    }
-  } catch {
-    // 轮询失败不弹重复错误；下一次打开或用户点击时仍可继续请求。
-  }
-}
-
-/** 启动独立 Luna 状态轮询，间隔内不触发任何旧图片流程。 */
-function startLunaImageJobsPolling(): void {
-  if (lunaImageJobsTimer) return;
-  lunaImageJobsTimer = setInterval(() => { void loadLunaImageJobs(); }, 3_000);
-}
-
-/** 清理详情关闭或组件销毁时的 Luna 状态轮询。 */
-function stopLunaImageJobsPolling(): void {
-  if (!lunaImageJobsTimer) return;
-  clearInterval(lunaImageJobsTimer);
-  lunaImageJobsTimer = null;
-}
-
-/** 提交一个提示词对应的一张 Luna 图片；封面追加，正文由服务端覆盖对应位置。 */
-async function handleGenerateLunaImage(target: LunaImageTarget, imageIndex?: number): Promise<void> {
-  if (!props.article || !lunaImageEligible.value) return;
-  const key = lunaJobKey(target, imageIndex);
-  const current = lunaImageJobs.value[key];
-  if (current?.status === "queued" || current?.status === "running") return;
-  try {
-    const result = await enqueueLunaImageJob(props.article.id, target, imageIndex);
-    if (!result.job) {
-      message.error(result.reason ?? "Luna 生图任务提交失败");
-      return;
-    }
-    lunaImageJobs.value = { ...lunaImageJobs.value, [key]: result.job };
-    startLunaImageJobsPolling();
-    message.success(target === "cover" ? "Luna 封面图已排队，完成后追加到封面列表" : `Luna 配图${imageIndex}已排队，完成后覆盖对应图片`);
-  } catch {
-    message.error("Luna 生图任务提交失败");
-  }
-}
-
-// 检测正文中剩余的 [IMAGE1]/[IMAGE2] 占位符索引
-const remainingImageSlots = computed(() => {
-  if (!humanContent.value) return [];
-  const matches = humanContent.value.match(/\[IMAGE(\d+)\]/gi) ?? [];
-  return matches.map(m => parseInt(m.replace(/\[IMAGE|\]/gi, ""), 10));
-});
-
-// 提示词数量也要纳入上传槽位，短内容没有正文占位符时才能显示对应的配图操作。
-const imagePromptSlotCount = computed(() => {
-  if (props.article?.direction === "short_content") {
-    return props.article.imagePrompts?.length ?? 0;
-  }
-  const indices = Object.keys(props.article?.inlineImagePrompts ?? {})
-    .map(Number)
-    .filter(Number.isInteger);
-  return indices.length > 0 ? Math.max(...indices) : 0;
-});
-
-// 总配图槽数 = 已生成 + 未替换占位符的最大索引 + 已保存提示词的最大索引
-const totalImageSlotCount = computed(() => {
-  const fromImages = articleImages.value.length;
-  const fromPlaceholders = remainingImageSlots.value.length > 0 ? Math.max(...remainingImageSlots.value) : 0;
-  return Math.max(fromImages, fromPlaceholders, imagePromptSlotCount.value);
-});
-
-const inlineImageSlotCount = computed(() => remainingImageSlots.value.length);
-
-// 正文配图是否完整（占位符已全部替换为实际图片）
-const inlineImagesComplete = computed(() => {
-  return articleImages.value.length > 0 && inlineImageSlotCount.value === 0;
-});
-
-async function handleRegenInlineImage(imageIndex: number): Promise<void> {
-  if (!props.article || regenInlineImageLoading.value.has(imageIndex)) return;
-  regenInlineImageLoading.value = new Set([...regenInlineImageLoading.value, imageIndex]);
-  try {
-    const result = await regenInlineImage(props.article.id, imageIndex);
-    if (result.ok) {
-      // Hermes 已回写 contentMarkdown 和 images，更新本地状态并同步保存 wechatHtml
-      if (result.contentMarkdown) {
-        editContent.value = result.contentMarkdown;
-        props.article.contentMarkdown = result.contentMarkdown;
-        lastSavedContent = result.contentMarkdown;
-
-        // 同步人工转写（发布内容）的对应配图：从回写的 contentMarkdown 提取新图 URL，只换图不丢用户转写文字
-        const newUrl = extractInlineImageUrl(result.contentMarkdown, imageIndex);
-        let humanMd = humanContent.value;
-        if (newUrl) {
-          humanMd = applyInlineImage(humanContent.value, imageIndex, newUrl);
-          humanContent.value = humanMd;
-          lastSavedHuman = humanMd;
-          props.article.humanMarkdown = humanMd;
-        }
-
-        // 同步渲染并保存公众号预览 HTML（总是更新，live 模式用 classic 兜底）
-        const saveFields: Record<string, unknown> = { contentMarkdown: result.contentMarkdown };
-        if (newUrl) saveFields.humanMarkdown = humanMd;
-        const themeId = activePreviewTheme.value !== "live"
-          ? themeIdMap[activePreviewTheme.value]
-          : "classic" as WechatThemeId;
-        const html = renderWechatThemePreview(humanMd, themeId);
-        props.article.wechatHtml = html;
-        saveFields.wechatHtml = html;
-        editFinishedArticle(props.article.id, saveFields).catch(() => {});
-      }
-      if (result.images) {
-        props.article.imagesJson = result.images as typeof props.article.imagesJson;
-      }
-      message.success(`配图 ${imageIndex} 已重新生成`);
-      tickArticleChange();
-    } else {
-      message.error(result.reason ?? "配图生成失败");
-    }
-  } catch {
-    message.error("配图生成请求失败");
-  } finally {
-    regenInlineImageLoading.value = new Set([...regenInlineImageLoading.value].filter(i => i !== imageIndex));
-  }
-}
-
-// ─── 短内容配图：按第 promptIndex 条提示词出图（图后置，不注入正文） ───
-
-const renderShortImageLoading = ref<Set<number>>(new Set());
-
-async function handleRenderShortImage(promptIndex: number): Promise<void> {
-  if (!props.article || renderShortImageLoading.value.has(promptIndex)) return;
-  renderShortImageLoading.value = new Set([...renderShortImageLoading.value, promptIndex]);
-  try {
-    const result = await renderShortImage(props.article.id, promptIndex);
-    if (result.ok) {
-      // 后端已回写 images_json，更新本地状态（封面图区短内容分支会自动显示新图）
-      if (result.images) {
-        props.article.imagesJson = result.images as typeof props.article.imagesJson;
-      }
-      message.success(`配图 ${promptIndex + 1} 已生成`);
-      tickArticleChange();
-    } else {
-      message.error(result.reason ?? "配图生成失败");
-    }
-  } catch {
-    message.error("配图生成请求失败");
-  } finally {
-    renderShortImageLoading.value = new Set([...renderShortImageLoading.value].filter(i => i !== promptIndex));
-  }
-}
-
-// ─── 手动上传正文配图 ──
-
-const uploadingInline = ref<Set<number>>(new Set());
-
-async function handleUploadInlineImage(imageIndex: number, event: Event): Promise<void> {
-  const input = event.target as HTMLInputElement;
-  const files = input.files;
-  if (!files || files.length === 0 || !props.article) return;
-  const fileArray = Array.from(files);
-  input.value = "";
-
-  uploadingInline.value = new Set([...uploadingInline.value, imageIndex]);
-  try {
-    const uploaded = await uploadImages(fileArray, "inline");
-    if (uploaded.length === 0) {
-      message.error(`配图 ${imageIndex} 上传失败`);
-      return;
-    }
-    const newUrl = uploaded[0].storedUrl;
-
-    // ── 逻辑1：更新 imagesJson 数组对应位置 ──
-    const currentImages = parseArticleImages(props.article?.imagesJson ?? null);
-    const updatedImages = [...currentImages];
-    // 确保数组足够长
-    while (updatedImages.length < imageIndex) {
-      updatedImages.push({ url: "", purpose: "inline", alt: "" });
-    }
-    updatedImages[imageIndex - 1] = newUrl;
-    props.article.imagesJson = updatedImages as typeof props.article.imagesJson;
-
-    // ── 逻辑2 & 3：替换正文 markdown 中的图片（AI 草稿 + 人工转写双写）──
-    const aiDraftHasSameSlot = new RegExp(`\\[IMAGE${imageIndex}\\]`).test(editContent.value)
-      || [...editContent.value.matchAll(/!\[配图[^\]]*\]\([^)]+\)/g)].length >= imageIndex;
-    const md = aiDraftHasSameSlot ? applyInlineImage(editContent.value, imageIndex, newUrl) : editContent.value;
-    const humanMd = applyInlineImage(humanContent.value, imageIndex, newUrl);
-
-    editContent.value = md;
-    humanContent.value = humanMd;
-    props.article.contentMarkdown = md;
-    props.article.humanMarkdown = humanMd;
-    lastSavedContent = md;
-    lastSavedHuman = humanMd;
-
-    const saveFields: Record<string, unknown> = {
-      contentMarkdown: md,
-      humanMarkdown: humanMd,
-      images: updatedImages,
-    };
-    const themeId = activePreviewTheme.value !== "live"
-      ? themeIdMap[activePreviewTheme.value]
-      : "classic" as WechatThemeId;
-    const html = renderWechatThemePreview(humanMd, themeId);
-    props.article.wechatHtml = html;
-    saveFields.wechatHtml = html;
-
-    await editFinishedArticle(props.article.id, saveFields);
-    message.success(`配图 ${imageIndex} 已上传`);
-    tickArticleChange();
-  } catch {
-    message.error(`配图 ${imageIndex} 上传失败`);
-  } finally {
-    uploadingInline.value = new Set([...uploadingInline.value].filter(i => i !== imageIndex));
-  }
-}
-
-// ─── 封面图选择 & 重新生成 ───
-
-const activeCoverIndex = ref(0);
-const regenerating = ref(false);
-// 按需生成评论的 loading 态
+// 按需生成评论：调后端代理拉取 Hermes 结果并注入当前文章。
 const generatingComments = ref(false);
-// 按需生成作者拓展的 loading 态
-const generatingAuthorExtensions = ref(false);
-// 本地缓存最新的 coverImage 数组，regen 后不依赖父组件刷新
-const localCoverImages = ref<string[]>([]);
-
-const displayCoverImages = computed(() => {
-  // 新短内容使用独立封面；旧短内容没有 coverImage 时继续兼容历史配图组。
-  if (props.article?.direction === "short_content") {
-    if (props.article.coverImage.length > 0) return props.article.coverImage.slice(0, 10);
-    return parseArticleImages(props.article?.imagesJson ?? null)
-      .map(extractImageUrl)
-      .slice(0, 10);
-  }
-  const src = localCoverImages.value.length > 0 ? localCoverImages.value : (props.article?.coverImage ?? []);
-  return src.slice(0, 10);
-});
-
-async function handleRegenCover(): Promise<void> {
-  if (!props.article || regenerating.value) return;
-  regenerating.value = true;
-  try {
-    const result = await regenCover(props.article.id);
-    if (result.ok && result.coverImage) {
-      localCoverImages.value = result.coverImage;
-      activeCoverIndex.value = 0;
-      props.article.coverImage = result.coverImage;
-      props.article.coverImageIndex = 0;
-
-      // 联动：替换 AI 草稿和人工转写（发布内容）的封面图行，渲染并保存 wechatHtml
-      const newUrl = result.coverImage[0] ?? "";
-      const md = applyCoverImage(editContent.value, newUrl);
-      const humanMd = applyCoverImage(humanContent.value, newUrl);
-      editContent.value = md;
-      humanContent.value = humanMd;
-      props.article.contentMarkdown = md;
-      props.article.humanMarkdown = humanMd;
-      lastSavedContent = md;
-      lastSavedHuman = humanMd;
-
-      const saveFields: Record<string, unknown> = {
-        coverImageIndex: 0,
-        contentMarkdown: md,
-        humanMarkdown: humanMd,
-      };
-      if (activePreviewTheme.value !== "live" && humanMd) {
-        const html = renderWechatThemePreview(humanMd, themeIdMap[activePreviewTheme.value]);
-        props.article.wechatHtml = html;
-        saveFields.wechatHtml = html;
-      }
-      editFinishedArticle(props.article.id, saveFields).catch(() => {});
-
-      message.success("新封面图已生成");
-      tickArticleChange();
-    } else {
-      message.error(result.reason ?? "封面图生成失败");
-    }
-  } catch {
-    message.error("封面图生成请求失败");
-  } finally {
-    regenerating.value = false;
-  }
-}
-
-// 按需补评论：调后端代理拉 Hermes 生成 + 注入 article.comments（历史文章可首次生成，已有可覆盖）
 async function handleGenerateComments(): Promise<void> {
   if (!props.article || generatingComments.value) return;
   generatingComments.value = true;
@@ -1193,7 +749,8 @@ async function handleGenerateComments(): Promise<void> {
   }
 }
 
-// 按需补作者拓展：调后端代理拉 Hermes 生成 5 条作者视角拓展 + 注入 article.authorExtensions
+// 按需补作者拓展：调后端代理拉取 5 条作者视角拓展并注入当前文章。
+const generatingAuthorExtensions = ref(false);
 async function handleGenerateAuthorExtensions(): Promise<void> {
   if (!props.article || generatingAuthorExtensions.value) return;
   generatingAuthorExtensions.value = true;
@@ -1212,198 +769,6 @@ async function handleGenerateAuthorExtensions(): Promise<void> {
     generatingAuthorExtensions.value = false;
   }
 }
-
-// ─── 手动上传封面图 ──
-
-const uploadingCover = ref(false);
-
-async function handleUploadCover(event: Event): Promise<void> {
-  const input = event.target as HTMLInputElement;
-  const files = input.files;
-  if (!files || files.length === 0 || !props.article) return;
-  const fileArray = Array.from(files);
-  input.value = "";
-
-  uploadingCover.value = true;
-  try {
-    const uploaded = await uploadImages(fileArray, "cover");
-    if (uploaded.length === 0) {
-      message.error("封面图上传失败");
-      return;
-    }
-    const newUrl = uploaded[0].storedUrl;
-
-    // ── 逻辑1：更新 coverImage 数组（插入首位，默认选中） ──
-    const updatedCovers = [newUrl, ...displayCoverImages.value];
-    localCoverImages.value = updatedCovers;
-    activeCoverIndex.value = 0;
-    props.article.coverImage = updatedCovers;
-    props.article.coverImageIndex = 0;
-
-    // ── 逻辑2：将新封面图插入 AI 草稿和人工转写（发布内容）顶部 ──
-    const md = applyCoverImage(editContent.value, newUrl);
-    const humanMd = applyCoverImage(humanContent.value, newUrl);
-    editContent.value = md;
-    humanContent.value = humanMd;
-    props.article.contentMarkdown = md;
-    props.article.humanMarkdown = humanMd;
-    lastSavedContent = md;
-    lastSavedHuman = humanMd;
-
-    const saveFields: Record<string, unknown> = {
-      coverImage: updatedCovers,
-      coverImageIndex: 0,
-      contentMarkdown: md,
-      humanMarkdown: humanMd,
-    };
-    if (activePreviewTheme.value !== "live" && humanMd) {
-      const html = renderWechatThemePreview(humanMd, themeIdMap[activePreviewTheme.value]);
-      props.article.wechatHtml = html;
-      saveFields.wechatHtml = html;
-    }
-    await editFinishedArticle(props.article.id, saveFields);
-    message.success("封面图已上传");
-    tickArticleChange();
-  } catch {
-    message.error("封面图上传失败");
-  } finally {
-    uploadingCover.value = false;
-  }
-}
-
-async function selectCoverImage(idx: number): Promise<void> {
-  if (!props.article || idx === activeCoverIndex.value) return;
-
-  // 短内容：封面 = 配图组第 idx 张（idx 是 images 原始索引），只记 coverImageIndex，不改正文（图后置）
-  if (props.article.direction === "short_content") {
-    activeCoverIndex.value = idx;
-    try {
-      await editFinishedArticle(props.article.id, { coverImageIndex: idx });
-      props.article.coverImageIndex = idx;
-      emit("saved");
-    } catch { /* 静默失败，本地状态已更新 */ }
-    return;
-  }
-
-  const newUrl = displayCoverImages.value[idx];
-
-  // 替换 AI 草稿和人工转写（发布内容）的封面图行
-  const content = applyCoverImage(editContent.value, newUrl);
-  const humanMd = applyCoverImage(humanContent.value, newUrl);
-
-  activeCoverIndex.value = idx;
-  editContent.value = content;
-  humanContent.value = humanMd;
-  lastSavedHuman = humanMd;
-
-  try {
-    const saveFields: Record<string, unknown> = {
-      coverImageIndex: idx,
-      contentMarkdown: content,
-      humanMarkdown: humanMd,
-    };
-
-    if (activePreviewTheme.value !== "live" && humanMd) {
-      const themeId = themeIdMap[activePreviewTheme.value];
-      const html = renderWechatThemePreview(humanMd, themeId);
-      props.article.wechatHtml = html;
-      saveFields.wechatHtml = html;
-    }
-
-    await editFinishedArticle(props.article.id, saveFields);
-    props.article.coverImageIndex = idx;
-    props.article.contentMarkdown = content;
-    props.article.humanMarkdown = humanMd;
-    lastSavedContent = content;
-
-    emit("saved");
-  } catch { /* 静默失败，本地状态已更新 */ }
-}
-
-type AutosavePayload = { articleId: number; content: string };
-
-/** 左栏自动保存只落盘草稿快照，不读取或改写当前编辑器状态。 */
-async function persistDraftAutosave(payload: AutosavePayload): Promise<void> {
-  saving.value = true;
-  try {
-    await editFinishedArticle(payload.articleId, { contentMarkdown: payload.content });
-    if (props.article?.id !== payload.articleId) return;
-    lastSavedContent = payload.content;
-    if (editContent.value === payload.content) lastSavedAt.value = Date.now();
-    emit("saved");
-  } catch (error) {
-    if (props.article?.id === payload.articleId) message.error("自动保存失败");
-    throw error;
-  } finally {
-    saving.value = false;
-  }
-}
-
-/** 中栏自动保存只落盘用户原文，标题同步留给显式标题操作、手动保存和推送。 */
-async function persistHumanAutosave(payload: AutosavePayload): Promise<void> {
-  try {
-    await editFinishedArticle(payload.articleId, { humanMarkdown: payload.content });
-    if (props.article?.id !== payload.articleId) return;
-    lastSavedHuman = payload.content;
-    if (humanContent.value === payload.content) lastSavedAt.value = Date.now();
-  } catch (error) {
-    if (props.article?.id === payload.articleId) message.error("人工转写保存失败");
-    throw error;
-  }
-}
-
-const draftAutosaveQueue = createLatestAutosaveQueue(persistDraftAutosave);
-const humanAutosaveQueue = createLatestAutosaveQueue(persistHumanAutosave);
-
-/** 清理尚未触发的防抖任务，显式保存和标题联动会先接管当前内容。 */
-function clearAutosaveTimers(): void {
-  if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
-  if (humanAutoSaveTimer) { clearTimeout(humanAutoSaveTimer); humanAutoSaveTimer = null; }
-}
-
-/** 等待已经发出的自动保存结束，并丢弃失败遗留的旧快照。 */
-async function prepareExplicitContentSave(): Promise<void> {
-  clearAutosaveTimers();
-  await Promise.allSettled([
-    draftAutosaveQueue.waitForIdle(),
-    humanAutosaveQueue.waitForIdle(),
-  ]);
-  draftAutosaveQueue.clearPending();
-  humanAutosaveQueue.clearPending();
-}
-
-/** 将左栏当前最新版交给串行队列，错误已经在持久化边界提示。 */
-function enqueueDraftAutosave(content: string): void {
-  const articleId = props.article?.id;
-  if (!articleId) return;
-  void draftAutosaveQueue.enqueue({ articleId, content }).catch(() => {});
-}
-
-/** 将中栏当前最新版交给串行队列，不在响应后回写 humanContent。 */
-function enqueueHumanAutosave(content: string): void {
-  const articleId = props.article?.id;
-  if (!articleId) return;
-  void humanAutosaveQueue.enqueue({ articleId, content }).catch(() => {});
-}
-
-// 两栏均在停止输入 5 秒后入队；定时器触发时读取当前值，避免提交闭包中的旧版本。
-watch(editContent, (val) => {
-  if (!props.open || props.readonly || val === lastSavedContent) return;
-  if (autoSaveTimer) clearTimeout(autoSaveTimer);
-  autoSaveTimer = setTimeout(() => {
-    autoSaveTimer = null;
-    if (editContent.value !== lastSavedContent) enqueueDraftAutosave(editContent.value);
-  }, 5_000);
-});
-
-watch(humanContent, (val) => {
-  if (!props.open || props.readonly || val === lastSavedHuman) return;
-  if (humanAutoSaveTimer) clearTimeout(humanAutoSaveTimer);
-  humanAutoSaveTimer = setTimeout(() => {
-    humanAutoSaveTimer = null;
-    if (humanContent.value !== lastSavedHuman) enqueueHumanAutosave(humanContent.value);
-  }, 5_000);
-});
 
 // ─── 素材原图：按 sourceItemId 取素材 cover 外链展示（不转存，no-referrer 绕防盗链）───
 const sourceCoverUrl = ref<string | null>(null);
@@ -1426,14 +791,11 @@ watch(() => props.open, (val) => {
     // 重置保存时间，避免上一篇的相对时间残留到当前文章
     lastSavedAt.value = null;
     // 重置本地缓存状态
-    localCoverImages.value = [];
+    resetImageState(props.article);
     localTitles.value = [];
     manualTitle.value = parseJsonArray(props.article.titles)[0] ?? readFirstH1(hm || md);
     promptDirtyKeys.value = new Set();
-    lunaImageJobs.value = {};
-    appliedLunaJobIds.clear();
     localIntros.value = [];
-    activeCoverIndex.value = props.article.coverImageIndex ?? 0;
     activeTitleIndex.value = props.article.titleIndex ?? 0;
     activeIntroIndex.value = props.article.introIndex ?? 0;
     // 重置标题编辑态，避免上一篇的编辑下标残留到当前文章
@@ -1546,35 +908,6 @@ async function handleClose(): Promise<void> {
 
 // ─── 预览主题切换 ───
 
-type PreviewThemeKey = "classic" | "live" | "bauhaus" | "sunsetFilm" | "receipt" | "blackGold";
-
-const previewThemeOptions: { key: PreviewThemeKey; label: string }[] = [
-  { key: "classic", label: "默认" },
-  { key: "bauhaus", label: "包豪斯" },
-  { key: "sunsetFilm", label: "落日胶片" },
-  { key: "receipt", label: "购物小票" },
-  { key: "blackGold", label: "黑金主题" },
-  { key: "live", label: "实时预览" },
-];
-
-const activePreviewTheme = ref<PreviewThemeKey>("sunsetFilm");
-
-const themeIdMap: Record<Exclude<PreviewThemeKey, "live">, WechatThemeId> = {
-  classic: "classic",
-  bauhaus: "bauhaus",
-  sunsetFilm: "sunset-film",
-  receipt: "receipt",
-  blackGold: "black-gold",
-};
-
-const reverseThemeIdMap: Record<string, Exclude<PreviewThemeKey, "live">> = {
-  classic: "classic",
-  bauhaus: "bauhaus",
-  "sunset-film": "sunsetFilm",
-  receipt: "receipt",
-  "black-gold": "blackGold",
-};
-
 // 切换预览主题：客户端即时渲染（基于人工转写内容 = 发布内容）
 function switchPreviewTheme(key: PreviewThemeKey): void {
   activePreviewTheme.value = key;
@@ -1681,9 +1014,6 @@ async function copyMarkdownAsPlainText(mdText: string): Promise<void> {
 
 // ─── 推送条件检查（复用共享模块） ───
 // props.article 深层属性修改不会触发响应式，用一个计数器手动刷新
-const articleChangeTick = ref(0);
-function tickArticleChange() { articleChangeTick.value++; }
-
 const canPush = computed(() => {
   void articleChangeTick.value;
   const article = props.article;

@@ -53,14 +53,15 @@ describe("listCreativeRawRssItems", () => {
     const source = resolveSourceByKind(handle.db, "juya");
     if (!source) throw new Error("juya source missing in test database");
     const publishedAt = new Date().toISOString();
-    const url = "https://example.com/rss-item#rd";
+    const contentUrl = "https://example.com/rss-item/#rd";
+    const creativeUrl = "https://example.com/rss-item";
 
     upsertContentItems(handle.db, {
       sourceId: source.id,
       items: [{
         externalId: "juya-content-2",
         title: "已经入素材库的 RSS 素材",
-        canonicalUrl: url,
+        canonicalUrl: contentUrl,
         publishedAt,
         fetchedAt: publishedAt
       }]
@@ -69,7 +70,7 @@ describe("listCreativeRawRssItems", () => {
       externalId: "creative-2",
       collectorAgent: "hotnow-feed",
       title: "已经入素材库的 RSS 素材",
-      url,
+      url: creativeUrl,
     });
 
     const result = listCreativeRawRssItems(handle.db, {

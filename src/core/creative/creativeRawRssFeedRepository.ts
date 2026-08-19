@@ -26,13 +26,14 @@ const feedToSourceKind: Record<CreativeRawRssFeed, string> = {
   "wechat-rss": "wechat_rss"
 };
 
-const normalizedUrlExpression = `LOWER(
-  SUBSTR(
+const normalizedUrlExpression = `LOWER(RTRIM(
+  TRIM(SUBSTR(
     %s,
     1,
     CASE WHEN INSTR(%s, '#') > 0 THEN INSTR(%s, '#') - 1 ELSE LENGTH(%s) END
-  )
-)`;
+  )),
+  '/'
+))`;
 
 type RawRssRow = {
   id: number;

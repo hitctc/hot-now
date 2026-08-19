@@ -49,7 +49,6 @@ export type RuntimeServerActionDeps = Pick<ServerDeps,
   | "triggerManualWechatRssCollect"
   | "triggerManualWeiboTrendingCollect"
   | "triggerManualJuyaCollect"
-  | "creativeAutomation"
 >;
 
 export type RuntimeServerDepsInput = RuntimeServerActionDeps & {
@@ -392,7 +391,6 @@ export function createRuntimeServerDeps(input: RuntimeServerDepsInput): ServerDe
   return {
   db,
     creativeApiToken: input.creativeApiToken,
-    creativeAutomation: input.creativeAutomation,
     creativeImageDir,
     config,
     clientDevOrigin: input.clientDevOrigin,

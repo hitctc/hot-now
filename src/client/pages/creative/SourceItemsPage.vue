@@ -2,8 +2,6 @@
 import { computed, onBeforeUnmount, ref } from "vue";
 import { message } from "ant-design-vue";
 
-import { HttpError } from "../../services/http.js";
-import { usePipelineStatus } from "../../composables/usePipelineStatus.js";
 import { useSearchHistory } from "../../composables/useSearchHistory.js";
 import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
 import { resolveWritePollOutcome } from "../../utils/writePollOutcome.js";
@@ -17,7 +15,6 @@ import {
   readCreativeFinishedArticle,
   updateSourceItemWritingStatus,
   writeSourceItemArticle,
-  evaluateSourceItemAccountFit,
   fetchWriteQueueStatus,
   submitManualWrite,
   traceSourceItem,
@@ -55,7 +52,6 @@ const accountFitOptions = [
 ];
 
 const { history: searchHistory, addToHistory, removeFromHistory } = useSearchHistory("creative-source-search-history");
-const { pipelineOn } = usePipelineStatus();
 // ─── 成品文章弹窗 ───
 
 async function openArticleModal(articleId: number): Promise<void> {
@@ -103,7 +99,6 @@ const writeModeVisible = ref(false);
 const writeModeTarget = ref<CreativeSourceItem | null>(null);
 const writeModeThesis = ref("");
 const writeModeConfirming = ref(false);
-const writeModeLowConfirmed = ref(false);
 
 // ─── 手动写作弹窗 ───
 const manualWriteVisible = ref(false);
@@ -218,7 +213,6 @@ function stopTracePoll(): void {
 function openWriteModeModal(item: CreativeSourceItem): void {
   writeModeTarget.value = item;
   writeModeThesis.value = "";
-  writeModeLowConfirmed.value = false;
   writeModeVisible.value = true;
 }
 
@@ -226,7 +220,6 @@ function cancelWriteMode(): void {
   writeModeVisible.value = false;
   writeModeTarget.value = null;
   writeModeConfirming.value = false;
-  writeModeLowConfirmed.value = false;
   writeModeThesis.value = "";
 }
 
@@ -355,45 +348,18 @@ async function confirmWriteMode(): Promise<void> {
     const result = await writeSourceItemArticle(
       item.id,
       writeModeThesis.value.trim() || undefined,
-      item.accountFitLevel === "low" && writeModeLowConfirmed.value,
     );
     if (result.ok) {
       writeModeVisible.value = false;
-      message.success(item.accountFitLevel ? "已加入手动写作队列" : "已加入账号适配队列，符合条件后会自动续接写作");
+      message.success("已加入手动写作队列");
       await loadItems();
-    } else if (result.reason === "account-fit-low-confirmation-required" && !writeModeLowConfirmed.value) {
-      writeModeLowConfirmed.value = true;
-      message.warning("该素材为低适配；请查看原因，再次点击“仍然写作”即可强制继续");
     } else {
       message.error(result.reason ?? "文章生成失败");
     }
-  } catch (err) {
-    if (err instanceof HttpError && err.status === 422 && !writeModeLowConfirmed.value) {
-      writeModeLowConfirmed.value = true;
-      message.warning("该素材为低适配；请查看原因，再次点击“仍然写作”即可强制继续");
-    } else {
-      message.error("写文章请求失败");
-    }
+  } catch {
+    message.error("写文章请求失败");
   } finally {
     writeModeConfirming.value = false;
-  }
-}
-
-/** 手动重评单条素材，和自动评估共享持久化单 worker。 */
-async function handleAccountFitEvaluation(item: CreativeSourceItem): Promise<void> {
-  actionPendingId.value = item.id;
-  try {
-    const result = await evaluateSourceItemAccountFit(item.id);
-    if (!result.ok) {
-      message.error(result.reason ?? "账号适配度评估请求失败");
-      return;
-    }
-    message.success(result.reason === "job-already-active" ? "该素材已在评估队列中" : "已加入账号适配评估队列");
-    await loadItems();
-  } catch {
-    message.error("账号适配度评估请求失败");
-  } finally {
-    actionPendingId.value = null;
   }
 }
 
@@ -440,11 +406,9 @@ const pagination = computed(() => ({
       :items="items"
       :pagination="pagination"
       :expanded-row-keys="expandedRowKeys"
-      :pipeline-on="pipelineOn"
       :writing-ids="writingIds"
       :tracing-ids="tracingIds"
       :action-pending-id="actionPendingId"
-      @evaluate-fit="handleAccountFitEvaluation"
       @table-change="handleTableChange"
       @toggle-expand="toggleExpand"
       @open-article="openArticleModal"
@@ -466,7 +430,7 @@ const pagination = computed(() => ({
       :open="writeModeVisible"
       title="开始写作"
       :confirm-loading="writeModeConfirming"
-      :ok-text="writeModeLowConfirmed ? '仍然写作' : '开始写作'"
+      ok-text="开始写作"
       cancel-text="取消"
       :destroy-on-close="true"
       width="480px"
@@ -478,7 +442,7 @@ const pagination = computed(() => ({
         素材：{{ writeModeTarget.title.slice(0, 60) }}{{ writeModeTarget.title.length > 60 ? '...' : '' }}
       </div>
       <p class="mb-0 text-xs leading-5 text-editorial-text-muted">
-        写作前会经过账号适配队列；未评估素材完成后，高/中适配会自动续接，低适配需要再次确认。
+        这是人工写作，不受自动账号适配阶段开关影响；提交后由 Hermes 统一执行写作及符合条件的 Luna 配图流程。
       </p>
       <a-alert
         v-if="writeModeTarget?.accountFitLevel"

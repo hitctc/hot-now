@@ -102,7 +102,6 @@ import type {
 import type { WeiboTrendingRunState } from "../core/weibo/runWeiboTrendingCollection.js";
 import type { RuntimeConfig } from "../core/types/appConfig.js";
 import type { SqliteDatabase } from "../core/db/openDatabase.js";
-import type { CreativeAutomationService } from "../core/creative/creativeAutomationService.js";
 import type {
   ViewRulesWorkbenchView
 } from "./renderSystemPages.js";
@@ -295,7 +294,6 @@ export type ServerDeps = {
   db?: SqliteDatabase;
   creativeApiToken?: string;
   creativeImageDir?: string;
-  creativeAutomation?: CreativeAutomationService;
   listReportSummaries?: () => Promise<ReportSummary[]>;
   latestReportDate?: () => Promise<string | null>;
   readReportHtml?: (date: string) => Promise<string>;
@@ -475,7 +473,6 @@ export function createServer(deps: ServerDeps = {}) {
   const creativeImageDir = deps.creativeImageDir;
   registerCreativeSourceActionRoutes(app, {
     db,
-    automation: deps.creativeAutomation,
     authorizeCreativeApiToken: (request, reply) => validateCreativeApiToken(request, reply, creativeApiToken),
     hasCreativeApiToken: (request) => Boolean(
       creativeApiToken && request.headers["x-creative-token"] === creativeApiToken

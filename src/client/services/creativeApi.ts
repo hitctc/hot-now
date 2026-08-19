@@ -599,49 +599,64 @@ export type WriteArticleResult = {
 };
 
 /** 调用 Hermes v2 write-article API（异步），只允许人工锁定核心立意。 */
-export function writeSourceItemArticle(id: number, thesis?: string, forceAccountFit = false): Promise<WriteArticleResult> {
+export function writeSourceItemArticle(id: number, thesis?: string): Promise<WriteArticleResult> {
   const body: Record<string, unknown> = {};
   if (thesis) body.thesis = thesis;
-  if (forceAccountFit) body.forceAccountFit = true;
   return requestJson<WriteArticleResult>(`/api/creative/source-items/${id}/write-article`, {
     method: "POST",
     body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined,
   });
 }
 
-export type EvaluateAccountFitResult = {
-  ok: boolean;
-  status?: "queued";
-  taskId?: number;
-  reason?: string;
-};
-
-/** 将单条适配度评估加入持久化队列；完成后由素材列表轮询刷新结果。 */
-export function evaluateSourceItemAccountFit(id: number): Promise<EvaluateAccountFitResult> {
-  return requestJson<EvaluateAccountFitResult>(`/api/creative/source-items/${id}/evaluate-account-fit`, {
-    method: "POST"
-  });
-}
+export type AutomationMode = "running" | "paused" | "emergency_stopped";
+export type AutomationStageKey =
+  | "collection"
+  | "base_scoring"
+  | "account_fit"
+  | "long_write"
+  | "short_write"
+  | "images"
+  | "daily_digest"
+  | "reminders"
+  | "notifications";
 
 export type CreativeAutomationStatus = {
   ok: boolean;
-  automationEnabled: boolean;
-  autoEvaluateEnabled: boolean;
-  autoWriteEnabled: boolean;
-  pendingEvaluationCount: number;
-  pendingWriteCount: number;
-  retryingJobCount: number;
-  expiredAutomaticWriteCount: number;
-  automaticWriteDispatchedToday: number;
-  latestErrors: Array<{ jobType: "evaluate" | "write"; sourceItemId: number; error: string; updatedAt: string }>;
+  mode: AutomationMode;
+  modeLabel: string;
+  manualAllowed: boolean;
+  stages: Record<AutomationStageKey, { label: string; enabled: boolean; effective: boolean }>;
+  config: {
+    dailyLongWriteCount: number;
+    dailyLongWriteTime: string;
+    windowHours: number;
+    baseScoreThreshold: number;
+    trendScoreThreshold: number;
+    timezone: string;
+  };
+  dailyPlan: Record<string, unknown>;
+  queue?: WriteQueueStatus | null;
 };
 
-/** 读取 HotNow 本地账号适配/写作队列状态，不代理 Hermes 内部内存队列。 */
+/** 读取 Hermes 统一自动化状态；HotNow 不再读取本地自动化 SQLite 表。 */
 export function fetchCreativeAutomationStatus(): Promise<CreativeAutomationStatus> {
   return requestJson<CreativeAutomationStatus>("/api/creative/automation/status");
 }
 
-/** 控制创作自动化总开关或评估/写作细分开关；人工操作不受总开关影响。 */
+/** 更新 Hermes 统一模式、阶段开关或计划参数。 */
+export function updateCreativeAutomationControl(input: {
+  mode?: AutomationMode;
+  stage?: AutomationStageKey;
+  enabled?: boolean;
+  config?: Record<string, string | number>;
+}): Promise<CreativeAutomationStatus> {
+  return requestJson<CreativeAutomationStatus>("/api/creative/automation/control", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/** 兼容旧调用方，实际仍转成 Hermes 阶段控制，不创建 HotNow 本地任务。 */
 export function updateCreativeAutomationEnabled(kind: "master" | "evaluate" | "write", enabled: boolean): Promise<CreativeAutomationStatus> {
   return requestJson<CreativeAutomationStatus>(`/api/creative/automation/${kind}/enabled`, {
     method: "POST",

@@ -1,371 +1,273 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { Modal, message } from "ant-design-vue";
-import { fetchMonitorStats, updateSwitch, getTriggerPath, triggerTask, type MonitorStats } from "../../services/monitorApi.js";
-import { usePipelineStatus } from "../../composables/usePipelineStatus.js";
 
-const { pipelineOn, writeOn, refresh: refreshGlobal } = usePipelineStatus();
+import {
+  fetchMonitorStats,
+  updateSwitch,
+  type MonitorStats,
+} from "../../services/monitorApi.js";
+import {
+  fetchCreativeAutomationStatus,
+  updateCreativeAutomationControl,
+  type AutomationMode,
+  type AutomationStageKey,
+  type CreativeAutomationStatus,
+} from "../../services/creativeApi.js";
 
-const switches = ref<Record<string, string>>({});
+const automation = ref<CreativeAutomationStatus | null>(null);
 const stats = ref<MonitorStats | null>(null);
 const loading = ref(false);
 const saving = ref<string | null>(null);
-const triggering = ref<string | null>(null);
 
-// 当前自动生图模式（三选一，与手动独立）
-const imageMode = computed(() => switches.value.image_gen_mode ?? "codex-auto");
-const isProviderAuto = computed(() => imageMode.value === "provider-auto");
-// 只读生效时间
-const providerAutoSince = computed(() => switches.value.provider_auto_since ?? "");
-const codexAutoSince = computed(() => switches.value.codex_auto_since ?? "");
+const modeOptions: Array<{ value: AutomationMode; label: string }> = [
+  { value: "running", label: "运行中" },
+  { value: "paused", label: "普通暂停" },
+  { value: "emergency_stopped", label: "紧急停止" },
+];
 
+const stageDefinitions: Array<{ key: AutomationStageKey; description: string }> = [
+  { key: "collection", description: "Hermes 自动采集新素材" },
+  { key: "base_scoring", description: "基础评分、趋势评分和基础筛选" },
+  { key: "account_fit", description: "账号适配评估；失败按退避上限重试" },
+  { key: "long_write", description: "每日计划触发的自动长文写作" },
+  { key: "short_write", description: "自动短内容写作" },
+  { key: "images", description: "自动写作中的 Luna 图片生成许可" },
+  { key: "daily_digest", description: "自动日报" },
+  { key: "reminders", description: "自动提醒" },
+  { key: "notifications", description: "邮件和其他自动通知" },
+];
+
+const configDefinitions = [
+  { key: "dailyLongWriteCount", backendKey: "auto_write_daily_count", label: "每日自动长文数量", description: "默认 3 篇；手动写作不计入此数量", type: "number" as const, min: 0, max: 20 },
+  { key: "dailyLongWriteTime", backendKey: "auto_write_daily_time", label: "每日自动写作时间", description: "北京时间，默认 10:00", type: "time" as const, min: 0, max: 0 },
+  { key: "windowHours", backendKey: "auto_write_window_hours", label: "素材回看窗口（小时）", description: "计划时间向前筛选，默认 48 小时", type: "number" as const, min: 1, max: 168 },
+  { key: "baseScoreThreshold", backendKey: "auto_write_base_score_threshold", label: "基础评分阈值", description: "自动写作硬门槛，默认 80", type: "number" as const, min: 0, max: 100 },
+  { key: "trendScoreThreshold", backendKey: "trend_score_threshold", label: "趋势评分阈值", description: "自动写作硬门槛，默认 80", type: "number" as const, min: 0, max: 100 },
+] as const;
+
+type ConfigKey = (typeof configDefinitions)[number]["key"];
+const configDraft = ref<Partial<Record<ConfigKey, string | number>>>({});
+const configDirty = ref<ConfigKey | null>(null);
+
+const imageMode = computed(() => stats.value?.switches.image_gen_mode ?? "codex-auto");
+const imageProvider = computed(() => stats.value?.switches.image_provider ?? "aitechflux");
 const imageModeOptions = [
   { value: "provider-auto", label: "服务商自动" },
   { value: "codex-auto", label: "Codex 自动" },
   { value: "off", label: "关闭自动" },
 ];
+const imageProviderOptions = ["aitechflux", "packy", "nebula"];
+const isProviderAuto = computed(() => imageMode.value === "provider-auto");
 
-// 第一组：管线控制
-const pipelineGroup = [
-  {
-    key: "pipeline",
-    label: "管线紧急制动",
-    type: "onoff" as const,
-    description: "关闭后采集、评分、写作全部停止",
-    confirmMessages: {
-      onToOff: { title: "紧急制动", content: "关闭管线后，采集、评分、写作将全部停止。正在写作的文章会被中止并回退。确认关闭？" },
-      offToOn: { title: "恢复管线", content: "管线将恢复运行，下一轮调度到来时正常执行。确认恢复？" },
-    },
-  },
-  {
-    key: "write",
-    label: "自动写作",
-    type: "onoff" as const,
-    description: "关闭后只暂停自动写作，采集评分照常；手动写作不受影响",
-    confirmMessages: {
-      onToOff: { title: "关闭自动写作", content: "自动写作将暂停，但采集和评分继续运行。手动写作不受影响。确认关闭？" },
-      offToOn: { title: "开启自动写作", content: "下一轮管线执行时将正常提交写作任务。确认开启？" },
-    },
-  },
-];
-
-// 第二组：业务开关
-// （draft_push 开关已移除——状态统一管理上线后不再需要）
-const businessGroup: typeof pipelineGroup = [];
-
-// 第三组：参数配置（image_gen_mode + image_provider 联动 + 只读时间戳）
-const paramGroup = [
-  { key: "image_gen_mode", label: "自动生图模式", type: "select" as const, options: imageModeOptions, description: "自动模式三选一；手动生图始终可用，不受此开关影响", confirmChange: true },
-  { key: "image_provider", label: "图片服务商", type: "select" as const, options: ["aitechflux", "packy", "nebula"], description: "仅在 provider-auto 时生效", confirmChange: true },
-  { key: "trend_score_threshold", label: "趋势分阈值", type: "number" as const, description: "≥ 此值的素材进入待写作队列" },
-  { key: "interval_pipeline", label: "管线间隔（分钟）", type: "number" as const, description: "自动运行间隔" },
-  { key: "interval_codex_generate", label: "Codex 生成间隔（分钟）", type: "number" as const, description: "Codex 任务生成间隔" },
-  { key: "interval_codex_consume", label: "Codex 消费间隔（分钟）", type: "number" as const, description: "Codex 结果消费间隔" },
-];
-
-// 第四组：短内容线（反转贴文/短文）
-const shortContentGroup = [
-  {
-    key: "short_content",
-    label: "短内容线",
-    type: "onoff" as const,
-    description: "关闭后采集、评分、写作全部停止",
-    confirmMessages: {
-      onToOff: { title: "关闭短内容线", content: "短内容线的采集、评分、写作将全部停止。确认关闭？" },
-      offToOn: { title: "开启短内容线", content: "短内容线恢复运行，下一轮调度到来时正常执行。确认开启？" },
-    },
-  },
-  { key: "interval_short_content", label: "运行间隔（分钟）", type: "number" as const, description: "自动运行间隔，默认 60，建议 ≥10" },
-  { key: "short_content_batch_size", label: "每次写作数量", type: "number" as const, description: "每次自动跑写几篇反转内容，默认 1" },
-  { key: "short_content_score_threshold", label: "反转评分阈值", type: "number" as const, description: "短内容素材反转评分≥此值才写，默认 75（0-100），越高越严" },
-];
-
-type SwitchDef = { key: string; confirmChange?: boolean; confirmMessages?: Record<string, { title: string; content: string }> };
-const allDefs = [...pipelineGroup, ...businessGroup, ...paramGroup, ...shortContentGroup] as SwitchDef[];
-
-// 状态摘要
 const statusSummary = computed(() => {
-  if (!pipelineOn.value) return { text: "⚠️ 自动化管线已暂停，采集和自动任务停止；素材库人工写作仍可用", type: "warning" as const };
-  if (!writeOn.value) return { text: "自动写作已暂停，采集评分正常运行", type: "info" as const };
-  return { text: "管线正常运行中", type: "success" as const };
+  const mode = automation.value?.mode;
+  if (mode === "emergency_stopped") {
+    return { type: "warning" as const, text: "自动化已紧急停止：自动采集、评估、写作和图片任务不再启动；手动写作仍可用" };
+  }
+  if (mode === "paused") {
+    return { type: "info" as const, text: "自动化处于普通暂停：自动任务暂缓；人工评估入口已移除，手动写作仍可用" };
+  }
+  return { type: "success" as const, text: "自动化运行中；各阶段由下方独立开关控制" };
 });
 
-// 数值草稿
-const draftNumbers = ref<Record<string, number>>({});
-function hasDraft(key: string): boolean {
-  if (switches.value[key] == null) return false;
-  return draftNumbers.value[key] != null && draftNumbers.value[key] !== Number(switches.value[key]);
+function stageState(key: AutomationStageKey): { enabled: boolean; effective: boolean } {
+  return automation.value?.stages[key] ?? { enabled: false, effective: false };
 }
-function onNumberInput(key: string, val: number | null): void {
-  if (val == null) return;
-  draftNumbers.value = { ...draftNumbers.value, [key]: val };
+
+function draftValue(key: ConfigKey): string | number {
+  const draft = configDraft.value[key];
+  if (draft !== undefined) return draft;
+  return automation.value?.config[key] ?? "";
 }
-async function confirmNumber(key: string): Promise<void> {
-  const val = draftNumbers.value[key];
-  if (val == null) return;
-  await saveSwitch(key, String(val));
-  const next = { ...draftNumbers.value };
-  delete next[key];
-  draftNumbers.value = next;
+
+function planValue(key: string): string {
+  const value = automation.value?.dailyPlan?.[key];
+  return value === undefined || value === null ? "-" : String(value);
+}
+
+function syncConfigDraft(status: CreativeAutomationStatus): void {
+  if (configDirty.value) return;
+  configDraft.value = {
+    dailyLongWriteCount: status.config.dailyLongWriteCount,
+    dailyLongWriteTime: status.config.dailyLongWriteTime,
+    windowHours: status.config.windowHours,
+    baseScoreThreshold: status.config.baseScoreThreshold,
+    trendScoreThreshold: status.config.trendScoreThreshold,
+  };
 }
 
 async function refresh(): Promise<void> {
   loading.value = true;
-  try {
-    const s = await fetchMonitorStats();
-    stats.value = s;
-    switches.value = s.switches;
-    pipelineOn.value = s.switches.pipeline === "on";
-    writeOn.value = s.switches.write === "on";
-  } catch { /* 静默 */ }
-  finally { loading.value = false; }
+  const [automationResult, monitorResult] = await Promise.allSettled([
+    fetchCreativeAutomationStatus(),
+    fetchMonitorStats(),
+  ]);
+  if (automationResult.status === "fulfilled") {
+    automation.value = automationResult.value;
+    syncConfigDraft(automationResult.value);
+  }
+  if (monitorResult.status === "fulfilled") stats.value = monitorResult.value;
+  if (automationResult.status === "rejected" && monitorResult.status === "rejected") {
+    message.error("统一自动化状态读取失败，请检查 Hermes 服务");
+  }
+  loading.value = false;
 }
 
-async function saveSwitch(key: string, value: string): Promise<void> {
-  saving.value = key;
+/** 修改全局模式；紧急停止由 Hermes 负责清理自动队列，不触碰人工任务。 */
+async function changeMode(mode: AutomationMode): Promise<void> {
+  const current = automation.value?.mode;
+  if (!current || current === mode) return;
+  if (mode === "emergency_stopped") {
+    const confirmed = await new Promise<boolean>((resolve) => {
+      Modal.confirm({
+        title: "确认紧急停止",
+        content: "将取消尚未开始的自动写作任务，并阻止新的自动任务；人工写作不受影响。确认停止？",
+        okText: "确认停止",
+        cancelText: "取消",
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      });
+    });
+    if (!confirmed) return;
+  }
+  saving.value = "mode";
   try {
-    await updateSwitch(key, value);
-    message.success("已更新");
+    automation.value = await updateCreativeAutomationControl({ mode });
+    syncConfigDraft(automation.value);
+    message.success("自动化模式已更新");
+  } catch {
+    message.error("自动化模式更新失败");
     await refresh();
-    refreshGlobal();
-  } catch (err: unknown) {
-    const errMsg = (err as { body?: { error?: string } })?.body?.error ?? "修改失败";
-    message.error(errMsg);
   } finally {
     saving.value = null;
   }
 }
 
-// 立即触发间隔任务
-async function handleTrigger(key: string): Promise<void> {
-  const path = getTriggerPath(key);
-  if (!path) return;
-  triggering.value = key;
+/** 修改单个自动阶段；全局暂停和紧急停止不改变阶段本身的配置值。 */
+async function changeStage(stage: AutomationStageKey, enabled: boolean): Promise<void> {
+  saving.value = stage;
   try {
-    const res = await triggerTask(path);
-    if (res.ok) {
-      message.success(res.message);
-    } else {
-      message.warning(res.message);
-    }
-    await refresh();
+    automation.value = await updateCreativeAutomationControl({ stage, enabled });
+    syncConfigDraft(automation.value);
+    message.success(`${automation.value.stages[stage].label}已${enabled ? "开启" : "关闭"}`);
   } catch {
-    message.error("触发失败");
+    message.error("阶段开关更新失败");
+    await refresh();
   } finally {
-    triggering.value = null;
+    saving.value = null;
   }
 }
 
-// onoff 切换
-async function handleSwitchChange(key: string, checked: boolean): Promise<void> {
-  const value = checked ? "on" : "off";
-  const def = allDefs.find(d => d.key === key) as SwitchDef & { confirmMessages?: Record<string, { title: string; content: string }> };
-  if (def?.confirmMessages) {
-    const msgKey = checked ? "offToOn" : "onToOff";
-    const confirmed = await new Promise<boolean>(resolve => {
-      Modal.confirm({
-        title: def.confirmMessages![msgKey]?.title ?? "确认操作",
-        content: def.confirmMessages![msgKey]?.content ?? "确认修改？",
-        okText: "确认", cancelText: "取消",
-        onOk: () => resolve(true), onCancel: () => resolve(false),
-      });
-    });
-    if (!confirmed) return;
+/** 保存每日计划参数，参数写入 Hermes，不在 HotNow 留本地副本。 */
+async function saveConfig(definition: (typeof configDefinitions)[number]): Promise<void> {
+  const value = configDraft.value[definition.key];
+  if (value === undefined || value === "") return;
+  configDirty.value = definition.key;
+  saving.value = definition.key;
+  try {
+    automation.value = await updateCreativeAutomationControl({ config: { [definition.backendKey]: value } });
+    configDraft.value = { ...configDraft.value, [definition.key]: automation.value.config[definition.key] };
+    message.success("自动化参数已更新");
+  } catch {
+    message.error("自动化参数更新失败");
+    await refresh();
+  } finally {
+    configDirty.value = null;
+    saving.value = null;
   }
-  await saveSwitch(key, value);
 }
 
-// select 切换（image_gen_mode / image_provider）
-async function handleSelectChange(key: string, value: string): Promise<void> {
-  const def = allDefs.find(d => d.key === key);
-  if (key === "image_gen_mode") {
-    const confirmed = await new Promise<boolean>(resolve => {
-      Modal.confirm({
-        title: "切换自动生图模式",
-        content: `将自动生图模式从「${imageMode.value}」切换为「${value}」。手动生图不受影响。确认？`,
-        okText: "确认切换", cancelText: "取消",
-        onOk: () => resolve(true), onCancel: () => resolve(false),
-      });
-    });
-    if (!confirmed) return;
-  } else if (key === "image_provider" && def?.confirmChange) {
-    const confirmed = await new Promise<boolean>(resolve => {
-      Modal.confirm({
-        title: "切换图片服务商",
-        content: `图片生成将切换为 ${value}，可能影响图片风格。确认切换？`,
-        okText: "确认切换", cancelText: "取消",
-        onOk: () => resolve(true), onCancel: () => resolve(false),
-      });
-    });
-    if (!confirmed) return;
+async function saveLegacySwitch(key: string, value: string): Promise<void> {
+  saving.value = key;
+  try {
+    await updateSwitch(key, value);
+    await refresh();
+    message.success("参数已更新");
+  } catch {
+    message.error("参数更新失败");
+  } finally {
+    saving.value = null;
   }
-  await saveSwitch(key, value);
 }
 
-function isOn(key: string): boolean {
-  return switches.value[key] === "on";
+async function changeImageMode(value: string): Promise<void> {
+  if (value === imageMode.value) return;
+  await saveLegacySwitch("image_gen_mode", value);
 }
 
-// 格式化 ISO 时间戳为本地时间
-function formatSince(raw: string): string {
-  if (!raw) return "";
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return raw;
-  return d.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
-}
-
-// 每秒刷新的倒计时驱动
-const now = ref(Date.now());
-let countdownTimer: ReturnType<typeof setInterval> | null = null;
-
-// 间隔参数 key → stats 中对应下次执行时间字段
-const intervalCountdownKey: Record<string, "next_pipeline_at" | "next_codex_generate_at" | "next_codex_consume_at"> = {
-  interval_pipeline: "next_pipeline_at",
-  interval_codex_generate: "next_codex_generate_at",
-  interval_codex_consume: "next_codex_consume_at",
-};
-
-// 获取间隔参数对应的下次执行时间
-function getCountdownIso(key: string): string | null | undefined {
-  if (!stats.value) return undefined;
-  const field = intervalCountdownKey[key];
-  if (!field) return undefined;
-  return stats.value[field];
-}
-
-function formatCountdown(iso: string | null | undefined): string {
-  if (!iso) return "-";
-  const target = new Date(iso).getTime();
-  const diff = target - now.value;
-  if (diff <= 0) return "即将执行";
-  const totalSec = Math.floor(diff / 1000);
-  const min = Math.floor(totalSec / 60);
-  const sec = totalSec % 60;
-  if (min > 0) return `${min}分${sec}秒`;
-  return `${sec}秒`;
+async function changeImageProvider(value: string): Promise<void> {
+  if (value === imageProvider.value) return;
+  await saveLegacySwitch("image_provider", value);
 }
 
 onMounted(() => {
   refresh();
-  countdownTimer = setInterval(() => { now.value = Date.now(); }, 1000);
 });
-onBeforeUnmount(() => { if (countdownTimer) clearInterval(countdownTimer); });
 </script>
 
 <template>
   <section class="rounded-lg border border-editorial-border bg-white p-4">
     <div class="mb-3 flex items-center justify-between">
-      <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">开关配置</h3>
+      <div>
+        <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">统一自动化控制</h3>
+        <p class="m-0 mt-1 text-[10px] text-editorial-text-muted/70">Hermes 是状态、队列、调度和重试的唯一真源；HotNow 只展示并发送控制意图。</p>
+      </div>
       <a-button type="link" size="small" class="!p-0 !text-[11px]" :loading="loading" @click="refresh">刷新</a-button>
     </div>
 
-    <a-spin :spinning="loading && Object.keys(switches).length === 0">
-      <!-- 状态摘要 -->
+    <a-spin :spinning="loading && !automation">
       <a-alert :type="statusSummary.type" :message="statusSummary.text" show-icon class="!mb-3 !py-1.5 !text-xs" />
 
-      <!-- 第一组：管线控制 -->
-      <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">管线控制</div>
-      <div class="mb-3 space-y-1.5">
-        <div v-for="def in pipelineGroup" :key="def.key" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5">
-          <div class="min-w-0 flex-1">
-            <span class="text-xs font-medium text-editorial-text-body">{{ def.label }}</span>
-            <span class="ml-1 text-[10px] text-editorial-text-muted/70">{{ def.description }}</span>
-          </div>
-          <span class="shrink-0 text-[10px] font-mono text-editorial-text-muted/60">{{ switches[def.key] ?? '-' }}</span>
-          <a-switch :checked="isOn(def.key)" :loading="saving === def.key" :disabled="def.key === 'write' && !pipelineOn" size="small" @change="(checked: boolean) => handleSwitchChange(def.key, checked)" />
+      <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">总模式</div>
+      <div class="mb-4 flex items-center gap-2 rounded border border-editorial-border px-2.5 py-2">
+        <div class="min-w-0 flex-1">
+          <span class="text-xs font-medium text-editorial-text-body">自动化总模式</span>
+          <span class="ml-1 text-[10px] text-editorial-text-muted/70">普通暂停允许人工写作；紧急停止取消未开始的自动任务</span>
         </div>
-        <div v-if="!pipelineOn" class="pl-2 text-[10px] text-orange-500">管线已紧急制动，write 开关不可操作</div>
+        <a-select :value="automation?.mode" :options="modeOptions" class="!w-28" size="small" :loading="saving === 'mode'" @change="changeMode" />
       </div>
 
-      <!-- 第二组：业务开关（仅在有条目时显示） -->
-      <template v-if="businessGroup.length">
-        <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">业务开关</div>
-        <div class="mb-3 space-y-1.5">
-          <div v-for="def in businessGroup" :key="def.key" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5">
-            <div class="min-w-0 flex-1">
-              <span class="text-xs font-medium text-editorial-text-body">{{ def.label }}</span>
-              <span class="ml-1 text-[10px] text-editorial-text-muted/70">{{ def.description }}</span>
-            </div>
-            <span class="shrink-0 text-[10px] font-mono text-editorial-text-muted/60">{{ switches[def.key] ?? '-' }}</span>
-            <a-switch :checked="isOn(def.key)" :loading="saving === def.key" size="small" @change="(checked: boolean) => handleSwitchChange(def.key, checked)" />
-          </div>
-        </div>
-      </template>
-
-      <!-- 第三组：参数配置 -->
-      <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">参数配置</div>
-      <div class="space-y-1.5">
-        <div v-for="def in paramGroup" :key="def.key" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5" :class="{ 'opacity-50': def.key === 'image_provider' && !isProviderAuto }">
+      <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">独立自动阶段</div>
+      <div class="mb-4 space-y-1.5">
+        <div v-for="definition in stageDefinitions" :key="definition.key" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5">
           <div class="min-w-0 flex-1">
-            <div>
-              <span class="text-xs font-medium text-editorial-text-body">{{ def.label }}</span>
-              <span class="ml-1 text-[10px] text-editorial-text-muted/70">{{ def.description }}</span>
-            </div>
-            <div v-if="intervalCountdownKey[def.key] && getCountdownIso(def.key)" class="mt-0.5 text-[10px] font-medium tabular-nums" :class="formatCountdown(getCountdownIso(def.key)) === '即将执行' ? 'text-orange-500' : 'text-blue-500'">
-              {{ formatCountdown(getCountdownIso(def.key)) }}后执行
-            </div>
+            <span class="text-xs font-medium text-editorial-text-body">{{ automation?.stages[definition.key]?.label ?? definition.key }}</span>
+            <span class="ml-1 text-[10px] text-editorial-text-muted/70">{{ definition.description }}</span>
           </div>
-          <span class="shrink-0 text-[10px] font-mono text-editorial-text-muted/60">{{ switches[def.key] ?? '-' }}</span>
-
-          <!-- select -->
-          <a-select
-            v-if="def.type === 'select'"
-            :value="switches[def.key] ?? ''"
-            :options="def.options?.map((o: any) => ({ value: o.value ?? o, label: o.label ?? o }))"
-            size="small"
-            :class="def.key === 'image_gen_mode' ? '!w-[120px]' : '!w-28'"
-            :loading="saving === def.key"
-            :disabled="def.key === 'image_provider' && !isProviderAuto"
-            @change="(val: string) => handleSelectChange(def.key, val)"
-          />
-
-          <!-- number -->
-          <template v-else-if="def.type === 'number'">
-            <a-input-number
-              :value="hasDraft(def.key) ? draftNumbers[def.key] : Number(switches[def.key] ?? 0)"
-              :min="0" :step="1" size="small" class="!w-20"
-              :disabled="saving === def.key"
-              @change="(val: number) => onNumberInput(def.key, val)"
-            />
-            <button
-              class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium disabled:opacity-50"
-              :class="hasDraft(def.key) ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-gray-100 text-gray-400 cursor-default'"
-              :disabled="saving === def.key || !hasDraft(def.key)"
-              @click="confirmNumber(def.key)"
-            >确认</button>
-            <!-- 立即触发按钮（仅间隔参数显示） -->
-            <button
-              v-if="getTriggerPath(def.key)"
-              class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-50"
-              :disabled="triggering === def.key"
-              @click="handleTrigger(def.key)"
-            >{{ triggering === def.key ? '触发中…' : '立即触发' }}</button>
-            <!-- 间隔参数行内显示下次执行倒计时 -->
-          </template>
-        </div>
-
-        <!-- 只读：自动生图生效时间 -->
-        <div v-if="providerAutoSince || codexAutoSince" class="mt-2 rounded border border-editorial-border bg-editorial-bg-page px-2.5 py-1.5 space-y-0.5">
-          <div v-if="providerAutoSince" class="text-[10px] text-editorial-text-muted">服务商自动生效于 {{ formatSince(providerAutoSince) }}</div>
-          <div v-if="codexAutoSince" class="text-[10px] text-editorial-text-muted">Codex 自动生效于 {{ formatSince(codexAutoSince) }}</div>
+          <span class="shrink-0 text-[10px] text-editorial-text-muted/70">{{ stageState(definition.key).effective ? '当前生效' : stageState(definition.key).enabled ? '已配置，暂不生效' : '关闭' }}</span>
+          <a-switch :checked="stageState(definition.key).enabled" :loading="saving === definition.key" size="small" @change="(checked: boolean) => changeStage(definition.key, checked)" />
         </div>
       </div>
 
-      <!-- 第四组：短内容线（反转贴文/短文） -->
-      <div class="mb-2 mt-3 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">短内容线</div>
-      <div class="space-y-1.5">
-        <div v-for="def in shortContentGroup" :key="def.key" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5">
+      <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">每日自动长文计划</div>
+      <div class="mb-4 space-y-1.5">
+        <div v-for="definition in configDefinitions" :key="definition.key" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5">
           <div class="min-w-0 flex-1">
-            <span class="text-xs font-medium text-editorial-text-body">{{ def.label }}</span>
-            <span class="ml-1 text-[10px] text-editorial-text-muted/70">{{ def.description }}</span>
+            <div class="text-xs font-medium text-editorial-text-body">{{ definition.label }}</div>
+            <div class="text-[10px] text-editorial-text-muted/70">{{ definition.description }}</div>
           </div>
-          <span class="shrink-0 text-[10px] font-mono text-editorial-text-muted/60">{{ switches[def.key] ?? '-' }}</span>
-          <a-switch v-if="def.type === 'onoff'" :checked="isOn(def.key)" :loading="saving === def.key" size="small" @change="(checked: boolean) => handleSwitchChange(def.key, checked)" />
-          <template v-else-if="def.type === 'number'">
-            <a-input-number :value="hasDraft(def.key) ? draftNumbers[def.key] : Number(switches[def.key] ?? 0)" :min="0" :step="1" size="small" class="!w-20" :disabled="saving === def.key" @change="(val: number) => onNumberInput(def.key, val)" />
-            <button class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium disabled:opacity-50" :class="hasDraft(def.key) ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-gray-100 text-gray-400 cursor-default'" :disabled="saving === def.key || !hasDraft(def.key)" @click="confirmNumber(def.key)">确认</button>
-          </template>
+          <a-input v-if="definition.type === 'time'" :value="draftValue(definition.key)" type="time" size="small" class="!w-24" :disabled="saving === definition.key" @input="(event: Event) => { configDraft[definition.key] = (event.target as HTMLInputElement).value; }" />
+          <a-input-number v-else :value="draftValue(definition.key)" :min="definition.min" :max="definition.max" size="small" class="!w-20" :disabled="saving === definition.key" @change="(value: number | null) => { if (value !== null) configDraft[definition.key] = value; }" />
+          <a-button size="small" :loading="saving === definition.key" @click="saveConfig(definition)">保存</a-button>
         </div>
+        <div class="rounded border border-editorial-border bg-editorial-bg-page px-2.5 py-1.5 text-[10px] text-editorial-text-muted">
+          <div>今日计划：{{ planValue('status') }} · 已锁定 {{ planValue('selected_count') }} / {{ planValue('target_count') }} 篇</div>
+          <div class="mt-0.5">计划日期 {{ planValue('plan_date') }} · 模型快照 {{ planValue('model_snapshot') }}</div>
+        </div>
+      </div>
+
+      <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">旧图片实现参数（不承载自动调度）</div>
+      <div class="space-y-1.5">
+        <div class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5">
+          <div class="min-w-0 flex-1"><span class="text-xs font-medium text-editorial-text-body">旧自动生图实现</span><span class="ml-1 text-[10px] text-editorial-text-muted/70">仅选择旧服务商/Codex-auto实现；是否执行由上方“自动图片生成”阶段控制</span></div>
+          <a-select :value="imageMode" :options="imageModeOptions" size="small" class="!w-28" :loading="saving === 'image_gen_mode'" @change="changeImageMode" />
+        </div>
+        <div class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5" :class="{ 'opacity-50': !isProviderAuto }">
+          <div class="min-w-0 flex-1"><span class="text-xs font-medium text-editorial-text-body">图片服务商</span><span class="ml-1 text-[10px] text-editorial-text-muted/70">仅在服务商自动模式下生效</span></div>
+          <a-select :value="imageProvider" :options="imageProviderOptions.map(value => ({ value, label: value }))" size="small" class="!w-28" :disabled="!isProviderAuto" :loading="saving === 'image_provider'" @change="changeImageProvider" />
+        </div>
+        <div class="rounded border border-editorial-border bg-editorial-bg-page px-2.5 py-1.5 text-[10px] text-editorial-text-muted">自动任务只由 Hermes automation_tick 统一调度；如需立即推进，请使用统一控制 API，不再从此处启动独立管线。</div>
       </div>
     </a-spin>
   </section>

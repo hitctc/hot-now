@@ -3,7 +3,6 @@ import { computed, onBeforeUnmount, ref } from "vue";
 import { message } from "ant-design-vue";
 
 import { HttpError } from "../../services/http.js";
-import { usePipelineStatus } from "../../composables/usePipelineStatus.js";
 import { useSearchHistory } from "../../composables/useSearchHistory.js";
 import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
 import SourceItemsFilterBar from "../../components/creative/source-items/SourceItemsFilterBar.vue";
@@ -37,7 +36,6 @@ const writingStatusOptions = [
 ];
 
 const { history: searchHistory, addToHistory, removeFromHistory } = useSearchHistory("creative-short-source-search-history");
-const { pipelineOn } = usePipelineStatus();
 // ─── 成品文章弹窗 ───
 
 async function openArticleModal(articleId: number): Promise<void> {
@@ -370,7 +368,6 @@ const pagination = computed(() => ({
       :items="items"
       :pagination="pagination"
       :expanded-row-keys="expandedRowKeys"
-      :pipeline-on="pipelineOn"
       :writing-ids="writingIds"
       :tracing-ids="tracingIds"
       :action-pending-id="actionPendingId"

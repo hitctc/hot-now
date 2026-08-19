@@ -28,7 +28,6 @@ const props = defineProps<{
   items: CreativeSourceItem[];
   pagination: Pagination;
   expandedRowKeys: number[];
-  pipelineOn: boolean;
   writingIds: Set<number>;
   tracingIds: Set<number>;
   actionPendingId: number | null;
@@ -40,11 +39,10 @@ const emit = defineEmits<{
   (event: "open-article", id: number): void;
   (event: "write", item: CreativeSourceItem): void;
   (event: "trace", item: CreativeSourceItem): void;
-  (event: "evaluate-fit", item: CreativeSourceItem): void;
   (event: "writing-action", item: CreativeSourceItem, status: "done" | "skipped"): void;
 }>();
 
-const { mode, isLoading, items, pagination, expandedRowKeys, pipelineOn, writingIds, tracingIds, actionPendingId } = toRefs(props);
+const { mode, isLoading, items, pagination, expandedRowKeys, writingIds, tracingIds, actionPendingId } = toRefs(props);
 
 const columns = [
   { title: "ID / 序号", dataIndex: "id", key: "idSeq", width: 72, fixed: "left" as const },
@@ -253,13 +251,9 @@ function copyId(id: number): void {
         </div>
       </template>
 
-      <!-- 写文章列；长文人工写作不受自动化/旧管线开关影响，短内容继续遵循原有开关。 -->
+      <!-- 写文章列：人工写作不受自动化阶段开关影响，统一由 Hermes 接收人工意图。 -->
       <template v-else-if="column.key === 'quickCopy'">
-        <a-tooltip v-if="!pipelineOn && mode === 'short_content'" title="短内容管线已紧急制动，请先恢复管线">
-          <a-button type="link" size="small" class="!p-0 !text-[11px]" disabled>写短内容</a-button>
-        </a-tooltip>
         <a-button
-          v-else
           type="link"
           size="small"
           class="!p-0 !text-[11px]"
@@ -388,14 +382,7 @@ function copyId(id: number): void {
         <!-- 写作状态操作 -->
         <div class="flex items-center gap-3 border-t border-editorial-border pt-3">
           <span class="text-xs font-semibold uppercase tracking-[0.08em] text-editorial-text-muted">写作状态：</span>
-          <a-button
-            v-if="mode === 'article'"
-            size="small"
-            :loading="actionPendingId === record.id"
-            @click="emit('evaluate-fit', record)"
-          >
-            {{ record.accountFitLevel ? "重新评估适配度" : "评估适配度" }}
-          </a-button>
+          <span v-if="mode === 'article'" class="text-xs text-editorial-text-muted">账号适配度由 Hermes 自动评估：{{ record.accountFitLevel ? accountFitLabel(record.accountFitLevel) : "待评估" }}</span>
           <a-button
             size="small"
             type="primary"

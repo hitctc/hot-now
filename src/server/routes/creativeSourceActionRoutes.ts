@@ -1,7 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import type { SqliteDatabase } from "../../core/db/openDatabase.js";
-import type { CreativeAutomationService } from "../../core/creative/creativeAutomationService.js";
 import {
   findCreativeSourceItemById,
   insertCreativeSourceItem,
@@ -12,10 +11,10 @@ import {
   updateCreativeSourceItemWritingStatus,
   type AccountFitDetails,
 } from "../../core/creative/creativeSourceItemRepository.js";
+import { callHermesAutomation } from "../hermesAutomationClient.js";
 
 export type CreativeSourceActionRouteOptions = {
   db?: SqliteDatabase;
-  automation?: CreativeAutomationService;
   authorizeCreativeApiToken: (request: FastifyRequest, reply: FastifyReply) => boolean;
   hasCreativeApiToken: (request: FastifyRequest) => boolean;
   authorizeSession: (request: FastifyRequest, reply: FastifyReply) => boolean;
@@ -79,10 +78,7 @@ export function registerCreativeSourceActionRoutes(
       direction: typeof body?.direction === "string" ? body.direction : undefined
     });
 
-    if (result.created) {
-      // 长内容创建后立即唤醒持久化评估队列；重复采集不会新增任务。
-      options.automation?.onSourceCreated(result.id);
-    }
+    // 新素材只入 HotNow 展示库；评估和自动写作由 Hermes automation_tick 统一发现。
     return reply.code(result.created ? 201 : 200).send({
       id: result.id,
       externalId,
@@ -90,55 +86,52 @@ export function registerCreativeSourceActionRoutes(
     });
   });
 
-  // ─── 本地自动化状态与开关：只控制 HotNow 的自动任务，人工动作始终可用 ───
+  // ─── Hermes 自动化状态与控制代理：HotNow 不保存自动化业务状态 ───
   app.get("/api/creative/automation/status", async (request, reply) => {
     if (!options.authorizeSession(request, reply)) return;
-    if (!options.automation) return reply.code(503).send({ ok: false, reason: "creative-automation-not-available" });
-    return reply.send({ ok: true, ...options.automation.getStatus() });
+    const result = await callHermesAutomation("/api/automation/status", "GET");
+    return reply.code(result.status).send(result.data);
+  });
+
+  app.post("/api/creative/automation/control", async (request, reply) => {
+    if (!options.authorizeSession(request, reply)) return;
+    const result = await callHermesAutomation("/api/automation/control", "POST", request.body);
+    return reply.code(result.status).send(result.data);
   });
 
   app.post("/api/creative/automation/:kind/enabled", async (request, reply) => {
     if (!options.authorizeSession(request, reply)) return;
-    if (!options.automation) return reply.code(503).send({ ok: false, reason: "creative-automation-not-available" });
     const kind = (request.params as { kind: string }).kind;
     const enabled = (request.body as { enabled?: unknown } | undefined)?.enabled;
     if ((kind !== "master" && kind !== "evaluate" && kind !== "write") || typeof enabled !== "boolean") return reply.code(400).send({ ok: false, reason: "invalid-automation-setting" });
-    if (kind === "master") {
-      options.automation.setMasterEnabled(enabled);
-    } else {
-      options.automation.setEnabled(kind, enabled);
-    }
-    return reply.send({ ok: true, ...options.automation.getStatus() });
+    const body = kind === "master"
+      ? { mode: enabled ? "running" : "emergency_stopped" }
+      : { stage: kind === "evaluate" ? "account_fit" : "long_write", enabled };
+    const result = await callHermesAutomation("/api/automation/control", "POST", body);
+    return reply.code(result.status).send(result.data);
   });
 
-  // ─── 素材库写文章：先进入 HotNow 持久化队列，再由单 worker 投递 Hermes ───
+  // ─── 素材库写文章：HotNow 只把人工意图代理给 Hermes ───
   app.post("/api/creative/source-items/:id/write-article", async (request, reply) => {
     if (!options.authorizeSession(request, reply)) return;
-    if (!db || !options.automation) return reply.code(503).send({ ok: false, reason: "creative-automation-not-available" });
-
     const id = parseInt((request.params as { id: string }).id, 10);
-    const body = request.body as { thesis?: string; forceAccountFit?: boolean } | undefined;
-    const result = options.automation.enqueueManualWrite(
-      id,
-      typeof body?.thesis === "string" ? body.thesis.trim() || undefined : undefined,
-      body?.forceAccountFit === true,
-    );
-    if (!result.accepted) {
-      const status = result.reason === "account-fit-low-confirmation-required" ? 422 : result.reason === "source-item-not-found" ? 404 : 409;
-      return reply.code(status).send({ ok: false, reason: result.reason });
+    const body = request.body as { thesis?: string } | undefined;
+    if (!Number.isInteger(id) || id <= 0) return reply.code(400).send({ ok: false, reason: "invalid-source-item-id" });
+    const result = await callHermesAutomation("/api/write-article", "POST", {
+      sourceItemId: id,
+      automatic: false,
+      thesis: typeof body?.thesis === "string" ? body.thesis.trim() || undefined : undefined,
+    });
+    if (result.status >= 400) {
+      return reply.code(result.status).send({ ok: false, reason: result.data.error ?? result.data.reason ?? "hermes-write-rejected" });
     }
-    return reply.code(202).send({ ok: true, status: "queued", taskId: result.jobId });
+    return reply.code(202).send({ ok: true, status: result.data.status ?? "queued", taskId: result.data.task_id ?? result.data.taskId });
   });
 
-  // ─── 手动评估账号适配度：与自动任务共用单 worker，不阻塞页面请求 ───
+  // ─── 手动评估已从产品面移除；账号适配只由 Hermes 自动阶段统一执行 ───
   app.post("/api/creative/source-items/:id/evaluate-account-fit", async (request, reply) => {
     if (!options.authorizeSession(request, reply)) return;
-    if (!db || !options.automation) return reply.code(503).send({ ok: false, reason: "creative-automation-not-available" });
-    const id = parseInt((request.params as { id: string }).id, 10);
-    if (!findCreativeSourceItemById(db, id)) return reply.code(404).send({ ok: false, reason: "source-item-not-found" });
-    const result = options.automation.enqueueManualEvaluation(id);
-    if (!result.accepted && result.reason !== "job-already-active") return reply.code(409).send({ ok: false, reason: result.reason });
-    return reply.code(202).send({ ok: true, status: "queued", taskId: result.jobId, reason: result.reason });
+    return reply.code(410).send({ ok: false, reason: "manual-account-fit-evaluation-removed", replacement: "Hermes 自动评估阶段" });
   });
 
   // ─── 短内容素材写短内容：调用 Hermes /api/short/write，异步执行 ───
@@ -214,10 +207,13 @@ export function registerCreativeSourceActionRoutes(
       fullContent: content,
     });
 
-    if (!options.automation) return reply.code(503).send({ ok: false, reason: "creative-automation-not-available" });
-    const queued = options.automation.enqueueManualWrite(result.id, typeof body?.thesis === "string" ? body.thesis.trim() || undefined : undefined);
-    if (!queued.accepted) return reply.code(409).send({ ok: false, reason: queued.reason });
-    return reply.code(202).send({ ok: true, sourceItemId: result.id, taskId: queued.jobId, status: "queued" });
+    const queued = await callHermesAutomation("/api/write-article", "POST", {
+      sourceItemId: result.id,
+      automatic: false,
+      thesis: typeof body?.thesis === "string" ? body.thesis.trim() || undefined : undefined,
+    });
+    if (queued.status >= 400) return reply.code(queued.status).send({ ok: false, reason: queued.data.error ?? queued.data.reason ?? "hermes-write-rejected" });
+    return reply.code(202).send({ ok: true, sourceItemId: result.id, taskId: queued.data.task_id ?? queued.data.taskId, status: queued.data.status ?? "queued" });
   });
 
   // ─── 素材溯源：调用 Hermes 搜索原始来源 ───
@@ -441,8 +437,6 @@ export function registerCreativeSourceActionRoutes(
     if (!updated) {
       return reply.code(404).send({ ok: false, reason: "not-found" });
     }
-    // 规则版本漂移时只撤销未开始的自动写作，并重评最近窗口内的未完成长素材。
-    options.automation?.recordAccountFitRuleVersion(body.ruleVersion, id);
     return reply.send({ ok: true });
   });
 

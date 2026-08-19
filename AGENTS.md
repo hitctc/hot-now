@@ -81,9 +81,11 @@
 - `src/core/storage/`
   负责报告文件读写和历史日期索引。
 - `src/core/scheduler/`
-  负责按配置启动每日定时任务。
+  只负责保留既有报告/邮件/时间线的运行时计时器；每个自动回调执行前必须向 Hermes 查询阶段许可，不得在这里保存自动化开关、队列、重试或业务状态。
 - `src/server/`
   负责 HTTP 协议适配、页面分发和业务域路由；`createServer.ts` 只做 Fastify 创建、全局配置、依赖装配与路由注册。路由域、核心层和客户端的长期边界以 `docs/开发与模块化规范.md` 为准，历史治理过程见 `docs/性能优化基线.md`。
+- `src/server/hermesAutomationClient.ts` 与创作动作路由
+  只负责调用 Hermes 自动化控制面、读取自动阶段许可、转发人工写作请求和展示状态；不要在 HotNow 增加新的自动化队列、重试器或账号适配业务判断。
 - `src/wechatResolver/`
   负责本地开发时自动启动的公众号解析 sidecar；当前默认先尝试公开索引，再用“文章页元数据 + 搜狗文章检索”做 fallback，最终把标准 `rss_url` 返回给主应用。
 - `tests/`
@@ -108,6 +110,16 @@
 - 运行产物仅保留在 `data/`：报告位于 `data/reports/<YYYY-MM-DD>/`，已验证快照位于 `data/recovery-backups/<timestamp>/`，不得提交 Git。
 
 页面细节、接口契约和配置说明以 `README.md` 为准；模块边界以 `docs/开发与模块化规范.md` 为准。
+
+### Hermes 自动化边界（强约束）
+
+- Hermes（`/Users/tc-nihao/.hermes`）是素材采集、基础评分、账号适配评估、自动长短写作、图片、日报、提醒、邮件通知的业务编排、状态、队列、计划、重试和告警唯一真源。
+- HotNow 只展示 Hermes 返回的状态，并把控制请求代理到 Hermes；素材入库只写 HotNow 展示数据，不得在入库后本地创建自动评估或自动写作任务。既有报告/邮件/时间线计时器只能把 Hermes 阶段许可当作执行前门禁，不能形成第二套控制面。
+- 自动化使用一个全局模式：`running`、`paused`、`emergency_stopped`；阶段开关仍独立存在。暂停只阻止自动任务，紧急停止还会取消未开始的自动队列项；两者都不影响人工写作。
+- 基础评分与账号适配评估在 Hermes 内部保持两个独立阶段。HotNow 可以展示适配结果，但不提供手动账号适配评估入口，也不以本地适配结果决定人工写作能否提交。
+- 每日自动写作计划、素材锁定、候选理由、同日主题去重和失败终态都只能由 Hermes 记录；HotNow 不得复制筛选条件或自行补投递。
+- Luna 配图资格由 Hermes 按“实际模型为 `codex/gpt-5.6-luna` + 触发类型 + 图片阶段开关”判断。HotNow 只提交人工意图，不直接调用模型或维护图片任务状态。
+- 旧 `/api/creative/automation/:kind/enabled` 仅作为兼容代理；新增控制必须使用统一 `/api/creative/automation/status` 与 `/api/creative/automation/control`，禁止再扩展旧的平行开关语义。
 
 ## 5. 运行与验证
 

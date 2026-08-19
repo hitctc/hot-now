@@ -117,6 +117,7 @@ async function startPush(): Promise<void> {
 const isPushing = computed(() => pushState.value === "pushing");
 const isDone = computed(() => pushState.value === "done");
 const failedStepError = computed(() => pushResult.value?.ok ? "" : (pushResult.value?.errorMessage || "推送失败"));
+const failedStepTitle = computed(() => STEP_DEFS.find((step) => stepStates[step.id].status === "error")?.title || "推送");
 </script>
 
 <template>
@@ -189,8 +190,14 @@ const failedStepError = computed(() => pushResult.value?.ok ? "" : (pushResult.v
         type="error"
         show-icon
         message="推送失败"
-        :description="failedStepError"
-      />
+      >
+        <template #description>
+          <div class="push-error-meta">
+            失败步骤：{{ failedStepTitle }}<span v-if="pushResult?.errorCode"> · 错误码 {{ pushResult.errorCode }}</span>
+          </div>
+          <div class="push-error-detail">{{ failedStepError }}</div>
+        </template>
+      </a-alert>
       <div class="push-result-actions">
         <a-button @click="$emit('update:visible', false)">关闭</a-button>
       </div>
@@ -233,6 +240,15 @@ const failedStepError = computed(() => pushResult.value?.ok ? "" : (pushResult.v
 .push-detail {
   color: #b88ef5;
   font-size: 12px;
+}
+.push-error-meta {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.push-error-detail {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .push-result {
   margin-top: 16px;

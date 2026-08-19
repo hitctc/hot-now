@@ -112,6 +112,7 @@ function close(): void {
 const isPushing = computed(() => pushState.value === "pushing");
 const isDone = computed(() => pushState.value === "done");
 const failedStepError = computed(() => pushResult.value?.ok ? "" : (pushResult.value?.errorMessage || "推送失败"));
+const failedStepTitle = computed(() => STEP_DEFS.find((step) => stepStates[step.id].status === "error")?.title || "推送");
 
 // 暴露给父组件：isPushing 判断是否正在推送，resetState 切换新文章时重置浮窗状态
 defineExpose({ isPushing, resetState });
@@ -168,7 +169,11 @@ defineExpose({ isPushing, resetState });
           <CheckCircleFilled /> 草稿已添加到微信公众号
         </div>
         <div v-else class="push-float-result-err">
-          <CloseCircleFilled /> 推送失败：{{ failedStepError }}
+          <CloseCircleFilled />
+          <div>
+            <div>推送失败 · {{ failedStepTitle }}<span v-if="pushResult?.errorCode"> · 错误码 {{ pushResult.errorCode }}</span></div>
+            <div class="push-float-error-detail">{{ failedStepError }}</div>
+          </div>
         </div>
         <div class="push-float-result-actions">
           <a-button size="small" @click="close">关闭</a-button>
@@ -315,6 +320,12 @@ defineExpose({ isPushing, resetState });
 .push-float-result-err {
   font-size: 12px;
   color: #ff4d4f;
+}
+.push-float-error-detail {
+  margin-top: 4px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #8c1d18;
 }
 .push-float-result-actions {
   display: flex;

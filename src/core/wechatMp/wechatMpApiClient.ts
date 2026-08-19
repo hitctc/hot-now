@@ -3,6 +3,7 @@
 
 import { clearTokenCache } from "./wechatMpAccessToken.js";
 import { WECHAT_ERROR_HINTS, type WechatApiError } from "./types.js";
+import sharp from "sharp";
 
 // 微信 API 调用失败时抛出的结构化错误
 export class WechatApiCallError extends Error {
@@ -14,6 +15,45 @@ export class WechatApiCallError extends Error {
     super(`微信 API 调用失败 (${errcode}): ${errmsg}`);
     this.name = "WechatApiCallError";
   }
+}
+
+export type WechatImageUpload = {
+  buffer: Buffer;
+  filename: string;
+  contentType: "image/jpeg" | "image/png";
+};
+
+/**
+ * 把本地图片整理成微信草稿接口接受的格式，并让文件名、MIME 和真实字节保持一致。
+ * 封面固定输出 JPEG；正文保留 JPEG/PNG，其余格式（包括 WebP）转成 PNG。
+ */
+export async function prepareWechatImage(
+  imageBuffer: Buffer,
+  filenameBase: string,
+  kind: "cover" | "content",
+): Promise<WechatImageUpload> {
+  const metadata = await sharp(imageBuffer).metadata();
+
+  if (kind === "cover") {
+    return {
+      buffer: await sharp(imageBuffer).rotate().jpeg({ quality: 90 }).toBuffer(),
+      filename: `${filenameBase}.jpg`,
+      contentType: "image/jpeg",
+    };
+  }
+
+  if (metadata.format === "jpeg") {
+    return { buffer: imageBuffer, filename: `${filenameBase}.jpg`, contentType: "image/jpeg" };
+  }
+  if (metadata.format === "png") {
+    return { buffer: imageBuffer, filename: `${filenameBase}.png`, contentType: "image/png" };
+  }
+
+  return {
+    buffer: await sharp(imageBuffer).rotate().png({ compressionLevel: 9 }).toBuffer(),
+    filename: `${filenameBase}.png`,
+    contentType: "image/png",
+  };
 }
 
 // 检查微信 API 响应是否报错，有错则抛出
@@ -39,19 +79,19 @@ function checkWechatResponse<T extends WechatApiError>(
 /** 上传封面图为微信永久素材，返回 media_id */
 export async function uploadPermanentImage(
   accessToken: string,
-  imageBuffer: Buffer,
-  filename: string
+  image: WechatImageUpload,
+  accountId?: number,
 ): Promise<{ mediaId: string; url: string }> {
   const url = `https://api.weixin.qq.com/cgi-bin/material/add_material?access_token=${accessToken}&type=image`;
 
   const formData = new FormData();
-  const blob = new Blob([new Uint8Array(imageBuffer)]);
-  formData.append("media", blob, filename);
+  const blob = new Blob([new Uint8Array(image.buffer)], { type: image.contentType });
+  formData.append("media", blob, image.filename);
 
   const response = await fetch(url, { method: "POST", body: formData, signal: AbortSignal.timeout(60000) });
   const data = await response.json() as { media_id?: string; url?: string } & WechatApiError;
 
-  checkWechatResponse(data);
+  checkWechatResponse(data, accountId);
 
   if (!data.media_id) throw new Error("上传封面图失败：未返回 media_id");
   return { mediaId: data.media_id, url: data.url ?? "" };
@@ -60,14 +100,13 @@ export async function uploadPermanentImage(
 /** 上传正文图片，返回微信 CDN URL */
 export async function uploadContentImage(
   accessToken: string,
-  imageBuffer: Buffer,
-  filename: string
+  image: WechatImageUpload,
 ): Promise<string> {
   const url = `https://api.weixin.qq.com/cgi-bin/media/uploadimg?access_token=${accessToken}`;
 
   const formData = new FormData();
-  const blob = new Blob([new Uint8Array(imageBuffer)]);
-  formData.append("media", blob, filename);
+  const blob = new Blob([new Uint8Array(image.buffer)], { type: image.contentType });
+  formData.append("media", blob, image.filename);
 
   const response = await fetch(url, { method: "POST", body: formData, signal: AbortSignal.timeout(60000) });
   const data = await response.json() as { url?: string } & WechatApiError;

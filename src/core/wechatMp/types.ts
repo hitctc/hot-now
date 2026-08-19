@@ -105,6 +105,7 @@ export const WECHAT_ERROR_HINTS: Record<number, { message: string; hint: string 
   40001: { message: "微信接口认证失败", hint: "请检查 AppID 和 AppSecret 配置是否正确" },
   40004: { message: "媒体类型不合法", hint: "请检查图片格式（封面图需 JPEG，正文图需 PNG）" },
   40009: { message: "图片大小超限", hint: "图片文件不能超过 10MB" },
+  40113: { message: "不支持的文件类型", hint: "系统会在上传前把封面转换为 JPEG、正文图片转换为 PNG；如果仍失败，请检查图片文件是否损坏" },
   41001: { message: "缺少 access_token", hint: "系统错误，请重试" },
   42001: { message: "access_token 已过期", hint: "系统会自动刷新，请重试" },
   43002: { message: "请求方法错误", hint: "系统错误，请联系开发者" },
@@ -114,7 +115,7 @@ export const WECHAT_ERROR_HINTS: Record<number, { message: string; hint: string 
   61004: { message: "access_token 过期", hint: "系统会自动刷新，请重试" },
   40125: { message: "AppSecret 错误", hint: "请检查 AppSecret 配置是否与公众号后台一致" },
   40130: { message: "封面素材无效", hint: "请重新推送，系统会重新上传封面图" },
-  40164: { message: "图文内容超限", hint: "正文 HTML 超出微信限制（约 20000 字符），请精简内容或减少图片后重试" },
+  40164: { message: "服务器 IP 不在微信白名单", hint: "请在微信公众号后台 → 基本配置 → IP 白名单中添加当前服务器公网 IP" },
   45065: { message: "24小时内重复发布", hint: "该内容在24小时内已发布过，请稍后再试" },
   61006: { message: "IP 不在白名单中", hint: "请在微信公众号后台 → 基本配置 → IP 白名单中添加服务器 IP" },
 };

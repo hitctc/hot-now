@@ -51,6 +51,7 @@ type StepStatus = "pending" | "running" | "done" | "error";
 const stepStates = ref<Record<string, { status: StepStatus; detail?: string }>>(
   Object.fromEntries(STEP_DEFS.map(s => [s.id, { status: "pending" as StepStatus }]))
 );
+const failedStepTitle = computed(() => STEP_DEFS.find((step) => stepStates.value[step.id]?.status === "error")?.title || "推送");
 
 // 编辑内容的主题预览 HTML
 const activePreviewHtml = computed(() => {
@@ -272,8 +273,15 @@ watch(() => props.digest?.contentMarkdown, (val) => {
             v-else
             type="error"
             show-icon
-            :message="pushResult.errorMessage ?? '推送失败'"
-          />
+            message="推送失败"
+          >
+            <template #description>
+              <div>
+                失败步骤：{{ failedStepTitle }}<span v-if="pushResult.errorCode"> · 错误码 {{ pushResult.errorCode }}</span>
+              </div>
+              <div class="whitespace-pre-wrap break-words">{{ pushResult.errorMessage ?? "推送失败" }}</div>
+            </template>
+          </a-alert>
         </div>
       </div>
 

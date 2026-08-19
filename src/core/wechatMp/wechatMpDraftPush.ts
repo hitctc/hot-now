@@ -4,7 +4,13 @@
 import { JSDOM } from "jsdom";
 import { findDefaultWechatMpAccount } from "./wechatMpAccountRepository.js";
 import { getAccessToken } from "./wechatMpAccessToken.js";
-import { uploadPermanentImage, uploadContentImage, createDraft, WechatApiCallError } from "./wechatMpApiClient.js";
+import {
+  uploadPermanentImage,
+  uploadContentImage,
+  createDraft,
+  prepareWechatImage,
+  WechatApiCallError,
+} from "./wechatMpApiClient.js";
 import { makeWechatCompatible, type WechatThemeId } from "../creative/wechatFormat/wechatCompat.js";
 import {
   checkPublishConditions,
@@ -178,8 +184,8 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
     const coverUrl = article.coverImage.length > 0 ? article.coverImage[selectedCoverIdx >= 0 ? selectedCoverIdx : 0] : null;
     if (coverUrl) {
       const coverBuffer = await downloadImage(coverUrl);
-      const ext = coverUrl.includes(".png") ? "png" : "jpg";
-      const coverResult = await uploadPermanentImage(token, coverBuffer, `cover.${ext}`);
+      const coverImage = await prepareWechatImage(coverBuffer, "cover", "cover");
+      const coverResult = await uploadPermanentImage(token, coverImage, account.id);
       thumbMediaId = coverResult.mediaId;
       if (coverResult.url) {
         html = replaceImageUrls(html, [coverUrl], [coverResult.url]);
@@ -200,15 +206,10 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
 
       for (let i = 0; i < imageUrls.length; i++) {
         await onProgress?.("images", "running", `${i + 1}/${imageUrls.length}`);
-        try {
-          const imgBuffer = await downloadImage(imageUrls[i]);
-          const ext = imageUrls[i].includes(".png") ? "png" : "jpg";
-          const cdnUrl = await uploadContentImage(token, imgBuffer, `image_${i}.${ext}`);
-          cdnUrls.push(cdnUrl);
-        } catch {
-          // 单张图片上传失败不阻塞整体流程，保留原始 URL
-          cdnUrls.push(imageUrls[i]);
-        }
+        const imgBuffer = await downloadImage(imageUrls[i]);
+        const image = await prepareWechatImage(imgBuffer, `image_${i}`, "content");
+        const cdnUrl = await uploadContentImage(token, image);
+        cdnUrls.push(cdnUrl);
       }
 
       html = replaceImageUrls(html, imageUrls, cdnUrls);

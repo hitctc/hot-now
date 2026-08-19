@@ -3,7 +3,12 @@
 
 import { findDefaultWechatMpAccount } from "./wechatMpAccountRepository.js";
 import { getAccessToken } from "./wechatMpAccessToken.js";
-import { uploadPermanentImage, createDraft, WechatApiCallError } from "./wechatMpApiClient.js";
+import {
+  uploadPermanentImage,
+  createDraft,
+  prepareWechatImage,
+  WechatApiCallError,
+} from "./wechatMpApiClient.js";
 import { makeWechatCompatible, type WechatThemeId } from "../creative/wechatFormat/wechatCompat.js";
 import { findDailyDigestById, updateDailyDigestStatus } from "../dailyDigest/dailyDigestRepository.js";
 import type { SqliteDatabase } from "../db/openDatabase.js";
@@ -91,8 +96,8 @@ export async function pushDailyDigestToWechatDraft(params: DigestPushParams): Pr
     let thumbMediaId = "";
     if (digest.coverImage) {
       const coverBuffer = await downloadImage(digest.coverImage);
-      const ext = digest.coverImage.includes(".png") ? "png" : "jpg";
-      const coverResult = await uploadPermanentImage(token, coverBuffer, `digest_cover.${ext}`);
+      const coverImage = await prepareWechatImage(coverBuffer, "digest_cover", "cover");
+      const coverResult = await uploadPermanentImage(token, coverImage, account.id);
       thumbMediaId = coverResult.mediaId;
     }
     await onProgress?.("cover", "done");

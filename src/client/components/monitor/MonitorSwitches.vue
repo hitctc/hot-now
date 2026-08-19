@@ -30,7 +30,7 @@ const stageDefinitions: Array<{ key: AutomationStageKey; description: string }> 
   { key: "collection", description: "Hermes 自动采集新素材" },
   { key: "base_scoring", description: "基础评分、趋势评分和基础筛选" },
   { key: "account_fit", description: "账号适配评估；失败按退避上限重试" },
-  { key: "long_write", description: "每日计划触发的自动长文写作" },
+  { key: "long_write", description: "每日计划自动长文；仅接受账号适配=high且双评分达标的素材" },
   { key: "short_write", description: "自动短内容写作" },
   { key: "images", description: "自动写作中的 Luna 图片生成许可" },
   { key: "daily_digest", description: "自动日报" },
@@ -42,8 +42,8 @@ const configDefinitions = [
   { key: "dailyLongWriteCount", backendKey: "auto_write_daily_count", label: "每日自动长文数量", description: "默认 3 篇；手动写作不计入此数量", type: "number" as const, min: 0, max: 20 },
   { key: "dailyLongWriteTime", backendKey: "auto_write_daily_time", label: "每日自动写作时间", description: "北京时间，默认 10:00", type: "time" as const, min: 0, max: 0 },
   { key: "windowHours", backendKey: "auto_write_window_hours", label: "素材回看窗口（小时）", description: "计划时间向前筛选，默认 48 小时", type: "number" as const, min: 1, max: 168 },
-  { key: "baseScoreThreshold", backendKey: "auto_write_base_score_threshold", label: "基础评分阈值", description: "自动写作硬门槛，默认 80", type: "number" as const, min: 0, max: 100 },
-  { key: "trendScoreThreshold", backendKey: "trend_score_threshold", label: "趋势评分阈值", description: "自动写作硬门槛，默认 80", type: "number" as const, min: 0, max: 100 },
+  { key: "baseScoreThreshold", backendKey: "auto_write_base_score_threshold", label: "基础评分阈值", description: "自动写作硬门槛；还必须账号适配=high且趋势分达标，默认 80", type: "number" as const, min: 0, max: 100 },
+  { key: "trendScoreThreshold", backendKey: "trend_score_threshold", label: "趋势评分阈值", description: "自动写作硬门槛；还必须账号适配=high且基础分达标，默认 80", type: "number" as const, min: 0, max: 100 },
 ] as const;
 
 type ConfigKey = (typeof configDefinitions)[number]["key"];
@@ -254,6 +254,9 @@ onMounted(() => {
         <div class="rounded border border-editorial-border bg-editorial-bg-page px-2.5 py-1.5 text-[10px] text-editorial-text-muted">
           <div>今日计划：{{ planValue('status') }} · 已锁定 {{ planValue('selected_count') }} / {{ planValue('target_count') }} 篇</div>
           <div class="mt-0.5">计划日期 {{ planValue('plan_date') }} · 模型快照 {{ planValue('model_snapshot') }}</div>
+        </div>
+        <div class="rounded border border-editorial-border bg-editorial-bg-page px-2.5 py-1.5 text-[10px] leading-5 text-editorial-text-muted">
+          自动写作入列条件：账号适配必须为 <strong>high（高适配）</strong>，同时基础评分 ≥ {{ automation?.config.baseScoreThreshold ?? 80 }}、趋势评分 ≥ {{ automation?.config.trendScoreThreshold ?? 80 }}；另受 48 小时窗口、已写作/已占用排除和同日主题去重约束。
         </div>
       </div>
 

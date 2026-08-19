@@ -7,6 +7,7 @@ import {
   resolveClientAssetMimeType,
 } from "./sitePageAssetHelpers.js";
 import { readContentPageModelApiData } from "./sitePageContentHelpers.js";
+import { listCreativeRawRssItems, type CreativeRawRssFeed } from "../../core/creative/creativeRawRssFeedRepository.js";
 
 /** 注册健康检查、静态资源、内容 API 和创作 feed API。 */
 export function registerSitePublicRoutes(context: SitePageRouteContext): void {
@@ -146,4 +147,39 @@ export function registerSitePublicRoutes(context: SitePageRouteContext): void {
 
     return reply.send({ ok: true, total: candidates.length, items: candidates });
   });
+
+  app.get("/api/creative/feed/raw-rss", async (request, reply) => {
+    if (!options.authorizeCreativeApiToken(request, reply)) {
+      return;
+    }
+    if (!db) {
+      return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    }
+
+    const query = request.query as Record<string, string | undefined>;
+    const rawSourceFeed = query.sourceFeed?.trim();
+    const sourceFeed = rawSourceFeed === "juya-ai-daily" || rawSourceFeed === "wechat-rss"
+      ? rawSourceFeed as CreativeRawRssFeed
+      : rawSourceFeed
+        ? null
+        : undefined;
+
+    if (sourceFeed === null) {
+      return reply.code(400).send({ ok: false, reason: "invalid-source-feed" });
+    }
+
+    const windowHours = parseBoundedInteger(query.windowHours, 48, 1, 168);
+    const limit = parseBoundedInteger(query.limit, 200, 1, 500);
+    const result = listCreativeRawRssItems(db, { sourceFeed, windowHours, limit });
+    return reply.send({ ok: true, ...result });
+  });
+}
+
+function parseBoundedInteger(value: string | undefined, fallback: number, min: number, max: number): number {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= min && parsed <= max ? parsed : fallback;
 }

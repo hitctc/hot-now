@@ -656,6 +656,23 @@ export function updateCreativeAutomationControl(input: {
   });
 }
 
+export type DailyPlanRunResponse = {
+  ok: boolean;
+  status: string;
+  submitted?: number;
+  plan?: Record<string, unknown>;
+  errors?: string[];
+  error?: string;
+};
+
+/** 立即执行当天自动写作计划；不触发采集、评分或其他自动阶段。 */
+export function triggerCreativeDailyPlan(): Promise<DailyPlanRunResponse> {
+  return requestJson<DailyPlanRunResponse>("/api/creative/automation/daily-plan/run", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
 /** 兼容旧调用方，实际仍转成 Hermes 阶段控制，不创建 HotNow 本地任务。 */
 export function updateCreativeAutomationEnabled(kind: "master" | "evaluate" | "write", enabled: boolean): Promise<CreativeAutomationStatus> {
   return requestJson<CreativeAutomationStatus>(`/api/creative/automation/${kind}/enabled`, {

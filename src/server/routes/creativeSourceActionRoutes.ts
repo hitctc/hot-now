@@ -99,6 +99,12 @@ export function registerCreativeSourceActionRoutes(
     return reply.code(result.status).send(result.data);
   });
 
+  app.post("/api/creative/automation/daily-plan/run", async (request, reply) => {
+    if (!options.authorizeSession(request, reply)) return;
+    const result = await callHermesAutomation("/api/automation/daily-plan/run", "POST", request.body ?? {});
+    return reply.code(result.status).send(result.data);
+  });
+
   app.post("/api/creative/automation/:kind/enabled", async (request, reply) => {
     if (!options.authorizeSession(request, reply)) return;
     const kind = (request.params as { kind: string }).kind;

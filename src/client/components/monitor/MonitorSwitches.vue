@@ -9,6 +9,7 @@ import {
 } from "../../services/monitorApi.js";
 import {
   fetchCreativeAutomationStatus,
+  triggerCreativeDailyPlan,
   updateCreativeAutomationControl,
   type AutomationMode,
   type AutomationStageKey,
@@ -39,7 +40,7 @@ const stageDefinitions: Array<{ key: AutomationStageKey; description: string }> 
 ];
 
 const configDefinitions = [
-  { key: "dailyLongWriteCount", backendKey: "auto_write_daily_count", label: "每日自动长文数量", description: "默认 3 篇；手动写作不计入此数量", type: "number" as const, min: 0, max: 20 },
+  { key: "dailyLongWriteCount", backendKey: "auto_write_daily_count", label: "每日自动长文数量", description: "默认 3 篇；到点有几篇写几篇，不自动补齐；手动写作不计入此数量", type: "number" as const, min: 0, max: 20 },
   { key: "dailyLongWriteTime", backendKey: "auto_write_daily_time", label: "每日自动写作时间", description: "北京时间，默认 10:00", type: "time" as const, min: 0, max: 0 },
   { key: "windowHours", backendKey: "auto_write_window_hours", label: "素材回看窗口（小时）", description: "计划时间向前筛选，默认 48 小时", type: "number" as const, min: 1, max: 168 },
   { key: "baseScoreThreshold", backendKey: "auto_write_base_score_threshold", label: "基础评分阈值", description: "自动写作硬门槛；还必须账号适配=high且趋势分达标，默认 80", type: "number" as const, min: 0, max: 100 },
@@ -178,6 +179,27 @@ async function saveConfig(definition: (typeof configDefinitions)[number]): Promi
   }
 }
 
+/** 只手动推进当天自动计划，不启动采集、评分或其他自动阶段。 */
+async function runDailyPlanNow(): Promise<void> {
+  saving.value = "daily-plan";
+  try {
+    const result = await triggerCreativeDailyPlan();
+    await refresh();
+    if (result.status === "waiting_candidates") {
+      message.info("今日计划当前没有合格素材，仍保持等待状态");
+    } else if (result.status === "partial") {
+      message.success(`今日计划已执行 ${result.plan?.selected_count ?? result.submitted ?? 0} 篇`);
+    } else {
+      message.success("今日计划已触发");
+    }
+  } catch {
+    message.error("今日计划执行失败");
+    await refresh();
+  } finally {
+    saving.value = null;
+  }
+}
+
 async function saveLegacySwitch(key: string, value: string): Promise<void> {
   saving.value = key;
   try {
@@ -252,7 +274,10 @@ onMounted(() => {
           <a-button size="small" :loading="saving === definition.key" @click="saveConfig(definition)">保存</a-button>
         </div>
         <div class="rounded border border-editorial-border bg-editorial-bg-page px-2.5 py-1.5 text-[10px] text-editorial-text-muted">
-          <div>今日计划：{{ planValue('status') }} · 已锁定 {{ planValue('selected_count') }} / {{ planValue('target_count') }} 篇</div>
+          <div class="flex items-center gap-2">
+            <span>今日计划：{{ planValue('status') }} · 已锁定 {{ planValue('selected_count') }} / {{ planValue('target_count') }} 篇</span>
+            <a-button size="small" :loading="saving === 'daily-plan'" @click="runDailyPlanNow">立即执行今日计划</a-button>
+          </div>
           <div class="mt-0.5">计划日期 {{ planValue('plan_date') }} · 模型快照 {{ planValue('model_snapshot') }}</div>
         </div>
         <div class="rounded border border-editorial-border bg-editorial-bg-page px-2.5 py-1.5 text-[10px] leading-5 text-editorial-text-muted">

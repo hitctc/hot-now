@@ -56,6 +56,15 @@ describe("creative automation Hermes proxy", () => {
     expect(control.statusCode).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[1][0]).toBe("https://hermes.test/api/automation/control");
+
+    const dailyPlan = await app.inject({
+      method: "POST",
+      url: "/api/creative/automation/daily-plan/run",
+      payload: {},
+    });
+    expect(dailyPlan.statusCode).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[2][0]).toBe("https://hermes.test/api/automation/daily-plan/run");
     await app.close();
   });
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { Modal, message } from "ant-design-vue";
 
 import {
@@ -14,7 +14,11 @@ import {
   type AutomationMode,
   type AutomationStageKey,
   type CreativeAutomationStatus,
+  type DailyPlanItem,
+  type DailyPlanView,
 } from "../../services/creativeApi.js";
+
+const emit = defineEmits<{ openArticle: [articleId: number] }>();
 
 const automation = ref<CreativeAutomationStatus | null>(null);
 const stats = ref<MonitorStats | null>(null);
@@ -31,7 +35,7 @@ const stageDefinitions: Array<{ key: AutomationStageKey; description: string }> 
   { key: "collection", description: "Hermes 自动采集新素材" },
   { key: "base_scoring", description: "基础评分、趋势评分和基础筛选" },
   { key: "account_fit", description: "账号适配评估；失败按退避上限重试" },
-  { key: "long_write", description: "每日计划自动长文；仅接受账号适配=high且双评分达标的素材" },
+  { key: "long_write", description: "周期槽位自动长文；仅接受账号适配=high且双评分达标的素材" },
   { key: "short_write", description: "自动短内容写作" },
   { key: "images", description: "自动写作中的 Luna 图片生成许可" },
   { key: "daily_digest", description: "自动日报" },
@@ -40,7 +44,7 @@ const stageDefinitions: Array<{ key: AutomationStageKey; description: string }> 
 ];
 
 const configDefinitions = [
-  { key: "dailyLongWriteCount", backendKey: "auto_write_daily_count", label: "每日自动长文数量", description: "默认 3 篇；到点有几篇写几篇，不自动补齐；手动写作不计入此数量", type: "number" as const, min: 0, max: 20 },
+  { key: "dailyLongWriteCount", backendKey: "auto_write_daily_count", label: "每轮自动长文槽位", description: "默认 3 个；表示当前执行周期最多同时占用的任务数，成功或终态阻断后自动释放", type: "number" as const, min: 0, max: 20 },
   { key: "dailyLongWriteTime", backendKey: "auto_write_daily_time", label: "每日自动写作时间", description: "北京时间，默认 10:00", type: "time" as const, min: 0, max: 0 },
   { key: "windowHours", backendKey: "auto_write_window_hours", label: "素材回看窗口（小时）", description: "计划时间向前筛选，默认 48 小时", type: "number" as const, min: 1, max: 168 },
   { key: "baseScoreThreshold", backendKey: "auto_write_base_score_threshold", label: "基础评分阈值", description: "自动写作硬门槛；还必须账号适配=high且趋势分达标，默认 80", type: "number" as const, min: 0, max: 100 },
@@ -50,6 +54,9 @@ const configDefinitions = [
 type ConfigKey = (typeof configDefinitions)[number]["key"];
 const configDraft = ref<Partial<Record<ConfigKey, string | number>>>({});
 const configDirty = ref<ConfigKey | null>(null);
+const refreshTimer = ref<ReturnType<typeof setInterval> | null>(null);
+let refreshInFlight = false;
+let refreshErrorShown = false;
 
 const imageMode = computed(() => stats.value?.switches.image_gen_mode ?? "codex-auto");
 const imageProvider = computed(() => stats.value?.switches.image_provider ?? "aitechflux");
@@ -82,9 +89,58 @@ function draftValue(key: ConfigKey): string | number {
   return automation.value?.config[key] ?? "";
 }
 
-function planValue(key: string): string {
-  const value = automation.value?.dailyPlan?.[key];
-  return value === undefined || value === null ? "-" : String(value);
+const dailyPlan = computed<DailyPlanView | null>(() => automation.value?.dailyPlan ?? null);
+const slotSummary = computed(() => dailyPlan.value?.slots ?? {
+  capacity: 0,
+  occupied: 0,
+  vacant: 0,
+  selected: 0,
+  dispatching: 0,
+  queued: 0,
+  writing: 0,
+  retry_waiting: 0,
+});
+const currentPlanItems = computed<DailyPlanItem[]>(() => dailyPlan.value?.items ?? []);
+const lastRunItems = computed<DailyPlanItem[]>(() => dailyPlan.value?.lastRun?.items ?? []);
+
+const itemStatusLabels: Record<string, string> = {
+  selected: "已锁定，待执行",
+  dispatching: "提交中",
+  queued: "已入队",
+  writing: "写作中",
+  retry_waiting: "待重试",
+  succeeded: "已成功",
+  blocked: "已阻断，槽位已释放",
+  retry_exhausted: "重试耗尽，需人工处理",
+  cancelled: "已取消",
+};
+const planStatusLabels: Record<string, string> = {
+  preparing: "准备中",
+  ready: "待执行",
+  observing: "执行中",
+  empty: "当前无占用槽位",
+  paused: "已暂停",
+  waiting_stage: "等待阶段开启",
+};
+
+/** 将逐篇状态统一映射为页面文案，未知状态保留后端原值。 */
+function itemStatusLabel(item: DailyPlanItem): string {
+  return itemStatusLabels[item.status] ?? item.status;
+}
+
+/** 将 Hermes 的触发来源转换成监控页可读文案。 */
+function triggerKindLabel(kind?: string | null): string {
+  if (kind === "scheduled") return "定时执行";
+  if (kind === "manual") return "人工执行";
+  return kind || "-";
+}
+
+/** 统一展示周期和逐篇结果时间；异常格式保留原值便于排查。 */
+function formatDateTime(value?: string | null): string {
+  if (!value) return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString("zh-CN", { hour12: false });
 }
 
 function syncConfigDraft(status: CreativeAutomationStatus): void {
@@ -98,8 +154,11 @@ function syncConfigDraft(status: CreativeAutomationStatus): void {
   };
 }
 
-async function refresh(): Promise<void> {
-  loading.value = true;
+/** 读取 Hermes 计划与监控状态；轮询失败时保留上一次成功快照。 */
+async function refresh(options: { silent?: boolean } = {}): Promise<void> {
+  if (refreshInFlight) return;
+  refreshInFlight = true;
+  if (!options.silent) loading.value = true;
   const [automationResult, monitorResult] = await Promise.allSettled([
     fetchCreativeAutomationStatus(),
     fetchMonitorStats(),
@@ -107,12 +166,15 @@ async function refresh(): Promise<void> {
   if (automationResult.status === "fulfilled") {
     automation.value = automationResult.value;
     syncConfigDraft(automationResult.value);
+    refreshErrorShown = false;
   }
   if (monitorResult.status === "fulfilled") stats.value = monitorResult.value;
-  if (automationResult.status === "rejected" && monitorResult.status === "rejected") {
+  if (automationResult.status === "rejected" && monitorResult.status === "rejected" && !refreshErrorShown) {
     message.error("统一自动化状态读取失败，请检查 Hermes 服务");
+    refreshErrorShown = true;
   }
-  loading.value = false;
+  if (!options.silent) loading.value = false;
+  refreshInFlight = false;
 }
 
 /** 修改全局模式；紧急停止由 Hermes 负责清理自动队列，不触碰人工任务。 */
@@ -179,21 +241,20 @@ async function saveConfig(definition: (typeof configDefinitions)[number]): Promi
   }
 }
 
-/** 只手动推进当天自动计划，不启动采集、评分或其他自动阶段。 */
+/** 只手动执行点击瞬间的计划快照，不补入后续候选，也不启动持续自动执行。 */
 async function runDailyPlanNow(): Promise<void> {
   saving.value = "daily-plan";
   try {
     const result = await triggerCreativeDailyPlan();
     await refresh();
-    if (result.status === "waiting_candidates") {
-      message.info("今日计划当前没有合格素材，仍保持等待状态");
-    } else if (result.status === "partial") {
-      message.success(`今日计划已执行 ${result.plan?.selected_count ?? result.submitted ?? 0} 篇`);
+    if ((result.submitted ?? 0) > 0) {
+      message.success(`本次快照已提交 ${result.submitted} 项：新任务 ${result.newSubmitted ?? 0} 项，重试任务 ${result.retrySubmitted ?? 0} 项`);
     } else {
-      message.success("今日计划已触发");
+      const slots = result.plan?.slots;
+      message.info(`本次没有可执行槽位；当前占用 ${slots?.occupied ?? 0}/${slots?.capacity ?? 0}，空位 ${slots?.vacant ?? 0}`);
     }
   } catch {
-    message.error("今日计划执行失败");
+    message.error("本轮计划执行失败");
     await refresh();
   } finally {
     saving.value = null;
@@ -224,7 +285,16 @@ async function changeImageProvider(value: string): Promise<void> {
 }
 
 onMounted(() => {
-  refresh();
+  void refresh();
+  refreshTimer.value = setInterval(() => {
+    void refresh({ silent: true });
+  }, 10_000);
+});
+onBeforeUnmount(() => {
+  if (refreshTimer.value) {
+    clearInterval(refreshTimer.value);
+    refreshTimer.value = null;
+  }
 });
 </script>
 
@@ -262,7 +332,7 @@ onMounted(() => {
         </div>
       </div>
 
-      <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">每日自动长文计划</div>
+      <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">每轮自动长文计划</div>
       <div class="mb-4 space-y-1.5">
         <div v-for="definition in configDefinitions" :key="definition.key" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5">
           <div class="min-w-0 flex-1">
@@ -273,15 +343,58 @@ onMounted(() => {
           <a-input-number v-else :value="draftValue(definition.key)" :min="definition.min" :max="definition.max" size="small" class="!w-20" :disabled="saving === definition.key" @change="(value: number | null) => { if (value !== null) configDraft[definition.key] = value; }" />
           <a-button size="small" :loading="saving === definition.key" @click="saveConfig(definition)">保存</a-button>
         </div>
-        <div class="rounded border border-editorial-border bg-editorial-bg-page px-2.5 py-1.5 text-[10px] text-editorial-text-muted">
+        <div class="rounded border border-editorial-border bg-editorial-bg-page px-2.5 py-1.5 text-[10px] text-editorial-text-muted" data-testid="daily-plan-summary">
           <div class="flex items-center gap-2">
-            <span>今日计划：{{ planValue('status') }} · 已锁定 {{ planValue('selected_count') }} / {{ planValue('target_count') }} 篇</span>
-            <a-button size="small" :loading="saving === 'daily-plan'" @click="runDailyPlanNow">立即执行今日计划</a-button>
+            <span class="min-w-0 flex-1">
+              当前周期 {{ dailyPlan?.cycle.planDate ?? "-" }} · 执行边界 {{ formatDateTime(dailyPlan?.cycle.scheduledAt) }}
+            </span>
+            <a-button size="small" :loading="saving === 'daily-plan'" @click="runDailyPlanNow">立即执行本轮计划</a-button>
           </div>
-          <div class="mt-0.5">计划日期 {{ planValue('plan_date') }} · 模型快照 {{ planValue('model_snapshot') }}</div>
+          <div class="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 sm:grid-cols-4">
+            <span>槽位占用 <strong>{{ slotSummary.occupied }}/{{ slotSummary.capacity }}</strong></span>
+            <span>空位 <strong>{{ slotSummary.vacant }}</strong></span>
+            <span>待执行 <strong>{{ slotSummary.selected }}</strong></span>
+            <span>提交中 <strong>{{ slotSummary.dispatching }}</strong></span>
+            <span>待重试 <strong>{{ slotSummary.retry_waiting }}</strong></span>
+          </div>
+          <div class="mt-0.5">周期状态 {{ planStatusLabels[dailyPlan?.status ?? ""] ?? dailyPlan?.status ?? "-" }} · 模型快照 {{ dailyPlan?.model_snapshot ?? "-" }}</div>
+        </div>
+        <div class="rounded border border-editorial-border bg-white px-2.5 py-1.5 text-[10px] text-editorial-text-muted" data-testid="daily-plan-items">
+          <div class="mb-1 flex items-center justify-between">
+            <span class="font-medium text-editorial-text-body">当前槽位任务</span>
+            <span>成功 {{ dailyPlan?.results.succeeded ?? 0 }} · 阻断 {{ dailyPlan?.results.blocked ?? 0 }} · 重试耗尽 {{ dailyPlan?.results.retryExhausted ?? 0 }}</span>
+          </div>
+          <div v-if="currentPlanItems.length === 0" class="py-1 text-editorial-text-muted/70">当前没有占用槽位的任务；后续五分钟复核会继续补充合格候选。</div>
+          <div v-for="item in currentPlanItems" :key="item.sourceItemId" class="border-t border-editorial-border/70 py-1.5 first:border-t-0" data-testid="daily-plan-item">
+            <div class="flex items-start gap-2">
+              <span class="shrink-0 font-semibold text-editorial-text-body">#{{ item.sourceItemId }}</span>
+              <span class="min-w-0 flex-1 break-words text-editorial-text-body">{{ item.title || "未读取标题" }}</span>
+              <span class="shrink-0 rounded bg-editorial-bg-page px-1.5 py-0.5" :class="item.status === 'retry_waiting' || item.status === 'retry_exhausted' || item.status === 'blocked' ? 'text-amber-700' : 'text-editorial-text-muted'">{{ itemStatusLabel(item) }}</span>
+            </div>
+            <div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-editorial-text-muted/80">
+              <span>执行 {{ item.executionAttempts }}/{{ item.maxExecutionAttempts }}</span>
+              <span>{{ item.occupiesSlot ? "占用槽位" : "已释放槽位" }}</span>
+              <span v-if="item.updatedAt">更新于 {{ formatDateTime(item.updatedAt) }}</span>
+              <a-button v-if="item.finishedArticleId" type="link" size="small" class="!h-auto !p-0 !text-[10px]" @click="emit('openArticle', item.finishedArticleId)">查看成品 #{{ item.finishedArticleId }}</a-button>
+            </div>
+            <details v-if="item.lastError" class="mt-0.5 text-editorial-text-muted/80">
+              <summary class="cursor-pointer">查看失败原因（{{ item.failureStepName || item.failureKind || "执行" }}）</summary>
+              <div class="mt-0.5 whitespace-pre-wrap break-words rounded bg-editorial-bg-page px-1.5 py-1">{{ item.lastError }}</div>
+            </details>
+          </div>
+        </div>
+        <div v-if="dailyPlan?.lastRun" class="rounded border border-editorial-border bg-editorial-bg-page px-2.5 py-1.5 text-[10px] leading-5 text-editorial-text-muted" data-testid="daily-plan-last-run">
+          <div class="font-medium text-editorial-text-body">最近一次执行：{{ triggerKindLabel(dailyPlan.lastRun.triggerKind) }} · {{ formatDateTime(dailyPlan.lastRun.triggeredAt) }}</div>
+          <div v-for="item in lastRunItems" :key="`last-${dailyPlan.lastRun.planDate}-${item.sourceItemId}`" class="flex flex-wrap items-center gap-x-2 border-t border-editorial-border/60 py-0.5 first:border-t-0">
+            <span>#{{ item.sourceItemId }} {{ item.title || "未读取标题" }}</span>
+            <span>{{ itemStatusLabel(item) }}</span>
+            <span>执行 {{ item.executionAttempts }}/{{ item.maxExecutionAttempts }}</span>
+            <a-button v-if="item.finishedArticleId" type="link" size="small" class="!h-auto !p-0 !text-[10px]" @click="emit('openArticle', item.finishedArticleId)">查看成品 #{{ item.finishedArticleId }}</a-button>
+            <span v-if="item.lastError" class="w-full whitespace-pre-wrap break-words text-amber-700">原因：{{ item.lastError }}</span>
+          </div>
         </div>
         <div class="rounded border border-editorial-border bg-editorial-bg-page px-2.5 py-1.5 text-[10px] leading-5 text-editorial-text-muted">
-          自动写作入列条件：账号适配必须为 <strong>high（高适配）</strong>，同时基础评分 ≥ {{ automation?.config.baseScoreThreshold ?? 80 }}、趋势评分 ≥ {{ automation?.config.trendScoreThreshold ?? 80 }}；另受 48 小时窗口、已写作/已占用排除和同日主题去重约束。
+          五分钟复核只补空槽，不投递写作；手动或定时触发只执行点击/到点瞬间的待执行与待重试快照。自动写作入列条件：账号适配必须为 <strong>high（高适配）</strong>，同时基础评分 ≥ {{ automation?.config.baseScoreThreshold ?? 80 }}、趋势评分 ≥ {{ automation?.config.trendScoreThreshold ?? 80 }}；另受 48 小时窗口、已写作/已占用排除和同主题去重约束。
         </div>
       </div>
 

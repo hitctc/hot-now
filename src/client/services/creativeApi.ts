@@ -620,6 +620,83 @@ export type AutomationStageKey =
   | "reminders"
   | "notifications";
 
+export type DailyPlanItemStatus =
+  | "selected"
+  | "dispatching"
+  | "queued"
+  | "writing"
+  | "retry_waiting"
+  | "succeeded"
+  | "blocked"
+  | "retry_exhausted"
+  | "cancelled";
+
+export type DailyPlanItem = {
+  sourceItemId: number;
+  title: string;
+  status: DailyPlanItemStatus | string;
+  occupiesSlot: boolean;
+  executionAttempts: number;
+  maxExecutionAttempts: number;
+  selectionReason?: string;
+  score?: number | null;
+  trendScore?: number | null;
+  accountFitLevel?: string;
+  taskId?: string | null;
+  failureKind?: string | null;
+  failureStep?: number | null;
+  failureStepName?: string | null;
+  lastError?: string | null;
+  attemptHistory: Array<Record<string, unknown>>;
+  finishedArticleId?: number | null;
+  selectedAt?: string | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  updatedAt?: string | null;
+};
+
+export type DailyPlanView = {
+  plan_date?: string;
+  scheduled_at?: string;
+  window_start?: string;
+  target_count?: number;
+  model_snapshot?: string;
+  status?: string;
+  selected_count?: number;
+  completed_count?: number;
+  last_error?: string | null;
+  cycle: {
+    planDate: string;
+    scheduledAt?: string | null;
+    timezone: string;
+    lastCandidateCheckAt?: string | null;
+    lastExecutionAt?: string | null;
+    lastTriggerKind?: string | null;
+  };
+  slots: {
+    capacity: number;
+    occupied: number;
+    vacant: number;
+    selected: number;
+    dispatching: number;
+    queued: number;
+    writing: number;
+    retry_waiting: number;
+  };
+  results: {
+    succeeded: number;
+    blocked: number;
+    retryExhausted: number;
+  };
+  items: DailyPlanItem[];
+  lastRun?: {
+    planDate: string;
+    triggeredAt?: string | null;
+    triggerKind?: string | null;
+    items: DailyPlanItem[];
+  } | null;
+};
+
 export type CreativeAutomationStatus = {
   ok: boolean;
   mode: AutomationMode;
@@ -634,7 +711,7 @@ export type CreativeAutomationStatus = {
     trendScoreThreshold: number;
     timezone: string;
   };
-  dailyPlan: Record<string, unknown>;
+  dailyPlan: DailyPlanView;
   queue?: WriteQueueStatus | null;
 };
 
@@ -660,12 +737,15 @@ export type DailyPlanRunResponse = {
   ok: boolean;
   status: string;
   submitted?: number;
-  plan?: Record<string, unknown>;
+  newSubmitted?: number;
+  retrySubmitted?: number;
+  snapshotCount?: number;
+  plan?: DailyPlanView;
   errors?: string[];
   error?: string;
 };
 
-/** 立即执行当天自动写作计划；不触发采集、评分或其他自动阶段。 */
+/** 立即执行当前周期自动写作快照；不触发采集、评分或其他自动阶段。 */
 export function triggerCreativeDailyPlan(): Promise<DailyPlanRunResponse> {
   return requestJson<DailyPlanRunResponse>("/api/creative/automation/daily-plan/run", {
     method: "POST",

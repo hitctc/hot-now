@@ -116,7 +116,7 @@ onBeforeUnmount(() => {
     <!-- 顶部两栏：左侧统计 + 右侧开关 -->
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <MonitorStatsCards />
-      <MonitorSwitches />
+      <MonitorSwitches @open-article="openArticleDetail" />
     </div>
 
     <!-- 写作队列 -->

@@ -97,6 +97,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 公开内容：`/`、`/ai-new`、`/ai-hot`。
 - 登录系统页：`/settings/view-rules`、`/settings/sources`、`/settings/wechat-mp`、`/settings/profile`。
 - 创作工作台：`/creative/source-items`、`/creative/finished-articles`、`/creative/short-source-items`、`/creative/short-finished-articles`、`/daily-digest`、`/monitor`。
+- `/monitor` 的每日长文区展示 Hermes 当前周期槽位（默认 3 个）、空位、逐篇状态/失败原因、最近执行结果和成品入口；五分钟轮询只读取状态。每轮自动长文槽位由 Hermes 维护，定时或“立即执行本轮计划”只执行触发瞬间快照，HotNow 不创建本地队列或重试。
 - 兼容入口：`/history`、`/reports/:date`、`/control`；健康检查：`/health`。
 - AI 时间线 feed：`/feeds/ai-timeline-feed.md`。页面 `/ai-timeline` 与 `/settings/ai-timeline` 当前暂时下架；相关 API 与 S 级提醒链路仍可运行。
 

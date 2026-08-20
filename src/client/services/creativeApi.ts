@@ -806,6 +806,16 @@ export type WriteQueueTask = {
   stop_step_name?: string;
   reason_text?: string;
   error?: string;
+  phase?: "writing" | "images" | string;
+  phase_order?: number;
+  phase_name?: string;
+  phase_status?: string;
+  phase_detail?: Record<string, unknown>;
+  finished_article_id?: number;
+  retry_count?: number;
+  next_retry_at?: string;
+  image_index?: number;
+  image_total?: number;
   /** 后端代理从本地素材表补充 */
   source_item_title?: string | null;
   source_item_source_name?: string | null;
@@ -824,6 +834,21 @@ export type WriteQueueStatus = {
   queue: WriteQueueTask[];
   recent?: WriteQueueTask[];
   stats: WriteQueueStats;
+  luna?: {
+    status: "idle" | "running" | string;
+    active: boolean;
+    available?: boolean;
+    paused?: boolean;
+    remaining_seconds?: number;
+    reason?: string;
+    kind?: string;
+    task_id?: string;
+    source_item_id?: number;
+    article_id?: number;
+    label?: string;
+    phase?: string;
+    started_at?: string;
+  };
   /** 本次队列运行首次开始执行的时间（Hermes 提供，暂未上线时为 undefined） */
   run_started_at?: string | null;
   /** Hermes 超时后由 HotNow 返回最近一次成功状态。 */

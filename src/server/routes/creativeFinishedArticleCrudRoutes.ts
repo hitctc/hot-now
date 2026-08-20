@@ -48,7 +48,8 @@ export function registerCreativeFinishedArticleCrudRoutes(context: CreativeFinis
     const existing = findCreativeFinishedArticleBySourceItemId(db, sourceItem.id);
     const allowDuplicate = body?.allowDuplicate === true;
     if (existing && !allowDuplicate) {
-      return reply.code(409).send({ ok: false, reason: "article-already-exists" });
+      // Hermes 在“平台已创建、任务检查点尚未落盘”的重启窗口需要既有编号续跑图片。
+      return reply.code(409).send({ ok: false, reason: "article-already-exists", articleId: existing.id });
     }
 
     const article = insertCreativeFinishedArticle(db, {

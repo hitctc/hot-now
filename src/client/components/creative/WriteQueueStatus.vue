@@ -113,7 +113,7 @@ onBeforeUnmount(() => {
       <!-- 展开态 -->
       <template v-else>
         <div class="write-queue-header">
-          <span class="text-xs font-semibold text-editorial-text-body">写作队列</span>
+          <span class="text-xs font-semibold text-editorial-text-body">Luna 文章队列</span>
           <button class="write-queue-close" @click="toggleExpand">✕</button>
         </div>
 
@@ -125,6 +125,11 @@ onBeforeUnmount(() => {
             <span class="text-[11px] text-blue-800 break-all">{{ data.current.source_item_title || data.current.label }}</span>
           </div>
           <div v-if="data.current.source_item_source_name" class="mt-0.5 text-[10px] text-blue-400 truncate">{{ data.current.source_item_source_name }}</div>
+          <div v-if="data.current.phase_name" class="mt-1 text-[11px] font-medium text-blue-700">
+            当前阶段：{{ data.current.phase_name }}
+            <template v-if="data.current.image_total"> · 图片 {{ data.current.image_index || 0 }}/{{ data.current.image_total }}</template>
+            <template v-if="data.current.retry_count"> · 重试 {{ data.current.retry_count }}/1</template>
+          </div>
           <div v-if="data.current.started_at" class="mt-0.5 text-[10px] font-medium tabular-nums text-blue-500">
             本文 {{ formatElapsed(data.current.started_at) }}<template v-if="data.run_started_at"> · 队列 {{ formatElapsed(data.run_started_at) }}</template>
           </div>
@@ -149,6 +154,27 @@ onBeforeUnmount(() => {
           v-if="!data.status_unavailable && !data.current && data.queue.length === 0"
           class="write-queue-idle"
         >队列空闲</div>
+
+        <div v-if="data.luna" class="mt-2 rounded bg-gray-50 px-2 py-1 text-[10px] text-editorial-text-muted">
+          Luna：{{ data.luna.paused ? `暂停 · ${data.luna.reason || "等待恢复探测"}` : (data.luna.active ? `执行中 · ${data.luna.label || data.luna.kind || "任务"}` : "空闲") }}
+        </div>
+
+        <!-- 最近逐篇终态：任务离开 current 后仍保留成功、失败阶段和原因。 -->
+        <div v-if="data.recent?.length" class="write-queue-list mt-2 border-t border-gray-100 pt-1" data-testid="write-queue-recent">
+          <div class="mb-1 text-[10px] font-medium text-editorial-text-muted">最近结果</div>
+          <div v-for="task in data.recent.slice(0, 5)" :key="`${task.task_id}-${task.finished_at}`" class="mb-1 rounded bg-gray-50 px-2 py-1 text-[10px]">
+            <div class="flex items-center gap-1">
+              <span :class="task.status === 'done' ? 'text-green-600' : task.status === 'stopped' ? 'text-amber-600' : 'text-red-600'">
+                {{ task.status === "done" ? "成功" : task.status === "stopped" ? "已阻断" : "失败" }}
+              </span>
+              <span v-if="task.source_item_id" class="write-queue-id" @click.stop="openSourceItem(task.source_item_id)">#{{ task.source_item_id }}</span>
+              <span v-if="task.finished_article_id" class="text-editorial-text-muted">成品 #{{ task.finished_article_id }}</span>
+            </div>
+            <div v-if="task.status !== 'done'" class="mt-0.5 break-words text-red-500">
+              {{ task.stop_step_name || task.phase_name || "执行" }}：{{ task.reason_text || task.error || "未提供失败原因" }}
+            </div>
+          </div>
+        </div>
 
         <!-- 统计 + 刷新 -->
         <div class="write-queue-footer">

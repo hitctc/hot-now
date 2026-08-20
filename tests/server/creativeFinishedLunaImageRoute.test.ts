@@ -177,4 +177,32 @@ describe("GPT Luna 独立生图路由", () => {
     expect(saved?.humanMarkdown).toBe("审改后的初始人工稿");
     await app.close();
   });
+
+  it("returns the existing article id when an idempotent create conflicts", async () => {
+    const handle = await createTestDatabase("hot-now-existing-article-id-");
+    handles.push(handle);
+    const sourceExternalId = `existing-${Date.now()}-${Math.random()}`;
+    const source = insertCreativeSourceItem(handle.db, {
+      externalId: sourceExternalId,
+      collectorAgent: "test",
+      title: "重复交付恢复测试",
+      url: "https://example.com/existing",
+    });
+    const existing = insertCreativeFinishedArticle(handle.db, {
+      sourceItemId: source.id,
+      contentMarkdown: "已经交付的正文",
+    });
+    const app = createServer({ db: handle.db, creativeApiToken: "test-token" });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/creative/finished-articles",
+      headers: { "x-creative-token": "test-token" },
+      payload: { sourceExternalId, collectorAgent: "test", contentMarkdown: "重启后的重复请求" },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({ ok: false, reason: "article-already-exists", articleId: existing.id });
+    await app.close();
+  });
 });

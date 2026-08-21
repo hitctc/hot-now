@@ -202,6 +202,8 @@ cp .deploy.local.env.example .deploy.local.env
 
 - 本地先执行 `npm run build`，再同步代码和 `dist` 到 `/srv/hot-now/app`
 - 明确排除 `.git`、`node_modules`、`data`、`.env`
+- 覆盖代码前检查生产数据库并生成完整快照；快照验证成功后，自动保留最近 `5` 份，并对最近 `14` 天的更早快照按自然日保留当天最后一份
+- 自动保留策略只处理 `pre-deploy-*.sqlite`，不会删除专项备份、人工备份或未知命名文件
 - 在服务器执行 `npm ci --prefer-offline --production`
 - 通过免密 `sudo -n systemctl` 重启并检查 `hot-now` 服务
 - 最后调用 `http://127.0.0.1:3030/health` 做健康检查

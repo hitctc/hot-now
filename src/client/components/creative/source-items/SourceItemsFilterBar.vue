@@ -15,6 +15,8 @@ const props = defineProps<{
   minTrendScore: number | null;
   searchText: string;
   searchHistory: string[];
+  isLoading: boolean;
+  hasActiveFilters: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -29,6 +31,8 @@ const emit = defineEmits<{
   (event: "apply-trend-score"): void;
   (event: "remove-history", value: string): void;
   (event: "manual-write"): void;
+  (event: "refresh"): void;
+  (event: "clear-filters"): void;
 }>();
 
 const searchDropdownRef = ref<HTMLElement | null>(null);
@@ -129,5 +133,17 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
     <a-button type="primary" size="small" @click="emit('manual-write')">
       <span class="mr-1">✏️</span>自定义写作
     </a-button>
+    <a-button
+      data-source-items-filter-action="refresh"
+      size="small"
+      :loading="props.isLoading"
+      @click="emit('refresh')"
+    >刷新</a-button>
+    <a-button
+      data-source-items-filter-action="clear-filters"
+      v-if="props.hasActiveFilters"
+      size="small"
+      @click="emit('clear-filters')"
+    >清除筛选</a-button>
   </div>
 </template>

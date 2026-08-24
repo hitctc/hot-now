@@ -292,7 +292,16 @@ const {
   applyTrendScoreFilter,
   handleTableChange,
   toggleExpand,
+  clearFilters,
 } = sourceQuery;
+
+const hasActiveFilters = computed(() => Boolean(
+  writingStatusFilter.value
+  || sourceNameFilter.value.trim()
+  || searchText.value.trim()
+  || minTrendScore.value != null
+  || writableOnly.value,
+));
 
 // 搜索历史由页面保留，查询参数和网络请求由共享 composable 负责。
 function handleSearch(value: string): void {
@@ -349,6 +358,8 @@ const pagination = computed(() => ({
       :min-trend-score="minTrendScore"
       :search-text="searchText"
       :search-history="searchHistory"
+      :is-loading="isLoading"
+      :has-active-filters="hasActiveFilters"
       @update:writing-status-filter="writingStatusFilter = $event"
       @update:source-name-filter="sourceNameFilter = $event"
       @update:writable-only="writableOnly = $event"
@@ -359,6 +370,8 @@ const pagination = computed(() => ({
       @apply-trend-score="applyTrendScoreFilter"
       @remove-history="removeFromHistory"
       @manual-write="openManualWriteModal"
+      @refresh="loadItems"
+      @clear-filters="clearFilters"
     />
 
     <!-- 素材表格：表格、展开区和展示事件由共享组件负责。 -->

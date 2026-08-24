@@ -66,6 +66,8 @@ export function useSourceItemsQuery(options: SourceItemsQueryOptions) {
   const loadedDetailIds = new Set<number>();
   const sourceDetailRequests = new Map<number, Promise<void>>();
   const listRequests = createLatestAbortController();
+  const refreshTimer = window.setInterval(() => void loadItems(), 60_000);
+  let suppressFilterReload = false;
 
   /** 将当前筛选条件持久化，保持两条素材列表各自独立的筛选记忆。 */
   function saveSourceFilters(): void {
@@ -211,24 +213,44 @@ export function useSourceItemsQuery(options: SourceItemsQueryOptions) {
     void loadItems();
   }
 
+  /** 清除页面和 localStorage 中的旧筛选，避免新入库素材被历史条件隐藏。 */
+  function clearFilters(): void {
+    suppressFilterReload = true;
+    writingStatusFilter.value = undefined;
+    accountFitFilter.value = undefined;
+    sourceNameFilter.value = "";
+    searchText.value = "";
+    minTrendScore.value = null;
+    writableOnly.value = false;
+    currentPage.value = 1;
+    saveSourceFilters();
+    void loadItems();
+    void nextTick(() => { suppressFilterReload = false; });
+  }
+
   watch(writingStatusFilter, () => {
+    if (suppressFilterReload) return;
     currentPage.value = 1;
     saveSourceFilters();
     void loadItems();
   });
   watch(accountFitFilter, () => {
-    if (!options.includeAccountFit) return;
+    if (!options.includeAccountFit || suppressFilterReload) return;
     currentPage.value = 1;
     saveSourceFilters();
     void loadItems();
   });
   watch(writableOnly, () => {
+    if (suppressFilterReload) return;
     currentPage.value = 1;
     void loadItems();
   });
 
   onMounted(() => void loadItems());
-  onBeforeUnmount(() => listRequests.cancel());
+  onBeforeUnmount(() => {
+    window.clearInterval(refreshTimer);
+    listRequests.cancel();
+  });
 
   return {
     isLoading,
@@ -245,6 +267,7 @@ export function useSourceItemsQuery(options: SourceItemsQueryOptions) {
     expandedRowKeys,
     loadItems,
     saveSourceFilters,
+    clearFilters,
     applyTrendScoreFilter,
     applySourceNameFilter,
     handleSearch,

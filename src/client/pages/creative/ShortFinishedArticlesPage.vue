@@ -426,9 +426,14 @@ function closeSourceItemModal(): void {
 
 // 详情弹窗保存后刷新列表，同步更新 detailArticle 以反映 DB 最新数据
 async function onDetailSaved(): Promise<void> {
+  const requestId = detailRequestGuard.begin();
+  const articleId = detailArticle.value?.id;
   await loadItems();
-  if (detailArticle.value) {
-    detailArticle.value = await readCreativeFinishedArticle(detailArticle.value.id);
+  if (!articleId || !detailRequestGuard.isCurrent(requestId)) return;
+  const latest = await readCreativeFinishedArticle(articleId);
+  // 自动保存和手动保存可能同时触发刷新，只接受最后一次详情响应。
+  if (detailRequestGuard.isCurrent(requestId) && detailArticle.value?.id === articleId) {
+    detailArticle.value = latest;
   }
 }
 

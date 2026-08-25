@@ -19,7 +19,6 @@ export type ArticleAutosaveOptions = {
   setLastSavedHuman: (content: string) => void;
   isOpen: () => boolean;
   isReadonly: () => boolean;
-  onSaved: () => void;
 };
 
 /**
@@ -40,7 +39,6 @@ export function useArticleAutosave(options: ArticleAutosaveOptions) {
       if (options.getArticle()?.id !== payload.articleId) return;
       options.setLastSavedContent(payload.content);
       if (options.editContent.value === payload.content) lastSavedAt.value = Date.now();
-      options.onSaved();
     } catch (error) {
       if (options.getArticle()?.id === payload.articleId) message.error("自动保存失败");
       throw error;

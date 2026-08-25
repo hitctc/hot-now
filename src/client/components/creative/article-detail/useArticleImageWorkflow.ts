@@ -40,6 +40,8 @@ export type ArticleImageWorkflowOptions = {
 
 /** 在 markdown 中替换第 imageIndex 个配图，兼容占位符和已有图片两种历史格式。 */
 export function applyInlineImage(md: string, imageIndex: number, newUrl: string): string {
+  // 图片描述是占位符协议的一部分，图片成功后必须和同编号占位符一起清理。
+  md = md.replace(new RegExp(`\\[IMAGE${imageIndex}_DESC(?::[^\\]]*)?\\]\\s*`, "g"), "");
   if (new RegExp(`\\[IMAGE${imageIndex}\\]`).test(md)) {
     return md.replace(new RegExp(`\\[IMAGE${imageIndex}\\]`, "g"), `![配图${imageIndex}](${newUrl})`);
   }

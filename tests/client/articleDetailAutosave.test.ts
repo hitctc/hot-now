@@ -1,6 +1,18 @@
-import { describe, expect, it, vi } from "vitest";
+import { effectScope, nextTick, ref } from "vue";
+import { describe, expect, it, vi, afterEach } from "vitest";
 
 import { createLatestAutosaveQueue } from "../../src/client/components/creative/article-detail/latestAutosaveQueue.js";
+import { useArticleAutosave } from "../../src/client/components/creative/article-detail/useArticleAutosave.js";
+import { editFinishedArticle, type CreativeFinishedArticle } from "../../src/client/services/creativeApi.js";
+
+vi.mock("../../src/client/services/creativeApi.js", () => ({
+  editFinishedArticle: vi.fn().mockResolvedValue({ ok: true }),
+}));
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.clearAllMocks();
+});
 
 function deferred(): { promise: Promise<void>; resolve: () => void } {
   let resolve = () => {};
@@ -9,6 +21,35 @@ function deferred(): { promise: Promise<void>; resolve: () => void } {
 }
 
 describe("article detail autosave", () => {
+  it("自动保存成功不触发父页面刷新，避免旧详情响应覆盖编辑内容", async () => {
+    vi.useFakeTimers();
+    const article = { id: 16212 } as CreativeFinishedArticle;
+    const editContent = ref("旧草稿");
+    const humanContent = ref("人工稿");
+    const scope = effectScope();
+
+    scope.run(() => useArticleAutosave({
+      getArticle: () => article,
+      editContent,
+      humanContent,
+      getLastSavedContent: () => "旧草稿",
+      setLastSavedContent: () => {},
+      getLastSavedHuman: () => "人工稿",
+      setLastSavedHuman: () => {},
+      isOpen: () => true,
+      isReadonly: () => false,
+    }));
+
+    editContent.value = "用户刚编辑的新草稿";
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(editFinishedArticle).toHaveBeenCalledWith(article.id, {
+      contentMarkdown: "用户刚编辑的新草稿",
+    });
+    scope.stop();
+  });
+
   it("保存进行中只保留最新版，并严格串行写入", async () => {
     const first = deferred();
     const saved: string[] = [];

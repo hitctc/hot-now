@@ -232,6 +232,59 @@ describe("editCreativeFinishedArticle", () => {
     expect(updated.thesis).toBe("original thesis");
   });
 
+  it("does not let a stale正文保存覆盖已经落库的图片槽位", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+
+    const source = createSourceItem(handle.db);
+    const image1 = "https://img.example.com/1.jpg";
+    const image2 = "https://img.example.com/2.jpg";
+    const image3 = "https://img.example.com/3.jpg";
+    const article = insertCreativeFinishedArticle(handle.db, {
+      sourceItemId: source.id,
+      contentMarkdown: `![配图1](${image1})\n\n![配图2](${image2})\n\n![配图3](${image3})`,
+      humanMarkdown: `人工稿\n\n![配图1](${image1})\n\n![配图2](${image2})\n\n![配图3](${image3})`,
+      images: [image1, image2, image3],
+    });
+
+    // 模拟 Luna 已完成回写后，浏览器仍提交生成前的旧正文快照。
+    const staleContent = `![配图1](${image1})\n\n[IMAGE2_DESC:图二说明]\n[IMAGE2]\n\n[IMAGE3_DESC:图三说明]\n[IMAGE3]`;
+    const result = editCreativeFinishedArticle(handle.db, article.id, {
+      contentMarkdown: staleContent,
+      humanMarkdown: `人工旧稿\n\n${staleContent}`,
+    });
+
+    expect(result.ok).toBe(true);
+    const updated = findCreativeFinishedArticleById(handle.db, article.id)!;
+    expect(updated.contentMarkdown).toContain(`![配图2](${image2})`);
+    expect(updated.contentMarkdown).toContain(`![配图3](${image3})`);
+    expect(updated.contentMarkdown).not.toContain("[IMAGE2");
+    expect(updated.contentMarkdown).not.toContain("[IMAGE3");
+    expect(updated.humanMarkdown).toContain(`![配图2](${image2})`);
+    expect(updated.humanMarkdown).toContain(`![配图3](${image3})`);
+  });
+
+  it("保留用户本次明确提交的新正文图片 URL", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+
+    const source = createSourceItem(handle.db);
+    const oldImage = "https://img.example.com/old.jpg";
+    const newImage = "https://img.example.com/new.jpg";
+    const article = insertCreativeFinishedArticle(handle.db, {
+      sourceItemId: source.id,
+      contentMarkdown: `![配图1](${oldImage})`,
+      images: [oldImage],
+    });
+
+    const result = editCreativeFinishedArticle(handle.db, article.id, {
+      contentMarkdown: `![配图1](${newImage})`,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(findCreativeFinishedArticleById(handle.db, article.id)?.contentMarkdown).toContain(newImage);
+  });
+
   it("returns ok with no-op when input has no fields", async () => {
     const handle = await makeHandle();
     handles.push(handle);

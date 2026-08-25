@@ -34,6 +34,25 @@ describe("article image workflow helpers", () => {
     );
   });
 
+  it("替换正文图时同时删除对应图片描述，但保留其他槽位", () => {
+    const markdown = [
+      "开头",
+      "[IMAGE1_DESC:图一说明]",
+      "[IMAGE1]",
+      "中段",
+      "[IMAGE2_DESC:图二说明]",
+      "[IMAGE2]",
+    ].join("\n\n");
+
+    const result = applyInlineImage(markdown, 2, "https://img.test/2.png");
+
+    expect(result).toContain("[IMAGE1_DESC:图一说明]");
+    expect(result).toContain("[IMAGE1]");
+    expect(result).toContain("![配图2](https://img.test/2.png)");
+    expect(result).not.toContain("[IMAGE2_DESC:");
+    expect(result).not.toContain("[IMAGE2]");
+  });
+
   it("没有封面图行时插入封面，有封面图行时只替换图片", () => {
     expect(applyCoverImage("正文", "https://img.test/cover.png")).toBe(
       "![封面图](https://img.test/cover.png)\n\n正文",

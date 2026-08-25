@@ -337,7 +337,6 @@ const {
   setLastSavedHuman: (content) => { lastSavedHuman = content; },
   isOpen: () => props.open,
   isReadonly: () => Boolean(props.readonly),
-  onSaved: () => emit("saved"),
 });
 
 const {

@@ -1,6 +1,7 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
 import { updateCreativeSourceItemLinkedArticle } from "./creativeSourceItemRepository.js";
 import { findCreativeFinishedArticleById } from "./creativeFinishedArticleReadRepository.js";
+import { mergePublishedImages } from "./creativeMarkdownImageMerge.js";
 import type {
   CreativeFinishedArticleRecord,
   EditCreativeFinishedArticleInput,
@@ -235,11 +236,25 @@ export function editCreativeFinishedArticle(
   }
   if (input.contentMarkdown !== undefined) {
     setClauses.push("content_markdown = ?");
-    params.push(input.contentMarkdown);
+    params.push(mergePublishedImages(
+      current.contentMarkdown,
+      input.contentMarkdown,
+      current.images ?? [],
+      current.coverImage,
+      current.direction !== "short_content",
+    ));
   }
   if (input.humanMarkdown !== undefined) {
     setClauses.push("human_markdown = ?");
-    params.push(input.humanMarkdown);
+    params.push(input.humanMarkdown === null
+      ? null
+      : mergePublishedImages(
+        current.humanMarkdown ?? "",
+        input.humanMarkdown,
+        current.images ?? [],
+        current.coverImage,
+        current.direction !== "short_content",
+      ));
   }
   if (input.titles !== undefined) {
     setClauses.push("titles = ?");

@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import ArticleEditorPanel from "../../src/client/components/creative/article-detail/ArticleEditorPanel.vue";
 import { useArticleEditorViewport } from "../../src/client/components/creative/article-detail/useArticleEditorViewport.js";
+import type { CreativeFinishedArticle } from "../../src/client/services/creativeApi.js";
+
+const focusArticle = { id: 1, status: "generated", originType: "article" } as unknown as CreativeFinishedArticle;
 
 class ResizeObserverStub {
   observe(): void {}
@@ -61,6 +64,7 @@ describe("article editor focus lock", () => {
   it("专注态右上角显示锁定提示并发出解锁事件", async () => {
     const wrapper = shallowMount(ArticleEditorPanel, {
       props: {
+        article: focusArticle,
         readonly: false,
         isManualArticle: false,
         humanContent: "正文",
@@ -73,6 +77,9 @@ describe("article editor focus lock", () => {
         savedAtLabel: "",
         focusMode: true,
         saving: false,
+        wechatCopying: false,
+        canPush: false,
+        missingConditions: [],
         dynamicHeight: 400,
         editorFullscreen: false,
       },
@@ -82,7 +89,7 @@ describe("article editor focus lock", () => {
     });
 
     const lock = wrapper.get("[data-focus-mode-lock]");
-    expect(lock.text()).toContain("专注模式已锁定 · 点击解锁");
+    expect(lock.text()).toContain("解锁");
     await lock.trigger("click");
     expect(wrapper.emitted("unlock-focus-mode")).toHaveLength(1);
   });

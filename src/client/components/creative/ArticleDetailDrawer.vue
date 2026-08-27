@@ -136,6 +136,7 @@
         <!-- 正文编辑器：普通态与全屏态共用同一份编辑状态。 -->
         <section v-if="article.contentMarkdown || article.humanMarkdown || isManualArticle" ref="editorSectionRef" class="editor-section">
           <ArticleEditorPanel
+            :article="article"
             :readonly="props.readonly"
             :is-manual-article="isManualArticle"
             :human-content="humanContent"
@@ -148,6 +149,9 @@
             :saved-at-label="savedAtLabel"
             :focus-mode="focusMode"
             :saving="saving"
+            :wechat-copying="wechatCopying"
+            :can-push="canPush"
+            :missing-conditions="missingConditions"
             :dynamic-height="dynamicEditorHeight"
             :editor-fullscreen="editorFullscreen"
             @update:human-content="humanContent = $event"
@@ -157,6 +161,13 @@
             @copy-plain="copyAiDraftAsPlainText"
             @toggle-sync-scroll="toggleSyncScroll"
             @toggle-fullscreen="toggleEditorFullscreen"
+            @copy-format="copyAsWechatFormat"
+            @review="reviewModalVisible = true"
+            @mark-publishable="handleDetailMarkPublishable"
+            @cancel-publishable="handleDetailCancelPublishable"
+            @restore="handleDetailRestore"
+            @discard="handleDetailDiscard"
+            @push="saveAndPush"
             @unlock-focus-mode="unlockFocusMode"
             @save="handleSave"
           />

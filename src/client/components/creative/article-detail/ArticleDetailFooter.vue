@@ -5,6 +5,7 @@ import { getAvailableActions } from "../articleStatusShared.js";
 defineProps<{
   article: CreativeFinishedArticle;
   readonly?: boolean;
+  hideSave?: boolean;
   saving: boolean;
   wechatCopying: boolean;
   canPush: boolean;
@@ -27,7 +28,7 @@ const emit = defineEmits<{
   <div v-if="!readonly" class="article-detail-footer">
     <!-- 编辑操作直接生效；确认型操作仍交给父抽屉弹二次确认。 -->
     <div class="article-detail-footer__group footer-group--edit">
-      <a-tooltip :mouse-enter-delay="0.5" title="保存正文内容到数据库">
+      <a-tooltip v-if="!hideSave" :mouse-enter-delay="0.5" title="保存正文内容到数据库">
         <a-button :loading="saving" @click="emit('save')">保存</a-button>
       </a-tooltip>
       <a-tooltip :mouse-enter-delay="0.5" title="按选定主题渲染后复制到剪贴板，可粘贴到公众号编辑器">

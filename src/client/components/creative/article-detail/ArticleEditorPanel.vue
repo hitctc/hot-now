@@ -1,9 +1,14 @@
 <script setup lang="ts">
+import { onBeforeUnmount, ref } from "vue";
+
 import ArticleMarkdownEditor from "../ArticleMarkdownEditor.vue";
+import ArticleDetailFooter from "./ArticleDetailFooter.vue";
+import type { CreativeFinishedArticle } from "../../../services/creativeApi.js";
 
 type PreviewThemeOption = { key: string; label: string };
 
-defineProps<{
+const props = defineProps<{
+  article: CreativeFinishedArticle;
   readonly?: boolean;
   isManualArticle: boolean;
   humanContent: string;
@@ -16,6 +21,9 @@ defineProps<{
   savedAtLabel: string;
   focusMode: boolean;
   saving: boolean;
+  wechatCopying: boolean;
+  canPush: boolean;
+  missingConditions: string[];
   dynamicHeight: number;
   editorFullscreen: boolean;
 }>();
@@ -28,9 +36,41 @@ const emit = defineEmits<{
   (event: "copy-plain"): void;
   (event: "toggle-sync-scroll"): void;
   (event: "toggle-fullscreen"): void;
+  (event: "copy-format"): void;
+  (event: "review"): void;
+  (event: "mark-publishable"): void;
+  (event: "cancel-publishable"): void;
+  (event: "restore"): void;
+  (event: "discard"): void;
+  (event: "push"): void;
   (event: "unlock-focus-mode"): void;
   (event: "save"): void;
 }>();
+
+const focusToolsOpen = ref(false);
+let focusToolsCloseTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 专注模式的工具区由悬浮区域控制，延迟收起避免鼠标移入面板时闪退。 */
+function openFocusTools(): void {
+  if (focusToolsCloseTimer) {
+    clearTimeout(focusToolsCloseTimer);
+    focusToolsCloseTimer = null;
+  }
+  focusToolsOpen.value = true;
+}
+
+/** 鼠标或键盘离开整个工具区后再收起，保留短暂移动缓冲。 */
+function scheduleCloseFocusTools(): void {
+  if (focusToolsCloseTimer) clearTimeout(focusToolsCloseTimer);
+  focusToolsCloseTimer = setTimeout(() => {
+    focusToolsCloseTimer = null;
+    focusToolsOpen.value = false;
+  }, 180);
+}
+
+onBeforeUnmount(() => {
+  if (focusToolsCloseTimer) clearTimeout(focusToolsCloseTimer);
+});
 </script>
 
 <template>
@@ -75,17 +115,86 @@ const emit = defineEmits<{
     data-article-editor-wrapper
     :style="{ height: dynamicHeight + 'px' }"
   >
-    <button
+    <div
       v-if="focusMode"
-      type="button"
-      data-focus-mode-lock
-      aria-label="解锁并退出专注模式"
-      class="fixed right-4 top-4 z-[1100] inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-white/95 px-3 py-1.5 text-xs font-medium text-violet-700 shadow-md backdrop-blur transition hover:border-violet-300 hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 max-[640px]:right-3 max-[640px]:top-3"
-      @click="emit('unlock-focus-mode')"
+      class="focus-tools"
+      data-focus-tools
+      @mouseenter="openFocusTools"
+      @mouseleave="scheduleCloseFocusTools"
+      @focusin="openFocusTools"
+      @focusout="scheduleCloseFocusTools"
     >
-      <span aria-hidden="true">🔒</span>
-      <span>专注模式已锁定 · 点击解锁</span>
-    </button>
+      <div class="focus-tools__bar">
+        <a-button
+          type="primary"
+          size="small"
+          data-focus-save
+          :loading="saving"
+          @click="emit('save')"
+        >保存</a-button>
+        <button
+          type="button"
+          class="focus-tools__trigger"
+          data-focus-tools-trigger
+          aria-controls="focus-tools-panel"
+          :aria-expanded="focusToolsOpen"
+        >工具</button>
+        <button
+          type="button"
+          data-focus-mode-lock
+          aria-label="解锁并退出专注模式"
+          class="focus-tools__unlock"
+          @click="emit('unlock-focus-mode')"
+        >
+          <span aria-hidden="true">🔒</span>
+          <span>解锁</span>
+        </button>
+      </div>
+
+      <div id="focus-tools-panel" v-show="focusToolsOpen" class="focus-tools__panel" data-focus-tools-panel>
+        <div class="focus-tools__section">
+          <span class="focus-tools__label">主题</span>
+          <div class="focus-tools__theme-list">
+            <a-button
+              v-for="option in previewThemeOptions"
+              :key="option.key"
+              :type="activePreviewTheme === option.key ? 'primary' : 'default'"
+              size="small"
+              @click="emit('select-theme', option.key)"
+            >{{ option.label }}</a-button>
+          </div>
+        </div>
+
+        <div class="focus-tools__section focus-tools__section--editor">
+          <span class="focus-tools__label">编辑</span>
+          <div class="focus-tools__action-list">
+            <a-button type="link" size="small" @click="emit('copy-ai')">复制原文</a-button>
+            <a-button type="link" size="small" @click="emit('copy-plain')">复制纯文本</a-button>
+            <a-button type="link" size="small" @click="emit('toggle-sync-scroll')">{{ syncScrollEnabled ? '同步滚动：开' : '同步滚动：关' }}</a-button>
+            <a-button type="link" size="small" @click="emit('toggle-fullscreen')">{{ editorFullscreen ? '退出全屏' : '全屏' }}</a-button>
+          </div>
+        </div>
+
+        <ArticleDetailFooter
+          :article="props.article"
+          :readonly="readonly"
+          hide-save
+          :saving="saving"
+          :wechat-copying="wechatCopying"
+          :can-push="canPush"
+          :missing-conditions="missingConditions"
+          class="focus-tools__flow"
+          @save="emit('save')"
+          @copy-format="emit('copy-format')"
+          @review="emit('review')"
+          @mark-publishable="emit('mark-publishable')"
+          @cancel-publishable="emit('cancel-publishable')"
+          @restore="emit('restore')"
+          @discard="emit('discard')"
+          @push="emit('push')"
+        />
+      </div>
+    </div>
     <ArticleMarkdownEditor
       :model-value="humanContent"
       human-mode

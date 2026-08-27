@@ -151,7 +151,13 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <div id="focus-tools-panel" v-show="focusToolsOpen" class="focus-tools__panel" data-focus-tools-panel>
+      <div
+        id="focus-tools-panel"
+        class="focus-tools__panel"
+        :class="{ 'focus-tools__panel--hidden': !focusToolsOpen }"
+        :aria-hidden="!focusToolsOpen"
+        data-focus-tools-panel
+      >
         <div class="focus-tools__section">
           <span class="focus-tools__label">主题</span>
           <div class="focus-tools__theme-list">
@@ -175,24 +181,27 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <ArticleDetailFooter
-          :article="props.article"
-          :readonly="readonly"
-          hide-save
-          :saving="saving"
-          :wechat-copying="wechatCopying"
-          :can-push="canPush"
-          :missing-conditions="missingConditions"
-          class="focus-tools__flow"
-          @save="emit('save')"
-          @copy-format="emit('copy-format')"
-          @review="emit('review')"
-          @mark-publishable="emit('mark-publishable')"
-          @cancel-publishable="emit('cancel-publishable')"
-          @restore="emit('restore')"
-          @discard="emit('discard')"
-          @push="emit('push')"
-        />
+        <div class="focus-tools__section focus-tools__section--flow">
+          <span class="focus-tools__label" data-focus-tools-flow-label aria-hidden="true"></span>
+          <ArticleDetailFooter
+            :article="props.article"
+            :readonly="readonly"
+            hide-save
+            :saving="saving"
+            :wechat-copying="wechatCopying"
+            :can-push="canPush"
+            :missing-conditions="missingConditions"
+            class="focus-tools__flow"
+            @save="emit('save')"
+            @copy-format="emit('copy-format')"
+            @review="emit('review')"
+            @mark-publishable="emit('mark-publishable')"
+            @cancel-publishable="emit('cancel-publishable')"
+            @restore="emit('restore')"
+            @discard="emit('discard')"
+            @push="emit('push')"
+          />
+        </div>
       </div>
     </div>
     <ArticleMarkdownEditor

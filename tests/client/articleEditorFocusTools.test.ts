@@ -62,10 +62,14 @@ describe("article editor focus tools", () => {
     const tools = wrapper.get("[data-focus-tools]");
     const panel = wrapper.get("[data-focus-tools-panel]");
 
-    expect(panel.isVisible()).toBe(false);
+    expect(panel.classes()).toContain("focus-tools__panel--hidden");
+    expect(panel.attributes("aria-hidden")).toBe("true");
     await tools.trigger("mouseenter");
 
-    expect(panel.isVisible()).toBe(true);
+    expect(panel.classes()).not.toContain("focus-tools__panel--hidden");
+    expect(panel.attributes("aria-hidden")).toBe("false");
+    expect(wrapper.findAll(".focus-tools__section")).toHaveLength(3);
+    expect(wrapper.get("[data-focus-tools-flow-label]").text()).toBe("");
     expect(panel.text()).toMatch(/默\s*认/);
     expect(panel.text()).toContain("实时预览");
     expect(panel.text()).toContain("复制原文");
@@ -95,15 +99,16 @@ describe("article editor focus tools", () => {
     const panel = wrapper.get("[data-focus-tools-panel]");
 
     await tools.trigger("mouseenter");
-    expect(panel.isVisible()).toBe(true);
+    expect(panel.classes()).not.toContain("focus-tools__panel--hidden");
 
     await tools.trigger("mouseleave");
     vi.advanceTimersByTime(179);
     await nextTick();
-    expect(panel.isVisible()).toBe(true);
+    expect(panel.classes()).not.toContain("focus-tools__panel--hidden");
 
     vi.advanceTimersByTime(1);
     await nextTick();
-    expect(panel.isVisible()).toBe(false);
+    expect(panel.classes()).toContain("focus-tools__panel--hidden");
+    expect(panel.attributes("aria-hidden")).toBe("true");
   });
 });

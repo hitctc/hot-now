@@ -160,11 +160,30 @@
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 12px 32px rgba(71, 45, 120, 0.18);
   backdrop-filter: blur(12px);
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease,
+    visibility 0s linear 0s;
+}
+.focus-tools__panel--hidden {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease,
+    visibility 0s linear 0.22s;
 }
 .focus-tools__section {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: start;
+  column-gap: 10px;
 }
 .focus-tools__section + .focus-tools__section {
   margin-top: 8px;
@@ -172,11 +191,13 @@
   border-top: 1px solid #f0ecf8;
 }
 .focus-tools__label {
-  flex: 0 0 32px;
-  padding-top: 5px;
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  padding-top: 0;
   color: #8b7ca3;
   font-size: 11px;
-  line-height: 24px;
+  line-height: 20px;
 }
 .focus-tools__theme-list,
 .focus-tools__action-list {
@@ -197,12 +218,15 @@
   font-size: 12px;
 }
 .focus-tools__flow {
-  width: 100%;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid #f0ecf8;
+  min-width: 0;
+}
+.focus-tools__section--flow .focus-tools__flow {
+  margin: 0;
+  padding: 0;
+  border-top: 0;
 }
 .focus-tools__flow .article-detail-footer__group {
+  align-items: center;
   flex-wrap: wrap;
   gap: 4px;
 }
@@ -210,9 +234,15 @@
   margin-inline: 8px;
 }
 .focus-tools__flow .ant-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   height: 28px;
   padding-inline: 9px;
   font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+  vertical-align: middle;
 }
 .article-detail-modal .ant-modal-footer {
   flex-shrink: 0;
@@ -292,6 +322,7 @@
   }
   .focus-tools__label {
     display: block;
+    min-height: 0;
     padding-top: 0;
     line-height: 20px;
   }

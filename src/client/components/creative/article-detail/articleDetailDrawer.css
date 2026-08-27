@@ -151,7 +151,9 @@
   color: #5b21b6;
 }
 .focus-tools__panel {
-  width: min(860px, calc(100vw - 32px));
+  /* 桌面端按实际按钮内容收缩，避免固定宽度制造无意义的大片空白。 */
+  width: fit-content;
+  max-width: calc(100vw - 32px);
   max-height: calc(100dvh - 80px);
   overflow: auto;
   padding: 12px;

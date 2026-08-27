@@ -264,6 +264,42 @@ describe("editCreativeFinishedArticle", () => {
     expect(updated.humanMarkdown).toContain(`![配图3](${image3})`);
   });
 
+  it("does not let a stale image callback erase a newer user正文", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+
+    const source = createSourceItem(handle.db);
+    const article = insertCreativeFinishedArticle(handle.db, {
+      sourceItemId: source.id,
+      contentMarkdown: "旧正文\n\n[IMAGE1]",
+      humanMarkdown: "旧人工稿\n\n[IMAGE1]",
+      images: [""],
+    });
+    const staleUpdatedAt = article.updatedAt;
+
+    const userContent = "用户刚刚保存的新正文\n\n[IMAGE1]";
+    const userHumanContent = "用户刚刚保存的新人工稿\n\n[IMAGE1]";
+    expect(editCreativeFinishedArticle(handle.db, article.id, {
+      contentMarkdown: userContent,
+      humanMarkdown: userHumanContent,
+    }).ok).toBe(true);
+
+    // 模拟 Luna 在读取用户内容之前已经拿到旧快照，完成后才回写图片。
+    const staleImageCallbackContent = "旧正文\n\n![配图1](https://img.example.com/generated.jpg)";
+    const imageCallbackResult = editCreativeFinishedArticle(handle.db, article.id, {
+      contentMarkdown: staleImageCallbackContent,
+      humanMarkdown: staleImageCallbackContent,
+      images: ["https://img.example.com/generated.jpg"],
+      expectedUpdatedAt: staleUpdatedAt,
+    });
+
+    const updated = findCreativeFinishedArticleById(handle.db, article.id)!;
+    expect(imageCallbackResult.ok).toBe(false);
+    expect(imageCallbackResult.reason).toBe("article-revision-conflict");
+    expect(updated.contentMarkdown).toContain("用户刚刚保存的新正文");
+    expect(updated.humanMarkdown).toContain("用户刚刚保存的新人工稿");
+  });
+
   it("保留用户本次明确提交的新正文图片 URL", async () => {
     const handle = await makeHandle();
     handles.push(handle);

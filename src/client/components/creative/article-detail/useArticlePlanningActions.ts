@@ -139,7 +139,8 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
     const humanMarkdown = replaceH1(humanContent.value, title);
     const titles = [title];
     try {
-      await editFinishedArticle(latestArticle.id, { titles, contentMarkdown, humanMarkdown });
+      const saved = await editFinishedArticle(latestArticle.id, { titles, contentMarkdown, humanMarkdown });
+      if (saved.updatedAt) latestArticle.updatedAt = saved.updatedAt;
       localTitles.value = titles;
       latestArticle.titles = JSON.stringify(titles);
       latestArticle.contentMarkdown = contentMarkdown;
@@ -187,7 +188,8 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
         saveFields.wechatHtml = html;
       }
 
-      await editFinishedArticle(latestArticle.id, saveFields);
+      const saved = await editFinishedArticle(latestArticle.id, saveFields);
+      if (saved.updatedAt) latestArticle.updatedAt = saved.updatedAt;
       latestArticle.titleIndex = idx;
       latestArticle.titleSelectionConfirmed = true;
       latestArticle.contentMarkdown = content;
@@ -254,7 +256,8 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
     }
 
     try {
-      await editFinishedArticle(article.id, saveFields);
+      const saved = await editFinishedArticle(article.id, saveFields);
+      if (saved.updatedAt) article.updatedAt = saved.updatedAt;
       onSaved();
     } catch {
       // 本地状态已经更新，保留原有静默失败语义。
@@ -274,10 +277,14 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
     try {
       const result = await regenIntro(article.id);
       if (result.ok && result.intros) {
+        // 导语生成期间仍可能有正文自动保存，先收口后再基于当前正文替换导语。
+        await prepareExplicitContentSave();
+        const latestArticle = getArticle();
+        if (!latestArticle) return;
         localIntros.value = result.intros;
         activeIntroIndex.value = 0;
-        article.intros = result.intros;
-        article.introIndex = 0;
+        latestArticle.intros = result.intros;
+        latestArticle.introIndex = 0;
 
         // 联动：替换 markdown 中的 blockquote，渲染并保存 wechatHtml。
         const newIntro = result.intros[0] ?? "";
@@ -287,8 +294,7 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
           md = md.replace(bqMatch[1], `> ${newIntro}`);
         }
         editContent.value = md;
-        article.contentMarkdown = md;
-        setLastSavedContent(md);
+        latestArticle.contentMarkdown = md;
 
         const saveFields: Record<string, unknown> = {
           intros: result.intros,
@@ -297,10 +303,15 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
         };
         if (activePreviewTheme.value !== "live" && md) {
           const html = renderWechatThemePreview(md, themeIdMap[activePreviewTheme.value]);
-          article.wechatHtml = html;
+          latestArticle.wechatHtml = html;
           saveFields.wechatHtml = html;
         }
-        editFinishedArticle(article.id, saveFields).catch(() => {});
+        const saved = await editFinishedArticle(latestArticle.id, {
+          expectedUpdatedAt: latestArticle.updatedAt,
+          ...saveFields,
+        });
+        if (saved.updatedAt) latestArticle.updatedAt = saved.updatedAt;
+        setLastSavedContent(md);
         message.success("新导语已生成");
       } else {
         message.error(result.reason ?? "导语生成失败");
@@ -315,6 +326,9 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
   async function selectIntro(idx: number): Promise<void> {
     const article = getArticle();
     if (!article || idx === activeIntroIndex.value) return;
+    await prepareExplicitContentSave();
+    const latestArticle = getArticle();
+    if (!latestArticle || idx === activeIntroIndex.value) return;
     const selectedIntro = displayIntros.value[idx];
     if (!selectedIntro) return;
 
@@ -347,13 +361,17 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
       };
       if (activePreviewTheme.value !== "live" && content) {
         const html = renderWechatThemePreview(content, themeIdMap[activePreviewTheme.value]);
-        article.wechatHtml = html;
+        latestArticle.wechatHtml = html;
         saveFields.wechatHtml = html;
       }
 
-      await editFinishedArticle(article.id, saveFields);
-      article.introIndex = idx;
-      article.contentMarkdown = content;
+      const saved = await editFinishedArticle(latestArticle.id, {
+        expectedUpdatedAt: latestArticle.updatedAt,
+        ...saveFields,
+      });
+      if (saved.updatedAt) latestArticle.updatedAt = saved.updatedAt;
+      latestArticle.introIndex = idx;
+      latestArticle.contentMarkdown = content;
       setLastSavedContent(content);
       onSaved();
     } catch {

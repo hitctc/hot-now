@@ -206,10 +206,15 @@ export function editCreativeFinishedArticle(
   id: number,
   input: EditCreativeFinishedArticleInput,
   source?: string,
-): { ok: boolean; reason?: string } {
+): { ok: boolean; reason?: string; updatedAt?: string } {
   const current = findCreativeFinishedArticleById(db, id);
   if (!current) {
     return { ok: false, reason: "article not found" };
+  }
+
+  // 图片生成可能耗时数分钟；写入前后都用版本条件保护，避免旧快照覆盖用户刚保存的正文。
+  if (input.expectedUpdatedAt !== undefined && current.updatedAt !== input.expectedUpdatedAt) {
+    return { ok: false, reason: "article-revision-conflict" };
   }
 
   // 状态变更校验：Hermes 管线内部流转跳过（source="hermes"），仅校验前端人工操作
@@ -385,12 +390,23 @@ export function editCreativeFinishedArticle(
     return { ok: true };
   }
 
-  setClauses.push("updated_at = CURRENT_TIMESTAMP");
-  params.push(id);
+  const updatedAt = new Date().toISOString();
+  setClauses.push("updated_at = ?");
+  params.push(updatedAt, id);
+  const where = ["id = ?"];
+  if (input.expectedUpdatedAt !== undefined) {
+    where.push("updated_at = ?");
+    params.push(input.expectedUpdatedAt);
+  }
 
-  db.prepare(`UPDATE creative_finished_articles SET ${setClauses.join(", ")} WHERE id = ?`).run(...params);
+  const result = db.prepare(
+    `UPDATE creative_finished_articles SET ${setClauses.join(", ")} WHERE ${where.join(" AND ")}`
+  ).run(...params);
+  if (input.expectedUpdatedAt !== undefined && result.changes === 0) {
+    return { ok: false, reason: "article-revision-conflict" };
+  }
 
-  return { ok: true };
+  return { ok: true, updatedAt };
 }
 
 /**

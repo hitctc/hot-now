@@ -1,12 +1,29 @@
-import { describe, expect, it } from "vitest";
+import { effectScope, ref } from "vue";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   applyCoverImage,
   applyInlineImage,
   extractInlineImageUrl,
   mergeLunaImageJobs,
+  useArticleImageWorkflow,
 } from "../../src/client/components/creative/article-detail/useArticleImageWorkflow.js";
-import type { LunaImageJob } from "../../src/client/services/creativeApi.js";
+import { editFinishedArticle, regenInlineImage, type CreativeFinishedArticle, type LunaImageJob } from "../../src/client/services/creativeApi.js";
+
+vi.mock("../../src/client/services/creativeApi.js", async () => {
+  const actual = await vi.importActual<typeof import("../../src/client/services/creativeApi.js")>("../../src/client/services/creativeApi.js");
+  return {
+    ...actual,
+    editFinishedArticle: vi.fn().mockResolvedValue({ ok: true, updatedAt: "revision-3" }),
+    regenInlineImage: vi.fn(),
+  };
+});
+
+vi.mock("ant-design-vue", () => ({
+  message: { success: vi.fn(), error: vi.fn() },
+}));
+
+afterEach(() => vi.clearAllMocks());
 
 function lunaJob(overrides: Partial<LunaImageJob> = {}): LunaImageJob {
   return {
@@ -80,5 +97,65 @@ describe("article image workflow helpers", () => {
       "inline-1": newer,
       cover,
     });
+  });
+
+  it("正文图完成后只替换当前编号并保留生图期间用户的新正文", async () => {
+    vi.mocked(regenInlineImage).mockResolvedValue({
+      ok: true,
+      imageUrl: "https://img.test/generated-2.png",
+      imageIndex: 2,
+      contentMarkdown: "旧快照\n\n![配图2](https://img.test/generated-2.png)",
+      updatedAt: "revision-2",
+    });
+    const article = {
+      id: 16212,
+      updatedAt: "revision-1",
+      contentMarkdown: "旧快照",
+      humanMarkdown: "旧人工稿",
+      imagesJson: null,
+      coverImage: [],
+      direction: "article",
+    } as unknown as CreativeFinishedArticle;
+    const editContent = ref("用户新正文\n\n[IMAGE1]\n\n[IMAGE2_DESC:图二]\n[IMAGE2]");
+    const humanContent = ref("用户新人工稿\n\n[IMAGE1]\n\n[IMAGE2_DESC:图二]\n[IMAGE2]");
+    const scope = effectScope();
+    const prepareExplicitContentSave = vi.fn().mockResolvedValue(undefined);
+    let lastSavedContent = "旧快照";
+    let lastSavedHuman = "旧人工稿";
+    let workflow!: ReturnType<typeof useArticleImageWorkflow>;
+
+    scope.run(() => {
+      workflow = useArticleImageWorkflow({
+        getArticle: () => article,
+        isOpen: () => true,
+        editContent,
+        humanContent,
+        getLastSavedContent: () => lastSavedContent,
+        setLastSavedContent: (value) => { lastSavedContent = value; },
+        getLastSavedHuman: () => lastSavedHuman,
+        setLastSavedHuman: (value) => { lastSavedHuman = value; },
+        prepareExplicitContentSave,
+        setPromptDirty: () => {},
+        isLivePreview: () => false,
+        getPreviewThemeId: () => "sunset-film",
+        tickArticleChange: () => {},
+        onSaved: () => {},
+      });
+    });
+
+    await workflow.handleRegenInlineImage(2);
+
+    expect(vi.mocked(regenInlineImage)).toHaveBeenCalledWith(article.id, 2);
+    expect(prepareExplicitContentSave).toHaveBeenCalledOnce();
+    expect(editContent.value).toContain("用户新正文");
+    expect(humanContent.value).toContain("用户新人工稿");
+    expect(editContent.value).toContain("![配图2](https://img.test/generated-2.png)");
+    expect(editContent.value).not.toContain("[IMAGE2_DESC:");
+    expect(vi.mocked(editFinishedArticle)).toHaveBeenCalledWith(article.id, expect.objectContaining({
+      expectedUpdatedAt: "revision-2",
+      contentMarkdown: editContent.value,
+      humanMarkdown: humanContent.value,
+    }));
+    scope.stop();
   });
 });

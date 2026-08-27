@@ -148,6 +148,8 @@ export type InsertCreativeFinishedArticleInput = {
 };
 
 export type EditCreativeFinishedArticleInput = {
+  /** 仅在调用方掌握文章快照版本时启用，防止异步回写覆盖较新的用户编辑。 */
+  expectedUpdatedAt?: string;
   mode?: CreativeFinishedArticleMode;
   thesis?: string;
   intros?: string[];

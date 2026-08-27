@@ -10,6 +10,7 @@ vi.mock("../../src/client/services/http", () => ({
 
 import {
   enqueueLunaImageJob,
+  editFinishedArticle,
   fetchLunaImageJobs,
   fetchWriteQueueStatus,
   readCreativeFinishedArticles,
@@ -103,5 +104,14 @@ describe("creativeApi Luna image requests", () => {
     expect(requestJson).toHaveBeenCalledWith(
       "/api/creative/finished-articles/16212/luna-image-jobs"
     );
+  });
+});
+
+describe("creativeApi finished article writes", () => {
+  it("rejects a 2xx response whose business result is not successful", async () => {
+    requestJson.mockResolvedValue({ ok: false, reason: "article-revision-conflict" });
+
+    await expect(editFinishedArticle(16212, { contentMarkdown: "新正文" }))
+      .rejects.toThrow("finished article edit was not accepted");
   });
 });

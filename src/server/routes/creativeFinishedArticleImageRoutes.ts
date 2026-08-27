@@ -185,6 +185,7 @@ export function registerCreativeFinishedArticleImageRoutes(context: CreativeFini
       return reply.send({
         ok: true,
         coverImage: updated?.coverImage ?? updatedCovers,
+        updatedAt: updated?.updatedAt,
         prompt: data.prompt,
         sourceUrl: data.sourceUrl ?? "",
         provider: data.provider ?? "",
@@ -246,6 +247,7 @@ export function registerCreativeFinishedArticleImageRoutes(context: CreativeFini
         imageIndex: data.imageIndex,
         contentMarkdown: updated?.contentMarkdown ?? article.contentMarkdown,
         images: updated?.images ?? article.images,
+        updatedAt: updated?.updatedAt,
         prompt: data.prompt,
         sourceUrl: data.sourceUrl ?? "",
         provider: data.provider ?? "",

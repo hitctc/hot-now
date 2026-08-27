@@ -147,6 +147,41 @@ describe("GPT Luna 独立生图路由", () => {
     await app.close();
   });
 
+  it("rejects a stale Hermes image patch without erasing a newer user save", async () => {
+    const { handle, article } = await createArticle([
+      { step: 8, meta: { writingProvider: "codex", writingModel: "gpt-5.6-luna" } },
+    ]);
+    const app = createServer({ db: handle.db, creativeApiToken: "test-token" });
+    const staleUpdatedAt = article.updatedAt;
+
+    const userSave = await app.inject({
+      method: "PATCH",
+      url: `/api/creative/finished-articles/${article.id}`,
+      headers: { "x-creative-token": "test-token" },
+      payload: { contentMarkdown: "用户最新正文", humanMarkdown: "用户最新人工稿" },
+    });
+    expect(userSave.statusCode).toBe(200);
+
+    const stalePatch = await app.inject({
+      method: "PATCH",
+      url: `/api/creative/finished-articles/${article.id}`,
+      headers: { "x-creative-token": "test-token" },
+      payload: {
+        expectedUpdatedAt: staleUpdatedAt,
+        contentMarkdown: "旧正文\n\n![配图1](https://img.test/generated.jpg)",
+        humanMarkdown: "旧人工稿\n\n![配图1](https://img.test/generated.jpg)",
+        images: ["https://img.test/generated.jpg"],
+      },
+    });
+
+    expect(stalePatch.statusCode).toBe(409);
+    expect(stalePatch.json()).toMatchObject({ ok: false, reason: "article-revision-conflict" });
+    const saved = findCreativeFinishedArticleById(handle.db, article.id);
+    expect(saved?.contentMarkdown).toBe("用户最新正文");
+    expect(saved?.humanMarkdown).toBe("用户最新人工稿");
+    await app.close();
+  });
+
   it("persists humanMarkdown when Hermes creates a finished article", async () => {
     const handle = await createTestDatabase("hot-now-human-markdown-");
     handles.push(handle);

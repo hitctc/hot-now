@@ -31,6 +31,8 @@ export type ArticleImageWorkflowOptions = {
   setLastSavedContent: (content: string) => void;
   getLastSavedHuman: () => string;
   setLastSavedHuman: (content: string) => void;
+  /** 图片结果写回前先收口正文自动保存，避免异步图片动作使用旧版本覆盖编辑。 */
+  prepareExplicitContentSave: () => Promise<void>;
   setPromptDirty: (key: string, dirty: boolean) => void;
   isLivePreview: () => boolean;
   getPreviewThemeId: () => WechatThemeId;
@@ -261,28 +263,34 @@ export function useArticleImageWorkflow(options: ArticleImageWorkflowOptions) {
     try {
       const result = await regenInlineImage(article.id, imageIndex);
       if (result.ok) {
-        if (result.contentMarkdown) {
-          options.editContent.value = result.contentMarkdown;
-          article.contentMarkdown = result.contentMarkdown;
-          options.setLastSavedContent(result.contentMarkdown);
+        // 生成期间用户可能已经修改正文；只从结果中取新 URL，再合并到当前编辑文本。
+        const newUrl = result.imageUrl
+          ?? (result.contentMarkdown ? extractInlineImageUrl(result.contentMarkdown, imageIndex) : null);
+        if (newUrl) {
+          if (result.updatedAt) article.updatedAt = result.updatedAt;
+          await options.prepareExplicitContentSave();
+          const latestArticle = options.getArticle();
+          if (!options.isOpen() || !latestArticle || latestArticle.id !== article.id) return;
 
-          const newUrl = extractInlineImageUrl(result.contentMarkdown, imageIndex);
-          let humanMarkdown = options.humanContent.value;
-          if (newUrl) {
-            humanMarkdown = applyInlineImage(options.humanContent.value, imageIndex, newUrl);
-            options.humanContent.value = humanMarkdown;
-            options.setLastSavedHuman(humanMarkdown);
-            article.humanMarkdown = humanMarkdown;
-          }
-
-          const saveFields: Record<string, unknown> = { contentMarkdown: result.contentMarkdown };
-          if (newUrl) saveFields.humanMarkdown = humanMarkdown;
+          const contentMarkdown = applyInlineImage(options.editContent.value, imageIndex, newUrl);
+          const humanMarkdown = applyInlineImage(options.humanContent.value, imageIndex, newUrl);
           const html = renderWechatThemePreview(humanMarkdown, options.getPreviewThemeId());
-          article.wechatHtml = html;
-          saveFields.wechatHtml = html;
-          editFinishedArticle(article.id, saveFields).catch(() => {});
+          const saved = await editFinishedArticle(article.id, {
+            expectedUpdatedAt: latestArticle.updatedAt,
+            contentMarkdown,
+            humanMarkdown,
+            wechatHtml: html,
+          });
+          options.editContent.value = contentMarkdown;
+          options.humanContent.value = humanMarkdown;
+          latestArticle.contentMarkdown = contentMarkdown;
+          latestArticle.humanMarkdown = humanMarkdown;
+          latestArticle.wechatHtml = html;
+          if (result.images) latestArticle.imagesJson = result.images as typeof latestArticle.imagesJson;
+          if (saved.updatedAt) latestArticle.updatedAt = saved.updatedAt;
+          options.setLastSavedContent(contentMarkdown);
+          options.setLastSavedHuman(humanMarkdown);
         }
-        if (result.images) article.imagesJson = result.images as typeof article.imagesJson;
         message.success(`配图 ${imageIndex} 已重新生成`);
         options.tickArticleChange();
       } else {
@@ -333,6 +341,9 @@ export function useArticleImageWorkflow(options: ArticleImageWorkflowOptions) {
         return;
       }
       const newUrl = uploaded[0].storedUrl;
+      await options.prepareExplicitContentSave();
+      const latestArticle = options.getArticle();
+      if (!options.isOpen() || !latestArticle || latestArticle.id !== article.id) return;
       const currentImages = parseArticleImages(article.imagesJson ?? null);
       const updatedImages = [...currentImages];
       while (updatedImages.length < imageIndex) updatedImages.push({ url: "", purpose: "inline", alt: "" });
@@ -347,8 +358,6 @@ export function useArticleImageWorkflow(options: ArticleImageWorkflowOptions) {
       options.humanContent.value = humanMarkdown;
       article.contentMarkdown = md;
       article.humanMarkdown = humanMarkdown;
-      options.setLastSavedContent(md);
-      options.setLastSavedHuman(humanMarkdown);
 
       const saveFields: Record<string, unknown> = {
         contentMarkdown: md,
@@ -359,7 +368,10 @@ export function useArticleImageWorkflow(options: ArticleImageWorkflowOptions) {
       article.wechatHtml = html;
       saveFields.wechatHtml = html;
 
-      await editFinishedArticle(article.id, saveFields);
+      const saved = await editFinishedArticle(article.id, { expectedUpdatedAt: latestArticle.updatedAt, ...saveFields });
+      if (saved.updatedAt) latestArticle.updatedAt = saved.updatedAt;
+      options.setLastSavedContent(md);
+      options.setLastSavedHuman(humanMarkdown);
       message.success(`配图 ${imageIndex} 已上传`);
       options.tickArticleChange();
     } catch {
@@ -377,6 +389,10 @@ export function useArticleImageWorkflow(options: ArticleImageWorkflowOptions) {
     try {
       const result = await regenCover(article.id);
       if (result.ok && result.coverImage) {
+        if (result.updatedAt) article.updatedAt = result.updatedAt;
+        await options.prepareExplicitContentSave();
+        const latestArticle = options.getArticle();
+        if (!options.isOpen() || !latestArticle || latestArticle.id !== article.id) return;
         localCoverImages.value = result.coverImage;
         activeCoverIndex.value = 0;
         article.coverImage = result.coverImage;
@@ -389,8 +405,6 @@ export function useArticleImageWorkflow(options: ArticleImageWorkflowOptions) {
         options.humanContent.value = humanMarkdown;
         article.contentMarkdown = md;
         article.humanMarkdown = humanMarkdown;
-        options.setLastSavedContent(md);
-        options.setLastSavedHuman(humanMarkdown);
 
         const saveFields: Record<string, unknown> = {
           coverImageIndex: 0,
@@ -402,7 +416,10 @@ export function useArticleImageWorkflow(options: ArticleImageWorkflowOptions) {
           article.wechatHtml = html;
           saveFields.wechatHtml = html;
         }
-        editFinishedArticle(article.id, saveFields).catch(() => {});
+        const saved = await editFinishedArticle(article.id, { expectedUpdatedAt: latestArticle.updatedAt, ...saveFields });
+        if (saved.updatedAt) latestArticle.updatedAt = saved.updatedAt;
+        options.setLastSavedContent(md);
+        options.setLastSavedHuman(humanMarkdown);
 
         message.success("新封面图已生成");
         options.tickArticleChange();
@@ -433,6 +450,9 @@ export function useArticleImageWorkflow(options: ArticleImageWorkflowOptions) {
         return;
       }
       const newUrl = uploaded[0].storedUrl;
+      await options.prepareExplicitContentSave();
+      const latestArticle = options.getArticle();
+      if (!options.isOpen() || !latestArticle || latestArticle.id !== article.id) return;
       const updatedCovers = [newUrl, ...displayCoverImages.value];
       localCoverImages.value = updatedCovers;
       activeCoverIndex.value = 0;
@@ -445,8 +465,6 @@ export function useArticleImageWorkflow(options: ArticleImageWorkflowOptions) {
       options.humanContent.value = humanMarkdown;
       article.contentMarkdown = md;
       article.humanMarkdown = humanMarkdown;
-      options.setLastSavedContent(md);
-      options.setLastSavedHuman(humanMarkdown);
 
       const saveFields: Record<string, unknown> = {
         coverImage: updatedCovers,
@@ -459,7 +477,10 @@ export function useArticleImageWorkflow(options: ArticleImageWorkflowOptions) {
         article.wechatHtml = html;
         saveFields.wechatHtml = html;
       }
-      await editFinishedArticle(article.id, saveFields);
+      const saved = await editFinishedArticle(article.id, { expectedUpdatedAt: latestArticle.updatedAt, ...saveFields });
+      if (saved.updatedAt) latestArticle.updatedAt = saved.updatedAt;
+      options.setLastSavedContent(md);
+      options.setLastSavedHuman(humanMarkdown);
       message.success("封面图已上传");
       options.tickArticleChange();
     } catch {
@@ -483,13 +504,16 @@ export function useArticleImageWorkflow(options: ArticleImageWorkflowOptions) {
       return;
     }
 
+    await options.prepareExplicitContentSave();
+    const latestArticle = options.getArticle();
+    if (!options.isOpen() || !latestArticle || latestArticle.id !== article.id) return;
+
     const newUrl = displayCoverImages.value[index];
     const content = applyCoverImage(options.editContent.value, newUrl);
     const humanMarkdown = applyCoverImage(options.humanContent.value, newUrl);
     activeCoverIndex.value = index;
     options.editContent.value = content;
     options.humanContent.value = humanMarkdown;
-    options.setLastSavedHuman(humanMarkdown);
 
     try {
       const saveFields: Record<string, unknown> = {
@@ -503,11 +527,13 @@ export function useArticleImageWorkflow(options: ArticleImageWorkflowOptions) {
         saveFields.wechatHtml = html;
       }
 
-      await editFinishedArticle(article.id, saveFields);
+      const saved = await editFinishedArticle(article.id, { expectedUpdatedAt: latestArticle.updatedAt, ...saveFields });
+      if (saved.updatedAt) latestArticle.updatedAt = saved.updatedAt;
       article.coverImageIndex = index;
       article.contentMarkdown = content;
       article.humanMarkdown = humanMarkdown;
       options.setLastSavedContent(content);
+      options.setLastSavedHuman(humanMarkdown);
       options.onSaved();
     } catch { /* 静默失败，本地状态已更新 */ }
   }

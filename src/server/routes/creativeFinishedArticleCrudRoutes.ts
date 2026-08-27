@@ -137,6 +137,9 @@ export function registerCreativeFinishedArticleCrudRoutes(context: CreativeFinis
 
     // finished_articles 表字段
     const editInput: Record<string, unknown> = {};
+    if (typeof body?.expectedUpdatedAt === "string") {
+      editInput.expectedUpdatedAt = body.expectedUpdatedAt;
+    }
     if (body?.contentMarkdown !== undefined) { editInput.contentMarkdown = body.contentMarkdown; updatedFields.push("contentMarkdown"); }
     if (typeof body?.humanMarkdown === "string" || body?.humanMarkdown === null) {
       editInput.humanMarkdown = body.humanMarkdown;
@@ -208,7 +211,8 @@ export function registerCreativeFinishedArticleCrudRoutes(context: CreativeFinis
       const source = hasToken ? "hermes" : undefined;
       const editResult = editCreativeFinishedArticle(db, id, editInput as any, source);
       if (!editResult.ok) {
-        return reply.code(400).send({ ok: false, reason: editResult.reason });
+        return reply.code(editResult.reason === "article-revision-conflict" ? 409 : 400)
+          .send({ ok: false, reason: editResult.reason });
       }
     }
 
@@ -379,6 +383,7 @@ export function registerCreativeFinishedArticleCrudRoutes(context: CreativeFinis
     const id = parseInt(params.id, 10);
     const source = typeof body?._source === "string" ? body._source : undefined;
     const result = editCreativeFinishedArticle(db, id, {
+      expectedUpdatedAt: typeof body?.expectedUpdatedAt === "string" ? body.expectedUpdatedAt : undefined,
       contentMarkdown: typeof body?.contentMarkdown === "string" ? body.contentMarkdown : undefined,
       humanMarkdown: typeof body?.humanMarkdown === "string" ? body.humanMarkdown : (body?.humanMarkdown === null ? null : undefined),
       thesis: typeof body?.thesis === "string" ? body.thesis : undefined,
@@ -408,9 +413,10 @@ export function registerCreativeFinishedArticleCrudRoutes(context: CreativeFinis
       return reply.code(404).send({ ok: false, reason: "not-found" });
     }
     if (!result.ok) {
-      return reply.code(400).send({ ok: false, reason: result.reason });
+      return reply.code(result.reason === "article-revision-conflict" ? 409 : 400)
+        .send({ ok: false, reason: result.reason });
     }
-    return reply.send({ ok: true });
+    return reply.send({ ok: true, updatedAt: result.updatedAt });
   });
 
   // 手动成品直接进入编辑器，不创建素材，也不经过写作管线。

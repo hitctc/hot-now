@@ -35,8 +35,9 @@ export function useArticleAutosave(options: ArticleAutosaveOptions) {
   async function persistDraftAutosave(payload: AutosavePayload): Promise<void> {
     saving.value = true;
     try {
-      await editFinishedArticle(payload.articleId, { contentMarkdown: payload.content });
+      const result = await editFinishedArticle(payload.articleId, { contentMarkdown: payload.content });
       if (options.getArticle()?.id !== payload.articleId) return;
+      if (result.updatedAt) options.getArticle()!.updatedAt = result.updatedAt;
       options.setLastSavedContent(payload.content);
       if (options.editContent.value === payload.content) lastSavedAt.value = Date.now();
     } catch (error) {
@@ -50,8 +51,9 @@ export function useArticleAutosave(options: ArticleAutosaveOptions) {
   /** 中栏自动保存只落盘用户原文，标题同步留给显式标题操作、手动保存和推送。 */
   async function persistHumanAutosave(payload: AutosavePayload): Promise<void> {
     try {
-      await editFinishedArticle(payload.articleId, { humanMarkdown: payload.content });
+      const result = await editFinishedArticle(payload.articleId, { humanMarkdown: payload.content });
       if (options.getArticle()?.id !== payload.articleId) return;
+      if (result.updatedAt) options.getArticle()!.updatedAt = result.updatedAt;
       options.setLastSavedHuman(payload.content);
       if (options.humanContent.value === payload.content) lastSavedAt.value = Date.now();
     } catch (error) {

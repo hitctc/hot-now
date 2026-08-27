@@ -143,9 +143,10 @@ export function updateSourceItemWritingStatus(
   });
 }
 
-export function editFinishedArticle(
+export async function editFinishedArticle(
   id: number,
   fields: {
+    expectedUpdatedAt?: string;
     contentMarkdown?: string;
     humanMarkdown?: string | null;
     thesis?: string;
@@ -173,11 +174,14 @@ export function editFinishedArticle(
     status?: string;
     anomalyReason?: string;
   }
-): Promise<{ ok: boolean }> {
-  return requestJson<{ ok: boolean }>(`/actions/creative/finished-articles/${id}`, {
+): Promise<{ ok: boolean; updatedAt?: string }> {
+  const result = await requestJson<{ ok: boolean; updatedAt?: string }>(`/actions/creative/finished-articles/${id}`, {
     method: "PUT",
     body: JSON.stringify(fields)
   });
+  // 兼容代理返回 2xx 但业务失败的情况，禁止自动保存把假成功显示给用户。
+  if (result?.ok !== true) throw new Error("finished article edit was not accepted");
+  return result;
 }
 
 // ─── 手动上传图片 ──
@@ -365,6 +369,7 @@ export function readArticlePushLog(id: number): Promise<{ ok: boolean; log: Push
 export type RegenCoverResult = {
   ok: boolean;
   coverImage?: string[];
+  updatedAt?: string;
   prompt?: string;
   reason?: string;
 };
@@ -449,6 +454,7 @@ export type RegenInlineImageResult = {
   imageIndex?: number;
   contentMarkdown?: string;
   images?: unknown[];
+  updatedAt?: string;
   prompt?: string;
   reason?: string;
 };

@@ -373,6 +373,7 @@ const {
   setLastSavedContent: (content) => { lastSavedContent = content; },
   getLastSavedHuman: () => lastSavedHuman,
   setLastSavedHuman: (content) => { lastSavedHuman = content; },
+  prepareExplicitContentSave,
   setPromptDirty,
   isLivePreview: () => activePreviewTheme.value === "live",
   getPreviewThemeId: getImagePreviewThemeId,
@@ -547,11 +548,12 @@ async function handleSave(): Promise<boolean> {
     if (!props.article) return false;
     const sync = buildTitleSync(humanContent.value);
     // 手动保存同时落盘左栏 AI 草稿（content_markdown）和中栏人工转写（human_markdown）
-    await editFinishedArticle(props.article.id, {
+    const saved = await editFinishedArticle(props.article.id, {
       contentMarkdown: editContent.value,
       ...sync.fields,
     });
     applyTitleSync(sync);
+    if (saved.updatedAt) props.article.updatedAt = saved.updatedAt;
     lastSavedContent = sync.contentMarkdown ?? editContent.value;
     lastSavedHuman = sync.humanMarkdown;
     tickArticleChange();

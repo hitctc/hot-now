@@ -55,8 +55,11 @@ export type RuntimeServerDepsInput = RuntimeServerActionDeps & {
   db: SqliteDatabase;
   config: RuntimeConfig;
   creativeApiToken?: string;
+  remoteApiOrigin?: string;
+  remoteApiToken?: string;
   clientDevOrigin?: string;
   hasTwitterApiKey: boolean;
+  requireLogin?: boolean;
 };
 
 type ReportSummary = {
@@ -391,11 +394,13 @@ export function createRuntimeServerDeps(input: RuntimeServerDepsInput): ServerDe
   return {
   db,
     creativeApiToken: input.creativeApiToken,
+    remoteApiOrigin: input.remoteApiOrigin,
+    remoteApiToken: input.remoteApiToken,
     creativeImageDir,
     config,
     clientDevOrigin: input.clientDevOrigin,
   auth: {
-    requireLogin: true,
+    requireLogin: input.requireLogin ?? true,
     sessionSecret: config.auth.sessionSecret,
     sessionTtlSeconds: config.auth.sessionTtlSeconds,
     verifyLogin

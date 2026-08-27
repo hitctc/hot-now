@@ -17,6 +17,12 @@ fi
 
 if [ "${mode}" = "local" ]; then
   echo "npm run dev:local 已退回兼容入口，后续开发和调试请直接使用 npm run dev。"
+  unset HOT_NOW_DEV_REMOTE_API_ORIGIN
+  unset HOT_NOW_DEV_REMOTE_API_TOKEN
+else
+  # 标准开发入口按当前需求直接代理正式 API；本地数据库只用于满足启动依赖，不承载页面读写。
+  export HOT_NOW_DEV_REMOTE_API_ORIGIN="${HOT_NOW_DEV_REMOTE_API_ORIGIN:-https://now.achuan.cc}"
+  echo "WARNING: npm run dev 将通过 ${HOT_NOW_DEV_REMOTE_API_ORIGIN} 直接读写正式数据；定时任务已关闭。"
 fi
 
 echo "Preparing client bundle..."

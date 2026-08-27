@@ -35,6 +35,8 @@ export AI_TIMELINE_FEED_MANIFEST_FILE="/srv/hot-now/shared/data/feeds/ai-timelin
 export AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS="10"
 export FEISHU_ALERT_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/replace-with-secret"
 export HOT_NOW_CLIENT_DEV_ORIGIN="http://127.0.0.1:35173"
+export HOT_NOW_DEV_REMOTE_API_ORIGIN="https://now.achuan.cc"
+export HOT_NOW_DEV_REMOTE_API_TOKEN="replace-with-remote-creative-api-token"
 ```
 
 `LLM_SETTINGS_MASTER_KEY` 现在是可选覆盖项；如果你不单独配置，系统会回退使用 `SESSION_SECRET` 继续加密保存厂商 API key。
@@ -47,6 +49,7 @@ export HOT_NOW_CLIENT_DEV_ORIGIN="http://127.0.0.1:35173"
 `AI_TIMELINE_FEED_URL`、`AI_TIMELINE_FEED_FILE`、`AI_TIMELINE_FEED_MANIFEST_FILE` 和 `AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS` 是可选的外部 AI 官方发布时间线 feed 配置；服务端接口优先读取本地稳定文件和回退版本，公网 URL 只作为兜底来源，避免生产接口每次请求都绕公网访问自己。
 `FEISHU_ALERT_WEBHOOK_URL` 是 S 级 AI 时间线事件飞书提醒的敏感 webhook，只能放在 `.env` 或生产环境变量里，不要写进仓库；缺失时飞书通道会失败，但邮件备份通道仍会尝试发送。
 `HOT_NOW_CLIENT_DEV_ORIGIN` 也是可选开发辅助项；`npm run dev` 默认会把 Vite dev server 拉到 `http://127.0.0.1:35173`，并按这个地址接入，让 `3030` 页面直接拿到 HMR 和 Vue DevTools。只有你想改成别的开发端口时，才需要显式覆盖它。
+`HOT_NOW_DEV_REMOTE_API_ORIGIN` 用于把本地页面的 `/api/*`、`/actions/*`、登录和登出请求代理到正式站点；`npm run dev` 默认使用 `https://now.achuan.cc`，页面上的保存、发布、图片和其他操作会直接作用于正式数据。代理会转发正式站点的登录 Cookie，但不会挂载或复制远程 SQLite。`HOT_NOW_DEV_REMOTE_API_TOKEN` 仅在正式接口需要 `x-creative-token` 时配置，必须只放在 `.env`，不能提交到仓库。
 本地开发不再要求手工配置 `WECHAT_RESOLVER_BASE_URL`、`WECHAT_RESOLVER_TOKEN`；`npm run dev` 会自动拉起仓库内置的本地公众号解析 sidecar。只有你想覆盖到远端 relay 时，才需要显式配置这两个环境变量。
 
 4. 如果这次改动涉及 unified shell 客户端页面，先构建最新客户端资源：`npm run build:client`
@@ -58,8 +61,8 @@ export HOT_NOW_CLIENT_DEV_ORIGIN="http://127.0.0.1:35173"
 npm run dev
 ```
 
-  这条命令现在会一起拉起 Fastify、Vite dev server 和本地公众号解析 sidecar；继续打开 `http://127.0.0.1:3030/...` 即可直接使用 Vue DevTools，不需要再手动开第二个终端。
-  `npm run dev` 现在只读取仓库根目录的 `.env`；后续开发统一把共享配置和每台设备自己的敏感项都收口到这一份文件里。若本地还残留旧的 `.env.local`，脚本会明确提示它已被忽略。默认情况下它会先清理本地 `3030` 后端端口、`35173` Vite 调试端口，并在未显式配置远端 resolver 时同步清理和启用本地 sidecar。
+  这条命令现在会一起拉起 Fastify、Vite dev server 和本地公众号解析 sidecar；继续打开 `http://127.0.0.1:3030/...` 即可直接使用 Vue DevTools，不需要再手动开第二个终端。标准入口默认通过 HTTPS 代理正式 API，登录后页面的保存、发布和图片操作都是真实生产操作；启动日志会再次显示该警告。
+  `npm run dev` 现在只读取仓库根目录的 `.env`；后续开发统一把共享配置和每台设备自己的敏感项都收口到这一份文件里。若本地还残留旧的 `.env.local`，脚本会明确提示它已被忽略。默认情况下它会先清理本地 `3030` 后端端口、`35173` Vite 调试端口，并在未显式配置远端 resolver 时同步清理和启用本地 sidecar。远程模式会关闭本地采集、发信和时间线调度，避免本地开发进程产生额外副作用。
 
 - 仅启动 Vite 客户端调试时：
 
@@ -75,7 +78,7 @@ npm run dev:client
 npm run dev:local
 ```
 
-`dev:local` 现在只保留为兼容入口，内部会直接转发到 `npm run dev` 并提示后续统一使用 `npm run dev`。
+`dev:local` 用于完全离线的本地数据库开发：它会清除正式 API 代理环境变量，再启动本地数据服务。需要直接操作正式数据时使用 `npm run dev`，不要使用 `dev:local`。
 
 QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 
@@ -282,7 +285,7 @@ sudo visudo -cf /etc/sudoers.d/hot-now-systemctl
 - 固定读取 `data/prod-sync/hot-now.sqlite`
 - 固定读取 `data/prod-sync/reports`
 - 自动导出 `HOT_NOW_DATABASE_FILE` 和 `HOT_NOW_REPORT_DATA_DIR`
-- 然后执行 `npm run dev`
+- 然后执行 `npm run dev:local`，明确只使用这份本地副本，不访问正式 API
 
 如果 `data/prod-sync/` 里还没有最新副本，脚本会直接提示你先执行 `./scripts/pull-prod-data.sh`。
 

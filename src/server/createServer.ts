@@ -18,6 +18,7 @@ import { registerWechatRssRoutes } from "./routes/wechatRssRoutes.js";
 import { registerContentFeedbackRoutes } from "./routes/contentFeedbackRoutes.js";
 import { registerSitePageRoutes, readSettingsAiTimelineAdminApiData } from "./routes/sitePageRoutes.js";
 import { registerAiTimelineRoutes } from "./routes/aiTimelineRoutes.js";
+import { registerRemoteApiProxy } from "./remoteApiProxy.js";
 import {
   ensureManualActionAuthorized,
   ensureStateActionAuthorized,
@@ -293,6 +294,8 @@ export type ServerDeps = {
   config?: Partial<RuntimeConfig>;
   db?: SqliteDatabase;
   creativeApiToken?: string;
+  remoteApiOrigin?: string;
+  remoteApiToken?: string;
   creativeImageDir?: string;
   listReportSummaries?: () => Promise<ReportSummary[]>;
   latestReportDate?: () => Promise<string | null>;
@@ -471,6 +474,12 @@ export function createServer(deps: ServerDeps = {}) {
   const db = deps.db;
   const creativeApiToken = deps.creativeApiToken;
   const creativeImageDir = deps.creativeImageDir;
+  if (deps.remoteApiOrigin) {
+    registerRemoteApiProxy(app, {
+      origin: deps.remoteApiOrigin,
+      token: deps.remoteApiToken
+    });
+  }
   registerCreativeSourceActionRoutes(app, {
     db,
     authorizeCreativeApiToken: (request, reply) => validateCreativeApiToken(request, reply, creativeApiToken),

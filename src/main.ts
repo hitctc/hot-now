@@ -26,10 +26,17 @@ import { runWechatRssCollection } from "./core/wechatRss/runWechatRssCollection.
 import { runWeiboTrendingCollection } from "./core/weibo/runWeiboTrendingCollection.js";
 import { createServer } from "./server/createServer.js";
 import { isHermesAutomationAllowed } from "./server/hermesAutomationClient.js";
+import { normalizeRemoteApiOrigin } from "./server/remoteApiProxy.js";
 
 // 本地直接跑 tsx watch src/main.ts 时也要和 npm run dev 一样吃到根目录 .env。
 loadRootEnvFile();
 const config = await loadRuntimeConfig();
+const remoteApiOrigin = normalizeRemoteApiOrigin(process.env.HOT_NOW_DEV_REMOTE_API_ORIGIN);
+const remoteApiToken = process.env.HOT_NOW_DEV_REMOTE_API_TOKEN?.trim() || undefined;
+
+if (remoteApiOrigin) {
+  console.warn(`本地开发已连接正式 API：${remoteApiOrigin}；本地定时任务已关闭，页面写入会直接作用于正式数据。`);
+}
 const recoveryDir = path.join(path.dirname(config.database.file), "recovery-backups");
 const db = createRuntimeDatabase({
   databaseFile: config.database.file,
@@ -201,8 +208,11 @@ const app = createServer(createRuntimeServerDeps({
   db,
   config,
   creativeApiToken: process.env.CREATIVE_API_TOKEN,
+  remoteApiOrigin,
+  remoteApiToken,
   clientDevOrigin: process.env.HOT_NOW_CLIENT_DEV_ORIGIN?.trim() || undefined,
   hasTwitterApiKey: Boolean(process.env.TWITTER_API_KEY?.trim()),
+  requireLogin: !remoteApiOrigin,
   isRunning: () => lock.isRunning(),
   triggerManualCollect,
   triggerManualTwitterCollect,
@@ -224,7 +234,7 @@ if (!existsSync(clientIndexPath)) {
   );
 }
 
-const collectionScheduler = startCollectionScheduler(config, async () => {
+const collectionScheduler = remoteApiOrigin ? null : startCollectionScheduler(config, async () => {
   try {
     if (!(await isHermesAutomationAllowed("collection"))) {
       return;
@@ -237,7 +247,7 @@ const collectionScheduler = startCollectionScheduler(config, async () => {
   }
 });
 
-const mailScheduler = startMailScheduler(config, async () => {
+const mailScheduler = remoteApiOrigin ? null : startMailScheduler(config, async () => {
   try {
     if (!(await isHermesAutomationAllowed("notifications"))) {
       return;
@@ -250,7 +260,7 @@ const mailScheduler = startMailScheduler(config, async () => {
   }
 });
 
-const aiTimelineAlertScheduler = startAiTimelineAlertScheduler(config, async () => {
+const aiTimelineAlertScheduler = remoteApiOrigin ? null : startAiTimelineAlertScheduler(config, async () => {
   try {
     if (!(await isHermesAutomationAllowed("reminders")) || !(await isHermesAutomationAllowed("notifications"))) {
       return;
@@ -266,7 +276,7 @@ const aiTimelineAlertScheduler = startAiTimelineAlertScheduler(config, async () 
 });
 
 // 公众号 RSS 独立调度和锁，不受主采集锁阻塞
-const wechatRssScheduler = startWechatRssScheduler(config, async () => {
+const wechatRssScheduler = remoteApiOrigin ? null : startWechatRssScheduler(config, async () => {
   try {
     if (!(await isHermesAutomationAllowed("collection"))) {
       return;

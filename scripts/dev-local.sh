@@ -2,5 +2,5 @@
 
 set -euo pipefail
 
-echo "npm run dev:local 已退回兼容入口，后续开发和调试请直接使用 npm run dev。"
+echo "启动本地离线开发模式，不会访问正式 API。"
 exec zsh ./scripts/dev.sh local

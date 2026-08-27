@@ -136,7 +136,7 @@
 - 开发启动：`npm run dev`
 - 仅启动 Vite 客户端调试：`npm run dev:client`
 - 仅启动公众号解析 sidecar：`npm run dev:wechat-resolver`
-- 兼容入口：`npm run dev:local`
+- 本地离线入口：`npm run dev:local`
 - 数据库检查：`npm run db:check`
 - 生成 verified snapshot：`npm run db:snapshot`
 - 从快照恢复主库：`npm run db:restore -- <snapshot-file>`
@@ -149,7 +149,7 @@
 - 客户端类型检查：`npm run typecheck:client`
 - 测试：`npm run test`
 
-`npm run dev` 现在是唯一主开发入口：启动前会准备最新 client bundle，并同时拉起 Fastify、Vite dev server 和本地公众号解析 sidecar。脚本现在只读取根目录 `.env`；`.env.local` 已不再参与启动加载，若仓库里还残留旧文件，脚本会明确提示它已被忽略。后续开发统一把共享配置和每台设备自己的敏感项都维护在 `.env`。未显式配置 `WECHAT_RESOLVER_BASE_URL` / `WECHAT_RESOLVER_TOKEN` 时，`npm run dev` 会自动注入本地默认值并启动 sidecar；只有想改接远端 relay 时才需要覆盖这两个环境变量。`HOT_NOW_CLIENT_DEV_ORIGIN` 未显式配置时，默认使用 `http://127.0.0.1:35173`，避免和常见本地前端服务抢占 `5173`。每次执行 `npm run dev` 都会先清理后端端口、Vite 调试端口和自动 sidecar 端口，再启动新进程，不复用旧的 Vite dev server。`npm run dev:local` 已退回兼容入口，只负责转发到 `npm run dev` 并提示后续统一使用 `dev`。当前 `3030` 页面会优先尝试接入 `HOT_NOW_CLIENT_DEV_ORIGIN` 指向的 Vite dev server，成功时可直接使用 Vue DevTools，失败时自动回退到 `dist/client` 构建产物；`npm run dev:client` 仍保留给只调前端时单独使用。
+`npm run dev` 现在默认是正式 API 开发入口：启动前会准备最新 client bundle，并同时拉起 Fastify、Vite dev server 和本地公众号解析 sidecar；`/api/*`、`/actions/*`、登录和登出会通过 HTTPS 代理到 `https://now.achuan.cc`，页面保存、发布、图片和其他写操作直接作用于正式数据。代理模式不挂载远程 SQLite，只转发 HTTP 请求和正式站点会话 Cookie；本地采集、发信、AI 时间线提醒和公众号 RSS 定时任务会关闭。脚本现在只读取根目录 `.env`；`.env.local` 已不再参与启动加载，若仓库里还残留旧文件，脚本会明确提示它已被忽略。后续开发统一把共享配置和每台设备自己的敏感项都维护在 `.env`。未显式配置 `WECHAT_RESOLVER_BASE_URL` / `WECHAT_RESOLVER_TOKEN` 时，`npm run dev` 会自动注入本地默认值并启动 sidecar；只有想改接远端 relay 时才需要覆盖这两个环境变量。`HOT_NOW_CLIENT_DEV_ORIGIN` 未显式配置时，默认使用 `http://127.0.0.1:35173`，避免和常见本地前端服务抢占 `5173`。每次执行 `npm run dev` 都会先清理后端端口、Vite 调试端口和自动 sidecar 端口，再启动新进程，不复用旧的 Vite dev server。`npm run dev:local` 会清除正式 API 代理环境变量，用于完全离线的本地数据库开发；`npm run dev-prod-sync` 也必须经由这个入口运行，不能误把生产副本调试请求发到正式站点。当前 `3030` 页面会优先尝试接入 `HOT_NOW_CLIENT_DEV_ORIGIN` 指向的 Vite dev server，成功时可直接使用 Vue DevTools，失败时自动回退到 `dist/client` 构建产物；`npm run dev:client` 仍保留给只调前端时单独使用。
 
 SQLite 可靠性约定：
 
@@ -210,6 +210,8 @@ SQLite 可靠性约定：
 - `AI_TIMELINE_FEED_MANIFEST_FILE`（可选外部 AI 官方发布时间线 feed manifest 路径，生产推荐 `/srv/hot-now/shared/data/feeds/ai-timeline-feed-manifest.json`）
 - `AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS`（可选回退版本数量，默认 `10`）
 - `HOT_NOW_CLIENT_DEV_ORIGIN`
+- `HOT_NOW_DEV_REMOTE_API_ORIGIN`（本地 `npm run dev` 默认使用 `https://now.achuan.cc`；将 `/api/*`、`/actions/*`、登录和登出代理到正式 API）
+- `HOT_NOW_DEV_REMOTE_API_TOKEN`（可选，仅在正式接口需要 `x-creative-token` 时使用；必须通过本地 `.env` 提供）
 - `WECHAT_RESOLVER_BASE_URL`（可选覆盖项；本地开发默认由 `npm run dev` 自动注入 `http://127.0.0.1:4040`）
 - `WECHAT_RESOLVER_TOKEN`（可选覆盖项；本地开发默认由 `npm run dev` 自动注入本地 sidecar token）
 

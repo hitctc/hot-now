@@ -33,5 +33,6 @@ export HOT_NOW_REPORT_DATA_DIR="${LOCAL_REPORTS_DIR}"
 echo "Starting local dev against prod-sync snapshot:"
 echo "  HOT_NOW_DATABASE_FILE=${HOT_NOW_DATABASE_FILE}"
 echo "  HOT_NOW_REPORT_DATA_DIR=${HOT_NOW_REPORT_DATA_DIR}"
+echo "  使用 npm run dev:local，避免生产副本调试误走正式 API。"
 
-exec npm run dev
+exec npm run dev:local

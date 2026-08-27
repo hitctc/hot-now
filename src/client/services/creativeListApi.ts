@@ -281,5 +281,6 @@ export function readCreativeFinishedArticles(params?: {
 
 /** 读取单篇成品的完整编辑数据。 */
 export function readCreativeFinishedArticle(id: number): Promise<CreativeFinishedArticle> {
-  return requestJson<CreativeFinishedArticle>(`/api/creative/finished-articles/${id}`);
+  // 详情正文刚保存后立即重开时必须绕过浏览器旧 GET 缓存，避免显示过期正文。
+  return requestJson<CreativeFinishedArticle>(`/api/creative/finished-articles/${id}`, { cache: "no-store" });
 }

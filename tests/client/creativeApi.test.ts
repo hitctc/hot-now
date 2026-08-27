@@ -14,6 +14,7 @@ import {
   fetchLunaImageJobs,
   fetchWriteQueueStatus,
   readCreativeFinishedArticles,
+  readCreativeFinishedArticle,
   readCreativeSourceItems
 } from "../../src/client/services/creativeApi";
 
@@ -54,6 +55,19 @@ describe("creativeApi list requests", () => {
       2,
       "/api/creative/finished-articles?view=summary&page=21",
       { signal: controller.signal }
+    );
+  });
+});
+
+describe("creativeApi finished article detail requests", () => {
+  it("重新打开详情时跳过浏览器缓存，读取刚保存的正文", async () => {
+    requestJson.mockResolvedValue({ id: 2373 });
+
+    await readCreativeFinishedArticle(2373);
+
+    expect(requestJson).toHaveBeenCalledWith(
+      "/api/creative/finished-articles/2373",
+      { cache: "no-store" },
     );
   });
 });

@@ -8,13 +8,14 @@ import {
   mergeLunaImageJobs,
   useArticleImageWorkflow,
 } from "../../src/client/components/creative/article-detail/useArticleImageWorkflow.js";
-import { editFinishedArticle, regenInlineImage, type CreativeFinishedArticle, type LunaImageJob } from "../../src/client/services/creativeApi.js";
+import { editFinishedArticle, fetchLunaImageJobs, regenInlineImage, type CreativeFinishedArticle, type LunaImageJob } from "../../src/client/services/creativeApi.js";
 
 vi.mock("../../src/client/services/creativeApi.js", async () => {
   const actual = await vi.importActual<typeof import("../../src/client/services/creativeApi.js")>("../../src/client/services/creativeApi.js");
   return {
     ...actual,
     editFinishedArticle: vi.fn().mockResolvedValue({ ok: true, updatedAt: "revision-3" }),
+    fetchLunaImageJobs: vi.fn(),
     regenInlineImage: vi.fn(),
   };
 });
@@ -97,6 +98,64 @@ describe("article image workflow helpers", () => {
       "inline-1": newer,
       cover,
     });
+  });
+
+  it("打开详情时不使用历史 Luna 任务里的旧正文快照覆盖用户最新正文", async () => {
+    vi.mocked(fetchLunaImageJobs).mockResolvedValue({
+      ok: true,
+      eligible: true,
+      jobs: [lunaJob({
+        jobId: "old-succeeded-job",
+        status: "succeeded",
+        imageUrl: "https://img.test/1.png",
+        contentMarkdown: "旧 AI 正文\n\n![配图1](https://img.test/1.png)",
+        humanMarkdown: "旧人工正文\n\n![配图1](https://img.test/1.png)",
+        updatedAt: "2026-08-18T00:02:00.000Z",
+      })],
+    });
+    const article = {
+      id: 2373,
+      updatedAt: "2026-08-27T07:49:07.702Z",
+      contentMarkdown: "当前 AI 正文\n\n![配图1](https://img.test/1.png)",
+      humanMarkdown: "当前人工正文\n\n![配图1](https://img.test/1.png)",
+      imagesJson: ["https://img.test/1.png"],
+      coverImage: [],
+      direction: "article",
+      stepTrace: [{ meta: { writingProvider: "codex", writingModel: "gpt-5.6-luna" } }],
+    } as unknown as CreativeFinishedArticle;
+    const editContent = ref(article.contentMarkdown);
+    const humanContent = ref(article.humanMarkdown!);
+    let lastSavedContent = editContent.value;
+    let lastSavedHuman = humanContent.value;
+    const scope = effectScope();
+    let workflow!: ReturnType<typeof useArticleImageWorkflow>;
+
+    scope.run(() => {
+      workflow = useArticleImageWorkflow({
+        getArticle: () => article,
+        isOpen: () => true,
+        editContent,
+        humanContent,
+        getLastSavedContent: () => lastSavedContent,
+        setLastSavedContent: (value) => { lastSavedContent = value; },
+        getLastSavedHuman: () => lastSavedHuman,
+        setLastSavedHuman: (value) => { lastSavedHuman = value; },
+        prepareExplicitContentSave: vi.fn().mockResolvedValue(undefined),
+        setPromptDirty: () => {},
+        isLivePreview: () => false,
+        getPreviewThemeId: () => "sunset-film",
+        tickArticleChange: () => {},
+        onSaved: () => {},
+      });
+    });
+
+    await workflow.loadLunaImageJobs();
+
+    expect(editContent.value).toContain("当前 AI 正文");
+    expect(humanContent.value).toContain("当前人工正文");
+    expect(editContent.value).not.toContain("旧 AI 正文");
+    expect(humanContent.value).not.toContain("旧人工正文");
+    scope.stop();
   });
 
   it("正文图完成后只替换当前编号并保留生图期间用户的新正文", async () => {

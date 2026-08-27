@@ -64,6 +64,13 @@ export function extractInlineImageUrl(md: string, imageIndex: number): string | 
   return matches[imageIndex - 1]?.[1] ?? null;
 }
 
+/** 只在目标槽位仍是占位符或图片 URL 已变化时应用任务结果，避免历史任务带回旧正文。 */
+function applyLunaInlineImage(md: string, imageIndex: number, newUrl: string): string {
+  const hasPlaceholder = new RegExp(`\\[IMAGE${imageIndex}\\]`).test(md);
+  if (!hasPlaceholder && extractInlineImageUrl(md, imageIndex) === newUrl) return md;
+  return applyInlineImage(md, imageIndex, newUrl);
+}
+
 /** 替换 markdown 中的封面图行；没有封面图行时插入到正文开头。 */
 export function applyCoverImage(md: string, newUrl: string): string {
   if (!newUrl) return md;
@@ -555,21 +562,21 @@ export function useArticleImageWorkflow(options: ArticleImageWorkflowOptions) {
       activeCoverIndex.value = 0;
     } else if (job.imageIndex != null) {
       if (Array.isArray(job.images)) article.imagesJson = job.images as typeof article.imagesJson;
-      if (typeof job.contentMarkdown === "string") {
-        article.contentMarkdown = job.contentMarkdown;
-        const draftWasDirty = options.editContent.value !== options.getLastSavedContent();
-        options.editContent.value = draftWasDirty
-          ? applyInlineImage(options.editContent.value, job.imageIndex, job.imageUrl)
-          : job.contentMarkdown;
-        if (!draftWasDirty) options.setLastSavedContent(job.contentMarkdown);
+      // 任务响应中的正文是生图时的旧快照；这里只把图片 URL 合并到当前正文，不能整篇替换。
+      const draftWasDirty = options.editContent.value !== options.getLastSavedContent();
+      const nextDraft = applyLunaInlineImage(options.editContent.value, job.imageIndex, job.imageUrl);
+      options.editContent.value = nextDraft;
+      if (!draftWasDirty) {
+        article.contentMarkdown = nextDraft;
+        options.setLastSavedContent(nextDraft);
       }
-      if (typeof job.humanMarkdown === "string") {
-        article.humanMarkdown = job.humanMarkdown;
-        const humanWasDirty = options.humanContent.value !== options.getLastSavedHuman();
-        options.humanContent.value = humanWasDirty
-          ? applyInlineImage(options.humanContent.value, job.imageIndex, job.imageUrl)
-          : job.humanMarkdown;
-        if (!humanWasDirty) options.setLastSavedHuman(job.humanMarkdown);
+
+      const humanWasDirty = options.humanContent.value !== options.getLastSavedHuman();
+      const nextHuman = applyLunaInlineImage(options.humanContent.value, job.imageIndex, job.imageUrl);
+      options.humanContent.value = nextHuman;
+      if (!humanWasDirty) {
+        article.humanMarkdown = nextHuman;
+        options.setLastSavedHuman(nextHuman);
       }
     }
     options.tickArticleChange();

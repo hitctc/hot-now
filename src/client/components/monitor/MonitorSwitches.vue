@@ -36,7 +36,8 @@ const stageDefinitions: Array<{ key: AutomationStageKey; description: string }> 
   { key: "base_scoring", description: "基础评分、趋势评分和基础筛选" },
   { key: "account_fit", description: "账号适配评估；失败按退避上限重试" },
   { key: "long_write", description: "周期槽位自动长文；仅接受账号适配=high且双评分达标的素材" },
-  { key: "short_write", description: "自动短内容写作" },
+  { key: "short_collection", description: "采集短内容热搜并入库；不启动写作" },
+  { key: "short_write", description: "只消费当前采集批次的自动短内容写作" },
   { key: "images", description: "自动写作中的 Luna 图片生成许可" },
   { key: "daily_digest", description: "自动日报" },
   { key: "reminders", description: "自动提醒" },
@@ -49,6 +50,9 @@ const configDefinitions = [
   { key: "windowHours", backendKey: "auto_write_window_hours", label: "素材回看窗口（小时）", description: "计划时间向前筛选，默认 48 小时", type: "number" as const, min: 1, max: 168 },
   { key: "baseScoreThreshold", backendKey: "auto_write_base_score_threshold", label: "基础评分阈值", description: "自动写作硬门槛；还必须账号适配=high且趋势分达标，默认 80", type: "number" as const, min: 0, max: 100 },
   { key: "trendScoreThreshold", backendKey: "trend_score_threshold", label: "趋势评分阈值", description: "自动写作硬门槛；还必须账号适配=high且基础分达标，默认 80", type: "number" as const, min: 0, max: 100 },
+  { key: "shortWriteBatchSize", backendKey: "auto_write_short_daily_count", label: "每轮自动短内容数量", description: "只处理刚完成采集的素材，默认 1 篇；历史 ready 素材不会自动补写", type: "number" as const, min: 0, max: 20 },
+  { key: "shortCollectionInterval", backendKey: "interval_short_collection", label: "短内容采集间隔（分钟）", description: "独立于写作调度；当前默认 60 分钟", type: "number" as const, min: 1, max: 1440 },
+  { key: "shortWriteInterval", backendKey: "interval_short_write", label: "短内容写作间隔（分钟）", description: "每次最多写入配置数量，当前设置为 60 分钟", type: "number" as const, min: 1, max: 1440 },
 ] as const;
 
 type ConfigKey = (typeof configDefinitions)[number]["key"];
@@ -151,6 +155,9 @@ function syncConfigDraft(status: CreativeAutomationStatus): void {
     windowHours: status.config.windowHours,
     baseScoreThreshold: status.config.baseScoreThreshold,
     trendScoreThreshold: status.config.trendScoreThreshold,
+    shortWriteBatchSize: status.config.shortWriteBatchSize,
+    shortCollectionInterval: status.config.shortCollectionInterval,
+    shortWriteInterval: status.config.shortWriteInterval,
   };
 }
 

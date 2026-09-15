@@ -620,6 +620,7 @@ export type AutomationStageKey =
   | "base_scoring"
   | "account_fit"
   | "long_write"
+  | "short_collection"
   | "short_write"
   | "images"
   | "daily_digest"
@@ -715,6 +716,9 @@ export type CreativeAutomationStatus = {
     windowHours: number;
     baseScoreThreshold: number;
     trendScoreThreshold: number;
+    shortWriteBatchSize: number;
+    shortCollectionInterval: number;
+    shortWriteInterval: number;
     timezone: string;
   };
   dailyPlan: DailyPlanView;

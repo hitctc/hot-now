@@ -85,7 +85,7 @@ export function buildCodeImageSourceFingerprint(
   keywords: string[],
 ): string {
   return createHash("sha256")
-    .update(JSON.stringify({ title, thesis, keywords, template: "hotnow-code-card-v2", sizes: { wide: "750x300", square: "750x750", portrait: "750x1000" } }))
+    .update(JSON.stringify({ title, thesis, keywords, template: "hotnow-code-card-v3", sizes: { wide: "1500x600", square: "1500x1500", portrait: "1500x2000" } }))
     .digest("hex");
 }
 
@@ -104,14 +104,13 @@ export function resolveCodeImageThesis(
     article.titles?.[article.titleIndex],
     title,
   ];
-  return candidates.find((value): value is string => typeof value === "string" && value.trim().length > 0)?.trim() ?? title;
+  const selected = candidates.find((value): value is string => typeof value === "string" && value.trim().length > 0)?.trim();
+  return selected ? selected.replace(/^[|｜]\s*/, "") : title;
 }
 
 /** 从标题、判断和素材标签中整理图片使用的短关键词，完全在本地确定性完成。 */
-export function resolveCodeImageKeywords(tags: string | null, title: string, thesis: string): string[] {
-  const fromTags = parseTags(tags);
-  const candidates = fromTags.length > 0 ? fromTags : extractKeywords(`${title} ${thesis}`);
-  return [...new Set(candidates.map((item) => shortenKeyword(item)).filter(Boolean))].slice(0, 3);
+export function resolveCodeImageKeywords(tags: string | null): string[] {
+  return [...new Set(parseTags(tags).map((item) => shortenKeyword(item)).filter(Boolean))].slice(0, 3);
 }
 
 async function runCodeImageCards(
@@ -127,7 +126,7 @@ async function runCodeImageCards(
   const title = selectedTitle(initial);
   const source = initial.sourceItemId ? findCreativeSourceItemById(db, initial.sourceItemId) : null;
   const thesis = resolveCodeImageThesis(initial, title, source?.summary ?? null);
-  const keywords = resolveCodeImageKeywords(source?.tags ?? null, title, thesis);
+  const keywords = resolveCodeImageKeywords(source?.tags ?? null);
   const fingerprint = buildCodeImageSourceFingerprint(title, thesis, keywords);
   const existing = orderCodeImageCards(initial.codeImageCards);
   const mode = options.mode ?? "missing";
@@ -310,11 +309,6 @@ function parseTags(raw: string | null): string[] {
     // 兼容历史数据中的逗号、顿号和井号分隔文本。
   }
   return raw.split(/[、,，|｜#\n]/).map((item) => item.trim()).filter(Boolean);
-}
-
-function extractKeywords(text: string): string[] {
-  const words: string[] = text.match(/[\u4e00-\u9fff]{2,8}|[A-Za-z][A-Za-z0-9-]{1,15}/g) ?? [];
-  return words.filter((word, index) => words.indexOf(word) === index).slice(0, 3);
 }
 
 function shortenKeyword(value: string): string {

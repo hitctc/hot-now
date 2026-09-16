@@ -68,10 +68,8 @@ describe("短内容代码制图", () => {
   });
 
   it("优先使用素材标签，缺失时确定性提取关键词", () => {
-    expect(resolveCodeImageKeywords('["AI代理", "工作流", "自动化"]', "标题", "判断")).toEqual(["AI代理", "工作流", "自动化"]);
-    const fallback = resolveCodeImageKeywords(null, "AI 代理正在重写工作流", "自动化会先改变流程");
-    expect(fallback).toHaveLength(3);
-    expect(fallback.every((keyword) => keyword.length > 0 && keyword.length <= 9)).toBe(true);
+    expect(resolveCodeImageKeywords('["AI代理", "工作流", "自动化"]')).toEqual(["AI代理", "工作流", "自动化"]);
+    expect(resolveCodeImageKeywords(null)).toEqual([]);
   });
 
   it("制作三张图片并回写独立元数据、封面候选和人工正文", async () => {

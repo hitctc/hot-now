@@ -11,15 +11,16 @@ export type CodeImageCardRenderInput = {
   logoDataUri?: string;
 };
 
-const CANVAS_SIZE: Record<CodeImageCardVariant, { width: number; height: number }> = {
+const LOGICAL_CANVAS_SIZE: Record<CodeImageCardVariant, { width: number; height: number }> = {
   "2.5:1": { width: 750, height: 300 },
   "1:1": { width: 750, height: 750 },
   "3:4": { width: 750, height: 1000 },
 };
+const OUTPUT_SCALE = 2;
 
 /** 将品牌模板渲染为压缩 PNG；所有文字和装饰均来自输入数据，不调用外部模型。 */
 export async function renderCodeImageCard(input: CodeImageCardRenderInput): Promise<Buffer> {
-  const size = CANVAS_SIZE[input.variant];
+  const size = getCodeImageCardLogicalSize(input.variant);
   const svg = buildSvg(input, size.width, size.height);
   return sharp(Buffer.from(svg))
     .png({ compressionLevel: 9, adaptiveFiltering: true, effort: 9 })
@@ -28,7 +29,13 @@ export async function renderCodeImageCard(input: CodeImageCardRenderInput): Prom
 
 /** 返回固定比例的输出尺寸，供元数据和测试复用。 */
 export function getCodeImageCardSize(variant: CodeImageCardVariant): { width: number; height: number } {
-  return CANVAS_SIZE[variant];
+  const size = getCodeImageCardLogicalSize(variant);
+  return { width: size.width * OUTPUT_SCALE, height: size.height * OUTPUT_SCALE };
+}
+
+/** 返回 SVG 排版使用的逻辑尺寸，供渲染器内部保持原有比例和坐标。 */
+function getCodeImageCardLogicalSize(variant: CodeImageCardVariant): { width: number; height: number } {
+  return LOGICAL_CANVAS_SIZE[variant];
 }
 
 /** 按三种画布比例排布标题、核心文案和标签，保证主体内容占据主要视觉区域。 */
@@ -54,10 +61,10 @@ function buildSvg(input: CodeImageCardRenderInput, width: number, height: number
   const logoMarkup = input.logoDataUri
     ? `<image href="${input.logoDataUri}" x="${width - margin - 34}" y="${logoY - 23}" width="24" height="24" preserveAspectRatio="xMidYMid meet"/><text x="${width - margin - 4}" y="${logoY - 5}" text-anchor="end" class="logo">HotNow</text>`
     : `<text x="${width - margin}" y="${logoY}" text-anchor="end" class="logo">HotNow</text>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width * OUTPUT_SCALE}" height="${height * OUTPUT_SCALE}" viewBox="0 0 ${width} ${height}">
   <rect width="${width}" height="${height}" fill="#f8f5ff"/>
   <circle cx="${width - margin * 0.7}" cy="${margin * 0.8}" r="${Math.max(34, Math.round(width * 0.08))}" fill="#caa9fa" opacity="0.28"/>
-  <path d="M${margin} ${height - margin * 0.8} H${Math.round(width * 0.38)}" stroke="#d8c0fc" stroke-width="3" stroke-linecap="round"/>
+  <path d="M${margin} ${input.variant === "2.5:1" ? height - 14 : height - margin * 0.8} H${Math.round(width * 0.38)}" stroke="#d8c0fc" stroke-width="3" stroke-linecap="round"/>
   <path d="M${Math.round(width * 0.68)} ${margin * 0.7} H${width - margin}" stroke="#e7c79a" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
   <style>
     text { font-family: "Noto Sans SC", "PingFang SC", sans-serif; fill: #1a1525; }
@@ -91,11 +98,14 @@ function renderKeywordTags(keywords: string[], x: number, y: number): string {
 function fitText(text: string, maxWidth: number, initialSize: number, maxLines: number, minSize: number): string[] {
   for (let size = initialSize; size >= minSize; size -= 2) {
     const lines = wrapText(text, maxWidth, size);
-    if (lines.length <= maxLines) return lines;
+    if (lines.length <= maxLines && lines.every((line) => measureTextWidth(line, size) <= maxWidth)) return lines;
   }
   const lines = wrapText(text, maxWidth, minSize).slice(0, maxLines);
-  if (lines.length > 0) lines[lines.length - 1] = `${truncateByWidth(lines[lines.length - 1], maxWidth - 20, minSize)}…`;
-  return lines;
+  return lines.map((line, index) => {
+    const limit = index === lines.length - 1 ? maxWidth - measureTextWidth("…", minSize) : maxWidth;
+    const safeLine = truncateByWidth(line, limit, minSize);
+    return index === lines.length - 1 ? `${safeLine}…` : safeLine;
+  });
 }
 
 /** 按中英文字符宽度换行，并保持中文标点跟随前一行，避免出现孤立标点。 */
@@ -134,12 +144,17 @@ function truncateByWidth(text: string, maxWidth: number, fontSize: number): stri
   let result = "";
   let width = 0;
   for (const char of text.trim()) {
-    const charWidth = /[\x00-\xff]/.test(char) ? fontSize * 0.55 : fontSize;
+    const charWidth = measureTextWidth(char, fontSize);
     if (width + charWidth > maxWidth) break;
     result += char;
     width += charWidth;
   }
   return result || text.trim().slice(0, 1);
+}
+
+/** 使用与换行一致的字符宽度估算，作为 SVG 文本不越界的保守上限。 */
+function measureTextWidth(text: string, fontSize: number): number {
+  return [...text].reduce((total, char) => total + (/[\x00-\xff]/.test(char) ? fontSize * 0.55 : fontSize), 0);
 }
 
 function escapeXml(value: string): string {

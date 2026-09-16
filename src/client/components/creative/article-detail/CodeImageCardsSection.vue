@@ -98,7 +98,7 @@ function statusClass(card: CodeImageCard | null): string {
               <span class="text-xs font-semibold text-editorial-text-main">{{ item.label }}</span>
               <span :class="['text-[10px]', statusClass(item.card)]">{{ statusLabel(item.card) }}</span>
             </div>
-            <div class="text-[10px] text-editorial-text-muted">{{ item.usage }} · {{ item.card?.width ?? (item.key === '2.5:1' ? 750 : 750) }} × {{ item.card?.height ?? (item.key === '2.5:1' ? 300 : item.key === '1:1' ? 750 : 1000) }}</div>
+            <div class="text-[10px] text-editorial-text-muted">{{ item.usage }} · {{ item.card?.width ?? 1500 }} × {{ item.card?.height ?? (item.key === '2.5:1' ? 600 : item.key === '1:1' ? 1500 : 2000) }}</div>
             <div v-if="item.card?.url" class="flex flex-wrap gap-2 pt-1">
               <a :href="item.card.url" :download="`hotnow-${item.key.replace(':', '-')}.png`" target="_blank" rel="noreferrer" class="text-[11px] text-editorial-link-active hover:underline">下载 PNG</a>
               <button type="button" class="text-[11px] text-editorial-link-active hover:underline" @click="emit('copy-url', item.card?.url ?? '')">复制图片地址</button>

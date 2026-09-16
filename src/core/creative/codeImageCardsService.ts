@@ -27,7 +27,6 @@ export type GenerateCodeImageCardsOptions = {
   imageDir: string;
   publicBaseUrl: string;
   logoPath?: string;
-  fontPath?: string;
   mode?: CodeImageCardsGenerationMode;
 };
 
@@ -132,10 +131,7 @@ async function runCodeImageCards(
     };
   }
 
-  const [logoDataUri, fontDataUri] = await Promise.all([
-    readLogoDataUri(options.logoPath),
-    readFontDataUri(options.fontPath),
-  ]);
+  const logoDataUri = await readLogoDataUri(options.logoPath);
   const runningCards = mergeCardStates(existing, targets.map((variant) => {
     const size = getCodeImageCardSize(variant);
     const current = findCodeImageCard(existing, variant);
@@ -156,7 +152,7 @@ async function runCodeImageCards(
 
   const rendered = await Promise.all(targets.map(async (variant) => {
     try {
-      const buffer = await renderCodeImageCard({ variant, title, thesis, keywords, logoDataUri, fontDataUri });
+      const buffer = await renderCodeImageCard({ variant, title, thesis, keywords, logoDataUri });
       const stored = await storeImageBuffer(options.imageDir, buffer, ".png");
       const size = getCodeImageCardSize(variant);
       const publicUrl = options.publicBaseUrl ? `${options.publicBaseUrl}${stored.urlPath}` : stored.urlPath;
@@ -282,17 +278,6 @@ async function readLogoDataUri(logoPath: string | undefined): Promise<string | u
   try {
     const buffer = await readFile(logoPath);
     return `data:image/png;base64,${buffer.toString("base64")}`;
-  } catch {
-    return undefined;
-  }
-}
-
-/** 读取随应用部署的中文字体并嵌入 SVG，避免生产服务器缺少 CJK 字体导致乱码。 */
-async function readFontDataUri(fontPath: string | undefined): Promise<string | undefined> {
-  if (!fontPath) return undefined;
-  try {
-    const buffer = await readFile(fontPath);
-    return `data:font/otf;base64,${buffer.toString("base64")}`;
   } catch {
     return undefined;
   }

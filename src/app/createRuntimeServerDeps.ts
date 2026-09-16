@@ -392,7 +392,6 @@ export function createRuntimeServerDeps(input: RuntimeServerDepsInput): ServerDe
   // 创作图片与数据库同目录，保持既有持久化位置。
   const creativeImageDir = path.join(path.dirname(config.database.file), "creative-images");
   const codeImageLogoPath = path.join(process.cwd(), "src/server/public/brand/hotnow-logo-mark.png");
-  const codeImageFontPath = path.join(process.cwd(), "src/server/public/fonts/NotoSansSC-Regular.otf");
 
   return {
   db,
@@ -404,7 +403,6 @@ export function createRuntimeServerDeps(input: RuntimeServerDepsInput): ServerDe
       imageDir: creativeImageDir,
       publicBaseUrl: (config.publicBaseUrl ?? "").replace(/\/+$/, ""),
       logoPath: codeImageLogoPath,
-      fontPath: codeImageFontPath,
       mode,
     }),
     config,

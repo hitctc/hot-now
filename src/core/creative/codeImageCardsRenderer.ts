@@ -1,3 +1,4 @@
+import "../runtime/configureFontconfig.js";
 import sharp from "sharp";
 
 import type { CodeImageCardVariant } from "./codeImageCards.js";
@@ -8,7 +9,6 @@ export type CodeImageCardRenderInput = {
   thesis: string;
   keywords: string[];
   logoDataUri?: string;
-  fontDataUri?: string;
 };
 
 const CANVAS_SIZE: Record<CodeImageCardVariant, { width: number; height: number }> = {
@@ -51,18 +51,13 @@ function buildSvg(input: CodeImageCardRenderInput, width: number, height: number
   const logoMarkup = input.logoDataUri
     ? `<image href="${input.logoDataUri}" x="${width - margin - 34}" y="${logoY - 23}" width="24" height="24" preserveAspectRatio="xMidYMid meet"/><text x="${width - margin - 4}" y="${logoY - 5}" text-anchor="end" class="logo">HotNow</text>`
     : `<text x="${width - margin}" y="${logoY}" text-anchor="end" class="logo">HotNow</text>`;
-  const embeddedFont = input.fontDataUri
-    ? `@font-face { font-family: "HotNow CJK"; src: url("${input.fontDataUri}"); font-weight: 400; }`
-    : "";
-
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
   <rect width="${width}" height="${height}" fill="#f8f5ff"/>
   <circle cx="${width - margin * 0.7}" cy="${margin * 0.8}" r="${Math.max(34, Math.round(width * 0.08))}" fill="#caa9fa" opacity="0.28"/>
   <path d="M${margin} ${height - margin * 0.8} H${Math.round(width * 0.38)}" stroke="#d8c0fc" stroke-width="3" stroke-linecap="round"/>
   <path d="M${Math.round(width * 0.68)} ${margin * 0.7} H${width - margin}" stroke="#e7c79a" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
   <style>
-    ${embeddedFont}
-    text { font-family: "HotNow CJK", "PingFang SC", "Noto Sans SC", sans-serif; fill: #1a1525; }
+    text { font-family: "Noto Sans SC", "PingFang SC", sans-serif; fill: #1a1525; }
     .title { font-weight: 700; letter-spacing: -0.8px; }
     .thesis { font-weight: 400; fill: #51445f; }
     .keyword { font-weight: 400; fill: #5b3c86; }

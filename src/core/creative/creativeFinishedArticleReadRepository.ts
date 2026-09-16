@@ -25,6 +25,7 @@ const SELECT_COLUMNS = `
   summary_100,
   images_json,
   code_image_cards,
+  code_image_keywords,
   cover_image_url,
   cover_image_index,
   title_index,
@@ -98,6 +99,7 @@ const LIST_SELECT_COLUMNS = `
   NULL AS summary_100,
   NULL AS images_json,
   code_image_cards,
+  NULL AS code_image_keywords,
   cover_image_url,
   cover_image_index,
   title_index,
@@ -200,6 +202,7 @@ type ArticleRow = {
   summary_index: number;
   images_json: string | null;
   code_image_cards: string | null;
+  code_image_keywords: string | null;
   cover_image_url: string | null;
   cover_image_index: number;
   title_index: number;
@@ -295,6 +298,7 @@ function mapRow(row: ArticleRow): CreativeFinishedArticleRecord {
     imagesJson: row.images_json ? JSON.parse(row.images_json) : null,
     images: row.images_json ? JSON.parse(row.images_json) : null,
     codeImageCards: parseCodeImageCards(row.code_image_cards),
+    codeImageKeywords: parseSummary100(row.code_image_keywords),
     coverImage: parseCoverImages(row.cover_image_url),
     coverImageIndex: row.cover_image_index ?? 0,
     titleIndex: row.title_index ?? 0,

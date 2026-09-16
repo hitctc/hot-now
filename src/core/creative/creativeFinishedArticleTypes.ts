@@ -40,6 +40,7 @@ export type CreativeFinishedArticleRecord = {
   hooks: string[] | null;
   quotes: string[] | null;
   summary100: string[] | null;
+  codeImageKeywords: string[] | null;
   imagesJson: unknown[] | null;
   images: unknown[] | null;
   codeImageCards: CodeImageCard[];
@@ -112,6 +113,7 @@ export type InsertCreativeFinishedArticleInput = {
   hooks?: string[];
   quotes?: string[];
   summary100?: string[];
+  codeImageKeywords?: string[];
   images?: unknown[];
   coverImage?: string[];
   rawResponseText?: string;
@@ -163,6 +165,7 @@ export type EditCreativeFinishedArticleInput = {
   quotes?: string[];
   summary100?: string[];
   summaryIndex?: number;
+  codeImageKeywords?: string[];
   images?: unknown[];
   codeImageCards?: CodeImageCard[];
   coverImage?: string[];

@@ -57,6 +57,9 @@ export function registerCreativeFinishedArticleCrudRoutes(context: CreativeFinis
       mode: typeof body?.mode === "string" ? (body.mode as "A" | "B") : undefined,
       thesis: typeof body?.thesis === "string" ? body.thesis : undefined,
       intros: Array.isArray(body?.intros) ? body.intros as string[] : undefined,
+      codeImageKeywords: Array.isArray(body?.codeImageKeywords)
+        ? body.codeImageKeywords.filter((item): item is string => typeof item === "string")
+        : undefined,
       contentMarkdown,
       humanMarkdown: typeof body?.humanMarkdown === "string" ? body.humanMarkdown : (body?.humanMarkdown === null ? null : undefined),
       titles: Array.isArray(body?.titles) ? body.titles as string[] : undefined,
@@ -386,6 +389,9 @@ export function registerCreativeFinishedArticleCrudRoutes(context: CreativeFinis
       expectedUpdatedAt: typeof body?.expectedUpdatedAt === "string" ? body.expectedUpdatedAt : undefined,
       contentMarkdown: typeof body?.contentMarkdown === "string" ? body.contentMarkdown : undefined,
       humanMarkdown: typeof body?.humanMarkdown === "string" ? body.humanMarkdown : (body?.humanMarkdown === null ? null : undefined),
+      codeImageKeywords: Array.isArray(body?.codeImageKeywords)
+        ? body.codeImageKeywords.filter((item): item is string => typeof item === "string")
+        : undefined,
       thesis: typeof body?.thesis === "string" ? body.thesis : undefined,
       titles: Array.isArray(body?.titles) ? body.titles as string[] : undefined,
       hooks: Array.isArray(body?.hooks) ? body.hooks as string[] : undefined,

@@ -85,7 +85,7 @@ export function buildCodeImageSourceFingerprint(
   keywords: string[],
 ): string {
   return createHash("sha256")
-    .update(JSON.stringify({ title, thesis, keywords, template: "hotnow-code-card-v3", sizes: { wide: "1500x600", square: "1500x1500", portrait: "1500x2000" } }))
+    .update(JSON.stringify({ title, thesis, keywords, template: "hotnow-code-card-v4", sizes: { wide: "1500x600", square: "1500x1500", portrait: "1500x2000" } }))
     .digest("hex");
 }
 
@@ -108,9 +108,11 @@ export function resolveCodeImageThesis(
   return selected ? selected.replace(/^[|｜]\s*/, "") : title;
 }
 
-/** 从标题、判断和素材标签中整理图片使用的短关键词，完全在本地确定性完成。 */
-export function resolveCodeImageKeywords(tags: string | null): string[] {
-  return [...new Set(parseTags(tags).map((item) => shortenKeyword(item)).filter(Boolean))].slice(0, 3);
+/** 优先整理文章生成阶段的真实标签，其次读取素材标签；缺失时返回空数组。 */
+export function resolveCodeImageKeywords(articleKeywords: string[] | null, sourceTags: string | null): string[] {
+  const fromArticle = normalizeKeywords(articleKeywords ?? []);
+  const fromSource = normalizeKeywords(parseTags(sourceTags));
+  return (fromArticle.length > 0 ? fromArticle : fromSource).slice(0, 3);
 }
 
 async function runCodeImageCards(
@@ -126,7 +128,7 @@ async function runCodeImageCards(
   const title = selectedTitle(initial);
   const source = initial.sourceItemId ? findCreativeSourceItemById(db, initial.sourceItemId) : null;
   const thesis = resolveCodeImageThesis(initial, title, source?.summary ?? null);
-  const keywords = resolveCodeImageKeywords(source?.tags ?? null);
+  const keywords = resolveCodeImageKeywords(initial.codeImageKeywords, source?.tags ?? null);
   const fingerprint = buildCodeImageSourceFingerprint(title, thesis, keywords);
   const existing = orderCodeImageCards(initial.codeImageCards);
   const mode = options.mode ?? "missing";
@@ -309,6 +311,10 @@ function parseTags(raw: string | null): string[] {
     // 兼容历史数据中的逗号、顿号和井号分隔文本。
   }
   return raw.split(/[、,，|｜#\n]/).map((item) => item.trim()).filter(Boolean);
+}
+
+function normalizeKeywords(values: string[]): string[] {
+  return [...new Set(values.map((item) => shortenKeyword(item)).filter(Boolean))];
 }
 
 function shortenKeyword(value: string): string {

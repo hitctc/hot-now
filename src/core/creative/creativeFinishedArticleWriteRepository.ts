@@ -32,6 +32,7 @@ export function insertCreativeFinishedArticle(
         hooks,
         quotes,
         summary_100,
+        code_image_keywords,
         images_json,
         cover_image_url,
         cover_image_prompt,
@@ -70,7 +71,7 @@ export function insertCreativeFinishedArticle(
         human_markdown,
         origin_type
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
   ).run(
     input.sourceItemId,
@@ -82,6 +83,7 @@ export function insertCreativeFinishedArticle(
     input.hooks ? JSON.stringify(input.hooks) : null,
     input.quotes ? JSON.stringify(input.quotes) : null,
     input.summary100 ? JSON.stringify(input.summary100) : null,
+    input.codeImageKeywords ? JSON.stringify(input.codeImageKeywords) : null,
     input.images ? JSON.stringify(input.images) : null,
     input.coverImage ? JSON.stringify(input.coverImage) : null,
     input.coverImagePrompt ?? null,
@@ -290,6 +292,10 @@ export function editCreativeFinishedArticle(
   if (input.summary100 !== undefined) {
     setClauses.push("summary_100 = ?");
     params.push(JSON.stringify(input.summary100));
+  }
+  if (input.codeImageKeywords !== undefined) {
+    setClauses.push("code_image_keywords = ?");
+    params.push(JSON.stringify(input.codeImageKeywords));
   }
   if (input.images !== undefined) {
     setClauses.push("images_json = ?");

@@ -73,15 +73,27 @@ function buildSvg(input: CodeImageCardRenderInput, width: number, height: number
     .keyword { font-weight: 400; fill: #5b3c86; }
     .logo { font-size: 18px; font-weight: 400; letter-spacing: 0.4px; }
   </style>
-  ${renderTextLines(titleLines, margin, titleY, titleSize, "title", 1.16)}
-  ${renderTextLines(thesisLines, margin, thesisY, thesisSize, "thesis", 1.35)}
+  ${renderTextLines(titleLines, margin, titleY, titleSize, "title", 1.16, width - margin * 2)}
+  ${renderTextLines(thesisLines, margin, thesisY, thesisSize, "thesis", 1.35, width - margin * 2)}
   ${keywordMarkup}
   ${logoMarkup}
 </svg>`;
 }
 
-function renderTextLines(lines: string[], x: number, y: number, fontSize: number, className: string, lineHeight: number): string {
-  return lines.map((line, index) => `<text x="${x}" y="${Math.round(y + index * fontSize * lineHeight)}" font-size="${fontSize}" class="${className}" dominant-baseline="hanging">${escapeXml(line)}</text>`).join("");
+/** 渲染文本行并显式约束 SVG 实际字宽，避免字体引擎差异造成横向裁切。 */
+function renderTextLines(
+  lines: string[],
+  x: number,
+  y: number,
+  fontSize: number,
+  className: string,
+  lineHeight: number,
+  maxWidth: number,
+): string {
+  return lines.map((line, index) => {
+    const textLength = Math.min(measureTextWidth(line, fontSize), maxWidth);
+    return `<text x="${x}" y="${Math.round(y + index * fontSize * lineHeight)}" font-size="${fontSize}" textLength="${Math.round(textLength)}" lengthAdjust="spacingAndGlyphs" class="${className}" dominant-baseline="hanging">${escapeXml(line)}</text>`;
+  }).join("");
 }
 
 function renderKeywordTags(keywords: string[], x: number, y: number): string {

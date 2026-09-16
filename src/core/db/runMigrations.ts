@@ -18,9 +18,10 @@ import { creativeAutomationMasterSwitchMigration } from "./migrations/050_creati
 import { finishedArticlesCodeImageCardsMigration } from "./migrations/051_finished_articles_code_image_cards.js";
 import { refreshCodeImageCardsTemplateMigration } from "./migrations/052_refresh_code_image_cards_template.js";
 import { refreshCodeImageCardsFontconfigMigration } from "./migrations/053_refresh_code_image_cards_fontconfig.js";
+import { finishedArticlesCodeImageKeywordsMigration } from "./migrations/054_finished_articles_code_image_keywords.js";
 import { applyLegacyMigrations014To047 } from "./legacyMigrations014To047.js";
 
-const schemaVersion = 53;
+const schemaVersion = 54;
 
 export function runMigrations(db: SqliteDatabase): void {
   // Migrations stay idempotent because existing local SQLite files must be upgraded in place
@@ -195,6 +196,12 @@ export function runMigrations(db: SqliteDatabase): void {
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(
       refreshCodeImageCardsFontconfigMigration.version,
       refreshCodeImageCardsFontconfigMigration.name
+    );
+
+    finishedArticlesCodeImageKeywordsMigration.apply(db);
+    db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(
+      finishedArticlesCodeImageKeywordsMigration.version,
+      finishedArticlesCodeImageKeywordsMigration.name
     );
 
     db.pragma(`user_version = ${schemaVersion}`);

@@ -68,8 +68,9 @@ describe("短内容代码制图", () => {
   });
 
   it("优先使用素材标签，缺失时确定性提取关键词", () => {
-    expect(resolveCodeImageKeywords('["AI代理", "工作流", "自动化"]')).toEqual(["AI代理", "工作流", "自动化"]);
-    expect(resolveCodeImageKeywords(null)).toEqual([]);
+    expect(resolveCodeImageKeywords(["文章标签"], '["素材标签"]')).toEqual(["文章标签"]);
+    expect(resolveCodeImageKeywords([], '["素材标签"]')).toEqual(["素材标签"]);
+    expect(resolveCodeImageKeywords(null, null)).toEqual([]);
   });
 
   it("制作三张图片并回写独立元数据、封面候选和人工正文", async () => {
@@ -89,6 +90,7 @@ describe("短内容代码制图", () => {
       direction: "short_content",
       titles: ["AI 代理正在重写工作流"],
       thesis: "真正的变化来自工作流程，而不是单个工具。",
+      codeImageKeywords: ["文章标签", "工作流"],
       contentMarkdown: "# AI 代理正在重写工作流\n\n正文内容足够长，满足短内容成品的最小正文长度要求。",
       humanMarkdown: "# AI 代理正在重写工作流\n\n正文内容足够长，满足短内容成品的最小正文长度要求。",
       status: "ready_for_publish",
@@ -104,6 +106,7 @@ describe("短内容代码制图", () => {
     const saved = findCreativeFinishedArticleById(handle.db, article.id)!;
     expect(saved.codeImageCards).toHaveLength(3);
     expect(saved.codeImageCards.every((card) => card.status === "succeeded")).toBe(true);
+    expect(saved.codeImageKeywords).toEqual(["文章标签", "工作流"]);
     expect(saved.coverImage).toHaveLength(3);
     expect(saved.coverImageIndex).toBe(0);
     expect(saved.humanMarkdown).toContain("封面图｜HotNow 2.5:1 横图");

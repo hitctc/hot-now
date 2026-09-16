@@ -114,7 +114,7 @@
 
 成品正文编辑的 AI 草稿与人工发布内容分别保存；自动保存不得触发父页面详情刷新，成功响应必须同步服务端 `updatedAt`。图片回写与正文编辑并发时，必须保留已落库的图片 Markdown 槽位并清理对应图片描述，不能只看 `images_json` 是否已有 URL；异步图片回写必须携带文章版本，遇到 `article-revision-conflict` 要基于最新正文重试，前端只替换目标图片槽位，不能用旧整篇正文覆盖用户编辑。
 
-短内容代码图片独立于文章状态机，接口为 `/api/creative/finished-articles/:id/code-images`（Hermes token）和 `/actions/creative/finished-articles/:id/code-images`（页面 session）；图片文件沿用 `/api/creative/images/<date>/<uuid>.png`，标题、核心判断、导语/摘要或选中标题变化会将已有代码图片标记为 `stale`，普通正文段落变化不触发重做。卡片排版必须用换行阶段实际选中的字号绘制，禁止按初始字号渲染缩小后的文案行；短内容详情弹窗在「备选标题」下方展示 `codeImageKeywords`，没有标签时也保留该区域。
+短内容代码图片独立于文章状态机，接口为 `/api/creative/finished-articles/:id/code-images`（Hermes token）和 `/actions/creative/finished-articles/:id/code-images`（页面 session）；图片文件沿用 `/api/creative/images/<date>/<uuid>.png`，标题、核心判断、导语/摘要、标签或选中标题变化会将已有代码图片标记为 `stale`，普通正文段落变化不触发重做。卡片排版必须用换行阶段实际选中的字号绘制，禁止按初始字号渲染缩小后的文案行；短内容详情弹窗在「备选标题」下方展示 `codeImageKeywords`，没有标签时也保留该区域，并可通过 `/api/creative/finished-articles/:id/regen-code-image-keywords` 代理 Hermes 覆盖生成（仅短内容）。制作图片不限次数，每次整组重做三张。
 
 ### Hermes 自动化边界（强约束）
 
@@ -180,7 +180,7 @@ SQLite 可靠性约定：
 5. 进入 `/settings/sources` 或 legacy `/control`，先手动执行一次普通 RSS 采集；如果已配置 `TWITTER_API_KEY`，再到 `/settings/sources` 的 Twitter 分区单独执行一次 Twitter 账号采集，并确认账号“最近成功 / 最近结果”回写；如需验证关键词搜索、Hacker News、B站、微信公众号 RSS 或微博热搜，分别使用该页对应手动入口并在 `/ai-new`、`/ai-hot` 检查结果可见性。AI 时间线页面当前下架，只验证 `AI_TIMELINE_FEED_URL` 或默认 `https://now.achuan.cc/feeds/ai-timeline-feed.md` 可访问且包含 `json ai-timeline-feed`，以及相关 API 返回有效数据；需要验证发信时，再单独触发一次“发送最新报告”
 6. 检查是否生成报告目录与 `report.json`、`report.html`、`run-meta.json`
 7. 检查 `/`、`/ai-new`、`/ai-hot`、`/settings/view-rules`、`/settings/sources`、`/settings/wechat-mp`、`/settings/profile`、`/history`、`/reports/:date` 是否正常显示，并验证内容页 source 过滤条、共享排序切换、共享标题搜索、内容页策略摘要、内容卡片反馈面板、反馈池和 LLM 设置占位文案
-8. 在 `/creative/short-finished-articles` 打开一篇短内容，点击“制作图片”，确认三种比例均生成、正文开头出现三条图片 Markdown、封面候选可见；再次点击“重新制作图片”应仍可整组重做，且只更新当前引用、保留旧文件
+8. 在 `/creative/short-finished-articles` 打开一篇短内容，确认「备选标题」下方展示代码图片标签（无标签时保留区域并可点“生成标签”），点击“制作图片”确认三种比例均生成、正文开头出现三条图片 Markdown、封面候选可见；再次点击“重新制作图片”应仍可整组重做，且只更新当前引用、保留旧文件；点“重新生成标签”并确认后应覆盖标签并把已有图片标为需重做
 
 ## 6. 配置与安全约束
 

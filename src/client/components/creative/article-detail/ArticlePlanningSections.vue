@@ -17,6 +17,7 @@ const props = defineProps<{
   activeIntroIndex: number;
   regenIntroLoading: boolean;
   displaySummaries: string[];
+  regenCodeImageKeywordsLoading: boolean;
   titleCandidateAt: (index: number) => ArticleTitleCandidate | null;
 }>();
 
@@ -32,6 +33,7 @@ const emit = defineEmits<{
   (event: "update:editing-title-value", value: string): void;
   (event: "regenerate-intro"): void;
   (event: "select-intro", index: number): void;
+  (event: "regenerate-code-image-keywords"): void;
 }>();
 
 /** 主审核标记沿用历史文案；多标记列表仍显示代码，方便定位规则来源。 */
@@ -181,13 +183,42 @@ watch(() => props.editingTitleIndex, (index) => {
         <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">代码图片标签</h3>
         <p class="mb-0 mt-1 text-[11px] text-editorial-text-muted">写作阶段产出，代码图片优先使用这些标签；没有标签时图片不显示标签区域。</p>
       </div>
-      <a-button
-        v-if="(article.codeImageKeywords?.length ?? 0) > 0"
-        type="link"
-        size="small"
-        class="!h-auto !px-2 !py-1 !text-[11px]"
-        @click="emit('copy', (article.codeImageKeywords ?? []).join('、'))"
-      >复制</a-button>
+      <div v-if="!readonly" class="flex items-center gap-3">
+        <!-- 已有标签时先确认再覆盖，避免误点丢掉手工认可的标签。 -->
+        <a-popconfirm
+          v-if="(article.codeImageKeywords?.length ?? 0) > 0"
+          title="重新生成会覆盖当前标签，确定继续？"
+          ok-text="覆盖生成"
+          cancel-text="取消"
+          @confirm="emit('regenerate-code-image-keywords')"
+        >
+          <a-button
+            type="link"
+            size="small"
+            class="!h-auto !px-2 !py-1 !text-[11px]"
+            :loading="regenCodeImageKeywordsLoading"
+            :disabled="regenCodeImageKeywordsLoading"
+            data-code-image-keywords-regenerate
+          >{{ regenCodeImageKeywordsLoading ? '生成中...' : '重新生成标签' }}</a-button>
+        </a-popconfirm>
+        <a-button
+          v-else
+          type="link"
+          size="small"
+          class="!h-auto !px-2 !py-1 !text-[11px]"
+          :loading="regenCodeImageKeywordsLoading"
+          :disabled="regenCodeImageKeywordsLoading"
+          data-code-image-keywords-generate
+          @click="emit('regenerate-code-image-keywords')"
+        >{{ regenCodeImageKeywordsLoading ? '生成中...' : '生成标签' }}</a-button>
+        <a-button
+          v-if="(article.codeImageKeywords?.length ?? 0) > 0"
+          type="link"
+          size="small"
+          class="!h-auto !px-2 !py-1 !text-[11px]"
+          @click="emit('copy', (article.codeImageKeywords ?? []).join('、'))"
+        >复制</a-button>
+      </div>
     </div>
     <div v-if="(article.codeImageKeywords?.length ?? 0) > 0" class="flex flex-wrap gap-2">
       <span
@@ -196,7 +227,7 @@ watch(() => props.editingTitleIndex, (index) => {
         class="rounded-full bg-editorial-surface-muted px-2.5 py-1 text-xs text-editorial-text-main"
       >{{ keyword }}</span>
     </div>
-    <p v-else class="m-0 rounded-editorial-sm border border-dashed border-editorial-border px-3 py-2 text-xs text-editorial-text-muted">暂无标签：写作阶段未产出标签，代码图片会省略标签区域，不会用标题拆词代替。</p>
+    <p v-else class="m-0 rounded-editorial-sm border border-dashed border-editorial-border px-3 py-2 text-xs text-editorial-text-muted">暂无标签：可点击“生成标签”让 Hermes 重新提取。代码图片会省略标签区域，不会用标题拆词代替。</p>
   </section>
 
   <!-- 核心立意（只读） -->

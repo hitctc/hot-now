@@ -459,6 +459,23 @@ export function regenSummary(id: number): Promise<RegenSummaryResult> {
   });
 }
 
+export type RegenCodeImageKeywordsResult = {
+  ok: boolean;
+  keywords?: string[];
+  article?: CreativeFinishedArticle;
+  reason?: string;
+};
+
+/**
+ * 手动重新生成短内容代码图片标签。
+ * 服务端代理 Hermes 生成并覆盖回写；返回最新成品，供页面同步标签和图片过期状态。
+ */
+export function regenCodeImageKeywords(id: number): Promise<RegenCodeImageKeywordsResult> {
+  return requestJson<RegenCodeImageKeywordsResult>(`/api/creative/finished-articles/${id}/regen-code-image-keywords`, {
+    method: "POST",
+  });
+}
+
 export type RegenInlineImageResult = {
   ok: boolean;
   imageUrl?: string;

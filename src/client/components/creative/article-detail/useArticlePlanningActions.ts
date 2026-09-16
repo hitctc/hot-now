@@ -3,6 +3,7 @@ import { message } from "ant-design-vue";
 
 import {
   editFinishedArticle,
+  regenCodeImageKeywords,
   regenIntro,
   regenTitle,
   type CreativeFinishedArticle,
@@ -59,6 +60,7 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
   const regenIntroLoading = ref(false);
   const activeIntroIndex = ref(0);
   const localIntros = ref<string[]>([]);
+  const regenCodeImageKeywordsLoading = ref(false);
 
   const displayTitles = computed(() => {
     return localTitles.value.length > 0 ? localTitles.value : parseJsonArray(getArticle()?.titles ?? null);
@@ -379,6 +381,32 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
     }
   }
 
+  /**
+   * 手动重新生成代码图片标签。
+   * 标签会改变图片上的文字，服务端会把已有图片标记为过期，这里同步服务端返回的最新成品。
+   */
+  async function handleRegenCodeImageKeywords(): Promise<void> {
+    const article = getArticle();
+    if (!article || regenCodeImageKeywordsLoading.value) return;
+    regenCodeImageKeywordsLoading.value = true;
+    try {
+      const result = await regenCodeImageKeywords(article.id);
+      if (result.article) {
+        Object.assign(article, result.article);
+      } else if (result.keywords) {
+        article.codeImageKeywords = result.keywords;
+      }
+      const keywords = result.article?.codeImageKeywords ?? result.keywords ?? [];
+      message.success(keywords.length > 0
+        ? `已生成 ${keywords.length} 个标签，代码图片需重新制作`
+        : "标签生成完成，未产出可用标签");
+    } catch {
+      message.error("标签生成请求失败");
+    } finally {
+      regenCodeImageKeywordsLoading.value = false;
+    }
+  }
+
   return {
     manualTitle,
     regenTitleLoading,
@@ -403,6 +431,8 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
     displaySummaries,
     handleRegenIntro,
     selectIntro,
+    regenCodeImageKeywordsLoading,
+    handleRegenCodeImageKeywords,
     getLastSavedContent,
     getLastSavedHuman,
     setLastSavedContent,

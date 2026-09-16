@@ -190,6 +190,13 @@ export function registerCreativeFinishedArticleCrudRoutes(context: CreativeFinis
       editInput.summaryIndex = body.summaryIndex;
       updatedFields.push("summaryIndex");
     }
+    // Hermes 生成代码图片标签后通过 PATCH 回写；非字符串项直接丢弃，避免脏数据进入制图。
+    if (body?.codeImageKeywords !== undefined) {
+      editInput.codeImageKeywords = Array.isArray(body.codeImageKeywords)
+        ? (body.codeImageKeywords as unknown[]).filter((item): item is string => typeof item === "string")
+        : [];
+      updatedFields.push("codeImageKeywords");
+    }
     if (body?.status !== undefined) { editInput.status = body.status; updatedFields.push("status"); }
     if (body?.anomalyReason !== undefined) { editInput.anomalyReason = body.anomalyReason; updatedFields.push("anomalyReason"); }
     if (body?.wechatThemeId !== undefined) { editInput.wechatThemeId = body.wechatThemeId; updatedFields.push("wechatThemeId"); }

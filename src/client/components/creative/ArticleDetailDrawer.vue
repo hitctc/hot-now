@@ -58,6 +58,7 @@
           :active-intro-index="activeIntroIndex"
           :regen-intro-loading="regenIntroLoading"
           :display-summaries="displaySummaries"
+          :regen-code-image-keywords-loading="regenCodeImageKeywordsLoading"
           :title-candidate-at="titleCandidateAt"
           @update:manual-title="manualTitle = $event"
           @save-manual-title="saveManualTitle"
@@ -70,6 +71,7 @@
           @update:editing-title-value="editingTitleValue = $event"
           @regenerate-intro="handleRegenIntro"
           @select-intro="selectIntro"
+          @regenerate-code-image-keywords="handleRegenCodeImageKeywords"
         />
 
         <ArticleSimilaritySection
@@ -461,6 +463,8 @@ const {
   displaySummaries,
   handleRegenIntro,
   selectIntro,
+  regenCodeImageKeywordsLoading,
+  handleRegenCodeImageKeywords,
 } = useArticlePlanningActions({
   getArticle: () => props.article,
   isManualArticle,

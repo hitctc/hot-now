@@ -230,9 +230,12 @@ export function editCreativeFinishedArticle(
   const setClauses: string[] = [];
   const params: unknown[] = [];
 
-  // 标题、核心判断或选中标题变化会改变图片上的事实，普通正文段落变化不触发重做。
+  // 标题、核心判断、选中标题或代码图片标签变化会改变图片上的文字，普通正文段落变化不触发重做。
   const codeImageSourceChanged = source !== "code-image"
-    && (input.thesis !== undefined || input.titles !== undefined || input.titleIndex !== undefined);
+    && (input.thesis !== undefined
+      || input.titles !== undefined
+      || input.titleIndex !== undefined
+      || input.codeImageKeywords !== undefined);
   if (codeImageSourceChanged && input.codeImageCards === undefined && current.codeImageCards.length > 0) {
     const staleCards: CodeImageCard[] = current.codeImageCards.map((card) => ({
       ...card,

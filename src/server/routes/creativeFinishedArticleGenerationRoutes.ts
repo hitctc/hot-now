@@ -477,4 +477,55 @@ export function registerCreativeFinishedArticleGenerationRoutes(context: Creativ
       return reply.code(502).send({ ok: false, reason: `Hermes 调用失败`, detail: errMessage });
     }
   });
+
+  /**
+   * 手动重新生成代码图片标签；只对短内容开放，标签由 Hermes 生成并覆盖回写。
+   * 覆盖语义：这是制图直接读取的最终标签，不做多候选，避免制图无法决定用哪一组。
+   */
+  app.post("/api/creative/finished-articles/:id/regen-code-image-keywords", async (request, reply) => {
+    const session = options.readSession(request, reply);
+    if (session === undefined) { return; }
+    if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
+
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const article = findCreativeFinishedArticleById(db, id);
+    if (!article) { return reply.code(404).send({ ok: false, reason: "article-not-found" }); }
+    if (article.direction !== "short_content") {
+      return reply.code(409).send({ ok: false, reason: "code-image-keywords-require-short-content" });
+    }
+
+    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+    const hermesApiToken = process.env.HERMES_API_TOKEN;
+    if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30_000);
+      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/regen-code-image-keywords`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
+        body: JSON.stringify({ articleId: id }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
+        return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, hermesResponse: errorBody });
+      }
+
+      const data = await res.json() as { success: boolean; keywords?: string[]; error?: string };
+      if (!data.success) {
+        return reply.code(502).send({ ok: false, reason: data.error ?? "代码图片标签生成失败", hermesResponse: JSON.stringify(data) });
+      }
+
+      // Hermes 已 PATCH 回写，这里重新读取最新成品，让页面同步标签和图片过期状态。
+      const updated = findCreativeFinishedArticleById(db, id) ?? article;
+      return reply.send({ ok: true, keywords: updated.codeImageKeywords ?? [], article: updated });
+    } catch (err) {
+      const errMessage = (err as Error).message ?? String(err);
+      if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "标签生成超时（>30s），Hermes 未响应", detail: errMessage }); }
+      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败`, detail: errMessage });
+    }
+  });
 }

@@ -103,9 +103,15 @@ function wrapText(text: string, maxWidth: number, fontSize: number): string[] {
   for (const char of normalized) {
     const charWidth = /[\x00-\xff]/.test(char) ? fontSize * 0.55 : fontSize;
     if (line && width + charWidth > maxWidth) {
-      lines.push(line);
-      line = char;
-      width = charWidth;
+      // 中文标点不单独起行；允许它轻微超出一字宽，优先保证阅读连续性。
+      if (isNonBreakingPunctuation(char)) {
+        line += char;
+        width += charWidth;
+      } else {
+        lines.push(line);
+        line = char;
+        width = charWidth;
+      }
     } else {
       line += char;
       width += charWidth;
@@ -113,6 +119,10 @@ function wrapText(text: string, maxWidth: number, fontSize: number): string[] {
   }
   if (line) lines.push(line);
   return lines;
+}
+
+function isNonBreakingPunctuation(char: string): boolean {
+  return "，。！？；：、）》】』”’」』】》〉〕］）)]}>".includes(char);
 }
 
 function truncateByWidth(text: string, maxWidth: number, fontSize: number): string {

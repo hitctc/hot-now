@@ -255,12 +255,17 @@ async function handleTogglePin(article: CreativeFinishedArticle): Promise<void> 
   }
 }
 
-/** 从列表单篇补做缺失代码图片，完成后刷新当前页以同步封面候选和状态。 */
+/** 已有图片的成品显示“重做图片”，避免用户以为只能制作一次。 */
+function codeImageActionLabel(article: CreativeFinishedArticle): string {
+  return article.codeImageCards?.some((card) => Boolean(card.url)) ? "重做图片" : "制作图片";
+}
+
+/** 从列表单篇制作代码图片；已制作过的会整组重做，完成后刷新当前页同步封面候选。 */
 async function handleGenerateCodeImages(article: CreativeFinishedArticle): Promise<void> {
   if (article.deletedAt || codeImageGeneratingArticleId.value !== null) return;
   codeImageGeneratingArticleId.value = article.id;
   try {
-    const result = await generateFinishedArticleCodeImages(article.id, "missing");
+    const result = await generateFinishedArticleCodeImages(article.id, "all");
     if (result.status === "succeeded") message.success("代码制图片已完成");
     else if (result.status === "partial") message.warning("部分代码制图片已完成，可打开详情补做");
     else if (result.status === "running") message.info("图片正在制作中，请稍后刷新");
@@ -766,7 +771,7 @@ const pagination = computed(() => ({
                 :disabled="codeImageGeneratingArticleId !== null && codeImageGeneratingArticleId !== record.id"
                 data-code-image-list-action
                 @click="handleGenerateCodeImages(record)"
-              >制作图片</a-button>
+              >{{ codeImageActionLabel(record) }}</a-button>
               <a-button size="small" type="link" class="!h-auto !text-[10px]" @click="handleTogglePin(record)">
                 {{ record.pinnedAt ? "取消置顶" : "置顶" }}
               </a-button>

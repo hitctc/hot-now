@@ -180,7 +180,7 @@ SQLite 可靠性约定：
 5. 进入 `/settings/sources` 或 legacy `/control`，先手动执行一次普通 RSS 采集；如果已配置 `TWITTER_API_KEY`，再到 `/settings/sources` 的 Twitter 分区单独执行一次 Twitter 账号采集，并确认账号“最近成功 / 最近结果”回写；如需验证关键词搜索、Hacker News、B站、微信公众号 RSS 或微博热搜，分别使用该页对应手动入口并在 `/ai-new`、`/ai-hot` 检查结果可见性。AI 时间线页面当前下架，只验证 `AI_TIMELINE_FEED_URL` 或默认 `https://now.achuan.cc/feeds/ai-timeline-feed.md` 可访问且包含 `json ai-timeline-feed`，以及相关 API 返回有效数据；需要验证发信时，再单独触发一次“发送最新报告”
 6. 检查是否生成报告目录与 `report.json`、`report.html`、`run-meta.json`
 7. 检查 `/`、`/ai-new`、`/ai-hot`、`/settings/view-rules`、`/settings/sources`、`/settings/wechat-mp`、`/settings/profile`、`/history`、`/reports/:date` 是否正常显示，并验证内容页 source 过滤条、共享排序切换、共享标题搜索、内容页策略摘要、内容卡片反馈面板、反馈池和 LLM 设置占位文案
-8. 在 `/creative/short-finished-articles` 打开一篇短内容，点击“制作图片”，确认三种比例均生成、正文开头出现三条图片 Markdown、封面候选可见；修改标题后应显示“内容已变化”，点击“重新制作图片”只更新当前引用并保留旧文件
+8. 在 `/creative/short-finished-articles` 打开一篇短内容，点击“制作图片”，确认三种比例均生成、正文开头出现三条图片 Markdown、封面候选可见；再次点击“重新制作图片”应仍可整组重做，且只更新当前引用、保留旧文件
 
 ## 6. 配置与安全约束
 

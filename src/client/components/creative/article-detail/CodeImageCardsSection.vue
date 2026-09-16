@@ -25,8 +25,9 @@ const cards = computed(() => variants.map((variant) => ({
   card: props.article.codeImageCards?.find((item) => item.variant === variant.key) ?? null,
 })));
 
-const hasStaleCard = computed(() => cards.value.some(({ card }) => card?.status === "stale"));
-const hasMissingCard = computed(() => cards.value.some(({ card }) => !card || card.status === "failed" || card.status === "pending"));
+// 只要任一比例已有图片就视为“已制作”，按钮文案据此切换；
+// 这里不再用“是否缺图”决定按钮可用性，否则三张都完成后就没有重做入口。
+const hasAnyCard = computed(() => cards.value.some(({ card }) => Boolean(card?.url)));
 
 /** 将单张图片状态翻译成页面可理解的短文案。 */
 function statusLabel(card: CodeImageCard | null): string {
@@ -56,22 +57,15 @@ function statusClass(card: CodeImageCard | null): string {
         <p class="m-0 mt-1 text-[11px] text-editorial-text-muted/80">三张图片会写入正文，也可直接下载作为封面候选。</p>
       </div>
       <div v-if="!readonly" class="flex flex-wrap gap-2">
+        <!-- 代码图片是本地确定性渲染，不消耗外部额度，因此不限制制作次数。 -->
         <a-button
-          v-if="hasStaleCard && !generating"
-          size="small"
-          type="primary"
-          data-code-image-regenerate
-          @click="emit('generate', 'all')"
-        >重新制作图片</a-button>
-        <a-button
-          v-else
           size="small"
           type="primary"
           :loading="generating"
-          :disabled="generating || !hasMissingCard"
-          data-code-image-generate
-          @click="emit('generate', 'missing')"
-        >{{ generating ? '制作中...' : '制作图片' }}</a-button>
+          :disabled="generating"
+          data-code-image-regenerate
+          @click="emit('generate', 'all')"
+        >{{ generating ? '制作中...' : (hasAnyCard ? '重新制作图片' : '制作图片') }}</a-button>
       </div>
     </div>
 

@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -22,16 +22,34 @@ afterEach(async () => {
 describe("短内容代码制图", () => {
   it("按三种比例导出清晰的 PNG", async () => {
     for (const variant of ["2.5:1", "1:1", "3:4"] as const) {
+      const fontDataUri = `data:font/otf;base64,${(await readFile(path.join(process.cwd(), "src/server/public/fonts/NotoSansSC-Regular.otf"))).toString("base64")}`;
       const buffer = await renderCodeImageCard({
         variant,
         title: "AI 产品正在改变普通人的工作方式",
         thesis: "真正的变化来自工作流程，而不是单个工具的功能列表。",
         keywords: ["AI产品", "工作流程", "效率"],
+        fontDataUri,
       });
       const metadata = await sharp(buffer).metadata();
       expect({ width: metadata.width, height: metadata.height }).toEqual(getCodeImageCardSize(variant));
       expect(metadata.format).toBe("png");
       expect(buffer.length).toBeGreaterThan(0);
+
+      const { data, info } = await sharp(buffer).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+      const darkPixels = (x: number, y: number): boolean => {
+        const offset = (y * info.width + x) * info.channels;
+        return data[offset] < 150 && data[offset + 1] < 140 && data[offset + 2] < 170;
+      };
+      const darkBounds = { top: info.height, bottom: -1 };
+      for (let y = 0; y < info.height; y += 1) {
+        for (let x = 0; x < Math.floor(info.width * 0.8); x += 1) {
+          if (darkPixels(x, y)) {
+            darkBounds.top = Math.min(darkBounds.top, y);
+            darkBounds.bottom = Math.max(darkBounds.bottom, y);
+          }
+        }
+      }
+      expect((darkBounds.bottom - darkBounds.top + 1) / info.height).toBeGreaterThan(0.4);
     }
   });
 
@@ -64,9 +82,11 @@ describe("短内容代码制图", () => {
       status: "ready_for_publish",
     });
 
+    const fontPath = path.join(process.cwd(), "src/server/public/fonts/NotoSansSC-Regular.otf");
     const result = await generateCodeImageCards(handle.db, article.id, {
       imageDir,
       publicBaseUrl: "https://now.example.com",
+      fontPath,
     });
 
     expect(result.ok).toBe(true);
@@ -83,6 +103,7 @@ describe("短内容代码制图", () => {
     const repeat = await generateCodeImageCards(handle.db, article.id, {
       imageDir,
       publicBaseUrl: "https://now.example.com",
+      fontPath,
     });
     expect(repeat.status).toBe("succeeded");
     const repeated = findCreativeFinishedArticleById(handle.db, article.id)!;
@@ -96,6 +117,7 @@ describe("短内容代码制图", () => {
     const regenerated = await generateCodeImageCards(handle.db, article.id, {
       imageDir,
       publicBaseUrl: "https://now.example.com",
+      fontPath,
       mode: "all",
     });
     expect(regenerated.status).toBe("succeeded");

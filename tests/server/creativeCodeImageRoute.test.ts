@@ -49,6 +49,7 @@ describe("短内容代码制图片路由", () => {
       generateCodeImageCards: (articleId, mode) => generateCodeImageCards(handle.db, articleId, {
         imageDir,
         publicBaseUrl: "https://now.example.com",
+        fontPath: path.join(process.cwd(), "src/server/public/fonts/NotoSansSC-Regular.otf"),
         mode,
       }),
     });

@@ -8,6 +8,7 @@ export type CodeImageCardRenderInput = {
   thesis: string;
   keywords: string[];
   logoDataUri?: string;
+  fontDataUri?: string;
 };
 
 const CANVAS_SIZE: Record<CodeImageCardVariant, { width: number; height: number }> = {
@@ -31,18 +32,18 @@ export function getCodeImageCardSize(variant: CodeImageCardVariant): { width: nu
 }
 
 function buildSvg(input: CodeImageCardRenderInput, width: number, height: number): string {
-  const margin = Math.round(width * 0.08);
-  const titleSize = input.variant === "2.5:1" ? 34 : 48;
-  const titleLines = fitText(input.title, width - margin * 2, titleSize, input.variant === "2.5:1" ? 2 : input.variant === "1:1" ? 3 : 4, 24);
-  const thesisLines = input.variant === "2.5:1"
-    ? fitText(input.thesis, width * 0.54, 18, 2, 14)
-    : fitText(input.thesis, width - margin * 2, 23, input.variant === "3:4" ? 4 : 3, 16);
-  const keywordLines = input.keywords.slice(0, 3).map((keyword) => truncateByWidth(keyword, 145, 17));
-  const titleY = input.variant === "2.5:1" ? Math.round(height * 0.18) : Math.round(height * 0.13);
-  const thesisY = input.variant === "2.5:1"
-    ? Math.round(height * 0.61)
-    : Math.round(height * (input.variant === "3:4" ? 0.42 : 0.58));
-  const keywordY = input.variant === "3:4" ? Math.round(height * 0.72) : Math.round(height * 0.78);
+  const margin = input.variant === "2.5:1" ? 42 : input.variant === "1:1" ? 58 : 64;
+  const titleSize = input.variant === "2.5:1" ? 42 : input.variant === "1:1" ? 54 : 56;
+  const titleMaxLines = input.variant === "2.5:1" ? 2 : input.variant === "1:1" ? 3 : 4;
+  const titleMinSize = input.variant === "2.5:1" ? 30 : 38;
+  const titleLines = fitText(input.title, width - margin * 2, titleSize, titleMaxLines, titleMinSize);
+  const thesisSize = input.variant === "2.5:1" ? 25 : 30;
+  const thesisMaxLines = input.variant === "2.5:1" ? 3 : input.variant === "3:4" ? 5 : 4;
+  const thesisLines = fitText(input.thesis, width - margin * 2, thesisSize, thesisMaxLines, 20);
+  const keywordLines = input.keywords.slice(0, 3).map((keyword) => truncateByWidth(keyword, 180, 20));
+  const titleY = input.variant === "2.5:1" ? 34 : input.variant === "1:1" ? 70 : 82;
+  const thesisY = input.variant === "2.5:1" ? 142 : input.variant === "1:1" ? 300 : 390;
+  const keywordY = input.variant === "3:4" ? 710 : 535;
   const logoY = height - Math.round(height * 0.09);
   const keywordMarkup = input.variant === "2.5:1"
     ? ""
@@ -50,6 +51,9 @@ function buildSvg(input: CodeImageCardRenderInput, width: number, height: number
   const logoMarkup = input.logoDataUri
     ? `<image href="${input.logoDataUri}" x="${width - margin - 34}" y="${logoY - 23}" width="24" height="24" preserveAspectRatio="xMidYMid meet"/><text x="${width - margin - 4}" y="${logoY - 5}" text-anchor="end" class="logo">HotNow</text>`
     : `<text x="${width - margin}" y="${logoY}" text-anchor="end" class="logo">HotNow</text>`;
+  const embeddedFont = input.fontDataUri
+    ? `@font-face { font-family: "HotNow CJK"; src: url("${input.fontDataUri}"); font-weight: 400; }`
+    : "";
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
   <rect width="${width}" height="${height}" fill="#f8f5ff"/>
@@ -57,14 +61,15 @@ function buildSvg(input: CodeImageCardRenderInput, width: number, height: number
   <path d="M${margin} ${height - margin * 0.8} H${Math.round(width * 0.38)}" stroke="#d8c0fc" stroke-width="3" stroke-linecap="round"/>
   <path d="M${Math.round(width * 0.68)} ${margin * 0.7} H${width - margin}" stroke="#e7c79a" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
   <style>
-    text { font-family: PingFang SC, Noto Sans SC, sans-serif; fill: #1a1525; }
+    ${embeddedFont}
+    text { font-family: "HotNow CJK", "PingFang SC", "Noto Sans SC", sans-serif; fill: #1a1525; }
     .title { font-weight: 700; letter-spacing: -0.8px; }
-    .thesis { font-weight: 500; fill: #51445f; }
-    .keyword { font-weight: 600; fill: #5b3c86; }
-    .logo { font-size: 16px; font-weight: 700; letter-spacing: 0.4px; }
+    .thesis { font-weight: 400; fill: #51445f; }
+    .keyword { font-weight: 400; fill: #5b3c86; }
+    .logo { font-size: 18px; font-weight: 400; letter-spacing: 0.4px; }
   </style>
-  ${renderTextLines(titleLines, margin, titleY, titleSize, "title", 1.2)}
-  ${renderTextLines(thesisLines, input.variant === "2.5:1" ? margin : margin, thesisY, input.variant === "2.5:1" ? 18 : 23, "thesis", 1.45)}
+  ${renderTextLines(titleLines, margin, titleY, titleSize, "title", 1.16)}
+  ${renderTextLines(thesisLines, margin, thesisY, thesisSize, "thesis", 1.35)}
   ${keywordMarkup}
   ${logoMarkup}
 </svg>`;
@@ -77,9 +82,9 @@ function renderTextLines(lines: string[], x: number, y: number, fontSize: number
 function renderKeywordTags(keywords: string[], x: number, y: number): string {
   let cursor = x;
   return keywords.map((keyword) => {
-    const width = Math.max(86, keyword.length * 17 + 28);
-    const markup = `<rect x="${cursor}" y="${y}" width="${width}" height="34" rx="17" fill="#eadffc"/><text x="${cursor + width / 2}" y="${y + 9}" text-anchor="middle" font-size="17" class="keyword" dominant-baseline="hanging">${escapeXml(keyword)}</text>`;
-    cursor += width + 12;
+    const width = Math.max(104, keyword.length * 20 + 34);
+    const markup = `<rect x="${cursor}" y="${y}" width="${width}" height="42" rx="21" fill="#eadffc"/><text x="${cursor + width / 2}" y="${y + 10}" text-anchor="middle" font-size="20" class="keyword" dominant-baseline="hanging">${escapeXml(keyword)}</text>`;
+    cursor += width + 14;
     return markup;
   }).join("");
 }

@@ -10,6 +10,7 @@ import { type TestDatabaseHandle, createTestDatabase } from "../helpers/testData
 const handles: TestDatabaseHandle[] = [];
 const originalHermesUrl = process.env.HERMES_API_BASE_URL;
 const originalHermesToken = process.env.HERMES_API_TOKEN;
+const originalCreativeToken = process.env.CREATIVE_API_TOKEN;
 
 afterEach(() => {
   while (handles.length > 0) handles.pop()?.close();
@@ -18,6 +19,8 @@ afterEach(() => {
   else process.env.HERMES_API_BASE_URL = originalHermesUrl;
   if (originalHermesToken === undefined) delete process.env.HERMES_API_TOKEN;
   else process.env.HERMES_API_TOKEN = originalHermesToken;
+  if (originalCreativeToken === undefined) delete process.env.CREATIVE_API_TOKEN;
+  else process.env.CREATIVE_API_TOKEN = originalCreativeToken;
 });
 
 /** 建立一条短内容成品，并可预置已有标签。 */
@@ -36,6 +39,39 @@ async function createShortArticle(codeImageKeywords?: string[]) {
 }
 
 describe("代码图片标签重新生成路由", () => {
+  it("Hermes 可通过 PATCH 成品接口回写标签，并把图片标记为过期", async () => {
+    process.env.CREATIVE_API_TOKEN = "test-token";
+    const { handle, article } = await createShortArticle(["旧标签"]);
+    const { editCreativeFinishedArticle } = await import("../../src/core/creative/creativeFinishedArticleRepository.js");
+    editCreativeFinishedArticle(handle.db, article.id, {
+      codeImageCards: [{
+        variant: "1:1",
+        url: "https://now.example.com/old-square.png",
+        width: 1500,
+        height: 1500,
+        status: "succeeded",
+        generatedAt: "2026-09-16T00:00:00.000Z",
+        sourceFingerprint: "old",
+        fileSize: 1,
+        error: null,
+      }],
+    }, "code-image");
+
+    const app = createServer({ db: handle.db, creativeApiToken: "test-token" });
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/api/creative/finished-articles/${article.id}`,
+      headers: { "x-creative-token": "test-token" },
+      payload: { codeImageKeywords: ["冒名通知", "民政部"] },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const saved = findCreativeFinishedArticleById(handle.db, article.id)!;
+    expect(saved.codeImageKeywords).toEqual(["冒名通知", "民政部"]);
+    expect(saved.codeImageCards[0].status).toBe("stale");
+    await app.close();
+  });
+
   it("覆盖旧标签并把已有代码图片标记为过期", async () => {
     process.env.HERMES_API_BASE_URL = "http://hermes.test";
     process.env.HERMES_API_TOKEN = "test-token";

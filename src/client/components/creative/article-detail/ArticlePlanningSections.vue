@@ -174,6 +174,31 @@ watch(() => props.editingTitleIndex, (index) => {
     </ul>
   </section>
 
+  <!-- 代码图片标签：短内容制图直接使用，没有标签时也保留区域，方便判断是缺少生成结果还是显示异常。 -->
+  <section v-if="!isManualArticle && article.direction === 'short_content'" data-testid="article-code-image-keywords">
+    <div class="mb-2 flex items-center justify-between">
+      <div>
+        <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">代码图片标签</h3>
+        <p class="mb-0 mt-1 text-[11px] text-editorial-text-muted">写作阶段产出，代码图片优先使用这些标签；没有标签时图片不显示标签区域。</p>
+      </div>
+      <a-button
+        v-if="(article.codeImageKeywords?.length ?? 0) > 0"
+        type="link"
+        size="small"
+        class="!h-auto !px-2 !py-1 !text-[11px]"
+        @click="emit('copy', (article.codeImageKeywords ?? []).join('、'))"
+      >复制</a-button>
+    </div>
+    <div v-if="(article.codeImageKeywords?.length ?? 0) > 0" class="flex flex-wrap gap-2">
+      <span
+        v-for="keyword in article.codeImageKeywords"
+        :key="keyword"
+        class="rounded-full bg-editorial-surface-muted px-2.5 py-1 text-xs text-editorial-text-main"
+      >{{ keyword }}</span>
+    </div>
+    <p v-else class="m-0 rounded-editorial-sm border border-dashed border-editorial-border px-3 py-2 text-xs text-editorial-text-muted">暂无标签：写作阶段未产出标签，代码图片会省略标签区域，不会用标题拆词代替。</p>
+  </section>
+
   <!-- 核心立意（只读） -->
   <section v-if="!isManualArticle && article.thesis">
     <div class="mb-2 flex items-center justify-between">

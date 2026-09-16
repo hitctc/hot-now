@@ -140,6 +140,7 @@ export type CreativeFinishedArticle = {
   hooks: string | null;
   quotes: string | null;
   summary100: string[] | null;
+  codeImageKeywords: string[] | null;
   imagesJson: string | ArticleImageEntry[] | null;
   images: string | ArticleImageEntry[] | null;
   codeImageCards: CodeImageCard[];

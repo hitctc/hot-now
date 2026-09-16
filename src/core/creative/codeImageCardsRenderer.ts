@@ -11,12 +11,44 @@ export type CodeImageCardRenderInput = {
   logoDataUri?: string;
 };
 
+/** 压缩后的文案行，以及生成这些行时实际使用的字号。 */
+type FittedText = {
+  lines: string[];
+  fontSize: number;
+};
+
 const LOGICAL_CANVAS_SIZE: Record<CodeImageCardVariant, { width: number; height: number }> = {
   "2.5:1": { width: 750, height: 300 },
   "1:1": { width: 750, height: 750 },
   "3:4": { width: 750, height: 1000 },
 };
 const OUTPUT_SCALE = 2;
+/** 半角字符宽度比例上限，用于保守换行；详见 `measureTextWidth`。 */
+const HALF_WIDTH_RATIO = 0.62;
+/** 标签胶囊的内边距和间距，配合 `measureTextWidth` 保证标签行不越界。 */
+const KEYWORD_FONT_SIZE = 20;
+const KEYWORD_PADDING_X = 17;
+const KEYWORD_GAP = 14;
+
+type VariantLayout = {
+  margin: number;
+  titleSize: number;
+  titleMinSize: number;
+  titleMaxLines: number;
+  thesisSize: number;
+  thesisMinSize: number;
+  thesisMaxLines: number;
+  titleY: number;
+  thesisBaseY: number;
+  keywordBaseY: number;
+};
+
+/** 三种比例的基础排版参数：外边距、字号、行数上限和纵向锚点。 */
+const VARIANT_LAYOUT: Record<CodeImageCardVariant, VariantLayout> = {
+  "2.5:1": { margin: 42, titleSize: 42, titleMinSize: 30, titleMaxLines: 2, thesisSize: 25, thesisMinSize: 20, thesisMaxLines: 2, titleY: 34, thesisBaseY: 132, keywordBaseY: 232 },
+  "1:1": { margin: 58, titleSize: 54, titleMinSize: 38, titleMaxLines: 3, thesisSize: 30, thesisMinSize: 20, thesisMaxLines: 4, titleY: 70, thesisBaseY: 205, keywordBaseY: 400 },
+  "3:4": { margin: 64, titleSize: 56, titleMinSize: 38, titleMaxLines: 4, thesisSize: 30, thesisMinSize: 20, thesisMaxLines: 5, titleY: 82, thesisBaseY: 330, keywordBaseY: 650 },
+};
 
 /** 将品牌模板渲染为压缩 PNG；所有文字和装饰均来自输入数据，不调用外部模型。 */
 export async function renderCodeImageCard(input: CodeImageCardRenderInput): Promise<Buffer> {
@@ -40,24 +72,23 @@ function getCodeImageCardLogicalSize(variant: CodeImageCardVariant): { width: nu
 
 /** 按三种画布比例排布标题、核心文案和标签，保证主体内容占据主要视觉区域。 */
 function buildSvg(input: CodeImageCardRenderInput, width: number, height: number): string {
-  const margin = input.variant === "2.5:1" ? 42 : input.variant === "1:1" ? 58 : 64;
-  const titleSize = input.variant === "2.5:1" ? 42 : input.variant === "1:1" ? 54 : 56;
-  const titleMaxLines = input.variant === "2.5:1" ? 2 : input.variant === "1:1" ? 3 : 4;
-  const titleMinSize = input.variant === "2.5:1" ? 30 : 38;
-  const titleLines = fitText(input.title, width - margin * 2, titleSize, titleMaxLines, titleMinSize);
-  const thesisSize = input.variant === "2.5:1" ? 25 : 30;
-  const thesisMaxLines = input.variant === "2.5:1" ? 2 : input.variant === "3:4" ? 5 : 4;
-  const thesisLines = fitText(input.thesis, width - margin * 2, thesisSize, thesisMaxLines, 20);
-  const keywordLines = input.keywords.slice(0, 3).map((keyword) => truncateByWidth(keyword, 180, 20));
-  const titleY = input.variant === "2.5:1" ? 34 : input.variant === "1:1" ? 70 : 82;
-  const thesisBaseY = input.variant === "2.5:1" ? 132 : input.variant === "1:1" ? 205 : 330;
-  const thesisY = Math.max(thesisBaseY, titleY + titleLines.length * titleSize * 1.16 + 30);
-  const keywordBaseY = input.variant === "2.5:1" ? 232 : input.variant === "1:1" ? 400 : 650;
+  const layout = VARIANT_LAYOUT[input.variant];
+  const margin = layout.margin;
+  const availableWidth = width - margin * 2;
+  // 标题和正文都必须用 fitText 实际选中的字号绘制；
+  // 用缩小前的字号绘制会让行宽超出换行时的计算宽度，在画布右侧被裁掉。
+  const title = fitText(input.title, availableWidth, layout.titleSize, layout.titleMaxLines, layout.titleMinSize);
+  const thesis = fitText(input.thesis, availableWidth, layout.thesisSize, layout.thesisMaxLines, layout.thesisMinSize);
+  const thesisY = Math.max(
+    layout.thesisBaseY,
+    layout.titleY + title.lines.length * title.fontSize * 1.16 + 30,
+  );
+  // 横图高度只有 300，标签和标识都固定在底部，因此标签行不跟随正文下移。
   const keywordY = input.variant === "2.5:1"
-    ? keywordBaseY
-    : Math.max(keywordBaseY, thesisY + thesisLines.length * thesisSize * 1.35 + 36);
+    ? layout.keywordBaseY
+    : Math.max(layout.keywordBaseY, thesisY + thesis.lines.length * thesis.fontSize * 1.35 + 36);
   const logoY = height - Math.round(height * 0.09);
-  const keywordMarkup = renderKeywordTags(keywordLines, margin, keywordY);
+  const keywordMarkup = renderKeywordTags(input.keywords, margin, keywordY, availableWidth);
   const logoMarkup = input.logoDataUri
     ? `<image href="${input.logoDataUri}" x="${width - margin - 34}" y="${logoY - 23}" width="24" height="24" preserveAspectRatio="xMidYMid meet"/><text x="${width - margin - 4}" y="${logoY - 5}" text-anchor="end" class="logo">HotNow</text>`
     : `<text x="${width - margin}" y="${logoY}" text-anchor="end" class="logo">HotNow</text>`;
@@ -73,14 +104,14 @@ function buildSvg(input: CodeImageCardRenderInput, width: number, height: number
     .keyword { font-weight: 400; fill: #5b3c86; }
     .logo { font-size: 18px; font-weight: 400; letter-spacing: 0.4px; }
   </style>
-  ${renderTextLines(titleLines, margin, titleY, titleSize, "title", 1.16, width - margin * 2)}
-  ${renderTextLines(thesisLines, margin, thesisY, thesisSize, "thesis", 1.35, width - margin * 2)}
+  ${renderTextLines(title.lines, margin, layout.titleY, title.fontSize, "title", 1.16)}
+  ${renderTextLines(thesis.lines, margin, thesisY, thesis.fontSize, "thesis", 1.35)}
   ${keywordMarkup}
   ${logoMarkup}
 </svg>`;
 }
 
-/** 渲染文本行并显式约束 SVG 实际字宽，避免字体引擎差异造成横向裁切。 */
+/** 按行输出 SVG 文本；行宽已在上游换行阶段保证不越过可用宽度。 */
 function renderTextLines(
   lines: string[],
   x: number,
@@ -88,63 +119,67 @@ function renderTextLines(
   fontSize: number,
   className: string,
   lineHeight: number,
-  maxWidth: number,
 ): string {
-  return lines.map((line, index) => {
-    const textLength = Math.min(measureTextWidth(line, fontSize), maxWidth);
-    return `<text x="${x}" y="${Math.round(y + index * fontSize * lineHeight)}" font-size="${fontSize}" textLength="${Math.round(textLength)}" lengthAdjust="spacingAndGlyphs" class="${className}" dominant-baseline="hanging">${escapeXml(line)}</text>`;
-  }).join("");
+  return lines.map((line, index) => `<text x="${x}" y="${Math.round(y + index * fontSize * lineHeight)}" font-size="${fontSize}" class="${className}" dominant-baseline="hanging">${escapeXml(line)}</text>`).join("");
 }
 
-function renderKeywordTags(keywords: string[], x: number, y: number): string {
+/** 渲染标签胶囊；胶囊宽度由保守文本宽度推导，放不下时直接跳过而不是越界。 */
+function renderKeywordTags(keywords: string[], x: number, y: number, maxWidth: number): string {
   let cursor = x;
-  return keywords.map((keyword) => {
-    const width = Math.max(104, keyword.length * 20 + 34);
-    const markup = `<rect x="${cursor}" y="${y}" width="${width}" height="42" rx="21" fill="#eadffc"/><text x="${cursor + width / 2}" y="${y + 10}" text-anchor="middle" font-size="20" class="keyword" dominant-baseline="hanging">${escapeXml(keyword)}</text>`;
-    cursor += width + 14;
-    return markup;
-  }).join("");
+  const parts: string[] = [];
+  for (const keyword of keywords.slice(0, 3)) {
+    const label = truncateByWidth(keyword, 180, KEYWORD_FONT_SIZE);
+    const width = Math.max(104, Math.round(measureTextWidth(label, KEYWORD_FONT_SIZE)) + KEYWORD_PADDING_X * 2);
+    if (cursor + width > x + maxWidth) break;
+    parts.push(`<rect x="${cursor}" y="${y}" width="${width}" height="42" rx="21" fill="#eadffc"/><text x="${Math.round(cursor + width / 2)}" y="${y + 10}" text-anchor="middle" font-size="${KEYWORD_FONT_SIZE}" class="keyword" dominant-baseline="hanging">${escapeXml(label)}</text>`);
+    cursor += width + KEYWORD_GAP;
+  }
+  return parts.join("");
 }
 
-/** 将文案压缩到指定宽度和行数；空输入返回空数组，由调用方负责提供确定性回退字段。 */
-function fitText(text: string, maxWidth: number, initialSize: number, maxLines: number, minSize: number): string[] {
+/**
+ * 将文案压缩到指定宽度和行数，并返回换行时实际选中的字号。
+ * 调用方必须用返回的 `fontSize` 绘制，否则会按初始字号渲染出比换行宽度更宽的文字。
+ * 行数仍超限时只截断末行并补省略号，保证每一行都不越过 `maxWidth`。
+ */
+function fitText(text: string, maxWidth: number, initialSize: number, maxLines: number, minSize: number): FittedText {
   for (let size = initialSize; size >= minSize; size -= 2) {
     const lines = wrapText(text, maxWidth, size);
-    if (lines.length <= maxLines && lines.every((line) => measureTextWidth(line, size) <= maxWidth)) return lines;
+    if (lines.length <= maxLines) return { lines, fontSize: size };
   }
   const lines = wrapText(text, maxWidth, minSize).slice(0, maxLines);
-  return lines.map((line, index) => {
-    const limit = index === lines.length - 1 ? maxWidth - measureTextWidth("…", minSize) : maxWidth;
-    const safeLine = truncateByWidth(line, limit, minSize);
-    return index === lines.length - 1 ? `${safeLine}…` : safeLine;
-  });
+  if (lines.length === 0) return { lines, fontSize: minSize };
+  const lastIndex = lines.length - 1;
+  const ellipsisWidth = measureTextWidth("…", minSize);
+  lines[lastIndex] = `${truncateByWidth(lines[lastIndex], maxWidth - ellipsisWidth, minSize)}…`;
+  return { lines, fontSize: minSize };
 }
 
-/** 按中英文字符宽度换行，并保持中文标点跟随前一行，避免出现孤立标点。 */
+/**
+ * 按保守字符宽度做硬换行，保证每一行都不超过 `maxWidth`。
+ * 中文标点不允许靠“轻微超出”续行，否则 librsvg 会直接把它画到画布外。
+ */
 function wrapText(text: string, maxWidth: number, fontSize: number): string[] {
-  const normalized = text.trim().replace(/\s+/g, " ");
-  if (!normalized) return [];
+  const characters = [...text.trim().replace(/\s+/g, " ")];
   const lines: string[] = [];
-  let line = "";
-  let width = 0;
-  for (const char of normalized) {
-    const charWidth = /[\x00-\xff]/.test(char) ? fontSize * 0.55 : fontSize;
-    if (line && width + charWidth > maxWidth) {
-      // 中文标点不单独起行；允许它轻微超出一字宽，优先保证阅读连续性。
-      if (isNonBreakingPunctuation(char)) {
-        line += char;
-        width += charWidth;
-      } else {
-        lines.push(line);
-        line = char;
-        width = charWidth;
-      }
-    } else {
-      line += char;
-      width += charWidth;
+  let index = 0;
+  while (index < characters.length) {
+    let width = 0;
+    let end = index;
+    while (end < characters.length) {
+      const nextWidth = width + measureTextWidth(characters[end], fontSize);
+      // 至少消费一个字符，避免单字宽于可用宽度时无法推进。
+      if (nextWidth > maxWidth && end > index) break;
+      width = nextWidth;
+      end += 1;
     }
+    // 避头尾：下一字符是禁则标点时，把本行末字一起下移，而不是让标点越界。
+    if (end < characters.length && end - index > 1 && isNonBreakingPunctuation(characters[end])) {
+      end -= 1;
+    }
+    lines.push(characters.slice(index, end).join(""));
+    index = end;
   }
-  if (line) lines.push(line);
   return lines;
 }
 
@@ -164,9 +199,13 @@ function truncateByWidth(text: string, maxWidth: number, fontSize: number): stri
   return result || text.trim().slice(0, 1);
 }
 
-/** 使用与换行一致的字符宽度估算，作为 SVG 文本不越界的保守上限。 */
+/**
+ * 字符宽度的保守上限。
+ * 中文按整字宽（实测 Noto Sans SC 约 0.92em，取 1em 留出余量），
+ * 英文数字按 0.62em（实测约 0.48em），确保估算永远不小于实际绘制宽度。
+ */
 function measureTextWidth(text: string, fontSize: number): number {
-  return [...text].reduce((total, char) => total + (/[\x00-\xff]/.test(char) ? fontSize * 0.55 : fontSize), 0);
+  return [...text].reduce((total, char) => total + (/[\x00-\xff]/.test(char) ? fontSize * HALF_WIDTH_RATIO : fontSize), 0);
 }
 
 function escapeXml(value: string): string {

@@ -52,6 +52,36 @@ describe("短内容代码制图", () => {
     }
   });
 
+  it("长文案不会越过画布右边界，也不会和底部元素重叠", async () => {
+    // 这里回归的是真实缺陷：换行按缩小后的字号计算，绘制却用初始字号，
+    // 导致第一行被画到画布右侧之外。横图和方图都曾因此被裁切。
+    const longTitle = "这是一条特别特别长的标题用来测试换行是否会超出画布右边界的极端情况";
+    const longThesis = "判断方向：核心事实不在于制造“反转”，而在于复盘公开表态，解释其对 AI Agent 发展速度、监管和未来讨论的立场（包括但不限于产能、价格与合规）。";
+    for (const variant of ["2.5:1", "1:1", "3:4"] as const) {
+      const buffer = await renderCodeImageCard({
+        variant,
+        title: longTitle,
+        thesis: longThesis,
+        keywords: ["AI监管", "算力供给", "合规边界"],
+      });
+      const { data, info } = await sharp(buffer).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+      const marginPx = (variant === "2.5:1" ? 42 : variant === "1:1" ? 58 : 64) * 2;
+      let right = -1;
+      let bottom = -1;
+      for (let y = 0; y < info.height; y += 1) {
+        for (let x = 0; x < info.width; x += 1) {
+          const offset = (y * info.width + x) * info.channels;
+          if (data[offset] < 150 && data[offset + 1] < 140 && data[offset + 2] < 170) {
+            if (x > right) right = x;
+            if (y > bottom) bottom = y;
+          }
+        }
+      }
+      expect({ variant, contained: right <= info.width - marginPx }).toEqual({ variant, contained: true });
+      expect(bottom).toBeLessThan(info.height);
+    }
+  });
+
   it("核心文案缺失时使用导语、摘要或标签，不输出占位文案", async () => {
     const handle = await createTestDatabase("hot-now-code-image-fallback-");
     handles.push(handle);

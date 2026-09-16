@@ -2,6 +2,7 @@ import type { SqliteDatabase } from "../db/openDatabase.js";
 import { updateCreativeSourceItemLinkedArticle } from "./creativeSourceItemRepository.js";
 import { findCreativeFinishedArticleById } from "./creativeFinishedArticleReadRepository.js";
 import { mergePublishedImages } from "./creativeMarkdownImageMerge.js";
+import { normalizeFinishedArticleStatus } from "./creativeFinishedArticleStatus.js";
 import type { CodeImageCard } from "./codeImageCards.js";
 import type {
   CreativeFinishedArticleRecord,
@@ -97,7 +98,7 @@ export function insertCreativeFinishedArticle(
     input.stopStep ?? null,
     input.reasonCode ?? null,
     input.reasonText ?? null,
-    input.status ?? "generated",
+    normalizeFinishedArticleStatus(direction, input.status) ?? "generated",
     input.anomalyReason ?? null,
     input.rawResponseText ?? null,
     direction,
@@ -220,9 +221,11 @@ export function editCreativeFinishedArticle(
     return { ok: false, reason: "article-revision-conflict" };
   }
 
-  // 状态变更校验：Hermes 管线内部流转跳过（source="hermes"），仅校验前端人工操作
-  if (input.status !== undefined && input.status !== current.status && source !== "hermes") {
-    const error = validateStatusTransition(current.status, input.status, current, source);
+  // 状态变更校验：Hermes 管线内部流转跳过（source="hermes"），仅校验前端人工操作。
+  // 短内容状态先归一化成平台词汇，否则 ready 会因为查不到状态转换而无从变更。
+  const nextStatus = normalizeFinishedArticleStatus(current.direction, input.status);
+  if (nextStatus !== undefined && nextStatus !== current.status && source !== "hermes") {
+    const error = validateStatusTransition(current.status, nextStatus, current, source);
     if (error) return { ok: false, reason: error };
   }
 
@@ -340,9 +343,9 @@ export function editCreativeFinishedArticle(
     setClauses.push("raw_response_text = ?");
     params.push(input.rawResponseText);
   }
-  if (input.status !== undefined) {
+  if (nextStatus !== undefined) {
     setClauses.push("status = ?");
-    params.push(input.status);
+    params.push(nextStatus);
   }
   if (input.anomalyReason !== undefined) {
     setClauses.push("anomaly_reason = ?");

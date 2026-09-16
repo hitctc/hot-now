@@ -85,8 +85,26 @@ export function buildCodeImageSourceFingerprint(
   keywords: string[],
 ): string {
   return createHash("sha256")
-    .update(JSON.stringify({ title, thesis, keywords, template: "hotnow-code-card-v1", sizes: { wide: "750x300", square: "750x750", portrait: "750x1000" } }))
+    .update(JSON.stringify({ title, thesis, keywords, template: "hotnow-code-card-v2", sizes: { wide: "750x300", square: "750x750", portrait: "750x1000" } }))
     .digest("hex");
+}
+
+/** 从文章必有字段中选择图片核心文案，避免把空字段渲染成“暂无内容”。 */
+export function resolveCodeImageThesis(
+  article: CreativeFinishedArticleRecord,
+  title: string,
+  sourceSummary: string | null,
+): string {
+  const candidates = [
+    article.thesis,
+    article.reversalAngle,
+    article.intros?.[article.introIndex],
+    article.summary100?.[article.summaryIndex],
+    sourceSummary,
+    article.titles?.[article.titleIndex],
+    title,
+  ];
+  return candidates.find((value): value is string => typeof value === "string" && value.trim().length > 0)?.trim() ?? title;
 }
 
 /** 从标题、判断和素材标签中整理图片使用的短关键词，完全在本地确定性完成。 */
@@ -107,8 +125,8 @@ async function runCodeImageCards(
   if (initial.direction !== "short_content") return { ok: false, status: "failed", reason: "article-is-not-short-content" };
 
   const title = selectedTitle(initial);
-  const thesis = initial.thesis?.trim() ?? "";
   const source = initial.sourceItemId ? findCreativeSourceItemById(db, initial.sourceItemId) : null;
+  const thesis = resolveCodeImageThesis(initial, title, source?.summary ?? null);
   const keywords = resolveCodeImageKeywords(source?.tags ?? null, title, thesis);
   const fingerprint = buildCodeImageSourceFingerprint(title, thesis, keywords);
   const existing = orderCodeImageCards(initial.codeImageCards);

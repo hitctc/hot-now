@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { editCreativeFinishedArticle, findCreativeFinishedArticleById, insertCreativeFinishedArticle } from "../../src/core/creative/creativeFinishedArticleRepository.js";
 import { insertCreativeSourceItem } from "../../src/core/creative/creativeSourceItemRepository.js";
-import { generateCodeImageCards, resolveCodeImageKeywords } from "../../src/core/creative/codeImageCardsService.js";
+import { generateCodeImageCards, resolveCodeImageKeywords, resolveCodeImageThesis } from "../../src/core/creative/codeImageCardsService.js";
 import { getCodeImageCardSize, renderCodeImageCard } from "../../src/core/creative/codeImageCardsRenderer.js";
 import { refreshCodeImageCardsTemplateMigration } from "../../src/core/db/migrations/052_refresh_code_image_cards_template.js";
 import { createTestDatabase, type TestDatabaseHandle } from "../helpers/testDatabase.js";
@@ -50,6 +50,21 @@ describe("短内容代码制图", () => {
       }
       expect((darkBounds.bottom - darkBounds.top + 1) / info.height).toBeGreaterThan(0.4);
     }
+  });
+
+  it("核心文案缺失时使用导语、摘要或标签，不输出占位文案", async () => {
+    const handle = await createTestDatabase("hot-now-code-image-fallback-");
+    handles.push(handle);
+    const article = insertCreativeFinishedArticle(handle.db, {
+      direction: "short_content",
+      titles: ["标题内容"],
+      intros: ["这是一条可直接用于图片主体的导语。"],
+      contentMarkdown: "正文",
+    });
+
+    expect(resolveCodeImageThesis(article, "标题内容", "素材摘要")).toBe("这是一条可直接用于图片主体的导语。");
+    expect(resolveCodeImageThesis({ ...article, intros: null }, "标题内容", "素材摘要")).toBe("素材摘要");
+    expect(resolveCodeImageThesis({ ...article, intros: null }, "标题内容", null)).toBe("标题内容");
   });
 
   it("优先使用素材标签，缺失时确定性提取关键词", () => {

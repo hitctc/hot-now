@@ -31,6 +31,7 @@ export function getCodeImageCardSize(variant: CodeImageCardVariant): { width: nu
   return CANVAS_SIZE[variant];
 }
 
+/** 按三种画布比例排布标题、核心文案和标签，保证主体内容占据主要视觉区域。 */
 function buildSvg(input: CodeImageCardRenderInput, width: number, height: number): string {
   const margin = input.variant === "2.5:1" ? 42 : input.variant === "1:1" ? 58 : 64;
   const titleSize = input.variant === "2.5:1" ? 42 : input.variant === "1:1" ? 54 : 56;
@@ -38,16 +39,18 @@ function buildSvg(input: CodeImageCardRenderInput, width: number, height: number
   const titleMinSize = input.variant === "2.5:1" ? 30 : 38;
   const titleLines = fitText(input.title, width - margin * 2, titleSize, titleMaxLines, titleMinSize);
   const thesisSize = input.variant === "2.5:1" ? 25 : 30;
-  const thesisMaxLines = input.variant === "2.5:1" ? 3 : input.variant === "3:4" ? 5 : 4;
+  const thesisMaxLines = input.variant === "2.5:1" ? 2 : input.variant === "3:4" ? 5 : 4;
   const thesisLines = fitText(input.thesis, width - margin * 2, thesisSize, thesisMaxLines, 20);
   const keywordLines = input.keywords.slice(0, 3).map((keyword) => truncateByWidth(keyword, 180, 20));
   const titleY = input.variant === "2.5:1" ? 34 : input.variant === "1:1" ? 70 : 82;
-  const thesisY = input.variant === "2.5:1" ? 142 : input.variant === "1:1" ? 300 : 390;
-  const keywordY = input.variant === "3:4" ? 710 : 535;
+  const thesisBaseY = input.variant === "2.5:1" ? 132 : input.variant === "1:1" ? 205 : 330;
+  const thesisY = Math.max(thesisBaseY, titleY + titleLines.length * titleSize * 1.16 + 30);
+  const keywordBaseY = input.variant === "2.5:1" ? 232 : input.variant === "1:1" ? 400 : 650;
+  const keywordY = input.variant === "2.5:1"
+    ? keywordBaseY
+    : Math.max(keywordBaseY, thesisY + thesisLines.length * thesisSize * 1.35 + 36);
   const logoY = height - Math.round(height * 0.09);
-  const keywordMarkup = input.variant === "2.5:1"
-    ? ""
-    : renderKeywordTags(keywordLines, margin, keywordY);
+  const keywordMarkup = renderKeywordTags(keywordLines, margin, keywordY);
   const logoMarkup = input.logoDataUri
     ? `<image href="${input.logoDataUri}" x="${width - margin - 34}" y="${logoY - 23}" width="24" height="24" preserveAspectRatio="xMidYMid meet"/><text x="${width - margin - 4}" y="${logoY - 5}" text-anchor="end" class="logo">HotNow</text>`
     : `<text x="${width - margin}" y="${logoY}" text-anchor="end" class="logo">HotNow</text>`;
@@ -84,6 +87,7 @@ function renderKeywordTags(keywords: string[], x: number, y: number): string {
   }).join("");
 }
 
+/** 将文案压缩到指定宽度和行数；空输入返回空数组，由调用方负责提供确定性回退字段。 */
 function fitText(text: string, maxWidth: number, initialSize: number, maxLines: number, minSize: number): string[] {
   for (let size = initialSize; size >= minSize; size -= 2) {
     const lines = wrapText(text, maxWidth, size);
@@ -94,9 +98,10 @@ function fitText(text: string, maxWidth: number, initialSize: number, maxLines: 
   return lines;
 }
 
+/** 按中英文字符宽度换行，并保持中文标点跟随前一行，避免出现孤立标点。 */
 function wrapText(text: string, maxWidth: number, fontSize: number): string[] {
   const normalized = text.trim().replace(/\s+/g, " ");
-  if (!normalized) return ["暂无内容"];
+  if (!normalized) return [];
   const lines: string[] = [];
   let line = "";
   let width = 0;

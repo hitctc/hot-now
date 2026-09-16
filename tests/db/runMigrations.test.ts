@@ -84,7 +84,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(51);
+    expect(schemaVersion).toBe(52);
 
     const appliedMigrations = db
       .prepare(
@@ -147,7 +147,8 @@ describe("runMigrations", () => {
       { version: 48, name: "048_creative_account_fit_automation" },
       { version: 49, name: "049_creative_automation_alert_log" },
       { version: 50, name: "050_creative_automation_master_switch" },
-      { version: 51, name: "051_finished_articles_code_image_cards" }
+      { version: 51, name: "051_finished_articles_code_image_cards" },
+      { version: 52, name: "052_refresh_code_image_cards_template" }
     ]);
 
     const performanceIndexes = db
@@ -661,7 +662,7 @@ describe("runMigrations", () => {
     expect(evidenceTable).toBeTruthy();
     expect(sourceRunsTable).toBeTruthy();
     expect(notificationsTable).toBeTruthy();
-    expect(db.pragma("user_version", { simple: true })).toBe(51);
+    expect(db.pragma("user_version", { simple: true })).toBe(52);
 
     // daily_digests 表验证
     const digestTable = db

@@ -9,6 +9,7 @@ import { editCreativeFinishedArticle, findCreativeFinishedArticleById, insertCre
 import { insertCreativeSourceItem } from "../../src/core/creative/creativeSourceItemRepository.js";
 import { generateCodeImageCards, resolveCodeImageKeywords } from "../../src/core/creative/codeImageCardsService.js";
 import { getCodeImageCardSize, renderCodeImageCard } from "../../src/core/creative/codeImageCardsRenderer.js";
+import { refreshCodeImageCardsTemplateMigration } from "../../src/core/db/migrations/052_refresh_code_image_cards_template.js";
 import { createTestDatabase, type TestDatabaseHandle } from "../helpers/testDatabase.js";
 
 const handles: TestDatabaseHandle[] = [];
@@ -99,6 +100,9 @@ describe("短内容代码制图", () => {
     expect(saved.humanMarkdown).toContain("封面图｜HotNow 2.5:1 横图");
     expect(saved.humanMarkdown).toContain("配图｜HotNow 1:1 方图");
     expect(saved.humanMarkdown).toContain("配图｜HotNow 3:4 竖图");
+
+    refreshCodeImageCardsTemplateMigration.apply(handle.db);
+    expect(findCreativeFinishedArticleById(handle.db, article.id)!.codeImageCards.every((card) => card.status === "stale")).toBe(true);
 
     const repeat = await generateCodeImageCards(handle.db, article.id, {
       imageDir,

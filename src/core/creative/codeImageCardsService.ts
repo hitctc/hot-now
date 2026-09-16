@@ -117,7 +117,11 @@ async function runCodeImageCards(
   const targets = CODE_IMAGE_CARD_VARIANTS.filter((variant) => {
     const card = findCodeImageCard(existing, variant);
     if (mode === "all") return true;
-    return !card || card.status === "failed" || card.status === "pending";
+    return !card
+      || card.status === "failed"
+      || card.status === "pending"
+      || card.status === "stale"
+      || card.sourceFingerprint !== fingerprint;
   });
 
   if (targets.length === 0) {

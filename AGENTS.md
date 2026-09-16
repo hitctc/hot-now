@@ -26,6 +26,7 @@
   - `AI 时间线提醒链路`：`定时读取 AI 时间线 feed -> 筛选新增 S 级官方事件 -> 按 eventKey 去重 -> 飞书主通道 + 邮件备份通道推送`
   - `发信链路`：`手动发信 -> 读取最新一份已生成报告 -> SMTP 发邮件`；每日早报发信默认关闭，SMTP 同时作为 S 级事件邮件备份通道
   - `HotNow-Hermes 创作交付链路`：`Hermes 事实核验/写作 -> human-writing 只读终稿审改 -> 图片提示词/图片执行 -> 成品创建`；初次成品创建同时接收 `contentMarkdown` 与 `humanMarkdown`，`stepTrace.meta.humanWriting` 只保存审改状态摘要，不能把本地审改全文写入 trace
+  - `短内容代码制图链路`：短内容成品进入 HotNow 后由 Hermes 触发单篇代码制图；HotNow 使用 SVG + Sharp 输出 `2.5:1`、`1:1`、`3:4` 三张 PNG，写入 `code_image_cards`、`humanMarkdown` 和封面候选，失败不改变文章状态，页面支持单篇制作、重做、下载和复制地址
 - 当前数据源：内置 RSS 库已扩展到 `21` 个，覆盖聚合日报、国际官方 AI 博客、国内科技媒体、创投资讯、开发者社区与综合新闻；Twitter 已拆成两类独立来源类型：账号采集配置保存在 `twitter_accounts`，关键词搜索配置保存在 `twitter_search_keywords`；Hacker News 搜索配置保存在 `hackernews_queries`；B 站搜索配置保存在 `bilibili_queries`；微信公众号 RSS 配置保存在 `wechat_rss_sources`；微博热搜榜匹配使用固定 AI 关键词，不提供独立配置表；AI 时间线不再维护应用内官方源白名单和采集规则，服务端优先读取 `AI_TIMELINE_FEED_FILE` 指向的本地 Markdown feed，必要时再用 `AI_TIMELINE_FEED_URL` 指向的公网 Markdown feed 兜底，解析其中唯一的 `json ai-timeline-feed` 代码块并提供 API 与提醒数据。这些扩展链路除 AI 时间线 feed 外都只支持后台手动执行，完整清单和边界见 `README.md`
 - 当前采集语义：以 `is_enabled` 为准决定是否参与采集；`is_active` 仅保留兼容，不再作为系统菜单主语义
 - 当前技术栈：`Node.js + TypeScript + Fastify + Vue 3 + Vite + Ant Design Vue + Tailwind CSS + Vitest`
@@ -113,6 +114,8 @@
 
 成品正文编辑的 AI 草稿与人工发布内容分别保存；自动保存不得触发父页面详情刷新，成功响应必须同步服务端 `updatedAt`。图片回写与正文编辑并发时，必须保留已落库的图片 Markdown 槽位并清理对应图片描述，不能只看 `images_json` 是否已有 URL；异步图片回写必须携带文章版本，遇到 `article-revision-conflict` 要基于最新正文重试，前端只替换目标图片槽位，不能用旧整篇正文覆盖用户编辑。
 
+短内容代码图片独立于文章状态机，接口为 `/api/creative/finished-articles/:id/code-images`（Hermes token）和 `/actions/creative/finished-articles/:id/code-images`（页面 session）；图片文件沿用 `/api/creative/images/<date>/<uuid>.png`，标题、核心判断或选中标题变化会将已有代码图片标记为 `stale`，普通正文段落变化不触发重做。
+
 ### Hermes 自动化边界（强约束）
 
 - Hermes（`/Users/tc-nihao/.hermes`）是素材采集、基础评分、账号适配评估、自动长短写作、图片、日报、提醒、邮件通知的业务编排、状态、队列、计划、重试和告警唯一真源。
@@ -177,6 +180,7 @@ SQLite 可靠性约定：
 5. 进入 `/settings/sources` 或 legacy `/control`，先手动执行一次普通 RSS 采集；如果已配置 `TWITTER_API_KEY`，再到 `/settings/sources` 的 Twitter 分区单独执行一次 Twitter 账号采集，并确认账号“最近成功 / 最近结果”回写；如需验证关键词搜索、Hacker News、B站、微信公众号 RSS 或微博热搜，分别使用该页对应手动入口并在 `/ai-new`、`/ai-hot` 检查结果可见性。AI 时间线页面当前下架，只验证 `AI_TIMELINE_FEED_URL` 或默认 `https://now.achuan.cc/feeds/ai-timeline-feed.md` 可访问且包含 `json ai-timeline-feed`，以及相关 API 返回有效数据；需要验证发信时，再单独触发一次“发送最新报告”
 6. 检查是否生成报告目录与 `report.json`、`report.html`、`run-meta.json`
 7. 检查 `/`、`/ai-new`、`/ai-hot`、`/settings/view-rules`、`/settings/sources`、`/settings/wechat-mp`、`/settings/profile`、`/history`、`/reports/:date` 是否正常显示，并验证内容页 source 过滤条、共享排序切换、共享标题搜索、内容页策略摘要、内容卡片反馈面板、反馈池和 LLM 设置占位文案
+8. 在 `/creative/short-finished-articles` 打开一篇短内容，点击“制作图片”，确认三种比例均生成、正文开头出现三条图片 Markdown、封面候选可见；修改标题后应显示“内容已变化”，点击“重新制作图片”只更新当前引用并保留旧文件
 
 ## 6. 配置与安全约束
 

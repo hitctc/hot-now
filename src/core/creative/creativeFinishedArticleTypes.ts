@@ -1,4 +1,5 @@
 import type { CreativeFinishedArticleMode } from "./types.js";
+import type { CodeImageCard } from "./codeImageCards.js";
 
 // 写作流程单步追踪记录
 export type StepTraceEntry = {
@@ -41,6 +42,7 @@ export type CreativeFinishedArticleRecord = {
   summary100: string[] | null;
   imagesJson: unknown[] | null;
   images: unknown[] | null;
+  codeImageCards: CodeImageCard[];
   coverImage: string[];
   coverImageIndex: number;
   titleIndex: number;
@@ -162,6 +164,7 @@ export type EditCreativeFinishedArticleInput = {
   summary100?: string[];
   summaryIndex?: number;
   images?: unknown[];
+  codeImageCards?: CodeImageCard[];
   coverImage?: string[];
   coverImageIndex?: number;
   titleIndex?: number;

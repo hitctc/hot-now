@@ -104,6 +104,10 @@ import type { WeiboTrendingRunState } from "../core/weibo/runWeiboTrendingCollec
 import type { RuntimeConfig } from "../core/types/appConfig.js";
 import type { SqliteDatabase } from "../core/db/openDatabase.js";
 import type {
+  CodeImageCardsGenerationMode,
+  GenerateCodeImageCardsResult,
+} from "../core/creative/codeImageCardsService.js";
+import type {
   ViewRulesWorkbenchView
 } from "./renderSystemPages.js";
 
@@ -427,6 +431,10 @@ export type ServerDeps = {
     onProgress?: (step: string, status: "running" | "done" | "error", detail?: string) => void | Promise<void>
   ) => Promise<{ ok: boolean; mediaId?: string; errorCode?: string; errorMessage?: string }>;
   getArticleWechatPushLog?: (articleId: number) => unknown[];
+  generateCodeImageCards?: (
+    articleId: number,
+    mode?: CodeImageCardsGenerationMode,
+  ) => Promise<GenerateCodeImageCardsResult>;
   getArticlePushCount?: (articleId: number) => number;
   listWechatMpAccounts?: () => unknown[];
   saveWechatMpAccount?: (input: { id?: number; name: string; appId: string; appSecret?: string; notes?: string; isDefault?: boolean; isEnabled?: boolean }) => Promise<{ ok: boolean; id: number }>;
@@ -525,6 +533,7 @@ export function createServer(deps: ServerDeps = {}) {
     ),
     pushArticleToWechatDraft: deps.pushArticleToWechatDraft,
     getArticleWechatPushLog: deps.getArticleWechatPushLog,
+    generateCodeImageCards: deps.generateCodeImageCards,
   });
 
 

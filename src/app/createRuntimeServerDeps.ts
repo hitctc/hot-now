@@ -36,6 +36,7 @@ import { pushArticleToWechatDraft, getArticlePushLog, getArticlePushCount } from
 import { pushDailyDigestToWechatDraft } from "../core/wechatMp/dailyDigestDraftPush.js";
 import { listWechatMpAccounts, saveWechatMpAccount, deleteWechatMpAccount, setDefaultWechatMpAccount } from "../core/wechatMp/wechatMpAccountRepository.js";
 import type { WechatThemeId } from "../core/creative/wechatFormat/wechatCompat.js";
+import { generateCodeImageCards as runCodeImageCards } from "../core/creative/codeImageCardsService.js";
 import type { ServerDeps } from "../server/createServer.js";
 
 export type RuntimeServerActionDeps = Pick<ServerDeps,
@@ -390,6 +391,7 @@ export function createRuntimeServerDeps(input: RuntimeServerDepsInput): ServerDe
 
   // 创作图片与数据库同目录，保持既有持久化位置。
   const creativeImageDir = path.join(path.dirname(config.database.file), "creative-images");
+  const codeImageLogoPath = path.join(process.cwd(), "src/server/public/brand/hotnow-logo-mark.png");
 
   return {
   db,
@@ -397,6 +399,12 @@ export function createRuntimeServerDeps(input: RuntimeServerDepsInput): ServerDe
     remoteApiOrigin: input.remoteApiOrigin,
     remoteApiToken: input.remoteApiToken,
     creativeImageDir,
+    generateCodeImageCards: (articleId, mode) => runCodeImageCards(db, articleId, {
+      imageDir: creativeImageDir,
+      publicBaseUrl: (config.publicBaseUrl ?? "").replace(/\/+$/, ""),
+      logoPath: codeImageLogoPath,
+      mode,
+    }),
     config,
     clientDevOrigin: input.clientDevOrigin,
   auth: {

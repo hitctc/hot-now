@@ -9,6 +9,40 @@ import { articleUsesGptLuna, readLunaPrompt } from "./creativeFinishedArticleRou
 export function registerCreativeFinishedArticleImageRoutes(context: CreativeFinishedArticleRouteContext): void {
   const { app, options, db } = context;
 
+  /** 处理 Hermes 自动触发的代码制图片制作请求，使用 token 鉴权并保持单篇幂等。 */
+  app.post("/api/creative/finished-articles/:id/code-images", async (request, reply) => {
+    if (!options.authorizeCreativeApiToken(request, reply)) return;
+    if (!options.generateCodeImageCards) {
+      return reply.code(503).send({ ok: false, reason: "code-image-service-not-configured" });
+    }
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const body = request.body as { mode?: unknown } | undefined;
+    const mode = body?.mode === "all" ? "all" : "missing";
+    const result = await options.generateCodeImageCards(id, mode);
+    if (!result.ok) {
+      const status = result.reason === "article-not-found" ? 404 : result.reason === "article-is-not-short-content" ? 409 : 502;
+      return reply.code(status).send(result);
+    }
+    return reply.code(result.status === "running" ? 202 : 200).send(result);
+  });
+
+  /** 处理页面单篇制作和补做请求，沿用 session 状态操作鉴权。 */
+  app.post("/actions/creative/finished-articles/:id/code-images", async (request, reply) => {
+    if (!options.authorizeStateAction(request, reply)) return;
+    if (!options.generateCodeImageCards) {
+      return reply.code(503).send({ ok: false, reason: "code-image-service-not-configured" });
+    }
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const body = request.body as { mode?: unknown } | undefined;
+    const mode = body?.mode === "all" ? "all" : "missing";
+    const result = await options.generateCodeImageCards(id, mode);
+    if (!result.ok) {
+      const status = result.reason === "article-not-found" ? 404 : result.reason === "article-is-not-short-content" ? 409 : 502;
+      return reply.code(status).send(result);
+    }
+    return reply.code(result.status === "running" ? 202 : 200).send(result);
+  });
+
   app.get("/api/creative/finished-articles/:id/missing-images", async (request, reply) => {
     const session = options.readSession(request, reply);
     if (session === undefined) { return; }

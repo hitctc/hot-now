@@ -15,6 +15,7 @@ import {
   createManualFinishedArticle,
   toggleFinishedArticlePin,
   editFinishedArticle,
+  generateFinishedArticleCodeImages,
   deleteFinishedArticle,
   restoreFinishedArticle,
   parseArticleImages,
@@ -114,6 +115,7 @@ const manualCreateOpen = ref(false);
 const manualTitle = ref("");
 const manualForm = ref<"tuwen" | "duanwen">("tuwen");
 const manualCreating = ref(false);
+const codeImageGeneratingArticleId = ref<number | null>(null);
 
 // 素材详情弹窗
 const sourceItemModalOpen = ref(false);
@@ -250,6 +252,24 @@ async function handleTogglePin(article: CreativeFinishedArticle): Promise<void> 
     message.success(updated.pinnedAt ? "已置顶" : "已取消置顶");
   } catch {
     message.error("置顶操作失败");
+  }
+}
+
+/** 从列表单篇补做缺失代码图片，完成后刷新当前页以同步封面候选和状态。 */
+async function handleGenerateCodeImages(article: CreativeFinishedArticle): Promise<void> {
+  if (article.deletedAt || codeImageGeneratingArticleId.value !== null) return;
+  codeImageGeneratingArticleId.value = article.id;
+  try {
+    const result = await generateFinishedArticleCodeImages(article.id, "missing");
+    if (result.status === "succeeded") message.success("代码制图片已完成");
+    else if (result.status === "partial") message.warning("部分代码制图片已完成，可打开详情补做");
+    else if (result.status === "running") message.info("图片正在制作中，请稍后刷新");
+    else message.error(result.reason ?? "代码制图片制作失败");
+    await loadItems();
+  } catch {
+    message.error("代码制图片制作失败");
+  } finally {
+    codeImageGeneratingArticleId.value = null;
   }
 }
 
@@ -738,6 +758,15 @@ const pagination = computed(() => ({
           <!-- 操作列：废弃/恢复 -->
           <template v-else-if="column.key === 'actions'">
             <div v-if="!record.deletedAt" class="flex flex-col items-start gap-0.5">
+              <a-button
+                size="small"
+                type="link"
+                class="!h-auto !text-[10px]"
+                :loading="codeImageGeneratingArticleId === record.id"
+                :disabled="codeImageGeneratingArticleId !== null && codeImageGeneratingArticleId !== record.id"
+                data-code-image-list-action
+                @click="handleGenerateCodeImages(record)"
+              >制作图片</a-button>
               <a-button size="small" type="link" class="!h-auto !text-[10px]" @click="handleTogglePin(record)">
                 {{ record.pinnedAt ? "取消置顶" : "置顶" }}
               </a-button>

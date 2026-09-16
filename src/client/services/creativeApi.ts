@@ -82,6 +82,17 @@ export function toggleFinishedArticlePublished(id: number): Promise<{ ok: boolea
   });
 }
 
+/** 触发单篇短内容代码制图片，服务端负责幂等、存储、正文回写和封面候选更新。 */
+export function generateFinishedArticleCodeImages(
+  id: number,
+  mode: "missing" | "all" = "missing",
+): Promise<{ ok: boolean; status: "running" | "succeeded" | "partial" | "failed"; article?: CreativeFinishedArticle; reason?: string }> {
+  return requestJson(`/actions/creative/finished-articles/${id}/code-images`, {
+    method: "POST",
+    body: JSON.stringify({ mode }),
+  });
+}
+
 export function toggleFinishedArticlePublishable(id: number): Promise<{ ok: boolean; publishable: boolean }> {
   return requestJson<{ ok: boolean; publishable: boolean }>(`/api/creative/finished-articles/${id}/toggle-publishable`, {
     method: "POST"

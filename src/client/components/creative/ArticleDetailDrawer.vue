@@ -98,6 +98,15 @@
           @generate-author-extensions="handleGenerateAuthorExtensions"
         />
 
+        <CodeImageCardsSection
+          v-if="article.direction === 'short_content'"
+          :article="article"
+          :readonly="props.readonly"
+          :generating="codeImagesGenerating"
+          @generate="handleGenerateCodeImages"
+          @copy-url="copyCodeImageUrl"
+        />
+
         <ArticleShortImagePromptSection
           :prompts="article.imagePrompts ?? []"
           :readonly="props.readonly"
@@ -202,6 +211,7 @@ import ArticleEditorPanel from "./article-detail/ArticleEditorPanel.vue";
 import ArticlePlanningSections from "./article-detail/ArticlePlanningSections.vue";
 import ArticleSimilaritySection from "./article-detail/ArticleSimilaritySection.vue";
 import ArticleSupplementalSections from "./article-detail/ArticleSupplementalSections.vue";
+import CodeImageCardsSection from "./article-detail/CodeImageCardsSection.vue";
 import { useArticleEditorViewport } from "./article-detail/useArticleEditorViewport.js";
 import { useArticleAutosave } from "./article-detail/useArticleAutosave.js";
 import { useArticleImageWorkflow } from "./article-detail/useArticleImageWorkflow.js";
@@ -221,6 +231,7 @@ import {
   restoreFinishedArticle,
   generateComments,
   generateAuthorExtensions,
+  generateFinishedArticleCodeImages,
   type CreativeFinishedArticle,
   type WechatThemeId,
 } from "../../services/creativeApi.js";
@@ -308,6 +319,33 @@ function copyPrompt(text: string): void {
   navigator.clipboard.writeText(text).then(() => {
     message.success("已复制");
   });
+}
+
+const codeImagesGenerating = ref(false);
+
+/** 触发当前短内容的代码制图片并同步服务端返回的最新成品状态。 */
+async function handleGenerateCodeImages(mode: "missing" | "all"): Promise<void> {
+  if (!props.article) return;
+  codeImagesGenerating.value = true;
+  try {
+    const result = await generateFinishedArticleCodeImages(props.article.id, mode);
+    if (result.article) Object.assign(props.article, result.article);
+    if (result.status === "succeeded") message.success("三张代码制图片已完成");
+    else if (result.status === "partial") message.warning("部分代码制图片已完成，可稍后补做失败图片");
+    else if (result.status === "running") message.info("图片正在制作中，请稍后刷新");
+    else message.error(result.reason ?? "代码制图片制作失败");
+    tickArticleChange();
+  } catch {
+    message.error("代码制图片制作失败");
+  } finally {
+    codeImagesGenerating.value = false;
+  }
+}
+
+/** 复制当前图片的公开地址，供用户手动选择封面或外部分享。 */
+function copyCodeImageUrl(url: string): void {
+  if (!url) return;
+  navigator.clipboard.writeText(url).then(() => message.success("图片地址已复制"));
 }
 
 // 提示词编辑使用显式保存；关闭弹窗前统一检查仍未保存的行。

@@ -4,6 +4,10 @@ import type { SqliteDatabase } from "../../core/db/openDatabase.js";
 import {
   type CreativeFinishedArticleRecord,
 } from "../../core/creative/creativeFinishedArticleRepository.js";
+import type {
+  CodeImageCardsGenerationMode,
+  GenerateCodeImageCardsResult,
+} from "../../core/creative/codeImageCardsService.js";
 
 export type CreativeFinishedArticleRouteOptions = {
   db?: SqliteDatabase;
@@ -18,6 +22,10 @@ export type CreativeFinishedArticleRouteOptions = {
     onProgress?: (step: string, status: "running" | "done" | "error", detail?: string) => void | Promise<void>
   ) => Promise<{ ok: boolean; mediaId?: string; errorCode?: string; errorMessage?: string; hint?: string; pushCount?: number }>;
   getArticleWechatPushLog?: (articleId: number) => unknown[];
+  generateCodeImageCards?: (
+    articleId: number,
+    mode?: CodeImageCardsGenerationMode,
+  ) => Promise<GenerateCodeImageCardsResult>;
 };
 
 export type CreativeFinishedArticleRouteContext = {

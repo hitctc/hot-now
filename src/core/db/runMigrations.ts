@@ -15,9 +15,10 @@ import { wechatRssSourcesMigration } from "./migrations/013_wechat_rss_sources.j
 import { creativeAccountFitAutomationMigration } from "./migrations/048_creative_account_fit_automation.js";
 import { creativeAutomationAlertLogMigration } from "./migrations/049_creative_automation_alert_log.js";
 import { creativeAutomationMasterSwitchMigration } from "./migrations/050_creative_automation_master_switch.js";
+import { finishedArticlesCodeImageCardsMigration } from "./migrations/051_finished_articles_code_image_cards.js";
 import { applyLegacyMigrations014To047 } from "./legacyMigrations014To047.js";
 
-const schemaVersion = 50;
+const schemaVersion = 51;
 
 export function runMigrations(db: SqliteDatabase): void {
   // Migrations stay idempotent because existing local SQLite files must be upgraded in place
@@ -174,6 +175,12 @@ export function runMigrations(db: SqliteDatabase): void {
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(
       creativeAutomationMasterSwitchMigration.version,
       creativeAutomationMasterSwitchMigration.name
+    );
+
+    finishedArticlesCodeImageCardsMigration.apply(db);
+    db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(
+      finishedArticlesCodeImageCardsMigration.version,
+      finishedArticlesCodeImageCardsMigration.name
     );
 
     db.pragma(`user_version = ${schemaVersion}`);

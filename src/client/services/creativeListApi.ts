@@ -2,6 +2,22 @@ import { requestJson } from "./http.js";
 
 // ─── Types ───
 
+export type CodeImageCardVariant = "2.5:1" | "1:1" | "3:4";
+export type CodeImageCardStatus = "pending" | "running" | "succeeded" | "failed" | "stale";
+export type CodeImageCardsGenerationMode = "missing" | "all";
+
+export type CodeImageCard = {
+  variant: CodeImageCardVariant;
+  url: string | null;
+  width: number;
+  height: number;
+  status: CodeImageCardStatus;
+  generatedAt: string | null;
+  sourceFingerprint: string | null;
+  fileSize: number | null;
+  error: string | null;
+};
+
 export type TrendBreakdown = {
   topicPower: number;
   emotionResonance: number;
@@ -126,6 +142,7 @@ export type CreativeFinishedArticle = {
   summary100: string[] | null;
   imagesJson: string | ArticleImageEntry[] | null;
   images: string | ArticleImageEntry[] | null;
+  codeImageCards: CodeImageCard[];
   coverImage: string[];
   coverImageIndex: number;
   titleIndex: number;

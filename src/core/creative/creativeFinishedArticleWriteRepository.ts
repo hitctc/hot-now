@@ -2,6 +2,7 @@ import type { SqliteDatabase } from "../db/openDatabase.js";
 import { updateCreativeSourceItemLinkedArticle } from "./creativeSourceItemRepository.js";
 import { findCreativeFinishedArticleById } from "./creativeFinishedArticleReadRepository.js";
 import { mergePublishedImages } from "./creativeMarkdownImageMerge.js";
+import type { CodeImageCard } from "./codeImageCards.js";
 import type {
   CreativeFinishedArticleRecord,
   EditCreativeFinishedArticleInput,
@@ -227,6 +228,19 @@ export function editCreativeFinishedArticle(
   const setClauses: string[] = [];
   const params: unknown[] = [];
 
+  // 标题、核心判断或选中标题变化会改变图片上的事实，普通正文段落变化不触发重做。
+  const codeImageSourceChanged = source !== "code-image"
+    && (input.thesis !== undefined || input.titles !== undefined || input.titleIndex !== undefined);
+  if (codeImageSourceChanged && input.codeImageCards === undefined && current.codeImageCards.length > 0) {
+    const staleCards: CodeImageCard[] = current.codeImageCards.map((card) => ({
+      ...card,
+      status: "stale",
+      error: null,
+    }));
+    setClauses.push("code_image_cards = ?");
+    params.push(JSON.stringify(staleCards));
+  }
+
   if (input.mode !== undefined) {
     setClauses.push("mode = ?");
     params.push(input.mode);
@@ -280,6 +294,10 @@ export function editCreativeFinishedArticle(
   if (input.images !== undefined) {
     setClauses.push("images_json = ?");
     params.push(JSON.stringify(input.images));
+  }
+  if (input.codeImageCards !== undefined) {
+    setClauses.push("code_image_cards = ?");
+    params.push(JSON.stringify(input.codeImageCards));
   }
   if (input.coverImage !== undefined) {
     setClauses.push("cover_image_url = ?");

@@ -114,7 +114,8 @@
 .focus-tools {
   position: absolute;
   top: 12px;
-  right: 12px;
+  /* 右侧给弹窗关闭按钮留出独立点击区，避免两个控件发生遮挡。 */
+  right: 56px;
   z-index: 1100;
   display: flex;
   flex-direction: column;
@@ -311,7 +312,8 @@
   }
   .focus-tools {
     top: 8px;
-    right: 8px;
+    /* 移动端同样避开右上角关闭按钮，同时保留左侧可用宽度。 */
+    right: 48px;
     left: 8px;
     max-width: none;
   }

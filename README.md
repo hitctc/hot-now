@@ -103,8 +103,8 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 - 短内容成品支持代码制图片：服务端使用 SVG + Sharp 和随应用部署、由 fontconfig 注册的 `NotoSansSC-Regular.otf` 生成 `2.5:1`、`1:1`、`3:4` 三张 2 倍像素 PNG，写入 `code_image_cards`、人工正文和封面候选；Hermes 成品推送成功后通过 token 接口触发，页面也可在单篇详情中制作、重做、下载和复制图片地址。图片主体按标题、核心判断、导语/摘要、文章生成标签组织，缺少核心判断时读取素材 `summary`；标签优先读取成品字段 `codeImageKeywords`，再读取素材 `tags`，缺失时不伪造标签，也不生成空内容占位文案。短内容详情弹窗在「备选标题」下方展示代码图片标签，没有标签时保留区域并说明原因。标签由 Hermes 写作时自动产出，模型漏给时 Hermes 会单独补一次；页面也可点“生成标签 / 重新生成标签”代理 Hermes 重新生成，采用覆盖语义（已有标签时先确认），覆盖后已有代码图片会标记为 `stale`。
 - 短内容成品的 `status` 会在入库时归一化为平台成品状态：`ready → ready_for_publish`、`draft` / `needs_rewrite → needs_review`。短内容质检通过后不需要额外的“标记可推送”步骤，可直接推送公众号草稿箱；长文状态不参与映射，仍走自己的门禁流程。
 - 成品正文编辑保存按“AI 草稿 / 人工撰写（发布内容）”分别落盘；自动保存不刷新详情弹窗，手动保存才刷新列表和详情。图片任务与正文编辑并发时，服务端会保留已经落库的封面和正文图片槽位，并清理成功图片对应的 `[IMAGEn]` / `[IMAGEn_DESC:...]` 占位协议；异步图片回写携带文章版本，版本冲突时必须基于最新正文重试，不能用旧快照覆盖用户编辑。
-- 代码图片接口为 `/api/creative/finished-articles/:id/code-images`（Hermes token）和 `/actions/creative/finished-articles/:id/code-images`（页面 session）；图片文件沿用 `/api/creative/images/<date>/<uuid>.png`。标题、核心判断、导语/摘要或选中标题变化会标记代码图片过期，普通正文段落变化不会触发重做。
-- `/monitor` 的每日长文区展示 Hermes 当前周期槽位（默认 3 个）、空位、逐篇状态/失败原因、最近执行结果和成品入口；五分钟轮询只读取状态。每轮自动长文槽位由 Hermes 维护，定时或“立即执行本轮计划”只执行触发瞬间快照，HotNow 不创建本地队列或重试。
+- 代码图片接口为 `/api/creative/finished-articles/:id/code-images`（Hermes token）和 `/actions/creative/finished-articles/:id/code-images`（页面 session）；图片文件沿用 `/api/creative/images/<date>/<uuid>.png`。标题、核心判断、导语、摘要、代码图片标签或选中标题变化会标记代码图片过期，普通正文段落变化不会触发重做。
+- `/monitor` 的每日长文区展示 Hermes 当前周期槽位（当前生产配置为 2 个）、空位、逐篇状态/失败原因、最近执行结果和成品入口；五分钟轮询只读取状态。每轮自动长文槽位由 Hermes 维护，定时或“立即执行本轮计划”只执行触发瞬间快照，HotNow 不创建本地队列或重试。
 - 兼容入口：`/history`、`/reports/:date`、`/control`；健康检查：`/health`。
 - AI 时间线 feed：`/feeds/ai-timeline-feed.md`。页面 `/ai-timeline` 与 `/settings/ai-timeline` 当前暂时下架；相关 API 与 S 级提醒链路仍可运行。
 

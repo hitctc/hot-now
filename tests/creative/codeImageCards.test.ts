@@ -165,5 +165,20 @@ describe("短内容代码制图", () => {
       mode: "all",
     });
     expect(regenerated.status).toBe("succeeded");
+
+    expect(editCreativeFinishedArticle(handle.db, article.id, {
+      intros: ["更新后的导语"],
+    }).ok).toBe(true);
+    expect(findCreativeFinishedArticleById(handle.db, article.id)!.codeImageCards.every((card) => card.status === "stale")).toBe(true);
+
+    await generateCodeImageCards(handle.db, article.id, {
+      imageDir,
+      publicBaseUrl: "https://now.example.com",
+      mode: "all",
+    });
+    expect(editCreativeFinishedArticle(handle.db, article.id, {
+      summary100: ["更新后的摘要"],
+    }).ok).toBe(true);
+    expect(findCreativeFinishedArticleById(handle.db, article.id)!.codeImageCards.every((card) => card.status === "stale")).toBe(true);
   });
 });

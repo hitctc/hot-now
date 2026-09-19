@@ -204,7 +204,7 @@ export function validateStatusTransition(
 
 // ── Edit content fields ────────────────────────────────────────────────────
 
-/** 校验人工状态转换后，仅更新调用方明确提供的文章字段。 */
+/** 校验人工状态转换后更新调用方指定字段；制图文案变化时同步将现有代码图片标记为过期。 */
 export function editCreativeFinishedArticle(
   db: SqliteDatabase,
   id: number,
@@ -233,9 +233,11 @@ export function editCreativeFinishedArticle(
   const setClauses: string[] = [];
   const params: unknown[] = [];
 
-  // 标题、核心判断、选中标题或代码图片标签变化会改变图片上的文字，普通正文段落变化不触发重做。
+  // 标题、核心判断、导语、摘要或标签都会参与制图，任一变化都不能继续沿用旧图片。
   const codeImageSourceChanged = source !== "code-image"
     && (input.thesis !== undefined
+      || input.intros !== undefined
+      || input.summary100 !== undefined
       || input.titles !== undefined
       || input.titleIndex !== undefined
       || input.codeImageKeywords !== undefined);

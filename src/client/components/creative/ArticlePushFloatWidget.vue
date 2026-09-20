@@ -78,8 +78,9 @@ function handleProgressEvent(event: PushProgressEvent): void {
   if (event.status === "done") state.detail = undefined;
 }
 
+/** 立即启动当前文章推送，并在悬浮窗内持续更新进度与最终结果。 */
 async function startPush(): Promise<void> {
-  if (!props.article) return;
+  if (!props.article || pushState.value === "pushing") return;
   pushState.value = "pushing";
   pushResult.value = null;
   STEP_DEFS.forEach((s) => { stepStates[s.id] = { status: "pending" }; });
@@ -114,8 +115,8 @@ const isDone = computed(() => pushState.value === "done");
 const failedStepError = computed(() => pushResult.value?.ok ? "" : (pushResult.value?.errorMessage || "推送失败"));
 const failedStepTitle = computed(() => STEP_DEFS.find((step) => stepStates[step.id].status === "error")?.title || "推送");
 
-// 暴露给父组件：isPushing 判断是否正在推送，resetState 切换新文章时重置浮窗状态
-defineExpose({ isPushing, resetState });
+// 父页面在首次点击时直接调用 startPush；其余方法用于阻止并发和切换文章。
+defineExpose({ isPushing, resetState, startPush });
 </script>
 
 <template>
@@ -131,15 +132,6 @@ defineExpose({ isPushing, resetState });
       <div v-if="article" class="push-float-info">
         <div class="push-float-info-title">{{ getPublishTitle(article) }}</div>
         <div class="push-float-info-meta">{{ defaultAccountName || '未配置' }} · {{ themeLabel }}</div>
-      </div>
-
-      <!-- 推送前：确认 -->
-      <div v-if="pushState === 'idle'" class="push-float-confirm">
-        <div class="push-float-confirm-hint">推送将在草稿箱新增一篇，旧版本需手动清理</div>
-        <div class="push-float-confirm-btns">
-          <a-button size="small" @click="close">取消</a-button>
-          <a-button size="small" type="primary" @click="startPush">确认推送</a-button>
-        </div>
       </div>
 
       <!-- 推送进度 -->
@@ -241,18 +233,6 @@ defineExpose({ isPushing, resetState });
   font-size: 11px;
   color: rgba(0, 0, 0, 0.45);
   margin-top: 2px;
-}
-
-/* 确认 */
-.push-float-confirm-hint {
-  font-size: 11px;
-  color: rgba(0, 0, 0, 0.45);
-  margin-bottom: 8px;
-}
-.push-float-confirm-btns {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
 }
 
 /* 步骤列表 */

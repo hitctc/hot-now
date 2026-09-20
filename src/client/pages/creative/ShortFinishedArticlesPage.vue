@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { message } from "ant-design-vue";
 
 import { useSearchHistory } from "../../composables/useSearchHistory.js";
@@ -126,7 +126,11 @@ const sourceItemModalId = ref<number | null>(null);
 const pushConfirmVisible = ref(false);
 const pushConfirmArticle = ref<CreativeFinishedArticle | null>(null);
 // 推送浮窗实例引用，用于判断是否正在推送、切换文章时重置状态
-const pushWidgetRef = ref<{ isPushing: boolean; resetState: () => void } | null>(null);
+const pushWidgetRef = ref<{
+  isPushing: boolean;
+  resetState: () => void;
+  startPush: () => Promise<void>;
+} | null>(null);
 const wechatTheme = ref<WechatThemeId>("bauhaus");
 const wechatMpAccounts = ref<WechatMpAccountSummary[]>([]);
 const defaultAccountName = computed(() => {
@@ -156,6 +160,7 @@ function getMissingConditions(article: CreativeFinishedArticle | null): string[]
   return missing;
 }
 
+/** 打开推送进度浮窗并立即推送，避免用户再次确认同一个动作。 */
 function openPushConfirm(article: CreativeFinishedArticle, themeId?: WechatThemeId): void {
   // 正在推送时禁止切换到新文章，避免并发推送和状态混乱
   if (pushWidgetRef.value?.isPushing) {
@@ -165,8 +170,11 @@ function openPushConfirm(article: CreativeFinishedArticle, themeId?: WechatTheme
   wechatTheme.value = themeId ?? (article.wechatThemeId as WechatThemeId) ?? "bauhaus";
   pushConfirmArticle.value = article;
   pushConfirmVisible.value = true;
-  // 浮窗已打开时切换文章：重置状态回确认态（visible 未变化不会触发组件内 watch）
   pushWidgetRef.value?.resetState();
+  // 等待文章和主题 props 写入浮窗后再启动，确保推送使用本次点击的数据。
+  void nextTick(() => {
+    void pushWidgetRef.value?.startPush();
+  });
   loadWechatMpAccounts();
 }
 

@@ -621,29 +621,13 @@ async function handleSave(): Promise<boolean> {
   }
 }
 
-// 推送前先保存正文，确保 DB 中是最新内容
+/** 保存最新发布正文后立即进入草稿箱推送，不再要求用户重复确认同一动作。 */
 async function saveAndPush(): Promise<void> {
   if (!props.article) return;
   // 中栏（发布内容）为空则阻止发布
   if (!humanContent.value.trim()) {
     message.warning("请先在中间栏输入或转写发布内容");
     return;
-  }
-  // 软提示：中栏内容与 AI 草稿一致（未实际改动），发布将是纯 AI（0% 人工），可能被限流
-  if (humanContent.value === editContent.value) {
-    const { Modal } = await import("ant-design-vue");
-    const confirmed = await new Promise<boolean>((resolve) => {
-      Modal.confirm({
-        bodyStyle: { padding: '24px' },
-        title: "内容未改动",
-        content: "中间栏内容与 AI 草稿一致，发布出去将是纯 AI（0% 人工），可能被限流。确认发布？",
-        okText: "确认发布",
-        cancelText: "再改改",
-        onOk: () => resolve(true),
-        onCancel: () => resolve(false),
-      });
-    });
-    if (!confirmed) return;
   }
   if (!await handleSave()) return;
   emit("openPush", props.article, currentWechatThemeId.value);

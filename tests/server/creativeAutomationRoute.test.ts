@@ -68,6 +68,44 @@ describe("creative automation Hermes proxy", () => {
     await app.close();
   });
 
+  it.each(["auto", "tuwen", "duanwen"] as const)("短内容手动写作原样代理 %s 形态", async (form) => {
+    vi.stubEnv("HERMES_API_BASE_URL", "https://hermes.test");
+    vi.stubEnv("HERMES_API_TOKEN", "token");
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ success: true }), { status: 202 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const handle = await createTestDatabase(`hot-now-short-write-${form}-`);
+    handles.push(handle);
+    const app = createServer({ db: handle.db, creativeApiToken: "test-token" });
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/creative/source-items",
+      headers: { "x-creative-token": "test-token" },
+      payload: {
+        externalId: `short-${form}`,
+        collectorAgent: "short-content-writer",
+        title: `${form} 素材`,
+        url: `https://example.com/${form}`,
+        direction: "short_content",
+      },
+    });
+    const sourceItemId = created.json().id as number;
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/creative/source-items/${sourceItemId}/write-short`,
+      payload: { externalId: `short-${form}`, form },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ ok: true, status: "writing" });
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+      external_id: `short-${form}`,
+      form,
+    });
+    await app.close();
+  });
+
   it("手动写作只把人工意图代理给 Hermes", async () => {
     vi.stubEnv("HERMES_API_BASE_URL", "https://hermes.test");
     vi.stubEnv("HERMES_API_TOKEN", "token");

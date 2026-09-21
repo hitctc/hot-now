@@ -154,7 +154,12 @@ export function registerCreativeSourceActionRoutes(
     const hermesApiToken = process.env.HERMES_API_TOKEN;
     if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
 
-    const form = body?.form === "tuwen" ? "tuwen" : "duanwen";
+    const requestedForm = body?.form;
+    if (requestedForm !== undefined && !["auto", "tuwen", "duanwen"].includes(requestedForm)) {
+      return reply.code(400).send({ ok: false, reason: "invalid-short-content-form" });
+    }
+    // 三种页面选项都由 Hermes 解释，HotNow 不能把“自动判断”提前改写成固定形态。
+    const form = requestedForm ?? "auto";
     const hermesBody: Record<string, unknown> = { form };
     if (typeof body?.externalId === "string" && body.externalId.trim()) {
       hermesBody.external_id = body.externalId.trim();

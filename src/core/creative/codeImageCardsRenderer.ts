@@ -60,6 +60,8 @@ export async function renderCodeImageCard(input: CodeImageCardRenderInput): Prom
   const size = getCodeImageCardLogicalSize(input.variant);
   const svg = buildSvg(input, size.width, size.height);
   return sharp(Buffer.from(svg))
+    // SVG 抗锯齿在浏览器缩放时会显得发虚；栅格化后做一次中等锐化，保留布局但强化文字边缘。
+    .sharpen({ sigma: 0.8 })
     .png({ compressionLevel: 9, adaptiveFiltering: true, effort: 9 })
     .toBuffer();
 }

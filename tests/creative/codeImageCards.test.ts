@@ -27,6 +27,28 @@ describe("短内容代码制图", () => {
     expect(getCodeImageCardTypography("3:4")).toMatchObject({ titleSize: 60, thesisSize: 44, keywordSize: 36 });
   });
 
+  it("栅格化后的文字边缘保持足够清晰", async () => {
+    const buffer = await renderCodeImageCard({
+      variant: "2.5:1",
+      title: "三条车道等一位老人",
+      thesis: "判断方向：核心重点不是制造反转，而是复盘老人过斑马线近3分钟期间车辆集体耐心礼让。",
+      keywords: ["文明礼让", "斑马线安全", "上海交通"],
+    });
+    const { data, info } = await sharp(buffer).greyscale().raw().toBuffer({ resolveWithObject: true });
+    let gradientTotal = 0;
+    let gradientSamples = 0;
+    for (let y = 1; y < info.height - 1; y += 1) {
+      for (let x = 1; x < info.width - 1; x += 1) {
+        const offset = y * info.width + x;
+        if (data[offset] >= 235) continue;
+        gradientTotal += Math.abs(data[offset] - data[offset + 1]);
+        gradientTotal += Math.abs(data[offset] - data[offset + info.width]);
+        gradientSamples += 2;
+      }
+    }
+    expect(gradientTotal / gradientSamples).toBeGreaterThan(16);
+  });
+
   it("按三种比例导出清晰的 PNG", async () => {
     for (const variant of ["2.5:1", "1:1", "3:4"] as const) {
       const buffer = await renderCodeImageCard({

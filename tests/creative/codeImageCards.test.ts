@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { editCreativeFinishedArticle, findCreativeFinishedArticleById, insertCreativeFinishedArticle } from "../../src/core/creative/creativeFinishedArticleRepository.js";
 import { insertCreativeSourceItem } from "../../src/core/creative/creativeSourceItemRepository.js";
 import { generateCodeImageCards, resolveCodeImageKeywords, resolveCodeImageThesis } from "../../src/core/creative/codeImageCardsService.js";
-import { getCodeImageCardSize, renderCodeImageCard } from "../../src/core/creative/codeImageCardsRenderer.js";
+import { getCodeImageCardSize, getCodeImageCardTypography, renderCodeImageCard } from "../../src/core/creative/codeImageCardsRenderer.js";
 import { refreshCodeImageCardsTemplateMigration } from "../../src/core/db/migrations/052_refresh_code_image_cards_template.js";
 import { createTestDatabase, type TestDatabaseHandle } from "../helpers/testDatabase.js";
 
@@ -21,6 +21,12 @@ afterEach(async () => {
 });
 
 describe("短内容代码制图", () => {
+  it("三种比例使用适合移动端阅读的判断和标签字号", () => {
+    expect(getCodeImageCardTypography("2.5:1")).toMatchObject({ thesisSize: 31 });
+    expect(getCodeImageCardTypography("1:1")).toMatchObject({ thesisSize: 38, keywordSize: 28 });
+    expect(getCodeImageCardTypography("3:4")).toMatchObject({ thesisSize: 40, keywordSize: 30 });
+  });
+
   it("按三种比例导出清晰的 PNG", async () => {
     for (const variant of ["2.5:1", "1:1", "3:4"] as const) {
       const buffer = await renderCodeImageCard({

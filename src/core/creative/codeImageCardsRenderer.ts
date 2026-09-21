@@ -25,9 +25,7 @@ const LOGICAL_CANVAS_SIZE: Record<CodeImageCardVariant, { width: number; height:
 const OUTPUT_SCALE = 2;
 /** 半角字符宽度比例上限，用于保守换行；详见 `measureTextWidth`。 */
 const HALF_WIDTH_RATIO = 0.62;
-/** 标签胶囊的内边距和间距，配合 `measureTextWidth` 保证标签行不越界。 */
-const KEYWORD_FONT_SIZE = 20;
-const KEYWORD_PADDING_X = 17;
+/** 标签胶囊的基础间距，配合各比例字号动态计算尺寸并保证标签行不越界。 */
 const KEYWORD_GAP = 14;
 
 type VariantLayout = {
@@ -38,6 +36,7 @@ type VariantLayout = {
   thesisSize: number;
   thesisMinSize: number;
   thesisMaxLines: number;
+  keywordSize: number;
   titleY: number;
   thesisBaseY: number;
   keywordBaseY: number;
@@ -45,10 +44,16 @@ type VariantLayout = {
 
 /** 三种比例的基础排版参数：外边距、字号、行数上限和纵向锚点。 */
 const VARIANT_LAYOUT: Record<CodeImageCardVariant, VariantLayout> = {
-  "2.5:1": { margin: 42, titleSize: 42, titleMinSize: 30, titleMaxLines: 2, thesisSize: 25, thesisMinSize: 20, thesisMaxLines: 2, titleY: 34, thesisBaseY: 132, keywordBaseY: 232 },
-  "1:1": { margin: 58, titleSize: 54, titleMinSize: 38, titleMaxLines: 3, thesisSize: 30, thesisMinSize: 20, thesisMaxLines: 4, titleY: 70, thesisBaseY: 205, keywordBaseY: 400 },
-  "3:4": { margin: 64, titleSize: 56, titleMinSize: 38, titleMaxLines: 4, thesisSize: 30, thesisMinSize: 20, thesisMaxLines: 5, titleY: 82, thesisBaseY: 330, keywordBaseY: 650 },
+  "2.5:1": { margin: 42, titleSize: 42, titleMinSize: 30, titleMaxLines: 2, thesisSize: 31, thesisMinSize: 24, thesisMaxLines: 2, keywordSize: 22, titleY: 34, thesisBaseY: 132, keywordBaseY: 244 },
+  "1:1": { margin: 58, titleSize: 54, titleMinSize: 38, titleMaxLines: 3, thesisSize: 38, thesisMinSize: 26, thesisMaxLines: 4, keywordSize: 28, titleY: 70, thesisBaseY: 205, keywordBaseY: 400 },
+  "3:4": { margin: 64, titleSize: 56, titleMinSize: 38, titleMaxLines: 4, thesisSize: 40, thesisMinSize: 28, thesisMaxLines: 5, keywordSize: 30, titleY: 82, thesisBaseY: 330, keywordBaseY: 650 },
 };
+
+/** 返回当前比例实际采用的字号，供渲染与回归测试共享同一套排版基线。 */
+export function getCodeImageCardTypography(variant: CodeImageCardVariant): Pick<VariantLayout, "titleSize" | "thesisSize" | "keywordSize"> {
+  const layout = VARIANT_LAYOUT[variant];
+  return { titleSize: layout.titleSize, thesisSize: layout.thesisSize, keywordSize: layout.keywordSize };
+}
 
 /** 将品牌模板渲染为压缩 PNG；所有文字和装饰均来自输入数据，不调用外部模型。 */
 export async function renderCodeImageCard(input: CodeImageCardRenderInput): Promise<Buffer> {
@@ -88,21 +93,21 @@ function buildSvg(input: CodeImageCardRenderInput, width: number, height: number
     ? layout.keywordBaseY
     : Math.max(layout.keywordBaseY, thesisY + thesis.lines.length * thesis.fontSize * 1.35 + 36);
   const logoY = height - Math.round(height * 0.09);
-  const keywordMarkup = renderKeywordTags(input.keywords, margin, keywordY, availableWidth);
+  const keywordMarkup = renderKeywordTags(input.keywords, margin, keywordY, availableWidth, layout.keywordSize);
   const logoMarkup = input.logoDataUri
     ? `<image href="${input.logoDataUri}" x="${width - margin - 34}" y="${logoY - 23}" width="24" height="24" preserveAspectRatio="xMidYMid meet"/><text x="${width - margin - 4}" y="${logoY - 5}" text-anchor="end" class="logo">HotNow</text>`
     : `<text x="${width - margin}" y="${logoY}" text-anchor="end" class="logo">HotNow</text>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width * OUTPUT_SCALE}" height="${height * OUTPUT_SCALE}" viewBox="0 0 ${width} ${height}">
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width * OUTPUT_SCALE}" height="${height * OUTPUT_SCALE}" viewBox="0 0 ${width} ${height}" text-rendering="geometricPrecision">
   <rect width="${width}" height="${height}" fill="#f8f5ff"/>
   <circle cx="${width - margin * 0.7}" cy="${margin * 0.8}" r="${Math.max(34, Math.round(width * 0.08))}" fill="#caa9fa" opacity="0.28"/>
   <path d="M${margin} ${input.variant === "2.5:1" ? height - 14 : height - margin * 0.8} H${Math.round(width * 0.38)}" stroke="#d8c0fc" stroke-width="3" stroke-linecap="round"/>
   <path d="M${Math.round(width * 0.68)} ${margin * 0.7} H${width - margin}" stroke="#e7c79a" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
   <style>
     text { font-family: "Noto Sans SC", "PingFang SC", sans-serif; fill: #1a1525; }
-    .title { font-weight: 700; letter-spacing: -0.8px; }
-    .thesis { font-weight: 400; fill: #51445f; }
-    .keyword { font-weight: 400; fill: #5b3c86; }
-    .logo { font-size: 18px; font-weight: 400; letter-spacing: 0.4px; }
+    .title { font-weight: 700; letter-spacing: -0.4px; }
+    .thesis { font-weight: 500; fill: #51445f; }
+    .keyword { font-weight: 500; fill: #5b3c86; }
+    .logo { font-size: 18px; font-weight: 500; letter-spacing: 0.4px; }
   </style>
   ${renderTextLines(title.lines, margin, layout.titleY, title.fontSize, "title", 1.16)}
   ${renderTextLines(thesis.lines, margin, thesisY, thesis.fontSize, "thesis", 1.35)}
@@ -123,15 +128,17 @@ function renderTextLines(
   return lines.map((line, index) => `<text x="${x}" y="${Math.round(y + index * fontSize * lineHeight)}" font-size="${fontSize}" class="${className}" dominant-baseline="hanging">${escapeXml(line)}</text>`).join("");
 }
 
-/** 渲染标签胶囊；胶囊宽度由保守文本宽度推导，放不下时直接跳过而不是越界。 */
-function renderKeywordTags(keywords: string[], x: number, y: number, maxWidth: number): string {
+/** 渲染标签胶囊；字号随画布比例调整，胶囊尺寸同步放大且始终限制在内容宽度内。 */
+function renderKeywordTags(keywords: string[], x: number, y: number, maxWidth: number, fontSize: number): string {
   let cursor = x;
   const parts: string[] = [];
+  const paddingX = 17 + Math.round((fontSize - 20) * 0.5);
+  const height = fontSize + 24;
   for (const keyword of keywords.slice(0, 3)) {
-    const label = truncateByWidth(keyword, 180, KEYWORD_FONT_SIZE);
-    const width = Math.max(104, Math.round(measureTextWidth(label, KEYWORD_FONT_SIZE)) + KEYWORD_PADDING_X * 2);
+    const label = truncateByWidth(keyword, 210, fontSize);
+    const width = Math.max(104, Math.round(measureTextWidth(label, fontSize)) + paddingX * 2);
     if (cursor + width > x + maxWidth) break;
-    parts.push(`<rect x="${cursor}" y="${y}" width="${width}" height="42" rx="21" fill="#eadffc"/><text x="${Math.round(cursor + width / 2)}" y="${y + 10}" text-anchor="middle" font-size="${KEYWORD_FONT_SIZE}" class="keyword" dominant-baseline="hanging">${escapeXml(label)}</text>`);
+    parts.push(`<rect x="${cursor}" y="${y}" width="${width}" height="${height}" rx="${Math.round(height / 2)}" fill="#eadffc"/><text x="${Math.round(cursor + width / 2)}" y="${Math.round(y + height / 2)}" text-anchor="middle" font-size="${fontSize}" class="keyword" dominant-baseline="central">${escapeXml(label)}</text>`);
     cursor += width + KEYWORD_GAP;
   }
   return parts.join("");

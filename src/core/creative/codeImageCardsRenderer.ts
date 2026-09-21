@@ -44,9 +44,9 @@ type VariantLayout = {
 
 /** 三种比例的基础排版参数：外边距、字号、行数上限和纵向锚点。 */
 const VARIANT_LAYOUT: Record<CodeImageCardVariant, VariantLayout> = {
-  "2.5:1": { margin: 42, titleSize: 42, titleMinSize: 30, titleMaxLines: 2, thesisSize: 31, thesisMinSize: 24, thesisMaxLines: 2, keywordSize: 22, titleY: 34, thesisBaseY: 132, keywordBaseY: 244 },
-  "1:1": { margin: 58, titleSize: 54, titleMinSize: 38, titleMaxLines: 3, thesisSize: 38, thesisMinSize: 26, thesisMaxLines: 4, keywordSize: 28, titleY: 70, thesisBaseY: 205, keywordBaseY: 400 },
-  "3:4": { margin: 64, titleSize: 56, titleMinSize: 38, titleMaxLines: 4, thesisSize: 40, thesisMinSize: 28, thesisMaxLines: 5, keywordSize: 30, titleY: 82, thesisBaseY: 330, keywordBaseY: 650 },
+  "2.5:1": { margin: 42, titleSize: 42, titleMinSize: 30, titleMaxLines: 2, thesisSize: 31, thesisMinSize: 24, thesisMaxLines: 2, keywordSize: 22, titleY: 34, thesisBaseY: 132, keywordBaseY: 228 },
+  "1:1": { margin: 58, titleSize: 54, titleMinSize: 38, titleMaxLines: 3, thesisSize: 38, thesisMinSize: 26, thesisMaxLines: 4, keywordSize: 28, titleY: 70, thesisBaseY: 205, keywordBaseY: 450 },
+  "3:4": { margin: 64, titleSize: 60, titleMinSize: 42, titleMaxLines: 4, thesisSize: 44, thesisMinSize: 32, thesisMaxLines: 5, keywordSize: 36, titleY: 82, thesisBaseY: 330, keywordBaseY: 735 },
 };
 
 /** 返回当前比例实际采用的字号，供渲染与回归测试共享同一套排版基线。 */
@@ -132,7 +132,8 @@ function renderTextLines(
 function renderKeywordTags(keywords: string[], x: number, y: number, maxWidth: number, fontSize: number): string {
   let cursor = x;
   const parts: string[] = [];
-  const paddingX = 17 + Math.round((fontSize - 20) * 0.5);
+  // 大字号时收紧横向留白，避免竖图的三枚常规长度标签因胶囊膨胀而丢失第三枚。
+  const paddingX = Math.max(12, 17 - Math.round((fontSize - 20) * 0.25));
   const height = fontSize + 24;
   for (const keyword of keywords.slice(0, 3)) {
     const label = truncateByWidth(keyword, 210, fontSize);

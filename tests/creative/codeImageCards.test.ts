@@ -24,7 +24,7 @@ describe("短内容代码制图", () => {
   it("三种比例使用适合移动端阅读的判断和标签字号", () => {
     expect(getCodeImageCardTypography("2.5:1")).toMatchObject({ thesisSize: 31 });
     expect(getCodeImageCardTypography("1:1")).toMatchObject({ thesisSize: 38, keywordSize: 28 });
-    expect(getCodeImageCardTypography("3:4")).toMatchObject({ thesisSize: 40, keywordSize: 30 });
+    expect(getCodeImageCardTypography("3:4")).toMatchObject({ titleSize: 60, thesisSize: 44, keywordSize: 36 });
   });
 
   it("按三种比例导出清晰的 PNG", async () => {

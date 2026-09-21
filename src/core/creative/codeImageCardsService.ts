@@ -85,7 +85,7 @@ export function buildCodeImageSourceFingerprint(
   keywords: string[],
 ): string {
   return createHash("sha256")
-    .update(JSON.stringify({ title, thesis, keywords, template: "hotnow-code-card-v5", sizes: { wide: "1500x600", square: "1500x1500", portrait: "1500x2000" } }))
+    .update(JSON.stringify({ title, thesis, keywords, template: "hotnow-code-card-v6", sizes: { wide: "1500x600", square: "1500x1500", portrait: "1500x2000" } }))
     .digest("hex");
 }
 

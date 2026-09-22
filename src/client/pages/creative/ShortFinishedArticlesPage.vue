@@ -619,8 +619,8 @@ function copyId(id: number): void {
 }
 
 const columns = [
-  { title: "ID / 序号", dataIndex: "id", key: "idSeq", width: 72, fixed: "left" as const },
-  { title: "标题", key: "title", width: 300, className: "table-day-title-cell" },
+  { title: "ID / 序号", dataIndex: "id", key: "idSeq", width: 72, fixed: "left" as const, className: "table-day-anchor-cell" },
+  { title: "标题", key: "title", width: 300 },
   { title: "配图提示词", key: "coverImage", width: 120 },
   { title: "状态", key: "status", width: 100 },
   { title: "来源", key: "sourceName", width: 115 },
@@ -699,6 +699,9 @@ const pagination = computed(() => ({
         <template #bodyCell="{ column, record, index }">
           <!-- ID 列：点击复制 -->
           <template v-if="column.key === 'idSeq'">
+            <div v-if="getArticleDayLabel(record, index)" class="table-day-group-label" data-table-day-divider>
+              {{ getArticleDayLabel(record, index) }}
+            </div>
             <div class="flex flex-col leading-tight">
               <span class="cursor-pointer text-editorial-link-active hover:underline" @click="copyId(record.id)">{{ record.id }}</span>
               <span class="text-[11px] text-editorial-text-muted">#{{ record.seqNumber ?? '-' }}</span>
@@ -706,9 +709,6 @@ const pagination = computed(() => ({
           </template>
           <!-- 标题列：点击标题打开详情，点击素材链接打开来源素材弹窗，互不影响 -->
           <template v-if="column.key === 'title'">
-            <div v-if="getArticleDayLabel(record, index)" class="table-day-group-label" data-table-day-divider>
-              {{ getArticleDayLabel(record, index) }}
-            </div>
             <div class="flex items-start gap-1">
               <span v-if="record.pinnedAt" class="shrink-0 text-[13px] text-purple-600" title="已置顶">◆</span>
               <span

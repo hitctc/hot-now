@@ -5,6 +5,7 @@ export type HermesWriteQueueStatus = {
   stats: Record<string, number>;
   recent?: unknown[];
   history?: unknown[];
+  day_counts?: Array<{ day_key: string; article_count: number; source_count: number }>;
   run_started_at?: string | null;
   status_delayed?: boolean;
   status_unavailable?: boolean;

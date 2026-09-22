@@ -52,6 +52,29 @@ export function registerHermesOperationalRoutes(
 
     // 队列终态历史从 Hermes 持久化读取；旧版本服务没有历史文件时，用本地 pipeline 成品补齐成功记录。
     if (db) {
+      // 队列日期带必须读取数据库全量日统计，不能从有限的历史记录反推文章和素材数量。
+      const articleDayRows = db.prepare(`
+        SELECT date(datetime(created_at), '+8 hours') AS day_key, COUNT(*) AS article_count
+        FROM creative_finished_articles
+        WHERE deleted_at IS NULL
+        GROUP BY day_key
+      `).all() as Array<{ day_key: string; article_count: number }>;
+      const sourceDayRows = db.prepare(`
+        SELECT date(datetime(COALESCE(collector_timestamp, created_at)), '+8 hours') AS day_key, COUNT(*) AS source_count
+        FROM creative_source_items
+        GROUP BY day_key
+      `).all() as Array<{ day_key: string; source_count: number }>;
+      const dayCounts = new Map<string, { day_key: string; article_count: number; source_count: number }>();
+      for (const row of articleDayRows) {
+        dayCounts.set(row.day_key, { ...row, source_count: 0 });
+      }
+      for (const row of sourceDayRows) {
+        const current = dayCounts.get(row.day_key) ?? { day_key: row.day_key, article_count: 0, source_count: 0 };
+        current.source_count = row.source_count;
+        dayCounts.set(row.day_key, current);
+      }
+      data.day_counts = [...dayCounts.values()].sort((left, right) => right.day_key.localeCompare(left.day_key));
+
       const history = Array.isArray(data.history) ? data.history as Array<Record<string, unknown>> : [];
       const knownArticleIds = new Set(
         history.map((task) => Number(task.finished_article_id)).filter((id) => Number.isFinite(id) && id > 0),

@@ -15,6 +15,7 @@ import {
 } from "../../services/creativeApi.js";
 import ArticleDetailDrawer from "./ArticleDetailDrawer.vue";
 import SourceItemDetailModal from "./SourceItemDetailModal.vue";
+import { toShanghaiDayKey } from "./tableDayGroups.js";
 
 const data = ref<WriteQueueStatusType | null>(null);
 const loading = ref(false);
@@ -104,19 +105,7 @@ async function openArticleDetail(id: number): Promise<void> {
   }
 }
 
-/** 将 ISO 时间按北京时间切成自然日，避免浏览器本地时区造成跨日错分。 */
-function beijingDateKey(value: string | null | undefined): string {
-  if (!value) return "unknown";
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date(value));
-  const fields = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${fields.year}-${fields.month}-${fields.day}`;
-}
-
+/** 读取任务用于北京时间自然日分组的终态时间。 */
 function historyTime(task: WriteQueueTask): string {
   return task.finished_at || task.started_at || task.submitted_at;
 }
@@ -125,7 +114,7 @@ const historyGroups = computed(() => {
   const tasks = data.value?.history?.length ? data.value.history : (data.value?.recent ?? []);
   const groups = new Map<string, WriteQueueTask[]>();
   for (const task of tasks) {
-    const key = beijingDateKey(historyTime(task));
+    const key = toShanghaiDayKey(historyTime(task)) ?? "unknown";
     const items = groups.get(key) ?? [];
     items.push(task);
     groups.set(key, items);
@@ -135,13 +124,16 @@ const historyGroups = computed(() => {
     .map(([date, items]) => ({ date, items }));
 });
 
-/** 日期后显示当天成功成品数和去重素材数，失败任务不计入文章数。 */
+/** 日期后显示数据库当天全量成品和采集素材数；旧接口缺字段时才回退队列记录。 */
 function formatHistoryDate(date: string, tasks: WriteQueueTask[]): string {
   if (date === "unknown") return "日期未知";
   const weekday = new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", weekday: "short" })
     .format(new Date(`${date}T00:00:00+08:00`));
-  const articleCount = new Set(tasks.map((task) => task.finished_article_id).filter((id): id is number => id != null)).size;
-  const sourceCount = new Set(tasks.map((task) => task.source_item_id).filter((id): id is number => id != null)).size;
+  const dayCount = data.value?.day_counts?.find((count) => count.day_key === date);
+  const articleCount = dayCount?.article_count
+    ?? new Set(tasks.map((task) => task.finished_article_id).filter((id): id is number => id != null)).size;
+  const sourceCount = dayCount?.source_count
+    ?? new Set(tasks.map((task) => task.source_item_id).filter((id): id is number => id != null)).size;
   return `${date}（${weekday}） · 文章 ${articleCount} · 素材 ${sourceCount}`;
 }
 

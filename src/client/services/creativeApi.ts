@@ -859,6 +859,12 @@ export type WriteQueueTask = {
   source_item_source_name?: string | null;
 };
 
+export type WriteQueueDayCount = {
+  day_key: string;
+  article_count: number;
+  source_count: number;
+};
+
 export type WriteQueueStats = {
   total_submitted: number;
   total_completed: number;
@@ -873,6 +879,8 @@ export type WriteQueueStatus = {
   recent?: WriteQueueTask[];
   /** Hermes 持久化的终态历史，按完成时间倒序。 */
   history?: WriteQueueTask[];
+  /** HotNow 数据库按北京时间统计的全量成品与采集素材数量。 */
+  day_counts?: WriteQueueDayCount[];
   stats: WriteQueueStats;
   luna?: {
     status: "idle" | "running" | string;

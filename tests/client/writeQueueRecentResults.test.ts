@@ -54,7 +54,13 @@ describe("写作队列最近逐篇结果", () => {
       recent: [],
       history: [
         { ...queueStatus.recent![1], task_id: "h-today", finished_at: "2026-08-20T15:10:00Z", finished_article_id: 2401 },
+        { ...queueStatus.recent![1], task_id: "h-sqlite-utc", finished_at: "2026-08-20 16:10:00", finished_article_id: 2402 },
         { ...queueStatus.recent![1], task_id: "h-yesterday", finished_at: "2026-08-19T15:10:00Z", finished_article_id: 2400 },
+      ],
+      day_counts: [
+        { day_key: "2026-08-21", article_count: 41, source_count: 259 },
+        { day_key: "2026-08-20", article_count: 38, source_count: 180 },
+        { day_key: "2026-08-19", article_count: 30, source_count: 150 },
       ],
     });
     vi.spyOn(creativeApi, "readCreativeFinishedArticle").mockResolvedValue({ id: 2401 } as never);
@@ -67,7 +73,8 @@ describe("写作队列最近逐篇结果", () => {
     await wrapper.vm.$nextTick();
 
     expect(document.body.textContent).toContain("北京时间 00:00–23:59");
-    expect(document.body.textContent).toContain("2026-08-20");
+    expect(document.body.textContent).toContain("2026-08-21（周五） · 文章 41 · 素材 259");
+    expect(document.body.textContent).toContain("2026-08-20（周四） · 文章 38 · 素材 180");
     expect(document.body.textContent).toContain("2026-08-19");
     const articleLink = [...document.body.querySelectorAll<HTMLButtonElement>(".write-queue-link")]
       .find((button) => button.textContent?.includes("成品 #2401"));

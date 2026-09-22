@@ -218,6 +218,7 @@ import { useArticleEditorViewport } from "./article-detail/useArticleEditorViewp
 import { useArticleAutosave } from "./article-detail/useArticleAutosave.js";
 import { useArticleImageWorkflow } from "./article-detail/useArticleImageWorkflow.js";
 import { useArticlePlanningActions, type PreviewThemeKey } from "./article-detail/useArticlePlanningActions.js";
+import { syncArticleEditorContent } from "./article-detail/articleDetailContentSync.js";
 import ArticleImageWorkflowSections from "./article-detail/ArticleImageWorkflowSections.vue";
 import ArticleShortImagePromptSection from "./article-detail/ArticleShortImagePromptSection.vue";
 import ArticleDetailFooter from "./article-detail/ArticleDetailFooter.vue";
@@ -331,7 +332,10 @@ async function handleGenerateCodeImages(mode: "missing" | "all"): Promise<void> 
   codeImagesGenerating.value = true;
   try {
     const result = await generateFinishedArticleCodeImages(props.article.id, mode);
-    if (result.article) Object.assign(props.article, result.article);
+    if (result.article) {
+      Object.assign(props.article, result.article);
+      syncCurrentArticleContent();
+    }
     if (result.status === "succeeded") message.success("三张代码制图片已完成");
     else if (result.status === "partial") message.warning("部分代码制图片已完成，可稍后补做失败图片");
     else if (result.status === "running") message.info("图片正在制作中，请稍后刷新");
@@ -370,6 +374,21 @@ let relativeTimer: ReturnType<typeof setInterval> | null = null;
 // 记住打开时的原始内容，用于判断是否真正发生变化
 let lastSavedContent = "";
 let lastSavedHuman = "";
+
+/** 同步当前服务端文章正文；未保存的用户编辑按栏位独立保留。 */
+function syncCurrentArticleContent(force = false): void {
+  if (!props.article) return;
+  syncArticleEditorContent({
+    article: props.article,
+    editContent,
+    humanContent,
+    getLastSavedContent: () => lastSavedContent,
+    setLastSavedContent: (value) => { lastSavedContent = value; },
+    getLastSavedHuman: () => lastSavedHuman,
+    setLastSavedHuman: (value) => { lastSavedHuman = value; },
+    force,
+  });
+}
 
 const {
   saving,
@@ -548,19 +567,14 @@ watch(() => props.article?.sourceItemId, (sid) => {
 
 watch(() => props.open, (val) => {
   if (val && props.article) {
-    const md = props.article.contentMarkdown || "";
-    editContent.value = md;
-    lastSavedContent = md;
-    // 人工转写：优先用已保存的 human_markdown，为空则预填 AI 草稿副本（用户在此基础上改）
-    const hm = props.article.humanMarkdown ?? "";
-    humanContent.value = hm || md;
-    lastSavedHuman = humanContent.value;
+    // 首次打开强制以服务端正文初始化；保持打开后的刷新则走下面的安全同步监听。
+    syncCurrentArticleContent(true);
     // 重置保存时间，避免上一篇的相对时间残留到当前文章
     lastSavedAt.value = null;
     // 重置本地缓存状态
     resetImageState(props.article);
     localTitles.value = [];
-    manualTitle.value = parseJsonArray(props.article.titles)[0] ?? readFirstH1(hm || md);
+    manualTitle.value = parseJsonArray(props.article.titles)[0] ?? readFirstH1(humanContent.value || editContent.value);
     promptDirtyKeys.value = new Set();
     localIntros.value = [];
     activeTitleIndex.value = props.article.titleIndex ?? 0;
@@ -591,6 +605,15 @@ watch(() => props.open, (val) => {
     }
   }
 });
+
+watch(
+  () => [props.article?.id, props.article?.contentMarkdown, props.article?.humanMarkdown] as const,
+  (current, previous) => {
+    if (!props.open || !props.article) return;
+    // 同一篇文章的图片回写只同步未编辑栏位；弹窗内切换文章时强制重置两栏。
+    syncCurrentArticleContent(previous?.[0] !== current[0]);
+  },
+);
 
 /** 手动保存等待自动队列收口后，再执行双栏正文和标题的完整同步。 */
 async function handleSave(): Promise<boolean> {

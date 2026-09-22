@@ -205,11 +205,18 @@ export type ListCreativeFinishedArticlesFilters = {
   summaryOnly?: boolean;
 };
 
+export type FinishedArticleDayCount = {
+  dayKey: string;
+  articleCount: number;
+  sourceCount: number;
+};
+
 export type ListCreativeFinishedArticlesResult = {
   items: CreativeFinishedArticleRecord[];
   total: number;
   page: number;
   pageSize: number;
+  dayCounts: FinishedArticleDayCount[];
 };
 
 export type SaveArticlePerformanceFeedbackInput = {

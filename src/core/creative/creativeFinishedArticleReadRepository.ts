@@ -422,6 +422,18 @@ export function listCreativeFinishedArticles(
   const countRow = db
     .prepare(`SELECT COUNT(*) AS total FROM creative_finished_articles ${whereClause}`)
     .get(...params) as { total: number };
+  const dayCounts = db
+    .prepare(`
+      SELECT
+        date(datetime(created_at), '+8 hours') AS day_key,
+        COUNT(*) AS article_count,
+        COUNT(DISTINCT source_item_id) AS source_count
+      FROM creative_finished_articles
+      ${whereClause}
+      GROUP BY day_key
+      ORDER BY day_key DESC
+    `)
+    .all(...params) as Array<{ day_key: string; article_count: number; source_count: number }>;
 
   const offset = (page - 1) * pageSize;
   const selectedColumns = filters.summaryOnly ? LIST_SELECT_COLUMNS : SELECT_COLUMNS;
@@ -437,6 +449,11 @@ export function listCreativeFinishedArticles(
     items: items.map(mapRow),
     total: countRow.total,
     page,
-    pageSize
+    pageSize,
+    dayCounts: dayCounts.map((row) => ({
+      dayKey: row.day_key,
+      articleCount: row.article_count,
+      sourceCount: row.source_count,
+    }))
   };
 }

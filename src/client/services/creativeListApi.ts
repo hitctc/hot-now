@@ -214,11 +214,18 @@ export type SourceItemListResponse = {
   pageSize: number;
 };
 
+export type FinishedArticleDayCount = {
+  dayKey: string;
+  articleCount: number;
+  sourceCount: number;
+};
+
 export type FinishedArticleListResponse = {
   items: CreativeFinishedArticle[];
   total: number;
   page: number;
   pageSize: number;
+  dayCounts: FinishedArticleDayCount[];
 };
 
 // 图片转存接口类型

@@ -389,6 +389,28 @@ describe("listCreativeFinishedArticles", () => {
     expect(result.items.every((item) => typeof item.id === "number")).toBe(true);
   });
 
+  it("returns full filtered day counts independent of pagination", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+
+    const source = createSourceItem(handle.db);
+    const otherSource = createSourceItem(handle.db);
+    const first = insertCreativeFinishedArticle(handle.db, { sourceItemId: source.id, contentMarkdown: "first" });
+    const second = insertCreativeFinishedArticle(handle.db, { sourceItemId: source.id, contentMarkdown: "second" });
+    const third = insertCreativeFinishedArticle(handle.db, { sourceItemId: otherSource.id, contentMarkdown: "third" });
+    handle.db.prepare("UPDATE creative_finished_articles SET created_at = ? WHERE id = ?").run("2026-09-22 01:00:00", first.id);
+    handle.db.prepare("UPDATE creative_finished_articles SET created_at = ? WHERE id = ?").run("2026-09-22 12:00:00", second.id);
+    handle.db.prepare("UPDATE creative_finished_articles SET created_at = ? WHERE id = ?").run("2026-09-23 01:00:00", third.id);
+
+    const result = listCreativeFinishedArticles(handle.db, { page: 1, pageSize: 1 });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.dayCounts).toEqual([
+      { dayKey: "2026-09-23", articleCount: 1, sourceCount: 1 },
+      { dayKey: "2026-09-22", articleCount: 2, sourceCount: 1 },
+    ]);
+  });
+
   it("returns second page with remainder items", async () => {
     const handle = await makeHandle();
     handles.push(handle);

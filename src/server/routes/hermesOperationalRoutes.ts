@@ -50,9 +50,42 @@ export function registerHermesOperationalRoutes(
 
     const data = await hermesWriteQueueStatusReader.read();
 
-    // 从队列中收集所有 source_item_id，批量查本地素材表补充标题和来源
+    // 队列终态历史从 Hermes 持久化读取；旧版本服务没有历史文件时，用本地 pipeline 成品补齐成功记录。
     if (db) {
-      const tasks = [data.current, ...(data.queue ?? [])].filter(Boolean) as Array<Record<string, unknown>>;
+      const history = Array.isArray(data.history) ? data.history as Array<Record<string, unknown>> : [];
+      const knownArticleIds = new Set(
+        history.map((task) => Number(task.finished_article_id)).filter((id) => Number.isFinite(id) && id > 0),
+      );
+      const legacyArticles = db.prepare(`
+        SELECT id, source_item_id, created_at
+        FROM creative_finished_articles
+        WHERE origin_type = 'pipeline'
+        ORDER BY datetime(created_at) DESC, id DESC
+        LIMIT 500
+      `).all() as Array<{ id: number; source_item_id: number | null; created_at: string }>;
+      for (const article of legacyArticles) {
+        if (knownArticleIds.has(article.id)) continue;
+        history.push({
+          task_id: `article-${article.id}`,
+          label: `历史成品 · #${article.id}`,
+          priority: "normal",
+          source_item_id: article.source_item_id,
+          status: "done",
+          submitted_at: article.created_at,
+          started_at: article.created_at,
+          finished_at: article.created_at,
+          finished_article_id: article.id,
+        });
+      }
+      data.history = history;
+
+      // 从队列中收集所有 source_item_id，批量查本地素材表补充标题和来源
+      const tasks = [
+        data.current,
+        ...(data.queue ?? []),
+        ...(data.recent ?? []),
+        ...(data.history ?? []),
+      ].filter(Boolean) as Array<Record<string, unknown>>;
       const sourceItemIds = [...new Set(tasks.map((task) => Number(task.source_item_id)).filter(Boolean))];
       if (sourceItemIds.length > 0) {
         const placeholders = sourceItemIds.map(() => "?").join(",");

@@ -34,7 +34,7 @@ describe("写作队列最近逐篇结果", () => {
     vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue(queueStatus);
     const wrapper = mount(WriteQueueStatus, {
       attachTo: document.body,
-      global: { stubs: { SourceItemDetailModal: true } },
+      global: { stubs: { SourceItemDetailModal: true, ArticleDetailDrawer: true } },
     });
     await flushPromises();
     const toggle = document.body.querySelector<HTMLButtonElement>(".write-queue-dot-btn");
@@ -45,6 +45,36 @@ describe("写作队列最近逐篇结果", () => {
     expect(document.body.textContent).toContain("最近结果");
     expect(document.body.textContent).toContain("成品 #2401");
     expect(document.body.textContent).toContain("口述底稿生成：Luna 调用失败");
+    wrapper.unmount();
+  });
+
+  it("按北京时间分组历史记录并可打开成品详情", async () => {
+    vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue({
+      ...queueStatus,
+      recent: [],
+      history: [
+        { ...queueStatus.recent![1], task_id: "h-today", finished_at: "2026-08-20T15:10:00Z", finished_article_id: 2401 },
+        { ...queueStatus.recent![1], task_id: "h-yesterday", finished_at: "2026-08-19T15:10:00Z", finished_article_id: 2400 },
+      ],
+    });
+    vi.spyOn(creativeApi, "readCreativeFinishedArticle").mockResolvedValue({ id: 2401 } as never);
+    const wrapper = mount(WriteQueueStatus, {
+      attachTo: document.body,
+      global: { stubs: { SourceItemDetailModal: true, ArticleDetailDrawer: true } },
+    });
+    await flushPromises();
+    document.body.querySelector<HTMLButtonElement>(".write-queue-dot-btn")?.click();
+    await wrapper.vm.$nextTick();
+
+    expect(document.body.textContent).toContain("北京时间 00:00–23:59");
+    expect(document.body.textContent).toContain("2026-08-20");
+    expect(document.body.textContent).toContain("2026-08-19");
+    const articleLink = [...document.body.querySelectorAll<HTMLButtonElement>(".write-queue-link")]
+      .find((button) => button.textContent?.includes("成品 #2401"));
+    expect(articleLink).toBeTruthy();
+    articleLink?.click();
+    await flushPromises();
+    expect(creativeApi.readCreativeFinishedArticle).toHaveBeenCalledWith(2401);
     wrapper.unmount();
   });
 

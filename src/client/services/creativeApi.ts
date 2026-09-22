@@ -871,6 +871,8 @@ export type WriteQueueStatus = {
   queue_length: number;
   queue: WriteQueueTask[];
   recent?: WriteQueueTask[];
+  /** Hermes 持久化的终态历史，按完成时间倒序。 */
+  history?: WriteQueueTask[];
   stats: WriteQueueStats;
   luna?: {
     status: "idle" | "running" | string;

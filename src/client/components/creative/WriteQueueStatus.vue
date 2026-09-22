@@ -8,8 +8,12 @@
 import { ref, onMounted, onBeforeUnmount, computed } from "vue";
 import {
   fetchWriteQueueStatus,
+  readCreativeFinishedArticle,
   type WriteQueueStatus as WriteQueueStatusType,
+  type WriteQueueTask,
+  type CreativeFinishedArticle,
 } from "../../services/creativeApi.js";
+import ArticleDetailDrawer from "./ArticleDetailDrawer.vue";
 import SourceItemDetailModal from "./SourceItemDetailModal.vue";
 
 const data = ref<WriteQueueStatusType | null>(null);
@@ -79,6 +83,67 @@ function toggleExpand(): void {
 function openSourceItem(id: number): void {
   modalSourceItemId.value = id;
   modalVisible.value = true;
+}
+
+// 成品详情抽屉
+const articleDetailOpen = ref(false);
+const articleDetail = ref<CreativeFinishedArticle | null>(null);
+const articleDetailLoading = ref(false);
+
+/** 读取队列终态对应的完整成品，打开只读详情抽屉。 */
+async function openArticleDetail(id: number): Promise<void> {
+  if (articleDetailLoading.value) return;
+  articleDetailLoading.value = true;
+  try {
+    articleDetail.value = await readCreativeFinishedArticle(id);
+    articleDetailOpen.value = true;
+  } catch {
+    articleDetail.value = null;
+  } finally {
+    articleDetailLoading.value = false;
+  }
+}
+
+/** 将 ISO 时间按北京时间切成自然日，避免浏览器本地时区造成跨日错分。 */
+function beijingDateKey(value: string | null | undefined): string {
+  if (!value) return "unknown";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(value));
+  const fields = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${fields.year}-${fields.month}-${fields.day}`;
+}
+
+function historyTime(task: WriteQueueTask): string {
+  return task.finished_at || task.started_at || task.submitted_at;
+}
+
+const historyGroups = computed(() => {
+  const tasks = data.value?.history?.length ? data.value.history : (data.value?.recent ?? []);
+  const groups = new Map<string, WriteQueueTask[]>();
+  for (const task of tasks) {
+    const key = beijingDateKey(historyTime(task));
+    const items = groups.get(key) ?? [];
+    items.push(task);
+    groups.set(key, items);
+  }
+  return [...groups.entries()]
+    .sort(([left], [right]) => right.localeCompare(left))
+    .map(([date, items]) => ({ date, items }));
+});
+
+function formatHistoryDate(date: string): string {
+  if (date === "unknown") return "日期未知";
+  const weekday = new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", weekday: "short" })
+    .format(new Date(`${date}T00:00:00+08:00`));
+  return `${date}（${weekday}）`;
+}
+
+function statusLabel(status: WriteQueueTask["status"]): string {
+  return status === "done" ? "成功" : status === "stopped" ? "已阻断" : "失败";
 }
 
 onMounted(() => {
@@ -159,21 +224,31 @@ onBeforeUnmount(() => {
           Luna：{{ data.luna.paused ? `暂停 · ${data.luna.reason || "等待恢复探测"}` : (data.luna.active ? `执行中 · ${data.luna.label || data.luna.kind || "任务"}` : "空闲") }}
         </div>
 
-        <!-- 最近逐篇终态：任务离开 current 后仍保留成功、失败阶段和原因。 -->
-        <div v-if="data.recent?.length" class="write-queue-list mt-2 border-t border-gray-100 pt-1" data-testid="write-queue-recent">
-          <div class="mb-1 text-[10px] font-medium text-editorial-text-muted">最近结果</div>
-          <div v-for="task in data.recent.slice(0, 5)" :key="`${task.task_id}-${task.finished_at}`" class="mb-1 rounded bg-gray-50 px-2 py-1 text-[10px]">
-            <div class="flex items-center gap-1">
-              <span :class="task.status === 'done' ? 'text-green-600' : task.status === 'stopped' ? 'text-amber-600' : 'text-red-600'">
-                {{ task.status === "done" ? "成功" : task.status === "stopped" ? "已阻断" : "失败" }}
-              </span>
-              <span v-if="task.source_item_id" class="write-queue-id" @click.stop="openSourceItem(task.source_item_id)">#{{ task.source_item_id }}</span>
-              <span v-if="task.finished_article_id" class="text-editorial-text-muted">成品 #{{ task.finished_article_id }}</span>
-            </div>
-            <div v-if="task.status !== 'done'" class="mt-0.5 break-words text-red-500">
-              {{ task.stop_step_name || task.phase_name || "执行" }}：{{ task.reason_text || task.error || "未提供失败原因" }}
-            </div>
+        <!-- 持久化终态历史：按北京时间 00:00–23:59 分组，服务重启后仍可查看。 -->
+        <div v-if="historyGroups.length" class="write-queue-history mt-2 border-t border-gray-100 pt-1" data-testid="write-queue-history">
+          <div class="mb-1 flex items-center justify-between text-[10px] font-medium text-editorial-text-muted">
+            <span>写作记录（最近结果）</span>
+            <span>北京时间 00:00–23:59</span>
           </div>
+          <section v-for="group in historyGroups" :key="group.date" class="write-queue-day-group">
+            <h4 class="write-queue-day-label">{{ formatHistoryDate(group.date) }}</h4>
+            <div v-for="task in group.items" :key="`${task.task_id}-${task.finished_at}`" class="write-queue-history-item">
+              <div class="flex items-center gap-1">
+                <span :class="task.status === 'done' ? 'text-green-600' : task.status === 'stopped' ? 'text-amber-600' : 'text-red-600'">
+                  {{ statusLabel(task.status) }}
+                </span>
+                <button v-if="task.source_item_id" class="write-queue-link" @click.stop="openSourceItem(task.source_item_id)">素材 #{{ task.source_item_id }}</button>
+                <button v-if="task.finished_article_id" class="write-queue-link" :disabled="articleDetailLoading" @click.stop="openArticleDetail(task.finished_article_id)">成品 #{{ task.finished_article_id }}</button>
+                <span class="min-w-0 flex-1 truncate">{{ task.source_item_title || task.label }}</span>
+              </div>
+              <div class="mt-0.5 text-[9px] text-editorial-text-muted">
+                {{ task.finished_at ? new Date(task.finished_at).toLocaleTimeString("zh-CN", { timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit" }) : "时间未知" }}
+              </div>
+              <div v-if="task.status !== 'done'" class="mt-0.5 break-words text-red-500">
+                {{ task.stop_step_name || task.phase_name || "执行" }}：{{ task.reason_text || task.error || "未提供失败原因" }}
+              </div>
+            </div>
+          </section>
         </div>
 
         <!-- 统计 + 刷新 -->
@@ -185,6 +260,14 @@ onBeforeUnmount(() => {
 
       <!-- 素材详情弹窗 -->
       <SourceItemDetailModal v-model:visible="modalVisible" :source-item-id="modalSourceItemId" />
+      <!-- 成品详情抽屉：队列终态中的成品编号必须可直接打开。 -->
+      <ArticleDetailDrawer
+        :open="articleDetailOpen"
+        :article="articleDetail"
+        :readonly="true"
+        @update:open="(value: boolean) => { articleDetailOpen = value; if (!value) articleDetail = null; }"
+        @open-source-item="openSourceItem"
+      />
     </div>
   </Teleport>
 </template>
@@ -268,6 +351,40 @@ onBeforeUnmount(() => {
   overflow-y: auto;
   padding: 2px 8px;
 }
+.write-queue-history {
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 2px 8px 0;
+}
+.write-queue-day-group + .write-queue-day-group {
+  margin-top: 8px;
+}
+.write-queue-day-label {
+  margin: 0 -2px 3px;
+  border-left: 3px solid #f59e0b;
+  background: #fffbeb;
+  padding: 3px 5px;
+  color: #92400e;
+  font-size: 10px;
+  font-weight: 600;
+}
+.write-queue-history-item {
+  margin-bottom: 3px;
+  border-radius: 4px;
+  background: #f9fafb;
+  padding: 4px 5px;
+  font-size: 10px;
+}
+.write-queue-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: #1677ff;
+  cursor: pointer;
+  font-size: inherit;
+}
+.write-queue-link:hover { text-decoration: underline; }
+.write-queue-link:disabled { cursor: wait; opacity: 0.5; }
 .write-queue-task {
   display: flex;
   align-items: center;

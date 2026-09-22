@@ -404,13 +404,19 @@
   }
 }
 
-/* 创作列表按北京时间分日；分隔线作用于整行，固定列横向滚动时也保持连续。 */
+/* 不同日期之间保留明显的空白断层，并用强调线切开整张表。 */
 .table-day-group-start > td {
-  border-top: 2px solid var(--editorial-border-strong) !important;
+  border-top: 12px solid var(--editorial-bg-page) !important;
+  box-shadow: inset 0 2px 0 var(--editorial-link-active);
 }
 
 .table-day-group-label {
-  margin-bottom: 4px;
+  display: inline-flex;
+  margin-bottom: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--editorial-border-strong);
+  border-radius: var(--editorial-radius-pill);
+  background: var(--editorial-bg-link);
   color: var(--editorial-link-active);
   font-size: 11px;
   font-weight: 700;

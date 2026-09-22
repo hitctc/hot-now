@@ -434,6 +434,19 @@ export function listCreativeFinishedArticles(
       ORDER BY day_key DESC
     `)
     .all(...params) as Array<{ day_key: string; article_count: number; source_count: number }>;
+  const sourceWhereClause = filters.direction ? "WHERE direction = ?" : "";
+  const sourceParams = filters.direction ? [filters.direction] : [];
+  const sourceDayCounts = db
+    .prepare(`
+      SELECT
+        date(datetime(COALESCE(collector_timestamp, created_at)), '+8 hours') AS day_key,
+        COUNT(*) AS source_count
+      FROM creative_source_items
+      ${sourceWhereClause}
+      GROUP BY day_key
+      ORDER BY day_key DESC
+    `)
+    .all(...sourceParams) as Array<{ day_key: string; source_count: number }>;
 
   const offset = (page - 1) * pageSize;
   const selectedColumns = filters.summaryOnly ? LIST_SELECT_COLUMNS : SELECT_COLUMNS;
@@ -453,6 +466,10 @@ export function listCreativeFinishedArticles(
     dayCounts: dayCounts.map((row) => ({
       dayKey: row.day_key,
       articleCount: row.article_count,
+      sourceCount: row.source_count,
+    })),
+    sourceDayCounts: sourceDayCounts.map((row) => ({
+      dayKey: row.day_key,
       sourceCount: row.source_count,
     }))
   };

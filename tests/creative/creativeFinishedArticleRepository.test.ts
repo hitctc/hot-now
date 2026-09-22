@@ -394,13 +394,20 @@ describe("listCreativeFinishedArticles", () => {
     handles.push(handle);
 
     const source = createSourceItem(handle.db);
-    const otherSource = createSourceItem(handle.db);
+    const otherSource = insertCreativeSourceItem(handle.db, {
+      externalId: `other-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      collectorAgent: "codex",
+      title: "Other Source Article",
+      url: "https://example.com/other-source",
+    });
     const first = insertCreativeFinishedArticle(handle.db, { sourceItemId: source.id, contentMarkdown: "first" });
     const second = insertCreativeFinishedArticle(handle.db, { sourceItemId: source.id, contentMarkdown: "second" });
     const third = insertCreativeFinishedArticle(handle.db, { sourceItemId: otherSource.id, contentMarkdown: "third" });
     handle.db.prepare("UPDATE creative_finished_articles SET created_at = ? WHERE id = ?").run("2026-09-22 01:00:00", first.id);
     handle.db.prepare("UPDATE creative_finished_articles SET created_at = ? WHERE id = ?").run("2026-09-22 12:00:00", second.id);
     handle.db.prepare("UPDATE creative_finished_articles SET created_at = ? WHERE id = ?").run("2026-09-23 01:00:00", third.id);
+    handle.db.prepare("UPDATE creative_source_items SET collector_timestamp = ? WHERE id = ?").run("2026-09-22 01:00:00", source.id);
+    handle.db.prepare("UPDATE creative_source_items SET collector_timestamp = ? WHERE id = ?").run("2026-09-23 01:00:00", otherSource.id);
 
     const result = listCreativeFinishedArticles(handle.db, { page: 1, pageSize: 1 });
 
@@ -408,6 +415,10 @@ describe("listCreativeFinishedArticles", () => {
     expect(result.dayCounts).toEqual([
       { dayKey: "2026-09-23", articleCount: 1, sourceCount: 1 },
       { dayKey: "2026-09-22", articleCount: 2, sourceCount: 1 },
+    ]);
+    expect(result.sourceDayCounts).toEqual([
+      { dayKey: "2026-09-23", sourceCount: 1 },
+      { dayKey: "2026-09-22", sourceCount: 1 },
     ]);
   });
 

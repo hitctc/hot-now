@@ -220,12 +220,18 @@ export type FinishedArticleDayCount = {
   sourceCount: number;
 };
 
+export type SourceDayCount = {
+  dayKey: string;
+  sourceCount: number;
+};
+
 export type FinishedArticleListResponse = {
   items: CreativeFinishedArticle[];
   total: number;
   page: number;
   pageSize: number;
   dayCounts: FinishedArticleDayCount[];
+  sourceDayCounts: SourceDayCount[];
 };
 
 // 图片转存接口类型

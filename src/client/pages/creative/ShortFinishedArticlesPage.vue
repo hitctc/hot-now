@@ -22,6 +22,7 @@ import {
   wechatThemeOptions,
   type CreativeFinishedArticle,
   type FinishedArticleDayCount,
+  type SourceDayCount,
   type TrendBreakdown,
   type WechatThemeId,
   type PushLogEntry
@@ -53,6 +54,7 @@ const isLoading = ref(false);
 const items = ref<CreativeFinishedArticle[]>([]);
 const total = ref(0);
 const dayCounts = ref<Record<string, FinishedArticleDayCount>>({});
+const sourceDayCounts = ref<Record<string, SourceDayCount>>({});
 const currentPage = ref(1);
 const pageSize = ref(30);
 
@@ -216,6 +218,7 @@ async function loadItems(): Promise<void> {
     items.value = res.items;
     total.value = res.total;
     dayCounts.value = Object.fromEntries((res.dayCounts ?? []).map((count) => [count.dayKey, count]));
+    sourceDayCounts.value = Object.fromEntries((res.sourceDayCounts ?? []).map((count) => [count.dayKey, count]));
   } catch (error) {
     if (!isAbortError(error)) throw error;
   } finally {
@@ -304,8 +307,9 @@ function getArticleRowClass(record: CreativeFinishedArticle, index: number): str
 /** 读取服务端按北京时间全量统计的日期组成品数和去重素材数，不受当前分页影响。 */
 function getArticleDayCounts(record: CreativeFinishedArticle): { articleCount: number; sourceCount: number } {
   const dayKey = toShanghaiDayKey(record.createdAt);
-  const count = dayKey ? dayCounts.value[dayKey] : undefined;
-  return count ?? { articleCount: 0, sourceCount: 0 };
+  const articleCount = dayKey ? dayCounts.value[dayKey]?.articleCount ?? 0 : 0;
+  const sourceCount = dayKey ? sourceDayCounts.value[dayKey]?.sourceCount ?? 0 : 0;
+  return { articleCount, sourceCount };
 }
 
 /** 仅在当前页的日期组首行显示北京时间日期标题和当天数量。 */

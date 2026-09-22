@@ -211,12 +211,18 @@ export type FinishedArticleDayCount = {
   sourceCount: number;
 };
 
+export type SourceDayCount = {
+  dayKey: string;
+  sourceCount: number;
+};
+
 export type ListCreativeFinishedArticlesResult = {
   items: CreativeFinishedArticleRecord[];
   total: number;
   page: number;
   pageSize: number;
   dayCounts: FinishedArticleDayCount[];
+  sourceDayCounts: SourceDayCount[];
 };
 
 export type SaveArticlePerformanceFeedbackInput = {

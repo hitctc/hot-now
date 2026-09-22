@@ -23,7 +23,6 @@ import {
   type CreativeFinishedArticle,
   type FinishedArticleDayCount,
   type SourceDayCount,
-  type TrendBreakdown,
   type WechatThemeId,
   type PushLogEntry
 } from "../../services/creativeApi.js";
@@ -33,7 +32,17 @@ import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.v
 import CreativeCoverThumbnail from "../../components/creative/CreativeCoverThumbnail.vue";
 import SourceItemDetailModal from "../../components/creative/SourceItemDetailModal.vue";
 import { formatTableDayLabel, isTableDayStart, toShanghaiDayKey } from "../../components/creative/tableDayGroups.js";
-import { getStatusLabel, getAvailableActions, checkPublishConditions, getDisplayTitle, type ArticleAction } from "../../components/creative/articleStatusShared.js";
+import { getAvailableActions, checkPublishConditions, getDisplayTitle, type ArticleAction } from "../../components/creative/articleStatusShared.js";
+import {
+  SHORT_FINISHED_COLUMNS,
+  SHORT_FINISHED_STATUS_OPTIONS,
+  calculateWritingDuration,
+  formatShortFinishedLocalTime,
+  formatTrendBreakdown,
+  formatWritingDuration,
+  getShortFinishedStatusInfo,
+  getTrendBreakdownBars
+} from "./shortFinishedArticlePresentation.js";
 
 // ─── JSON 解析辅助 ───
 
@@ -98,21 +107,7 @@ function onDocClick(e: MouseEvent): void {
 onMounted(() => document.addEventListener("click", onDocClick));
 onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 
-const statusOptions = [
-  { label: "全部状态", value: "" },
-  { label: "排队中", value: "queued" },
-  { label: "写作中", value: "writing" },
-  { label: "已生成", value: "generated" },
-  { label: "手动草稿", value: "manual_draft" },
-  { label: "待审核", value: "needs_review" },
-  { label: "可推送", value: "ready_for_publish" },
-  { label: "已推送草稿", value: "wechat_draft" },
-  { label: "审核不通过", value: "review_rejected" },
-  { label: "异常", value: "anomaly" },
-  { label: "已中止", value: "stopped" },
-  { label: "已失败", value: "failed" },
-  { label: "已删除", value: "soft_deleted" },
-];
+const statusOptions = SHORT_FINISHED_STATUS_OPTIONS;
 
 // 文章详情全屏弹窗
 const detailArticle = ref<CreativeFinishedArticle | null>(null);
@@ -496,97 +491,6 @@ async function onDetailSaved(): Promise<void> {
 
 // ─── 格式化辅助 ───
 
-const breakdownLabels: Record<keyof TrendBreakdown, string> = {
-  topicPower: "话题",
-  emotionResonance: "情绪",
-  infoGap: "信息差",
-  socialCurrency: "社交",
-  timingWindow: "时效",
-  audienceBreadth: "受众"
-};
-
-function formatBreakdown(b: TrendBreakdown): string {
-  return (Object.entries(b) as [keyof TrendBreakdown, number][])
-    .sort((a, b) => b[1] - a[1])
-    .map(([key, val]) => `${breakdownLabels[key]}${val}`)
-    .join(" | ");
-}
-
-// 爆文维度柱状图配色
-const breakdownColors: Record<keyof TrendBreakdown, string> = {
-  topicPower: "#3b82f6",
-  emotionResonance: "#ef4444",
-  infoGap: "#f59e0b",
-  socialCurrency: "#10b981",
-  timingWindow: "#8b5cf6",
-  audienceBreadth: "#6366f1"
-};
-
-// 返回排序后的柱状图段数据
-// 固定维度顺序，柱状图每段颜色位置一致便于横向对比
-const breakdownDimensionOrder: Array<keyof TrendBreakdown> = [
-  "topicPower", "infoGap", "emotionResonance", "socialCurrency", "timingWindow", "audienceBreadth"
-];
-
-function getBreakdownBars(b: TrendBreakdown): Array<{ label: string; value: number; color: string; width: string }> {
-  const total = Object.values(b).reduce((s, v) => s + v, 0);
-  if (total === 0) return [];
-  return breakdownDimensionOrder
-    .filter(key => (b[key] ?? 0) > 0)
-    .map(key => {
-      const val = b[key];
-      return {
-        label: `${breakdownLabels[key]}${val}`,
-        value: val,
-        color: breakdownColors[key],
-        width: `${Math.round((val / total) * 100)}%`
-      };
-    });
-}
-
-// SQLite CURRENT_TIMESTAMP 输出 UTC 但不带后缀，补 Z 让 JS 正确解析
-function formatLocalTime(value: string): string {
-  const fixed = /^[0-9]{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(value) && !/[Zz+\-]\d{0,4}$/.test(value)
-    ? value.replace(" ", "T") + "Z"
-    : value;
-  const date = new Date(fixed);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleString("zh-CN", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-}
-
-/** 从 stepTrace 计算总写作耗时（ms），返回 null 表示无数据 */
-function calcWritingDuration(stepTrace: Array<{ startedAt?: string; finishedAt?: string }> | null): number | null {
-  if (!stepTrace || stepTrace.length === 0) return null;
-  const withStarted = stepTrace.filter(s => s.startedAt);
-  const withFinished = stepTrace.filter(s => s.finishedAt);
-  if (withStarted.length === 0 || withFinished.length === 0) return null;
-  const firstStart = new Date(withStarted[0].startedAt!).getTime();
-  const lastFinish = new Date(withFinished[withFinished.length - 1].finishedAt!).getTime();
-  if (Number.isNaN(firstStart) || Number.isNaN(lastFinish)) return null;
-  return lastFinish - firstStart;
-}
-
-/** 格式化毫秒为人类可读耗时 */
-function formatDuration(ms: number | null): string {
-  if (ms == null) return "-";
-  if (ms < 1000) return `${ms}ms`;
-  const sec = Math.round(ms / 1000);
-  if (sec < 60) return `${sec}s`;
-  const min = Math.floor(sec / 60);
-  const remainSec = sec % 60;
-  if (min < 60) return `${min}m${String(remainSec).padStart(2, "0")}s`;
-  const hr = Math.floor(min / 60);
-  const remainMin = min % 60;
-  return `${hr}h${String(remainMin).padStart(2, "0")}m`;
-}
-
 function formatPublishedAt(value: string | null): string {
   if (!value) return "-";
   const date = new Date(value);
@@ -613,16 +517,6 @@ async function copyText(text: string): Promise<void> {
 
 // 状态标签渲染函数，直接转发到共享模块
 // 短内容线状态（draft/ready/needs_rewrite/published）映射中文，公众号状态作 fallback
-const SHORT_STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  draft: { label: "草稿", color: "default" },
-  ready: { label: "可发布", color: "green" },
-  needs_rewrite: { label: "待重写", color: "orange" },
-  published: { label: "已发布", color: "blue" }
-};
-
-function getStatusInfo(status: string): { label: string; color: string } {
-  return SHORT_STATUS_LABELS[status] ?? getStatusLabel(status);
-}
 
 // ─── 表格列 ───
 
@@ -632,18 +526,7 @@ function copyId(id: number): void {
   });
 }
 
-const columns = [
-  { title: "ID / 序号", dataIndex: "id", key: "idSeq", width: 72, fixed: "left" as const, className: "table-day-anchor-cell" },
-  { title: "标题", key: "title", width: 300 },
-  { title: "配图提示词", key: "coverImage", width: 120 },
-  { title: "状态", key: "status", width: 100 },
-  { title: "来源", key: "sourceName", width: 115 },
-  { title: "爆文", key: "trend", width: 120, ellipsis: true },
-  { title: "相似度", key: "similarity", width: 56, ellipsis: true },
-  { title: "形态", key: "form", width: 72 },
-  { title: "耗时/时间", key: "timeInfo", width: 130, ellipsis: true },
-  { title: "操作", key: "actions", width: 86, fixed: "right" as const },
-];
+const columns = SHORT_FINISHED_COLUMNS;
 
 const pagination = computed(() => ({
   current: currentPage.value,
@@ -763,9 +646,9 @@ const pagination = computed(() => ({
           <template v-else-if="column.key === 'status'">
             <div class="flex flex-col items-start gap-0.5 leading-tight">
               <a-tag
-                :color="getStatusInfo(record.status).color"
+                :color="getShortFinishedStatusInfo(record.status).color"
                 :class="['!m-0 !text-[11px] !py-0', record.status === 'soft_deleted' ? 'line-through' : '']"
-              >{{ getStatusInfo(record.status).label }}</a-tag>
+              >{{ getShortFinishedStatusInfo(record.status).label }}</a-tag>
               <a-tag v-if="record.pushCount > 0" color="green" class="!m-0 !text-[11px] !py-0">{{ record.pushCount }}次</a-tag>
               <!-- 标记可推送 -->
               <button
@@ -851,13 +734,13 @@ const pagination = computed(() => ({
             <div v-else class="flex flex-col gap-0.5 leading-tight">
               <span v-if="record.reversalScore != null" class="inline-flex items-center self-start rounded-editorial-pill border px-1.5 py-0 text-[10px] font-bold" :class="record.reversalScore >= 90 ? 'border-purple-600 bg-purple-600 text-white shadow-sm' : record.reversalScore >= 80 ? 'border-red-500 bg-red-500 text-white shadow-sm' : 'border-orange-300 bg-orange-50 text-orange-700'">{{ record.reversalScore }}</span>
               <span v-else class="text-[10px] text-editorial-text-muted">未评分</span>
-              <a-tooltip v-if="record.trendBreakdown && getBreakdownBars(record.trendBreakdown).length > 0" :mouse-enter-delay="0.3">
+              <a-tooltip v-if="record.trendBreakdown && getTrendBreakdownBars(record.trendBreakdown).length > 0" :mouse-enter-delay="0.3">
                 <template #title>
-                  <div class="text-xs leading-5">{{ formatBreakdown(record.trendBreakdown) }}</div>
+                  <div class="text-xs leading-5">{{ formatTrendBreakdown(record.trendBreakdown) }}</div>
                 </template>
                 <div class="flex h-2.5 w-full min-w-[80px] overflow-hidden rounded-sm">
                   <div
-                    v-for="(bar, idx) in getBreakdownBars(record.trendBreakdown)"
+                    v-for="(bar, idx) in getTrendBreakdownBars(record.trendBreakdown)"
                     :key="idx"
                     :style="{ width: bar.width, backgroundColor: bar.color }"
                     :title="bar.label"
@@ -904,9 +787,9 @@ const pagination = computed(() => ({
           <!-- 耗时/时间列：写作耗时 + 发布时间 + 创建时间 三行紧凑展示 -->
           <template v-else-if="column.key === 'timeInfo'">
             <div class="flex flex-col gap-0 leading-tight">
-              <span class="text-[10px] text-editorial-text-body">耗时 {{ record.originType === "manual" ? "—" : formatDuration(calcWritingDuration(record.stepTrace)) }}</span>
-              <span class="text-[10px] text-editorial-text-muted">发 {{ record.originType === "manual" ? "—" : formatLocalTime(record.publishedAt || record.createdAt) }}</span>
-              <span class="text-[10px] text-editorial-text-muted">建 {{ formatLocalTime(record.createdAt) }}</span>
+              <span class="text-[10px] text-editorial-text-body">耗时 {{ record.originType === "manual" ? "—" : formatWritingDuration(calculateWritingDuration(record.stepTrace)) }}</span>
+              <span class="text-[10px] text-editorial-text-muted">发 {{ record.originType === "manual" ? "—" : formatShortFinishedLocalTime(record.publishedAt || record.createdAt) }}</span>
+              <span class="text-[10px] text-editorial-text-muted">建 {{ formatShortFinishedLocalTime(record.createdAt) }}</span>
             </div>
           </template>
         </template>

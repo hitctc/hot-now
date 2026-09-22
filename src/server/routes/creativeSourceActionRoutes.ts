@@ -160,7 +160,7 @@ export function registerCreativeSourceActionRoutes(
     }
     // 三种页面选项都由 Hermes 解释，HotNow 不能把“自动判断”提前改写成固定形态。
     const form = requestedForm ?? "auto";
-    const hermesBody: Record<string, unknown> = { form };
+    const hermesBody: Record<string, unknown> = { form, source_item_id: id };
     if (typeof body?.externalId === "string" && body.externalId.trim()) {
       hermesBody.external_id = body.externalId.trim();
     }

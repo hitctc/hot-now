@@ -102,6 +102,7 @@ describe("creative automation Hermes proxy", () => {
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
       external_id: `short-${form}`,
       form,
+      source_item_id: sourceItemId,
     });
     await app.close();
   });

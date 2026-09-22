@@ -30,6 +30,7 @@ import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.v
 import CreativeCoverThumbnail from "../../components/creative/CreativeCoverThumbnail.vue";
 import ArticlePerformanceFeedbackModal from "../../components/creative/ArticlePerformanceFeedbackModal.vue";
 import SourceItemDetailModal from "../../components/creative/SourceItemDetailModal.vue";
+import { formatTableDayLabel, isTableDayStart } from "../../components/creative/tableDayGroups.js";
 import { getStatusLabel, getAvailableActions, checkPublishConditions, getDisplayTitle, type ArticleAction } from "../../components/creative/articleStatusShared.js";
 
 // ─── JSON 解析辅助 ───
@@ -259,13 +260,22 @@ async function handleTogglePin(article: CreativeFinishedArticle): Promise<void> 
   }
 }
 
-/** 置顶底色优先于业务状态色，已删除样式仍保持最高优先级。 */
-function getArticleRowClass(record: CreativeFinishedArticle): string {
-  if (record.deletedAt) return "discarded-row";
-  if (record.pinnedAt) return "pinned-row";
-  if (record.status === "needs_review" || record.status === "ready_for_publish") return "review-highlight";
-  if (record.status === "wechat_draft") return "completed-row";
-  return "";
+/** 合并文章状态底色与按创建日期绘制的分组分隔线。 */
+function getArticleRowClass(record: CreativeFinishedArticle, index: number): string {
+  const classes: string[] = [];
+  if (isTableDayStart(items.value, index, (item) => item.createdAt)) classes.push("table-day-group-start");
+  if (record.deletedAt) classes.push("discarded-row");
+  else if (record.pinnedAt) classes.push("pinned-row");
+  else if (record.status === "needs_review" || record.status === "ready_for_publish") classes.push("review-highlight");
+  else if (record.status === "wechat_draft") classes.push("completed-row");
+  return classes.join(" ");
+}
+
+/** 仅在当前页的日期组首行显示北京时间日期标题。 */
+function getArticleDayLabel(record: CreativeFinishedArticle, index: number): string {
+  return isTableDayStart(items.value, index, (item) => item.createdAt)
+    ? formatTableDayLabel(record.createdAt)
+    : "";
 }
 
 onMounted(() => {
@@ -667,7 +677,7 @@ const pagination = computed(() => ({
         :row-class-name="getArticleRowClass"
         @change="handleTableChange"
       >
-        <template #bodyCell="{ column, record }">
+        <template #bodyCell="{ column, record, index }">
           <!-- ID 列：点击复制 -->
           <template v-if="column.key === 'idSeq'">
             <div class="flex flex-col leading-tight">
@@ -677,6 +687,9 @@ const pagination = computed(() => ({
           </template>
           <!-- 标题列：点击标题打开详情，点击素材链接打开来源素材弹窗，互不影响 -->
           <template v-if="column.key === 'title'">
+            <div v-if="getArticleDayLabel(record, index)" class="table-day-group-label" data-table-day-divider>
+              {{ getArticleDayLabel(record, index) }}
+            </div>
             <div class="flex items-start gap-1">
               <span v-if="record.pinnedAt" class="shrink-0 text-[13px] text-purple-600" title="已置顶">◆</span>
               <span

@@ -3,6 +3,7 @@ import { ref, toRefs } from "vue";
 import { message } from "ant-design-vue";
 
 import type { CreativeSourceItem } from "../../../services/creativeApi.js";
+import { formatTableDayLabel, isTableDayStart } from "../tableDayGroups.js";
 import {
   accountFitColor,
   accountFitLabel,
@@ -76,6 +77,23 @@ function onOverflowCellLeave(key: string): void {
   if (overflowHover.value?.key === key) overflowHover.value = null;
 }
 
+/** 素材优先按采集时间分日；历史空值回退到入库创建时间。 */
+function sourceItemTimestamp(item: CreativeSourceItem): string {
+  return item.collectorTimestamp || item.createdAt;
+}
+
+/** 标记每个北京时间日期组的首行，以绘制跨表格分隔线。 */
+function getSourceItemRowClass(_record: CreativeSourceItem, index: number): string {
+  return isTableDayStart(items.value, index, sourceItemTimestamp) ? "table-day-group-start" : "";
+}
+
+/** 仅为日期组首行提供标题，普通数据行不额外占用高度。 */
+function getSourceItemDayLabel(record: CreativeSourceItem, index: number): string {
+  return isTableDayStart(items.value, index, sourceItemTimestamp)
+    ? formatTableDayLabel(sourceItemTimestamp(record))
+    : "";
+}
+
 /** 复制素材 ID，保持列表原有的快捷操作反馈。 */
 function copyId(id: number): void {
   navigator.clipboard.writeText(`【素材id: ${id}】`).then(() => message.success("已复制"));
@@ -92,13 +110,14 @@ function copyId(id: number): void {
     :scroll="{ x: 1200 }"
     :expanded-row-keys="expandedRowKeys"
     row-key="id"
+    :row-class-name="getSourceItemRowClass"
     data-source-item-table
     size="small"
     @change="emit('table-change', $event)"
     @expand="(_expanded: boolean, record: CreativeSourceItem) => emit('toggle-expand', record.id)"
   >
     <!-- 标题列：点击展开/折叠 -->
-    <template #bodyCell="{ column, record }">
+    <template #bodyCell="{ column, record, index }">
       <template v-if="column.key === 'idSeq'">
         <div class="flex flex-col leading-tight">
           <span class="cursor-pointer text-editorial-link-active hover:underline" @click="copyId(record.id)">{{ record.id }}</span>
@@ -106,6 +125,9 @@ function copyId(id: number): void {
         </div>
       </template>
       <template v-if="column.key === 'title'">
+        <div v-if="getSourceItemDayLabel(record, index)" class="table-day-group-label" data-table-day-divider>
+          {{ getSourceItemDayLabel(record, index) }}
+        </div>
         <div class="flex items-center gap-2 min-w-0">
           <a-tooltip
             :open="overflowHover?.key === 'title-' + record.id"

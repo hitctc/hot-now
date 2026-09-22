@@ -404,6 +404,21 @@
   }
 }
 
+/* 创作列表按北京时间分日；分隔线作用于整行，固定列横向滚动时也保持连续。 */
+.table-day-group-start > td {
+  border-top: 2px solid var(--editorial-border-strong) !important;
+}
+
+.table-day-group-label {
+  margin-bottom: 4px;
+  color: var(--editorial-link-active);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
 /* Tooltip 在编辑主题下确保文字可读 —— 必须在 @layer 外才能覆盖 Ant Design 默认样式 */
 .ant-tooltip-inner {
   color: #fff !important;

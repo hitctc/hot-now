@@ -12,10 +12,19 @@ const weekdayFormatter = new Intl.DateTimeFormat("zh-CN", {
   weekday: "long",
 });
 
+/** 按存储语义解析时间；SQLite 无后缀时间来自 CURRENT_TIMESTAMP，必须视为 UTC。 */
+function parseStoredTimestamp(value: string | Date): Date {
+  if (value instanceof Date) return value;
+  const normalized = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(value)
+    ? `${value.replace(" ", "T")}Z`
+    : value;
+  return new Date(normalized);
+}
+
 /** 将时间转换为北京时间日期键；无效时间返回 null，避免错误分组。 */
 export function toShanghaiDayKey(value: string | Date | null | undefined): string | null {
   if (!value) return null;
-  const date = value instanceof Date ? value : new Date(value);
+  const date = parseStoredTimestamp(value);
   if (Number.isNaN(date.getTime())) return null;
   const parts = dayKeyFormatter.formatToParts(date);
   const readPart = (type: Intl.DateTimeFormatPartTypes): string =>

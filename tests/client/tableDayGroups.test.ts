@@ -11,6 +11,8 @@ describe("creative table day groups", () => {
 
   it("按北京时间划分日期并生成今天、昨天和历史日期标签", () => {
     expect(toShanghaiDayKey("2026-09-21T16:30:00.000Z")).toBe("2026-09-22");
+    // SQLite CURRENT_TIMESTAMP 没有时区后缀，但语义是 UTC；前端必须与服务端 +8 小时统计一致。
+    expect(toShanghaiDayKey("2026-09-21 16:16:26")).toBe("2026-09-22");
     expect(formatTableDayLabel("2026-09-22T01:00:00.000Z", now)).toBe("今天 · 9月22日");
     expect(formatTableDayLabel("2026-09-21T01:00:00.000Z", now)).toBe("昨天 · 9月21日");
     expect(formatTableDayLabel("2026-09-20T01:00:00.000Z", now)).toBe("9月20日 · 星期日");

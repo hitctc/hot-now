@@ -2,6 +2,15 @@
 
 本地单机运行的科技资讯编辑台。它会按固定周期拉取多个已启用的 RSS 来源；Twitter 已拆成 `/settings/sources` 里的两条独立手动链路：`账号采集` 和 `关键词搜索`；Hacker News、B 站、微信公众号 RSS 和微博热搜也拆成独立手动链路。扩展来源都不再并入默认定时采集。`AI 时间线` 只读取外部 Markdown feed 的 `json ai-timeline-feed` 数据块，不再在应用内维护官方源白名单、采集规则或本地候选池；相关 API 与 S 级事件提醒继续运行，但页面入口当前暂时下架。普通采集结果会经过规则聚类、系统百分制评分和排序，生成多源汇总的 HTML/JSON 报告。统一站点继续由 Fastify 托管路由和登录态，但 `/settings/*` 系统页现在已经切到 `Vue 3 + Vite + Ant Design Vue + Tailwind CSS`。
 
+## 文档入口
+
+- 核心协作规则：[AGENTS.md](./AGENTS.md)
+- 模块与开发规范：[开发与模块化规范](./docs/开发与模块化规范.md)
+- Hermes 自动化边界：[Hermes 自动化协作边界](./docs/Hermes自动化协作边界.md)
+- 生产发布与回滚：[生产部署手册](./docs/生产部署手册.md)
+- 外部创作接口：[创作外部智能体接口](./docs/创作外部智能体接口.md)
+- 性能与结构治理历史：[性能优化基线](./docs/性能优化基线.md)
+
 ## 本地启动
 
 1. 安装依赖：`npm install`

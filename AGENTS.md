@@ -1,300 +1,99 @@
-# HotNow 协作文档
+# HotNow 核心协作规范
 
-## 1. 文档目标
+## 1. 作用与优先级
 
-这份 `AGENTS.md` 是本项目唯一的协作约束入口，优先级高于上层通用约定中那些不够具体的部分。不再单独维护其他项目级协作文档；原有仍有效的通用规则已并入本文。
+`AGENTS.md` 是本项目的核心协作入口，只保留所有改动都必须遵守的规则、系统边界和文档路由。功能现状、代码细节、部署步骤和历史记录分别由下列文档维护，不在本文复制：
 
-它解决三件事：
+| 主题 | 权威文档 |
+| --- | --- |
+| 项目能力、页面、配置、本地启动、数据产物 | [README.md](./README.md) |
+| 模块职责、依赖方向、代码规模、测试与重构 | [开发与模块化规范](./docs/开发与模块化规范.md) |
+| Hermes 控制面、队列、写作与图片协作边界 | [Hermes 自动化协作边界](./docs/Hermes自动化协作边界.md) |
+| 生产部署、快照、回滚与 Nginx | [生产部署手册](./docs/生产部署手册.md) |
+| 性能证据、历史治理和部署留痕 | [性能优化基线](./docs/性能优化基线.md) |
+| 外部智能体接口和鉴权合同 | [创作外部智能体接口](./docs/创作外部智能体接口.md) |
+| 短内容代码图片设计与渲染细节 | [短内容代码制图开发方案](./docs/短内容代码制图开发方案.md) |
 
-- 让进入仓库的协作者先快速知道项目现在在做什么、怎么跑、主要代码在哪。
-- 让后续改动优先沿着现有架构继续推进，而不是随手发散重构。
-- 让 `AGENTS.md` 本身随着代码一起演进，不变成过期文档。
+代码、测试和文档冲突时，先用当前代码、schema、配置、测试和运行态裁决，再在同一轮修正文档。历史记录不能覆盖现役合同。
 
-## 2. 项目当前定位
+## 2. 项目定位与不可突破的边界
 
-- 项目名称：`hot-now`
-- 目标：本地单机运行的每日热点应用
-- 当前主链路：
-  - `采集链路`：`定时 / 手动采集 -> 拉取 enabled RSS sources -> 抓取 / 规范化内容 -> 规则聚类 -> 生成 JSON/HTML 报告 -> 网页查看`
-  - `Twitter 链路`：`后台维护账号列表 -> 手动执行 Twitter 账号采集 -> 推文入库 -> 内容页查看`
-  - `Twitter 关键词链路`：`后台维护关键词列表 -> 手动执行固定中文范围的 Twitter 关键词搜索 -> 去重入库 / 建立关键词命中关系 -> 内容页查看`
-  - `Hacker News 链路`：`后台维护 query 列表 -> 手动执行 Hacker News 搜索 -> 去重入库 / 合并 query 命中 -> 内容页查看`
-  - `B 站链路`：`后台维护 query 列表 -> 手动执行 B 站搜索 -> 去重入库 / 合并 query 命中 -> 内容页查看`
-  - `微信公众号 RSS 链路`：`后台批量维护 RSS 链接 -> 手动执行公众号 RSS 采集 -> 去重入库 / 按 RSS 来源筛选 -> 内容页查看`
-  - `微博热搜链路`：`固定 AI 关键词 -> 手动执行微博热搜榜匹配 -> 热搜命中入库 -> AI 热点查看`
-  - `AI 时间线链路`：`Codex 自动化生成官方发布时间线 Markdown -> 上传本地稳定 feed 并暴露公网入口 -> 应用优先读取本地 feed / 必要时用公网 URL 兜底 -> 解析 json ai-timeline-feed -> 提供 API 与 feed 摘要`；Vue 页面当前暂时下架
-  - `AI 时间线提醒链路`：`定时读取 AI 时间线 feed -> 筛选新增 S 级官方事件 -> 按 eventKey 去重 -> 飞书主通道 + 邮件备份通道推送`
-  - `发信链路`：`手动发信 -> 读取最新一份已生成报告 -> SMTP 发邮件`；每日早报发信默认关闭，SMTP 同时作为 S 级事件邮件备份通道
-  - `HotNow-Hermes 创作交付链路`：`Hermes 事实核验/写作 -> human-writing 只读终稿审改 -> 图片提示词/图片执行 -> 成品创建`；初次成品创建同时接收 `contentMarkdown` 与 `humanMarkdown`，`stepTrace.meta.humanWriting` 只保存审改状态摘要，不能把本地审改全文写入 trace
-  - `短内容代码制图链路`：短内容成品进入 HotNow 后由 Hermes 触发单篇代码制图；HotNow 使用 SVG + Sharp 和随应用部署、由 fontconfig 注册的 `NotoSansSC-Regular.otf` 输出 `2.5:1`、`1:1`、`3:4` 三张 2 倍像素 PNG，写入 `code_image_cards`、`humanMarkdown` 和封面候选，图片主体按标题、核心判断、导语/摘要和文章生成标签组织，缺少核心判断时读取素材 `summary`；标签优先读取成品 `codeImageKeywords`，再读取素材 `tags`，不输出空内容占位文案，缺少标签时不伪造标签；失败不改变文章状态，页面支持单篇制作、重做、下载和复制地址
-- 当前数据源：内置 RSS 库已扩展到 `21` 个，覆盖聚合日报、国际官方 AI 博客、国内科技媒体、创投资讯、开发者社区与综合新闻；Twitter 已拆成两类独立来源类型：账号采集配置保存在 `twitter_accounts`，关键词搜索配置保存在 `twitter_search_keywords`；Hacker News 搜索配置保存在 `hackernews_queries`；B 站搜索配置保存在 `bilibili_queries`；微信公众号 RSS 配置保存在 `wechat_rss_sources`；微博热搜榜匹配使用固定 AI 关键词，不提供独立配置表；AI 时间线不再维护应用内官方源白名单和采集规则，服务端优先读取 `AI_TIMELINE_FEED_FILE` 指向的本地 Markdown feed，必要时再用 `AI_TIMELINE_FEED_URL` 指向的公网 Markdown feed 兜底，解析其中唯一的 `json ai-timeline-feed` 代码块并提供 API 与提醒数据。这些扩展链路除 AI 时间线 feed 外都只支持后台手动执行，完整清单和边界见 `README.md`
-- 当前采集语义：以 `is_enabled` 为准决定是否参与采集；`is_active` 仅保留兼容，不再作为系统菜单主语义
-- 当前技术栈：`Node.js + TypeScript + Fastify + Vue 3 + Vite + Ant Design Vue + Tailwind CSS + Vitest`
+- HotNow 是本地单机运行的每日热点和内容编辑应用，技术栈为 `Node.js + TypeScript + Fastify + Vue 3 + Vite + Ant Design Vue + Tailwind CSS + Vitest`。
+- 保持当前单进程、SQLite、文件归档和规则聚类架构，除非需求明确要求架构升级。
+- `is_enabled` 决定来源是否参与采集；`is_active` 只保留兼容语义。
+- AI 时间线只读取外部 Markdown feed，不在 HotNow 恢复官方源采集、白名单、候选池或事件写入 `content_items` 的旧设计。相关 API、feed 和提醒仍运行，Vue 页面当前下架。
+- Hermes 是素材评估、自动长短写作、图片、日报、提醒、队列、计划、重试和告警的唯一业务编排真源。HotNow 只保存展示数据、代理控制请求和展示状态，不创建平行队列、调度器或自动化状态机。
+- 敏感信息只能通过环境变量或密钥管理提供；不得读取、回显、提交 `.env`、凭据、Cookie、token、数据库 live 文件或私钥。
+- `data/`、恢复快照、报告和 SQLite 均为本地运行产物，不得提交 Git。
+- 除非需求明确变化，不新增 telemetry(遥测)、analytics(分析)或其他外部网络上报。
 
-当前仓库已经有较完整的实现、配置模板、测试和设计/计划文档，不要把它当成从零开始的脚手架项目处理。
+更细的功能合同见 `README.md`，Hermes 交互和创作链路约束见 `docs/Hermes自动化协作边界.md`。
 
-## 3. 关键目录与职责
+## 3. 开发执行原则
 
-- `src/main.ts`
-  负责运行时配置、数据库初始化、运行锁、任务调度、监听和优雅退出；HTTP 依赖装配在 `src/app/createRuntimeServerDeps.ts`。
-- `src/client/`
-  负责内容、创作和 `/settings/*` 系统页的 Vue 3 客户端入口、路由、页面组件、主题和前端 service 封装。
-  `src/client/pages/*` 只保留路由级页面编排；可复用或大块 UI 下沉到 `src/client/components/*`，其中数据来源工作台的分区卡片、表格、弹窗和共享格式化逻辑集中在 `src/client/components/settings/sources/`。
-  客户端样式栈固定为 `Vue 3 + Vite + Ant Design Vue + Tailwind CSS`；统一主题源收口到 `src/client/theme/editorialTokens.ts`，`src/client/styles/tailwind.css` 只保留基础样式、主题变量和少量 AntD 深层覆写，不要再长出新的大型 CSS 皮肤文件。
-- `src/core/config/`
-  负责读取 `config/hot-now.config.json` 和环境变量，组装运行时配置。
-- `src/core/source/`
-  负责拉取并解析最新 RSS 日报。
-- `src/core/fetch/`
-  负责抓取原文和正文提取。
-- `src/core/feedback/`
-  负责内容反馈池相关数据的读写。
-- `src/core/llm/`
-  负责厂商配置加密存储；当前版本先只保留 LLM 设置入口，不再接入筛选策略链路。
-- `src/core/twitter/`
-  负责 Twitter 账号配置存储、Twitter 关键词配置存储、TwitterAPI.io 用户最新推文 / advanced search client、账号采集、关键词搜索、命中关系持久化和推文到候选内容的映射；不要把单个 Twitter 账号配置或单个关键词配置塞进 `content_sources`。
-- `src/core/hackernews/`
-  负责 Hacker News query 配置存储、Algolia search client、HN 搜索采集、命中 query 合并和 HN 条目到候选内容的映射；不要把单个 HN query 塞进 `content_sources`。
-- `src/core/bilibili/`
-  负责 B 站 query 配置存储、视频搜索 client、B 站搜索采集、命中 query 合并和视频条目到候选内容的映射；不要把单个 B 站 query 塞进 `content_sources`。
-- `src/core/wechatRss/`
-  负责微信公众号 RSS 链接配置存储、RSS 拉取解析、手动采集、状态回写和公众号 RSS 条目到候选内容的映射；不要把单个公众号 RSS 链接塞进 `content_sources`。
-- `src/core/weibo/`
-  负责微博热搜榜 client、固定 AI 关键词匹配、微博热搜采集和热搜条目到候选内容的映射；不要给微博热搜榜匹配补一套独立 query 配置表，也不要把单个热搜条目塞进 `content_sources`。
-- `src/core/aiTimeline/`
-  负责 AI 时间线 feed 类型、Markdown feed 读取、`json ai-timeline-feed` 代码块解析、事件质量门禁、feed 版本回退和时间线列表读取；应用内不再维护官方源白名单、官方源采集、重要性规则分类、事件 upsert、官方证据表或源健康表，也不要把 AI 时间线事件写入 `content_items`。
-- `src/core/viewRules/`
-  负责 `AI 新讯 / AI 热点` 的页面级筛选规则默认值、开关配置与持久化读写；后续如果继续扩展内容筛选逻辑，优先在这里演进，不要再新开一套平行配置源。
-- `src/core/topics/`
-  负责热点归并、排序和摘要整理。
-- `src/core/strategy/`
-  保留历史自然语言策略与评估相关实现；当前版本不再从 `view-rules` 页面装配或触发这条链路。
-- `src/core/report/`
-  负责生成结构化报告和 HTML 报告。
-- `src/core/pipeline/runCollectionCycle.ts`
-  负责执行“采集 + 聚类 + 生成报告 + 写入存储”的 collection-only 流水线。
-- `src/core/pipeline/sendLatestReportEmail.ts`
-  负责读取最新报告并单独执行发信。
-- `src/core/pipeline/runDailyDigest.ts`
-  保留旧的一体化日报流水线实现，新增功能优先复用拆分后的 collection / mail pipeline。
-- `src/core/mail/`
-  负责 QQ SMTP 邮件发送。
-- `src/core/storage/`
-  负责报告文件读写和历史日期索引。
-- `src/core/scheduler/`
-  只负责保留既有报告/邮件/时间线的运行时计时器；每个自动回调执行前必须向 Hermes 查询阶段许可，不得在这里保存自动化开关、队列、重试或业务状态。
-- `src/server/`
-  负责 HTTP 协议适配、页面分发和业务域路由；`createServer.ts` 只做 Fastify 创建、全局配置、依赖装配与路由注册。路由域、核心层和客户端的长期边界以 `docs/开发与模块化规范.md` 为准，历史治理过程见 `docs/性能优化基线.md`。
-- `src/server/hermesAutomationClient.ts` 与创作动作路由
-  只负责调用 Hermes 自动化控制面、读取自动阶段许可、转发人工写作请求和展示状态；写作队列状态可展示 Hermes 持久化的终态历史，客户端按北京时间自然日分组并在日期带显示全量成品文章数与采集素材数（不受分页影响，分别按成品创建时间和素材采集时间统计），且可打开成品只读详情；不要在 HotNow 增加新的自动化队列、重试器或账号适配业务判断。
-- `src/wechatResolver/`
-  负责本地开发时自动启动的公众号解析 sidecar；当前默认先尝试公开索引，再用“文章页元数据 + 搜狗文章检索”做 fallback，最终把标准 `rss_url` 返回给主应用。
-- `tests/`
-  负责单元测试与轻量集成测试。
-- `config/hot-now.config.json`
-  负责非敏感运行配置。
-- `deploy/`
-  保存生产环境的 `systemd`、`nginx`、sudoers 示例模板，供首次部署或服务器核对时复用。
+- 默认直接在 `main` 开发；只有用户明确要求隔离、分支或 PR 时才创建其他分支或 worktree。
+- 开始修改前先确认目标文件，并用 3～6 条说明计划、边界和验证方式。
+- 信息不足时先问关键问题，不猜 API、字段、命令、配置或业务语义。
+- 只修改当前任务直接相关的代码；不顺手重构、格式化或清理相邻模块。
+- 优先最小、清晰、可审查的实现；不为一次性需求创建抽象层，不为未来假设增加配置。
+- 行为变更必须补最相关测试。修 bug 先用测试复现，验证输入先覆盖无效场景，重构必须证明行为不变。
+- 每个新增或修改的方法都要有说明职责、关键参数/返回值和副作用的注释；复杂分支和边界条件解释“为什么”。不要写复述代码的废话注释。
+- 删除、清空、覆盖、重置、迁移、强制推送等高风险操作必须先说明精确命令和影响，并取得用户确认。
+- 外部写操作、上传、消息发送和非项目持续授权范围内的部署动作，执行前必须确认。
 
-### TypeScript 与构建约束
+代码分层、目录职责、TypeScript 模块解析、Vue 组件边界和大文件治理统一遵循 `docs/开发与模块化规范.md`。
 
-- 服务端使用 `tsconfig.json` 的 NodeNext 配置，源码内部导入必须保留 `.js` 扩展名。
-- 客户端使用 `tsconfig.client.json` 的 Bundler/Vite 配置，`.vue` 文件由 Vite 处理；不要把服务端的模块解析约束直接套到客户端代码。
+## 4. 本地运行与数据安全
 
-## 4. 当前页面与产物约定
+- 首次进入仓库先确认依赖状态，不得假设 `node_modules` 已存在。
+- 常用入口：
+  - 安装：`npm install`
+  - 标准开发：`npm run dev`
+  - 完全离线开发：`npm run dev:local`
+  - 客户端：`npm run dev:client`
+  - 客户端构建：`npm run build:client`
+  - 完整构建：`npm run build`
+  - 客户端类型检查：`npm run typecheck:client`
+  - 测试：`npm run test`
+  - 数据库检查：`npm run db:check`
+- `npm run dev` 默认把 `/api/*`、`/actions/*`、登录和登出代理到正式站点；页面保存、发布和图片操作可能直接修改生产数据。需要纯本地数据库时必须使用 `npm run dev:local`。
+- 本地排查生产数据只能使用 `./scripts/pull-prod-data.sh` 拉取副本，再通过 `./scripts/dev-prod-sync.sh` 启动；不得让开发进程直接读取服务器 live 数据。
+- 数据库损坏先执行 `npm run db:check`，恢复使用 `npm run db:restore -- <snapshot-file>`；不要直接覆盖 live SQLite。
 
-当前可访问入口：
+完整环境变量、开发模式和 SQLite 说明见 `README.md`。
 
-- 公开内容：`/`、`/ai-new`、`/ai-hot`；系统页：`/settings/view-rules`、`/settings/sources`、`/settings/wechat-mp`、`/settings/profile`；创作页：`/creative/*`、`/daily-digest`、`/monitor`。
-- 运维和兼容入口：`/health`、`/login`、`/logout`、`/history`、`/reports/:date`、`/control`。
-- AI 时间线 Markdown feed 公开入口为 `/feeds/ai-timeline-feed.md`；页面路由 `/ai-timeline` 与 `/settings/ai-timeline` 当前暂时下架，API、feed 回退和提醒链路继续运行。
-- 运行产物仅保留在 `data/`：报告位于 `data/reports/<YYYY-MM-DD>/`，已验证快照位于 `data/recovery-backups/<timestamp>/`，不得提交 Git。
+## 5. 验证门禁
 
-页面细节、接口契约和配置说明以 `README.md` 为准；模块边界以 `docs/开发与模块化规范.md` 为准。
+按最小充分原则逐级验证：
 
-成品正文编辑的 AI 草稿与人工发布内容分别保存；自动保存不得触发父页面详情刷新，成功响应必须同步服务端 `updatedAt`。图片回写与正文编辑并发时，必须保留已落库的图片 Markdown 槽位并清理对应图片描述，不能只看 `images_json` 是否已有 URL；异步图片回写必须携带文章版本，遇到 `article-revision-conflict` 要基于最新正文重试，前端只替换目标图片槽位，不能用旧整篇正文覆盖用户编辑。
+1. 局部逻辑先运行最相关的测试文件。
+2. 客户端页面改动运行相关前端测试和 `npm run build:client`。
+3. 服务端、路由、运行时类型或入口改动运行 `npm run build`。
+4. 任务链路、页面、配置或用户可见行为改动补手动 smoke test。
+5. 提交前执行 `git diff --check`；大文件治理、迁移、部署和性能改动还要执行各自专项门禁。
 
-短内容标题必须以素材原标题为锚点保守转写，保留主体、事件、关键数字、核心吸引点和疑问结构，并在既有 `human-writing` 阶段通过 80 分保真门禁；失败回退原标题清理版并进入人工审核。短内容详情展示素材原标题，人工重新生成固定返回“最贴近原标题 / 适度压缩 / 自然口语”三个候选；不批量改历史成品，不改变长文标题逻辑。
+不得把失败测试描述为通过，不得为了过门禁删除断言、降低阈值或掩盖既有失败。测试数量和一次性验收结果不写入本文件，以本轮实际输出和 CI 为准。
 
-短内容代码图片独立于文章状态机，接口为 `/api/creative/finished-articles/:id/code-images`（Hermes token）和 `/actions/creative/finished-articles/:id/code-images`（页面 session）；图片文件沿用 `/api/creative/images/<date>/<uuid>.png`，标题、核心判断、导语/摘要、标签或选中标题变化会将已有代码图片标记为 `stale`，普通正文段落变化不触发重做。卡片排版必须用换行阶段实际选中的字号绘制，禁止按初始字号渲染缩小后的文案行；短内容详情弹窗在「备选标题」下方展示 `codeImageKeywords`，没有标签时也保留该区域，并可通过 `/api/creative/finished-articles/:id/regen-code-image-keywords` 代理 Hermes 覆盖生成（仅短内容）。制作图片不限次数，每次整组重做三张。短内容成品的 `status` 在入库时会归一化为平台成品状态（`ready → ready_for_publish`、`draft` / `needs_rewrite → needs_review`），短内容质检通过后可直接推送草稿箱，不需要额外的“标记可推送”步骤；长文状态不参与该映射。
+## 6. 发布与 Git 交付
 
-### Hermes 自动化边界（强约束）
+- 达到一次最小可验证改动后，默认同一轮完成验证、生产部署和 `ship commit push`；用户明确说“先不部署 / 提交 / 推送”时除外。
+- HotNow 生产部署固定使用 `./scripts/deploy-prod.sh`，必须在进入 ship 阶段前完成。部署失败立即停止提交推送。
+- 进入 ship 阶段后只允许核对本轮 diff、整理提交信息、提交和推送；不得再运行测试、构建、lint、代码搜索或其他代码探查。
+- 提交标题默认使用 `英文类型: 中文摘要`，例如 `feat: 优化短内容标题`。提交正文遵循 ship skill：连续 bullet、完整 `变更文件:` 清单，不使用多个 `-m` 制造分段。
+- 工作区存在无关脏改、live 数据、凭据、临时恢复文件或提交边界不清时，不得部署或提交；必须明确报告阻塞原因。
+- 推送后核对本地 HEAD 与远端目标分支 SHA 一致，并如实报告部署、健康检查、提交和推送结果。
 
-- Hermes（`/Users/tc-nihao/.hermes`）是素材采集、基础评分、账号适配评估、自动长短写作、图片、日报、提醒、邮件通知的业务编排、状态、队列、计划、重试和告警唯一真源。
-- 写作管线当前任务、阶段与运行时 Skills 的协作索引统一维护在 Hermes `scripts/prd/公众号写作管线-任务与Skills协作索引.md`；HotNow 不复制 Skill 调用或版本判断，页面只展示 Hermes 返回的轻量追踪信息。
-- HotNow 只展示 Hermes 返回的状态，并把控制请求代理到 Hermes；素材入库只写 HotNow 展示数据，不得在入库后本地创建自动评估或自动写作任务。既有报告/邮件/时间线计时器只能把 Hermes 阶段许可当作执行前门禁，不能形成第二套控制面。
-- 自动化使用一个全局模式：`running`、`paused`、`emergency_stopped`；阶段开关仍独立存在。短内容的素材采集入库与自动写作是两个独立阶段，采集和写作各自有调度间隔，写作只消费当前采集批次，不自动补写历史 `ready` 素材。暂停只阻止自动任务，紧急停止还会取消未开始的自动队列项；两者都不影响人工写作。短内容素材表格的人工写作和自动短内容候选都必须逐篇进入 Hermes 全局文章队列；人工任务携带 HotNow 平台素材 ID并使用高优先级，自动任务使用普通优先级且继续受 `short_write` 阶段门禁控制，供右侧队列浮层展示素材或标题、形态、阶段和最终成品；HotNow 不为此创建平行队列。
-- 基础评分与账号适配评估在 Hermes 内部保持两个独立阶段。HotNow 可以展示适配结果，但不提供手动账号适配评估入口，也不以本地适配结果决定人工写作能否提交。
-- 每轮自动长文槽位、素材锁定、候选理由、同主题去重、成功/阻断/待重试/重试耗尽结果都只能由 Hermes 记录；HotNow 只轮询展示周期槽位、逐篇失败原因和成品入口，不得复制筛选条件、补投递或把人工点击变成持续自动执行。
-- Luna 配图资格由 Hermes 按“实际模型为 `codex/gpt-5.6-luna` + 触发类型 + 图片阶段开关”判断。HotNow 只提交人工意图，不直接调用模型或维护图片任务状态。
-- Luna 长文采用 Hermes 单一文章闭环队列：每篇文章完成写作、全部配图和图片写回后才开始下一篇；账号适配等后台任务在文章占用期间延后。HotNow 只展示 Hermes 返回的阶段、图片进度、重试次数和最终结果，不创建平行调度器。
-- 旧 `/api/creative/automation/:kind/enabled` 仅作为兼容代理；新增控制必须使用统一 `/api/creative/automation/status` 与 `/api/creative/automation/control`，禁止再扩展旧的平行开关语义。
+生产准备、快照、Nginx 和回滚细节见 `docs/生产部署手册.md`。
 
-## 5. 运行与验证
+## 7. 文档维护路由
 
-首次进入仓库先确认依赖状态。当前工作区可能没有安装依赖，不要默认 `node_modules` 已存在。
+对外可见行为或系统边界变化时，文档必须与代码同轮更新，但按职责写入唯一位置：
 
-常用命令：
+- 功能、页面、命令、配置、环境变量、产物格式变化：更新 `README.md` 和 `.env.example`，必要时补相关测试。
+- 目录职责、依赖方向、编码或重构规则变化：更新 `docs/开发与模块化规范.md`。
+- Hermes 阶段、队列、Skill、追踪字段或 HotNow 代理边界变化：更新 `docs/Hermes自动化协作边界.md`，并同步 Hermes 仓库对应 PRD。
+- 部署命令、服务器目录、服务、快照或回滚方式变化：更新 `docs/生产部署手册.md`。
+- 性能基线、历史治理过程和一次性部署证据：更新 `docs/性能优化基线.md`，不要写进核心规则。
+- 外部创作 API 契约变化：更新 `docs/创作外部智能体接口.md`。
 
-- 安装依赖：`npm install`
-- 系统页客户端构建：`npm run build:client`
-- 开发启动：`npm run dev`
-- 仅启动 Vite 客户端调试：`npm run dev:client`
-- 仅启动公众号解析 sidecar：`npm run dev:wechat-resolver`
-- 本地离线入口：`npm run dev:local`
-- 数据库检查：`npm run db:check`
-- 生成 verified snapshot：`npm run db:snapshot`
-- 从快照恢复主库：`npm run db:restore -- <snapshot-file>`
-- 生产部署：`./scripts/deploy-prod.sh`（默认会先读取仓库根 `.deploy.local.env`；如需临时覆盖，再显式传 `HOT_NOW_DEPLOY_*`）
-- 生产部署前会创建并验证 `pre-deploy-*.sqlite` 数据库快照；验证成功后自动保留最近 `5` 份，并对最近 `14` 天的更早快照按服务器自然日保留当天最后一份。专项、人工和未知命名备份不会自动删除。
-- 生产 Nginx：`deploy/nginx/hot-now.conf` 包含 `80 -> 443` 跳转、`now.achuan.cc` HTTPS 反代，并直接服务 `/client/assets/` 下的 Vite hash 资源，对 JS/CSS 开启 gzip 与长缓存；更新该模板后，服务器侧需要执行 `nginx -t` 并 reload Nginx，避免静态资源继续绕到 Node 进程。
-- 拉取生产数据副本：`./scripts/pull-prod-data.sh`（默认从生产服务器拉 `hot-now.sqlite + reports/` 到本地 `data/prod-sync/`）
-- 基于生产副本启动本地开发：`./scripts/dev-prod-sync.sh`（固定使用本地 `data/prod-sync/`，不直连服务器 live 数据）
-- 类型构建：`npm run build`
-- 客户端类型检查：`npm run typecheck:client`
-- 测试：`npm run test`
-
-`npm run dev` 现在默认是正式 API 开发入口：启动前会准备最新 client bundle，并同时拉起 Fastify、Vite dev server 和本地公众号解析 sidecar；`/api/*`、`/actions/*`、登录和登出会通过 HTTPS 代理到 `https://now.achuan.cc`，页面保存、发布、图片和其他写操作直接作用于正式数据。代理模式不挂载远程 SQLite，只转发 HTTP 请求和正式站点会话 Cookie；本地采集、发信、AI 时间线提醒和公众号 RSS 定时任务会关闭。脚本现在只读取根目录 `.env`；`.env.local` 已不再参与启动加载，若仓库里还残留旧文件，脚本会明确提示它已被忽略。后续开发统一把共享配置和每台设备自己的敏感项都维护在 `.env`。未显式配置 `WECHAT_RESOLVER_BASE_URL` / `WECHAT_RESOLVER_TOKEN` 时，`npm run dev` 会自动注入本地默认值并启动 sidecar；只有想改接远端 relay 时才需要覆盖这两个环境变量。`HOT_NOW_CLIENT_DEV_ORIGIN` 未显式配置时，默认使用 `http://127.0.0.1:35173`，避免和常见本地前端服务抢占 `5173`。每次执行 `npm run dev` 都会先清理后端端口、Vite 调试端口和自动 sidecar 端口，再启动新进程，不复用旧的 Vite dev server。`npm run dev:local` 会清除正式 API 代理环境变量，用于完全离线的本地数据库开发；`npm run dev-prod-sync` 也必须经由这个入口运行，不能误把生产副本调试请求发到正式站点。当前 `3030` 页面会优先尝试接入 `HOT_NOW_CLIENT_DEV_ORIGIN` 指向的 Vite dev server，成功时可直接使用 Vue DevTools，失败时自动回退到 `dist/client` 构建产物；`npm run dev:client` 仍保留给只调前端时单独使用。
-
-SQLite 可靠性约定：
-
-1. `data/` 整个目录都是本地运行产物目录，不再纳入 git。
-2. `data/hot-now.sqlite` 是运行中的 live 库，只给当前设备本地运行使用，不再直接跨设备同步或常规提交。
-3. 跨设备开发、服务器初始化和坏库恢复，统一手动复制 `data/recovery-backups/<timestamp>/hot-now.sqlite + manifest.json`。
-4. `.sqlite-wal` 与 `.sqlite-shm` 继续保持忽略，不纳入 git。
-5. 启动报损坏时，先跑 `npm run db:check`，再用 `npm run db:restore -- <snapshot-file>` 恢复。
-6. 如果本地开发要对照生产数据，优先运行 `./scripts/pull-prod-data.sh` 把生产库和报告拉到 `data/prod-sync/`，不要让开发环境直接读服务器上的 live 数据目录。
-7. 如果只是想基于这份副本排查或开发，优先运行 `./scripts/dev-prod-sync.sh`，不要每次手写 `HOT_NOW_DATABASE_FILE` 和 `HOT_NOW_REPORT_DATA_DIR`。
-
-推荐验证顺序：
-
-1. 只改了局部逻辑时，先跑最相关的单测文件（`npx vitest run tests/<path>.test.ts`）。
-2. 改动涉及 `/settings/*` 客户端页面时，先跑最相关的前端单测，再跑 `npm run build:client`。
-3. 改动影响运行时类型或入口时，再跑 `npm run build`。
-4. 改动影响任务链路、页面或配置时，最后做一次手动 smoke test。
-
-推荐 smoke test：
-
-1. 准备 `SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_USER`、`SMTP_PASS`、`MAIL_TO`、`BASE_URL`、`AUTH_USERNAME`、`AUTH_PASSWORD`、`SESSION_SECRET`；如需让厂商 API key 使用独立加密密钥，再额外准备 `LLM_SETTINGS_MASTER_KEY`；如需验证 Twitter 账号真实采集或 Twitter 关键词搜索，再额外准备 `TWITTER_API_KEY`
-2. 启动 `npm run dev`
-3. 打开 `/login` 并完成登录
-4. 如需验证内容筛选工作台，先进入 `/settings/view-rules` 检查 `AI 新讯 / AI 热点` 的筛选总览与开关保存，再检查 `反馈池` 的复制 / 删除 / 清空是否正常；`LLM 设置` 当前只保留配置入口，不会触发策略或重算
-5. 进入 `/settings/sources` 或 legacy `/control`，先手动执行一次普通 RSS 采集；如果已配置 `TWITTER_API_KEY`，再到 `/settings/sources` 的 Twitter 分区单独执行一次 Twitter 账号采集，并确认账号“最近成功 / 最近结果”回写；如需验证关键词搜索、Hacker News、B站、微信公众号 RSS 或微博热搜，分别使用该页对应手动入口并在 `/ai-new`、`/ai-hot` 检查结果可见性。AI 时间线页面当前下架，只验证 `AI_TIMELINE_FEED_URL` 或默认 `https://now.achuan.cc/feeds/ai-timeline-feed.md` 可访问且包含 `json ai-timeline-feed`，以及相关 API 返回有效数据；需要验证发信时，再单独触发一次“发送最新报告”
-6. 检查是否生成报告目录与 `report.json`、`report.html`、`run-meta.json`
-7. 检查 `/`、`/ai-new`、`/ai-hot`、`/settings/view-rules`、`/settings/sources`、`/settings/wechat-mp`、`/settings/profile`、`/history`、`/reports/:date` 是否正常显示，并验证内容页 source 过滤条、共享排序切换、共享标题搜索、内容页策略摘要、内容卡片反馈面板、反馈池和 LLM 设置占位文案
-8. 在 `/creative/short-finished-articles` 打开一篇短内容，确认「备选标题」下方展示代码图片标签（无标签时保留区域并可点“生成标签”），点击“制作图片”确认三种比例均生成、正文开头出现三条图片 Markdown、封面候选可见；再次点击“重新制作图片”应仍可整组重做，且只更新当前引用、保留旧文件；点“重新生成标签”并确认后应覆盖标签并把已有图片标为需重做
-
-## 6. 配置与安全约束
-
-- 非敏感配置放在 `config/hot-now.config.json`
-- 敏感信息必须通过环境变量提供，尤其是 QQ SMTP 授权码和飞书机器人 webhook
-- 不要把 `.env`、授权码、邮箱密码、cookies 或外部账号信息提交进仓库
-- 除非需求明确变化，否则不要新增外部 telemetry、analytics 或额外网络上报
-
-当前关键环境变量：
-
-- `SMTP_HOST`
-- `SMTP_PORT`
-- `SMTP_SECURE`
-- `SMTP_USER`
-- `SMTP_PASS`
-- `MAIL_TO`
-- `BASE_URL`
-- `PUBLIC_BASE_URL`（可选对外正式站点地址；飞书提醒和邮件里的用户可点击链接优先使用它，缺失时回退 `BASE_URL`）
-- `AUTH_USERNAME`
-- `AUTH_PASSWORD`
-- `SESSION_SECRET`
-- `AUTH_SESSION_TTL_SECONDS`（可选登录会话固定有效期，单位秒；默认 `604800`，即 7 天，不做滑动续期）
-- `LLM_SETTINGS_MASTER_KEY`
-- `CREATIVE_API_TOKEN`（外部智能体调用创作素材、成品和 feed 接口时需要；只通过调用方自己的密钥管理提供）
-- `HERMES_API_BASE_URL`、`HERMES_API_TOKEN`（写作、溯源、图片和监控代理等 Hermes 对接链路需要）
-- `TWITTER_API_KEY`（可选 TwitterAPI.io 密钥；在 Twitter 账号采集和 Twitter 关键词搜索时需要，缺失时不阻断普通 RSS、微信公众号 RSS、Hacker News、B 站或微博热搜采集）
-- `FEISHU_ALERT_WEBHOOK_URL`（可选 S 级 AI 时间线事件飞书提醒 webhook；缺失时飞书通道失败但邮件备份仍会尝试发送）
-- `HOT_NOW_DATABASE_FILE`（可选生产覆盖项；显式指定生产 SQLite 文件路径，例如 `/srv/hot-now/shared/data/hot-now.sqlite`）
-- `HOT_NOW_REPORT_DATA_DIR`（可选生产覆盖项；显式指定生产报告目录，例如 `/srv/hot-now/shared/data/reports`）
-- `AI_TIMELINE_FEED_FILE`（可选外部 AI 官方发布时间线 feed 稳定文件路径，生产推荐 `/srv/hot-now/shared/data/feeds/ai-timeline-feed.md`）
-- `AI_TIMELINE_FEED_MANIFEST_FILE`（可选外部 AI 官方发布时间线 feed manifest 路径，生产推荐 `/srv/hot-now/shared/data/feeds/ai-timeline-feed-manifest.json`）
-- `AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS`（可选回退版本数量，默认 `10`）
-- `HOT_NOW_CLIENT_DEV_ORIGIN`
-- `HOT_NOW_DEV_REMOTE_API_ORIGIN`（本地 `npm run dev` 默认使用 `https://now.achuan.cc`；将 `/api/*`、`/actions/*`、登录和登出代理到正式 API）
-- `HOT_NOW_DEV_REMOTE_API_TOKEN`（可选，仅在正式接口需要 `x-creative-token` 时使用；必须通过本地 `.env` 提供）
-- `WECHAT_RESOLVER_BASE_URL`（可选覆盖项；本地开发默认由 `npm run dev` 自动注入 `http://127.0.0.1:4040`）
-- `WECHAT_RESOLVER_TOKEN`（可选覆盖项；本地开发默认由 `npm run dev` 自动注入本地 sidecar token）
-
-部署脚本专用环境变量：
-
-- `HOT_NOW_DEPLOY_HOST`
-- `HOT_NOW_DEPLOY_USER`
-- `HOT_NOW_DEPLOY_APP_DIR`（可选，默认 `/srv/hot-now/app`）
-- `HOT_NOW_DEPLOY_SERVICE`（可选，默认 `hot-now`）
-- `HOT_NOW_DEPLOY_HEALTH_URL`（可选，默认 `http://127.0.0.1:3030/health`）
-
-日常开发机推荐在仓库根目录维护一个本地私有的 `.deploy.local.env`，让 `scripts/deploy-prod.sh` 直接读取默认发布目标；仓库里只保留 `.deploy.local.env.example` 模板，真实 `.deploy.local.env` 必须继续忽略，不提交进仓库。
-
-拉取生产数据副本脚本可选覆盖项：
-
-- `HOT_NOW_PULL_REMOTE_DATA_DIR`（可选，默认 `/srv/hot-now/shared/data`）
-- `HOT_NOW_PULL_LOCAL_DIR`（可选，默认 `<repo>/data/prod-sync`）
-
-单机生产部署默认要求部署用户具备最小范围的免密 sudo，只放开：
-
-- `/usr/bin/systemctl restart hot-now`
-- `/usr/bin/systemctl status hot-now --no-pager`
-
-不要把部署用户配置成全局免密 sudo；优先复用 `deploy/sudoers/hot-now-systemctl` 模板。
-
-如果新增、删除或重命名环境变量，必须同步更新：
-
-- `AGENTS.md`
-- `README.md`
-- `.env.example`
-- 相关测试
-
-## 7. 代码改动约束
-
-- 优先做小而清晰的改动，不要因为“顺手”重排整个项目结构。
-- 保持当前单进程、文件归档、规则聚类的主架构，除非需求明确要求架构升级。
-- 新增逻辑优先复用现有的依赖注入方式，特别是 `runDailyDigest` 和 `createServer` 的测试注入模式。
-- 改动行为时，优先补最相关测试，不要只改实现不补门禁。
-- Vue 客户端按“页面编排、组件呈现、composable 承载可复用状态、service 只做接口”的边界拆分；页面文件只保留路由级数据加载、动作编排和少量页面状态，不把表格、弹窗、分区卡片和重复表单都揉在一个 `.vue` 里。
-- `/settings/*` 这类系统页的业务组件放在 `src/client/components/settings/<domain>/`，内容页组件放在 `src/client/components/content/`；同一页面内多个卡片、表格、弹窗或 500 行以上的模板，应优先拆成具名组件。
-- 复杂页面的共享 UI 常量、表单状态类型、格式化函数和选项列表放到同域 `*Shared.ts` 或 composable 中；组件之间通过明确 props / emits 协作，不让子组件直接调用后端 service。
-- 新增组件必须保留清晰的 `data-*` 测试锚点；从大页面拆组件时，优先保持用户可见行为和测试选择器稳定，避免“组件化”顺手改交互。
-- 新增业务模块尽量控制在 `500～600` 行以内；Vue 页面或复杂组件超过 `800` 行时必须检查是否职责混杂；`src/server/createServer.ts` 只保留服务装配，结构治理目标控制在约 `1000` 行以内。行数是预警线而不是硬指标，不要为了压行数拆出无法独立命名和验证的碎片文件。
-- `src/` 与 `tests/` 中超过 `1000` 行的代码文件启动治理时，先建立完整清单；范围确认后一次性处理清单内文件，不拆成多个开发批次或多次提交。只有用户或维护者明确缩小范围时，才允许改变边界。
-- 大文件按完整功能区、业务域或稳定技术职责拆分，禁止按单个按钮、单个 endpoint（端点）或无业务名称的中间层机械切碎；低于 `1000` 行且职责稳定的文件不因数字继续拆分。
-- 大文件治理必须先记录行为基线，拆分后保留公开接口、鉴权、数据库语义、迁移顺序、浏览器资源行为和用户操作结果；不得顺手混入无关业务重构。
-- 一次性大文件治理除定向测试外，必须完成全量测试、相关客户端/服务端类型检查、必要构建、`git diff --check` 和大文件扫描；静态脚本、迁移或部署改动还要执行对应的兼容性、数据库和生产健康检查。完整规则见 `docs/开发与模块化规范.md`。
-- 性能改动必须先记录基线，再用相同数据和相同请求做前后对比；优先消除无效查询、大字段传输和重复请求，不用长期缓存掩盖慢查询。服务端通过 `HOT_NOW_SLOW_REQUEST_MS` 控制慢请求阈值，性能日志禁止记录查询参数、正文、Cookie 或密钥。
-- 删除、清空、覆盖、重置等不可逆或高风险操作，默认必须提供显式二次确认；除非用户明确要求并说明可跳过，否则不要直接把危险动作绑定成一次点击立即生效。
-- Git 提交信息默认使用 `英文类型：中文正文`，包含碎片提交、临时提交和最终交付提交；除非用户明确要求其他语言或其他格式，否则不要改成纯英文、纯中文或其他提交标题格式。
-- 默认直接在 `main` 分支开发，不单独开功能分支或 worktree；只有用户明确要求隔离开发、走分支 / PR 流程，或有其他特殊说明时，才切到非 `main` 分支工作。
-- 完成代码开发并达到一次“最小可验证改动”后，默认在同一轮依次执行生产部署与 `ship commit push`，不需要在新对话中再次询问；这里的“最小可验证改动”至少要求本轮最相关测试、构建或文档自检已经完成，不把未确认分析、草稿、半成品实验或明显中间态交付。
-- 生产部署固定使用 `./scripts/deploy-prod.sh`，并在进入 `ship` 前执行；该约定视为项目级持续授权。部署失败时必须停止提交推送并报告失败，不得把未成功部署的代码当作已交付结果。
-- 部署成功后立即触发 `ship commit push`：ship 阶段只读取本轮 `git diff`、整理提交标题与正文、执行 commit、执行 push；不得在 ship 阶段重复运行测试、构建、类型检查、lint、`git diff --check`、代码搜索或其他代码探查。所有验证必须在进入 ship 前完成。
-- 如果因为工作区混有无关脏改、提交边界不清、验证未完成或改动包含 live 数据库、凭据、临时恢复文件等不应入库的本地产物而不能部署或提交推送，必须在回复里明确说明原因，不得静默跳过。
-- 只有用户明确说“先不部署”“先不提交”或“先不推送”，或存在未解决的验证 / 部署失败时，才暂停对应动作；否则默认直接在 `main` 完成部署、提交和推送，不单独等待确认。
-- 对外可见行为变化时，更新文档，不要让 README 和 AGENTS 落后于代码。
-
-## 8. AGENTS.md 维护规则
-
-后续代码更新过程中，满足以下任一条件时，必须在同一轮改动里同步更新 `AGENTS.md`：
-
-- 项目目标、范围、主链路发生变化
-- 入口文件、核心模块职责或目录结构发生变化
-- 页面路由、控制台能力或报告产物格式发生变化
-- 配置项、环境变量、启动命令或验证命令发生变化
-- 当前阶段判断发生明显变化，例如从“待验证”进入“可交付”
-- 新增了后续协作者必须知道的限制、风险或操作前提
-- Hermes 写作任务、阶段、运行时 Skill 或追踪字段发生变化，影响 HotNow 代理、展示或状态解释
-
-如果只是纯实现细节调整，且不影响协作方式、运行方式、验证方式或系统边界，可以不改 `AGENTS.md`。
-
-## 9. 当前阶段快照
-
-- 结构治理已完成服务端业务域收口、核心 repository 读写边界、`main.ts` 启动装配，以及来源工作台表单生命周期拆分；不再为了行数继续机械拆分。
-- 数据库历史迁移保持兼容：`001`–`013` 与 `048` 起使用独立文件，`014`–`047` 保留现有实现；后续真实迁移继续独立归档。
-- AI 时间线 feed 与提醒链路仍运行，但 Vue 页面路由暂时下架；恢复必须同步代码、测试、`README.md`、`docs/开发与模块化规范.md` 与本文。
-- 测试通过情况以本次实际执行的命令和 CI 结果为准，不在本文件维护会过期的测试数量。
-- 每轮长文计划的周期边界由 Hermes 配置执行时间决定（默认北京时间 10:00），零点不切换；五分钟复核只补空槽，定时/人工触发只执行当前快照。
-- 大文件治理的历史过程、基线和部署记录见 `docs/性能优化基线.md`；公众号写作管线以 Hermes PRD 为准。
+只有项目定位、所有任务都必须遵守的协作流程、跨模块强边界或文档路由本身变化时，才更新 `AGENTS.md`。纯功能说明、阶段快照、测试数量和历史流水账禁止继续追加到本文。

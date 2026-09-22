@@ -135,11 +135,14 @@ const historyGroups = computed(() => {
     .map(([date, items]) => ({ date, items }));
 });
 
-function formatHistoryDate(date: string): string {
+/** 日期后显示当天成功成品数和去重素材数，失败任务不计入文章数。 */
+function formatHistoryDate(date: string, tasks: WriteQueueTask[]): string {
   if (date === "unknown") return "日期未知";
   const weekday = new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", weekday: "short" })
     .format(new Date(`${date}T00:00:00+08:00`));
-  return `${date}（${weekday}）`;
+  const articleCount = new Set(tasks.map((task) => task.finished_article_id).filter((id): id is number => id != null)).size;
+  const sourceCount = new Set(tasks.map((task) => task.source_item_id).filter((id): id is number => id != null)).size;
+  return `${date}（${weekday}） · 文章 ${articleCount} · 素材 ${sourceCount}`;
 }
 
 function statusLabel(status: WriteQueueTask["status"]): string {
@@ -231,7 +234,7 @@ onBeforeUnmount(() => {
             <span>北京时间 00:00–23:59</span>
           </div>
           <section v-for="group in historyGroups" :key="group.date" class="write-queue-day-group">
-            <h4 class="write-queue-day-label">{{ formatHistoryDate(group.date) }}</h4>
+            <h4 class="write-queue-day-label">{{ formatHistoryDate(group.date, group.items) }}</h4>
             <div v-for="task in group.items" :key="`${task.task_id}-${task.finished_at}`" class="write-queue-history-item">
               <div class="flex items-center gap-1">
                 <span :class="task.status === 'done' ? 'text-green-600' : task.status === 'stopped' ? 'text-amber-600' : 'text-red-600'">

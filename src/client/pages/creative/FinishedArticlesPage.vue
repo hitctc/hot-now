@@ -30,7 +30,7 @@ import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.v
 import CreativeCoverThumbnail from "../../components/creative/CreativeCoverThumbnail.vue";
 import ArticlePerformanceFeedbackModal from "../../components/creative/ArticlePerformanceFeedbackModal.vue";
 import SourceItemDetailModal from "../../components/creative/SourceItemDetailModal.vue";
-import { formatTableDayLabel, isTableDayStart } from "../../components/creative/tableDayGroups.js";
+import { formatTableDayLabel, isTableDayStart, toShanghaiDayKey } from "../../components/creative/tableDayGroups.js";
 import { getStatusLabel, getAvailableActions, checkPublishConditions, getDisplayTitle, type ArticleAction } from "../../components/creative/articleStatusShared.js";
 
 // ─── JSON 解析辅助 ───
@@ -271,10 +271,20 @@ function getArticleRowClass(record: CreativeFinishedArticle, index: number): str
   return classes.join(" ");
 }
 
-/** 仅在当前页的日期组首行显示北京时间日期标题。 */
+/** 统计当前页该北京时间日期组内的成品数和去重素材数。 */
+function getArticleDayCounts(record: CreativeFinishedArticle): { articleCount: number; sourceCount: number } {
+  const dayKey = toShanghaiDayKey(record.createdAt);
+  const dayItems = items.value.filter((item) => toShanghaiDayKey(item.createdAt) === dayKey);
+  return {
+    articleCount: dayItems.length,
+    sourceCount: new Set(dayItems.map((item) => item.sourceItemId).filter((id): id is number => id != null)).size,
+  };
+}
+
+/** 仅在当前页的日期组首行显示北京时间日期标题和当天数量。 */
 function getArticleDayLabel(record: CreativeFinishedArticle, index: number): string {
   return isTableDayStart(items.value, index, (item) => item.createdAt)
-    ? formatTableDayLabel(record.createdAt)
+    ? formatTableDayLabel(record.createdAt, new Date(), getArticleDayCounts(record))
     : "";
 }
 

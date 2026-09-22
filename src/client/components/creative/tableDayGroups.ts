@@ -34,22 +34,32 @@ function previousDayKey(dayKey: string): string {
   ].join("-");
 }
 
-/** 生成人类可读的日期分组标题，今天和昨天使用相对称呼。 */
+export type TableDayCounts = {
+  articleCount: number;
+  sourceCount: number;
+};
+
+/** 生成人类可读的日期分组标题，今天和昨天使用相对称呼；可选追加当天文章和素材数量。 */
 export function formatTableDayLabel(
   value: string | Date | null | undefined,
   now: Date = new Date(),
+  counts?: TableDayCounts,
 ): string {
   const dayKey = toShanghaiDayKey(value);
   const todayKey = toShanghaiDayKey(now);
   if (!dayKey || !todayKey) return "";
   const [, month, day] = dayKey.split("-").map(Number);
   const dateLabel = `${month}月${day}日`;
-  if (dayKey === todayKey) return `今天 · ${dateLabel}`;
-  if (dayKey === previousDayKey(todayKey)) return `昨天 · ${dateLabel}`;
-
-  // 日期键中午对应北京时间同一天，可避开跨时区解析日期字符串的偏移。
-  const date = new Date(`${dayKey}T12:00:00+08:00`);
-  return `${dateLabel} · ${weekdayFormatter.format(date)}`;
+  let label: string;
+  if (dayKey === todayKey) label = `今天 · ${dateLabel}`;
+  else if (dayKey === previousDayKey(todayKey)) label = `昨天 · ${dateLabel}`;
+  else {
+    // 日期键中午对应北京时间同一天，可避开跨时区解析日期字符串的偏移。
+    const date = new Date(`${dayKey}T12:00:00+08:00`);
+    label = `${dateLabel} · ${weekdayFormatter.format(date)}`;
+  }
+  if (!counts) return label;
+  return `${label} · 文章 ${counts.articleCount} · 素材 ${counts.sourceCount}`;
 }
 
 /** 判断当前记录是否是当前页中的日期组首行；首条有效记录始终展示分组标题。 */

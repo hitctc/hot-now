@@ -14,6 +14,8 @@ describe("creative table day groups", () => {
     expect(formatTableDayLabel("2026-09-22T01:00:00.000Z", now)).toBe("今天 · 9月22日");
     expect(formatTableDayLabel("2026-09-21T01:00:00.000Z", now)).toBe("昨天 · 9月21日");
     expect(formatTableDayLabel("2026-09-20T01:00:00.000Z", now)).toBe("9月20日 · 星期日");
+    expect(formatTableDayLabel("2026-09-22T01:00:00.000Z", now, { articleCount: 8, sourceCount: 8 }))
+      .toBe("今天 · 9月22日 · 文章 8 · 素材 8");
   });
 
   it("仅把当前页首条记录和日期变化后的首条记录标记为分组起点", () => {

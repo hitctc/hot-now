@@ -600,7 +600,7 @@ function copyId(id: number): void {
 
 const columns = [
   { title: "ID / 序号", dataIndex: "id", key: "idSeq", width: 72, fixed: "left" as const },
-  { title: "标题", key: "title", width: 300 },
+  { title: "标题", key: "title", width: 300, className: "table-day-title-cell" },
   { title: "封面图", key: "coverImage", width: 70, ellipsis: true },
   { title: "状态", key: "status", width: 100 },
   { title: "来源", key: "sourceName", width: 115 },

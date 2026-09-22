@@ -47,7 +47,7 @@ const { mode, isLoading, items, pagination, expandedRowKeys, writingIds, tracing
 
 const columns = [
   { title: "ID / 序号", dataIndex: "id", key: "idSeq", width: 72, fixed: "left" as const },
-  { title: "标题", dataIndex: "title", key: "title", width: 300 },
+  { title: "标题", dataIndex: "title", key: "title", width: 300, className: "table-day-title-cell" },
   { title: "来源", dataIndex: "sourceName", key: "sourceName", width: 115 },
   { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: 72, ellipsis: true },
   { title: "评分", key: "score", width: 90 },

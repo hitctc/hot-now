@@ -332,7 +332,8 @@ export function registerCreativeFinishedArticleGenerationRoutes(context: Creativ
 
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15_000);
+      // 短内容保守转写最多使用一次现有重试机会，超时需覆盖两次串行模型调用。
+      const timeout = setTimeout(() => controller.abort(), article.direction === "short_content" ? 120_000 : 15_000);
 
       const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/regen-title`, {
         method: "POST",
@@ -348,9 +349,12 @@ export function registerCreativeFinishedArticleGenerationRoutes(context: Creativ
 
       if (!res.ok) {
         const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
+        let parsedError: { error?: string; fallbackTitle?: string } = {};
+        try { parsedError = JSON.parse(errorBody) as typeof parsedError; } catch { /* 保留纯文本诊断。 */ }
         return reply.code(res.status >= 500 ? 502 : res.status).send({
           ok: false,
-          reason: `Hermes HTTP ${res.status}`,
+          reason: parsedError.error ?? `Hermes HTTP ${res.status}`,
+          fallbackTitle: parsedError.fallbackTitle,
           hermesResponse: errorBody,
         });
       }
@@ -377,7 +381,8 @@ export function registerCreativeFinishedArticleGenerationRoutes(context: Creativ
     } catch (err) {
       const errMessage = (err as Error).message ?? String(err);
       if ((err as Error).name === "AbortError") {
-        return reply.code(504).send({ ok: false, reason: "标题生成超时（>15s），Hermes 未响应", detail: errMessage });
+        const timeoutSeconds = article.direction === "short_content" ? 120 : 15;
+        return reply.code(504).send({ ok: false, reason: `标题生成超时（>${timeoutSeconds}s），Hermes 未响应`, detail: errMessage });
       }
       return reply.code(502).send({ ok: false, reason: `Hermes 调用失败`, detail: errMessage });
     }

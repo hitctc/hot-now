@@ -1,6 +1,7 @@
 import { computed, ref, type ComputedRef, type Ref } from "vue";
 import { message } from "ant-design-vue";
 
+import { HttpError } from "../../../services/http.js";
 import {
   editFinishedArticle,
   regenCodeImageKeywords,
@@ -71,9 +72,14 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
     return getArticle()?.titleCandidates?.[idx] ?? null;
   }
 
+  /** 长文沿用分组标题生成；短内容必须有素材原标题并只接收保守转写候选。 */
   async function handleRegenTitle(): Promise<void> {
     const article = getArticle();
     if (!article || regenTitleLoading.value) return;
+    if (article.direction === "short_content" && !article.sourceTitle) {
+      message.warning("未找到关联素材原标题，无法保守转写标题");
+      return;
+    }
     regenTitleLoading.value = true;
     try {
       const result = await regenTitle(article.id);
@@ -84,12 +90,17 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
         article.titleIndex = 0;
         article.titleCandidates = result.titleCandidates ?? null;
         article.titleSelectionConfirmed = false;
-        message.success("分组标题已生成，请选择发布标题");
+        message.success(article.direction === "short_content" ? "原标题转写候选已生成，请选择发布标题" : "分组标题已生成，请选择发布标题");
       } else {
         message.error(result.reason ?? "标题生成失败");
       }
-    } catch {
-      message.error("标题生成请求失败");
+    } catch (error) {
+      const body = error instanceof HttpError && error.body && typeof error.body === "object"
+        ? error.body as { reason?: string; fallbackTitle?: string }
+        : null;
+      message.error(body?.fallbackTitle
+        ? `${body.reason ?? "标题保真门禁未通过"}；建议人工参考：${body.fallbackTitle}`
+        : body?.reason ?? "标题生成请求失败");
     } finally {
       regenTitleLoading.value = false;
     }

@@ -44,6 +44,27 @@ function mountSections(
   });
 }
 
+describe("短内容原标题转写入口", () => {
+  it("展示素材原标题并提供复制入口", () => {
+    const wrapper = mountSections(buildArticle({ sourceTitle: "16岁少年强奸案，追问法定代理人到场权的落实" }));
+
+    const sourceTitle = wrapper.get('[data-testid="short-source-original-title"]');
+    expect(sourceTitle.text()).toContain("素材原标题");
+    expect(sourceTitle.text()).toContain("16岁少年强奸案");
+    expect(sourceTitle.text()).toContain("复制原标题");
+    expect(wrapper.text()).toContain("按原标题生成");
+  });
+
+  it("缺少素材原标题时禁用短内容标题生成", () => {
+    const wrapper = mountSections(buildArticle({ sourceTitle: null }));
+
+    expect(wrapper.get('[data-testid="short-source-original-title"]').text()).toContain("未找到关联素材原标题");
+    const button = wrapper.findAllComponents({ name: "AButton" })
+      .find((component) => component.text().includes("按原标题生成"));
+    expect(button?.props("disabled")).toBe(true);
+  });
+});
+
 describe("成品详情代码图片标签", () => {
   it("展示写作阶段产出的标签", () => {
     const wrapper = mountSections(buildArticle({ codeImageKeywords: ["AI监管", "算力供给"] }));

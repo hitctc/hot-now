@@ -96,6 +96,28 @@ watch(() => props.editingTitleIndex, (index) => {
 
   <!-- 备选标题 -->
   <section v-if="!isManualArticle && (displayTitles.length > 0 || (!readonly && regenTitleLoading))">
+    <div
+      v-if="article.direction === 'short_content'"
+      class="mb-3 rounded-editorial-sm border border-amber-200 bg-amber-50 px-3 py-2"
+      data-testid="short-source-original-title"
+    >
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <div class="text-[11px] font-semibold text-amber-700">素材原标题</div>
+          <div class="mt-0.5 break-words text-sm leading-6 text-editorial-text-main">
+            {{ article.sourceTitle || "未找到关联素材原标题" }}
+          </div>
+        </div>
+        <a-button
+          v-if="article.sourceTitle"
+          type="link"
+          size="small"
+          class="!h-auto shrink-0 !px-1 !py-0 !text-[11px]"
+          @click="emit('copy', article.sourceTitle)"
+        >复制原标题</a-button>
+      </div>
+      <p class="mb-0 mt-1 text-[11px] text-amber-700/80">短内容候选只围绕原标题保守转写，不另起角度。</p>
+    </div>
     <div class="mb-2 flex items-center justify-between">
       <div>
         <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">备选标题</h3>
@@ -110,9 +132,9 @@ watch(() => props.editingTitleIndex, (index) => {
           size="small"
           class="!h-auto !px-2 !py-1 !text-[11px]"
           :loading="regenTitleLoading"
-          :disabled="regenTitleLoading"
+          :disabled="regenTitleLoading || (article.direction === 'short_content' && !article.sourceTitle)"
           @click="emit('regenerate-title')"
-        >{{ regenTitleLoading ? '生成中...' : '生成新标题' }}</a-button>
+        >{{ regenTitleLoading ? '生成中...' : article.direction === 'short_content' ? '按原标题生成' : '生成新标题' }}</a-button>
         <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('copy', displayTitles.join('\n'))">复制全部</a-button>
       </div>
     </div>

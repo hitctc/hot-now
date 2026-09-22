@@ -114,6 +114,8 @@
 
 成品正文编辑的 AI 草稿与人工发布内容分别保存；自动保存不得触发父页面详情刷新，成功响应必须同步服务端 `updatedAt`。图片回写与正文编辑并发时，必须保留已落库的图片 Markdown 槽位并清理对应图片描述，不能只看 `images_json` 是否已有 URL；异步图片回写必须携带文章版本，遇到 `article-revision-conflict` 要基于最新正文重试，前端只替换目标图片槽位，不能用旧整篇正文覆盖用户编辑。
 
+短内容标题必须以素材原标题为锚点保守转写，保留主体、事件、关键数字、核心吸引点和疑问结构，并在既有 `human-writing` 阶段通过 80 分保真门禁；失败回退原标题清理版并进入人工审核。短内容详情展示素材原标题，人工重新生成固定返回“最贴近原标题 / 适度压缩 / 自然口语”三个候选；不批量改历史成品，不改变长文标题逻辑。
+
 短内容代码图片独立于文章状态机，接口为 `/api/creative/finished-articles/:id/code-images`（Hermes token）和 `/actions/creative/finished-articles/:id/code-images`（页面 session）；图片文件沿用 `/api/creative/images/<date>/<uuid>.png`，标题、核心判断、导语/摘要、标签或选中标题变化会将已有代码图片标记为 `stale`，普通正文段落变化不触发重做。卡片排版必须用换行阶段实际选中的字号绘制，禁止按初始字号渲染缩小后的文案行；短内容详情弹窗在「备选标题」下方展示 `codeImageKeywords`，没有标签时也保留该区域，并可通过 `/api/creative/finished-articles/:id/regen-code-image-keywords` 代理 Hermes 覆盖生成（仅短内容）。制作图片不限次数，每次整组重做三张。短内容成品的 `status` 在入库时会归一化为平台成品状态（`ready → ready_for_publish`、`draft` / `needs_rewrite → needs_review`），短内容质检通过后可直接推送草稿箱，不需要额外的“标记可推送”步骤；长文状态不参与该映射。
 
 ### Hermes 自动化边界（强约束）

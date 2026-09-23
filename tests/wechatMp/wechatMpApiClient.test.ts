@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
 import {
+  createDraft,
   prepareWechatImage,
   uploadPermanentImage,
 } from "../../src/core/wechatMp/wechatMpApiClient.js";
@@ -50,6 +51,27 @@ describe("公众号图片上传格式", () => {
     const media = (init?.body as FormData).get("media") as File;
     expect(media.name).toBe("cover.jpg");
     expect(media.type).toBe("image/jpeg");
+  });
+
+  it("创建草稿时为文章填写固定作者阿川", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ media_id: "draft-media" })));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const mediaId = await createDraft("token", {
+      title: "测试标题",
+      thumbMediaId: "cover-media",
+      content: "<p>正文</p>",
+    });
+
+    expect(mediaId).toBe("draft-media");
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toContain("/cgi-bin/draft/add?");
+    expect(JSON.parse(init.body as string).articles[0]).toMatchObject({
+      title: "测试标题",
+      author: "阿川",
+      thumb_media_id: "cover-media",
+      content: "<p>正文</p>",
+    });
   });
 
   it("为文件类型和 IP 白名单错误提供对应的处理提示", () => {

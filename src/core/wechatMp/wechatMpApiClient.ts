@@ -117,7 +117,7 @@ export async function uploadContentImage(
   return data.url;
 }
 
-/** 创建草稿 */
+/** 为文章和日报创建微信公众号草稿；共用固定作者署名，返回微信 media_id。 */
 export async function createDraft(
   accessToken: string,
   params: {
@@ -134,6 +134,7 @@ export async function createDraft(
     articles: [
       {
         title: params.title,
+        author: "阿川",
         thumb_media_id: params.thumbMediaId,
         content: params.content,
         digest: params.digest ?? "",

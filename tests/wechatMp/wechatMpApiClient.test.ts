@@ -53,7 +53,7 @@ describe("公众号图片上传格式", () => {
     expect(media.type).toBe("image/jpeg");
   });
 
-  it("创建草稿时为文章填写固定作者阿川", async () => {
+  it("创建草稿时固定填写作者和摘要，避免公众号自动截取正文", async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ media_id: "draft-media" })));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -69,6 +69,7 @@ describe("公众号图片上传格式", () => {
     expect(JSON.parse(init.body as string).articles[0]).toMatchObject({
       title: "测试标题",
       author: "阿川",
+      digest: "详情请见正文。",
       thumb_media_id: "cover-media",
       content: "<p>正文</p>",
     });

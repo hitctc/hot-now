@@ -117,7 +117,7 @@ export async function uploadContentImage(
   return data.url;
 }
 
-/** 为文章和日报创建微信公众号草稿；固定作者和摘要，返回微信 media_id。 */
+/** 为文章和日报创建微信公众号草稿；固定作者、摘要并开启公开留言，返回微信 media_id。 */
 export async function createDraft(
   accessToken: string,
   params: {
@@ -138,7 +138,7 @@ export async function createDraft(
         content: params.content,
         digest: "详情请见正文。",
         content_source_url: "",
-        need_open_comment: 0,
+        need_open_comment: 1,
         only_fans_can_comment: 0,
       },
     ],

@@ -53,7 +53,7 @@ describe("公众号图片上传格式", () => {
     expect(media.type).toBe("image/jpeg");
   });
 
-  it("创建草稿时固定填写作者和摘要，避免公众号自动截取正文", async () => {
+  it("创建草稿时固定填写作者、摘要并向所有人开启留言", async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ media_id: "draft-media" })));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -70,6 +70,8 @@ describe("公众号图片上传格式", () => {
       title: "测试标题",
       author: "阿川",
       digest: "详情请见正文。",
+      need_open_comment: 1,
+      only_fans_can_comment: 0,
       thumb_media_id: "cover-media",
       content: "<p>正文</p>",
     });

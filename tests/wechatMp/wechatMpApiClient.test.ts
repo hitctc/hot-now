@@ -69,7 +69,7 @@ describe("公众号图片上传格式", () => {
     expect(JSON.parse(init.body as string).articles[0]).toMatchObject({
       title: "测试标题",
       author: "阿川",
-      digest: "详情请见正文。",
+      digest: "求点赞、求关注、求转发，要是给个一键三连就更棒了",
       need_open_comment: 1,
       only_fans_can_comment: 0,
       thumb_media_id: "cover-media",

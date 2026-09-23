@@ -136,7 +136,7 @@ export async function createDraft(
         author: "阿川",
         thumb_media_id: params.thumbMediaId,
         content: params.content,
-        digest: "详情请见正文。",
+        digest: "求点赞、求关注、求转发，要是给个一键三连就更棒了",
         content_source_url: "",
         need_open_comment: 1,
         only_fans_can_comment: 0,

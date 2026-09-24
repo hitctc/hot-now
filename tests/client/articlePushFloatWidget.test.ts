@@ -31,6 +31,15 @@ afterEach(() => {
 });
 
 describe("ArticlePushFloatWidget", () => {
+  it("缩小悬浮进度窗并在窄屏内留出边距", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "src/client/components/creative/ArticlePushFloatWidget.vue"),
+      "utf8",
+    );
+
+    expect(source).toMatch(/\.push-float\s*\{[^}]*width: 260px;[^}]*max-width: calc\(100vw - 48px\);/);
+  });
+
   it("不显示二次确认，并可由首次点击直接启动推送", async () => {
     vi.mocked(readCreativeFinishedArticle).mockResolvedValue(article);
     vi.mocked(streamPushArticleToDraft).mockResolvedValue({ ok: true, mediaId: "draft-1" });

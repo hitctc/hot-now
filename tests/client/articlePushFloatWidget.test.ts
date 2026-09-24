@@ -37,7 +37,8 @@ describe("ArticlePushFloatWidget", () => {
       "utf8",
     );
 
-    expect(source).toMatch(/\.push-float\s*\{[^}]*width: 260px;[^}]*max-width: calc\(100vw - 48px\);/);
+    expect(source).toMatch(/\.push-float\s*\{[^}]*width: 208px;[^}]*max-width: calc\(100vw - 48px\);/);
+    expect(source).toMatch(/padding: 14px 12px;/);
   });
 
   it("不显示二次确认，并可由首次点击直接启动推送", async () => {

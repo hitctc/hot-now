@@ -413,13 +413,54 @@ describe("listCreativeFinishedArticles", () => {
 
     expect(result.items).toHaveLength(1);
     expect(result.dayCounts).toEqual([
-      { dayKey: "2026-09-23", articleCount: 1, sourceCount: 1 },
-      { dayKey: "2026-09-22", articleCount: 2, sourceCount: 1 },
+      { dayKey: "2026-09-23", articleCount: 1, sourceCount: 1, pushCount: 0 },
+      { dayKey: "2026-09-22", articleCount: 2, sourceCount: 1, pushCount: 0 },
     ]);
     expect(result.sourceDayCounts).toEqual([
       { dayKey: "2026-09-23", sourceCount: 1 },
       { dayKey: "2026-09-22", sourceCount: 1 },
     ]);
+  });
+
+  it("按推送发生的北京时间统计成功文章篇数，重复推送去重且不受分页和列表状态筛选影响", async () => {
+    const handle = await makeHandle();
+    handles.push(handle);
+
+    const first = insertCreativeFinishedArticle(handle.db, { contentMarkdown: "first", direction: "article" });
+    const second = insertCreativeFinishedArticle(handle.db, { contentMarkdown: "second", direction: "article" });
+    const short = insertCreativeFinishedArticle(handle.db, { contentMarkdown: "short", direction: "short_content" });
+    handle.db.prepare("UPDATE creative_finished_articles SET created_at = '2026-09-22 01:00:00' WHERE id = ?")
+      .run(short.id);
+    const anchor = insertCreativeFinishedArticle(handle.db, { contentMarkdown: "anchor", direction: "article" });
+    handle.db.prepare("UPDATE creative_finished_articles SET created_at = '2026-09-21 01:00:00', status = 'ready_for_publish' WHERE id = ?")
+      .run(anchor.id);
+    handle.db.prepare("INSERT INTO wechat_mp_accounts (name, app_id, encrypted_secret, secret_last4) VALUES (?, ?, ?, ?)")
+      .run("测试公众号", "test-app", "placeholder", "test");
+    const log = handle.db.prepare(`
+      INSERT INTO wechat_draft_push_log (article_id, account_id, theme_id, status, pushed_at, content_type)
+      VALUES (?, 1, 'bauhaus', ?, ?, ?)
+    `);
+    log.run(first.id, "success", "2026-09-21 15:59:59", "article");
+    log.run(first.id, "success", "2026-09-21 16:00:00", "article");
+    log.run(first.id, "success", "2026-09-22 01:00:00", "article");
+    log.run(second.id, "success", "2026-09-22 02:00:00", "article");
+    log.run(second.id, "failed", "2026-09-22 03:00:00", "article");
+    log.run(short.id, "success", "2026-09-22 04:00:00", "article");
+    // 旧行无法确认来源；日报 ID 即使与成品文章 ID 相同，也不能误算进推送篇数。
+    log.run(anchor.id, "success", "2026-09-22 05:00:00", null);
+    log.run(anchor.id, "success", "2026-09-22 06:00:00", "daily_digest");
+    log.run(first.id, "success", "2026-09-22 07:00:00", "daily_digest");
+    handle.db.prepare("UPDATE creative_finished_articles SET created_at = '2026-09-22 01:00:00', status = 'ready_for_publish' WHERE id = ?")
+      .run(first.id);
+
+    const result = listCreativeFinishedArticles(handle.db, { direction: "article", pageSize: 1, status: "ready_for_publish" });
+    expect(result.items).toHaveLength(1);
+    expect(result.dayCounts.find((count) => count.dayKey === "2026-09-22")?.pushCount).toBe(2);
+    expect(result.dayCounts.find((count) => count.dayKey === "2026-09-22")?.articleCount).toBe(1);
+    expect(result.dayCounts.find((count) => count.dayKey === "2026-09-21")?.pushCount).toBe(1);
+
+    const shortResult = listCreativeFinishedArticles(handle.db, { direction: "short_content", pageSize: 1 });
+    expect(shortResult.dayCounts.find((count) => count.dayKey === "2026-09-22")?.pushCount).toBe(1);
   });
 
   it("returns second page with remainder items", async () => {

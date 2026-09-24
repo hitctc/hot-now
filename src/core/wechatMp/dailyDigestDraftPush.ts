@@ -74,10 +74,10 @@ export async function pushDailyDigestToWechatDraft(params: DigestPushParams): Pr
   }
   await onProgress?.("compat", "done");
 
-  // 插入推送记录
+  // 日报 ID 与成品文章 ID 可能相同，日志必须标明内容类型。
   const logResult = db.prepare(`
-    INSERT INTO wechat_draft_push_log (article_id, account_id, theme_id, status)
-    VALUES (?, ?, ?, 'pending')
+    INSERT INTO wechat_draft_push_log (article_id, account_id, theme_id, status, content_type)
+    VALUES (?, ?, ?, 'pending', 'daily_digest')
   `).run(digestId, account.id, themeId);
   const logId = Number(logResult.lastInsertRowid);
 

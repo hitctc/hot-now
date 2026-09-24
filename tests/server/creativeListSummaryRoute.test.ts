@@ -50,6 +50,8 @@ describe("creative list summary routes", () => {
     expect(sourceFull.json().items[0].fullContent).toContain("素材完整正文");
     expect(articleSummary.json().items[0].evidencePack).toBeNull();
     expect(articleFull.json().items[0].evidencePack).toEqual({ source: "detail-only" });
+    expect(articleSummary.json().dayCounts[0].pushCount).toBe(0);
+    expect(articleFull.json().dayCounts[0].pushCount).toBe(0);
 
     await app.close();
   });

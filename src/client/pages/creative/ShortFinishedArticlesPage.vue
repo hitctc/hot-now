@@ -299,12 +299,13 @@ function getArticleRowClass(record: CreativeFinishedArticle, index: number): str
   return classes.join(" ");
 }
 
-/** 读取服务端按北京时间全量统计的日期组成品数和去重素材数，不受当前分页影响。 */
-function getArticleDayCounts(record: CreativeFinishedArticle): { articleCount: number; sourceCount: number } {
+/** 读取服务端按北京时间全量统计的成品、素材与成功推送篇数，不受当前分页影响。 */
+function getArticleDayCounts(record: CreativeFinishedArticle): { articleCount: number; sourceCount: number; pushCount: number } {
   const dayKey = toShanghaiDayKey(record.createdAt);
   const articleCount = dayKey ? dayCounts.value[dayKey]?.articleCount ?? 0 : 0;
   const sourceCount = dayKey ? sourceDayCounts.value[dayKey]?.sourceCount ?? 0 : 0;
-  return { articleCount, sourceCount };
+  const pushCount = dayKey ? dayCounts.value[dayKey]?.pushCount ?? 0 : 0;
+  return { articleCount, sourceCount, pushCount };
 }
 
 /** 仅在当前页的日期组首行显示北京时间日期标题和当天数量。 */

@@ -209,6 +209,7 @@ export type FinishedArticleDayCount = {
   dayKey: string;
   articleCount: number;
   sourceCount: number;
+  pushCount: number;
 };
 
 export type SourceDayCount = {

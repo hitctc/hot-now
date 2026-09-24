@@ -46,9 +46,10 @@ function previousDayKey(dayKey: string): string {
 export type TableDayCounts = {
   articleCount: number;
   sourceCount: number;
+  pushCount: number;
 };
 
-/** 生成人类可读的日期分组标题，今天和昨天使用相对称呼；可选追加当天文章和素材数量。 */
+/** 生成人类可读的日期分组标题，今天和昨天使用相对称呼；可选追加当天文章、素材与成功推送篇数。 */
 export function formatTableDayLabel(
   value: string | Date | null | undefined,
   now: Date = new Date(),
@@ -68,7 +69,7 @@ export function formatTableDayLabel(
     label = `${dateLabel} · ${weekdayFormatter.format(date)}`;
   }
   if (!counts) return label;
-  return `${label} · 文章 ${counts.articleCount} · 素材 ${counts.sourceCount}`;
+  return `${label} · 文章 ${counts.articleCount} · 素材 ${counts.sourceCount} · 推送 ${counts.pushCount}`;
 }
 
 /** 判断当前记录是否是当前页中的日期组首行；首条有效记录始终展示分组标题。 */

@@ -157,10 +157,10 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
   }
   await onProgress?.("compat", "done");
 
-  // 插入推送记录（pending 状态）
+  // 推送日志必须标明内容类型，避免与同 ID 的日报混淆。
   const logResult = db.prepare(`
-    INSERT INTO wechat_draft_push_log (article_id, account_id, theme_id, status)
-    VALUES (?, ?, ?, 'pending')
+    INSERT INTO wechat_draft_push_log (article_id, account_id, theme_id, status, content_type)
+    VALUES (?, ?, ?, 'pending', 'article')
   `).run(articleId, account.id, themeId);
   const logId = Number(logResult.lastInsertRowid);
 

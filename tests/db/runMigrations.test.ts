@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { verifyPassword } from "../../src/core/auth/passwords.js";
 import { openDatabase } from "../../src/core/db/openDatabase.js";
 import { findNewForeignKeyErrors, runMigrations } from "../../src/core/db/runMigrations.js";
+import { wechatDraftPushContentTypeMigration } from "../../src/core/db/migrations/056_wechat_draft_push_content_type.js";
 import { seedInitialData } from "../../src/core/db/seedInitialData.js";
 
 const expectedTables = [
@@ -45,6 +46,22 @@ const expectedTables = [
 ];
 
 describe("runMigrations", () => {
+  it("为存量推送日志增加可空类型且不回填旧行，重复迁移不丢数据", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-push-type-"));
+    const db = openDatabase(path.join(tempDir, "hot-now.sqlite"));
+    databasesToClose.push(db);
+    db.exec("CREATE TABLE wechat_draft_push_log (id INTEGER PRIMARY KEY, article_id INTEGER NOT NULL)");
+    db.exec("INSERT INTO wechat_draft_push_log (id, article_id) VALUES (1, 42)");
+
+    wechatDraftPushContentTypeMigration.apply(db);
+    wechatDraftPushContentTypeMigration.apply(db);
+
+    expect(db.prepare("SELECT article_id, content_type FROM wechat_draft_push_log WHERE id = 1").get())
+      .toEqual({ article_id: 42, content_type: null });
+    expect(() => db.prepare("INSERT INTO wechat_draft_push_log (article_id, content_type) VALUES (42, 'unknown')").run())
+      .toThrow();
+  });
+
   const databasesToClose: ReturnType<typeof openDatabase>[] = [];
 
   afterEach(() => {
@@ -84,7 +101,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(55);
+    expect(schemaVersion).toBe(56);
 
     const appliedMigrations = db
       .prepare(
@@ -151,8 +168,17 @@ describe("runMigrations", () => {
       { version: 52, name: "052_refresh_code_image_cards_template" },
       { version: 53, name: "053_refresh_code_image_cards_fontconfig" },
       { version: 54, name: "054_finished_articles_code_image_keywords" },
-      { version: 55, name: "055_normalize_short_content_statuses" }
+      { version: 55, name: "055_normalize_short_content_statuses" },
+      { version: 56, name: "056_wechat_draft_push_content_type" }
     ]);
+
+    expect(db.prepare("PRAGMA table_info(wechat_draft_push_log)").all()).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "content_type", notnull: 0, dflt_value: null })]),
+    );
+    runMigrations(db);
+    expect(db.prepare("PRAGMA table_info(wechat_draft_push_log)").all()).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "content_type", notnull: 0 })]),
+    );
 
     const performanceIndexes = db
       .prepare(
@@ -665,7 +691,7 @@ describe("runMigrations", () => {
     expect(evidenceTable).toBeTruthy();
     expect(sourceRunsTable).toBeTruthy();
     expect(notificationsTable).toBeTruthy();
-    expect(db.pragma("user_version", { simple: true })).toBe(55);
+    expect(db.pragma("user_version", { simple: true })).toBe(56);
 
     // daily_digests 表验证
     const digestTable = db

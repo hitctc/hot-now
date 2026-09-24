@@ -434,6 +434,19 @@ export function listCreativeFinishedArticles(
       ORDER BY day_key DESC
     `)
     .all(...params) as Array<{ day_key: string; article_count: number; source_count: number }>;
+  // 旧日志未标内容类型且可能与日报 ID 冲突，只有明确为文章的成功推送才能计数。
+  const pushDayCounts = db
+    .prepare(`
+      SELECT
+        date(datetime(log.pushed_at), '+8 hours') AS day_key,
+        COUNT(DISTINCT log.article_id) AS push_count
+      FROM wechat_draft_push_log AS log
+      JOIN creative_finished_articles AS article ON article.id = log.article_id
+      WHERE log.status = 'success' AND log.content_type = 'article' ${filters.direction ? "AND article.direction = ?" : ""}
+      GROUP BY day_key
+    `)
+    .all(...(filters.direction ? [filters.direction] : [])) as Array<{ day_key: string; push_count: number }>;
+  const pushCountsByDay = new Map(pushDayCounts.map((row) => [row.day_key, row.push_count]));
   const sourceWhereClause = filters.direction ? "WHERE direction = ?" : "";
   const sourceParams = filters.direction ? [filters.direction] : [];
   const sourceDayCounts = db
@@ -467,6 +480,7 @@ export function listCreativeFinishedArticles(
       dayKey: row.day_key,
       articleCount: row.article_count,
       sourceCount: row.source_count,
+      pushCount: pushCountsByDay.get(row.day_key) ?? 0,
     })),
     sourceDayCounts: sourceDayCounts.map((row) => ({
       dayKey: row.day_key,

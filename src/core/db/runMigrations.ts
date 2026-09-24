@@ -20,9 +20,10 @@ import { refreshCodeImageCardsTemplateMigration } from "./migrations/052_refresh
 import { refreshCodeImageCardsFontconfigMigration } from "./migrations/053_refresh_code_image_cards_fontconfig.js";
 import { finishedArticlesCodeImageKeywordsMigration } from "./migrations/054_finished_articles_code_image_keywords.js";
 import { normalizeShortContentStatusesMigration } from "./migrations/055_normalize_short_content_statuses.js";
+import { wechatDraftPushContentTypeMigration } from "./migrations/056_wechat_draft_push_content_type.js";
 import { applyLegacyMigrations014To047 } from "./legacyMigrations014To047.js";
 
-const schemaVersion = 55;
+const schemaVersion = 56;
 
 export function runMigrations(db: SqliteDatabase): void {
   // Migrations stay idempotent because existing local SQLite files must be upgraded in place
@@ -209,6 +210,12 @@ export function runMigrations(db: SqliteDatabase): void {
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(
       normalizeShortContentStatusesMigration.version,
       normalizeShortContentStatusesMigration.name
+    );
+
+    wechatDraftPushContentTypeMigration.apply(db);
+    db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(
+      wechatDraftPushContentTypeMigration.version,
+      wechatDraftPushContentTypeMigration.name
     );
 
     db.pragma(`user_version = ${schemaVersion}`);

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from "vue";
+import { ref, reactive, computed, watch, onBeforeUnmount } from "vue";
 import { CheckCircleFilled, CloseCircleFilled, LoadingOutlined } from "@ant-design/icons-vue";
 import type { CreativeFinishedArticle } from "../../services/creativeApi";
 import {
@@ -39,12 +39,34 @@ const emit = defineEmits<{
 
 const pushState = ref<"idle" | "pushing" | "done">("idle");
 const pushResult = ref<PushDraftResult | null>(null);
+const secondsUntilClose = ref<number | null>(null);
+let autoCloseTimer: ReturnType<typeof setInterval> | null = null;
 const stepStates = reactive<Record<string, { status: StepStatus; detail?: string }>>(
   Object.fromEntries(STEP_DEFS.map((s) => [s.id, { status: "pending" as StepStatus }]))
 );
 
-// 重置为初始确认态：切换到新文章推送或重新推送时调用
+/** 停止本次自动关闭并清除倒计时；用于取消、手动关闭和组件销毁，避免影响下一篇。 */
+function cancelAutoClose(): void {
+  if (autoCloseTimer !== null) clearInterval(autoCloseTimer);
+  autoCloseTimer = null;
+  secondsUntilClose.value = null;
+}
+
+/** 成功推送后显示五秒倒计时，到零时按手动关闭的同一事件通知父页面。 */
+function startAutoClose(): void {
+  cancelAutoClose();
+  if (!props.visible) return;
+  secondsUntilClose.value = 5;
+  autoCloseTimer = setInterval(() => {
+    if (secondsUntilClose.value === null) return;
+    if (secondsUntilClose.value <= 1) close();
+    else secondsUntilClose.value -= 1;
+  }, 1000);
+}
+
+/** 重置确认态并清理上一次推送的计时器；切换文章或重新推送时调用。 */
 function resetState(): void {
+  cancelAutoClose();
   pushState.value = "idle";
   pushResult.value = null;
   STEP_DEFS.forEach((s) => { stepStates[s.id] = { status: "pending" }; });
@@ -54,8 +76,10 @@ watch(
   () => props.visible,
   (v) => {
     if (v) resetState();
+    else cancelAutoClose();
   }
 );
+onBeforeUnmount(cancelAutoClose);
 
 function getPublishTitle(article: CreativeFinishedArticle): string {
   if (!article.titles) return "未命名文章";
@@ -81,6 +105,7 @@ function handleProgressEvent(event: PushProgressEvent): void {
 /** 立即启动当前文章推送，并在悬浮窗内持续更新进度与最终结果。 */
 async function startPush(): Promise<void> {
   if (!props.article || pushState.value === "pushing") return;
+  cancelAutoClose();
   pushState.value = "pushing";
   pushResult.value = null;
   STEP_DEFS.forEach((s) => { stepStates[s.id] = { status: "pending" }; });
@@ -99,14 +124,19 @@ async function startPush(): Promise<void> {
     const result = await streamPushArticleToDraft(latestArticle.id, props.themeId, html, handleProgressEvent);
     pushResult.value = result;
     pushState.value = "done";
-    if (result.ok) emit("success");
+    if (result.ok) {
+      emit("success");
+      startAutoClose();
+    }
   } catch (err) {
     pushResult.value = { ok: false, errorCode: "fetch-error", errorMessage: (err as Error).message };
     pushState.value = "done";
   }
 }
 
+/** 手动或倒计时关闭浮窗，停止后续计时并通知父页面更新可见状态。 */
 function close(): void {
+  cancelAutoClose();
   emit("update:visible", false);
 }
 
@@ -131,11 +161,11 @@ defineExpose({ isPushing, resetState, startPush });
       <!-- 文章信息 -->
       <div v-if="article" class="push-float-info">
         <div class="push-float-info-title">{{ getPublishTitle(article) }}</div>
-        <div class="push-float-info-meta">{{ defaultAccountName || '未配置' }} · {{ themeLabel }}</div>
+        <div v-if="!isDone || !pushResult?.ok" class="push-float-info-meta">{{ defaultAccountName || '未配置' }} · {{ themeLabel }}</div>
       </div>
 
       <!-- 推送进度 -->
-      <div v-if="pushState !== 'idle'" class="push-float-steps">
+      <div v-if="pushState !== 'idle' && (!isDone || !pushResult?.ok)" class="push-float-steps">
         <div
           v-for="step in STEP_DEFS"
           :key="step.id"
@@ -158,7 +188,7 @@ defineExpose({ isPushing, resetState, startPush });
       <!-- 推送结果 -->
       <div v-if="isDone" class="push-float-result">
         <div v-if="pushResult?.ok" class="push-float-result-ok">
-          <CheckCircleFilled /> 草稿已添加到微信公众号
+          <CheckCircleFilled /> 已加入公众号草稿箱
         </div>
         <div v-else class="push-float-result-err">
           <CloseCircleFilled />
@@ -166,6 +196,10 @@ defineExpose({ isPushing, resetState, startPush });
             <div>推送失败 · {{ failedStepTitle }}<span v-if="pushResult?.errorCode"> · 错误码 {{ pushResult.errorCode }}</span></div>
             <div class="push-float-error-detail">{{ failedStepError }}</div>
           </div>
+        </div>
+        <div v-if="secondsUntilClose !== null" class="push-float-auto-close">
+          <span>{{ secondsUntilClose }}s 后自动关闭</span>
+          <button type="button" class="push-float-cancel-auto-close" @click="cancelAutoClose">取消自动关闭</button>
         </div>
         <div class="push-float-result-actions">
           <a-button size="small" @click="close">关闭</a-button>
@@ -180,14 +214,14 @@ defineExpose({ isPushing, resetState, startPush });
   position: fixed;
   bottom: 24px;
   right: 24px;
-  width: 208px;
+  width: 184px;
   max-width: calc(100vw - 48px);
   background: var(--editorial-bg-card, #fff);
   border: 1px solid var(--editorial-border, #e5e7eb);
   border-radius: 10px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06);
   z-index: 2100;
-  padding: 14px 12px;
+  padding: 10px;
   font-size: 13px;
   max-height: calc(100vh - 48px);
   overflow-y: auto;
@@ -198,7 +232,7 @@ defineExpose({ isPushing, resetState, startPush });
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .push-float-header-title {
   font-size: 13px;
@@ -219,8 +253,8 @@ defineExpose({ isPushing, resetState, startPush });
 
 /* 文章信息 */
 .push-float-info {
-  margin-bottom: 10px;
-  padding-bottom: 8px;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 .push-float-info-title {
@@ -244,7 +278,7 @@ defineExpose({ isPushing, resetState, startPush });
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 0;
+  padding: 2px 0;
   font-size: 12px;
   color: rgba(0, 0, 0, 0.35);
 }
@@ -290,8 +324,8 @@ defineExpose({ isPushing, resetState, startPush });
 
 /* 结果 */
 .push-float-result {
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: 6px;
+  padding-top: 6px;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 .push-float-result-ok {
@@ -308,10 +342,25 @@ defineExpose({ isPushing, resetState, startPush });
   overflow-wrap: anywhere;
   color: #8c1d18;
 }
+.push-float-auto-close {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.55);
+}
+.push-float-cancel-auto-close {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: #6750a4;
+  cursor: pointer;
+}
 .push-float-result-actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 /* 过渡动画 */

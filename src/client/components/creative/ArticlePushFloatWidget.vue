@@ -212,18 +212,18 @@ defineExpose({ isPushing, resetState, startPush });
 <style scoped>
 .push-float {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
+  bottom: 0;
+  right: 0;
   width: 184px;
-  max-width: calc(100vw - 48px);
+  max-width: 100vw;
   background: var(--editorial-bg-card, #fff);
   border: 1px solid var(--editorial-border, #e5e7eb);
-  border-radius: 10px;
+  border-radius: 10px 0 0 0;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06);
   z-index: 2100;
   padding: 10px;
   font-size: 13px;
-  max-height: calc(100vh - 48px);
+  max-height: 100vh;
   overflow-y: auto;
 }
 

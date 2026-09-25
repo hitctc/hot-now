@@ -32,13 +32,15 @@ afterEach(() => {
 });
 
 describe("ArticlePushFloatWidget", () => {
-  it("缩小悬浮进度窗并在窄屏内留出边距", () => {
+  it("悬浮进度窗贴齐视口右下角且在窄屏内不溢出", () => {
     const source = readFileSync(
       resolve(process.cwd(), "src/client/components/creative/ArticlePushFloatWidget.vue"),
       "utf8",
     );
 
-    expect(source).toMatch(/\.push-float\s*\{[^}]*width: 184px;[^}]*max-width: calc\(100vw - 48px\);/);
+    expect(source).toMatch(/\.push-float\s*\{[^}]*bottom: 0;[^}]*right: 0;[^}]*width: 184px;[^}]*max-width: 100vw;/);
+    expect(source).toMatch(/border-radius: 10px 0 0 0;/);
+    expect(source).toMatch(/max-height: 100vh;/);
     expect(source).toMatch(/padding: 10px;/);
   });
 

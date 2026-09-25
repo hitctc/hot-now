@@ -451,6 +451,18 @@ html[data-theme="dark"] .table-day-group-label {
     box-shadow: none !important;
     display: none !important;
   }
+
+  /* 包括日报在内的右侧操作列也随表格滚动，不遮挡移动端的正文列。 */
+  .ant-table-cell-fix-right {
+    position: relative !important;
+    right: auto !important;
+    inset-inline-end: auto !important;
+    z-index: auto !important;
+  }
+
+  .ant-table-cell-fix-right-first::after {
+    display: none !important;
+  }
 }
 
 /* Tooltip 在编辑主题下确保文字可读 —— 必须在 @layer 外才能覆盖 Ant Design 默认样式 */

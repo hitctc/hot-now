@@ -256,29 +256,24 @@
 
 /* ─── 移动端适配 ─── */
 @media (max-width: 768px) {
-  /* wrap 容器改为顶部对齐，覆盖 centered 的垂直居中 */
-  .article-detail-modal .ant-modal-wrap {
+  /* wrap-class-name 落在容器自身；从顶部铺满视口，避免 centered 和全局高度限制留白。 */
+  .article-detail-modal.ant-modal-centered {
     align-items: flex-start !important;
     padding: 0 !important;
   }
   .article-detail-modal .ant-modal {
     max-width: 100% !important;
     width: 100% !important;
+    height: 100dvh;
+    max-height: 100dvh;
     margin: 0 !important;
     padding: 0 !important;
     top: 0 !important;
   }
-  .article-detail-modal--focus .ant-modal {
+  .article-detail-modal .ant-modal .ant-modal-content {
     height: 100dvh;
-    max-height: 100dvh;
-  }
-  .article-detail-modal .ant-modal-content {
     max-height: 100dvh;
     border-radius: 0;
-  }
-  .article-detail-modal--focus .ant-modal-content {
-    height: 100dvh;
-    max-height: 100dvh;
   }
   .article-detail-modal .ant-modal-body {
     padding: 12px !important;

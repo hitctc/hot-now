@@ -108,7 +108,7 @@ QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 
 - 公开内容：`/`、`/ai-new`、`/ai-hot`。
 - 登录系统页：`/settings/view-rules`、`/settings/sources`、`/settings/wechat-mp`、`/settings/profile`。
-- 创作工作台：`/creative/source-items`、`/creative/finished-articles`、`/creative/short-source-items`、`/creative/short-finished-articles`、`/daily-digest`、`/monitor`。
+- 创作工作台：`/creative/source-items`、`/creative/finished-articles`、`/creative/short-source-items`、`/creative/short-finished-articles`、`/daily-digest`、`/monitor`。长短内容的素材与成品表格在移动端不固定左侧 ID/序号列，桌面端仍固定；右侧操作列保持原有行为。
 - 短内容标题以素材原标题为锚点做保守转写，保留主体、事件、关键数字、核心吸引点和疑问结构，取消 15 字硬限制，并在既有 `human-writing` 阶段执行 80 分保真门禁；门禁无法确认时回退原标题清理版并交人工审核。短内容详情在备选标题上方展示素材原标题，现有“生成新标题”入口改为生成“最贴近原标题 / 适度压缩 / 自然口语”三个候选；历史成品不批量改写，长文标题逻辑不变。
 - 短内容成品支持代码制图片：服务端使用 SVG + Sharp 和随应用部署、由 fontconfig 注册的 `NotoSansSC-Regular.otf` 生成 `2.5:1`、`1:1`、`3:4` 三张 2 倍像素 PNG，写入 `code_image_cards`、人工正文和封面候选；Hermes 成品推送成功后通过 token 接口触发，页面也可在单篇详情中制作、重做、下载和复制图片地址。图片主体按标题、核心判断、导语/摘要、文章生成标签组织，缺少核心判断时读取素材 `summary`；标签优先读取成品字段 `codeImageKeywords`，再读取素材 `tags`，缺失时不伪造标签，也不生成空内容占位文案。短内容详情弹窗在「备选标题」下方展示代码图片标签，没有标签时保留区域并说明原因。标签由 Hermes 写作时自动产出，模型漏给时 Hermes 会单独补一次；页面也可点“生成标签 / 重新生成标签”代理 Hermes 重新生成，采用覆盖语义（已有标签时先确认），覆盖后已有代码图片会标记为 `stale`。
 - 短内容成品的 `status` 会在入库时归一化为平台成品状态：`ready → ready_for_publish`、`draft` / `needs_rewrite → needs_review`。短内容质检通过后不需要额外的“标记可推送”步骤，可直接推送公众号草稿箱；长文状态不参与映射，仍走自己的门禁流程。文章与日报推送到公众号草稿箱时，微信草稿的作者字段固定为「阿川」，摘要字段固定为「求点赞、求关注、求转发，要是给个一键三连就更棒了」，默认开启留言且不限于粉丝；无需在公众号后台手动填写摘要或开启留言（账号需具备留言权限）。长文和短内容的推送进度浮窗贴齐视口右下角；成功后收起步骤、显示 5 秒倒计时自动关闭，仍可手动关闭或取消自动关闭；失败时保留详情且不自动关闭。

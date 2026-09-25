@@ -414,7 +414,7 @@
   position: relative;
 }
 
-/* 日期文字从固定首列向上进入分隔带，横向滚动时仍贴住表格最左侧。 */
+/* 日期文字从首列向上进入分隔带；桌面端随固定首列保持可见。 */
 .table-day-group-label {
   position: absolute;
   z-index: 2;
@@ -436,6 +436,21 @@
 
 html[data-theme="dark"] .table-day-group-label {
   color: #fbbf24;
+}
+
+@media (max-width: 767px) {
+  /* 创作表格移动端首列不吸附，ID/序号及日期标签随表格横向滚动；桌面端仍固定。 */
+  .table-day-anchor-cell.ant-table-cell-fix-left {
+    position: relative !important;
+    left: auto !important;
+    inset-inline-start: auto !important;
+    z-index: auto !important;
+  }
+
+  .table-day-anchor-cell.ant-table-cell-fix-left-last::after {
+    box-shadow: none !important;
+    display: none !important;
+  }
 }
 
 /* Tooltip 在编辑主题下确保文字可读 —— 必须在 @layer 外才能覆盖 Ant Design 默认样式 */

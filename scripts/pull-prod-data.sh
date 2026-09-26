@@ -16,6 +16,7 @@ fi
 PROD_HOST="${HOT_NOW_DEPLOY_HOST:-}"
 PROD_USER="${HOT_NOW_DEPLOY_USER:-}"
 REMOTE_DATA_DIR="${HOT_NOW_PULL_REMOTE_DATA_DIR:-/srv/hot-now/shared/data}"
+REMOTE_DB_FILE="${HOT_NOW_PULL_REMOTE_DB_FILE:-${REMOTE_DATA_DIR}/hot-now.sqlite}"
 LOCAL_SYNC_DIR="${HOT_NOW_PULL_LOCAL_DIR:-${REPO_ROOT}/data/prod-sync}"
 REMOTE_TARGET="${PROD_USER}@${PROD_HOST}"
 
@@ -34,8 +35,12 @@ echo "Local sync dir: ${LOCAL_SYNC_DIR}"
 
 mkdir -p "${LOCAL_SYNC_DIR}"
 
-# Pull the database as a standalone file so the local prod-sync copy is always explicit.
-scp "${REMOTE_TARGET}:${REMOTE_DATA_DIR}/hot-now.sqlite" "${LOCAL_SYNC_DIR}/hot-now.sqlite"
+# 可指定部署时已验证的快照；直接复制运行中的 WAL 主文件可能得到不一致副本。
+scp "${REMOTE_TARGET}:${REMOTE_DB_FILE}" "${LOCAL_SYNC_DIR}/hot-now.sqlite"
+if ! check_result="$(sqlite3 "file:${LOCAL_SYNC_DIR}/hot-now.sqlite?mode=ro&immutable=1" 'PRAGMA quick_check;' 2>&1)" || [[ "${check_result}" != "ok" ]]; then
+  echo "Pulled database failed integrity check; do not use this copy." >&2
+  exit 1
+fi
 
 # Pull reports with rsync so deletions on the server are mirrored in the local prod-sync snapshot.
 mkdir -p "${LOCAL_SYNC_DIR}/reports"

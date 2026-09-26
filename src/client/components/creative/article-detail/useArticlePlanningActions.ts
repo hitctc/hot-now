@@ -72,14 +72,10 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
     return getArticle()?.titleCandidates?.[idx] ?? null;
   }
 
-  /** 长文沿用分组标题生成；短内容必须有素材原标题并只接收保守转写候选。 */
+  /** 长文沿用分组标题生成；短内容优先按素材原标题、缺失时按当前标题保守转写。 */
   async function handleRegenTitle(): Promise<void> {
     const article = getArticle();
     if (!article || regenTitleLoading.value) return;
-    if (article.direction === "short_content" && !article.sourceTitle) {
-      message.warning("未找到关联素材原标题，无法保守转写标题");
-      return;
-    }
     regenTitleLoading.value = true;
     try {
       const result = await regenTitle(article.id);
@@ -283,54 +279,63 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
 
   const displaySummaries = computed(() => getArticle()?.summary100 ?? []);
 
+  /** 先收口正文保存，再生成并同步导语；生成已入库后只把后续冲突提示为同步失败。 */
   async function handleRegenIntro(): Promise<void> {
     const article = getArticle();
     if (!article || regenIntroLoading.value) return;
     regenIntroLoading.value = true;
+    let generated = false;
     try {
+      await prepareExplicitContentSave();
       const result = await regenIntro(article.id);
-      if (result.ok && result.intros) {
-        // 导语生成期间仍可能有正文自动保存，先收口后再基于当前正文替换导语。
-        await prepareExplicitContentSave();
-        const latestArticle = getArticle();
-        if (!latestArticle) return;
-        localIntros.value = result.intros;
-        activeIntroIndex.value = 0;
-        latestArticle.intros = result.intros;
-        latestArticle.introIndex = 0;
-
-        // 联动：替换 markdown 中的 blockquote，渲染并保存 wechatHtml。
-        const newIntro = result.intros[0] ?? "";
-        let md = editContent.value;
-        const bqMatch = md.match(/\n\n(> [^\n]+(?:\n> [^\n]+)*)\n\n/);
-        if (bqMatch) {
-          md = md.replace(bqMatch[1], `> ${newIntro}`);
-        }
-        editContent.value = md;
-        latestArticle.contentMarkdown = md;
-
-        const saveFields: Record<string, unknown> = {
-          intros: result.intros,
-          introIndex: 0,
-          contentMarkdown: md,
-        };
-        if (activePreviewTheme.value !== "live" && md) {
-          const html = renderWechatThemePreview(md, themeIdMap[activePreviewTheme.value]);
-          latestArticle.wechatHtml = html;
-          saveFields.wechatHtml = html;
-        }
-        const saved = await editFinishedArticle(latestArticle.id, {
-          expectedUpdatedAt: latestArticle.updatedAt,
-          ...saveFields,
-        });
-        if (saved.updatedAt) latestArticle.updatedAt = saved.updatedAt;
-        setLastSavedContent(md);
-        message.success("新导语已生成");
-      } else {
+      if (!result.ok || !result.intros?.[0]) {
         message.error(result.reason ?? "导语生成失败");
+        return;
       }
+      generated = true;
+      const latestArticle = getArticle();
+      if (!latestArticle || latestArticle.id !== article.id) {
+        message.warning("导语已生成，但文章已切换，请重新打开详情确认");
+        return;
+      }
+      localIntros.value = result.intros;
+      activeIntroIndex.value = 0;
+      latestArticle.intros = result.intros;
+      latestArticle.introIndex = 0;
+      if (result.updatedAt) latestArticle.updatedAt = result.updatedAt;
+
+      // 联动：替换 markdown 中的 blockquote，渲染并保存 wechatHtml。
+      const newIntro = result.intros[0];
+      let md = editContent.value;
+      const bqMatch = md.match(/\n\n(> [^\n]+(?:\n> [^\n]+)*)\n\n/);
+      if (bqMatch) {
+        md = md.replace(bqMatch[1], `> ${newIntro}`);
+      }
+      editContent.value = md;
+      latestArticle.contentMarkdown = md;
+
+      const saveFields: Record<string, unknown> = {
+        intros: result.intros,
+        introIndex: 0,
+        contentMarkdown: md,
+      };
+      if (activePreviewTheme.value !== "live" && md) {
+        const html = renderWechatThemePreview(md, themeIdMap[activePreviewTheme.value]);
+        latestArticle.wechatHtml = html;
+        saveFields.wechatHtml = html;
+      }
+      const saved = await editFinishedArticle(latestArticle.id, {
+        expectedUpdatedAt: latestArticle.updatedAt,
+        ...saveFields,
+      });
+      if (saved.updatedAt) latestArticle.updatedAt = saved.updatedAt;
+      setLastSavedContent(md);
+      onSaved();
+      message.success("新导语已生成");
     } catch {
-      message.error("导语生成请求失败");
+      message[generated ? "warning" : "error"](generated
+        ? "导语已生成，但正文同步失败，请刷新详情确认"
+        : "导语生成请求失败");
     } finally {
       regenIntroLoading.value = false;
     }

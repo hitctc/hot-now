@@ -55,13 +55,13 @@ describe("短内容原标题转写入口", () => {
     expect(wrapper.text()).toContain("按原标题生成");
   });
 
-  it("缺少素材原标题时禁用短内容标题生成", () => {
+  it("缺少素材原标题时允许以现有标题生成新表达", () => {
     const wrapper = mountSections(buildArticle({ sourceTitle: null }));
 
     expect(wrapper.get('[data-testid="short-source-original-title"]').text()).toContain("未找到关联素材原标题");
     const button = wrapper.findAllComponents({ name: "AButton" })
-      .find((component) => component.text().includes("按原标题生成"));
-    expect(button?.props("disabled")).toBe(true);
+      .find((component) => component.text().includes("按现有标题生成"));
+    expect(button?.props("disabled")).toBe(false);
   });
 });
 

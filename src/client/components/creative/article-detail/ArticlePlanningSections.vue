@@ -116,7 +116,7 @@ watch(() => props.editingTitleIndex, (index) => {
           @click="emit('copy', article.sourceTitle)"
         >复制原标题</a-button>
       </div>
-      <p class="mb-0 mt-1 text-[11px] text-amber-700/80">短内容候选只围绕原标题保守转写，不另起角度。</p>
+      <p class="mb-0 mt-1 text-[11px] text-amber-700/80">{{ article.sourceTitle ? "短内容候选只围绕原标题保守转写，不另起角度。" : "原标题缺失时按当前选中标题转写，不另起角度。" }}</p>
     </div>
     <div class="mb-2 flex items-center justify-between">
       <div>
@@ -132,9 +132,9 @@ watch(() => props.editingTitleIndex, (index) => {
           size="small"
           class="!h-auto !px-2 !py-1 !text-[11px]"
           :loading="regenTitleLoading"
-          :disabled="regenTitleLoading || (article.direction === 'short_content' && !article.sourceTitle)"
+          :disabled="regenTitleLoading"
           @click="emit('regenerate-title')"
-        >{{ regenTitleLoading ? '生成中...' : article.direction === 'short_content' ? '按原标题生成' : '生成新标题' }}</a-button>
+        >{{ regenTitleLoading ? '生成中...' : article.direction === 'short_content' ? (article.sourceTitle ? '按原标题生成' : '按现有标题生成') : '生成新标题' }}</a-button>
         <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('copy', displayTitles.join('\n'))">复制全部</a-button>
       </div>
     </div>

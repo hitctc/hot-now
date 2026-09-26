@@ -333,7 +333,8 @@ export function registerCreativeFinishedArticleGenerationRoutes(context: Creativ
     try {
       const controller = new AbortController();
       // 短内容保守转写最多使用一次现有重试机会，超时需覆盖两次串行模型调用。
-      const timeout = setTimeout(() => controller.abort(), article.direction === "short_content" ? 120_000 : 15_000);
+      // 短内容上游限时 120 秒；代理多留 10 秒以接收最终结果。
+      const timeout = setTimeout(() => controller.abort(), article.direction === "short_content" ? 130_000 : 15_000);
 
       const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/regen-title`, {
         method: "POST",
@@ -381,7 +382,7 @@ export function registerCreativeFinishedArticleGenerationRoutes(context: Creativ
     } catch (err) {
       const errMessage = (err as Error).message ?? String(err);
       if ((err as Error).name === "AbortError") {
-        const timeoutSeconds = article.direction === "short_content" ? 120 : 15;
+        const timeoutSeconds = article.direction === "short_content" ? 130 : 15;
         return reply.code(504).send({ ok: false, reason: `标题生成超时（>${timeoutSeconds}s），Hermes 未响应`, detail: errMessage });
       }
       return reply.code(502).send({ ok: false, reason: `Hermes 调用失败`, detail: errMessage });
@@ -403,15 +404,13 @@ export function registerCreativeFinishedArticleGenerationRoutes(context: Creativ
     if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
 
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15_000);
+      // Hermes 生成最多等 120 秒；代理略长于上游，避免上游仍在生成时先报失败。
       const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/regen-intro`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
         body: JSON.stringify({ articleId: id }),
-        signal: controller.signal,
+        signal: AbortSignal.timeout(130_000),
       });
-      clearTimeout(timeout);
 
       if (!res.ok) {
         const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
@@ -419,19 +418,22 @@ export function registerCreativeFinishedArticleGenerationRoutes(context: Creativ
       }
 
       const data = await res.json() as { success: boolean; intro?: string; prompt?: string; error?: string };
-      if (!data.success || !data.intro) {
-        return reply.code(502).send({ ok: false, reason: data.error ?? "导语生成失败", hermesResponse: JSON.stringify(data) });
+      const intro = data.intro?.trim() ?? "";
+      if (!data.success || intro.length < 20) {
+        return reply.code(502).send({ ok: false, reason: data.error ?? "导语内容不足（少于20字）" });
       }
 
-      const existingIntros = article.intros ?? [];
-      const updatedIntros = [data.intro, ...existingIntros];
-      editCreativeFinishedArticle(db, id, { intros: updatedIntros });
-
+      // 生成期间可能有自动保存；基于最新版本合并旧导语，避免用生成前的快照覆盖并发编辑。
+      const current = findCreativeFinishedArticleById(db, id);
+      if (!current) return reply.code(404).send({ ok: false, reason: "article-not-found" });
+      const updatedIntros = [intro, ...(current.intros ?? [])];
+      const saved = editCreativeFinishedArticle(db, id, { intros: updatedIntros, expectedUpdatedAt: current.updatedAt });
+      if (!saved.ok) return reply.code(409).send({ ok: false, reason: saved.reason ?? "导语保存失败" });
       const updated = findCreativeFinishedArticleById(db, id);
-      return reply.send({ ok: true, intros: updated?.intros ?? updatedIntros, prompt: data.prompt });
+      return reply.send({ ok: true, intros: updated?.intros ?? updatedIntros, updatedAt: saved.updatedAt, prompt: data.prompt });
     } catch (err) {
       const errMessage = (err as Error).message ?? String(err);
-      if ((err as Error).name === "AbortError") { return reply.code(504).send({ ok: false, reason: "导语生成超时（>15s），Hermes 未响应", detail: errMessage }); }
+      if (["AbortError", "TimeoutError"].includes((err as Error).name)) { return reply.code(504).send({ ok: false, reason: "导语生成超时（>130s），Hermes 未响应", detail: errMessage }); }
       return reply.code(502).send({ ok: false, reason: `Hermes 调用失败`, detail: errMessage });
     }
   });

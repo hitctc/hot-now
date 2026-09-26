@@ -436,6 +436,7 @@ export function regenTitle(id: number): Promise<RegenTitleResult> {
 export type RegenIntroResult = {
   ok: boolean;
   intros?: string[];
+  updatedAt?: string;
   prompt?: string;
   reason?: string;
 };

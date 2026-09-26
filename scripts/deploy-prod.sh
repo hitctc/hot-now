@@ -55,6 +55,12 @@ rsync -az --delete \
   --exclude "node_modules" \
   --exclude "data" \
   --exclude ".env" \
+  --exclude ".env.*" \
+  --exclude ".deploy.local.env" \
+  --exclude "*.pem" \
+  --exclude "*.key" \
+  --exclude "auth.json" \
+  --exclude "credentials" \
   --exclude ".DS_Store" \
   ./ "${REMOTE_TARGET}:${DEPLOY_APP_DIR}/"
 

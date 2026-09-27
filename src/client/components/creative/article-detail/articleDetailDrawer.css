@@ -299,6 +299,10 @@
     align-items: center;
     justify-content: center;
   }
+  /* 复制和废弃在桌面端保留，移动端不占底部操作栏宽度。 */
+  .article-detail-footer .article-detail-footer__desktop-only {
+    display: none;
+  }
   .article-detail-footer__divider {
     display: none;
   }

@@ -21,6 +21,31 @@ describe("成品文章详情弹窗移动端布局", () => {
     expect(mobileStyles).toMatch(/\.article-detail-footer \.article-detail-footer__mobile-close\s*\{[^}]*align-items: center;[^}]*justify-content: center;/);
   });
 
+  it("只在移动端隐藏复制格式和废弃，桌面端保留两个操作", () => {
+    expect(mobileStyles).toMatch(/\.article-detail-footer \.article-detail-footer__desktop-only\s*\{[^}]*display: none;/);
+    expect(styles.slice(0, styles.indexOf("@media (max-width: 768px)"))).not.toMatch(/\.article-detail-footer \.article-detail-footer__desktop-only\s*\{[^}]*display: none;/);
+
+    const wrapper = mount(ArticleDetailFooter, {
+      props: {
+        article: { id: 1, status: "manual_draft", originType: "manual" } as CreativeFinishedArticle,
+        saving: false, wechatCopying: false, canPush: false, missingConditions: [],
+      },
+      global: {
+        stubs: {
+          "a-button": { template: "<button v-bind=\"$attrs\"><slot /></button>" },
+          "a-tooltip": { template: "<span><slot /></span>" },
+        },
+      },
+    });
+    const buttons = wrapper.findAll("button");
+    for (const label of ["复制格式", "废弃"]) {
+      const button = buttons.find((candidate) => candidate.text() === label);
+      expect(button?.classes()).toContain("article-detail-footer__desktop-only");
+    }
+    expect(buttons.find((candidate) => candidate.text() === "保存")?.classes()).not.toContain("article-detail-footer__desktop-only");
+    wrapper.unmount();
+  });
+
   it("关闭按钮位于保存左侧，点击不触发保存", async () => {
     const wrapper = mount(ArticleDetailFooter, {
       props: {

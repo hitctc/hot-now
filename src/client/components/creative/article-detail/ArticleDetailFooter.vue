@@ -34,7 +34,7 @@ const emit = defineEmits<{
         <a-button :loading="saving" @click="emit('save')">保存</a-button>
       </a-tooltip>
       <a-tooltip :mouse-enter-delay="0.5" title="按选定主题渲染后复制到剪贴板，可粘贴到公众号编辑器">
-        <a-button :loading="wechatCopying" @click="emit('copy-format')">复制格式</a-button>
+        <a-button class="article-detail-footer__desktop-only" :loading="wechatCopying" @click="emit('copy-format')">复制格式</a-button>
       </a-tooltip>
     </div>
 
@@ -51,7 +51,7 @@ const emit = defineEmits<{
       </a-tooltip>
       <a-button v-if="getAvailableActions(article).some((action) => action.type === 'cancel_publishable')" @click="emit('cancel-publishable')">取消推送</a-button>
       <a-button v-if="article.deletedAt" type="primary" @click="emit('restore')">恢复</a-button>
-      <a-button v-else danger @click="emit('discard')">废弃</a-button>
+      <a-button v-else class="article-detail-footer__desktop-only" danger @click="emit('discard')">废弃</a-button>
       <a-tooltip v-if="canPush" :mouse-enter-delay="0.5" title="自动保存正文后推送到微信公众号草稿箱">
         <a-button :loading="saving" @click="emit('push')">推送草稿箱</a-button>
       </a-tooltip>

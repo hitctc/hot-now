@@ -456,7 +456,7 @@ const pagination = computed(() => ({
         素材：{{ writeModeTarget.title.slice(0, 60) }}{{ writeModeTarget.title.length > 60 ? '...' : '' }}
       </div>
       <p class="mb-0 text-xs leading-5 text-editorial-text-muted">
-        这是人工写作，不受自动账号适配阶段开关影响；提交后由 Hermes 统一执行写作及符合条件的 Luna 配图流程。
+        这是人工写作，不受自动账号适配阶段开关影响；Hermes 会生成图片提示词，但不会随写作自动调用 Luna 生图。成品详情仍可按需手动逐图生成。
       </p>
       <a-alert
         v-if="writeModeTarget?.accountFitLevel"

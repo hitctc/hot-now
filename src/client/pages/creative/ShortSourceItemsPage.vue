@@ -66,7 +66,7 @@ async function handleWritingAction(
   }
 }
 
-// ─── 素材库写文章（支持多篇并行） ───
+// ─── 素材库写短内容（支持多篇并行） ───
 const writingIds = ref<Set<number>>(new Set());
 
 // Vue 3 ref<Set> 的 delete 不自动触发响应式，需要替换整个 Set
@@ -97,7 +97,7 @@ const manualWriteSubmitting = ref(false);
 const manualContentType = ref<"viewpoint" | "article">("viewpoint");
 const manualTitle = ref("");
 const manualContent = ref("");
-const manualMode = ref<string | null>(null);
+const manualForm = ref<"auto" | "tuwen" | "duanwen">("auto");
 const manualThesis = ref("");
 
 const contentTypeOptions = [
@@ -105,15 +105,17 @@ const contentTypeOptions = [
   { value: "article" as const, label: "素材/文章", desc: "较长的原文或素材内容" },
 ];
 
+/** 打开短内容自定义写作弹窗，清除上一轮输入并恢复自动判断形态。 */
 function openManualWriteModal(): void {
   manualContentType.value = "viewpoint";
   manualTitle.value = "";
   manualContent.value = "";
-  manualMode.value = null;
+  manualForm.value = "auto";
   manualThesis.value = "";
   manualWriteVisible.value = true;
 }
 
+/** 将当前输入创建为短素材并提交 Hermes 短写队列；成功后刷新列表，不生成长文成品。 */
 async function confirmManualWrite(): Promise<void> {
   if (!manualContent.value.trim()) {
     message.warning("请输入内容");
@@ -125,11 +127,12 @@ async function confirmManualWrite(): Promise<void> {
       title: manualTitle.value.trim() || undefined,
       content: manualContent.value.trim(),
       contentType: manualContentType.value,
-      mode: (manualMode.value as "A" | "B" | "C") ?? undefined,
+      direction: "short_content",
+      form: manualForm.value,
       thesis: manualThesis.value.trim() || undefined,
     });
     if (result.ok && result.sourceItemId) {
-      message.success(`已提交写作（素材#${result.sourceItemId}）`);
+      message.success(`短内容写作已进入队列（素材#${result.sourceItemId}）`);
       manualWriteVisible.value = false;
       loadItems();
     } else {
@@ -426,7 +429,7 @@ const pagination = computed(() => ({
     <!-- 手动写作弹窗 -->
     <a-modal
       :open="manualWriteVisible"
-      title="自定义内容写文章"
+      title="自定义内容写短内容"
       :confirm-loading="manualWriteSubmitting"
       ok-text="开始写作"
       cancel-text="取消"
@@ -469,11 +472,8 @@ const pagination = computed(() => ({
         <!-- 写作模式 -->
         <div>
           <div class="mb-1 text-xs font-medium text-editorial-text-muted">写作模式</div>
-          <a-radio-group v-model:value="manualMode" class="flex flex-col gap-1">
-            <a-radio :value="null">自动判断（观点默认随笔 B，文章默认观点文 A）</a-radio>
-            <a-radio value="A">短篇观点文（A）— 600~1500 字</a-radio>
-            <a-radio value="B">短篇随笔（B）— 600~1500 字</a-radio>
-            <a-radio value="C">长篇观点文（C）— 3000~6000 字</a-radio>
+          <a-radio-group v-model:value="manualForm" class="flex flex-col gap-1">
+            <a-radio v-for="opt in writeModeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</a-radio>
           </a-radio-group>
         </div>
 
@@ -485,7 +485,7 @@ const pagination = computed(() => ({
             placeholder="可选：指定文章的核心观点/立意"
             allow-clear
           />
-          <div class="mt-0.5 text-[10px] text-editorial-text-muted">指定后系统会锁定这个观点，不会被自动替换或反转</div>
+          <div class="mt-0.5 text-[10px] text-editorial-text-muted">作为短内容的写作方向参考，终稿仍需经过质检与审改</div>
         </div>
       </div>
     </a-modal>

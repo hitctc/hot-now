@@ -107,6 +107,67 @@ describe("creative automation Hermes proxy", () => {
     await app.close();
   });
 
+  it("短内容素材页自定义写作只投递指定的手动素材到短内容队列", async () => {
+    vi.stubEnv("HERMES_API_BASE_URL", "https://hermes.test");
+    vi.stubEnv("HERMES_API_TOKEN", "token");
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ success: true, task_id: "short-manual-1" }), { status: 202 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const handle = await createTestDatabase("hot-now-manual-short-write-");
+    handles.push(handle);
+    const app = createServer({ db: handle.db });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/actions/creative/source-items/manual-write",
+      payload: { direction: "short_content", title: "手动热点", content: "用户输入的短内容原文", contentType: "article", form: "tuwen", thesis: "保留核心观点" },
+    });
+
+    expect(response.statusCode).toBe(202);
+    const sourceItemId = response.json().sourceItemId as number;
+    const source = findCreativeSourceItemById(handle.db, sourceItemId);
+    expect(source).toMatchObject({ direction: "short_content", title: "手动热点", fullContent: "用户输入的短内容原文" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).toBe("https://hermes.test/api/short/write");
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+      source_item_id: sourceItemId,
+      external_id: source?.externalId,
+      form: "tuwen",
+      manual_source: { title: "手动热点", content: "用户输入的短内容原文", thesis: "保留核心观点" },
+    });
+    await app.close();
+  });
+
+  it("短内容自定义写作拒绝长文模式，不留下错误方向的素材", async () => {
+    const handle = await createTestDatabase("hot-now-manual-short-invalid-");
+    handles.push(handle);
+    const app = createServer({ db: handle.db });
+    const response = await app.inject({
+      method: "POST", url: "/actions/creative/source-items/manual-write",
+      payload: { direction: "short_content", content: "手动热点", form: "C" },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(handle.db.prepare("SELECT COUNT(*) AS count FROM creative_source_items").get()).toEqual({ count: 0 });
+    await app.close();
+  });
+
+  it("长文自定义写作仍走原有长文入口", async () => {
+    vi.stubEnv("HERMES_API_BASE_URL", "https://hermes.test");
+    vi.stubEnv("HERMES_API_TOKEN", "token");
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ success: true, task_id: "manual-article-1" }), { status: 202 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const handle = await createTestDatabase("hot-now-manual-article-write-");
+    handles.push(handle);
+    const app = createServer({ db: handle.db });
+    const response = await app.inject({
+      method: "POST", url: "/actions/creative/source-items/manual-write",
+      payload: { title: "长文素材", content: "手动输入的文章原文", thesis: "保留长文立意" },
+    });
+    expect(response.statusCode).toBe(202);
+    expect(findCreativeSourceItemById(handle.db, response.json().sourceItemId)?.direction).toBe("article");
+    expect(String(fetchMock.mock.calls[0][0])).toBe("https://hermes.test/api/write-article");
+    await app.close();
+  });
+
   it("手动写作只把人工意图代理给 Hermes", async () => {
     vi.stubEnv("HERMES_API_BASE_URL", "https://hermes.test");
     vi.stubEnv("HERMES_API_TOKEN", "token");

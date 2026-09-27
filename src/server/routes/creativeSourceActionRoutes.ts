@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import type { SqliteDatabase } from "../../core/db/openDatabase.js";
@@ -192,21 +193,29 @@ export function registerCreativeSourceActionRoutes(
 
 
 
-  // ─── 手动输入内容写文章：创建手动素材 + 触发 Hermes 写作 ───
+  // ─── 手动输入素材：按页面方向投递 Hermes 长文或短内容队列 ───
   app.post("/actions/creative/source-items/manual-write", async (request, reply) => {
     if (!options.authorizeSession(request, reply)) { return; }
     if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
 
-    const body = request.body as { title?: string; content?: string; contentType?: string; mode?: string; thesis?: string } | undefined;
+    const body = request.body as { title?: string; content?: string; contentType?: string; direction?: string; form?: string; mode?: string; thesis?: string } | undefined;
     const content = typeof body?.content === "string" ? body.content.trim() : "";
     const contentType = body?.contentType === "article" ? "article" : "viewpoint";
+    const direction = body?.direction ?? "article";
     if (!content) {
       return reply.code(400).send({ ok: false, reason: "content-required" });
     }
+    if (direction !== "article" && direction !== "short_content") {
+      return reply.code(400).send({ ok: false, reason: "invalid-direction" });
+    }
+    // 短内容不能把旧版长文 A/B/C 模式误送入队；必须在素材写入前拒绝。
+    const form = body?.form ?? "auto";
+    if (direction === "short_content" && (body?.mode !== undefined || !["auto", "tuwen", "duanwen"].includes(form))) {
+      return reply.code(400).send({ ok: false, reason: "invalid-short-content-form" });
+    }
 
-    // 生成素材字段
     const title = typeof body?.title === "string" && body.title.trim() ? body.title.trim() : content.slice(0, 50).replace(/\n/g, " ");
-    const externalId = `manual-${Date.now()}`;
+    const externalId = `manual-${randomUUID()}`;
 
     const result = insertCreativeSourceItem(db, {
       externalId,
@@ -216,13 +225,22 @@ export function registerCreativeSourceActionRoutes(
       sourceName: "手动输入",
       summary: contentType === "viewpoint" ? content : content.slice(0, 300),
       fullContent: content,
+      direction,
     });
 
-    const queued = await callHermesAutomation("/api/write-article", "POST", {
-      sourceItemId: result.id,
-      automatic: false,
-      thesis: typeof body?.thesis === "string" ? body.thesis.trim() || undefined : undefined,
-    });
+    const thesis = typeof body?.thesis === "string" ? body.thesis.trim() || undefined : undefined;
+    const queued = direction === "short_content"
+      ? await callHermesAutomation("/api/short/write", "POST", {
+          source_item_id: result.id,
+          external_id: externalId,
+          form,
+          manual_source: { title, content, thesis },
+        })
+      : await callHermesAutomation("/api/write-article", "POST", {
+          sourceItemId: result.id,
+          automatic: false,
+          thesis,
+        });
     if (queued.status >= 400) return reply.code(queued.status).send({ ok: false, reason: queued.data.error ?? queued.data.reason ?? "hermes-write-rejected" });
     return reply.code(202).send({ ok: true, sourceItemId: result.id, taskId: queued.data.task_id ?? queued.data.taskId, status: queued.data.status ?? "queued" });
   });

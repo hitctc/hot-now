@@ -935,15 +935,15 @@ export function fetchWriteQueueStatus(): Promise<WriteQueueStatus> {
   return writeQueueStatusRequest;
 }
 
-// ─── 手动输入内容写文章 ───
+// ─── 手动输入内容：按页面方向投递长文或短内容 ───
 
 export type ManualWriteRequest = {
   title?: string;
   content: string;
   contentType: "viewpoint" | "article";
-  /** 短内容页面的兼容字段；公众号 v2 页面不再传递。 */
-  mode?: "A" | "B" | "C";
-  /** 可选：指定文章的核心观点/立意，锁定后不会被自动替换 */
+  /** 短内容页必须显式指定方向和形态；长文页省略时继续走原入口。 */
+  direction?: "article" | "short_content";
+  form?: "auto" | "tuwen" | "duanwen";
   thesis?: string;
 };
 
@@ -953,7 +953,7 @@ export type ManualWriteResult = {
   reason?: string;
 };
 
-/** 手动输入内容创建素材并触发写作 */
+/** 将输入提交给对应方向的写作队列；返回创建的素材 ID，不在客户端生成成品。 */
 export function submitManualWrite(req: ManualWriteRequest): Promise<ManualWriteResult> {
   return requestJson<ManualWriteResult>("/actions/creative/source-items/manual-write", {
     method: "POST",

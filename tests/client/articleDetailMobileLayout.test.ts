@@ -17,6 +17,10 @@ describe("成品文章详情弹窗移动端布局", () => {
     expect(drawerSource).toContain('@close="handleClose"');
   });
 
+  it("移动端关闭按钮文字在按钮内部水平和垂直居中", () => {
+    expect(mobileStyles).toMatch(/\.article-detail-footer \.article-detail-footer__mobile-close\s*\{[^}]*align-items: center;[^}]*justify-content: center;/);
+  });
+
   it("关闭按钮位于保存左侧，点击不触发保存", async () => {
     const wrapper = mount(ArticleDetailFooter, {
       props: {

@@ -296,6 +296,8 @@
   }
   .article-detail-footer .article-detail-footer__mobile-close {
     display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
   .article-detail-footer__divider {
     display: none;

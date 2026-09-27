@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 
 import WriteQueueStatus from "../../src/client/components/creative/WriteQueueStatus.vue";
@@ -27,9 +27,59 @@ const queueStatus = {
   ],
 };
 
-afterEach(() => vi.restoreAllMocks());
+const QUEUE_EXPANDED_KEY = "hot-now-write-queue-expanded";
+beforeEach(() => window.localStorage.removeItem(QUEUE_EXPANDED_KEY));
+afterEach(() => {
+  vi.restoreAllMocks();
+  window.localStorage.removeItem(QUEUE_EXPANDED_KEY);
+});
 
 describe("写作队列最近逐篇结果", () => {
+  it("刷新后恢复上次的展开状态，再折叠后仍保持折叠", async () => {
+    vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue(queueStatus);
+    // 仅重新挂载浮层模拟刷新，避免测试把服务端队列状态当作界面偏好来源。
+    const mountQueue = () => mount(WriteQueueStatus, {
+      attachTo: document.body,
+      global: { stubs: { SourceItemDetailModal: true, ArticleDetailDrawer: true } },
+    });
+
+    const first = mountQueue();
+    await flushPromises();
+    expect(document.body.querySelector(".write-queue-dot-btn")).not.toBeNull();
+    document.body.querySelector<HTMLButtonElement>(".write-queue-dot-btn")?.click();
+    await first.vm.$nextTick();
+    expect(window.localStorage.getItem(QUEUE_EXPANDED_KEY)).toBe("1");
+    first.unmount();
+
+    const second = mountQueue();
+    await flushPromises();
+    expect(document.body.querySelector(".write-queue-header")).not.toBeNull();
+    document.body.querySelector<HTMLButtonElement>(".write-queue-close")?.click();
+    await second.vm.$nextTick();
+    expect(window.localStorage.getItem(QUEUE_EXPANDED_KEY)).toBe("0");
+    second.unmount();
+
+    const third = mountQueue();
+    await flushPromises();
+    expect(document.body.querySelector(".write-queue-dot-btn")).not.toBeNull();
+    third.unmount();
+  });
+
+  it("本地存储不可用时仍能展开队列", async () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("storage blocked"); });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("storage blocked"); });
+    vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue(queueStatus);
+    const wrapper = mount(WriteQueueStatus, {
+      attachTo: document.body,
+      global: { stubs: { SourceItemDetailModal: true, ArticleDetailDrawer: true } },
+    });
+    await flushPromises();
+    document.body.querySelector<HTMLButtonElement>(".write-queue-dot-btn")?.click();
+    await wrapper.vm.$nextTick();
+    expect(document.body.querySelector(".write-queue-header")).not.toBeNull();
+    wrapper.unmount();
+  });
+
   it("浮标展开后展示成功成品和失败阶段原因", async () => {
     vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue(queueStatus);
     const wrapper = mount(WriteQueueStatus, {

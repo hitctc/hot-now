@@ -17,9 +17,20 @@ import ArticleDetailDrawer from "./ArticleDetailDrawer.vue";
 import SourceItemDetailModal from "./SourceItemDetailModal.vue";
 import { toShanghaiDayKey } from "./tableDayGroups.js";
 
+const QUEUE_EXPANDED_KEY = "hot-now-write-queue-expanded";
+
+/** 读取上次的界面偏好；存储不可用或没有记录时默认折叠，不影响队列数据加载。 */
+function readExpandedPreference(): boolean {
+  try {
+    return localStorage.getItem(QUEUE_EXPANDED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 const data = ref<WriteQueueStatusType | null>(null);
 const loading = ref(false);
-const expanded = ref(false);
+const expanded = ref(readExpandedPreference());
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let refreshRequest: Promise<void> | null = null;
 
@@ -77,8 +88,14 @@ function handleVisibilityChange(): void {
   if (!document.hidden) void refresh();
 }
 
+/** 切换浮层并保存展开状态；浏览器拒绝写入时仍允许本次操作。 */
 function toggleExpand(): void {
   expanded.value = !expanded.value;
+  try {
+    localStorage.setItem(QUEUE_EXPANDED_KEY, expanded.value ? "1" : "0");
+  } catch {
+    // 无法持久化时只维持当前页面的展开状态。
+  }
 }
 
 function openSourceItem(id: number): void {

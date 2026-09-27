@@ -253,6 +253,10 @@
   border-top: 1px solid #f0f0f0;
   padding: 12px 24px;
 }
+/* 关闭入口仅补给底部操作区，桌面端继续使用弹窗右上角关闭按钮。 */
+.article-detail-footer .article-detail-footer__mobile-close {
+  display: none;
+}
 
 /* ─── 移动端适配 ─── */
 @media (max-width: 768px) {
@@ -289,6 +293,9 @@
     flex-wrap: nowrap !important;
     overflow-x: auto;
     gap: 8px !important;
+  }
+  .article-detail-footer .article-detail-footer__mobile-close {
+    display: inline-flex;
   }
   .article-detail-footer__divider {
     display: none;

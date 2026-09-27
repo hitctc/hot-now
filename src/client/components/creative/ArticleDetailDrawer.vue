@@ -31,6 +31,7 @@
         :wechat-copying="wechatCopying"
         :can-push="canPush"
         :missing-conditions="missingConditions"
+        @close="handleClose"
         @save="handleSave"
         @copy-format="copyAsWechatFormat"
         @review="reviewModalVisible = true"

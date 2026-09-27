@@ -1,11 +1,45 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { mount } from "@vue/test-utils";
+
+import ArticleDetailFooter from "../../src/client/components/creative/article-detail/ArticleDetailFooter.vue";
+import type { CreativeFinishedArticle } from "../../src/client/services/creativeApi.js";
 
 const styles = readFileSync(resolve(process.cwd(), "src/client/components/creative/article-detail/articleDetailDrawer.css"), "utf8");
+const drawerSource = readFileSync(resolve(process.cwd(), "src/client/components/creative/ArticleDetailDrawer.vue"), "utf8");
 const mobileStyles = styles.match(/@media \(max-width: 768px\) \{([\s\S]*?)\n\}\n\n\.article-detail-footer/)?.[1] ?? "";
 
 describe("成品文章详情弹窗移动端布局", () => {
+  it("移动端底部关闭按钮只在窄屏显示，并走现有关闭处理", () => {
+    expect(styles).toMatch(/\.article-detail-footer \.article-detail-footer__mobile-close\s*\{[^}]*display: none;/);
+    expect(mobileStyles).toMatch(/\.article-detail-footer \.article-detail-footer__mobile-close\s*\{[^}]*display: inline-flex;/);
+    expect(drawerSource).toContain('@close="handleClose"');
+  });
+
+  it("关闭按钮位于保存左侧，点击不触发保存", async () => {
+    const wrapper = mount(ArticleDetailFooter, {
+      props: {
+        article: { id: 1, status: "manual_draft", originType: "manual" } as CreativeFinishedArticle,
+        saving: false, wechatCopying: false, canPush: false, missingConditions: [],
+      },
+      global: {
+        stubs: {
+          "a-button": { template: "<button><slot /></button>" },
+          "a-tooltip": { template: "<span><slot /></span>" },
+        },
+      },
+    });
+    const buttons = wrapper.findAll("button");
+    expect(buttons.slice(0, 2).map((button) => button.text())).toEqual(["关闭", "保存"]);
+    await buttons[0]?.trigger("click");
+    expect(wrapper.emitted("close")).toHaveLength(1);
+    expect(wrapper.emitted("save")).toBeUndefined();
+    await wrapper.setProps({ hideSave: true });
+    expect(wrapper.find(".article-detail-footer__mobile-close").exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it("居中容器顶部对齐，弹窗和内容占满视口且正文仍可滚动", () => {
     expect(mobileStyles).toMatch(/\.article-detail-modal\.ant-modal-centered\s*\{[^}]*align-items: flex-start !important;/);
     expect(mobileStyles).toMatch(/\.article-detail-modal \.ant-modal\s*\{[^}]*width: 100% !important;[^}]*height: 100dvh;/);

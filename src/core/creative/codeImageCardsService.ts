@@ -90,10 +90,10 @@ export function buildCodeImageSourceFingerprint(
     .digest("hex");
 }
 
-/** 各比例只因自己的版式变化而过期，已有竖图继续复用原指纹。 */
+/** 各比例独立标记版式版本，单篇补做只更新过期比例，不连带重制其他图片。 */
 function getVariantFingerprint(baseFingerprint: string, variant: CodeImageCardVariant): string {
-  if (variant === "3:4") return baseFingerprint;
-  const version = variant === "1:1" ? "square-title-tags-v3" : "wide-intro-v2";
+  const version = variant === "1:1" ? "square-title-tags-v3"
+    : variant === "3:4" ? "portrait-type-spacing-v1" : "wide-intro-v2";
   return createHash("sha256").update(`${baseFingerprint}:${version}`).digest("hex");
 }
 

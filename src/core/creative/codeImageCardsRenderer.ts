@@ -46,7 +46,7 @@ type VariantLayout = {
 const VARIANT_LAYOUT: Record<CodeImageCardVariant, VariantLayout> = {
   "2.5:1": { margin: 42, titleSize: 42, titleMinSize: 30, titleMaxLines: 2, thesisSize: 38, thesisMinSize: 24, thesisMaxLines: 2, keywordSize: 22, titleY: 34, thesisBaseY: 110, keywordBaseY: 228 },
   "1:1": { margin: 58, titleSize: 120, titleMinSize: 60, titleMaxLines: 4, thesisSize: 38, thesisMinSize: 26, thesisMaxLines: 4, keywordSize: 62, titleY: 70, thesisBaseY: 205, keywordBaseY: 462 },
-  "3:4": { margin: 64, titleSize: 60, titleMinSize: 42, titleMaxLines: 4, thesisSize: 44, thesisMinSize: 32, thesisMaxLines: 5, keywordSize: 36, titleY: 82, thesisBaseY: 330, keywordBaseY: 735 },
+  "3:4": { margin: 64, titleSize: 66, titleMinSize: 42, titleMaxLines: 4, thesisSize: 55, thesisMinSize: 32, thesisMaxLines: 5, keywordSize: 48, titleY: 82, thesisBaseY: 330, keywordBaseY: 680 },
 };
 
 /** 返回当前比例实际采用的字号，供渲染与回归测试共享同一套排版基线。 */
@@ -83,23 +83,38 @@ function buildSvg(input: CodeImageCardRenderInput, width: number, height: number
   const margin = layout.margin;
   const availableWidth = width - margin * 2;
   const isSquare = input.variant === "1:1";
+  const isPortrait = input.variant === "3:4";
   // 标题用实际换行时选中的字号绘制，避免字号不一致造成文字越界。
   // 方图增至四行时同时限制标题高度，留出与固定标签行的间距。
   const title = fitText(input.title, availableWidth, layout.titleSize, layout.titleMaxLines, layout.titleMinSize,
     isSquare ? layout.keywordBaseY - layout.titleY - 20 : undefined);
-  const thesisY = Math.max(
+  // 竖图标题放大后容易在末行只剩一两个字；从上一行回拨字，保持字号和行数不变。
+  if (isPortrait && title.lines.length > 1) {
+    const previous = [...title.lines[title.lines.length - 2]];
+    const last = [...title.lines[title.lines.length - 1]];
+    while (previous.length > 2 && measureTextWidth(last.join(""), title.fontSize) < measureTextWidth(previous.join(""), title.fontSize) * 0.75
+      && measureTextWidth(`${previous.at(-1)}${last.join("")}`, title.fontSize) <= availableWidth) {
+      last.unshift(previous.pop()!);
+    }
+    title.lines[title.lines.length - 2] = previous.join("");
+    title.lines[title.lines.length - 1] = last.join("");
+  }
+  const titleBottom = layout.titleY + title.fontSize * (1 + Math.max(0, title.lines.length - 1) * 1.16);
+  const regularThesisY = Math.max(
     layout.thesisBaseY,
     layout.titleY + title.lines.length * title.fontSize * 1.16 + (input.variant === "2.5:1" ? 12 : 30),
   );
-  // 横图标签固定在底部；导语放大后按实际行高缩字，避免双行内容压到标签。
+  // 竖图标签增大后需要两行空间；导语先按剩余高度缩字，再居中分配上下留白。
   const thesis = isSquare
     ? { lines: [], fontSize: layout.thesisSize }
     : fitText(input.thesis, availableWidth, layout.thesisSize, layout.thesisMaxLines, layout.thesisMinSize,
-      input.variant === "2.5:1" ? layout.keywordBaseY - thesisY - 12 : undefined, 1.35);
-  // 方图标签锚点固定，不受标题长短影响；横图也固定底部标签，其他比例避开正文。
-  const keywordY = isSquare || input.variant === "2.5:1"
-    ? layout.keywordBaseY
-    : Math.max(layout.keywordBaseY, thesisY + thesis.lines.length * thesis.fontSize * 1.35 + 36);
+      isPortrait ? layout.keywordBaseY - titleBottom - 64
+        : input.variant === "2.5:1" ? layout.keywordBaseY - regularThesisY - 12 : undefined, 1.35);
+  const thesisHeight = thesis.fontSize * (1 + Math.max(0, thesis.lines.length - 1) * 1.35);
+  const thesisY = isPortrait
+    ? titleBottom + (layout.keywordBaseY - titleBottom - thesisHeight) / 2
+    : regularThesisY;
+  const keywordY = layout.keywordBaseY;
   const logoY = height - Math.round(height * 0.09);
   // 方图标签会占据更宽的底部区域，标识图案左移以免压在 HotNow 字样上。
   const logoMarkX = width - margin - (isSquare ? 110 : 34);
@@ -109,7 +124,7 @@ function buildSvg(input: CodeImageCardRenderInput, width: number, height: number
     keywordY,
     availableWidth,
     layout.keywordSize,
-    isSquare ? 2 : 1,
+    isSquare || isPortrait ? 2 : 1,
     isSquare ? 320 : 210,
   );
   const logoMarkup = input.logoDataUri

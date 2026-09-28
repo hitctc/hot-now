@@ -22,10 +22,56 @@ afterEach(async () => {
 });
 
 describe("短内容代码制图", () => {
-  it("方图使用加大的标题和标签字号，其他比例字号保持不变", () => {
+  it("三种比例使用各自的标题、导语和标签字号", () => {
     expect(getCodeImageCardTypography("2.5:1")).toMatchObject({ titleSize: 42, thesisSize: 38, keywordSize: 22 });
     expect(getCodeImageCardTypography("1:1")).toMatchObject({ titleSize: 120, keywordSize: 62 });
-    expect(getCodeImageCardTypography("3:4")).toMatchObject({ titleSize: 60, thesisSize: 44, keywordSize: 36 });
+    expect(getCodeImageCardTypography("3:4")).toMatchObject({ titleSize: 66, thesisSize: 55, keywordSize: 48 });
+  });
+
+  it("竖图在标题、导语和标签之间留出均衡空隙，长标签也避开标识", async () => {
+    const title = "手机弹窗广告如何治理";
+    const thesis = "开屏广告退场之后，手机弹窗广告依然频繁出现，需要明确治理责任。";
+    const input = { variant: "3:4" as const, title, thesis, keywords: ["手机广告", "弹窗治理", "平台责任"] };
+    const [complete, titleOnly] = await Promise.all([
+      renderCodeImageCard(input),
+      renderCodeImageCard({ ...input, thesis: "", keywords: [] }),
+    ]);
+    const { data, info } = await sharp(complete).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const { data: titleData } = await sharp(titleOnly).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    let titleBottom = -1;
+    let thesisTop = info.height;
+    let thesisBottom = -1;
+    let firstTagTop = info.height;
+    let secondTagPixels = 0;
+    let logoOverlapPixels = 0;
+    let lastTitleLineRight = 0;
+    for (let y = 0; y < 900 * 2; y += 1) {
+      for (let x = 128; x < 1250; x += 1) {
+        const index = (y * info.width + x) * info.channels;
+        if (y < 500 * 2 && titleData[index] < 80 && titleData[index + 1] < 80 && titleData[index + 2] < 80) {
+          titleBottom = y;
+          if (y > 350 && y < 395) lastTitleLineRight = Math.max(lastTitleLineRight, x);
+        }
+        if (y < 680 * 2 && Math.abs(data[index] - titleData[index]) > 40
+          && data[index] < 180) {
+          thesisTop = Math.min(thesisTop, y);
+          thesisBottom = Math.max(thesisBottom, y);
+        }
+        const tagFill = data[index] === 0xea && data[index + 1] === 0xdf && data[index + 2] === 0xfc;
+        if (tagFill && y > 550 * 2) {
+          firstTagTop = Math.min(firstTagTop, y);
+          if (y > 810 * 2 && y < 850 * 2) secondTagPixels += 1;
+          if (y >= 870 * 2) logoOverlapPixels += 1;
+        }
+      }
+    }
+    expect(titleBottom).toBeGreaterThan(0);
+    expect(lastTitleLineRight).toBeGreaterThan(550);
+    expect(thesisBottom).toBeGreaterThan(thesisTop);
+    expect(firstTagTop).toBeLessThan(info.height);
+    expect(Math.abs((thesisTop - titleBottom) - (firstTagTop - thesisBottom))).toBeLessThan(80);
+    expect(secondTagPixels).toBeGreaterThan(0);
+    expect(logoOverlapPixels).toBe(0);
   });
 
   it("横图长标题不遮挡右上角装饰线", async () => {
@@ -371,6 +417,21 @@ describe("短内容代码制图", () => {
     expect(squareRefreshedArticle.codeImageCards.find((card) => card.variant === "1:1")!.url).not.toBe(legacySquare.url);
     expect(squareRefreshedArticle.codeImageCards.find((card) => card.variant === "2.5:1")).toEqual(wideBeforeSquareRefresh);
     expect(squareRefreshedArticle.codeImageCards.find((card) => card.variant === "3:4")).toEqual(portraitBeforeSquareRefresh);
+
+    // 旧竖图仍使用未分版式的基础指纹；补做时仅替换这一比例。
+    const legacyPortrait = { ...portraitBeforeSquareRefresh, sourceFingerprint: baseFingerprint };
+    expect(editCreativeFinishedArticle(handle.db, article.id, {
+      codeImageCards: squareRefreshedArticle.codeImageCards.map((card) => card.variant === "3:4" ? legacyPortrait : card),
+    }).ok).toBe(true);
+    const portraitRefresh = await generateCodeImageCards(handle.db, article.id, {
+      imageDir,
+      publicBaseUrl: "https://now.example.com",
+    });
+    expect(portraitRefresh.status).toBe("succeeded");
+    const portraitRefreshedArticle = findCreativeFinishedArticleById(handle.db, article.id)!;
+    expect(portraitRefreshedArticle.codeImageCards.find((card) => card.variant === "3:4")!.url).not.toBe(legacyPortrait.url);
+    expect(portraitRefreshedArticle.codeImageCards.find((card) => card.variant === "2.5:1")).toEqual(wideBeforeSquareRefresh);
+    expect(portraitRefreshedArticle.codeImageCards.find((card) => card.variant === "1:1")).toEqual(squareRefreshedArticle.codeImageCards.find((card) => card.variant === "1:1"));
 
     refreshCodeImageCardsTemplateMigration.apply(handle.db);
     expect(findCreativeFinishedArticleById(handle.db, article.id)!.codeImageCards.every((card) => card.status === "stale")).toBe(true);

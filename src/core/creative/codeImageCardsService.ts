@@ -90,10 +90,11 @@ export function buildCodeImageSourceFingerprint(
     .digest("hex");
 }
 
-/** 方图版式更新时仅使旧方图失效，横图和竖图继续复用原指纹。 */
+/** 各比例只因自己的版式变化而过期，已有竖图继续复用原指纹。 */
 function getVariantFingerprint(baseFingerprint: string, variant: CodeImageCardVariant): string {
-  if (variant !== "1:1") return baseFingerprint;
-  return createHash("sha256").update(`${baseFingerprint}:square-title-tags-v3`).digest("hex");
+  if (variant === "3:4") return baseFingerprint;
+  const version = variant === "1:1" ? "square-title-tags-v3" : "wide-intro-v1";
+  return createHash("sha256").update(`${baseFingerprint}:${version}`).digest("hex");
 }
 
 /** 从文章必有字段中选择图片核心文案，避免把空字段渲染成“暂无内容”。 */

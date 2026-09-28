@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { editCreativeFinishedArticle, findCreativeFinishedArticleById, insertCreativeFinishedArticle } from "../../src/core/creative/creativeFinishedArticleRepository.js";
 import { insertCreativeSourceItem } from "../../src/core/creative/creativeSourceItemRepository.js";
-import { generateCodeImageCards, resolveCodeImageKeywords, resolveCodeImageThesis } from "../../src/core/creative/codeImageCardsService.js";
+import { buildCodeImageSourceFingerprint, generateCodeImageCards, resolveCodeImageKeywords, resolveCodeImageThesis } from "../../src/core/creative/codeImageCardsService.js";
 import { getCodeImageCardSize, getCodeImageCardTypography, renderCodeImageCard } from "../../src/core/creative/codeImageCardsRenderer.js";
 import { refreshCodeImageCardsTemplateMigration } from "../../src/core/db/migrations/052_refresh_code_image_cards_template.js";
 import { createTestDatabase, type TestDatabaseHandle } from "../helpers/testDatabase.js";
@@ -23,9 +23,37 @@ afterEach(async () => {
 
 describe("短内容代码制图", () => {
   it("方图使用加大的标题和标签字号，其他比例字号保持不变", () => {
-    expect(getCodeImageCardTypography("2.5:1")).toMatchObject({ titleSize: 42, thesisSize: 31, keywordSize: 22 });
+    expect(getCodeImageCardTypography("2.5:1")).toMatchObject({ titleSize: 42, thesisSize: 38, keywordSize: 22 });
     expect(getCodeImageCardTypography("1:1")).toMatchObject({ titleSize: 120, keywordSize: 62 });
     expect(getCodeImageCardTypography("3:4")).toMatchObject({ titleSize: 60, thesisSize: 44, keywordSize: 36 });
+  });
+
+  it("横图导语靠近标题，双行时仍与底部标签留有间距", async () => {
+    for (const [title, thesis, maxFirstRow] of [
+      ["短标题", "导语内容简短清晰", 260],
+      ["手机弹窗广告频繁出现后该怎么治理", "手机弹窗广告屡禁不止，开屏广告退场后还有哪些问题需要真正解决", 310],
+    ] as const) {
+      const input = { variant: "2.5:1" as const, title, thesis, keywords: ["手机广告"] };
+      const [withThesis, withoutThesis] = await Promise.all([
+        renderCodeImageCard(input),
+        renderCodeImageCard({ ...input, thesis: "" }),
+      ]);
+      const { data: withText, info } = await sharp(withThesis).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+      const { data: withoutText } = await sharp(withoutThesis).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+      let firstRow = info.height;
+      let lastRow = -1;
+      for (let y = 0; y < 228 * 2; y += 1) {
+        for (let x = 84; x < 1300; x += 1) {
+          const index = (y * info.width + x) * info.channels;
+          if (Math.abs(withText[index] - withoutText[index]) > 40) {
+            firstRow = Math.min(firstRow, y);
+            lastRow = Math.max(lastRow, y);
+          }
+        }
+      }
+      expect(firstRow).toBeLessThan(maxFirstRow);
+      expect(lastRow).toBeLessThan(440);
+    }
   });
 
   it("方图长标题最多四行且不侵入标签区域", async () => {
@@ -278,16 +306,35 @@ describe("短内容代码制图", () => {
     expect(saved.humanMarkdown).toContain("配图｜HotNow 1:1 方图");
     expect(saved.humanMarkdown).toContain("配图｜HotNow 3:4 竖图");
 
-    const wideBeforeSquareRefresh = saved.codeImageCards.find((card) => card.variant === "2.5:1")!;
-    const portraitBeforeSquareRefresh = saved.codeImageCards.find((card) => card.variant === "3:4")!;
-    const squareBeforeRefresh = saved.codeImageCards.find((card) => card.variant === "1:1")!;
+    const baseFingerprint = buildCodeImageSourceFingerprint(
+      "AI 代理正在重写工作流", "真正的变化来自工作流程，而不是单个工具。", ["文章标签", "工作流"],
+    );
+    const legacyWide = { ...saved.codeImageCards.find((card) => card.variant === "2.5:1")!, sourceFingerprint: baseFingerprint };
+    const squareBeforeWideRefresh = saved.codeImageCards.find((card) => card.variant === "1:1")!;
+    const portraitBeforeWideRefresh = saved.codeImageCards.find((card) => card.variant === "3:4")!;
+    expect(editCreativeFinishedArticle(handle.db, article.id, {
+      codeImageCards: saved.codeImageCards.map((card) => card.variant === "2.5:1" ? legacyWide : card),
+    }).ok).toBe(true);
+    const wideRefresh = await generateCodeImageCards(handle.db, article.id, {
+      imageDir,
+      publicBaseUrl: "https://now.example.com",
+    });
+    expect(wideRefresh.status).toBe("succeeded");
+    const wideRefreshedArticle = findCreativeFinishedArticleById(handle.db, article.id)!;
+    expect(wideRefreshedArticle.codeImageCards.find((card) => card.variant === "2.5:1")!.url).not.toBe(legacyWide.url);
+    expect(wideRefreshedArticle.codeImageCards.find((card) => card.variant === "1:1")).toEqual(squareBeforeWideRefresh);
+    expect(wideRefreshedArticle.codeImageCards.find((card) => card.variant === "3:4")).toEqual(portraitBeforeWideRefresh);
+
+    const wideBeforeSquareRefresh = wideRefreshedArticle.codeImageCards.find((card) => card.variant === "2.5:1")!;
+    const portraitBeforeSquareRefresh = wideRefreshedArticle.codeImageCards.find((card) => card.variant === "3:4")!;
+    const squareBeforeRefresh = wideRefreshedArticle.codeImageCards.find((card) => card.variant === "1:1")!;
     const legacySquare = {
       ...squareBeforeRefresh,
       sourceFingerprint: createHash("sha256")
-        .update(`${wideBeforeSquareRefresh.sourceFingerprint}:square-title-tags-v2`).digest("hex"),
+        .update(`${baseFingerprint}:square-title-tags-v2`).digest("hex"),
     };
     expect(editCreativeFinishedArticle(handle.db, article.id, {
-      codeImageCards: saved.codeImageCards.map((card) => card.variant === "1:1" ? legacySquare : card),
+      codeImageCards: wideRefreshedArticle.codeImageCards.map((card) => card.variant === "1:1" ? legacySquare : card),
     }).ok).toBe(true);
 
     const squareRefresh = await generateCodeImageCards(handle.db, article.id, {

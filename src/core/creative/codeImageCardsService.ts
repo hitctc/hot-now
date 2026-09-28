@@ -71,7 +71,8 @@ export function getCodeImageCardsStatus(
   const ordered = orderCodeImageCards(cards);
   if (ordered.some((card) => card.status === "running")) return "running";
   if (ordered.length === 0 || ordered.every((card) => card.status === "failed")) return "failed";
-  if (ordered.some((card) => card.status === "stale" || (currentFingerprint && card.sourceFingerprint !== currentFingerprint))) {
+  if (ordered.some((card) => card.status === "stale" || (currentFingerprint
+    && card.sourceFingerprint !== getVariantFingerprint(currentFingerprint, card.variant)))) {
     return "partial";
   }
   if (ordered.length === CODE_IMAGE_CARD_VARIANTS.length && ordered.every((card) => card.status === "succeeded")) return "succeeded";
@@ -87,6 +88,12 @@ export function buildCodeImageSourceFingerprint(
   return createHash("sha256")
     .update(JSON.stringify({ title, thesis, keywords, template: "hotnow-code-card-v7", sizes: { wide: "1500x600", square: "1500x1500", portrait: "1500x2000" } }))
     .digest("hex");
+}
+
+/** 方图版式更新时仅使旧方图失效，横图和竖图继续复用原指纹。 */
+function getVariantFingerprint(baseFingerprint: string, variant: CodeImageCardVariant): string {
+  if (variant !== "1:1") return baseFingerprint;
+  return createHash("sha256").update(`${baseFingerprint}:square-title-tags-v1`).digest("hex");
 }
 
 /** 从文章必有字段中选择图片核心文案，避免把空字段渲染成“暂无内容”。 */
@@ -139,7 +146,7 @@ async function runCodeImageCards(
       || card.status === "failed"
       || card.status === "pending"
       || card.status === "stale"
-      || card.sourceFingerprint !== fingerprint;
+      || card.sourceFingerprint !== getVariantFingerprint(fingerprint, variant);
   });
 
   if (targets.length === 0) {
@@ -161,7 +168,7 @@ async function runCodeImageCards(
       height: size.height,
       status: "running" as const,
       generatedAt: current?.generatedAt ?? null,
-      sourceFingerprint: fingerprint,
+      sourceFingerprint: getVariantFingerprint(fingerprint, variant),
       fileSize: current?.fileSize ?? null,
       error: null,
     };
@@ -182,7 +189,7 @@ async function runCodeImageCards(
         height: size.height,
         status: "succeeded" as const,
         generatedAt: new Date().toISOString(),
-        sourceFingerprint: fingerprint,
+        sourceFingerprint: getVariantFingerprint(fingerprint, variant),
         fileSize: buffer.length,
         error: null,
       } satisfies CodeImageCard;
@@ -195,7 +202,7 @@ async function runCodeImageCards(
         height: size.height,
         status: "failed" as const,
         generatedAt: findCodeImageCard(existing, variant)?.generatedAt ?? null,
-        sourceFingerprint: fingerprint,
+        sourceFingerprint: getVariantFingerprint(fingerprint, variant),
         fileSize: findCodeImageCard(existing, variant)?.fileSize ?? null,
         error: error instanceof Error ? error.message : String(error),
       } satisfies CodeImageCard;

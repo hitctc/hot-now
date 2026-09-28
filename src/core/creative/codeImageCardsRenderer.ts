@@ -45,7 +45,7 @@ type VariantLayout = {
 /** 三种比例的基础排版参数：外边距、字号、行数上限和纵向锚点。 */
 const VARIANT_LAYOUT: Record<CodeImageCardVariant, VariantLayout> = {
   "2.5:1": { margin: 42, titleSize: 42, titleMinSize: 30, titleMaxLines: 2, thesisSize: 31, thesisMinSize: 24, thesisMaxLines: 2, keywordSize: 22, titleY: 34, thesisBaseY: 132, keywordBaseY: 228 },
-  "1:1": { margin: 58, titleSize: 54, titleMinSize: 38, titleMaxLines: 3, thesisSize: 38, thesisMinSize: 26, thesisMaxLines: 4, keywordSize: 28, titleY: 70, thesisBaseY: 205, keywordBaseY: 450 },
+  "1:1": { margin: 58, titleSize: 108, titleMinSize: 60, titleMaxLines: 3, thesisSize: 38, thesisMinSize: 26, thesisMaxLines: 4, keywordSize: 72, titleY: 70, thesisBaseY: 205, keywordBaseY: 462 },
   "3:4": { margin: 64, titleSize: 60, titleMinSize: 42, titleMaxLines: 4, thesisSize: 44, thesisMinSize: 32, thesisMaxLines: 5, keywordSize: 36, titleY: 82, thesisBaseY: 330, keywordBaseY: 735 },
 };
 
@@ -77,27 +77,39 @@ function getCodeImageCardLogicalSize(variant: CodeImageCardVariant): { width: nu
   return LOGICAL_CANVAS_SIZE[variant];
 }
 
-/** 按三种画布比例排布标题、核心文案和标签，保证主体内容占据主要视觉区域。 */
+/** 按画布比例排布标题、文案和标签；方图只绘制标题与标签并保留固定版面区域。 */
 function buildSvg(input: CodeImageCardRenderInput, width: number, height: number): string {
   const layout = VARIANT_LAYOUT[input.variant];
   const margin = layout.margin;
   const availableWidth = width - margin * 2;
-  // 标题和正文都必须用 fitText 实际选中的字号绘制；
-  // 用缩小前的字号绘制会让行宽超出换行时的计算宽度，在画布右侧被裁掉。
+  const isSquare = input.variant === "1:1";
+  // 标题用实际换行时选中的字号绘制，避免字号不一致造成文字越界。
   const title = fitText(input.title, availableWidth, layout.titleSize, layout.titleMaxLines, layout.titleMinSize);
-  const thesis = fitText(input.thesis, availableWidth, layout.thesisSize, layout.thesisMaxLines, layout.thesisMinSize);
+  const thesis = isSquare
+    ? { lines: [], fontSize: layout.thesisSize }
+    : fitText(input.thesis, availableWidth, layout.thesisSize, layout.thesisMaxLines, layout.thesisMinSize);
   const thesisY = Math.max(
     layout.thesisBaseY,
     layout.titleY + title.lines.length * title.fontSize * 1.16 + 30,
   );
-  // 横图高度只有 300，标签和标识都固定在底部，因此标签行不跟随正文下移。
-  const keywordY = input.variant === "2.5:1"
+  // 方图标签锚点固定，不受标题长短影响；横图也固定底部标签，其他比例避开正文。
+  const keywordY = isSquare || input.variant === "2.5:1"
     ? layout.keywordBaseY
     : Math.max(layout.keywordBaseY, thesisY + thesis.lines.length * thesis.fontSize * 1.35 + 36);
   const logoY = height - Math.round(height * 0.09);
-  const keywordMarkup = renderKeywordTags(input.keywords, margin, keywordY, availableWidth, layout.keywordSize);
+  // 方图标签会占据更宽的底部区域，标识图案左移以免压在 HotNow 字样上。
+  const logoMarkX = width - margin - (isSquare ? 110 : 34);
+  const keywordMarkup = renderKeywordTags(
+    input.keywords,
+    margin,
+    keywordY,
+    availableWidth,
+    layout.keywordSize,
+    isSquare ? 2 : 1,
+    isSquare ? 320 : 210,
+  );
   const logoMarkup = input.logoDataUri
-    ? `<image href="${input.logoDataUri}" x="${width - margin - 34}" y="${logoY - 23}" width="24" height="24" preserveAspectRatio="xMidYMid meet"/><text x="${width - margin - 4}" y="${logoY - 5}" text-anchor="end" class="logo">HotNow</text>`
+    ? `<image href="${input.logoDataUri}" x="${logoMarkX}" y="${logoY - 23}" width="24" height="24" preserveAspectRatio="xMidYMid meet"/><text x="${width - margin - 4}" y="${logoY - 5}" text-anchor="end" class="logo">HotNow</text>`
     : `<text x="${width - margin}" y="${logoY}" text-anchor="end" class="logo">HotNow</text>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width * OUTPUT_SCALE}" height="${height * OUTPUT_SCALE}" viewBox="0 0 ${width} ${height}" text-rendering="geometricPrecision">
   <rect width="${width}" height="${height}" fill="#f8f5ff"/>
@@ -112,7 +124,7 @@ function buildSvg(input: CodeImageCardRenderInput, width: number, height: number
     .logo { font-size: 18px; font-weight: 500; letter-spacing: 0.4px; }
   </style>
   ${renderTextLines(title.lines, margin, layout.titleY, title.fontSize, "title", 1.16)}
-  ${renderTextLines(thesis.lines, margin, thesisY, thesis.fontSize, "thesis", 1.35)}
+  ${isSquare ? "" : renderTextLines(thesis.lines, margin, thesisY, thesis.fontSize, "thesis", 1.35)}
   ${keywordMarkup}
   ${logoMarkup}
 </svg>`;
@@ -130,18 +142,31 @@ function renderTextLines(
   return lines.map((line, index) => `<text x="${x}" y="${Math.round(y + index * fontSize * lineHeight)}" font-size="${fontSize}" class="${className}" dominant-baseline="hanging">${escapeXml(line)}</text>`).join("");
 }
 
-/** 渲染标签胶囊；字号随画布比例调整，胶囊尺寸同步放大且始终限制在内容宽度内。 */
-function renderKeywordTags(keywords: string[], x: number, y: number, maxWidth: number, fontSize: number): string {
+/** 渲染标签胶囊；maxRows 控制换行数量，胶囊始终限制在画布内容宽度内。 */
+function renderKeywordTags(
+  keywords: string[],
+  x: number,
+  y: number,
+  maxWidth: number,
+  fontSize: number,
+  maxRows = 1,
+  maxLabelWidth = 210,
+): string {
   let cursor = x;
+  let row = 0;
   const parts: string[] = [];
-  // 大字号时收紧横向留白，避免竖图的三枚常规长度标签因胶囊膨胀而丢失第三枚。
   const paddingX = Math.max(12, 17 - Math.round((fontSize - 20) * 0.25));
   const height = fontSize + 24;
   for (const keyword of keywords.slice(0, 3)) {
-    const label = truncateByWidth(keyword, 210, fontSize);
+    const label = truncateByWidth(keyword, maxLabelWidth, fontSize);
     const width = Math.max(104, Math.round(measureTextWidth(label, fontSize)) + paddingX * 2);
-    if (cursor + width > x + maxWidth) break;
-    parts.push(`<rect x="${cursor}" y="${y}" width="${width}" height="${height}" rx="${Math.round(height / 2)}" fill="#eadffc"/><text x="${Math.round(cursor + width / 2)}" y="${Math.round(y + height / 2)}" text-anchor="middle" font-size="${fontSize}" class="keyword" dominant-baseline="central">${escapeXml(label)}</text>`);
+    if (cursor + width > x + maxWidth) {
+      if (row + 1 >= maxRows) break;
+      row += 1;
+      cursor = x;
+    }
+    const rowY = y + row * (height + KEYWORD_GAP);
+    parts.push(`<rect x="${cursor}" y="${rowY}" width="${width}" height="${height}" rx="${Math.round(height / 2)}" fill="#eadffc"/><text x="${Math.round(cursor + width / 2)}" y="${Math.round(rowY + height / 2)}" text-anchor="middle" font-size="${fontSize}" class="keyword" dominant-baseline="central">${escapeXml(label)}</text>`);
     cursor += width + KEYWORD_GAP;
   }
   return parts.join("");

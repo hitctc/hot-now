@@ -21,10 +21,71 @@ afterEach(async () => {
 });
 
 describe("短内容代码制图", () => {
-  it("三种比例使用适合移动端阅读的判断和标签字号", () => {
-    expect(getCodeImageCardTypography("2.5:1")).toMatchObject({ thesisSize: 31 });
-    expect(getCodeImageCardTypography("1:1")).toMatchObject({ thesisSize: 38, keywordSize: 28 });
+  it("方图使用加大的标题和标签字号，其他比例字号保持不变", () => {
+    expect(getCodeImageCardTypography("2.5:1")).toMatchObject({ titleSize: 42, thesisSize: 31, keywordSize: 22 });
+    expect(getCodeImageCardTypography("1:1")).toMatchObject({ titleSize: 108, keywordSize: 72 });
     expect(getCodeImageCardTypography("3:4")).toMatchObject({ titleSize: 60, thesisSize: 44, keywordSize: 36 });
+  });
+
+  it("方图不渲染导语文案", async () => {
+    const base = {
+      variant: "1:1" as const,
+      title: "方图标题",
+      keywords: ["AI产品", "内容创作"],
+    };
+    const first = await renderCodeImageCard({ ...base, thesis: "这段导语不应出现在方图中。" });
+    const second = await renderCodeImageCard({ ...base, thesis: "替换为完全不同的中间文案。" });
+
+    expect(first.equals(second)).toBe(true);
+  });
+
+  it("方图标签位置不随标题长度变化", async () => {
+    const inputs = [
+      { title: "短标题" },
+      { title: "OpenAI 产品团队调整，AI 助手将从聊天工具走向完整工作流程" },
+    ];
+    const images = await Promise.all(inputs.map(({ title }) => renderCodeImageCard({
+      variant: "1:1",
+      title,
+      thesis: "方图不应展示导语。",
+      keywords: ["AI产品", "工作流程"],
+    })));
+    const tagTopRows = await Promise.all(images.map(async (image) => {
+      const { data, info } = await sharp(image).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+      for (let y = 800; y < info.height; y += 1) {
+        for (let x = 0; x < info.width; x += 1) {
+          const offset = (y * info.width + x) * info.channels;
+          if (data[offset] === 0xea && data[offset + 1] === 0xdf && data[offset + 2] === 0xfc) return y;
+        }
+      }
+      return -1;
+    }));
+
+    expect(tagTopRows[0]).toBeGreaterThanOrEqual(0);
+    expect(tagTopRows[1]).toBe(tagTopRows[0]);
+  });
+
+  it("方图大标签放不下一行时会换行显示", async () => {
+    const buffer = await renderCodeImageCard({
+      variant: "1:1",
+      title: "固定区域标题",
+      thesis: "方图不应显示这段导语。",
+      keywords: ["AI产品", "工作流程", "产品转型"],
+    });
+    const { data, info } = await sharp(buffer).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const rowTwoTop = 572 * 2;
+    const rowTwoBottom = 668 * 2;
+    let tagFillPixels = 0;
+    for (let y = rowTwoTop; y < rowTwoBottom; y += 1) {
+      for (let x = 0; x < info.width; x += 1) {
+        const offset = (y * info.width + x) * info.channels;
+        if (data[offset] === 0xea && data[offset + 1] === 0xdf && data[offset + 2] === 0xfc) {
+          tagFillPixels += 1;
+        }
+      }
+    }
+
+    expect(tagFillPixels).toBeGreaterThan(0);
   });
 
   it("栅格化后的文字边缘保持足够清晰", async () => {
@@ -170,6 +231,24 @@ describe("短内容代码制图", () => {
     expect(saved.humanMarkdown).toContain("封面图｜HotNow 2.5:1 横图");
     expect(saved.humanMarkdown).toContain("配图｜HotNow 1:1 方图");
     expect(saved.humanMarkdown).toContain("配图｜HotNow 3:4 竖图");
+
+    const wideBeforeSquareRefresh = saved.codeImageCards.find((card) => card.variant === "2.5:1")!;
+    const portraitBeforeSquareRefresh = saved.codeImageCards.find((card) => card.variant === "3:4")!;
+    const squareBeforeRefresh = saved.codeImageCards.find((card) => card.variant === "1:1")!;
+    const legacySquare = { ...squareBeforeRefresh, sourceFingerprint: wideBeforeSquareRefresh.sourceFingerprint };
+    expect(editCreativeFinishedArticle(handle.db, article.id, {
+      codeImageCards: saved.codeImageCards.map((card) => card.variant === "1:1" ? legacySquare : card),
+    }).ok).toBe(true);
+
+    const squareRefresh = await generateCodeImageCards(handle.db, article.id, {
+      imageDir,
+      publicBaseUrl: "https://now.example.com",
+    });
+    expect(squareRefresh.status).toBe("succeeded");
+    const squareRefreshedArticle = findCreativeFinishedArticleById(handle.db, article.id)!;
+    expect(squareRefreshedArticle.codeImageCards.find((card) => card.variant === "1:1")!.url).not.toBe(legacySquare.url);
+    expect(squareRefreshedArticle.codeImageCards.find((card) => card.variant === "2.5:1")).toEqual(wideBeforeSquareRefresh);
+    expect(squareRefreshedArticle.codeImageCards.find((card) => card.variant === "3:4")).toEqual(portraitBeforeSquareRefresh);
 
     refreshCodeImageCardsTemplateMigration.apply(handle.db);
     expect(findCreativeFinishedArticleById(handle.db, article.id)!.codeImageCards.every((card) => card.status === "stale")).toBe(true);

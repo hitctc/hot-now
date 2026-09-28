@@ -290,13 +290,14 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
     try {
       await prepareExplicitContentSave();
       let result = await regenIntro(article.id);
-      if (result.taskId && result.ok) {
+      const taskId = result.taskId;
+      if (taskId && result.ok) {
         queued = true;
         message.info("导语已加入写作队列，完成后会自动保存");
         while (true) {
           await new Promise<void>((resolve) => setTimeout(resolve, 3000));
           if (getArticle()?.id !== article.id) return; // 文章切换后由服务端回调继续保存，不跨文章修改正文。
-          result = await getRegenIntroStatus(article.id, result.taskId!);
+          result = await getRegenIntroStatus(article.id, taskId);
           if (result.status === "done" || !result.ok) break;
         }
       }

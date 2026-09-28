@@ -42,6 +42,8 @@ describe("详情新导语生成", () => {
     await vi.advanceTimersByTimeAsync(6000);
     await pending;
     expect(getRegenIntroStatus).toHaveBeenCalledTimes(2);
+    expect(getRegenIntroStatus).toHaveBeenNthCalledWith(1, 42, "intro-42");
+    expect(getRegenIntroStatus).toHaveBeenNthCalledWith(2, 42, "intro-42");
     expect(editFinishedArticle).toHaveBeenCalledTimes(1);
     expect(message.success).toHaveBeenCalledWith("新导语已生成");
   });

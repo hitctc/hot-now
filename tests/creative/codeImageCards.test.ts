@@ -74,6 +74,45 @@ describe("短内容代码制图", () => {
     expect(logoOverlapPixels).toBe(0);
   });
 
+  it("导语在缩小显示前具有足够深的实色笔画，避免灰字发虚", async () => {
+    for (const variant of ["2.5:1", "3:4"] as const) {
+      const input = { variant, title: "手机广告治理", thesis: "弹窗广告需要持续治理", keywords: [] };
+      const [image, titleOnly] = await Promise.all([
+        renderCodeImageCard(input),
+        renderCodeImageCard({ ...input, thesis: "" }),
+      ]);
+      const { data, info } = await sharp(image).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+      const { data: base } = await sharp(titleOnly).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+      const inkPixels: number[] = [];
+      for (let y = 0; y < info.height * 0.8; y += 1) {
+        for (let x = 0; x < info.width * 0.7; x += 1) {
+          const index = (y * info.width + x) * info.channels;
+          if (Math.abs(data[index] - base[index]) > 25) inkPixels.push(data[index]);
+        }
+      }
+      inkPixels.sort((a, b) => a - b);
+      expect(inkPixels.length).toBeGreaterThan(100);
+      expect({ variant, darkStroke: inkPixels[Math.floor(inkPixels.length / 4)] < 70 }).toEqual({ variant, darkStroke: true });
+    }
+  });
+
+  it("竖图导语缩到手机宽度后仍保有足够深的笔画", async () => {
+    const image = await renderCodeImageCard({
+      variant: "3:4",
+      title: "手机弹窗广告频繁出现，开屏广告暂退后平台还需要解决什么问题",
+      thesis: "当开屏广告减少之后，用户仍在不同 App 的使用过程中遇到各种弹窗广告。治理这些问题，不能只盯着一次性的关停措施，还需要明确平台、开发者和监管部门各自承担什么责任。",
+      keywords: ["手机广告", "弹窗治理", "平台责任"],
+    });
+    const { data, info } = await sharp(image).resize({ width: 375 }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    let darkInk = 0;
+    for (let y = 200; y < 325; y += 1) {
+      for (let x = 30; x < 335; x += 1) {
+        if (data[(y * info.width + x) * info.channels] < 100) darkInk += 1;
+      }
+    }
+    expect(darkInk).toBeGreaterThan(6500);
+  });
+
   it("横图长标题不遮挡右上角装饰线", async () => {
     for (const title of ["手机弹窗广告", "手机弹窗广告频繁出现后该怎么治理"]) {
       const image = await renderCodeImageCard({
@@ -379,7 +418,7 @@ describe("短内容代码制图", () => {
     );
     const legacyWide = {
       ...saved.codeImageCards.find((card) => card.variant === "2.5:1")!,
-      sourceFingerprint: createHash("sha256").update(`${baseFingerprint}:wide-intro-v1`).digest("hex"),
+      sourceFingerprint: createHash("sha256").update(`${baseFingerprint}:wide-intro-v2`).digest("hex"),
     };
     const squareBeforeWideRefresh = saved.codeImageCards.find((card) => card.variant === "1:1")!;
     const portraitBeforeWideRefresh = saved.codeImageCards.find((card) => card.variant === "3:4")!;
@@ -418,8 +457,11 @@ describe("短内容代码制图", () => {
     expect(squareRefreshedArticle.codeImageCards.find((card) => card.variant === "2.5:1")).toEqual(wideBeforeSquareRefresh);
     expect(squareRefreshedArticle.codeImageCards.find((card) => card.variant === "3:4")).toEqual(portraitBeforeSquareRefresh);
 
-    // 旧竖图仍使用未分版式的基础指纹；补做时仅替换这一比例。
-    const legacyPortrait = { ...portraitBeforeSquareRefresh, sourceFingerprint: baseFingerprint };
+    // 上个竖图版式仍需单篇补做，且不会连带替换横图和方图。
+    const legacyPortrait = {
+      ...portraitBeforeSquareRefresh,
+      sourceFingerprint: createHash("sha256").update(`${baseFingerprint}:portrait-type-spacing-v1`).digest("hex"),
+    };
     expect(editCreativeFinishedArticle(handle.db, article.id, {
       codeImageCards: squareRefreshedArticle.codeImageCards.map((card) => card.variant === "3:4" ? legacyPortrait : card),
     }).ok).toBe(true);

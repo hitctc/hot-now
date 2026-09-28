@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { collectImageUrlsFromHtml } from "../../src/core/wechatMp/wechatMpDraftPush.js";
+import { collectImageUrlsFromHtml, replaceCoverImageUrlInHtml } from "../../src/core/wechatMp/wechatMpDraftPush.js";
 
 // 草稿推送前的正文图片收集逻辑：推送流程不读 article.images，只信任渲染后的 HTML
 describe("collectImageUrlsFromHtml", () => {
@@ -29,6 +29,15 @@ describe("collectImageUrlsFromHtml", () => {
     expect(collectImageUrlsFromHtml(html)).toEqual([
       "https://cdn.example.com/dup.jpg",
     ]);
+  });
+
+  it("代码封面仍从原 PNG 上传正文，不复用封面素材 URL", () => {
+    const url = "https://now.example.com/api/creative/images/2026-01-01/card.png";
+    const html = `<p><img src="${url}"></p>`;
+    const coverCdnUrl = "https://mmbiz.qpic.cn/cover-url";
+    const codeHtml = replaceCoverImageUrlInHtml(html, url, coverCdnUrl, [{ url }]);
+    expect(collectImageUrlsFromHtml(codeHtml)).toEqual([url]);
+    expect(replaceCoverImageUrlInHtml(html, url, coverCdnUrl, [])).toContain(coverCdnUrl);
   });
 
   it("忽略无 src 的 img 占位", () => {

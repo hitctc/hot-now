@@ -28,6 +28,24 @@ describe("公众号图片上传格式", () => {
     expect(metadata.format).toBe("jpeg");
   });
 
+  it("代码图片作为封面时保留无损 PNG，不先转为 JPEG", async () => {
+    const png = await sharp({
+      create: { width: 750, height: 300, channels: 3, background: "#f8f5ff" },
+    }).png().toBuffer();
+    const prepared = await prepareWechatImage(png, "code-cover", "cover", true);
+    expect(prepared.contentType).toBe("image/png");
+    expect(prepared.filename).toBe("code-cover.png");
+    expect(prepared.buffer.equals(png)).toBe(true);
+
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ media_id: "code-cover-media" })));
+    vi.stubGlobal("fetch", fetchMock);
+    await uploadPermanentImage("token", prepared);
+    const media = (fetchMock.mock.calls[0]?.[1]?.body as FormData).get("media") as File;
+    expect(media.name).toBe("code-cover.png");
+    expect(media.type).toBe("image/png");
+    expect(Buffer.from(await media.arrayBuffer()).equals(png)).toBe(true);
+  });
+
   it("把 WebP 正文图片转换成 PNG，避免把不支持的格式发给微信", async () => {
     const prepared = await prepareWechatImage(await createWebpFixture(), "image_0", "content");
     const metadata = await sharp(prepared.buffer).metadata();

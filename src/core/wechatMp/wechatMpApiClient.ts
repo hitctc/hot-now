@@ -25,15 +25,21 @@ export type WechatImageUpload = {
 
 /**
  * 把本地图片整理成微信草稿接口接受的格式，并让文件名、MIME 和真实字节保持一致。
- * 封面固定输出 JPEG；正文保留 JPEG/PNG，其余格式（包括 WebP）转成 PNG。
+ * kind 决定封面或正文格式；preserveCodeCardPng 仅为代码封面保留不超过 2 MB 的原始 PNG。
+ * 返回可上传的字节、文件名和 MIME；不上传文件，其他封面转 JPEG，正文保留 JPEG/PNG。
  */
 export async function prepareWechatImage(
   imageBuffer: Buffer,
   filenameBase: string,
   kind: "cover" | "content",
+  preserveCodeCardPng = false,
 ): Promise<WechatImageUpload> {
   const metadata = await sharp(imageBuffer).metadata();
 
+  // 永久素材历史限制为 2 MB；超出时仍走原封面 JPEG 路径，避免影响非代码图片。
+  if (kind === "cover" && preserveCodeCardPng && metadata.format === "png" && imageBuffer.length <= 2 * 1024 * 1024) {
+    return { buffer: imageBuffer, filename: `${filenameBase}.png`, contentType: "image/png" };
+  }
   if (kind === "cover") {
     return {
       buffer: await sharp(imageBuffer).rotate().jpeg({ quality: 90 }).toBuffer(),

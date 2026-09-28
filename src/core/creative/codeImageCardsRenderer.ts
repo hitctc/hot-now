@@ -138,7 +138,7 @@ function buildSvg(input: CodeImageCardRenderInput, width: number, height: number
   <style>
     text { font-family: "Noto Sans SC", "PingFang SC", sans-serif; fill: #1a1525; }
     .title { font-weight: 700; letter-spacing: -0.4px; }
-    .thesis { font-weight: 500; fill: #51445f; }
+    .thesis { font-weight: 600; fill: #352842; }
     .keyword { font-weight: 500; fill: #5b3c86; }
     .logo { font-size: 18px; font-weight: 500; letter-spacing: 0.4px; }
   </style>

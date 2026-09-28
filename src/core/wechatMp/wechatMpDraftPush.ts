@@ -73,6 +73,17 @@ function replaceImageUrls(html: string, originalUrls: string[], cdnUrls: string[
   return result;
 }
 
+/** 根据封面 URL 和代码图片清单返回正文 HTML；代码封面不复用永久素材 URL，以便单独上传原 PNG。 */
+export function replaceCoverImageUrlInHtml(
+  html: string,
+  coverUrl: string,
+  cdnUrl: string,
+  codeImageCards: readonly { url: string | null }[],
+): string {
+  return codeImageCards.some((card) => card.url === coverUrl)
+    ? html : replaceImageUrls(html, [coverUrl], [cdnUrl]);
+}
+
 // 获取推送记录
 export function getArticlePushLog(db: SqliteDatabase, articleId: number) {
   return db.prepare(`
@@ -95,7 +106,7 @@ export function getArticlePushCount(db: SqliteDatabase, articleId: number): numb
   return row?.count ?? 0;
 }
 
-/** 推送文章到微信公众号草稿箱 */
+/** 根据文章 ID 和微信主题推送草稿；上传图片、写入推送日志并更新文章状态，返回推送结果。 */
 export async function pushArticleToWechatDraft(params: PushParams): Promise<DraftPushResult> {
   const { db, articleId, themeId, masterKey, onProgress } = params;
 
@@ -184,11 +195,12 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
     const coverUrl = article.coverImage.length > 0 ? article.coverImage[selectedCoverIdx >= 0 ? selectedCoverIdx : 0] : null;
     if (coverUrl) {
       const coverBuffer = await downloadImage(coverUrl);
-      const coverImage = await prepareWechatImage(coverBuffer, "cover", "cover");
+      const isCodeImageCover = article.codeImageCards.some((card) => card.url === coverUrl);
+      const coverImage = await prepareWechatImage(coverBuffer, "cover", "cover", isCodeImageCover);
       const coverResult = await uploadPermanentImage(token, coverImage, account.id);
       thumbMediaId = coverResult.mediaId;
       if (coverResult.url) {
-        html = replaceImageUrls(html, [coverUrl], [coverResult.url]);
+        html = replaceCoverImageUrlInHtml(html, coverUrl, coverResult.url, article.codeImageCards);
       }
     }
     stopHeartbeat();

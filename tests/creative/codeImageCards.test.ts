@@ -24,7 +24,7 @@ afterEach(async () => {
 describe("短内容代码制图", () => {
   it("方图使用加大的标题和标签字号，其他比例字号保持不变", () => {
     expect(getCodeImageCardTypography("2.5:1")).toMatchObject({ titleSize: 42, thesisSize: 31, keywordSize: 22 });
-    expect(getCodeImageCardTypography("1:1")).toMatchObject({ titleSize: 120, keywordSize: 72 });
+    expect(getCodeImageCardTypography("1:1")).toMatchObject({ titleSize: 120, keywordSize: 62 });
     expect(getCodeImageCardTypography("3:4")).toMatchObject({ titleSize: 60, thesisSize: 44, keywordSize: 36 });
   });
 
@@ -86,6 +86,29 @@ describe("短内容代码制图", () => {
 
     expect(tagTopRows[0]).toBeGreaterThanOrEqual(0);
     expect(tagTopRows[1]).toBe(tagTopRows[0]);
+  });
+
+  it("三个四字标签换行后给右下角标识留出空隙", async () => {
+    const buffer = await renderCodeImageCard({
+      variant: "1:1",
+      title: "手机弹窗广告频繁出现，开屏广告暂退后该怎么治",
+      thesis: "方图不显示导语。",
+      keywords: ["手机广告", "弹窗治理", "App规范"],
+    });
+    const { data, info } = await sharp(buffer).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    // Logo 位于 y=659 起；第二行标签必须在 y=650 前结束，不靠遮盖 Logo 解决。
+    let secondRowPixels = 0;
+    let overlapPixels = 0;
+    for (let y = 560 * 2; y < 659 * 2; y += 1) {
+      for (let x = 58 * 2; x < 560 * 2; x += 1) {
+        const offset = (y * info.width + x) * info.channels;
+        const isTag = data[offset] === 0xea && data[offset + 1] === 0xdf && data[offset + 2] === 0xfc;
+        if (isTag && y < 650 * 2) secondRowPixels += 1;
+        if (isTag && y >= 650 * 2) overlapPixels += 1;
+      }
+    }
+    expect(secondRowPixels).toBeGreaterThan(0);
+    expect(overlapPixels).toBe(0);
   });
 
   it("方图大标签放不下一行时会换行显示", async () => {
@@ -261,7 +284,7 @@ describe("短内容代码制图", () => {
     const legacySquare = {
       ...squareBeforeRefresh,
       sourceFingerprint: createHash("sha256")
-        .update(`${wideBeforeSquareRefresh.sourceFingerprint}:square-title-tags-v1`).digest("hex"),
+        .update(`${wideBeforeSquareRefresh.sourceFingerprint}:square-title-tags-v2`).digest("hex"),
     };
     expect(editCreativeFinishedArticle(handle.db, article.id, {
       codeImageCards: saved.codeImageCards.map((card) => card.variant === "1:1" ? legacySquare : card),

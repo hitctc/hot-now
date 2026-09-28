@@ -45,7 +45,7 @@ type VariantLayout = {
 /** 三种比例的基础排版参数：外边距、字号、行数上限和纵向锚点。 */
 const VARIANT_LAYOUT: Record<CodeImageCardVariant, VariantLayout> = {
   "2.5:1": { margin: 42, titleSize: 42, titleMinSize: 30, titleMaxLines: 2, thesisSize: 31, thesisMinSize: 24, thesisMaxLines: 2, keywordSize: 22, titleY: 34, thesisBaseY: 132, keywordBaseY: 228 },
-  "1:1": { margin: 58, titleSize: 120, titleMinSize: 60, titleMaxLines: 4, thesisSize: 38, thesisMinSize: 26, thesisMaxLines: 4, keywordSize: 72, titleY: 70, thesisBaseY: 205, keywordBaseY: 462 },
+  "1:1": { margin: 58, titleSize: 120, titleMinSize: 60, titleMaxLines: 4, thesisSize: 38, thesisMinSize: 26, thesisMaxLines: 4, keywordSize: 62, titleY: 70, thesisBaseY: 205, keywordBaseY: 462 },
   "3:4": { margin: 64, titleSize: 60, titleMinSize: 42, titleMaxLines: 4, thesisSize: 44, thesisMinSize: 32, thesisMaxLines: 5, keywordSize: 36, titleY: 82, thesisBaseY: 330, keywordBaseY: 735 },
 };
 

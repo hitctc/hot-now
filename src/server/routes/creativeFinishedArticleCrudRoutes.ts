@@ -45,11 +45,27 @@ export function registerCreativeFinishedArticleCrudRoutes(context: CreativeFinis
       return reply.code(404).send({ ok: false, reason: "source-item-not-found" });
     }
 
+    // Hermes 同时携带数据库素材 ID，防止 external ID 解析结果与队列任务素材错位。
+    const expectedSourceItemId = body?.sourceItemId;
+    if (expectedSourceItemId !== undefined && expectedSourceItemId !== sourceItem.id) {
+      return reply.code(409).send({
+        ok: false,
+        reason: "source-item-identity-conflict",
+        expectedSourceItemId,
+        resolvedSourceItemId: sourceItem.id,
+      });
+    }
+
     const existing = findCreativeFinishedArticleBySourceItemId(db, sourceItem.id);
     const allowDuplicate = body?.allowDuplicate === true;
     if (existing && !allowDuplicate) {
       // Hermes 在“平台已创建、任务检查点尚未落盘”的重启窗口需要既有编号续跑图片。
-      return reply.code(409).send({ ok: false, reason: "article-already-exists", articleId: existing.id });
+      return reply.code(409).send({
+        ok: false,
+        reason: "article-already-exists",
+        articleId: existing.id,
+        sourceItemId: sourceItem.id,
+      });
     }
 
     const article = insertCreativeFinishedArticle(db, {

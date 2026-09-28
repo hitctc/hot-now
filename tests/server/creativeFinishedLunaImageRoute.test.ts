@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   findCreativeFinishedArticleById,
+  findCreativeFinishedArticleBySourceItemId,
   insertCreativeFinishedArticle,
 } from "../../src/core/creative/creativeFinishedArticleRepository.js";
 import { insertCreativeSourceItem } from "../../src/core/creative/creativeSourceItemRepository.js";
@@ -213,6 +214,47 @@ describe("GPT Luna 独立生图路由", () => {
     await app.close();
   });
 
+  it("rejects a write when the explicit source item id conflicts with its external identity", async () => {
+    const handle = await createTestDatabase("hot-now-source-identity-conflict-");
+    handles.push(handle);
+    const sourceExternalId = `identity-${Date.now()}-${Math.random()}`;
+    const source = insertCreativeSourceItem(handle.db, {
+      externalId: sourceExternalId,
+      collectorAgent: "test",
+      title: "请求指定的素材",
+      url: "https://example.com/identity",
+    });
+    const other = insertCreativeSourceItem(handle.db, {
+      externalId: `${sourceExternalId}-other`,
+      collectorAgent: "test",
+      title: "不应关联的素材",
+      url: "https://example.com/other",
+    });
+    const app = createServer({ db: handle.db, creativeApiToken: "test-token" });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/creative/finished-articles",
+      headers: { "x-creative-token": "test-token" },
+      payload: {
+        sourceExternalId,
+        collectorAgent: "test",
+        sourceItemId: other.id,
+        contentMarkdown: "不应保存的正文",
+      },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({
+      ok: false,
+      reason: "source-item-identity-conflict",
+      expectedSourceItemId: other.id,
+      resolvedSourceItemId: source.id,
+    });
+    expect(findCreativeFinishedArticleBySourceItemId(handle.db, source.id)).toBeNull();
+    await app.close();
+  });
+
   it("returns the existing article id when an idempotent create conflicts", async () => {
     const handle = await createTestDatabase("hot-now-existing-article-id-");
     handles.push(handle);
@@ -237,7 +279,12 @@ describe("GPT Luna 独立生图路由", () => {
     });
 
     expect(response.statusCode).toBe(409);
-    expect(response.json()).toEqual({ ok: false, reason: "article-already-exists", articleId: existing.id });
+    expect(response.json()).toEqual({
+      ok: false,
+      reason: "article-already-exists",
+      articleId: existing.id,
+      sourceItemId: source.id,
+    });
     await app.close();
   });
 });

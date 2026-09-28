@@ -389,41 +389,38 @@ export function registerCreativeFinishedArticleGenerationRoutes(context: Creativ
     }
   });
 
-  // ─── regen-intro：重新生成导语 ───
+  // ─── regen-intro：入现有写作队列，HotNow 始终是导语唯一入库点 ───
   app.post("/api/creative/finished-articles/:id/regen-intro", async (request, reply) => {
     const session = options.readSession(request, reply);
     if (session === undefined) { return; }
     if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
 
     const id = parseInt((request.params as { id: string }).id, 10);
-    const article = findCreativeFinishedArticleById(db, id);
-    if (!article) { return reply.code(404).send({ ok: false, reason: "article-not-found" }); }
-
+    if (!findCreativeFinishedArticleById(db, id)) { return reply.code(404).send({ ok: false, reason: "article-not-found" }); }
     const hermesApiUrl = process.env.HERMES_API_BASE_URL;
     const hermesApiToken = process.env.HERMES_API_TOKEN;
     if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
 
     try {
-      // Hermes 生成最多等 120 秒；代理略长于上游，避免上游仍在生成时先报失败。
       const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/regen-intro`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
         body: JSON.stringify({ articleId: id }),
-        signal: AbortSignal.timeout(130_000),
+        signal: AbortSignal.timeout(15_000),
       });
-
       if (!res.ok) {
         const errorBody = await res.text().catch(() => "") || `Hermes HTTP ${res.status}`;
         return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: `Hermes HTTP ${res.status}`, hermesResponse: errorBody });
       }
-
-      const data = await res.json() as { success: boolean; intro?: string; prompt?: string; error?: string };
-      const intro = data.intro?.trim() ?? "";
-      if (!data.success || intro.length < 20) {
-        return reply.code(502).send({ ok: false, reason: data.error ?? "导语内容不足（少于20字）" });
+      const data = await res.json() as { success: boolean; intro?: string; taskId?: string; status?: string; prompt?: string; error?: string };
+      if (res.status === 202) {
+        if (!data.success || !data.taskId?.startsWith("intro-")) return reply.code(502).send({ ok: false, reason: "Hermes 未返回有效导语任务" });
+        return reply.code(202).send({ ok: true, taskId: data.taskId, status: data.status ?? "queued" });
       }
 
-      // 生成期间可能有自动保存；基于最新版本合并旧导语，避免用生成前的快照覆盖并发编辑。
+      // 部署期间兼容旧版 Hermes 的同步结果；切换完成后新任务均走队列回调。
+      const intro = data.intro?.trim() ?? "";
+      if (!data.success || intro.length < 20) return reply.code(502).send({ ok: false, reason: data.error ?? "导语内容不足（少于20字）" });
       const current = findCreativeFinishedArticleById(db, id);
       if (!current) return reply.code(404).send({ ok: false, reason: "article-not-found" });
       const updatedIntros = [intro, ...(current.intros ?? [])];
@@ -433,8 +430,51 @@ export function registerCreativeFinishedArticleGenerationRoutes(context: Creativ
       return reply.send({ ok: true, intros: updated?.intros ?? updatedIntros, updatedAt: saved.updatedAt, prompt: data.prompt });
     } catch (err) {
       const errMessage = (err as Error).message ?? String(err);
-      if (["AbortError", "TimeoutError"].includes((err as Error).name)) { return reply.code(504).send({ ok: false, reason: "导语生成超时（>130s），Hermes 未响应", detail: errMessage }); }
-      return reply.code(502).send({ ok: false, reason: `Hermes 调用失败`, detail: errMessage });
+      if (["AbortError", "TimeoutError"].includes((err as Error).name)) return reply.code(504).send({ ok: false, reason: "导语排队请求超时，Hermes 未确认受理", detail: errMessage });
+      return reply.code(502).send({ ok: false, reason: "Hermes 调用失败", detail: errMessage });
+    }
+  });
+
+  app.post("/actions/creative/finished-articles/:id/regen-intro/complete", async (request, reply) => {
+    if (!options.authorizeCreativeApiToken(request, reply)) return;
+    if (!db) return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    const id = parseInt((request.params as { id: string }).id, 10);
+    const intro = (request.body as { intro?: unknown } | undefined)?.intro;
+    if (typeof intro !== "string" || intro.trim().length < 20 || intro.length > 2000) return reply.code(400).send({ ok: false, reason: "invalid-intro" });
+    const current = findCreativeFinishedArticleById(db, id);
+    if (!current) return reply.code(404).send({ ok: false, reason: "article-not-found" });
+    // 网络重试或服务重启可能重复投递同一检查点；相同文本不再二次入库。
+    if ((current.intros ?? []).includes(intro.trim())) return reply.send({ ok: true, updatedAt: current.updatedAt });
+    const saved = editCreativeFinishedArticle(db, id, {
+      intros: [intro.trim(), ...(current.intros ?? [])], expectedUpdatedAt: current.updatedAt,
+    });
+    if (!saved.ok) return reply.code(409).send({ ok: false, reason: saved.reason ?? "导语保存失败" });
+    return reply.send({ ok: true, updatedAt: saved.updatedAt });
+  });
+
+  app.get("/api/creative/finished-articles/:id/regen-intro/status", async (request, reply) => {
+    const session = options.readSession(request, reply);
+    if (session === undefined) return;
+    if (!db) return reply.code(503).send({ ok: false, reason: "database-not-available" });
+    const id = parseInt((request.params as { id: string }).id, 10);
+    if (!findCreativeFinishedArticleById(db, id)) return reply.code(404).send({ ok: false, reason: "article-not-found" });
+    const taskId = (request.query as { taskId?: string }).taskId;
+    if (!taskId?.startsWith("intro-")) return reply.code(400).send({ ok: false, reason: "invalid-task-id" });
+    const hermesApiUrl = process.env.HERMES_API_BASE_URL;
+    const hermesApiToken = process.env.HERMES_API_TOKEN;
+    if (!hermesApiUrl || !hermesApiToken) return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" });
+    try {
+      const query = new URLSearchParams({ articleId: String(id), taskId });
+      const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/regen-intro/status?${query}`, {
+        headers: { "Authorization": `Bearer ${hermesApiToken}` }, signal: AbortSignal.timeout(10_000),
+      });
+      const data = await res.json() as { success?: boolean; status?: string; error?: string };
+      if (!res.ok || !data.success) return reply.code(res.status >= 500 ? 502 : res.status).send({ ok: false, reason: data.error ?? "导语任务状态不可用" });
+      if (data.status !== "done") return reply.send({ ok: data.status !== "failed" && data.status !== "stopped", status: data.status, reason: data.error });
+      const updated = findCreativeFinishedArticleById(db, id);
+      return reply.send({ ok: true, status: "done", intros: updated?.intros ?? [], updatedAt: updated?.updatedAt });
+    } catch (err) {
+      return reply.code(502).send({ ok: false, reason: "导语任务状态查询失败", detail: String(err) });
     }
   });
 

@@ -4,6 +4,7 @@ import { message } from "ant-design-vue";
 import { HttpError } from "../../../services/http.js";
 import {
   editFinishedArticle,
+  getRegenIntroStatus,
   regenCodeImageKeywords,
   regenIntro,
   regenTitle,
@@ -279,15 +280,26 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
 
   const displaySummaries = computed(() => getArticle()?.summary100 ?? []);
 
-  /** 先收口正文保存，再生成并同步导语；生成已入库后只把后续冲突提示为同步失败。 */
+  /** 先保存正文，再轮询 Hermes 队列终态；生成结果由 HotNow 回调入库后再同步正文。 */
   async function handleRegenIntro(): Promise<void> {
     const article = getArticle();
     if (!article || regenIntroLoading.value) return;
     regenIntroLoading.value = true;
     let generated = false;
+    let queued = false;
     try {
       await prepareExplicitContentSave();
-      const result = await regenIntro(article.id);
+      let result = await regenIntro(article.id);
+      if (result.taskId && result.ok) {
+        queued = true;
+        message.info("导语已加入写作队列，完成后会自动保存");
+        while (true) {
+          await new Promise<void>((resolve) => setTimeout(resolve, 3000));
+          if (getArticle()?.id !== article.id) return; // 文章切换后由服务端回调继续保存，不跨文章修改正文。
+          result = await getRegenIntroStatus(article.id, result.taskId!);
+          if (result.status === "done" || !result.ok) break;
+        }
+      }
       if (!result.ok || !result.intros?.[0]) {
         message.error(result.reason ?? "导语生成失败");
         return;
@@ -333,9 +345,9 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
       onSaved();
       message.success("新导语已生成");
     } catch {
-      message[generated ? "warning" : "error"](generated
+      message[generated || queued ? "warning" : "error"](generated
         ? "导语已生成，但正文同步失败，请刷新详情确认"
-        : "导语生成请求失败");
+        : queued ? "队列状态暂不可查，任务仍会继续；请稍后刷新详情确认" : "导语生成请求失败");
     } finally {
       regenIntroLoading.value = false;
     }

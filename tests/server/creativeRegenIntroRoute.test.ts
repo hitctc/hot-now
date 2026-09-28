@@ -12,6 +12,48 @@ afterEach(() => {
 });
 
 describe("生成新导语代理", () => {
+  it("Hermes 排队后立即返回任务 ID，不等待模型生成", async () => {
+    const handle = await createTestDatabase("hot-now-regen-intro-queued-");
+    handles.push(handle);
+    const app = createServer({ db: handle.db });
+    const created = await app.inject({ method: "POST", url: "/actions/creative/finished-articles/manual", payload: { title: "排队文章", direction: "article" } });
+    const id = created.json().id as number;
+    process.env.HERMES_API_BASE_URL = "http://hermes.test";
+    process.env.HERMES_API_TOKEN = "test-token";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ success: true, taskId: "intro-42", status: "queued" }), { status: 202 }));
+
+    const response = await app.inject({ method: "POST", url: `/api/creative/finished-articles/${id}/regen-intro` });
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toMatchObject({ ok: true, taskId: "intro-42", status: "queued" });
+    expect(findCreativeFinishedArticleById(handle.db, id)?.intros ?? []).toHaveLength(0);
+    await app.close();
+  });
+
+  it("带鉴权的任务回调只保存一次导语，状态查询返回已保存的结果", async () => {
+    const handle = await createTestDatabase("hot-now-regen-intro-complete-");
+    handles.push(handle);
+    const app = createServer({ db: handle.db, creativeApiToken: "test-token" });
+    const created = await app.inject({ method: "POST", url: "/actions/creative/finished-articles/manual", payload: { title: "异步导语", direction: "article" } });
+    const id = created.json().id as number;
+    const path = `/actions/creative/finished-articles/${id}/regen-intro/complete`;
+    const payload = { taskId: "intro-42", intro: "一项新服务已开始改变用户的选择，本文核对它的实际影响与使用边界。" };
+    const rejected = await app.inject({ method: "POST", url: path, payload });
+    expect(rejected.statusCode).toBe(401);
+    const invalid = await app.inject({ method: "POST", url: path, headers: { "x-creative-token": "test-token" }, payload: { intro: "新" } });
+    expect(invalid.statusCode).toBe(400);
+    handle.db.prepare("UPDATE creative_finished_articles SET intros = ? WHERE id = ?").run(JSON.stringify(["并发保存的导语"]), id);
+    for (let i = 0; i < 2; i++) {
+      const response = await app.inject({ method: "POST", url: path, headers: { "x-creative-token": "test-token" }, payload });
+      expect(response.statusCode).toBe(200);
+    }
+    expect(findCreativeFinishedArticleById(handle.db, id)?.intros).toEqual([payload.intro, "并发保存的导语"]);
+    process.env.HERMES_API_BASE_URL = "http://hermes.test";
+    process.env.HERMES_API_TOKEN = "test-token";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ success: true, taskId: "intro-42", status: "done" }), { status: 200 }));
+    const status = await app.inject({ method: "GET", url: `/api/creative/finished-articles/${id}/regen-intro/status?taskId=intro-42` });
+    expect(status.json()).toMatchObject({ ok: true, status: "done", intros: [payload.intro, "并发保存的导语"] });
+    await app.close();
+  });
   it("仅在 HotNow 保存一次，并返回更新后的文章版本供详情继续同步正文", async () => {
     const handle = await createTestDatabase("hot-now-regen-intro-");
     handles.push(handle);

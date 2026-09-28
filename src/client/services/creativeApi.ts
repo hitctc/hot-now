@@ -435,16 +435,24 @@ export function regenTitle(id: number): Promise<RegenTitleResult> {
 
 export type RegenIntroResult = {
   ok: boolean;
+  taskId?: string;
+  status?: "queued" | "writing" | "done" | "failed" | "stopped";
   intros?: string[];
   updatedAt?: string;
   prompt?: string;
   reason?: string;
 };
 
+/** 提交导语任务；排队时立即返回 taskId，旧版同步接口仍可返回 intros。 */
 export function regenIntro(id: number): Promise<RegenIntroResult> {
   return requestJson<RegenIntroResult>(`/api/creative/finished-articles/${id}/regen-intro`, {
     method: "POST",
   });
+}
+
+/** 查询指定文章的导语任务；完成后由 HotNow 返回已保存的导语及最新版本。 */
+export function getRegenIntroStatus(id: number, taskId: string): Promise<RegenIntroResult> {
+  return requestJson<RegenIntroResult>(`/api/creative/finished-articles/${id}/regen-intro/status?taskId=${encodeURIComponent(taskId)}`);
 }
 
 export type RegenSummaryResult = {

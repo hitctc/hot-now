@@ -93,7 +93,7 @@ export function buildCodeImageSourceFingerprint(
 /** 各比例只因自己的版式变化而过期，已有竖图继续复用原指纹。 */
 function getVariantFingerprint(baseFingerprint: string, variant: CodeImageCardVariant): string {
   if (variant === "3:4") return baseFingerprint;
-  const version = variant === "1:1" ? "square-title-tags-v3" : "wide-intro-v1";
+  const version = variant === "1:1" ? "square-title-tags-v3" : "wide-intro-v2";
   return createHash("sha256").update(`${baseFingerprint}:${version}`).digest("hex");
 }
 

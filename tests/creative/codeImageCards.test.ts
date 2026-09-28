@@ -28,6 +28,28 @@ describe("短内容代码制图", () => {
     expect(getCodeImageCardTypography("3:4")).toMatchObject({ titleSize: 60, thesisSize: 44, keywordSize: 36 });
   });
 
+  it("横图长标题不遮挡右上角装饰线", async () => {
+    for (const title of ["手机弹窗广告", "手机弹窗广告频繁出现后该怎么治理"]) {
+      const image = await renderCodeImageCard({
+        variant: "2.5:1",
+        title,
+        thesis: "手机弹窗广告屡禁不止，开屏广告退场后还有哪些问题需要真正解决",
+        keywords: ["手机广告"],
+      });
+      const { data, info } = await sharp(image).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+      let linePixels = 0;
+      for (let y = 12; y < 36; y += 1) {
+        for (let x = 1020; x < 1416; x += 1) {
+          const index = (y * info.width + x) * info.channels;
+          if (data[index] > 220 && data[index] < 245
+            && data[index + 1] > 185 && data[index + 1] < 220
+            && data[index + 2] > 130 && data[index + 2] < 180) linePixels += 1;
+        }
+      }
+      expect(linePixels).toBeGreaterThan(100);
+    }
+  });
+
   it("横图导语靠近标题，双行时仍与底部标签留有间距", async () => {
     for (const [title, thesis, maxFirstRow] of [
       ["短标题", "导语内容简短清晰", 260],
@@ -309,7 +331,10 @@ describe("短内容代码制图", () => {
     const baseFingerprint = buildCodeImageSourceFingerprint(
       "AI 代理正在重写工作流", "真正的变化来自工作流程，而不是单个工具。", ["文章标签", "工作流"],
     );
-    const legacyWide = { ...saved.codeImageCards.find((card) => card.variant === "2.5:1")!, sourceFingerprint: baseFingerprint };
+    const legacyWide = {
+      ...saved.codeImageCards.find((card) => card.variant === "2.5:1")!,
+      sourceFingerprint: createHash("sha256").update(`${baseFingerprint}:wide-intro-v1`).digest("hex"),
+    };
     const squareBeforeWideRefresh = saved.codeImageCards.find((card) => card.variant === "1:1")!;
     const portraitBeforeWideRefresh = saved.codeImageCards.find((card) => card.variant === "3:4")!;
     expect(editCreativeFinishedArticle(handle.db, article.id, {

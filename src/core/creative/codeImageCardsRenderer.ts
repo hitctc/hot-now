@@ -119,7 +119,7 @@ function buildSvg(input: CodeImageCardRenderInput, width: number, height: number
   <rect width="${width}" height="${height}" fill="#f8f5ff"/>
   <circle cx="${width - margin * 0.7}" cy="${margin * 0.8}" r="${Math.max(34, Math.round(width * 0.08))}" fill="#caa9fa" opacity="0.28"/>
   <path d="M${margin} ${input.variant === "2.5:1" ? height - 14 : height - margin * 0.8} H${Math.round(width * 0.38)}" stroke="#d8c0fc" stroke-width="3" stroke-linecap="round"/>
-  <path d="M${Math.round(width * 0.68)} ${margin * 0.7} H${width - margin}" stroke="#e7c79a" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
+  <path d="M${Math.round(width * 0.68)} ${input.variant === "2.5:1" ? 12 : margin * 0.7} H${width - margin}" stroke="#e7c79a" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
   <style>
     text { font-family: "Noto Sans SC", "PingFang SC", sans-serif; fill: #1a1525; }
     .title { font-weight: 700; letter-spacing: -0.4px; }

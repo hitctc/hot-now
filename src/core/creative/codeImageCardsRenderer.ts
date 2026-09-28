@@ -45,7 +45,7 @@ type VariantLayout = {
 /** 三种比例的基础排版参数：外边距、字号、行数上限和纵向锚点。 */
 const VARIANT_LAYOUT: Record<CodeImageCardVariant, VariantLayout> = {
   "2.5:1": { margin: 42, titleSize: 42, titleMinSize: 30, titleMaxLines: 2, thesisSize: 31, thesisMinSize: 24, thesisMaxLines: 2, keywordSize: 22, titleY: 34, thesisBaseY: 132, keywordBaseY: 228 },
-  "1:1": { margin: 58, titleSize: 108, titleMinSize: 60, titleMaxLines: 3, thesisSize: 38, thesisMinSize: 26, thesisMaxLines: 4, keywordSize: 72, titleY: 70, thesisBaseY: 205, keywordBaseY: 462 },
+  "1:1": { margin: 58, titleSize: 120, titleMinSize: 60, titleMaxLines: 4, thesisSize: 38, thesisMinSize: 26, thesisMaxLines: 4, keywordSize: 72, titleY: 70, thesisBaseY: 205, keywordBaseY: 462 },
   "3:4": { margin: 64, titleSize: 60, titleMinSize: 42, titleMaxLines: 4, thesisSize: 44, thesisMinSize: 32, thesisMaxLines: 5, keywordSize: 36, titleY: 82, thesisBaseY: 330, keywordBaseY: 735 },
 };
 
@@ -84,7 +84,9 @@ function buildSvg(input: CodeImageCardRenderInput, width: number, height: number
   const availableWidth = width - margin * 2;
   const isSquare = input.variant === "1:1";
   // 标题用实际换行时选中的字号绘制，避免字号不一致造成文字越界。
-  const title = fitText(input.title, availableWidth, layout.titleSize, layout.titleMaxLines, layout.titleMinSize);
+  // 方图增至四行时同时限制标题高度，留出与固定标签行的间距。
+  const title = fitText(input.title, availableWidth, layout.titleSize, layout.titleMaxLines, layout.titleMinSize,
+    isSquare ? layout.keywordBaseY - layout.titleY - 20 : undefined);
   const thesis = isSquare
     ? { lines: [], fontSize: layout.thesisSize }
     : fitText(input.thesis, availableWidth, layout.thesisSize, layout.thesisMaxLines, layout.thesisMinSize);
@@ -175,12 +177,13 @@ function renderKeywordTags(
 /**
  * 将文案压缩到指定宽度和行数，并返回换行时实际选中的字号。
  * 调用方必须用返回的 `fontSize` 绘制，否则会按初始字号渲染出比换行宽度更宽的文字。
- * 行数仍超限时只截断末行并补省略号，保证每一行都不越过 `maxWidth`。
+ * maxHeight 限制多行标题的纵向占用；仍超限时只截断末行并补省略号。
  */
-function fitText(text: string, maxWidth: number, initialSize: number, maxLines: number, minSize: number): FittedText {
+function fitText(text: string, maxWidth: number, initialSize: number, maxLines: number, minSize: number, maxHeight?: number): FittedText {
   for (let size = initialSize; size >= minSize; size -= 2) {
     const lines = wrapText(text, maxWidth, size);
-    if (lines.length <= maxLines) return { lines, fontSize: size };
+    const lineBlockHeight = size * (1 + Math.max(0, lines.length - 1) * 1.16);
+    if (lines.length <= maxLines && (maxHeight === undefined || lineBlockHeight <= maxHeight)) return { lines, fontSize: size };
   }
   const lines = wrapText(text, maxWidth, minSize).slice(0, maxLines);
   if (lines.length === 0) return { lines, fontSize: minSize };

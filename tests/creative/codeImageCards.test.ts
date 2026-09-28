@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -23,8 +24,30 @@ afterEach(async () => {
 describe("短内容代码制图", () => {
   it("方图使用加大的标题和标签字号，其他比例字号保持不变", () => {
     expect(getCodeImageCardTypography("2.5:1")).toMatchObject({ titleSize: 42, thesisSize: 31, keywordSize: 22 });
-    expect(getCodeImageCardTypography("1:1")).toMatchObject({ titleSize: 108, keywordSize: 72 });
+    expect(getCodeImageCardTypography("1:1")).toMatchObject({ titleSize: 120, keywordSize: 72 });
     expect(getCodeImageCardTypography("3:4")).toMatchObject({ titleSize: 60, thesisSize: 44, keywordSize: 36 });
+  });
+
+  it("方图长标题最多四行且不侵入标签区域", async () => {
+    const image = await renderCodeImageCard({
+      variant: "1:1",
+      title: "这是一条测试方图标题可以使用四行排版并保持标题和标签之间距离的较长中文标题",
+      thesis: "这段文字不出现在方图中。",
+      keywords: ["分享图片"],
+    });
+    const { data, info } = await sharp(image).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const darkRows: number[] = [];
+    for (let y = 100; y < 920; y += 1) {
+      let dark = 0;
+      for (let x = 116; x < 1300; x += 1) {
+        const offset = (y * info.width + x) * info.channels;
+        if (data[offset] < 80 && data[offset + 1] < 80 && data[offset + 2] < 80) dark += 1;
+      }
+      if (dark > 10) darkRows.push(y);
+    }
+    const lineStarts = darkRows.filter((row, index) => index === 0 || row > darkRows[index - 1] + 1);
+    expect(lineStarts).toHaveLength(4);
+    expect(darkRows.at(-1)).toBeLessThan(870);
   });
 
   it("方图不渲染导语文案", async () => {
@@ -235,7 +258,11 @@ describe("短内容代码制图", () => {
     const wideBeforeSquareRefresh = saved.codeImageCards.find((card) => card.variant === "2.5:1")!;
     const portraitBeforeSquareRefresh = saved.codeImageCards.find((card) => card.variant === "3:4")!;
     const squareBeforeRefresh = saved.codeImageCards.find((card) => card.variant === "1:1")!;
-    const legacySquare = { ...squareBeforeRefresh, sourceFingerprint: wideBeforeSquareRefresh.sourceFingerprint };
+    const legacySquare = {
+      ...squareBeforeRefresh,
+      sourceFingerprint: createHash("sha256")
+        .update(`${wideBeforeSquareRefresh.sourceFingerprint}:square-title-tags-v1`).digest("hex"),
+    };
     expect(editCreativeFinishedArticle(handle.db, article.id, {
       codeImageCards: saved.codeImageCards.map((card) => card.variant === "1:1" ? legacySquare : card),
     }).ok).toBe(true);

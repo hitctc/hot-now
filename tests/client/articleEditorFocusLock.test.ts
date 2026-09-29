@@ -15,6 +15,7 @@ class ResizeObserverStub {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  localStorage.removeItem("md-editor-auto-focus-mode");
   vi.stubGlobal("ResizeObserver", ResizeObserverStub);
 });
 
@@ -22,6 +23,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   document.body.innerHTML = "";
+  localStorage.removeItem("md-editor-auto-focus-mode");
 });
 
 describe("article editor focus lock", () => {
@@ -61,6 +63,45 @@ describe("article editor focus lock", () => {
     expect(viewport.focusMode.value).toBe(false);
   });
 
+  it("关闭自动专注后取消待触发计时，重新打开和重建时保留偏好", async () => {
+    const body = document.createElement("div");
+    body.className = "ant-modal-body";
+    const section = document.createElement("section");
+    const textarea = document.createElement("textarea");
+    textarea.className = "md-editor__textarea";
+    section.append(textarea);
+    body.append(section);
+    document.body.append(body);
+
+    const viewport = useArticleEditorViewport();
+    viewport.editorSectionRef.value = section;
+    viewport.setupEditorResize();
+    expect(viewport.autoFocusModeEnabled.value).toBe(true);
+    textarea.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+    viewport.toggleAutoFocusMode();
+    await vi.advanceTimersByTimeAsync(1200);
+    expect(viewport.focusMode.value).toBe(false);
+    expect(localStorage.getItem("md-editor-auto-focus-mode")).toBe("0");
+    viewport.teardownEditorResize();
+
+    const reopened = useArticleEditorViewport();
+    reopened.editorSectionRef.value = section;
+    reopened.setupEditorResize();
+    expect(reopened.autoFocusModeEnabled.value).toBe(false);
+    textarea.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(1200);
+    expect(reopened.focusMode.value).toBe(false);
+    reopened.toggleAutoFocusMode();
+    textarea.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(1200);
+    expect(reopened.focusMode.value).toBe(true);
+    expect(useArticleEditorViewport().autoFocusModeEnabled.value).toBe(true);
+    reopened.toggleAutoFocusMode();
+    expect(reopened.focusMode.value).toBe(false);
+    reopened.teardownEditorResize();
+    expect(useArticleEditorViewport().autoFocusModeEnabled.value).toBe(false);
+  });
+
   it("专注态右上角显示锁定提示并发出解锁事件", async () => {
     const wrapper = shallowMount(ArticleEditorPanel, {
       props: {
@@ -74,6 +115,7 @@ describe("article editor focus lock", () => {
         previewThemeOptions: [],
         activePreviewTheme: "classic",
         syncScrollEnabled: true,
+        autoFocusModeEnabled: true,
         savedAtLabel: "",
         focusMode: true,
         saving: false,
@@ -87,6 +129,10 @@ describe("article editor focus lock", () => {
         stubs: { AButton: true, Teleport: true },
       },
     });
+
+    const autoFocusSwitch = wrapper.get("[data-auto-focus-mode]");
+    await autoFocusSwitch.trigger("click");
+    expect(wrapper.emitted("toggle-auto-focus-mode")).toHaveLength(1);
 
     const lock = wrapper.get("[data-focus-mode-lock]");
     expect(lock.text()).toContain("解锁");

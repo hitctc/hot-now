@@ -34,6 +34,7 @@ function mountPanel() {
       ],
       activePreviewTheme: "sunsetFilm",
       syncScrollEnabled: true,
+      autoFocusModeEnabled: true,
       savedAtLabel: "保存成功",
       focusMode: true,
       saving: false,
@@ -74,6 +75,10 @@ describe("article editor focus tools", () => {
     expect(panel.text()).toContain("实时预览");
     expect(panel.text()).toContain("复制原文");
     expect(panel.text()).toContain("同步滚动：开");
+    expect(panel.text()).toContain("专注编辑：开");
+    const autoFocusButton = panel.findAll("button").find((button) => button.text() === "专注编辑：开");
+    await autoFocusButton!.trigger("click");
+    expect(panelComponent.emitted("toggle-auto-focus-mode")).toHaveLength(1);
     expect(panel.text()).toContain("复制格式");
     expect(panel.text()).toContain("取消推送");
     expect(panel.text()).toMatch(/废\s*弃/);

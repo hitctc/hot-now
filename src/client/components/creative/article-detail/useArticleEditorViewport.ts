@@ -1,12 +1,22 @@
 import { computed, nextTick, ref, watch } from "vue";
 
 const SYNC_SCROLL_KEY = "md-editor-sync-scroll";
+const AUTO_FOCUS_MODE_KEY = "md-editor-auto-focus-mode";
 
 /** 读取用户的滚动同步偏好；存储不可用时保持默认开启。 */
 function loadSyncScroll(): boolean {
   try {
     const saved = localStorage.getItem(SYNC_SCROLL_KEY);
     return saved === null ? true : saved === "1";
+  } catch {
+    return true;
+  }
+}
+
+/** 读取自动进入专注编辑的偏好；未设置或存储不可用时保持原有的默认开启行为。 */
+function loadAutoFocusMode(): boolean {
+  try {
+    return localStorage.getItem(AUTO_FOCUS_MODE_KEY) !== "0";
   } catch {
     return true;
   }
@@ -20,6 +30,7 @@ export function useArticleEditorViewport() {
   const editorFullscreen = ref(false);
   const focusMode = ref(false);
   const syncScrollEnabled = ref(loadSyncScroll());
+  const autoFocusModeEnabled = ref(loadAutoFocusMode());
   const editorSectionRef = ref<HTMLElement | null>(null);
   const dynamicEditorHeight = ref(400);
   let focusModeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -38,6 +49,18 @@ export function useArticleEditorViewport() {
     try {
       localStorage.setItem(SYNC_SCROLL_KEY, syncScrollEnabled.value ? "1" : "0");
     } catch { /* quota 忽略 */ }
+  }
+
+  /** 切换并保存自动专注偏好；关闭时同时取消待进入的计时及当前专注态。 */
+  function toggleAutoFocusMode(): void {
+    autoFocusModeEnabled.value = !autoFocusModeEnabled.value;
+    if (!autoFocusModeEnabled.value) {
+      if (focusModeTimer) { clearTimeout(focusModeTimer); focusModeTimer = null; }
+      focusMode.value = false;
+    }
+    try {
+      localStorage.setItem(AUTO_FOCUS_MODE_KEY, autoFocusModeEnabled.value ? "1" : "0");
+    } catch { /* 存储不可用时仍保留当前页面选择 */ }
   }
 
   /** 根据弹窗 body 的实时空间测量编辑器高度，专注态不再预留正文标题区域。 */
@@ -90,7 +113,7 @@ export function useArticleEditorViewport() {
   /** 连续聚焦 1.2 秒后进入专注模式，避免鼠标短暂停留造成页面闪动。 */
   function onEditorFocusIn(event: FocusEvent): void {
     const target = event.target as HTMLElement;
-    if (!target.classList?.contains("md-editor__textarea")) return;
+    if (!target.classList?.contains("md-editor__textarea") || !autoFocusModeEnabled.value) return;
     if (focusModeTimer) clearTimeout(focusModeTimer);
     focusModeTimer = setTimeout(() => { focusModeTimer = null; focusMode.value = true; }, 1200);
   }
@@ -154,6 +177,7 @@ export function useArticleEditorViewport() {
   return {
     articleDetailMaskStyle,
     articleDetailWrapClass,
+    autoFocusModeEnabled,
     dynamicEditorHeight,
     editorFullscreen,
     editorSectionRef,
@@ -163,6 +187,7 @@ export function useArticleEditorViewport() {
     setupEditorResize,
     syncScrollEnabled,
     teardownEditorResize,
+    toggleAutoFocusMode,
     toggleEditorFullscreen,
     toggleSyncScroll,
     unlockFocusMode,

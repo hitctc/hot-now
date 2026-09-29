@@ -158,6 +158,7 @@
             :preview-theme-options="previewThemeOptions"
             :active-preview-theme="activePreviewTheme"
             :sync-scroll-enabled="syncScrollEnabled"
+            :auto-focus-mode-enabled="autoFocusModeEnabled"
             :saved-at-label="savedAtLabel"
             :focus-mode="focusMode"
             :saving="saving"
@@ -172,6 +173,7 @@
             @copy-ai="copyAiDraft"
             @copy-plain="copyAiDraftAsPlainText"
             @toggle-sync-scroll="toggleSyncScroll"
+            @toggle-auto-focus-mode="toggleAutoFocusMode"
             @toggle-fullscreen="toggleEditorFullscreen"
             @copy-format="copyAsWechatFormat"
             @review="reviewModalVisible = true"
@@ -299,6 +301,7 @@ function getImagePreviewThemeId(): WechatThemeId {
 const {
   articleDetailMaskStyle,
   articleDetailWrapClass,
+  autoFocusModeEnabled,
   dynamicEditorHeight,
   editorFullscreen,
   editorSectionRef,
@@ -308,6 +311,7 @@ const {
   setupEditorResize,
   syncScrollEnabled,
   teardownEditorResize,
+  toggleAutoFocusMode,
   toggleEditorFullscreen,
   toggleSyncScroll,
   unlockFocusMode,

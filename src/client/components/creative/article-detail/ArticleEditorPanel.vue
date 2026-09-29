@@ -18,6 +18,7 @@ const props = defineProps<{
   previewThemeOptions: PreviewThemeOption[];
   activePreviewTheme: string;
   syncScrollEnabled: boolean;
+  autoFocusModeEnabled: boolean;
   savedAtLabel: string;
   focusMode: boolean;
   saving: boolean;
@@ -35,6 +36,7 @@ const emit = defineEmits<{
   (event: "copy-ai"): void;
   (event: "copy-plain"): void;
   (event: "toggle-sync-scroll"): void;
+  (event: "toggle-auto-focus-mode"): void;
   (event: "toggle-fullscreen"): void;
   (event: "copy-format"): void;
   (event: "review"): void;
@@ -94,6 +96,7 @@ onBeforeUnmount(() => {
         <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('copy-ai')">复制原文</a-button>
         <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('copy-plain')">复制纯文本</a-button>
         <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('toggle-sync-scroll')">{{ syncScrollEnabled ? '同步滚动：开' : '同步滚动：关' }}</a-button>
+        <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" data-auto-focus-mode @click="emit('toggle-auto-focus-mode')">{{ autoFocusModeEnabled ? '专注编辑：开' : '专注编辑：关' }}</a-button>
         <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('toggle-fullscreen')">{{ editorFullscreen ? '退出全屏' : '全屏' }}</a-button>
       </div>
     </template>
@@ -177,6 +180,7 @@ onBeforeUnmount(() => {
             <a-button type="link" size="small" @click="emit('copy-ai')">复制原文</a-button>
             <a-button type="link" size="small" @click="emit('copy-plain')">复制纯文本</a-button>
             <a-button type="link" size="small" @click="emit('toggle-sync-scroll')">{{ syncScrollEnabled ? '同步滚动：开' : '同步滚动：关' }}</a-button>
+            <a-button type="link" size="small" @click="emit('toggle-auto-focus-mode')">{{ autoFocusModeEnabled ? '专注编辑：开' : '专注编辑：关' }}</a-button>
             <a-button type="link" size="small" @click="emit('toggle-fullscreen')">{{ editorFullscreen ? '退出全屏' : '全屏' }}</a-button>
           </div>
         </div>
@@ -245,6 +249,7 @@ onBeforeUnmount(() => {
           <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('copy-ai')">复制原文</a-button>
           <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('copy-plain')">复制纯文本</a-button>
           <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('toggle-sync-scroll')">{{ syncScrollEnabled ? '同步滚动：开' : '同步滚动：关' }}</a-button>
+          <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('toggle-auto-focus-mode')">{{ autoFocusModeEnabled ? '专注编辑：开' : '专注编辑：关' }}</a-button>
           <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" :loading="saving" @click="emit('save')">保存</a-button>
           <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('toggle-fullscreen')">退出全屏</a-button>
         </div>

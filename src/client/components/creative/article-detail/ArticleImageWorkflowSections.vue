@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import EditablePromptRow from "../EditablePromptRow.vue";
+import OperationCapabilityBadge from "../OperationCapabilityBadge.vue";
 import {
   extractImageUrl,
   type ArticleImageEntry,
@@ -102,6 +103,7 @@ function lunaJobStatusClass(job: LunaImageJob | undefined): string {
           :disabled="coverPromptGenerating"
           @click="emit('generate-cover-prompt')"
         >{{ coverPromptGenerating ? '生成中...' : '生成封面提示词' }}</a-button>
+        <OperationCapabilityBadge capability="model" />
         <label class="cursor-pointer text-[11px] text-editorial-link-active hover:underline">
           <span v-if="uploadingCover">上传中...</span>
           <span v-else>上传封面图</span>
@@ -121,6 +123,7 @@ function lunaJobStatusClass(job: LunaImageJob | undefined): string {
             data-testid="luna-cover-image-button"
             @click="emit('generate-luna-image', 'cover')"
           >{{ lunaJobLabel(lunaJobFor(lunaImageJobs, 'cover')) }}</a-button>
+          <OperationCapabilityBadge capability="model" />
           <span
             v-if="lunaJobFor(lunaImageJobs, 'cover')"
             :class="['text-[11px]', lunaJobStatusClass(lunaJobFor(lunaImageJobs, 'cover'))]"
@@ -183,6 +186,7 @@ function lunaJobStatusClass(job: LunaImageJob | undefined): string {
           :disabled="inlinePromptsGenerating"
           @click="emit('generate-inline-prompts')"
         >{{ inlinePromptsGenerating ? '生成中...' : '生成正文配图提示词' }}</a-button>
+        <OperationCapabilityBadge capability="model" />
         <template v-for="index in totalImageSlotCount" :key="index">
           <span class="inline-flex items-center gap-1.5">
             <label class="cursor-pointer text-[11px] text-editorial-link-active hover:underline">
@@ -200,6 +204,7 @@ function lunaJobStatusClass(job: LunaImageJob | undefined): string {
                 :data-testid="`luna-inline-image-button-${index}`"
                 @click="emit('generate-luna-image', 'inline', index)"
               >{{ lunaJobLabel(lunaJobFor(lunaImageJobs, 'inline', index)) }}</a-button>
+              <OperationCapabilityBadge capability="model" />
               <span
                 v-if="lunaJobFor(lunaImageJobs, 'inline', index)"
                 :class="['text-[11px]', lunaJobStatusClass(lunaJobFor(lunaImageJobs, 'inline', index))]"

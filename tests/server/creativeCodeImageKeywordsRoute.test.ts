@@ -96,8 +96,8 @@ describe("代码图片标签重新生成路由", () => {
       // Hermes 负责生成并回写；这里直接改库模拟其 PATCH 结果。
       const { editCreativeFinishedArticle: edit } = await import("../../src/core/creative/creativeFinishedArticleRepository.js");
       edit(handle.db, article.id, { codeImageKeywords: ["冒名通知", "民政部"] });
-      return new Response(JSON.stringify({ success: true, keywords: ["冒名通知", "民政部"] }), {
-        status: 200,
+      return new Response(JSON.stringify({ success: true, taskId: "keywords-task", status: "queued" }), {
+        status: 202,
         headers: { "Content-Type": "application/json" },
       });
     });
@@ -109,10 +109,10 @@ describe("代码图片标签重新生成路由", () => {
       url: `/api/creative/finished-articles/${article.id}/regen-code-image-keywords`,
     });
 
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({ ok: true, keywords: ["冒名通知", "民政部"] });
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toMatchObject({ ok: true, taskId: "keywords-task" });
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://hermes.test/api/regen-code-image-keywords",
+      "http://hermes.test/api/manual-text-tasks",
       expect.objectContaining({ method: "POST" }),
     );
     const saved = findCreativeFinishedArticleById(handle.db, article.id)!;
@@ -121,7 +121,7 @@ describe("代码图片标签重新生成路由", () => {
     await app.close();
   });
 
-  it("长文成品拒绝生成代码图片标签", async () => {
+  it("长文成品也使用异步队列显式生成代码图片标签", async () => {
     process.env.HERMES_API_BASE_URL = "http://hermes.test";
     process.env.HERMES_API_TOKEN = "test-token";
     const handle = await createTestDatabase("hot-now-keywords-longform-");
@@ -131,7 +131,7 @@ describe("代码图片标签重新生成路由", () => {
       titles: ["长文标题"],
       contentMarkdown: "长文正文",
     });
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true, taskId: "long-keywords", status: "queued" }), { status: 202 }));
     vi.stubGlobal("fetch", fetchMock);
 
     const app = createServer({ db: handle.db });
@@ -140,9 +140,10 @@ describe("代码图片标签重新生成路由", () => {
       url: `/api/creative/finished-articles/${article.id}/regen-code-image-keywords`,
     });
 
-    expect(response.statusCode).toBe(409);
-    expect(response.json()).toMatchObject({ ok: false, reason: "code-image-keywords-require-short-content" });
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toMatchObject({ ok: true, taskId: "long-keywords" });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).toMatchObject({ articleId: article.id, operation: "keywords" });
     await app.close();
   });
 });

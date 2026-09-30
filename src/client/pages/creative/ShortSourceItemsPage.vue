@@ -221,26 +221,19 @@ function cancelWriteMode(): void {
   writeModeThesis.value = "";
 }
 
-// 写作状态轮询：10 秒间隔，10 分钟超时
+// 写作任务只观察，不把排队时间算作模型超时。
 let writingPollTimer: ReturnType<typeof setInterval> | null = null;
-const writingTimers = new Map<number, number>(); // itemId -> startTime
+const writingTimers = new Set<number>();
 
+/** 观察原素材的写作终态；离开页面停止查询，重开由素材状态恢复，不重新提交。 */
 function startWritingPoll(item: CreativeSourceItem): void {
-  writingTimers.set(item.id, Date.now());
+  writingTimers.add(item.id);
   if (writingPollTimer) return; // 已有全局轮询在跑
-  const TIMEOUT_MS = 10 * 60 * 1000;
 
   writingPollTimer = setInterval(async () => {
     if (writingTimers.size === 0) { stopWritingPoll(); return; }
-    const now = Date.now();
-    const checkIds = [...writingTimers.entries()];
-    for (const [itemId, startTime] of checkIds) {
-      if (now - startTime > TIMEOUT_MS) {
-        writingTimers.delete(itemId);
-        removeWritingId(itemId);
-        message.info(`素材#${itemId} 写作超时（>10分钟），请稍后查看成品列表`);
-        continue;
-      }
+    const checkIds = [...writingTimers];
+    for (const itemId of checkIds) {
       try {
         const updated = await readCreativeSourceItem(itemId);
         if (updated.writingStatus === "done") {
@@ -252,6 +245,11 @@ function startWritingPoll(item: CreativeSourceItem): void {
           writingTimers.delete(itemId);
           removeWritingId(itemId);
           message.error(`素材#${itemId} 写作失败，请重试`);
+        } else if (updated.writingStatus === "ready" || updated.writingStatus === "skipped") {
+          // 取消会把素材恢复 ready；停止观察，不能无限显示写作中。
+          writingTimers.delete(itemId);
+          removeWritingId(itemId);
+          message.info(`素材#${itemId} 任务已停止，可在队列查看保留结果`);
         }
       } catch {
         // 单次轮询失败不中断

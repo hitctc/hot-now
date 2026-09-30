@@ -73,6 +73,7 @@
           @regenerate-intro="handleRegenIntro"
           @select-intro="selectIntro"
           @regenerate-code-image-keywords="handleRegenCodeImageKeywords"
+          @cancel-text-task="handleCancelTextTask"
         />
 
         <ArticleSimilaritySection
@@ -219,6 +220,7 @@ import CodeImageCardsSection from "./article-detail/CodeImageCardsSection.vue";
 import { useArticleEditorViewport } from "./article-detail/useArticleEditorViewport.js";
 import { useArticleAutosave } from "./article-detail/useArticleAutosave.js";
 import { useArticleImageWorkflow } from "./article-detail/useArticleImageWorkflow.js";
+import { readManualTextTask, runManualModelTask } from "./article-detail/manualTextTaskWait.js";
 import { useArticlePlanningActions, type PreviewThemeKey } from "./article-detail/useArticlePlanningActions.js";
 import { syncArticleEditorContent } from "./article-detail/articleDetailContentSync.js";
 import ArticleImageWorkflowSections from "./article-detail/ArticleImageWorkflowSections.vue";
@@ -488,8 +490,10 @@ const {
   selectIntro,
   regenCodeImageKeywordsLoading,
   handleRegenCodeImageKeywords,
+  handleCancelTextTask,
 } = useArticlePlanningActions({
-  getArticle: () => props.article,
+  // 关闭详情即停止文案查询，后台任务和浏览器任务编号继续保留。
+  getArticle: () => props.open ? props.article : null,
   isManualArticle,
   editContent,
   humanContent,
@@ -518,15 +522,17 @@ function handleImageActionDone(): void {
   emit("saved");
 }
 
-// 按需生成评论：调后端代理拉取 Hermes 结果并注入当前文章。
 const generatingComments = ref(false);
+/** 恢复或提交评论任务；离开文章后不写入另一篇详情。 */
 async function handleGenerateComments(): Promise<void> {
-  if (!props.article || generatingComments.value) return;
+  const article = props.article;
+  if (!article || generatingComments.value) return;
   generatingComments.value = true;
   try {
-    const result = await generateComments(props.article.id);
+    const result = await runManualModelTask(article.id, "comments", () => generateComments(article.id), () => props.open && props.article?.id === article.id);
+    if (!result || !props.open || props.article?.id !== article.id) return;
     if (result.ok && result.comments) {
-      props.article.comments = result.comments;
+      article.comments = result.comments;
       message.success(`已生成 ${result.comments.length} 对评论`);
       tickArticleChange();
     } else {
@@ -539,15 +545,17 @@ async function handleGenerateComments(): Promise<void> {
   }
 }
 
-// 按需补作者拓展：调后端代理拉取 5 条作者视角拓展并注入当前文章。
 const generatingAuthorExtensions = ref(false);
+/** 恢复或提交作者拓展任务；关闭详情只停止查询，不取消生成。 */
 async function handleGenerateAuthorExtensions(): Promise<void> {
-  if (!props.article || generatingAuthorExtensions.value) return;
+  const article = props.article;
+  if (!article || generatingAuthorExtensions.value) return;
   generatingAuthorExtensions.value = true;
   try {
-    const result = await generateAuthorExtensions(props.article.id);
+    const result = await runManualModelTask(article.id, "extensions", () => generateAuthorExtensions(article.id), () => props.open && props.article?.id === article.id);
+    if (!result || !props.open || props.article?.id !== article.id) return;
     if (result.ok && result.extensions) {
-      props.article.authorExtensions = result.extensions;
+      article.authorExtensions = result.extensions;
       message.success(`已生成 ${result.extensions.length} 条作者拓展`);
       tickArticleChange();
     } else {
@@ -559,6 +567,13 @@ async function handleGenerateAuthorExtensions(): Promise<void> {
     generatingAuthorExtensions.value = false;
   }
 }
+
+/** 重开详情只恢复已有的评论/拓展编号，不自动发起新模型调用。 */
+watch(() => [props.open, props.article?.id] as const, ([open, id]) => {
+  if (!open || !id) return;
+  if (readManualTextTask(id, "comments")) void handleGenerateComments();
+  if (readManualTextTask(id, "extensions")) void handleGenerateAuthorExtensions();
+}, { immediate: true });
 
 // ─── 素材原图：按 sourceItemId 取素材 cover 外链展示（不转存，no-referrer 绕防盗链）───
 const sourceCoverUrl = ref<string | null>(null);

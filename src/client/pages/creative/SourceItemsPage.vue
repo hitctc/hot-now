@@ -121,6 +121,7 @@ function openManualWriteModal(): void {
   manualWriteVisible.value = true;
 }
 
+/** 新建自定义素材并持久保存受理编号，页面刷新只恢复查询。 */
 async function confirmManualWrite(): Promise<void> {
   if (!manualContent.value.trim()) {
     message.warning("请输入内容");
@@ -135,6 +136,9 @@ async function confirmManualWrite(): Promise<void> {
       thesis: manualThesis.value.trim() || undefined,
     });
     if (result.ok && result.sourceItemId) {
+      if (result.taskId) {
+        try { localStorage.setItem(`hotnow:write-task:${result.sourceItemId}`, result.taskId); } catch { /* 存储不可用不重复提交。 */ }
+      }
       message.success(`已加入写作准入队列（素材#${result.sourceItemId}）`);
       manualWriteVisible.value = false;
       loadItems();
@@ -223,15 +227,16 @@ function cancelWriteMode(): void {
   writeModeThesis.value = "";
 }
 
-// 写作状态轮询：10 秒间隔，10 分钟超时
+// 写作状态只观察，不以排队时长判定模型执行超时。
 let writingPollTimer: ReturnType<typeof setInterval> | null = null;
-const writingTimers = new Map<number, number>(); // itemId -> startTime
+const writingTimers = new Set<number>();
 const writingTaskIds = new Map<number, string>(); // itemId -> Hermes taskId
 
 /** 清理单篇文章的轮询状态，避免终态任务继续占用定时器。 */
 function finishWritingPoll(itemId: number): void {
   writingTimers.delete(itemId);
   writingTaskIds.delete(itemId);
+  try { localStorage.removeItem(`hotnow:write-task:${itemId}`); } catch { /* 存储限制不改变后台终态。 */ }
   removeWritingId(itemId);
 }
 
@@ -239,26 +244,23 @@ function finishWritingPoll(itemId: number): void {
  * 轮询手动写作任务；当场提示终态，并刷新素材以展示持久化停止说明。
  */
 function startWritingPoll(item: CreativeSourceItem): void {
-  writingTimers.set(item.id, Date.now());
+  writingTimers.add(item.id);
+  try {
+    const taskId = localStorage.getItem(`hotnow:write-task:${item.id}`);
+    if (taskId) writingTaskIds.set(item.id, taskId);
+  } catch { /* 仍可按素材读取 Hermes 任务状态。 */ }
   if (writingPollTimer) return; // 已有全局轮询在跑
-  const TIMEOUT_MS = 10 * 60 * 1000;
 
   writingPollTimer = setInterval(async () => {
     if (writingTimers.size === 0) { stopWritingPoll(); return; }
-    const now = Date.now();
-    const checkIds = [...writingTimers.entries()];
+    const checkIds = [...writingTimers];
     let queueStatus = null;
     try {
       queueStatus = await fetchWriteQueueStatus();
     } catch {
       // 队列状态偶发不可用时仍通过素材状态判断，不中断后续轮询。
     }
-    for (const [itemId, startTime] of checkIds) {
-      if (now - startTime > TIMEOUT_MS) {
-        finishWritingPoll(itemId);
-        message.info(`素材#${itemId} 写作超时（>10分钟），请稍后查看成品列表`);
-        continue;
-      }
+    for (const itemId of checkIds) {
       try {
         const updated = await readCreativeSourceItem(itemId);
         const outcome = resolveWritePollOutcome(
@@ -350,6 +352,7 @@ function handleSearch(value: string): void {
   sourceQuery.handleSearch(value, addToHistory);
 }
 
+/** 提交一次人工写作并保存原任务编号；刷新由素材状态恢复观察，不重复投递。 */
 async function confirmWriteMode(): Promise<void> {
   const item = writeModeTarget.value;
   if (!item) return;
@@ -360,6 +363,10 @@ async function confirmWriteMode(): Promise<void> {
       writeModeThesis.value.trim() || undefined,
     );
     if (result.ok) {
+      if (result.taskId) {
+        writingTaskIds.set(item.id, result.taskId);
+        try { localStorage.setItem(`hotnow:write-task:${item.id}`, result.taskId); } catch { /* 仍按素材恢复观察。 */ }
+      }
       writeModeVisible.value = false;
       message.success("已加入手动写作队列");
       await loadItems();

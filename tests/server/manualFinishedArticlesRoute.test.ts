@@ -79,7 +79,7 @@ describe("manual finished article routes", () => {
     await app.close();
   });
 
-  it("generates cover and inline prompts separately and saves placeholders only after success", async () => {
+  it("queues cover and inline prompts separately without writing premature placeholders", async () => {
     const handle = await createTestDatabase("hot-now-manual-prompts-route-");
     handles.push(handle);
     const app = createServer({ db: handle.db });
@@ -94,34 +94,33 @@ describe("manual finished article routes", () => {
 
     process.env.HERMES_API_BASE_URL = "http://hermes.test";
     process.env.HERMES_API_TOKEN = "token";
-    vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        success: true,
-        coverPrompt: "独立封面提示词",
-        inlinePrompts: {},
-      }), { status: 200, headers: { "Content-Type": "application/json" } }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        success: true,
-        coverPrompt: null,
-        inlinePrompts: { "1": "正文配图提示词" },
-      }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    const fetch = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, taskId: "cover-task", status: "queued" }), { status: 202 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, taskId: "inline-task", status: "queued" }), { status: 202 }));
 
     const coverResponse = await app.inject({
       method: "POST",
       url: `/actions/creative/finished-articles/${id}/generate-cover-prompt`,
     });
-    expect(coverResponse.statusCode).toBe(200);
+    expect(coverResponse.statusCode).toBe(202);
+    expect(coverResponse.json().taskId).toBe("cover-task");
     expect(findCreativeFinishedArticleById(handle.db, id)?.humanMarkdown).toBe(body);
 
     const inlineResponse = await app.inject({
       method: "POST",
       url: `/actions/creative/finished-articles/${id}/generate-inline-prompts`,
     });
-    expect(inlineResponse.statusCode).toBe(200);
+    expect(inlineResponse.statusCode).toBe(202);
+    expect(inlineResponse.json().taskId).toBe("inline-task");
     const article = findCreativeFinishedArticleById(handle.db, id);
-    expect(article?.coverImagePrompt).toBe("独立封面提示词");
-    expect(article?.inlineImagePrompts).toEqual({ "1": "正文配图提示词" });
-    expect(article?.humanMarkdown).toContain("[IMAGE1]");
+    expect(article?.coverImagePrompt).toBeNull();
+    expect(article?.inlineImagePrompts).toBeNull();
+    expect(article?.humanMarkdown).toBe(body);
+    const submitted = JSON.parse(fetch.mock.calls[1]![1]!.body as string);
+    expect(submitted.operation).toBe("inline-prompts");
+    expect(submitted.input.plannedMarkdown).toContain("[IMAGE1]");
+    expect(submitted.input.requiredIndexes).toEqual([1]);
+    expect(submitted.expectedUpdatedAt).toBe(article?.updatedAt);
     await app.close();
   });
 
@@ -175,18 +174,20 @@ describe("manual finished article routes", () => {
 
     process.env.HERMES_API_BASE_URL = "http://hermes.test";
     process.env.HERMES_API_TOKEN = "token";
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
-      success: true,
-      coverPrompt: null,
-      inlinePrompts: { "1": "只返回第一条提示词" },
-    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    const fetch = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, taskId: "incomplete", status: "queued" }), { status: 202 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, taskId: "incomplete", status: "failed", error: "正文提示词缺少编号" })));
 
     const response = await app.inject({
       method: "POST",
       url: `/actions/creative/finished-articles/${id}/generate-inline-prompts`,
     });
-    expect(response.statusCode).toBe(502);
-    expect(response.json().reason).toContain("缺少编号");
+    expect(response.statusCode).toBe(202);
+    expect(JSON.parse(fetch.mock.calls[0]![1]!.body as string).input.requiredIndexes.length).toBeGreaterThan(1);
+    const status = await app.inject({ method: "GET", url: `/api/creative/finished-articles/${id}/manual-text/inline-prompts/status?taskId=incomplete` });
+    expect(status.statusCode).toBe(200);
+    expect(status.json()).toMatchObject({ ok: false, status: "failed" });
+    expect(status.json().reason).toContain("缺少编号");
     const article = findCreativeFinishedArticleById(handle.db, id);
     expect(article?.humanMarkdown).toBe(body);
     expect(article?.inlineImagePrompts).toBeNull();

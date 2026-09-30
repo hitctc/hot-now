@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import OperationCapabilityBadge from "../OperationCapabilityBadge.vue";
 import type { CreativeFinishedArticle } from "../../../services/creativeApi.js";
 import { formatCommentPair, parseJsonArray } from "./articleDetailPresentation.js";
 
@@ -68,7 +69,7 @@ const sourceCoverPreviewOpen = ref(false);
       <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">读者评论 + 作者回复</h3>
       <div class="flex items-center gap-2">
         <a-button v-if="article.comments?.length" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('copy', article.comments.map(formatCommentPair).join('\n\n'))">复制全部</a-button>
-        <a-button v-if="!readonly" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" :loading="generatingComments" :disabled="generatingComments" @click="emit('generate-comments')">{{ generatingComments ? '生成中...' : (article.comments?.length ? '重新生成评论' : '生成评论') }}</a-button>
+        <a-button v-if="!readonly" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" :loading="generatingComments" :disabled="generatingComments" @click="emit('generate-comments')">{{ generatingComments ? '排队/生成中...' : (article.comments?.length ? '重新生成评论' : '生成评论') }}</a-button><OperationCapabilityBadge v-if="!readonly" capability="model" />
       </div>
     </div>
     <div v-if="article.comments?.length" class="flex flex-col gap-1.5">
@@ -93,7 +94,7 @@ const sourceCoverPreviewOpen = ref(false);
       <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">作者拓展</h3>
       <div class="flex items-center gap-2">
         <a-button v-if="article.authorExtensions?.length" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('copy', article.authorExtensions.join('\n\n'))">复制全部</a-button>
-        <a-button v-if="!readonly" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" :loading="generatingAuthorExtensions" :disabled="generatingAuthorExtensions" @click="emit('generate-author-extensions')">{{ generatingAuthorExtensions ? '生成中...' : (article.authorExtensions?.length ? '重新生成拓展' : '生成拓展') }}</a-button>
+        <a-button v-if="!readonly" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" :loading="generatingAuthorExtensions" :disabled="generatingAuthorExtensions" @click="emit('generate-author-extensions')">{{ generatingAuthorExtensions ? '排队/生成中...' : (article.authorExtensions?.length ? '重新生成拓展' : '生成拓展') }}</a-button><OperationCapabilityBadge v-if="!readonly" capability="model" />
       </div>
     </div>
     <div v-if="article.authorExtensions?.length" class="flex flex-col gap-1.5">

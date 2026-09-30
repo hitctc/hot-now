@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import OperationCapabilityBadge from "../OperationCapabilityBadge.vue";
 
 import type { CodeImageCard, CreativeFinishedArticle } from "../../../services/creativeApi.js";
 
@@ -56,7 +57,7 @@ function statusClass(card: CodeImageCard | null): string {
         <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">代码制图片</h3>
         <p class="m-0 mt-1 text-[11px] text-editorial-text-muted/80">{{ article.direction === 'short_content' ? '三张图片会写入正文，也可直接下载作为封面候选。' : '三张图片仅加入封面候选，不自动插入正文；可在封面区域选用或下载后使用。' }}</p>
       </div>
-      <div v-if="!readonly" class="flex flex-wrap gap-2">
+      <div v-if="!readonly" class="flex flex-wrap items-center gap-2">
         <!-- 代码图片是本地确定性渲染，不消耗外部额度，因此不限制制作次数。 -->
         <a-button
           size="small"
@@ -66,6 +67,7 @@ function statusClass(card: CodeImageCard | null): string {
           data-code-image-regenerate
           @click="emit('generate', 'all')"
         >{{ generating ? '制作中...' : (hasAnyCard ? '重新制作图片' : '制作图片') }}</a-button>
+        <OperationCapabilityBadge capability="local" />
       </div>
     </div>
 

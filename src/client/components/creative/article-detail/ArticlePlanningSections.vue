@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from "vue";
+import OperationCapabilityBadge from "../OperationCapabilityBadge.vue";
 import type { ArticleTitleCandidate, CreativeFinishedArticle } from "../../../services/creativeApi.js";
 import { charCount, countWords, formatAnomalyReason, formatReviewReason, titleRiskLabel } from "./articleDetailPresentation.js";
 
@@ -34,6 +35,7 @@ const emit = defineEmits<{
   (event: "regenerate-intro"): void;
   (event: "select-intro", index: number): void;
   (event: "regenerate-code-image-keywords"): void;
+  (event: "cancel-text-task", operation: "title" | "intro" | "keywords"): void;
 }>();
 
 /** 主审核标记沿用历史文案；多标记列表仍显示代码，方便定位规则来源。 */
@@ -134,7 +136,9 @@ watch(() => props.editingTitleIndex, (index) => {
           :loading="regenTitleLoading"
           :disabled="regenTitleLoading"
           @click="emit('regenerate-title')"
-        >{{ regenTitleLoading ? '生成中...' : article.direction === 'short_content' ? (article.sourceTitle ? '按原标题生成' : '按现有标题生成') : '生成新标题' }}</a-button>
+        >{{ regenTitleLoading ? '等待/执行中' : article.direction === 'short_content' ? (article.sourceTitle ? '按原标题生成' : '按现有标题生成') : '生成新标题' }}</a-button>
+        <OperationCapabilityBadge capability="model" />
+        <a-button v-if="regenTitleLoading" type="link" size="small" data-cancel-text-task="title" @click="emit('cancel-text-task', 'title')">取消任务</a-button>
         <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('copy', displayTitles.join('\n'))">复制全部</a-button>
       </div>
     </div>
@@ -240,6 +244,8 @@ watch(() => props.editingTitleIndex, (index) => {
           class="!h-auto !px-2 !py-1 !text-[11px]"
           @click="emit('copy', (article.codeImageKeywords ?? []).join('、'))"
         >复制</a-button>
+        <OperationCapabilityBadge capability="model" />
+        <a-button v-if="regenCodeImageKeywordsLoading" type="link" size="small" data-cancel-text-task="keywords" @click="emit('cancel-text-task', 'keywords')">取消任务</a-button>
       </div>
     </div>
     <div v-if="(article.codeImageKeywords?.length ?? 0) > 0" class="flex flex-wrap gap-2">
@@ -273,7 +279,9 @@ watch(() => props.editingTitleIndex, (index) => {
           :loading="regenIntroLoading"
           :disabled="regenIntroLoading"
           @click="emit('regenerate-intro')"
-        >{{ regenIntroLoading ? '生成中...' : '生成新导语' }}</a-button>
+        >{{ regenIntroLoading ? '等待/执行中' : '生成新导语' }}</a-button>
+        <OperationCapabilityBadge capability="model" />
+        <a-button v-if="regenIntroLoading" type="link" size="small" data-cancel-text-task="intro" @click="emit('cancel-text-task', 'intro')">取消任务</a-button>
         <a-button v-if="displayIntros.length > 0" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('copy', displayIntros[activeIntroIndex] ?? '')">复制</a-button>
       </div>
     </div>

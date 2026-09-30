@@ -7,7 +7,7 @@ import { editFinishedArticle, getRegenIntroStatus, regenIntro, type CreativeFini
 
 vi.mock("../../src/client/services/creativeApi.js", () => ({ regenIntro: vi.fn(), getRegenIntroStatus: vi.fn(), editFinishedArticle: vi.fn() }));
 
-afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); localStorage.clear(); });
 
 /** 用真实组合式逻辑复现导语生成后版本变更和详情同步的消息反馈。 */
 function setup() {

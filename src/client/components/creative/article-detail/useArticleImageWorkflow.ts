@@ -1,4 +1,5 @@
-import { computed, ref, type Ref } from "vue";
+import { computed, ref, watch, type Ref } from "vue";
+import { readManualTextTask, runManualModelTask } from "./manualTextTaskWait.js";
 import { message } from "ant-design-vue";
 
 import {
@@ -146,7 +147,11 @@ export function useArticleImageWorkflow(options: ArticleImageWorkflowOptions) {
     if (!article || coverPromptGenerating.value) return;
     coverPromptGenerating.value = true;
     try {
-      const result = await generateFinishedArticleCoverPrompt(article.id);
+      if (!readManualTextTask(article.id, "cover-prompts")) await options.prepareExplicitContentSave();
+      const result = await runManualModelTask(article.id, "cover-prompts", () => generateFinishedArticleCoverPrompt(article.id),
+        () => options.isOpen() && options.getArticle()?.id === article.id);
+      if (!result) return;
+      if (!result.ok || !result.article) throw new Error(result.reason ?? "提示词生成失败");
       article.coverImagePrompt = result.article.coverImagePrompt;
       options.setPromptDirty("cover", false);
       message.success("封面提示词已生成");
@@ -165,9 +170,15 @@ export function useArticleImageWorkflow(options: ArticleImageWorkflowOptions) {
     if (index) inlinePromptGeneratingIndex.value = index;
     else inlinePromptsGenerating.value = true;
     try {
-      const result = await generateFinishedArticleInlinePrompts(article.id, index);
+      const originalHuman = options.humanContent.value;
+      if (!readManualTextTask(article.id, "inline-prompts")) await options.prepareExplicitContentSave();
+      const result = await runManualModelTask(article.id, "inline-prompts", () => generateFinishedArticleInlinePrompts(article.id, index),
+        () => options.isOpen() && options.getArticle()?.id === article.id);
+      if (!result) return;
+      if (!result.ok || !result.article) throw new Error(result.reason ?? "提示词生成失败");
       article.inlineImagePrompts = result.article.inlineImagePrompts;
-      if (result.article.humanMarkdown !== null) {
+      // 等待时产生的本地未保存正文优先，不能用服务器结果覆盖。
+      if (result.article.humanMarkdown !== null && options.humanContent.value === originalHuman) {
         article.humanMarkdown = result.article.humanMarkdown;
         options.humanContent.value = result.article.humanMarkdown;
         options.setLastSavedHuman(result.article.humanMarkdown);
@@ -183,6 +194,14 @@ export function useArticleImageWorkflow(options: ArticleImageWorkflowOptions) {
       inlinePromptGeneratingIndex.value = null;
     }
   }
+
+  /** 重开详情恢复原编号；没有任务记录时不自动调用模型。 */
+  watch(() => [options.isOpen(), options.getArticle()?.id] as const, ([open, id]) => {
+    if (!open || !id) return;
+    if (readManualTextTask(id, "cover-prompts")) void handleGenerateCoverPrompt();
+    if (readManualTextTask(id, "inline-prompts")) void handleGenerateInlinePrompts();
+    if (readManualTextTask(id, "image-prompts")) void handleRegenImagePrompts();
+  }, { immediate: true });
 
   /** 保存封面提示词，不触碰封面图和正文内容。 */
   async function saveCoverPrompt(value: string): Promise<void> {
@@ -234,6 +253,7 @@ export function useArticleImageWorkflow(options: ArticleImageWorkflowOptions) {
   async function handleRegenImagePrompts(): Promise<void> {
     const article = options.getArticle();
     if (!article) return;
+    if (!readManualTextTask(article.id, "image-prompts")) {
     const { Modal } = await import("ant-design-vue");
     const confirmed = await new Promise<boolean>(resolve => {
       Modal.confirm({
@@ -245,10 +265,14 @@ export function useArticleImageWorkflow(options: ArticleImageWorkflowOptions) {
       });
     });
     if (!confirmed) return;
+    await options.prepareExplicitContentSave();
+    }
 
     regenPromptsLoading.value = true;
     try {
-      const result = await regenImagePrompts(article.id);
+      const result = await runManualModelTask(article.id, "image-prompts", () => regenImagePrompts(article.id),
+        () => options.isOpen() && options.getArticle()?.id === article.id);
+      if (!result) return;
       if (result.ok) {
         message.success("图片提示词已更新");
         options.onSaved();

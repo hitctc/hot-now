@@ -106,6 +106,14 @@ describe("成品详情代码图片标签", () => {
     expect(section.emitted("regenerate-code-image-keywords")).toHaveLength(1);
   });
 
+  it("标签任务等待时提供按操作取消，不触发重新生成", async () => {
+    const wrapper = mountSections(buildArticle({ codeImageKeywords: [] }), { loading: true });
+    await wrapper.get('[data-cancel-text-task="keywords"]').trigger("click");
+    const section = wrapper.findComponent(ArticlePlanningSections);
+    expect(section.emitted("cancel-text-task")).toEqual([["keywords"]]);
+    expect(section.emitted("regenerate-code-image-keywords")).toBeUndefined();
+  });
+
   it("只读模式下不提供生成入口", () => {
     const wrapper = mountSections(buildArticle({ codeImageKeywords: [] }), { readonly: true });
 

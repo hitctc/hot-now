@@ -39,6 +39,29 @@ export function registerHermesOperationalRoutes(
     }
   });
 
+  for (const action of ["cancel", "result"] as const) {
+    app.route({ method: action === "cancel" ? "POST" : "GET", url: `/api/creative/write-queue/${action}`,
+      /** 代理单任务取消或私有产物读取；只接受编号，不接受本地路径。 */
+      handler: async (request, reply) => {
+        if (options.readSession(request, reply) === undefined) return;
+        const taskId = (action === "cancel" ? request.body : request.query) as { taskId?: unknown } | undefined;
+        if (typeof taskId?.taskId !== "string" || !taskId.taskId || taskId.taskId.length > 128) {
+          return reply.code(400).send({ success: false, error: "无效任务编号" });
+        }
+        const base = process.env.HERMES_API_BASE_URL;
+        const token = process.env.HERMES_API_TOKEN;
+        if (!base || !token) return reply.code(503).send({ success: false, error: "Hermes 未配置" });
+        try {
+          const response = await fetch(`${base.replace(/\/+$/, "")}/api/write-queue/${action}${action === "result" ? `?taskId=${encodeURIComponent(taskId.taskId)}` : ""}`, {
+            method: action === "cancel" ? "POST" : "GET", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            ...(action === "cancel" ? { body: JSON.stringify({ taskId: taskId.taskId }) } : {}), signal: AbortSignal.timeout(10_000),
+          });
+          return reply.code(response.status >= 500 ? 502 : response.status).send(await response.json());
+        } catch { return reply.code(502).send({ success: false, error: "任务服务暂不可达，请查询原编号" }); }
+      },
+    });
+  }
+
   // ─── 写作队列状态：代理 Hermes GET /api/write-queue/status ───
   app.get("/api/creative/write-queue/status", async (request, reply) => {
     const session = options.readSession(request, reply);

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, toRefs } from "vue";
 import { message } from "ant-design-vue";
+import OperationCapabilityBadge from "../OperationCapabilityBadge.vue";
 
 import type { CreativeSourceItem } from "../../../services/creativeApi.js";
 import { formatTableDayLabel, isTableDayStart } from "../tableDayGroups.js";
@@ -282,6 +283,7 @@ function copyId(id: number): void {
           :disabled="writingIds.has(record.id)"
           @click="emit('write', record)"
         >{{ writingIds.has(record.id) ? "写作中..." : (mode === "article" ? "写文章" : "写短内容") }}</a-button>
+        <OperationCapabilityBadge capability="model" />
       </template>
     </template>
 

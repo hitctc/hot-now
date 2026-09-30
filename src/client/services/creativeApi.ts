@@ -59,8 +59,8 @@ export function toggleFinishedArticlePin(id: number): Promise<CreativeFinishedAr
 
 export function generateFinishedArticleCoverPrompt(
   id: number
-): Promise<{ ok: boolean; article: CreativeFinishedArticle }> {
-  return requestJson(`/actions/creative/finished-articles/${id}/generate-cover-prompt`, {
+): Promise<{ ok: boolean; taskId?: string; article?: CreativeFinishedArticle; reason?: string }> {
+  return requestJson(`/api/creative/finished-articles/${id}/manual-text/cover-prompts`, {
     method: "POST"
   });
 }
@@ -68,8 +68,8 @@ export function generateFinishedArticleCoverPrompt(
 export function generateFinishedArticleInlinePrompts(
   id: number,
   index?: number
-): Promise<{ ok: boolean; article: CreativeFinishedArticle }> {
-  return requestJson(`/actions/creative/finished-articles/${id}/generate-inline-prompts`, {
+): Promise<{ ok: boolean; taskId?: string; article?: CreativeFinishedArticle; reason?: string }> {
+  return requestJson(`/api/creative/finished-articles/${id}/manual-text/inline-prompts`, {
     method: "POST",
     body: JSON.stringify(index ? { index } : {})
   });
@@ -394,41 +394,46 @@ export function regenCover(id: number): Promise<RegenCoverResult> {
 
 export type GenerateCommentsResult = {
   ok: boolean;
+  taskId?: string;
   comments?: ArticleComment[];
   reason?: string;
 };
 
 /** 调用后端代理按需生成读者评论+作者回复，返回更新后的 comments 数组 */
 export function generateComments(id: number): Promise<GenerateCommentsResult> {
-  return requestJson<GenerateCommentsResult>(`/api/creative/finished-articles/${id}/generate-comments`, {
+  return requestJson<GenerateCommentsResult>(`/api/creative/finished-articles/${id}/manual-text/comments`, {
     method: "POST",
   });
 }
 
 export type GenerateAuthorExtensionsResult = {
   ok: boolean;
+  taskId?: string;
   extensions?: string[];
   reason?: string;
 };
 
 /** 调用后端代理按需生成作者拓展评论，返回更新后的 extensions 数组 */
 export function generateAuthorExtensions(id: number): Promise<GenerateAuthorExtensionsResult> {
-  return requestJson<GenerateAuthorExtensionsResult>(`/api/creative/finished-articles/${id}/generate-author-extensions`, {
+  return requestJson<GenerateAuthorExtensionsResult>(`/api/creative/finished-articles/${id}/manual-text/extensions`, {
     method: "POST",
   });
 }
 
 export type RegenTitleResult = {
   ok: boolean;
+  taskId?: string;
+  status?: "queued" | "writing" | "done" | "failed" | "stopped";
+  article?: CreativeFinishedArticle;
   titles?: string[];
   titleCandidates?: ArticleTitleCandidate[];
   prompt?: string;
   reason?: string;
 };
 
-/** 调用后端代理重新生成标题，返回更新后的 titles 数组 */
+/** 提交人工标题任务，立即返回编号；候选在后台完成并回写。 */
 export function regenTitle(id: number): Promise<RegenTitleResult> {
-  return requestJson<RegenTitleResult>(`/api/creative/finished-articles/${id}/regen-title`, {
+  return requestJson<RegenTitleResult>(`/api/creative/finished-articles/${id}/manual-text/title`, {
     method: "POST",
   });
 }
@@ -470,19 +475,34 @@ export function regenSummary(id: number): Promise<RegenSummaryResult> {
 
 export type RegenCodeImageKeywordsResult = {
   ok: boolean;
+  taskId?: string;
+  status?: "queued" | "writing" | "done" | "failed" | "stopped";
   keywords?: string[];
   article?: CreativeFinishedArticle;
   reason?: string;
 };
 
 /**
- * 手动重新生成短内容代码图片标签。
- * 服务端代理 Hermes 生成并覆盖回写；返回最新成品，供页面同步标签和图片过期状态。
+ * 提交成品标签任务并立即返回编号，不在 HTTP 请求内等待模型。
+ * 后台按文章版本覆盖回写，完成后查询最新标签及图片过期状态。
  */
 export function regenCodeImageKeywords(id: number): Promise<RegenCodeImageKeywordsResult> {
-  return requestJson<RegenCodeImageKeywordsResult>(`/api/creative/finished-articles/${id}/regen-code-image-keywords`, {
+  return requestJson<RegenCodeImageKeywordsResult>(`/api/creative/finished-articles/${id}/manual-text/keywords`, {
     method: "POST",
   });
+}
+
+export type ManualModelOperation = "title" | "keywords" | "comments" | "extensions" | "summary" | "cover-prompts" | "inline-prompts" | "image-prompts";
+export type ManualTextTaskResult = RegenTitleResult & RegenCodeImageKeywordsResult & GenerateCommentsResult & GenerateAuthorExtensionsResult;
+
+/** 查询既有文案任务，完成后返回文章状态；查询不会再次提交或调用模型。 */
+export function getManualTextTaskStatus(id: number, operation: ManualModelOperation, taskId: string): Promise<ManualTextTaskResult> {
+  return requestJson<ManualTextTaskResult>(`/api/creative/finished-articles/${id}/manual-text/${operation}/status?taskId=${encodeURIComponent(taskId)}`);
+}
+
+/** 请求取消指定文章任务；执行中仅标记待取消，不能据响应提前宣布模型已停止。 */
+export function cancelManualTextTask(id: number, taskId: string): Promise<{ ok: boolean; status?: string; reason?: string }> {
+  return requestJson(`/api/creative/finished-articles/${id}/manual-text/cancel`, { method: "POST", body: JSON.stringify({ taskId }) });
 }
 
 export type RegenInlineImageResult = {
@@ -572,7 +592,7 @@ export function codexGenerateImage(articleId: number, action: ImageGenAction, im
 // ─── GPT Luna 独立生图 ───
 
 export type LunaImageTarget = "cover" | "inline";
-export type LunaImageJobStatus = "queued" | "running" | "succeeded" | "failed" | "skipped";
+export type LunaImageJobStatus = "queued" | "running" | "succeeded" | "failed" | "skipped" | "cancelled";
 
 export type LunaImageJob = {
   jobId: string;
@@ -820,6 +840,7 @@ export function writeSourceItemShort(id: number, externalId: string, form: "tuwe
 
 export type RegenImagePromptsResult = {
   ok: boolean;
+  taskId?: string;
   articleId?: number;
   thesis?: string;
   coverPromptLength?: number;
@@ -838,13 +859,26 @@ export function regenImagePrompts(articleId: number): Promise<RegenImagePromptsR
   });
 }
 
+/** 按编号取消写作或生图；执行中等待安全检查点，不终止当前模型请求。 */
+export function cancelWriteQueueTask(taskId: string): Promise<{ success: boolean; status?: string; error?: string }> {
+  return requestJson("/api/creative/write-queue/cancel", { method: "POST", body: JSON.stringify({ taskId }) });
+}
+
+/** 读取失败或取消任务保留的生成结果，不重复调用模型。 */
+export function readWriteQueueTaskResult(taskId: string): Promise<{ success: boolean; generated?: unknown; error?: string }> {
+  return requestJson(`/api/creative/write-queue/result?taskId=${encodeURIComponent(taskId)}`);
+}
+
 // ─── 写作队列状态 ───
 
 export type WriteQueueTask = {
   task_id: string;
   label: string;
   priority: "high" | "normal";
-  source_item_id: number;
+  source_item_id: number | null;
+  cancel_requested?: boolean;
+  result_retained?: boolean;
+  retained_result_id?: string;
   status: "writing" | "queued" | "done" | "stopped" | "failed";
   submitted_at: string;
   started_at: string | null;
@@ -957,6 +991,7 @@ export type ManualWriteRequest = {
 
 export type ManualWriteResult = {
   ok: boolean;
+  taskId?: string;
   sourceItemId?: number;
   reason?: string;
 };

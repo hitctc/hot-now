@@ -8,10 +8,12 @@ import {
 } from "../../core/creative/inlineImagePromptPlanner.js";
 import type { CreativeFinishedArticleRouteContext } from "./creativeFinishedArticleRouteShared.js";
 import { requestImagePromptsFromHermes } from "./creativeFinishedArticleRouteShared.js";
+import { registerCreativeFinishedArticleTextTaskRoutes } from "./creativeFinishedArticleTextTaskRoutes.js";
 
 /** 注册成品文章的Generation路由，保持既有 HTTP 契约。 */
 export function registerCreativeFinishedArticleGenerationRoutes(context: CreativeFinishedArticleRouteContext): void {
   const { app, options, db } = context;
+  registerCreativeFinishedArticleTextTaskRoutes(context);
 
   // 按需生成读者评论+作者回复：代理 Hermes POST /api/generate-comments，hot-now 侧存储
   app.post("/api/creative/finished-articles/:id/generate-comments", async (request, reply) => {

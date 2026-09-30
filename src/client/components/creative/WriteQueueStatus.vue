@@ -16,6 +16,35 @@ import {
 import ArticleDetailDrawer from "./ArticleDetailDrawer.vue";
 import SourceItemDetailModal from "./SourceItemDetailModal.vue";
 import { toShanghaiDayKey } from "./tableDayGroups.js";
+import { message, Modal as AModal } from "ant-design-vue";
+import { cancelWriteQueueTask, readWriteQueueTaskResult } from "../../services/creativeApi.js";
+
+const cancellingTaskId = ref<string | null>(null);
+const retainedResultOpen = ref(false);
+const retainedResultText = ref("");
+
+/** 仅取消选中编号；执行中只提示已申请，不宣称当前模型已终止。 */
+async function cancelTask(task: WriteQueueTask): Promise<void> {
+  if (cancellingTaskId.value) return;
+  cancellingTaskId.value = task.task_id;
+  try {
+    const result = await cancelWriteQueueTask(task.task_id);
+    if (!result.success) throw new Error(result.error);
+    message.info(result.status === "cancelling" ? "已申请取消，等待当前模型返回并保存结果" : "任务已取消");
+    await refresh();
+  } catch { message.error("取消状态暂不可查，请查询原任务"); }
+  finally { cancellingTaskId.value = null; }
+}
+
+/** 只读展示保留结果，使用文本而非 HTML，不能从此入口重新运行模型。 */
+async function viewRetainedResult(task: WriteQueueTask): Promise<void> {
+  try {
+    const result = await readWriteQueueTaskResult(task.task_id);
+    if (!result.success) throw new Error(result.error);
+    retainedResultText.value = JSON.stringify(result.generated, null, 2);
+    retainedResultOpen.value = true;
+  } catch { message.error("保留结果暂不可读，未重新调用模型"); }
+}
 
 const QUEUE_EXPANDED_KEY = "hot-now-write-queue-expanded";
 
@@ -208,8 +237,11 @@ onBeforeUnmount(() => {
             <template v-if="data.current.retry_count"> · 重试 {{ data.current.retry_count }}/1</template>
           </div>
           <div v-if="data.current.started_at" class="mt-0.5 text-[10px] font-medium tabular-nums text-blue-500">
-            本文 {{ formatElapsed(data.current.started_at) }}<template v-if="data.run_started_at"> · 队列 {{ formatElapsed(data.run_started_at) }}</template>
+            执行 {{ formatElapsed(data.current.started_at) }}<template v-if="data.run_started_at"> · 队列 {{ formatElapsed(data.run_started_at) }}</template>
           </div>
+          <button class="write-queue-link" :disabled="Boolean(cancellingTaskId) || data.current.cancel_requested" @click.stop="cancelTask(data.current)">
+            {{ data.current.cancel_requested ? '等待安全取消' : '取消任务' }}
+          </button>
         </div>
 
         <div v-if="data.status_delayed" class="write-queue-delay">
@@ -222,7 +254,9 @@ onBeforeUnmount(() => {
             <span v-if="task.source_item_id" class="write-queue-id" @click.stop="openSourceItem(task.source_item_id)">#{{ task.source_item_id }}</span>
             <span class="flex-1 truncate text-[11px] text-editorial-text-body">{{ task.source_item_title || task.label }}</span>
             <span v-if="task.source_item_source_name" class="shrink-0 text-[10px] text-editorial-text-muted">· {{ task.source_item_source_name }}</span>
-            <span class="text-[10px]" :class="task.priority === 'high' ? 'text-yellow-600' : 'text-gray-400'">{{ task.priority }}</span>
+            <span class="text-[10px]" :class="task.priority === 'high' ? 'text-yellow-600' : 'text-gray-400'">{{ task.priority === 'high' ? '人工' : '自动' }}</span>
+            <span class="text-[10px] text-gray-400">等待 {{ formatElapsed(task.submitted_at) }}</span>
+            <button class="write-queue-link" :disabled="Boolean(cancellingTaskId)" @click.stop="cancelTask(task)">取消</button>
           </div>
         </div>
 
@@ -252,6 +286,7 @@ onBeforeUnmount(() => {
                 <button v-if="task.source_item_id" class="write-queue-link" @click.stop="openSourceItem(task.source_item_id)">素材 #{{ task.source_item_id }}</button>
                 <button v-if="task.finished_article_id" class="write-queue-link" :disabled="articleDetailLoading" @click.stop="openArticleDetail(task.finished_article_id)">成品 #{{ task.finished_article_id }}</button>
                 <span class="min-w-0 flex-1 truncate">{{ task.source_item_title || task.label }}</span>
+                <button v-if="task.result_retained" class="write-queue-link" @click.stop="viewRetainedResult(task)">查看保留结果</button>
               </div>
               <div class="mt-0.5 text-[9px] text-editorial-text-muted">
                 {{ task.finished_at ? new Date(task.finished_at).toLocaleTimeString("zh-CN", { timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit" }) : "时间未知" }}
@@ -270,6 +305,9 @@ onBeforeUnmount(() => {
         </div>
       </template>
 
+      <a-modal v-model:open="retainedResultOpen" title="保留的生成结果（只读，不调用模型）" :footer="null" width="min(900px, 95vw)">
+        <pre class="max-h-[70dvh] overflow-auto whitespace-pre-wrap break-words text-xs">{{ retainedResultText }}</pre>
+      </a-modal>
       <!-- 素材详情弹窗 -->
       <SourceItemDetailModal v-model:visible="modalVisible" :source-item-id="modalSourceItemId" />
       <!-- 成品详情抽屉：队列终态中的成品编号必须可直接打开。 -->

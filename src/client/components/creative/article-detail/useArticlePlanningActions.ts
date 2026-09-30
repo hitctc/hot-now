@@ -1,10 +1,11 @@
-import { computed, ref, type ComputedRef, type Ref } from "vue";
+import { computed, ref, watch, getCurrentScope, onScopeDispose, type ComputedRef, type Ref } from "vue";
 import { message } from "ant-design-vue";
 
 import { HttpError } from "../../../services/http.js";
+import { readManualTextTask, saveManualTextTask, waitManualTextTask, type ManualTextOperation } from "./manualTextTaskWait.js";
 import {
   editFinishedArticle,
-  getRegenIntroStatus,
+  cancelManualTextTask,
   regenCodeImageKeywords,
   regenIntro,
   regenTitle,
@@ -63,6 +64,8 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
   const activeIntroIndex = ref(0);
   const localIntros = ref<string[]>([]);
   const regenCodeImageKeywordsLoading = ref(false);
+  let disposed = false;
+  if (getCurrentScope()) onScopeDispose(() => { disposed = true; });
 
   const displayTitles = computed(() => {
     return localTitles.value.length > 0 ? localTitles.value : parseJsonArray(getArticle()?.titles ?? null);
@@ -79,14 +82,26 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
     if (!article || regenTitleLoading.value) return;
     regenTitleLoading.value = true;
     try {
-      const result = await regenTitle(article.id);
+      const existing = readManualTextTask(article.id, "title");
+      if (!existing) await prepareExplicitContentSave();
+      let result = existing ? { ok: true, taskId: existing } : await regenTitle(article.id);
+      if (result.ok && result.taskId) {
+        const taskId = result.taskId;
+        saveManualTextTask(article.id, "title", taskId);
+        message.info("标题已排队，关闭页面不影响任务");
+        const completed = await waitManualTextTask(article.id, "title", taskId, () => !disposed && getArticle()?.id === article.id);
+        if (!completed) return;
+        result = completed;
+      }
+      if (disposed || getArticle()?.id !== article.id) return;
       if (result.ok && result.titles) {
         localTitles.value = result.titles;
-        activeTitleIndex.value = 0;
+        activeTitleIndex.value = result.article?.titleIndex ?? 0;
         article.titles = JSON.stringify(result.titles);
-        article.titleIndex = 0;
+        article.titleIndex = activeTitleIndex.value;
         article.titleCandidates = result.titleCandidates ?? null;
-        article.titleSelectionConfirmed = false;
+        article.titleSelectionConfirmed = result.article?.titleSelectionConfirmed ?? false;
+        if (result.article?.updatedAt) article.updatedAt = result.article.updatedAt;
         message.success(article.direction === "short_content" ? "原标题转写候选已生成，请选择发布标题" : "分组标题已生成，请选择发布标题");
       } else {
         message.error(result.reason ?? "标题生成失败");
@@ -100,6 +115,9 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
         : body?.reason ?? "标题生成请求失败");
     } finally {
       regenTitleLoading.value = false;
+      // 切换文章时旧查询退出后，补恢复新文章任务，避免共享 loading 标记漏掉首次恢复。
+      const current = getArticle();
+      if (!disposed && current && current.id !== article.id && readManualTextTask(current.id, "title")) void handleRegenTitle();
     }
   }
 
@@ -280,7 +298,7 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
 
   const displaySummaries = computed(() => getArticle()?.summary100 ?? []);
 
-  /** 先保存正文，再轮询 Hermes 队列终态；生成结果由 HotNow 回调入库后再同步正文。 */
+  /** 提交或恢复导语任务；查询故障退避，恢复时仅同步导语，避免覆盖用户正在编辑的正文。 */
   async function handleRegenIntro(): Promise<void> {
     const article = getArticle();
     if (!article || regenIntroLoading.value) return;
@@ -288,18 +306,18 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
     let generated = false;
     let queued = false;
     try {
-      await prepareExplicitContentSave();
-      let result = await regenIntro(article.id);
+      const existing = readManualTextTask(article.id, "intro");
+      if (!existing) await prepareExplicitContentSave();
+      const contentBeforeWait = editContent.value;
+      let result = existing ? { ok: true, taskId: existing } : await regenIntro(article.id);
       const taskId = result.taskId;
       if (taskId && result.ok) {
         queued = true;
-        message.info("导语已加入写作队列，完成后会自动保存");
-        while (true) {
-          await new Promise<void>((resolve) => setTimeout(resolve, 3000));
-          if (getArticle()?.id !== article.id) return; // 文章切换后由服务端回调继续保存，不跨文章修改正文。
-          result = await getRegenIntroStatus(article.id, taskId);
-          if (result.status === "done" || !result.ok) break;
-        }
+        saveManualTextTask(article.id, "intro", taskId);
+        message.info("导语已排队，关闭页面不影响任务");
+        const completed = await waitManualTextTask(article.id, "intro", taskId, () => !disposed && getArticle()?.id === article.id);
+        if (!completed) return;
+        result = completed;
       }
       if (!result.ok || !result.intros?.[0]) {
         message.error(result.reason ?? "导语生成失败");
@@ -317,6 +335,11 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
       latestArticle.introIndex = 0;
       if (result.updatedAt) latestArticle.updatedAt = result.updatedAt;
 
+      // 恢复任务或等待期间编辑过正文时，只同步已入库导语，绝不把旧正文快照写回。
+      if (existing || editContent.value !== contentBeforeWait) {
+        message.success("新导语已保存，正文未自动修改");
+        return;
+      }
       // 联动：替换 markdown 中的 blockquote，渲染并保存 wechatHtml。
       const newIntro = result.intros[0];
       let md = editContent.value;
@@ -351,6 +374,8 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
         : queued ? "队列状态暂不可查，任务仍会继续；请稍后刷新详情确认" : "导语生成请求失败");
     } finally {
       regenIntroLoading.value = false;
+      const current = getArticle();
+      if (!disposed && current && current.id !== article.id && readManualTextTask(current.id, "intro")) void handleRegenIntro();
     }
   }
 
@@ -411,17 +436,30 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
   }
 
   /**
-   * 手动重新生成代码图片标签。
-   * 标签会改变图片上的文字，服务端会把已有图片标记为过期，这里同步服务端返回的最新成品。
+   * 提交或恢复标签任务，排队时不占用 HTTP 请求；只同步标签、图片状态和版本，不覆盖正文。
    */
   async function handleRegenCodeImageKeywords(): Promise<void> {
     const article = getArticle();
     if (!article || regenCodeImageKeywordsLoading.value) return;
     regenCodeImageKeywordsLoading.value = true;
     try {
-      const result = await regenCodeImageKeywords(article.id);
+      const existing = readManualTextTask(article.id, "keywords");
+      if (!existing) await prepareExplicitContentSave();
+      let result = existing ? { ok: true, taskId: existing } : await regenCodeImageKeywords(article.id);
+      if (result.ok && result.taskId) {
+        const taskId = result.taskId;
+        saveManualTextTask(article.id, "keywords", taskId);
+        message.info("标签已排队，关闭页面不影响任务");
+        const completed = await waitManualTextTask(article.id, "keywords", taskId, () => !disposed && getArticle()?.id === article.id);
+        if (!completed) return;
+        result = completed;
+      }
+      if (disposed || getArticle()?.id !== article.id) return;
+      if (!result.ok) { message.error(result.reason ?? "标签生成失败"); return; }
       if (result.article) {
-        Object.assign(article, result.article);
+        article.codeImageKeywords = result.article.codeImageKeywords;
+        article.codeImageCards = result.article.codeImageCards;
+        article.updatedAt = result.article.updatedAt;
       } else if (result.keywords) {
         article.codeImageKeywords = result.keywords;
       }
@@ -433,10 +471,34 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
       message.error("标签生成请求失败");
     } finally {
       regenCodeImageKeywordsLoading.value = false;
+      const current = getArticle();
+      if (!disposed && current && current.id !== article.id && readManualTextTask(current.id, "keywords")) void handleRegenCodeImageKeywords();
     }
   }
 
+  /** 请求取消原文案任务；执行中仅提示待取消，仍查询终态，不能假装进程已结束。 */
+  async function handleCancelTextTask(operation: ManualTextOperation): Promise<void> {
+    const article = getArticle();
+    if (!article) return;
+    const taskId = readManualTextTask(article.id, operation);
+    if (!taskId) { message.info("正在确认任务编号，请稍后取消"); return; }
+    try {
+      const result = await cancelManualTextTask(article.id, taskId);
+      if (!result.ok) { message.error(result.reason ?? "取消失败"); return; }
+      message.info(result.status === "cancelling" ? "将在当前请求结束后取消" : "任务已结束");
+    } catch { message.warning("取消状态暂不可查，仍会查询原任务"); }
+  }
+
+  // 重新打开文章只查询保存的编号，不重复提交模型请求。
+  watch(() => getArticle()?.id, (id) => {
+    if (!id || disposed) return;
+    if (readManualTextTask(id, "title")) void handleRegenTitle();
+    if (readManualTextTask(id, "keywords")) void handleRegenCodeImageKeywords();
+    if (readManualTextTask(id, "intro")) void handleRegenIntro();
+  }, { immediate: true });
+
   return {
+    handleCancelTextTask,
     manualTitle,
     regenTitleLoading,
     activeTitleIndex,

@@ -16,6 +16,7 @@ import {
 import ArticleDetailDrawer from "./ArticleDetailDrawer.vue";
 import SourceItemDetailModal from "./SourceItemDetailModal.vue";
 import { toShanghaiDayKey } from "./tableDayGroups.js";
+import { describeLunaStatus, describeQueuedTask, describeCurrentTask } from "./writeQueueStatusPresentation.js";
 import { message, Modal as AModal } from "ant-design-vue";
 import { cancelWriteQueueTask, readWriteQueueTaskResult } from "../../services/creativeApi.js";
 
@@ -58,6 +59,7 @@ function readExpandedPreference(): boolean {
 }
 
 const data = ref<WriteQueueStatusType | null>(null);
+const statusReceivedAt = ref(Date.now());
 const loading = ref(false);
 const expanded = ref(readExpandedPreference());
 let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -89,13 +91,15 @@ const hasActiveWork = computed(() => {
   return data.value.current !== null || data.value.queue_length > 0;
 });
 
-/** 合并重叠刷新；页面隐藏时由轮询入口直接跳过，不占用后台连接。 */
+/** 合并刷新并记录倒计时基准；降级缓存沿用原采集时间，避免旧状态重新获得完整冷却时间。 */
 function refresh(): Promise<void> {
   if (refreshRequest) return refreshRequest;
   loading.value = true;
   refreshRequest = fetchWriteQueueStatus()
     .then((status) => {
       data.value = status;
+      const cachedAt = status.status_cached_at ? Date.parse(status.status_cached_at) : NaN;
+      statusReceivedAt.value = Number.isFinite(cachedAt) ? cachedAt : Date.now();
     })
     .catch(() => {
       // 服务端无法提供降级状态时保留当前显示，避免浮标闪烁。
@@ -231,13 +235,16 @@ onBeforeUnmount(() => {
             <span class="text-[11px] text-blue-800 break-all">{{ data.current.source_item_title || data.current.label }}</span>
           </div>
           <div v-if="data.current.source_item_source_name" class="mt-0.5 text-[10px] text-blue-400 truncate">{{ data.current.source_item_source_name }}</div>
-          <div v-if="data.current.phase_name" class="mt-1 text-[11px] font-medium text-blue-700">
+          <div class="mt-1 text-[11px] font-medium text-blue-700" data-testid="queue-current-state">
+            {{ describeCurrentTask(data.current, data.luna, elapsedNow, statusReceivedAt) }}
+          </div>
+          <div v-if="data.current.phase_name && data.current.phase_name !== '等待 Luna'" class="mt-1 text-[11px] font-medium text-blue-700">
             当前阶段：{{ data.current.phase_name }}
             <template v-if="data.current.image_total"> · 图片 {{ data.current.image_index || 0 }}/{{ data.current.image_total }}</template>
             <template v-if="data.current.retry_count"> · 重试 {{ data.current.retry_count }}/1</template>
           </div>
           <div v-if="data.current.started_at" class="mt-0.5 text-[10px] font-medium tabular-nums text-blue-500">
-            执行 {{ formatElapsed(data.current.started_at) }}<template v-if="data.run_started_at"> · 队列 {{ formatElapsed(data.run_started_at) }}</template>
+            任务已耗时 {{ formatElapsed(data.current.started_at) }}（含等待）<template v-if="data.run_started_at"> · 队列 {{ formatElapsed(data.run_started_at) }}</template>
           </div>
           <button class="write-queue-link" :disabled="Boolean(cancellingTaskId) || data.current.cancel_requested" @click.stop="cancelTask(data.current)">
             {{ data.current.cancel_requested ? '等待安全取消' : '取消任务' }}
@@ -250,13 +257,18 @@ onBeforeUnmount(() => {
 
         <!-- 排队列表 -->
         <div v-if="data.queue.length > 0" class="write-queue-list">
-          <div v-for="task in data.queue" :key="task.task_id" class="write-queue-task">
+          <div v-for="task in data.queue" :key="task.task_id">
+          <div class="write-queue-task">
             <span v-if="task.source_item_id" class="write-queue-id" @click.stop="openSourceItem(task.source_item_id)">#{{ task.source_item_id }}</span>
             <span class="flex-1 truncate text-[11px] text-editorial-text-body">{{ task.source_item_title || task.label }}</span>
             <span v-if="task.source_item_source_name" class="shrink-0 text-[10px] text-editorial-text-muted">· {{ task.source_item_source_name }}</span>
             <span class="text-[10px]" :class="task.priority === 'high' ? 'text-yellow-600' : 'text-gray-400'">{{ task.priority === 'high' ? '人工' : '自动' }}</span>
-            <span class="text-[10px] text-gray-400">等待 {{ formatElapsed(task.submitted_at) }}</span>
+            <span class="text-[10px] text-gray-400">提交后 {{ formatElapsed(task.submitted_at) }}</span>
             <button class="write-queue-link" :disabled="Boolean(cancellingTaskId)" @click.stop="cancelTask(task)">取消</button>
+          </div>
+          <div class="pb-1 text-[10px] text-editorial-text-muted" data-testid="queue-wait-reason">
+            {{ describeQueuedTask(task, data.luna, elapsedNow) }}
+          </div>
           </div>
         </div>
 
@@ -266,8 +278,8 @@ onBeforeUnmount(() => {
           class="write-queue-idle"
         >队列空闲</div>
 
-        <div v-if="data.luna" class="mt-2 rounded bg-gray-50 px-2 py-1 text-[10px] text-editorial-text-muted">
-          Luna：{{ data.luna.paused ? `暂停 · ${data.luna.reason || "等待恢复探测"}` : (data.luna.active ? `执行中 · ${data.luna.label || data.luna.kind || "任务"}` : "空闲") }}
+        <div v-if="data.luna && !(data.current && (data.luna.paused || data.luna.available === false))" class="mt-2 rounded bg-gray-50 px-2 py-1 text-[10px] text-editorial-text-muted" data-testid="queue-luna-state">
+          Luna：{{ describeLunaStatus(data.luna, elapsedNow, statusReceivedAt) }}
         </div>
 
         <!-- 持久化终态历史：按北京时间 00:00–23:59 分组，服务重启后仍可查看。 -->

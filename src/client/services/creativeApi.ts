@@ -931,6 +931,8 @@ export type WriteQueueStatus = {
     available?: boolean;
     paused?: boolean;
     remaining_seconds?: number;
+    /** 冷却已到期，但需以实际任务结果确认模型是否恢复。 */
+    probe?: boolean;
     reason?: string;
     kind?: string;
     task_id?: string;

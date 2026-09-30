@@ -135,6 +135,42 @@ describe("写作队列最近逐篇结果", () => {
     wrapper.unmount();
   });
 
+  it("当前导语任务展示冷却原因与时间，不再误导为执行或卡死", async () => {
+    window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
+    vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue({
+      ...queueStatus,
+      current: { ...queueStatus.recent[0]!, task_id: "intro-current", status: "writing", phase_name: "等待 Luna" },
+      luna: { status: "running", active: true, paused: true, reason: "account_unavailable", remaining_seconds: 300 },
+    });
+    const wrapper = mount(WriteQueueStatus, { attachTo: document.body,
+      global: { stubs: { SourceItemDetailModal: true, ArticleDetailDrawer: true } } });
+    try {
+      await flushPromises();
+      const text = document.body.querySelector('[data-testid="queue-current-state"]')?.textContent;
+      expect(text).toContain("未确认额度耗尽");
+      expect(text).toContain("后尝试恢复");
+      expect(text).not.toContain("等待 Luna");
+      expect(document.body.textContent).toContain("任务已耗时");
+      expect(document.body.textContent).toContain("含等待");
+    } finally { wrapper.unmount(); }
+  });
+
+  it("当前任务获得租约后显示处理中而不是等待 Luna", async () => {
+    window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
+    vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue({
+      ...queueStatus,
+      current: { ...queueStatus.recent[0]!, task_id: "intro-current", status: "writing", phase_name: "等待 Luna" },
+      luna: { status: "running", active: true, task_id: "intro-current" },
+    });
+    const wrapper = mount(WriteQueueStatus, { attachTo: document.body,
+      global: { stubs: { SourceItemDetailModal: true, ArticleDetailDrawer: true } } });
+    try {
+      await flushPromises();
+      expect(document.body.querySelector('[data-testid="queue-current-state"]')?.textContent).toContain("已获得 Luna 资源");
+      expect(document.body.textContent).not.toContain("当前阶段：等待 Luna");
+    } finally { wrapper.unmount(); }
+  });
+
   it("监控页持续展示逐篇终态而不是任务结束后只显示空闲", async () => {
     vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue(queueStatus);
     const wrapper = mount(MonitorPage, {

@@ -131,7 +131,6 @@ async function runCodeImageCards(
   const initial = findCreativeFinishedArticleById(db, articleId);
   if (!initial) return { ok: false, status: "failed", reason: "article-not-found" };
   if (initial.deletedAt) return { ok: false, status: "failed", reason: "article-deleted" };
-  if (initial.direction !== "short_content") return { ok: false, status: "failed", reason: "article-is-not-short-content" };
 
   const title = selectedTitle(initial);
   const source = initial.sourceItemId ? findCreativeSourceItemById(db, initial.sourceItemId) : null;
@@ -213,11 +212,12 @@ async function runCodeImageCards(
   const latest = findCreativeFinishedArticleById(db, articleId);
   if (!latest) return { ok: false, status: "failed", reason: "article-not-found-after-render" };
   const finalCards = mergeCardStates(latest.codeImageCards, rendered);
-  const finalMarkdown = mergeCodeImageMarkdown(
+  // 长文已有独立正文配图；制图只补封面候选，不自动改变发布正文。
+  const finalMarkdown = latest.direction === "short_content" ? mergeCodeImageMarkdown(
     latest.humanMarkdown ?? latest.contentMarkdown,
     latest.codeImageCards,
     rendered,
-  );
+  ) : latest.humanMarkdown;
   const finalCoverImages = mergeCodeCoverCandidates(
     latest.coverImage,
     latest.coverImageIndex,
@@ -227,7 +227,7 @@ async function runCodeImageCards(
   const finalSaved = editCreativeFinishedArticle(db, articleId, {
     expectedUpdatedAt: latest.updatedAt,
     codeImageCards: finalCards,
-    humanMarkdown: finalMarkdown,
+    ...(latest.direction === "short_content" ? { humanMarkdown: finalMarkdown } : {}),
     coverImage: finalCoverImages.images,
     coverImageIndex: finalCoverImages.index,
   }, "code-image");
@@ -240,7 +240,8 @@ async function runCodeImageCards(
 
 function selectedTitle(article: CreativeFinishedArticleRecord): string {
   const titles = article.titles ?? [];
-  return (titles[article.titleIndex] ?? titles[0] ?? "未命名短内容").trim() || "未命名短内容";
+  // 长短成品共用选中标题，缺失时提供中性文件文案，不调用模型补齐。
+  return (titles[article.titleIndex] ?? titles[0] ?? "未命名文章").trim() || "未命名文章";
 }
 
 function mergeCardStates(base: CodeImageCard[], updates: CodeImageCard[]): CodeImageCard[] {

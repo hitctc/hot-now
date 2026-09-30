@@ -373,6 +373,30 @@ describe("短内容代码制图", () => {
     expect(resolveCodeImageKeywords(null, null)).toEqual([]);
   });
 
+  // 长文复用渲染与封面候选，但必须保持两份正文和已选封面不变。
+  it("长文生成三比例封面候选，不改正文或已选封面，缺标签仍可制作", async () => {
+    const handle = await createTestDatabase("hot-now-long-code-image-");
+    handles.push(handle);
+    const imageDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-long-code-image-files-"));
+    tempDirs.push(imageDir);
+    const article = insertCreativeFinishedArticle(handle.db, {
+      titles: ["长文代码图片"],
+      intros: ["已有导语用于制作分享图片，不需要额外模型调用。"],
+      contentMarkdown: "原始长文正文",
+      humanMarkdown: "人工编辑的长文正文",
+      coverImage: ["https://example.com/existing-cover.png"],
+      coverImageIndex: 0,
+    });
+    const result = await generateCodeImageCards(handle.db, article.id, { imageDir });
+    expect(result.status).toBe("succeeded");
+    const saved = findCreativeFinishedArticleById(handle.db, article.id)!;
+    expect(saved.codeImageCards).toHaveLength(3);
+    expect(saved.contentMarkdown).toBe(article.contentMarkdown);
+    expect(saved.humanMarkdown).toBe(article.humanMarkdown);
+    expect(saved.coverImage).toHaveLength(4);
+    expect(saved.coverImage?.[saved.coverImageIndex]).toBe("https://example.com/existing-cover.png");
+  });
+
   it("制作三张图片并回写独立元数据、封面候选和人工正文", async () => {
     const handle = await createTestDatabase("hot-now-code-image-");
     handles.push(handle);

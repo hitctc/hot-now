@@ -526,7 +526,7 @@ export function registerCreativeFinishedArticleGenerationRoutes(context: Creativ
   });
 
   /**
-   * 手动重新生成代码图片标签；只对短内容开放，标签由 Hermes 生成并覆盖回写。
+   * 手动重新生成成品代码图片标签；显式调用 Hermes 模型并覆盖回写，不由制图隐式触发。
    * 覆盖语义：这是制图直接读取的最终标签，不做多候选，避免制图无法决定用哪一组。
    */
   app.post("/api/creative/finished-articles/:id/regen-code-image-keywords", async (request, reply) => {
@@ -537,9 +537,6 @@ export function registerCreativeFinishedArticleGenerationRoutes(context: Creativ
     const id = parseInt((request.params as { id: string }).id, 10);
     const article = findCreativeFinishedArticleById(db, id);
     if (!article) { return reply.code(404).send({ ok: false, reason: "article-not-found" }); }
-    if (article.direction !== "short_content") {
-      return reply.code(409).send({ ok: false, reason: "code-image-keywords-require-short-content" });
-    }
 
     const hermesApiUrl = process.env.HERMES_API_BASE_URL;
     const hermesApiToken = process.env.HERMES_API_TOKEN;

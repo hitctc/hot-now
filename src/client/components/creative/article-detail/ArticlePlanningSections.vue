@@ -199,7 +199,7 @@ watch(() => props.editingTitleIndex, (index) => {
   </section>
 
   <!-- 代码图片标签：短内容制图直接使用，没有标签时也保留区域，方便判断是缺少生成结果还是显示异常。 -->
-  <section v-if="!isManualArticle && article.direction === 'short_content'" data-testid="article-code-image-keywords">
+  <section data-testid="article-code-image-keywords">
     <div class="mb-2 flex items-center justify-between">
       <div>
         <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">代码图片标签</h3>

@@ -113,9 +113,13 @@ describe("成品详情代码图片标签", () => {
     expect(wrapper.find('[data-code-image-keywords-regenerate]').exists()).toBe(false);
   });
 
-  it("长文成品不展示代码图片标签区域", () => {
+  // 长文与短内容复用字段和显式生成入口，不由制图偷偷补调模型。
+  it("长文展示已有标签，缺失时提供手动生成入口", async () => {
     const wrapper = mountSections(buildArticle({ direction: "article", codeImageKeywords: ["AI监管"] }));
-
-    expect(wrapper.find('[data-testid="article-code-image-keywords"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="article-code-image-keywords"]').text()).toContain("AI监管");
+    const emptyWrapper = mountSections(buildArticle({ direction: "article", codeImageKeywords: [] }));
+    expect(emptyWrapper.find('[data-code-image-keywords-generate]').exists()).toBe(true);
+    await emptyWrapper.find('[data-code-image-keywords-generate]').trigger("click");
+    expect(emptyWrapper.findComponent(ArticlePlanningSections).emitted("regenerate-code-image-keywords")).toHaveLength(1);
   });
 });

@@ -69,10 +69,13 @@ describe("成品文章详情弹窗移动端布局", () => {
     wrapper.unmount();
   });
 
-  it("居中容器顶部对齐，弹窗和内容占满视口且正文仍可滚动", () => {
-    expect(mobileStyles).toMatch(/\.article-detail-modal\.ant-modal-centered\s*\{[^}]*align-items: flex-start !important;/);
-    expect(mobileStyles).toMatch(/\.article-detail-modal \.ant-modal\s*\{[^}]*width: 100% !important;[^}]*height: 100dvh;/);
-    expect(mobileStyles).toMatch(/\.article-detail-modal \.ant-modal \.ant-modal-content\s*\{[^}]*height: 100dvh;[^}]*max-height: 100dvh;/);
+  // 全屏规则必须位于媒体查询之外，才能同时覆盖电脑和手机。
+  it("所有屏幕的弹窗占满视口且无外侧留白，正文仍可滚动", () => {
+    const sharedStyles = styles.slice(0, styles.indexOf("@media (max-width: 768px)"));
+    expect(drawerSource).toContain('width="100%"');
+    expect(sharedStyles).toMatch(/\.article-detail-modal\.ant-modal-centered\s*\{[^}]*align-items: flex-start !important;[^}]*padding: 0 !important;/);
+    expect(sharedStyles).toMatch(/\.article-detail-modal \.ant-modal\s*\{[^}]*max-width: 100% !important;[^}]*width: 100% !important;[^}]*height: 100dvh;[^}]*margin: 0 !important;[^}]*padding: 0 !important;[^}]*top: 0 !important;/);
+    expect(sharedStyles).toMatch(/\.article-detail-modal \.ant-modal \.ant-modal-content\s*\{[^}]*height: 100dvh;[^}]*max-height: 100dvh;[^}]*border-radius: 0;/);
     expect(styles).toMatch(/\.article-detail-modal \.ant-modal-body\s*\{[^}]*flex: 1;[^}]*overflow-y: auto;/);
   });
 });

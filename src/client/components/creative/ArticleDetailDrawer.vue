@@ -5,7 +5,7 @@
     :closable="true"
     :mask-closable="true"
     :destroy-on-close="true"
-    width="90%"
+    width="100%"
     centered
     :wrap-class-name="articleDetailWrapClass"
     :mask-style="articleDetailMaskStyle"

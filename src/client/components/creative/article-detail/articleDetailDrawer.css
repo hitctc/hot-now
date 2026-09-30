@@ -3,6 +3,26 @@
   overflow: hidden !important;
 }
 
+/* 所有屏幕从顶部铺满视口；只去掉弹窗外部留白，正文仍保留阅读内边距。 */
+.article-detail-modal.ant-modal-centered {
+  align-items: flex-start !important;
+  padding: 0 !important;
+}
+.article-detail-modal .ant-modal {
+  max-width: 100% !important;
+  width: 100% !important;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0 !important;
+  padding: 0 !important;
+  top: 0 !important;
+}
+.article-detail-modal .ant-modal .ant-modal-content {
+  height: 100dvh;
+  max-height: 100dvh;
+  border-radius: 0;
+}
+
 /* 专注模式：编辑区持续聚焦时渐隐弹窗 header/footer/其他 section 和正文标题栏，只凸显编辑器 */
 .article-detail-modal .ant-modal-header,
 .article-detail-modal .ant-modal-footer,
@@ -260,25 +280,6 @@
 
 /* ─── 移动端适配 ─── */
 @media (max-width: 768px) {
-  /* wrap-class-name 落在容器自身；从顶部铺满视口，避免 centered 和全局高度限制留白。 */
-  .article-detail-modal.ant-modal-centered {
-    align-items: flex-start !important;
-    padding: 0 !important;
-  }
-  .article-detail-modal .ant-modal {
-    max-width: 100% !important;
-    width: 100% !important;
-    height: 100dvh;
-    max-height: 100dvh;
-    margin: 0 !important;
-    padding: 0 !important;
-    top: 0 !important;
-  }
-  .article-detail-modal .ant-modal .ant-modal-content {
-    height: 100dvh;
-    max-height: 100dvh;
-    border-radius: 0;
-  }
   .article-detail-modal .ant-modal-body {
     padding: 12px !important;
   }

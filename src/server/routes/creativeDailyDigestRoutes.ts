@@ -173,7 +173,7 @@ export function registerCreativeDailyDigestRoutes(
     return reply.send(updated);
   });
 
-  // ─── Daily Digest: 手动触发生成（代理调用 Hermes） ───
+  // 日报仅代理异步受理，模型耗时和取消由 Hermes 唯一队列负责。
 
   app.post("/api/creative/daily-digests/generate", async (request, reply) => {
     const session = options.readSession(request, reply);
@@ -185,16 +185,14 @@ export function registerCreativeDailyDigestRoutes(
       return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" });
     }
 
-    const body = request.body as { date?: unknown } | undefined;
-    const requestBody: Record<string, string> = {};
+    const body = request.body as { date?: unknown; requestId?: unknown } | undefined;
+    if (body?.date !== undefined && typeof body.date !== "string") return reply.code(400).send({ ok: false, reason: "invalid-date" });
+    const requestBody: Record<string, unknown> = { requestId: body?.requestId };
     if (typeof body?.date === "string" && body.date) {
       requestBody.date = body.date;
     }
 
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 300_000);
-
       const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/generate-digest`, {
         method: "POST",
         headers: {
@@ -202,10 +200,8 @@ export function registerCreativeDailyDigestRoutes(
           "Authorization": `Bearer ${hermesApiToken}`,
         },
         body: JSON.stringify(requestBody),
-        signal: controller.signal,
+        signal: AbortSignal.timeout(10_000),
       });
-
-      clearTimeout(timeout);
 
       if (!res.ok) {
         const errorBody = await res.json().catch(() => ({ error: `Hermes HTTP ${res.status}` }));
@@ -215,14 +211,33 @@ export function registerCreativeDailyDigestRoutes(
         });
       }
 
-      const data = await res.json() as { success?: boolean; detail?: string; error?: string };
-      return reply.send({ ok: true, detail: data.detail ?? "生成请求已发送" });
+      const data = await res.json() as { success?: boolean; taskId?: string; status?: string; detail?: string; error?: string };
+      if (!data.success || (res.status === 202 && !data.taskId)) return reply.code(502).send({ ok: false, reason: "invalid-digest-task-response" });
+      return reply.code(res.status === 202 ? 202 : 200).send({ ok: true, taskId: data.taskId, status: data.status, detail: data.detail ?? "日报任务已受理" });
     } catch (err) {
       if ((err as Error).name === "AbortError") {
-        return reply.code(504).send({ ok: false, reason: "生成超时（>300s），请稍后刷新查看" });
+        return reply.code(504).send({ ok: false, reason: "日报受理响应暂不可查，请用原请求编号恢复" });
       }
       return reply.code(502).send({ ok: false, reason: `Hermes 调用失败: ${(err as Error).message}` });
     }
+  });
+
+  /** 查询既有日报任务；不得通过 GET 重新触发生成或向公众号推送。 */
+  app.get("/api/creative/daily-digests/generate/status", async (request, reply) => {
+    if (options.readSession(request, reply) === undefined) return;
+    const taskId = (request.query as { taskId?: string }).taskId;
+    if (!taskId) return reply.code(400).send({ ok: false, reason: "missing-task-id" });
+    const base = process.env.HERMES_API_BASE_URL;
+    const token = process.env.HERMES_API_TOKEN;
+    if (!base || !token) return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" });
+    try {
+      const response = await fetch(`${base.replace(/\/+$/, "")}/api/generate-digest/status?${new URLSearchParams({ taskId })}`, {
+        headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000),
+      });
+      const result = await response.json() as { success?: boolean; status?: string; error?: string };
+      return reply.code(response.ok ? 200 : response.status >= 500 ? 502 : response.status)
+        .send({ ok: Boolean(result.success), taskId, status: result.status, reason: result.error });
+    } catch { return reply.code(502).send({ ok: false, reason: "日报任务状态暂不可查" }); }
   });
 
   // ─── Daily Digest: 推送公众号草稿（SSE 流式推送） ───

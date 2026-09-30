@@ -49,7 +49,7 @@ export function registerCreativeFinishedArticleTextTaskRoutes({ app, options, db
       const query = new URLSearchParams({ articleId: String(id), operation, ...(taskId ? { taskId } : {}) });
       const response = await fetch(`${base.replace(/\/+$/, "")}/api/manual-text-tasks${method === "GET" ? `/status?${query}` : ""}`, {
         method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        ...(method === "POST" ? { body: JSON.stringify({ articleId: id, operation, expectedUpdatedAt: article.updatedAt, input }) } : {}),
+        ...(method === "POST" ? { body: JSON.stringify({ articleId: id, operation, expectedUpdatedAt: article.updatedAt, input, requestId: (request.body as { requestId?: unknown } | undefined)?.requestId }) } : {}),
         signal: AbortSignal.timeout(10_000),
       });
       const data = await response.json() as { success?: boolean; taskId?: string; status?: string; error?: string; phaseName?: string };
@@ -67,7 +67,7 @@ export function registerCreativeFinishedArticleTextTaskRoutes({ app, options, db
           summary100: latest.summary100?.[0] ?? "" } : {}),
       });
     } catch {
-      // 超时不能证明后台提交失败；保留文章+操作去重，客户端只恢复原编号。
+      // 超时不能证明提交失败；客户端保留请求编号，下次提交由 Hermes 找回原活动或终态任务。
       return reply.code(502).send({ ok: false, reason: "任务服务暂不可达，请查询原任务状态，勿重复投递" });
     }
   }

@@ -1,4 +1,5 @@
 import { requestJson } from "./http.js";
+import { requestModelTask } from "./modelTaskRequest.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -80,13 +81,21 @@ export type GenerateDigestResult = {
   ok: boolean;
   detail?: string;
   reason?: string;
+  taskId?: string;
+  status?: string;
 };
 
+/** 提交日报并复用未确认请求编号；返回任务号只表示受理，不表示日报已经生成。 */
 export function triggerGenerateDigest(date?: string): Promise<GenerateDigestResult> {
-  return requestJson<GenerateDigestResult>("/api/creative/daily-digests/generate", {
+  return requestModelTask<GenerateDigestResult>("/api/creative/daily-digests/generate", {
     method: "POST",
     body: JSON.stringify(date ? { date } : {}),
   });
+}
+
+/** 只观察既有日报任务，刷新或查询故障不触发新的模型调用。 */
+export function readGenerateDigestTask(taskId: string): Promise<GenerateDigestResult> {
+  return requestJson(`/api/creative/daily-digests/generate/status?taskId=${encodeURIComponent(taskId)}`);
 }
 
 // ── Push to WeChat draft (SSE) ───────────────────────────────────────────────

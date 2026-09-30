@@ -1,5 +1,6 @@
 import { getManualTextTaskStatus, getRegenIntroStatus, type ManualTextTaskResult, type RegenIntroResult, type ManualModelOperation } from "../../../services/creativeApi.js";
 import { HttpError } from "../../../services/http.js";
+import { clearModelTaskRequest } from "../../../services/modelTaskRequest.js";
 
 export type ManualTextOperation = ManualModelOperation | "intro";
 
@@ -46,6 +47,7 @@ export async function waitManualTextTask(articleId: number, operation: ManualTex
       delay = 3000;
       if (["done", "failed", "stopped"].includes(result.status ?? "") || !result.ok) {
         saveManualTextTask(articleId, operation, null);
+        clearModelTaskRequest(articleId, operation);
         return result;
       }
     } catch (error) {

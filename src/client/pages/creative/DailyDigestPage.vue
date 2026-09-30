@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onBeforeUnmount, ref } from "vue";
 import { message, Modal } from "ant-design-vue";
 import type { TableProps } from "ant-design-vue";
 
@@ -8,10 +8,14 @@ import {
   readDailyDigest,
   readDailyDigests,
   triggerGenerateDigest,
+  readGenerateDigestTask,
   type DailyDigestListItem,
   type DailyDigestRecord,
   type DailyDigestStatus,
 } from "../../services/dailyDigestApi.js";
+
+import { clearDailyDigestRequest } from "../../services/modelTaskRequest.js";
+import { HttpError } from "../../services/http.js";
 
 // ── 状态 ──
 
@@ -23,6 +27,54 @@ const pageSize = ref(20);
 const statusFilter = ref<string | undefined>(undefined);
 
 const generating = ref(false);
+const activeDigestTask = ref<string | null>(null);
+let digestObservation = 0;
+let pageClosed = false;
+const DIGEST_TASK_KEY = "hotnow:daily-digest-task";
+
+/** 保存或清理日报任务编号；不保存正文、凭据或生成参数。 */
+function rememberDigestTask(taskId: string | null): void {
+  activeDigestTask.value = taskId;
+  try {
+    if (taskId) localStorage.setItem(DIGEST_TASK_KEY, taskId);
+    else localStorage.removeItem(DIGEST_TASK_KEY);
+  } catch { /* 浏览器存储不可用时仍观察当前内存任务。 */ }
+}
+
+/** 观察原任务到终态；离开页面停止查询，网络故障退避，不重复提交生成。 */
+async function observeDigestTask(taskId: string): Promise<void> {
+  // 提交响应可能晚于页面卸载；编号仍保存供重开恢复，但旧页面不能重新启动轮询。
+  if (pageClosed) return;
+  const observation = ++digestObservation;
+  generating.value = true;
+  let delay = 3000;
+  while (observation === digestObservation) {
+    await new Promise<void>((resolve) => setTimeout(resolve, delay));
+    if (observation !== digestObservation) return;
+    try {
+      const result = await readGenerateDigestTask(taskId);
+      if (observation !== digestObservation) return;
+      delay = 3000;
+      if (["done", "failed", "stopped"].includes(result.status || "")) {
+        rememberDigestTask(null);
+        clearDailyDigestRequest();
+        generating.value = false;
+        if (result.status === "done") { message.success("日报生成完成"); await loadItems(); }
+        else if (result.status === "stopped") message.warning("日报任务已取消");
+        else message.error(result.reason || "日报生成失败");
+        return;
+      }
+    } catch (error) {
+      if (error instanceof HttpError && [401, 403, 404].includes(error.status)) {
+        generating.value = false;
+        if (error.status === 404) rememberDigestTask(null);
+        message.warning("日报任务状态暂不可确认，请查看队列；未重新提交生成");
+        return;
+      }
+      delay = Math.min(delay * 2, 30_000);
+    }
+  }
+}
 
 // 详情弹窗
 const detailOpen = ref(false);
@@ -64,32 +116,45 @@ async function loadItems(): Promise<void> {
   }
 }
 
-onMounted(loadItems);
+// 重开页面只恢复已有日报编号的观察，不自动提交新生成请求。
+onMounted(() => {
+  void loadItems();
+  try {
+    const taskId = localStorage.getItem(DIGEST_TASK_KEY);
+    if (taskId) { activeDigestTask.value = taskId; void observeDigestTask(taskId); }
+  } catch { /* 不把浏览器存储限制当作后台任务失败。 */ }
+});
+onBeforeUnmount(() => { pageClosed = true; digestObservation += 1; });
 
 // ── 生成日报 ──
 
+/** 确认后只提交一次日报；队列编号持久化，完成与取消由状态观察确认。 */
 function handleGenerate(): void {
   Modal.confirm({
     bodyStyle: { padding: '24px' },
     title: "生成日报",
-    content: "确认触发 Hermes 生成日报？生成过程可能需要 1-2 分钟。",
+    content: "确认将日报加入 Hermes 队列？等待时长取决于模型资源与冷却状态，可在队列查看进度或取消。",
     okText: "确认生成",
     cancelText: "取消",
     onOk: async () => {
       generating.value = true;
       try {
         const result = await triggerGenerateDigest();
-        if (result.ok) {
-          message.success(result.detail ?? "生成请求已发送，请稍后刷新查看");
-          // 延迟刷新，给 Hermes 时间推送
-          setTimeout(loadItems, 5000);
+        if (result.ok && result.taskId) {
+          rememberDigestTask(result.taskId);
+          message.info(result.detail ?? "日报任务已受理，请查看队列进度");
+          void observeDigestTask(result.taskId);
+        } else if (result.ok) {
+          // 滚动发布期间保留旧同步响应的兼容，不将新异步受理当成生成完成。
+          message.success(result.detail ?? "日报生成完成");
+          await loadItems();
         } else {
           message.error(result.reason ?? "生成失败");
         }
       } catch (err) {
         message.error("生成请求失败，请检查 Hermes 配置");
       } finally {
-        generating.value = false;
+        if (!activeDigestTask.value) generating.value = false;
       }
     },
   });

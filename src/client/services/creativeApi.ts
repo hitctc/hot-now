@@ -1,4 +1,4 @@
-import { requestJson } from "./http.js";
+import { requestModelTask as requestJson } from "./modelTaskRequest.js";
 import type {
   AccountFitDetails,
   AccountFitLevel,

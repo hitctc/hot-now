@@ -398,7 +398,8 @@ export function registerCreativeFinishedArticleGenerationRoutes(context: Creativ
     if (!db) { return reply.code(503).send({ ok: false, reason: "database-not-available" }); }
 
     const id = parseInt((request.params as { id: string }).id, 10);
-    if (!findCreativeFinishedArticleById(db, id)) { return reply.code(404).send({ ok: false, reason: "article-not-found" }); }
+    const article = findCreativeFinishedArticleById(db, id);
+    if (!article) { return reply.code(404).send({ ok: false, reason: "article-not-found" }); }
     const hermesApiUrl = process.env.HERMES_API_BASE_URL;
     const hermesApiToken = process.env.HERMES_API_TOKEN;
     if (!hermesApiUrl || !hermesApiToken) { return reply.code(503).send({ ok: false, reason: "hermes-api-not-configured" }); }
@@ -407,7 +408,7 @@ export function registerCreativeFinishedArticleGenerationRoutes(context: Creativ
       const res = await fetch(`${hermesApiUrl.replace(/\/+$/, "")}/api/regen-intro`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${hermesApiToken}` },
-        body: JSON.stringify({ articleId: id }),
+        body: JSON.stringify({ articleId: id, expectedUpdatedAt: article.updatedAt, requestId: (request.body as { requestId?: unknown } | undefined)?.requestId }),
         signal: AbortSignal.timeout(15_000),
       });
       if (!res.ok) {
@@ -426,7 +427,7 @@ export function registerCreativeFinishedArticleGenerationRoutes(context: Creativ
       const current = findCreativeFinishedArticleById(db, id);
       if (!current) return reply.code(404).send({ ok: false, reason: "article-not-found" });
       const updatedIntros = [intro, ...(current.intros ?? [])];
-      const saved = editCreativeFinishedArticle(db, id, { intros: updatedIntros, expectedUpdatedAt: current.updatedAt });
+      const saved = editCreativeFinishedArticle(db, id, { intros: updatedIntros, expectedUpdatedAt: article.updatedAt });
       if (!saved.ok) return reply.code(409).send({ ok: false, reason: saved.reason ?? "导语保存失败" });
       const updated = findCreativeFinishedArticleById(db, id);
       return reply.send({ ok: true, intros: updated?.intros ?? updatedIntros, updatedAt: saved.updatedAt, prompt: data.prompt });
@@ -437,6 +438,7 @@ export function registerCreativeFinishedArticleGenerationRoutes(context: Creativ
     }
   });
 
+  /** 用生成时版本回写导语；相同已交付文本幂等成功，版本冲突不合并或覆盖人工修改。 */
   app.post("/actions/creative/finished-articles/:id/regen-intro/complete", async (request, reply) => {
     if (!options.authorizeCreativeApiToken(request, reply)) return;
     if (!db) return reply.code(503).send({ ok: false, reason: "database-not-available" });
@@ -447,8 +449,11 @@ export function registerCreativeFinishedArticleGenerationRoutes(context: Creativ
     if (!current) return reply.code(404).send({ ok: false, reason: "article-not-found" });
     // 网络重试或服务重启可能重复投递同一检查点；相同文本不再二次入库。
     if ((current.intros ?? []).includes(intro.trim())) return reply.send({ ok: true, updatedAt: current.updatedAt });
+    const expectedUpdatedAt = (request.body as { expectedUpdatedAt?: unknown } | undefined)?.expectedUpdatedAt;
+    // 相同成品已交付时上面的幂等分支直接成功；未交付则必须校验生成时版本，不能重读新稿后合并。
+    if (typeof expectedUpdatedAt !== "string" || !expectedUpdatedAt) return reply.code(400).send({ ok: false, reason: "missing-article-version" });
     const saved = editCreativeFinishedArticle(db, id, {
-      intros: [intro.trim(), ...(current.intros ?? [])], expectedUpdatedAt: current.updatedAt,
+      intros: [intro.trim(), ...(current.intros ?? [])], expectedUpdatedAt,
     });
     if (!saved.ok) return reply.code(409).send({ ok: false, reason: saved.reason ?? "导语保存失败" });
     return reply.send({ ok: true, updatedAt: saved.updatedAt });

@@ -36,7 +36,7 @@ describe("global modal layout styles", () => {
     expect(header).toContain("flex-shrink: 0");
     expect(header).toContain("padding: 20px 24px 14px !important");
     expect(footer).toContain("flex-shrink: 0");
-    expect(footer).toContain("padding: 0 24px 20px");
+    expect(footer).toContain("padding: 20px 20px");
   });
 
   it("在移动端将普通弹窗正文边距收窄为 16px", () => {

@@ -589,20 +589,27 @@ watch(() => props.article?.sourceItemId, (sid) => {
     .catch(() => { sourceCoverUrl.value = null; });
 });
 
-watch(() => props.open, (val) => {
-  if (val && props.article) {
+/**
+ * 打开或切换到有效文章时做首次初始化，关闭时收尾。
+ * 加载态会先以 article=null 打开，所以条件必须同时看 open 与文章，
+ * 否则正文到达后初始化与高度测量都不会执行。
+ */
+watch(() => [props.open, props.article?.id] as const, ([open, id], previous) => {
+  const ready = Boolean(open && id);
+  const wasReady = Boolean(previous?.[0] && previous?.[1]);
+  if (ready && !wasReady) {
     // 首次打开强制以服务端正文初始化；保持打开后的刷新则走下面的安全同步监听。
     syncCurrentArticleContent(true);
     // 重置保存时间，避免上一篇的相对时间残留到当前文章
     lastSavedAt.value = null;
     // 重置本地缓存状态
-    resetImageState(props.article);
+    resetImageState(props.article!);
     localTitles.value = [];
-    manualTitle.value = parseJsonArray(props.article.titles)[0] ?? readFirstH1(humanContent.value || editContent.value);
+    manualTitle.value = parseJsonArray(props.article!.titles)[0] ?? readFirstH1(humanContent.value || editContent.value);
     promptDirtyKeys.value = new Set();
     localIntros.value = [];
-    activeTitleIndex.value = props.article.titleIndex ?? 0;
-    activeIntroIndex.value = props.article.introIndex ?? 0;
+    activeTitleIndex.value = props.article!.titleIndex ?? 0;
+    activeIntroIndex.value = props.article!.introIndex ?? 0;
     // 重置标题编辑态，避免上一篇的编辑下标残留到当前文章
     editingTitleIdx.value = null;
     editingTitleValue.value = "";
@@ -610,13 +617,15 @@ watch(() => props.open, (val) => {
     resetEditorFullscreen();
     document.addEventListener("keydown", handleFullscreenEsc);
     // 恢复文章保存的主题偏好，无记录时默认使用落日胶片。
-    const saved = props.article.wechatThemeId;
+    const saved = props.article!.wechatThemeId;
     const previewKey = saved ? reverseThemeIdMap[saved] : undefined;
     activePreviewTheme.value = previewKey ?? "sunsetFilm";
-    // 弹窗打开后测量编辑器可用高度
+    // 正文渲染后再测量编辑器可用高度，此时顶部与底部已确定。
     nextTick(() => setupEditorResize());
     void loadLunaImageJobs();
-  } else {
+    return;
+  }
+  if (!open && previous?.[0]) {
     stopLunaImageJobsPolling();
     teardownEditorResize();
     // 关闭弹窗时如果有未保存的内容，立即保存一次，避免防抖定时器还没触发就丢失

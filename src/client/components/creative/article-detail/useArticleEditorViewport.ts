@@ -76,12 +76,13 @@ export function useArticleEditorViewport() {
     dynamicEditorHeight.value = Math.max(200, scrollParent.clientHeight - bodyPadding - titleBarHeight);
   }
 
-  /** 编辑器挂载后绑定尺寸、滚轮与聚焦事件。 */
+  /** 编辑器挂载后绑定尺寸、滚轮与聚焦事件；重复调用先释放旧观察器，避免叠加。 */
   function setupEditorResize(): void {
     const section = editorSectionRef.value;
     if (!section) return;
     const scrollParent = section.closest(".ant-modal-body") as HTMLElement | null;
     if (!scrollParent) return;
+    if (editorResizeObserver) { editorResizeObserver.disconnect(); editorResizeObserver = null; }
     measureEditorHeight();
     editorResizeObserver = new ResizeObserver(() => measureEditorHeight());
     editorResizeObserver.observe(scrollParent);

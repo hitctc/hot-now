@@ -253,10 +253,7 @@ sudo bash /srv/hot-now/app/scripts/enable-nginx-http2.sh
 
 脚本只修改 HotNow 的两个 TLS `listen` 指令，会先备份原配置、执行 `nginx -t`，验证通过才 reload；验证或 reload 失败时自动恢复备份。
 
-部署脚本不会触碰：
-
-- `/srv/hot-now/shared/data`
-- `/srv/hot-now/shared/.env`
+部署脚本不会用本地文件覆盖生产 live 数据库、报告或 `/srv/hot-now/shared/.env`。部署预检会在共享数据目录创建恢复快照，并按保留策略清理旧的 `pre-deploy-*.sqlite`；因此“保护共享数据”不代表共享目录完全没有写入。
 
 外部 AI 官方发布时间线 feed 推荐目录：
 
@@ -336,10 +333,9 @@ sudo visudo -cf /etc/sudoers.d/hot-now-systemctl
 
 ## 验证
 
-- 相关测试：已通过
-- 类型构建：已通过
-- 系统页客户端构建：已通过
-- Playwright MCP 本地验收通过：`/login` 登录成功；`/`、`/settings/view-rules`、`/settings/sources`、`/settings/profile`、`/history`、`/control` 访问正常；浅色主题切换后 `data-theme=light` 且 `localStorage['hot-now-theme']='light'`，刷新后保持；切回深色后 `data-theme=dark` 且刷新后保持；内容页来源筛选写入 `localStorage['hot-now-content-sources']`、Twitter 二级筛选写入 `localStorage['hot-now-twitter-account-filter']` / `localStorage['hot-now-twitter-keyword-filter']`、微信公众号 RSS 二级筛选写入 `localStorage['hot-now-wechat-rss-filter']`、排序偏好写入 `localStorage['hot-now-content-sort']`、标题搜索词写入 `localStorage['hot-now-content-search']` 后刷新仍保留
+- 自动验证入口：`npm run test`、`npm run typecheck:client`、`npm run build`；通过状态以本轮实际输出为准，不用历史结果代替当前验证。
+- 人工模型任务生产验收与待用户操作清单见 [收尾验收记录](./docs/人工模型任务收尾验收.md)；浏览器无法操作时遵循 [协作规则](./AGENTS.md)，不频繁重试。
+- 基础页面手动验收：检查登录和受保护页回跳、浅色／深色主题切换及刷新保持、内容页来源／二级来源／排序／搜索偏好的刷新恢复。无可用浏览器能力时保留待验收，不宣称通过。
 - 如果要手动验证 `/settings/view-rules`，先检查 `AI 新讯 / AI 热点` 筛选总览与开关保存，再检查反馈池的复制 / 删除 / 清空，以及 LLM 设置的保存 / 启用 / 删除是否正常；如需把厂商配置和会话密钥分开管理，再额外配置 `LLM_SETTINGS_MASTER_KEY`
 - 如果要手动验证 Twitter 账号采集，先在 `.env` 配置 `TWITTER_API_KEY`，再到 `/settings/sources` 新增并启用账号，点击“手动采集 Twitter 账号”后确认账号“最近成功 / 最近结果”被回写；如果内容页仍无结果，优先检查“最近结果”里是否出现“本次抓取成功，但没有可入库的新推文。”这类提示；不配置 key 时应只显示不可用提示，普通 RSS 和微信公众号 RSS 采集仍可继续
 - 如果要手动验证 Twitter 关键词搜索，先在 `/settings/sources` 新增并启用关键词，确认 `采集启用` 与 `展示启用` 都打开，再点击“手动采集 Twitter 关键词”；当前第一版会限制为“最多处理 5 个已启用关键词、每个关键词最多取前 10 条中文结果”，成功后优先检查关键词“最近成功 / 最近结果”是否回写，再到 `/ai-new`、`/ai-hot` 确认结果是否可见；如果只想停采但保留历史展示，关闭 `采集启用`；如果只想让该关键词命中的内容从内容页消失，关闭 `展示启用`

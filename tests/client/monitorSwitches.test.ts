@@ -1,5 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import Antd from "ant-design-vue";
+import Antd, { InputNumber } from "ant-design-vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import MonitorSwitches from "../../src/client/components/monitor/MonitorSwitches.vue";
@@ -48,6 +48,11 @@ const status = {
     windowHours: 48,
     baseScoreThreshold: 80,
     trendScoreThreshold: 80,
+    shortWritePacingSupported: true,
+    shortWriteMode: "paced",
+    shortWriteBatchSize: 1,
+    shortCollectionInterval: 60,
+    shortWriteInterval: 7.5,
     timezone: "Asia/Shanghai",
   },
   dailyPlan: {
@@ -113,6 +118,38 @@ afterEach(() => {
 });
 
 describe("MonitorSwitches 每轮长文计划", () => {
+  it("长短配置分块，小数间隔原样保存且不提交长文配置", async () => {
+    const wrapper = mount(MonitorSwitches, { global: { plugins: [Antd] } });
+    await flushPromises();
+    const long = wrapper.get('[data-testid="long-write-config"]');
+    const short = wrapper.get('[data-testid="short-write-config"]');
+    expect(long.text()).toContain("每轮自动长文槽位");
+    expect(long.text()).not.toContain("短内容采集间隔");
+    expect(short.text()).toContain("短内容采集间隔");
+    expect(short.text()).toContain("单篇投递间隔");
+    expect(short.text()).not.toContain("基础评分阈值");
+    expect(short.text()).not.toContain("每轮自动短内容数量");
+    const row = wrapper.get('[data-testid="config-shortWriteInterval"]');
+    row.findComponent(InputNumber).vm.$emit("change", 7.5);
+    await row.get("button").trigger("click");
+    await flushPromises();
+    expect(serviceMocks.updateCreativeAutomationControl).toHaveBeenCalledWith({ config: { interval_short_write: 7.5 } });
+    wrapper.unmount();
+  });
+
+  it("旧 Hermes 尚不支持逐篇规则时不允许提交小数间隔", async () => {
+    serviceMocks.fetchCreativeAutomationStatus.mockResolvedValue({
+      ...structuredClone(status), config: { ...status.config, shortWritePacingSupported: false, shortWriteMode: "batch", shortWriteInterval: 60, shortWriteBatchSize: 6 },
+    });
+    const wrapper = mount(MonitorSwitches, { global: { plugins: [Antd] } });
+    await flushPromises();
+    const row = wrapper.get('[data-testid="config-shortWriteInterval"]');
+    expect(row.get("button").attributes("disabled")).toBeDefined();
+    expect(wrapper.get('[data-testid="short-write-config"]').text()).toContain("版本尚未生效");
+    expect(serviceMocks.updateCreativeAutomationControl).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
   it("展示槽位、失败原因、最近成功结果和成品入口", async () => {
     const wrapper = mount(MonitorSwitches, { global: { plugins: [Antd] } });
     await flushPromises();

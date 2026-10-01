@@ -37,23 +37,25 @@ const stageDefinitions: Array<{ key: AutomationStageKey; description: string }> 
   { key: "account_fit", description: "账号适配评估；失败按退避上限重试" },
   { key: "long_write", description: "周期槽位自动长文；仅接受账号适配=high且双评分达标的素材" },
   { key: "short_collection", description: "采集短内容热搜并入库；不启动写作" },
-  { key: "short_write", description: "只消费当前采集批次的自动短内容写作" },
+  { key: "short_write", description: "当前采集批次逐篇投递，已有自动短任务时不追加" },
   { key: "images", description: "自动写作中的 Luna 图片生成许可" },
   { key: "daily_digest", description: "自动日报" },
   { key: "reminders", description: "自动提醒" },
   { key: "notifications", description: "邮件和其他自动通知" },
 ];
 
-const configDefinitions = [
+const longConfigDefinitions = [
   { key: "dailyLongWriteCount", backendKey: "auto_write_daily_count", label: "每轮自动长文槽位", description: "默认 3 个；表示当前执行周期最多同时占用的任务数，成功或终态阻断后自动释放", type: "number" as const, min: 0, max: 20 },
   { key: "dailyLongWriteTime", backendKey: "auto_write_daily_time", label: "每日自动写作时间", description: "北京时间，默认 10:00", type: "time" as const, min: 0, max: 0 },
   { key: "windowHours", backendKey: "auto_write_window_hours", label: "素材回看窗口（小时）", description: "计划时间向前筛选，默认 48 小时", type: "number" as const, min: 1, max: 168 },
   { key: "baseScoreThreshold", backendKey: "auto_write_base_score_threshold", label: "基础评分阈值", description: "自动写作硬门槛；还必须账号适配=high且趋势分达标，默认 80", type: "number" as const, min: 0, max: 100 },
   { key: "trendScoreThreshold", backendKey: "trend_score_threshold", label: "趋势评分阈值", description: "自动写作硬门槛；还必须账号适配=high且基础分达标，默认 80", type: "number" as const, min: 0, max: 100 },
-  { key: "shortWriteBatchSize", backendKey: "auto_write_short_daily_count", label: "每轮自动短内容数量", description: "只处理刚完成采集的素材，默认 1 篇；历史 ready 素材不会自动补写", type: "number" as const, min: 0, max: 20 },
-  { key: "shortCollectionInterval", backendKey: "interval_short_collection", label: "短内容采集间隔（分钟）", description: "独立于写作调度；当前默认 60 分钟", type: "number" as const, min: 1, max: 1440 },
-  { key: "shortWriteInterval", backendKey: "interval_short_write", label: "短内容写作间隔（分钟）", description: "每次最多写入配置数量，当前设置为 60 分钟", type: "number" as const, min: 1, max: 1440 },
 ] as const;
+const shortConfigDefinitions = [
+  { key: "shortCollectionInterval", backendKey: "interval_short_collection", label: "短内容采集间隔（分钟）", description: "采集后评分形成当前批次候选；默认 60 分钟，不随每篇写作重复采集", type: "number" as const, min: 1, max: 1440 },
+  { key: "shortWriteInterval", backendKey: "interval_short_write", label: "单篇投递间隔（分钟）", description: "建议 7.5 分钟，每次最多一篇；支持小数，不保证届时立即开写", type: "number" as const, min: 1, max: 1440 },
+] as const;
+const configDefinitions = [...longConfigDefinitions, ...shortConfigDefinitions] as const;
 
 type ConfigKey = (typeof configDefinitions)[number]["key"];
 const configDraft = ref<Partial<Record<ConfigKey, string | number>>>({});
@@ -147,6 +149,7 @@ function formatDateTime(value?: string | null): string {
   return parsed.toLocaleString("zh-CN", { hour12: false });
 }
 
+/** 同步 Hermes 的长短配置快照；编辑期间保留用户输入，不保存第二套调度状态。 */
 function syncConfigDraft(status: CreativeAutomationStatus): void {
   if (configDirty.value) return;
   configDraft.value = {
@@ -155,7 +158,6 @@ function syncConfigDraft(status: CreativeAutomationStatus): void {
     windowHours: status.config.windowHours,
     baseScoreThreshold: status.config.baseScoreThreshold,
     trendScoreThreshold: status.config.trendScoreThreshold,
-    shortWriteBatchSize: status.config.shortWriteBatchSize,
     shortCollectionInterval: status.config.shortCollectionInterval,
     shortWriteInterval: status.config.shortWriteInterval,
   };
@@ -229,10 +231,14 @@ async function changeStage(stage: AutomationStageKey, enabled: boolean): Promise
   }
 }
 
-/** 保存每日计划参数，参数写入 Hermes，不在 HotNow 留本地副本。 */
+/** 保存选中的长文参数或短内容间隔；只有 Hermes 已支持逐篇模式时才允许启用小数间隔。 */
 async function saveConfig(definition: (typeof configDefinitions)[number]): Promise<void> {
   const value = configDraft.value[definition.key];
   if (value === undefined || value === "") return;
+  if (definition.key === "shortWriteInterval" && !automation.value?.config.shortWritePacingSupported) {
+    message.warning("Hermes 逐篇调度版本尚未生效，暂不能保存小数间隔");
+    return;
+  }
   configDirty.value = definition.key;
   saving.value = definition.key;
   try {
@@ -339,9 +345,9 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">每轮自动长文计划</div>
-      <div class="mb-4 space-y-1.5">
-        <div v-for="definition in configDefinitions" :key="definition.key" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5">
+      <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">长内容计划</div>
+      <div class="mb-4 space-y-1.5 rounded border border-editorial-border p-2" data-testid="long-write-config">
+        <div v-for="definition in longConfigDefinitions" :key="definition.key" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5">
           <div class="min-w-0 flex-1">
             <div class="text-xs font-medium text-editorial-text-body">{{ definition.label }}</div>
             <div class="text-[10px] text-editorial-text-muted/70">{{ definition.description }}</div>
@@ -402,6 +408,23 @@ onBeforeUnmount(() => {
         </div>
         <div class="rounded border border-editorial-border bg-editorial-bg-page px-2.5 py-1.5 text-[10px] leading-5 text-editorial-text-muted">
           五分钟复核只补空槽，不投递写作；手动或定时触发只执行点击/到点瞬间的待执行与待重试快照。自动写作入列条件：账号适配必须为 <strong>high（高适配）</strong>，同时基础评分 ≥ {{ automation?.config.baseScoreThreshold ?? 80 }}、趋势评分 ≥ {{ automation?.config.trendScoreThreshold ?? 80 }}；另受 48 小时窗口、已写作/已占用排除和同主题去重约束。
+        </div>
+      </div>
+
+      <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">短内容节奏</div>
+      <div class="mb-4 space-y-1.5 rounded border border-editorial-border p-2" data-testid="short-write-config">
+        <div v-for="definition in shortConfigDefinitions" :key="definition.key" :data-testid="`config-${definition.key}`" class="flex items-center gap-2 rounded border border-editorial-border px-2.5 py-1.5">
+          <div class="min-w-0 flex-1">
+            <div class="text-xs font-medium text-editorial-text-body">{{ definition.label }}</div>
+            <div class="text-[10px] text-editorial-text-muted/70">{{ definition.description }}</div>
+          </div>
+          <a-input-number :value="draftValue(definition.key)" :min="definition.min" :max="definition.max" :step="definition.key === 'shortWriteInterval' ? 0.5 : 1" size="small" class="!w-20" :disabled="saving === definition.key || (definition.key === 'shortWriteInterval' && !automation?.config.shortWritePacingSupported)" @change="(value: number | null) => { if (value !== null) configDraft[definition.key] = value; }" />
+          <a-button size="small" :loading="saving === definition.key" :disabled="definition.key === 'shortWriteInterval' && !automation?.config.shortWritePacingSupported" @click="saveConfig(definition)">保存</a-button>
+        </div>
+        <div class="rounded bg-editorial-bg-page px-2.5 py-1.5 text-[10px] leading-5 text-editorial-text-muted">
+          <template v-if="automation?.config.shortWriteMode === 'paced'">当前为逐篇模式，每次最多 1 篇；已有自动短内容排队或执行中时不追加，错过不补投。新批次替换未投递的旧候选，人工写作不受影响。分钟调度可能延后到期投递，不保证精确 450 秒开写。</template>
+          <template v-else-if="automation?.config.shortWritePacingSupported">当前仍为批量模式：{{ automation.config.shortWriteInterval }} 分钟最多 {{ automation.config.shortWriteBatchSize }} 篇。将单篇投递间隔设为 7.5 并保存后启用逐篇模式；旧任务不取消。</template>
+          <template v-else>Hermes 逐篇调度版本尚未生效，旧批量规则继续运行；请在确认活动任务安全后完成 Hermes 服务更新。</template>
         </div>
       </div>
 

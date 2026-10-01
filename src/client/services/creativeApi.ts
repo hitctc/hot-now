@@ -773,6 +773,8 @@ export type CreativeAutomationStatus = {
     windowHours: number;
     baseScoreThreshold: number;
     trendScoreThreshold: number;
+    shortWritePacingSupported?: boolean;
+    shortWriteMode?: "batch" | "paced";
     shortWriteBatchSize: number;
     shortCollectionInterval: number;
     shortWriteInterval: number;

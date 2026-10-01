@@ -1,7 +1,13 @@
 node_modules
 dist
 .env
-.env.local
+.env.*
+!.env.example
+*.pem
+*.key
+credentials
+credentials.*
+auth.json
 .deploy.local.env
 .playwright-cli
 *.sqlite-shm

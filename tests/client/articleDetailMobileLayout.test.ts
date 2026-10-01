@@ -94,19 +94,24 @@ describe("成品文章详情弹窗移动端布局", () => {
   it("所有屏幕的弹窗占满视口且无外侧留白，正文仍可滚动", () => {
     const sharedStyles = styles.slice(0, styles.indexOf("@media (max-width: 768px)"));
     expect(drawerSource).toContain('width="100%"');
-    expect(sharedStyles).toMatch(/\.article-detail-modal\.ant-modal-centered\s*\{[^}]*align-items: flex-start !important;[^}]*padding: 0 !important;/);
-    expect(sharedStyles).toMatch(/\.article-detail-modal \.ant-modal\s*\{[^}]*max-width: 100% !important;[^}]*width: 100% !important;[^}]*height: 100dvh;[^}]*margin: 0 !important;[^}]*padding: 0 !important;[^}]*top: 0 !important;/);
-    expect(sharedStyles).toMatch(/\.article-detail-modal \.ant-modal \.ant-modal-content\s*\{[^}]*height: 100dvh;[^}]*max-height: 100dvh;[^}]*border-radius: 0;/);
-    expect(styles).toMatch(/\.article-detail-modal \.ant-modal-body\s*\{[^}]*flex: 1;[^}]*overflow-y: auto;/);
+    expect(sharedStyles).toMatch(/\.article-detail-modal\.ant-modal-centered\s*\{[^}]*display: flex !important;[^}]*align-items: stretch !important;[^}]*padding: 0 !important;/);
+    expect(sharedStyles).toMatch(/\.article-detail-modal \.ant-modal\s*\{[^}]*max-width: 100% !important;[^}]*width: 100% !important;[^}]*margin: 0 !important;[^}]*padding: 0 !important;[^}]*top: 0 !important;/);
+    expect(styles).toMatch(/\.article-detail-modal \.ant-modal-body\s*\{[^}]*flex: 1;[^}]*min-height: 0;[^}]*overflow-y: auto;/);
   });
 
-  it("弹窗高度用视口单位而不是百分比，避免移动端正文区失去约束后无法滚动", () => {
-    // 百分比高度依赖包裹层高度是否为确定值，退化成 auto 时只有中间正文区滚动的行为会失效。
-    // 只检查声明了高度的块，避免把只写 transition 的块算进来。
-    const modalHeightBlocks = styles.match(/\.article-detail-modal \.ant-modal\s*\{[^}]*height:[^}]*\}/g) ?? [];
-    expect(modalHeightBlocks.length).toBeGreaterThan(0);
-    for (const block of modalHeightBlocks) expect(block).toContain("100dvh");
-    const mobileStyles = styles.match(/@media \(max-width: 768px\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
-    expect(mobileStyles).toMatch(/\.article-detail-modal \.ant-modal-footer\s*\{[^}]*padding: 8px 12px !important;[^}]*margin-top: 0 !important;/);
+  it("弹窗高度由固定容器拉伸，不用高度值也不靠 antd 居中占位符", () => {
+    // 历史教训：用 100dvh 会在视口单位失效时上下露缝；改成百分比又会在包裹层高度
+    // 不确定时退化成 auto，使正文区失去约束、整个弹窗都不能滚动。因此只用 flex 拉伸。
+    const sharedStyles = styles.slice(0, styles.indexOf("@media (max-width: 768px)"));
+    expect(sharedStyles).toMatch(/\.article-detail-modal\.ant-modal-centered::before\s*\{[^}]*display: none !important;/);
+    for (const block of styles.match(/\.article-detail-modal \.ant-modal\s*\{[^}]*\}/g) ?? []) {
+      expect(block).not.toMatch(/height:\s*(100dvh|100%|100vh)/);
+    }
+    // antd 在 .ant-modal 与内容块之间还有一层焦点包裹，flex 分配到不了内容块。
+    expect(sharedStyles).toMatch(/\.article-detail-modal \.ant-modal \.ant-modal-content\s*\{[^}]*position: absolute;[^}]*inset: 0;[^}]*max-height: none;/);
+    // 头尾固定且不留缝，中间是唯一滚动区。
+    expect(sharedStyles).toMatch(/\.article-detail-modal \.ant-modal-header\s*\{[^}]*margin-bottom: 0 !important;/);
+    expect(sharedStyles).toMatch(/\.article-detail-modal \.ant-modal-footer\s*\{[^}]*margin-top: 0 !important;/);
+    expect(sharedStyles).toMatch(/\.article-detail-modal \.ant-modal-body\s*\{[^}]*overflow-x: hidden;/);
   });
 });

@@ -3,25 +3,40 @@
   overflow: hidden !important;
 }
 
-/* 所有屏幕从顶部铺满视口；只去掉弹窗外部留白，正文仍保留阅读内边距。 */
+/* 所有屏幕铺满视口。
+   包裹层自己当 flex 容器，隐藏 antd 的垂直居中占位符：不再用“行内块 + vertical-align”
+   靠高度值居中，也不依赖 100dvh 或百分比高度，因而不会因视口单位失效或包裹层
+   高度不确定而上下出现间距。 */
 .article-detail-modal.ant-modal-centered {
-  align-items: flex-start !important;
+  display: flex !important;
+  align-items: stretch !important;
+  justify-content: center !important;
   padding: 0 !important;
 }
-/* 高度用视口单位而不是百分比：百分比依赖包裹层高度是否为确定值，
-   部分移动浏览器会把 100% 退化成 auto，导致正文区失去约束、整个弹窗都无法滚动。 */
+.article-detail-modal.ant-modal-centered::before {
+  display: none !important;
+}
+/* 高度由 align-items: stretch 拉伸而来，不声明高度；宽度占满，避免行内布局产生横向溢出。 */
 .article-detail-modal .ant-modal {
+  display: flex !important;
+  flex-direction: column;
   max-width: 100% !important;
   width: 100% !important;
-  height: 100dvh;
-  max-height: 100dvh;
   margin: 0 !important;
   padding: 0 !important;
   top: 0 !important;
+  text-align: start;
 }
+/* 弹窗内容绝对定位铺满弹窗：antd 在 .ant-modal 与 .ant-modal-content 之间插了焦点包裹层，
+   普通 flex 分配到不了内容块，才会出现“只能靠 max-height 兜底”的 32px 底部空白。
+   绝对定位直接以 .ant-modal（已 position: relative）为参照，不依赖中间层。 */
 .article-detail-modal .ant-modal .ant-modal-content {
-  height: 100dvh;
-  max-height: 100dvh;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: none;
   border-radius: 0;
 }
 
@@ -44,8 +59,13 @@
 .article-detail-content {
   position: relative;
 }
+.article-detail-modal--focus .ant-modal-body {
+  display: flex;
+  flex-direction: column;
+}
 .article-detail-modal--focus .article-detail-content {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   gap: 0;
 }
 .article-detail-modal--focus .article-detail-content > section:not(.editor-section) {
@@ -61,7 +81,8 @@
   position: relative;
 }
 .article-detail-modal--focus .editor-section {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 .article-detail-modal--focus [data-editor-title] {
   position: absolute;
@@ -85,19 +106,12 @@
 .article-detail-modal--focus .ant-modal {
   width: 100% !important;
   max-width: 100% !important;
-  height: 100dvh;
-  max-height: 100dvh;
   padding-bottom: 0;
 }
-/* 弹窗内容由 header/body/footer 三段组成，专注时 body 接管全部可用高度。 */
+/* 弹窗内容由 header/body/footer 三段组成：头尾固定，中间正文区占满剩余高度并可滚动。 */
 .article-detail-modal .ant-modal-content {
-  max-height: 100vh;
   display: flex;
   flex-direction: column;
-}
-.article-detail-modal--focus .ant-modal-content {
-  height: 100dvh;
-  max-height: 100dvh;
 }
 .article-detail-modal .ant-modal-header {
   flex-shrink: 0;
@@ -105,11 +119,16 @@
   z-index: 1;
   background: #faf9fc;
   box-shadow: 0 4px 12px rgba(31, 24, 48, 0.08);
+  /* 清掉 antd 默认外边距：三段结构应背靠背，靠背景与阴影区分而不是留缝。 */
+  margin-bottom: 0 !important;
 }
 .article-detail-modal .ant-modal-body {
   background: #ffffff;
   flex: 1;
+  /* 内容超出时只纵向滚动；横向溢出交给内部容器处理，不出现横向滚动条。 */
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 .article-detail-modal--focus .ant-modal-header,
 .article-detail-modal--focus .ant-modal-footer {
@@ -282,6 +301,8 @@
   background: #faf9fc;
   box-shadow: 0 -4px 12px rgba(31, 24, 48, 0.08);
   padding: 12px 24px;
+  /* 同理清掉 antd 默认外边距，避免正文与操作栏之间出现空白缝隙。 */
+  margin-top: 0 !important;
 }
 /* 关闭入口仅补给底部操作区，桌面端继续使用弹窗右上角关闭按钮。 */
 .article-detail-footer .article-detail-footer__mobile-close {
@@ -298,8 +319,6 @@
   }
   .article-detail-modal .ant-modal-footer {
     padding: 8px 12px !important;
-    /* 去掉 antd 默认的 margin-top，避免底部操作栏上方露出一道空白缝隙。 */
-    margin-top: 0 !important;
   }
   .article-detail-footer {
     display: flex;

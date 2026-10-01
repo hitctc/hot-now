@@ -82,8 +82,9 @@ onBeforeUnmount(() => {
       <span v-if="savedAtLabel" class="text-[11px] font-medium text-green-600">{{ savedAtLabel }}</span>
     </div>
     <template v-if="!readonly">
-      <div class="flex flex-wrap items-center gap-2 max-[768px]:flex-nowrap max-[768px]:overflow-x-auto">
-        <div class="flex flex-wrap gap-1 max-[768px]:flex-nowrap">
+      <!-- 窄屏允许换行：横向滚动条会被误认为弹窗布局错误，且与本弹窗只需纵向滚动不符。 -->
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap gap-1">
           <a-button
             v-for="option in previewThemeOptions"
             :key="option.key"

@@ -878,6 +878,8 @@ export type WriteQueueTask = {
   label: string;
   priority: "high" | "normal";
   source_item_id: number | null;
+  source_external_id?: string;
+  task_kind?: string;
   cancel_requested?: boolean;
   result_retained?: boolean;
   retained_result_id?: string;

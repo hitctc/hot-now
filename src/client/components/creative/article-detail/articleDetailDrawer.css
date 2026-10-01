@@ -418,6 +418,22 @@
   transition: height 0.8s ease;
 }
 
+/* 只读详情使用阅读栏宽度；覆盖主题图片的内联尺寸，竖图也不超过可视高度，不裁切内容。 */
+.article-readonly-preview {
+  width: 100%;
+  max-width: 800px;
+  margin-inline: auto;
+}
+.article-readonly-preview img {
+  display: block;
+  width: auto !important;
+  height: auto !important;
+  max-width: 100% !important;
+  max-height: 70dvh !important;
+  object-fit: contain;
+  margin-inline: auto !important;
+}
+
 .article-markdown-body {
   font-size: 14px;
   line-height: 1.75;

@@ -18,16 +18,20 @@ const emit = defineEmits<{
 const loading = ref(false);
 const data = ref<CreativeSourceItem | null>(null);
 
-// 打开时自动加载数据
-watch(() => props.visible, async (val) => {
-  if (!val || !props.sourceItemId) { data.value = null; return; }
+/** 打开或切换平台素材编号时读取详情；过期响应不能覆盖后来选中的素材。 */
+watch([() => props.visible, () => props.sourceItemId], async ([visible, sourceItemId], _previous, onCleanup) => {
+  let active = true;
+  onCleanup(() => { active = false; });
+  data.value = null;
+  if (!visible || !sourceItemId) { loading.value = false; return; }
   loading.value = true;
   try {
-    data.value = await readCreativeSourceItem(props.sourceItemId);
+    const source = await readCreativeSourceItem(sourceItemId);
+    if (active) data.value = source;
   } catch {
-    data.value = null;
+    if (active) data.value = null;
   } finally {
-    loading.value = false;
+    if (active) loading.value = false;
   }
 });
 
@@ -49,6 +53,7 @@ function formatTime(value: string | null): string {
   <a-modal
     :open="visible"
     title="素材详情"
+    :z-index="1950"
     :footer="null"
     :closable="true"
     :mask-closable="true"

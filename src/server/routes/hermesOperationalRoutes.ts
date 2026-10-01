@@ -62,7 +62,7 @@ export function registerHermesOperationalRoutes(
     });
   }
 
-  // ─── 写作队列状态：代理 Hermes GET /api/write-queue/status ───
+  // 队列状态仅补充展示关联：短素材外部标识和成品关联均转换为平台 ID，不改变 Hermes 任务。
   app.get("/api/creative/write-queue/status", async (request, reply) => {
     const session = options.readSession(request, reply);
     if (session === undefined) { return; }
@@ -132,6 +132,21 @@ export function registerHermesOperationalRoutes(
         ...(data.recent ?? []),
         ...(data.history ?? []),
       ].filter(Boolean) as Array<Record<string, unknown>>;
+      // 自动短内容没有平台 ID，不能拿 Hermes 本地编号打开平台素材；历史记录从成品补回关联。
+      const articleIds = [...new Set(tasks.map((task) => Number(task.finished_article_id || task.article_id)).filter((id) => Number.isSafeInteger(id) && id > 0))];
+      const articles = articleIds.length ? db.prepare(`SELECT id, source_item_id FROM creative_finished_articles WHERE id IN (${articleIds.map(() => "?").join(",")})`).all(...articleIds) as Array<{ id: number; source_item_id: number | null }> : [];
+      const articleSources = new Map(articles.map((article) => [article.id, article.source_item_id]));
+      for (const task of tasks) {
+        if (task.source_item_id) continue;
+        const articleSource = articleSources.get(Number(task.finished_article_id || task.article_id));
+        if (articleSource) {
+          task.source_item_id = articleSource;
+        } else if (typeof task.source_external_id === "string" && task.source_external_id) {
+          const matches = db.prepare("SELECT id FROM creative_source_items WHERE external_id = ? AND direction = 'short_content' LIMIT 2").all(task.source_external_id) as Array<{ id: number }>;
+          // 外部标识有歧义时不猜测素材，避免链接指向另一来源。
+          if (matches.length === 1) task.source_item_id = matches[0]!.id;
+        }
+      }
       const sourceItemIds = [...new Set(tasks.map((task) => Number(task.source_item_id)).filter(Boolean))];
       if (sourceItemIds.length > 0) {
         const placeholders = sourceItemIds.map(() => "?").join(",");

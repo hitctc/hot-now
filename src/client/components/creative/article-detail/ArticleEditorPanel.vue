@@ -105,7 +105,7 @@ onBeforeUnmount(() => {
   <!-- 只读详情继续使用已选主题的 HTML 预览。 -->
   <div
     v-if="readonly"
-    class="rounded border border-editorial-border bg-white p-4 overflow-auto"
+    class="article-readonly-preview rounded border border-editorial-border bg-white p-4 overflow-auto"
     :style="{ height: dynamicHeight + 'px' }"
     v-html="previewHtml"
   />

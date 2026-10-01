@@ -135,6 +135,24 @@ describe("写作队列最近逐篇结果", () => {
     wrapper.unmount();
   });
 
+  it("当前自动任务和历史素材编号均可打开相同的平台素材详情", async () => {
+    window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
+    vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue({
+      ...queueStatus, current: { ...queueStatus.recent[1]!, status: "writing", task_kind: "short_content_auto" },
+    });
+    const wrapper = mount(WriteQueueStatus, { attachTo: document.body,
+      global: { stubs: { SourceItemDetailModal: true, ArticleDetailDrawer: true } } });
+    try {
+      await flushPromises();
+      const link = document.body.querySelector<HTMLButtonElement>(".write-queue-current button.write-queue-id");
+      expect(link?.textContent).toContain("素材 #101");
+      link?.click();
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "SourceItemDetailModal" }).props()).toMatchObject({ visible: true, sourceItemId: 101 });
+      expect(document.body.querySelector(".write-queue-history")?.textContent).toContain("素材 #101");
+    } finally { wrapper.unmount(); }
+  });
+
   it("当前导语任务展示冷却原因与时间，不再误导为执行或卡死", async () => {
     window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
     vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue({

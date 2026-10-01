@@ -131,6 +131,7 @@ function toggleExpand(): void {
   }
 }
 
+/** 用平台素材编号打开现有只读详情，不提交写作请求。 */
 function openSourceItem(id: number): void {
   modalSourceItemId.value = id;
   modalVisible.value = true;
@@ -231,7 +232,7 @@ onBeforeUnmount(() => {
         <div v-if="data.current" class="write-queue-current">
           <div class="flex flex-wrap items-center gap-x-1 gap-y-0">
             <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500 shrink-0" />
-            <span v-if="data.current.source_item_id" class="write-queue-id" @click.stop="openSourceItem(data.current.source_item_id)">#{{ data.current.source_item_id }}</span>
+            <button v-if="data.current.source_item_id" type="button" class="write-queue-link write-queue-id" @click.stop="openSourceItem(data.current.source_item_id)">素材 #{{ data.current.source_item_id }}</button>
             <span class="text-[11px] text-blue-800 break-all">{{ data.current.source_item_title || data.current.label }}</span>
           </div>
           <div v-if="data.current.source_item_source_name" class="mt-0.5 text-[10px] text-blue-400 truncate">{{ data.current.source_item_source_name }}</div>
@@ -259,7 +260,7 @@ onBeforeUnmount(() => {
         <div v-if="data.queue.length > 0" class="write-queue-list">
           <div v-for="task in data.queue" :key="task.task_id">
           <div class="write-queue-task">
-            <span v-if="task.source_item_id" class="write-queue-id" @click.stop="openSourceItem(task.source_item_id)">#{{ task.source_item_id }}</span>
+            <button v-if="task.source_item_id" type="button" class="write-queue-link write-queue-id" @click.stop="openSourceItem(task.source_item_id)">素材 #{{ task.source_item_id }}</button>
             <span class="flex-1 truncate text-[11px] text-editorial-text-body">{{ task.source_item_title || task.label }}</span>
             <span v-if="task.source_item_source_name" class="shrink-0 text-[10px] text-editorial-text-muted">· {{ task.source_item_source_name }}</span>
             <span class="text-[10px]" :class="task.priority === 'high' ? 'text-yellow-600' : 'text-gray-400'">{{ task.priority === 'high' ? '人工' : '自动' }}</span>

@@ -11,6 +11,12 @@ const drawerSource = readFileSync(resolve(process.cwd(), "src/client/components/
 const mobileStyles = styles.match(/@media \(max-width: 768px\) \{([\s\S]*?)\n\}\n\n\.article-detail-footer/)?.[1] ?? "";
 
 describe("成品文章详情弹窗移动端布局", () => {
+  it("只读正文限制阅读宽度和图片高度，不裁切或放大小图", () => {
+    const panelSource = readFileSync(resolve(process.cwd(), "src/client/components/creative/article-detail/ArticleEditorPanel.vue"), "utf8");
+    expect(panelSource).toMatch(/v-if="readonly"\s+class="article-readonly-preview/);
+    expect(styles).toMatch(/\.article-readonly-preview\s*\{[^}]*width: 100%;[^}]*max-width: 800px;/);
+    expect(styles).toMatch(/\.article-readonly-preview img\s*\{[^}]*width: auto !important;[^}]*height: auto !important;[^}]*max-width: 100% !important;[^}]*max-height: 70dvh !important;[^}]*object-fit: contain;/);
+  });
   it("移动端底部关闭按钮只在窄屏显示，并走现有关闭处理", () => {
     expect(styles).toMatch(/\.article-detail-footer \.article-detail-footer__mobile-close\s*\{[^}]*display: none;/);
     expect(mobileStyles).toMatch(/\.article-detail-footer \.article-detail-footer__mobile-close\s*\{[^}]*display: inline-flex;/);

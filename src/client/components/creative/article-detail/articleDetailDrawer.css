@@ -8,18 +8,20 @@
   align-items: flex-start !important;
   padding: 0 !important;
 }
+/* 高度跟随包裹层（inset:0 覆盖视口），不用 100dvh：移动端动态视口与固定定位容器
+   可能不一致，用视口单位会让弹窗与容器高度错位，底部露出缝隙或超出可见区。 */
 .article-detail-modal .ant-modal {
   max-width: 100% !important;
   width: 100% !important;
-  height: 100dvh;
-  max-height: 100dvh;
+  height: 100%;
+  max-height: 100%;
   margin: 0 !important;
   padding: 0 !important;
   top: 0 !important;
 }
 .article-detail-modal .ant-modal .ant-modal-content {
-  height: 100dvh;
-  max-height: 100dvh;
+  height: 100%;
+  max-height: 100%;
   border-radius: 0;
 }
 
@@ -83,8 +85,8 @@
 .article-detail-modal--focus .ant-modal {
   width: 100% !important;
   max-width: 100% !important;
-  height: 100dvh;
-  max-height: 100dvh;
+  height: 100%;
+  max-height: 100%;
   padding-bottom: 0;
 }
 /* 弹窗内容由 header/body/footer 三段组成，专注时 body 接管全部可用高度。 */
@@ -94,8 +96,8 @@
   flex-direction: column;
 }
 .article-detail-modal--focus .ant-modal-content {
-  height: 100dvh;
-  max-height: 100dvh;
+  height: 100%;
+  max-height: 100%;
 }
 .article-detail-modal .ant-modal-header {
   flex-shrink: 0;
@@ -296,6 +298,8 @@
   }
   .article-detail-modal .ant-modal-footer {
     padding: 8px 12px !important;
+    /* 去掉 antd 默认的 margin-top，避免底部操作栏上方露出一道空白缝隙。 */
+    margin-top: 0 !important;
   }
   .article-detail-footer {
     display: flex;

@@ -95,8 +95,17 @@ describe("成品文章详情弹窗移动端布局", () => {
     const sharedStyles = styles.slice(0, styles.indexOf("@media (max-width: 768px)"));
     expect(drawerSource).toContain('width="100%"');
     expect(sharedStyles).toMatch(/\.article-detail-modal\.ant-modal-centered\s*\{[^}]*align-items: flex-start !important;[^}]*padding: 0 !important;/);
-    expect(sharedStyles).toMatch(/\.article-detail-modal \.ant-modal\s*\{[^}]*max-width: 100% !important;[^}]*width: 100% !important;[^}]*height: 100dvh;[^}]*margin: 0 !important;[^}]*padding: 0 !important;[^}]*top: 0 !important;/);
-    expect(sharedStyles).toMatch(/\.article-detail-modal \.ant-modal \.ant-modal-content\s*\{[^}]*height: 100dvh;[^}]*max-height: 100dvh;[^}]*border-radius: 0;/);
+    expect(sharedStyles).toMatch(/\.article-detail-modal \.ant-modal\s*\{[^}]*max-width: 100% !important;[^}]*width: 100% !important;[^}]*height: 100%;[^}]*margin: 0 !important;[^}]*padding: 0 !important;[^}]*top: 0 !important;/);
+    expect(sharedStyles).toMatch(/\.article-detail-modal \.ant-modal \.ant-modal-content\s*\{[^}]*height: 100%;[^}]*max-height: 100%;[^}]*border-radius: 0;/);
     expect(styles).toMatch(/\.article-detail-modal \.ant-modal-body\s*\{[^}]*flex: 1;[^}]*overflow-y: auto;/);
+  });
+
+  it("弹窗高度跟随包裹层而不是视口单位，移动端底部不留缝", () => {
+    // 移动端动态视口与 inset:0 固定容器可能不一致，用 100dvh 会让弹窗与容器错位。
+    const modalBlocks = styles.match(/\.article-detail-modal \.ant-modal\s*\{[^}]*\}/g) ?? [];
+    expect(modalBlocks.length).toBeGreaterThan(0);
+    for (const block of modalBlocks) expect(block).not.toContain("100dvh");
+    const mobileStyles = styles.match(/@media \(max-width: 768px\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
+    expect(mobileStyles).toMatch(/\.article-detail-modal \.ant-modal-footer\s*\{[^}]*margin-top: 0 !important;/);
   });
 });

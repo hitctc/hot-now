@@ -11,6 +11,8 @@
 
   html {
     color-scheme: dark;
+    /* 禁止双指缩放页面；单指滑动（pan）保留，因此滚动不受影响。 */
+    touch-action: pan-x pan-y;
   }
 
   html[data-theme="light"] {

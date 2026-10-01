@@ -98,7 +98,7 @@ export function renderLoginPage(redirectTarget?: string) {
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>登录 | 热讯平台HotNow</title>
     <link rel="icon" type="image/png" href="/brand/hotnow-favicon.png" />
     <link rel="stylesheet" href="/assets/site.css" />
@@ -146,6 +146,17 @@ export function renderLoginPage(redirectTarget?: string) {
       </section>
     </main>
     <script>
+      // H5 禁止双指缩放；iOS Safari 忽略 user-scalable=no，需拦 gesture 与多指触摸。
+      (function () {
+        const blockGesture = (event) => event.preventDefault();
+        for (const name of ["gesturestart", "gesturechange", "gestureend"]) {
+          document.addEventListener(name, blockGesture, { passive: false });
+        }
+        document.addEventListener("touchmove", (event) => {
+          if (event.touches && event.touches.length > 1) event.preventDefault();
+        }, { passive: false });
+      })();
+
       const redirectTarget = ${JSON.stringify(redirectTarget || "")};
       const form = document.getElementById("login-form");
       const errorNode = document.getElementById("login-error");

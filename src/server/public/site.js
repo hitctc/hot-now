@@ -1,6 +1,16 @@
 (function () {
   const root = document;
   const themeRoot = document.documentElement;
+  // H5 禁止双指缩放：iOS Safari 忽略 viewport 的 user-scalable=no，必须拦 gesture 事件；
+  // 单指不拦，滚动、点击和长按保持原行为。样式层另有 touch-action: pan-x pan-y 兼容其他浏览器。
+  const blockGesture = (event) => event.preventDefault();
+  const blockMultiTouch = (event) => {
+    if (event.touches && event.touches.length > 1) event.preventDefault();
+  };
+  for (const name of ["gesturestart", "gesturechange", "gestureend"]) {
+    root.addEventListener(name, blockGesture, { passive: false });
+  }
+  root.addEventListener("touchmove", blockMultiTouch, { passive: false });
   const themeStorageKey = "hot-now-theme";
   const viewRuleFieldOrder = [
     { name: "limit", label: "条数限制", integer: true },

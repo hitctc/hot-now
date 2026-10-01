@@ -1,6 +1,21 @@
-/* 弹窗打开时禁止蒙层滚动 */
-.article-detail-modal {
+/* 弹窗外壳永不滚动：唯一滚动容器是中间正文区，头尾固定。 */
+.article-detail-modal,
+.article-detail-modal .ant-modal,
+.article-detail-modal .ant-modal .ant-modal-content {
   overflow: hidden !important;
+}
+/* 预览栏与正文内容不得横向溢出，避免整屏出现横向滚动条。 */
+.article-detail-modal .md-editor__preview {
+  overflow-x: hidden;
+}
+/* 正文常内联很长的图片 URL 等不可断行内容，允许任意位置换行，否则会撑出横向滚动。 */
+.article-detail-modal .article-readonly-preview,
+.article-detail-modal .article-markdown-body {
+  overflow-wrap: anywhere;
+}
+.article-detail-modal .ant-modal-body > .article-detail-content {
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* 所有屏幕铺满视口。

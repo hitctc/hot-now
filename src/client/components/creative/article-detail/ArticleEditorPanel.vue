@@ -50,6 +50,8 @@ const emit = defineEmits<{
 }>();
 
 const focusToolsOpen = ref(false);
+// 移动端独立全屏预览：与详情弹窗分离，编辑时不再同时展示预览。
+const mobilePreviewOpen = ref(false);
 let focusToolsCloseTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** 专注模式的工具区由悬浮区域控制，延迟收起避免鼠标移入面板时闪退。 */
@@ -99,6 +101,14 @@ onBeforeUnmount(() => {
         <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('toggle-sync-scroll')">{{ syncScrollEnabled ? '同步滚动：开' : '同步滚动：关' }}</a-button>
         <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" data-auto-focus-mode @click="emit('toggle-auto-focus-mode')">{{ autoFocusModeEnabled ? '专注编辑：开' : '专注编辑：关' }}</a-button>
         <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('toggle-fullscreen')">{{ editorFullscreen ? '退出全屏' : '全屏' }}</a-button>
+        <!-- 仅移动端显示：打开独立全屏预览，与编辑互不干扰。 -->
+        <a-button
+          type="link"
+          size="small"
+          class="article-detail-preview-button !h-auto !px-2 !py-1 !text-[11px]"
+          data-mobile-preview-trigger
+          @click="mobilePreviewOpen = true"
+        >预览</a-button>
       </div>
     </template>
   </div>
@@ -224,6 +234,17 @@ onBeforeUnmount(() => {
       @update:ai-draft="emit('update:ai-draft', $event)"
     />
   </div>
+
+  <!-- 移动端独立全屏预览：直接展示当前主题渲染结果，关闭后回到编辑。 -->
+  <Teleport to="body">
+    <div v-if="mobilePreviewOpen" class="article-mobile-preview" data-mobile-preview>
+      <div class="article-mobile-preview__bar">
+        <span class="article-mobile-preview__title">{{ previewLabel }}预览</span>
+        <button type="button" class="article-mobile-preview__close" data-mobile-preview-close @click="mobilePreviewOpen = false">关闭</button>
+      </div>
+      <div class="article-mobile-preview__body" v-html="previewHtml" />
+    </div>
+  </Teleport>
 
   <Teleport to="body">
     <div

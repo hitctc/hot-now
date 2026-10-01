@@ -21,9 +21,9 @@
           />
         </div>
       </div>
-      <div class="md-editor__divider md-editor__divider--static" />
+      <div class="md-editor__divider md-editor__divider--static md-editor__divider--after-draft" />
       <!-- 中栏：人工转写（发布内容），滚动同步驱动右栏预览 -->
-      <div class="md-editor__pane">
+      <div class="md-editor__pane md-editor__pane--human">
         <div class="md-editor__label md-editor__label--human">
           <span>人工转写（发布内容）<span class="md-editor__word-count">{{ countWords(modelValue) }}字</span></span>
           <span
@@ -49,9 +49,9 @@
           />
         </div>
       </div>
-      <div class="md-editor__divider md-editor__divider--static" />
-      <!-- 右栏：预览（联动中栏） -->
-      <div class="md-editor__pane">
+      <div class="md-editor__divider md-editor__divider--static md-editor__divider--before-preview" />
+      <!-- 右栏：预览（联动中栏）；移动端隐藏，改由详情弹窗的“预览”按钮全屏展示。 -->
+      <div class="md-editor__pane md-editor__pane--preview">
         <div class="md-editor__label">{{ previewLabel }}</div>
         <div v-if="previewHtml" ref="previewRef" class="md-editor__preview" v-html="previewHtml" />
         <div v-else ref="previewRef" class="md-editor__preview" v-html="renderedHtml" />
@@ -551,6 +551,22 @@ function onDividerMouseDown(e: MouseEvent): void {
   }
   .md-editor--3pane .md-editor__divider--static {
     flex-basis: 3px;
+  }
+  /* 移动端手动编辑只保留“人工转写”：草稿栏与预览栏都隐藏，编辑区独占全部高度；
+     预览改由详情弹窗的“预览”按钮全屏展示，避免编辑与预览互相挤占空间。 */
+  .md-editor--3pane .md-editor__pane--ai-draft,
+  .md-editor--3pane .md-editor__divider--after-draft,
+  .md-editor--3pane .md-editor__pane--preview,
+  .md-editor--3pane .md-editor__divider--before-preview {
+    display: none;
+  }
+  /* 只剩一栏时不需要 500px 磅底高度，高度完全跟随详情弹窗的可视区。 */
+  .md-editor--3pane {
+    min-height: 0;
+  }
+  .md-editor--3pane .md-editor__pane--human {
+    flex: 1 1 auto;
+    min-height: 0;
   }
 }
 

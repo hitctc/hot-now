@@ -99,6 +99,10 @@
 }
 .article-detail-modal .ant-modal-header {
   flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+  background: #faf9fc;
+  box-shadow: 0 4px 12px rgba(31, 24, 48, 0.08);
 }
 .article-detail-modal .ant-modal-body {
   background: #ffffff;
@@ -270,7 +274,11 @@
 }
 .article-detail-modal .ant-modal-footer {
   flex-shrink: 0;
-  border-top: 1px solid #f0f0f0;
+  border-top: 0;
+  position: relative;
+  z-index: 1;
+  background: #faf9fc;
+  box-shadow: 0 -4px 12px rgba(31, 24, 48, 0.08);
   padding: 12px 24px;
 }
 /* 关闭入口仅补给底部操作区，桌面端继续使用弹窗右上角关闭按钮。 */
@@ -421,7 +429,7 @@
 /* 只读详情使用阅读栏宽度；覆盖主题图片的内联尺寸，竖图也不超过可视高度，不裁切内容。 */
 .article-readonly-preview {
   width: 100%;
-  max-width: 800px;
+  max-width: 414px;
   margin-inline: auto;
 }
 .article-readonly-preview img {

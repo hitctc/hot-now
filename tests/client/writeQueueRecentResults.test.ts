@@ -135,6 +135,26 @@ describe("写作队列最近逐篇结果", () => {
     wrapper.unmount();
   });
 
+  it("读取成品时立即打开加载弹窗，关闭后迟到响应不重新打开", async () => {
+    window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
+    vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue(queueStatus);
+    let finish!: (value: creativeApi.CreativeFinishedArticle) => void;
+    vi.spyOn(creativeApi, "readCreativeFinishedArticle").mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    const wrapper = mount(WriteQueueStatus, { attachTo: document.body, global: { stubs: { SourceItemDetailModal: true, ArticleDetailDrawer: true } } });
+    try {
+      await flushPromises();
+      const link = [...document.body.querySelectorAll<HTMLButtonElement>(".write-queue-link")].find((button) => button.textContent?.includes("成品 #2401"));
+      link?.click();
+      await flushPromises();
+      const drawer = wrapper.findComponent({ name: "ArticleDetailDrawer" });
+      expect(drawer.props()).toMatchObject({ open: true, loading: true, article: null });
+      drawer.vm.$emit("update:open", false);
+      finish({ id: 2401 } as creativeApi.CreativeFinishedArticle);
+      await flushPromises();
+      expect(drawer.props()).toMatchObject({ open: false, loading: false, article: null });
+    } finally { wrapper.unmount(); }
+  });
+
   it("当前自动任务和历史素材编号均可打开相同的平台素材详情", async () => {
     window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
     vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue({

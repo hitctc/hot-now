@@ -15,6 +15,7 @@ import {
 } from "../../services/creativeApi.js";
 import ArticleDetailDrawer from "./ArticleDetailDrawer.vue";
 import SourceItemDetailModal from "./SourceItemDetailModal.vue";
+import { createLatestRequestGuard } from "../../utils/latestRequestGuard.js";
 import { toShanghaiDayKey } from "./tableDayGroups.js";
 import { describeLunaStatus, describeQueuedTask, describeCurrentTask } from "./writeQueueStatusPresentation.js";
 import { message, Modal as AModal } from "ant-design-vue";
@@ -141,19 +142,34 @@ function openSourceItem(id: number): void {
 const articleDetailOpen = ref(false);
 const articleDetail = ref<CreativeFinishedArticle | null>(null);
 const articleDetailLoading = ref(false);
+const articleDetailRequestGuard = createLatestRequestGuard();
 
-/** 读取队列终态对应的完整成品，打开只读详情抽屉。 */
+/** 点击立即打开加载弹窗，读取完整成品；关闭后的迟到响应不恢复弹窗。 */
 async function openArticleDetail(id: number): Promise<void> {
   if (articleDetailLoading.value) return;
+  const requestId = articleDetailRequestGuard.begin();
+  articleDetail.value = null;
+  articleDetailOpen.value = true;
   articleDetailLoading.value = true;
   try {
-    articleDetail.value = await readCreativeFinishedArticle(id);
-    articleDetailOpen.value = true;
+    const article = await readCreativeFinishedArticle(id);
+    if (articleDetailRequestGuard.isCurrent(requestId)) articleDetail.value = article;
   } catch {
-    articleDetail.value = null;
+    if (articleDetailRequestGuard.isCurrent(requestId)) {
+      articleDetailOpen.value = false;
+      message.error("加载文章详情失败");
+    }
   } finally {
-    articleDetailLoading.value = false;
+    if (articleDetailRequestGuard.isCurrent(requestId)) articleDetailLoading.value = false;
   }
+}
+
+/** 关闭详情并使旧读取失效，允许用户立即打开另一篇文章。 */
+function closeArticleDetail(): void {
+  articleDetailRequestGuard.invalidate();
+  articleDetailOpen.value = false;
+  articleDetailLoading.value = false;
+  articleDetail.value = null;
 }
 
 /** 读取任务用于北京时间自然日分组的终态时间。 */
@@ -326,9 +342,10 @@ onBeforeUnmount(() => {
       <!-- 成品详情抽屉：队列终态中的成品编号必须可直接打开。 -->
       <ArticleDetailDrawer
         :open="articleDetailOpen"
+        :loading="articleDetailLoading"
         :article="articleDetail"
         :readonly="true"
-        @update:open="(value: boolean) => { articleDetailOpen = value; if (!value) articleDetail = null; }"
+        @update:open="(value: boolean) => { if (!value) closeArticleDetail(); }"
         @open-source-item="openSourceItem"
       />
     </div>

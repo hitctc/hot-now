@@ -111,6 +111,7 @@ const statusOptions = SHORT_FINISHED_STATUS_OPTIONS;
 
 // 文章详情全屏弹窗
 const detailArticle = ref<CreativeFinishedArticle | null>(null);
+const detailLoading = ref(false);
 const manualCreateOpen = ref(false);
 const manualTitle = ref("");
 const manualForm = ref<"tuwen" | "duanwen">("tuwen");
@@ -449,19 +450,25 @@ function handleTableChange(pagination: { current?: number; pageSize?: number }):
 
 const detailRequestGuard = createLatestRequestGuard();
 
-/** 只接收最后一次点击的详情响应，避免旧请求覆盖用户刚选择的文章。 */
+/** 点击即展示加载反馈；只接收最后一次详情响应，关闭或切换后忽略旧请求。 */
 async function openDetail(article: CreativeFinishedArticle): Promise<void> {
   const requestId = detailRequestGuard.begin();
+  detailArticle.value = null;
+  detailLoading.value = true;
   try {
     const detail = await readCreativeFinishedArticle(article.id);
     if (detailRequestGuard.isCurrent(requestId)) detailArticle.value = detail;
   } catch {
     if (detailRequestGuard.isCurrent(requestId)) message.error("加载文章详情失败");
+  } finally {
+    if (detailRequestGuard.isCurrent(requestId)) detailLoading.value = false;
   }
 }
 
+/** 关闭加载或详情弹窗并使在途响应失效，不取消服务端任务。 */
 function closeDetail(): void {
   detailRequestGuard.invalidate();
+  detailLoading.value = false;
   detailArticle.value = null;
 }
 
@@ -821,7 +828,8 @@ const pagination = computed(() => ({
 
     <!-- 文章详情弹窗 -->
     <ArticleDetailDrawer
-      :open="detailArticle !== null"
+      :open="detailLoading || detailArticle !== null"
+      :loading="detailLoading"
       :article="detailArticle"
       @update:open="(val) => { if (!val) closeDetail(); }"
       @saved="onDetailSaved"

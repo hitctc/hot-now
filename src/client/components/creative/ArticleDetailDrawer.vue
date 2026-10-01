@@ -15,7 +15,7 @@
   >
     <template #title>
       <ArticleDetailHeader
-        v-if="article"
+        v-if="article && !props.loading"
         :article="article"
         @copy-id="copyArticleId"
         @open-source="$emit('openSourceItem', $event)"
@@ -24,7 +24,7 @@
 
     <template #footer>
       <ArticleDetailFooter
-        v-if="article"
+        v-if="article && !props.loading"
         :article="article"
         :readonly="props.readonly"
         :saving="saving"
@@ -43,7 +43,11 @@
       />
     </template>
 
-    <template v-if="article">
+    <div v-if="props.loading" class="flex min-h-[240px] flex-col items-center justify-center gap-3" role="status" aria-live="polite" data-testid="article-detail-loading">
+      <a-spin size="large" />
+      <span class="text-sm text-editorial-text-muted">正在加载文章详情…</span>
+    </div>
+    <template v-else-if="article">
       <div class="article-detail-content flex flex-col gap-6">
         <ArticlePlanningSections
           :article="article"
@@ -250,6 +254,7 @@ const props = defineProps<{
   open: boolean;
   article: CreativeFinishedArticle | null;
   readonly?: boolean;
+  loading?: boolean;
 }>();
 
 const isManualArticle = computed(() => props.article?.originType === "manual");

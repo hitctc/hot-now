@@ -14,9 +14,24 @@ describe("成品文章详情弹窗移动端布局", () => {
   it("只读正文限制阅读宽度和图片高度，不裁切或放大小图", () => {
     const panelSource = readFileSync(resolve(process.cwd(), "src/client/components/creative/article-detail/ArticleEditorPanel.vue"), "utf8");
     expect(panelSource).toMatch(/v-if="readonly"\s+class="article-readonly-preview/);
-    expect(styles).toMatch(/\.article-readonly-preview\s*\{[^}]*width: 100%;[^}]*max-width: 800px;/);
+    expect(styles).toMatch(/\.article-readonly-preview\s*\{[^}]*width: 100%;[^}]*max-width: 414px;/);
     expect(styles).toMatch(/\.article-readonly-preview img\s*\{[^}]*width: auto !important;[^}]*height: auto !important;[^}]*max-width: 100% !important;[^}]*max-height: 70dvh !important;[^}]*object-fit: contain;/);
   });
+  it("标题栏和操作栏通过背景与阴影区分，底栏不再保留分隔线", () => {
+    expect(styles).toMatch(/\.article-detail-modal \.ant-modal-header\s*\{[^}]*background: #faf9fc;[^}]*box-shadow:/);
+    expect(styles).toMatch(/\.article-detail-modal \.ant-modal-footer\s*\{[^}]*border-top: 0;[^}]*background: #faf9fc;[^}]*box-shadow:/);
+    expect(drawerSource).toContain('v-if="props.loading"');
+    expect(drawerSource).toContain('data-testid="article-detail-loading"');
+  });
+
+  it.each(["FinishedArticlesPage", "ShortFinishedArticlesPage"])("%s 在读取前打开加载反馈，关闭时清除加载并使请求失效", (page) => {
+    const source = readFileSync(resolve(process.cwd(), `src/client/pages/creative/${page}.vue`), "utf8");
+    expect(source).toMatch(/detailLoading.value = true;\s*try \{\s*const detail = await readCreativeFinishedArticle/);
+    expect(source).toContain(':open="detailLoading || detailArticle !== null"');
+    expect(source).toContain(':loading="detailLoading"');
+    expect(source).toMatch(/function closeDetail\(\): void \{\s*detailRequestGuard.invalidate\(\);\s*detailLoading.value = false;/);
+  });
+
   it("移动端底部关闭按钮只在窄屏显示，并走现有关闭处理", () => {
     expect(styles).toMatch(/\.article-detail-footer \.article-detail-footer__mobile-close\s*\{[^}]*display: none;/);
     expect(mobileStyles).toMatch(/\.article-detail-footer \.article-detail-footer__mobile-close\s*\{[^}]*display: inline-flex;/);

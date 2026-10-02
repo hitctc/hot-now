@@ -5,6 +5,8 @@ const path = "/api/creative/finished-articles/7/manual-text/title";
 afterEach(() => {
   clearModelTaskRequest(7, "title");
   clearDailyDigestRequest("2026-09-29");
+  clearDailyDigestRequest();
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -51,6 +53,24 @@ describe("模型任务提交响应丢失", () => {
     expect(JSON.parse(String(fetch.mock.calls[0]![1]?.body))).toEqual({ humanMarkdown: "正文" });
     expect(fetch.mock.calls[1]![1]?.body).toBeUndefined();
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("默认日报响应丢失后跨北京时间零点重开，仍提交原素材日期和编号", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-01T15:59:00Z"));
+    const fetch = vi.spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(new TypeError("响应丢失"))
+      .mockResolvedValue(new Response(JSON.stringify({ ok: true, taskId: "digest-original", status: "queued" }), { status: 202 }));
+    const digestPath = "/api/creative/daily-digests/generate";
+    await expect(requestModelTask(digestPath, { method: "POST" })).rejects.toThrow("响应丢失");
+    const first = JSON.parse(String(fetch.mock.calls[0]![1]?.body));
+    expect(first.date).toBe("2026-09-30");
+    vi.setSystemTime(new Date("2026-10-01T16:01:00Z"));
+    vi.resetModules();
+    const restored = await import("../../src/client/services/modelTaskRequest.js");
+    await restored.requestModelTask(digestPath, { method: "POST" });
+    expect(JSON.parse(String(fetch.mock.calls[1]![1]?.body))).toEqual(first);
+    restored.clearDailyDigestRequest();
   });
 
   it("日报按素材日期保留提交编号，不把受理误当生成完成", async () => {

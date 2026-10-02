@@ -1,5 +1,28 @@
 import { describe, it, expect } from "vitest";
-import { collectImageUrlsFromHtml, replaceCoverImageUrlInHtml } from "../../src/core/wechatMp/wechatMpDraftPush.js";
+import Database from "better-sqlite3";
+import { collectImageUrlsFromHtml, getArticlePushCount, getArticlePushLog, replaceCoverImageUrlInHtml } from "../../src/core/wechatMp/wechatMpDraftPush.js";
+
+describe("文章推送记录隔离", () => {
+  it("排除同编号日报，保留原有未分类历史记录", () => {
+    const db = new Database(":memory:");
+    try {
+      db.exec(`
+        CREATE TABLE wechat_mp_accounts (id INTEGER PRIMARY KEY, name TEXT);
+        CREATE TABLE wechat_draft_push_log (
+          id INTEGER PRIMARY KEY, article_id INTEGER, account_id INTEGER, theme_id TEXT,
+          media_id TEXT, status TEXT, error_code TEXT, error_message TEXT, pushed_at TEXT, content_type TEXT
+        );
+        INSERT INTO wechat_draft_push_log (id, article_id, status, content_type) VALUES
+          (1, 7, 'success', 'article'), (2, 7, 'success', 'daily_digest'),
+          (3, 7, 'success', NULL), (4, 7, 'failed', 'article');
+      `);
+      expect(getArticlePushCount(db, 7)).toBe(2);
+      expect(getArticlePushLog(db, 7).map((row) => (row as { id: number }).id).sort()).toEqual([1, 3, 4]);
+    } finally {
+      db.close();
+    }
+  });
+});
 
 // 草稿推送前的正文图片收集逻辑：推送流程不读 article.images，只信任渲染后的 HTML
 describe("collectImageUrlsFromHtml", () => {

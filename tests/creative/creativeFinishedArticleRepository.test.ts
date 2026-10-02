@@ -455,6 +455,9 @@ describe("listCreativeFinishedArticles", () => {
 
     const result = listCreativeFinishedArticles(handle.db, { direction: "article", pageSize: 1, status: "ready_for_publish" });
     expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.pushCount).toBe(3);
+    expect(findCreativeFinishedArticleById(handle.db, first.id)?.pushCount).toBe(3);
+    expect(findCreativeFinishedArticleById(handle.db, anchor.id)?.pushCount).toBe(1);
     expect(result.dayCounts.find((count) => count.dayKey === "2026-09-22")?.pushCount).toBe(2);
     expect(result.dayCounts.find((count) => count.dayKey === "2026-09-22")?.articleCount).toBe(1);
     expect(result.dayCounts.find((count) => count.dayKey === "2026-09-21")?.pushCount).toBe(1);

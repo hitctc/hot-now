@@ -81,7 +81,7 @@ const SELECT_COLUMNS = `
   pinned_at,
   created_at,
   updated_at,
-  (SELECT COUNT(*) FROM wechat_draft_push_log WHERE article_id = creative_finished_articles.id AND status = 'success') AS push_count
+  (SELECT COUNT(*) FROM wechat_draft_push_log WHERE article_id = creative_finished_articles.id AND status = 'success' AND (content_type = 'article' OR content_type IS NULL)) AS push_count
 ` as const;
 
 // 列表保留表格和状态判断所需字段，正文只取 51 字用于既有发布条件判断。
@@ -184,7 +184,7 @@ const LIST_SELECT_COLUMNS = `
   pinned_at,
   created_at,
   updated_at,
-  (SELECT COUNT(*) FROM wechat_draft_push_log WHERE article_id = creative_finished_articles.id AND status = 'success') AS push_count
+  (SELECT COUNT(*) FROM wechat_draft_push_log WHERE article_id = creative_finished_articles.id AND status = 'success' AND (content_type = 'article' OR content_type IS NULL)) AS push_count
 ` as const;
 
 type ArticleRow = {

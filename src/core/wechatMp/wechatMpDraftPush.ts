@@ -84,7 +84,7 @@ export function replaceCoverImageUrlInHtml(
     ? html : replaceImageUrls(html, [coverUrl], [cdnUrl]);
 }
 
-// 获取推送记录
+/** 返回文章推送历史，排除明确的日报记录；未分类旧行沿用原统计，不猜测其内容类型。 */
 export function getArticlePushLog(db: SqliteDatabase, articleId: number) {
   return db.prepare(`
     SELECT
@@ -93,15 +93,15 @@ export function getArticlePushLog(db: SqliteDatabase, articleId: number) {
       a.name as account_name
     FROM wechat_draft_push_log l
     LEFT JOIN wechat_mp_accounts a ON a.id = l.account_id
-    WHERE l.article_id = ?
+    WHERE l.article_id = ? AND (l.content_type = 'article' OR l.content_type IS NULL)
     ORDER BY l.pushed_at DESC
   `).all(articleId);
 }
 
-// 获取文章的推送次数
+/** 统计文章成功推送次数，兼容未分类旧行，但不计入同编号日报的成功记录。 */
 export function getArticlePushCount(db: SqliteDatabase, articleId: number): number {
   const row = db.prepare(
-    "SELECT COUNT(*) as count FROM wechat_draft_push_log WHERE article_id = ? AND status = 'success'"
+    "SELECT COUNT(*) as count FROM wechat_draft_push_log WHERE article_id = ? AND status = 'success' AND (content_type = 'article' OR content_type IS NULL)"
   ).get(articleId) as { count: number } | undefined;
   return row?.count ?? 0;
 }

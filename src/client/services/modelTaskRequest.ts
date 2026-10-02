@@ -30,7 +30,7 @@ export function clearDailyDigestRequest(date?: string): void {
   try { localStorage.removeItem(key); } catch { /* 只清理本功能的请求元数据。 */ }
 }
 
-/** 提交前持久保存随机请求编号；网络失败与关闭页面都保留它，重试不会创造新任务。 */
+/** 提交前持久保存请求编号；默认日报以首次编号时间固定北京时间素材日期，跨零点重放不换参数。 */
 export async function requestModelTask<T>(path: string, init?: RequestInit): Promise<T> {
   let key = requestKey(path);
   // 普通请求保持原调用参数，不让模型任务包装改变 GET 等既有接口合同。
@@ -44,6 +44,10 @@ export async function requestModelTask<T>(path: string, init?: RequestInit): Pro
     try { localStorage.setItem(key, requestId); } catch { /* 不能保证禁用存储时跨刷新恢复，当前页面仍幂等。 */ }
   }
   memory.set(key, requestId);
+  // 编号保存首次时间；减 16 小时等价于 UTC+8 的昨日，不受手机时区影响，也无需新增日期存储。
+  if (path === "/api/creative/daily-digests/generate" && !payload.date && /^\d{13}-[0-9a-f]{32}$/.test(requestId)) {
+    payload.date = new Date(Number(requestId.slice(0, 13)) - 16 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  }
   try {
     const result = await requestJson<T>(path, { ...init, body: JSON.stringify({ ...payload, requestId }) });
     const response = result as { taskId?: string; status?: string; ok?: boolean };

@@ -38,6 +38,18 @@ echo "Deploy target: ${REMOTE_TARGET}:${DEPLOY_APP_DIR}"
 
 cd "${REPO_ROOT}"
 
+# 只读预检由服务管理器注入鉴权环境，不让智能体读取或回显生产配置。
+if [[ "${1:-}" == "--check-hermes" ]]; then
+  ssh "${REMOTE_TARGET}" \
+    "systemd-run --user --quiet --wait --pipe --property=EnvironmentFile='${DEPLOY_ENV_FILE}' node --input-type=module" \
+    < "${REPO_ROOT}/scripts/hermes-preflight.mjs"
+  exit $?
+fi
+if [[ $# -gt 0 ]]; then
+  echo 'Usage: ./scripts/deploy-prod.sh [--check-hermes]' >&2
+  exit 2
+fi
+
 echo "Building locally..."
 npm run build
 

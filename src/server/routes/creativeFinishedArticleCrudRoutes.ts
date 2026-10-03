@@ -464,7 +464,8 @@ export function registerCreativeFinishedArticleCrudRoutes(context: CreativeFinis
     if (!title) {
       return reply.code(400).send({ ok: false, reason: "title-required" });
     }
-    if (!direction || (direction === "short_content" && !form)) {
+    // 人工空白稿不经过生成；省略规格存空，旧显式请求仍严格校验并保留原值。
+    if (!direction || (direction === "short_content" && body?.form !== undefined && !form)) {
       return reply.code(400).send({ ok: false, reason: "invalid-manual-article-type" });
     }
 

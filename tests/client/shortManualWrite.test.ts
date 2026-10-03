@@ -8,7 +8,7 @@ import * as creativeApi from "../../src/client/services/creativeApi.js";
 afterEach(() => vi.restoreAllMocks());
 
 describe("短内容素材自定义写作", () => {
-  it("提交短内容方向和短写形态，不再发送长文写作模式", async () => {
+  it("提交统一短内容策略，不显示旧规格或发送长文写作模式", async () => {
     vi.spyOn(creativeApi, "readCreativeSourceItems").mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 30 } as never);
     const submit = vi.spyOn(creativeApi, "submitManualWrite").mockResolvedValue({ ok: true, sourceItemId: 15 });
     const wrapper = mount(ShortSourceItemsPage, {
@@ -36,6 +36,8 @@ describe("短内容素材自定义写作", () => {
     await flushPromises();
     wrapper.findComponent(SourceItemsFilterBar).vm.$emit("manual-write");
     await wrapper.vm.$nextTick();
+    expect(wrapper.text()).not.toContain("反转文");
+    expect(wrapper.text()).not.toContain("写作模式");
     await wrapper.get('[data-testid="short-input"]').setValue("用户输入的短内容原文");
     await wrapper.get('[data-testid="submit-short"]').trigger("click");
     await flushPromises();

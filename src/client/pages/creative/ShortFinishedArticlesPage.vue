@@ -62,7 +62,6 @@ const statusOptions = SHORT_FINISHED_STATUS_OPTIONS;
 // 文章详情全屏弹窗
 const manualCreateOpen = ref(false);
 const manualTitle = ref("");
-const manualForm = ref<"tuwen" | "duanwen">("tuwen");
 const manualCreating = ref(false);
 const codeImageGeneratingArticleId = ref<number | null>(null);
 
@@ -141,7 +140,7 @@ function handlePushSuccess(): void {
 
 // ─── 数据加载 ───
 
-/** 创建独立短内容，并直接进入与管线成品共用的三栏编辑器。 */
+/** 创建无生成规格的人工短稿并打开共用编辑器；不调用模型、不替历史稿补分类。 */
 async function handleCreateManualShortContent(): Promise<void> {
   const title = manualTitle.value.trim();
   if (!title) {
@@ -152,12 +151,10 @@ async function handleCreateManualShortContent(): Promise<void> {
   try {
     const article = await createManualFinishedArticle({
       title,
-      direction: "short_content",
-      form: manualForm.value
+      direction: "short_content"
     });
     manualCreateOpen.value = false;
     manualTitle.value = "";
-    manualForm.value = "tuwen";
     currentPage.value = 1;
     await loadItems();
     detailArticle.value = article;
@@ -551,21 +548,6 @@ useTableComponent();
             >恢复</a-button>
           </template>
 
-          <!-- 形态列：贴图(tuwen) / 反转文(duanwen) -->
-          <template v-else-if="column.key === 'form'">
-            <a-tag
-              v-if="record.form === 'tuwen'"
-              color="blue"
-              class="!m-0 !text-[11px] !py-0"
-            >贴图</a-tag>
-            <a-tag
-              v-else
-              color="cyan"
-              class="!m-0 !text-[11px] !py-0"
-            >反转文</a-tag>
-          </template>
-
-
 
           <!-- 来源列 -->
           <template v-else-if="column.key === 'sourceName'">
@@ -575,11 +557,17 @@ useTableComponent();
             </a-tooltip>
           </template>
 
-          <!-- 爆文列：分数 + 维度柱状图 两行紧凑展示 -->
+          <!-- 质检按生成时标准显示；趋势来自素材，不能作为成品质检的分项。 -->
+          <template v-else-if="column.key === 'quality'">
+            <a-tooltip title="生成时的成品质检评分；历史评分不重新计算，不预测传播效果。">
+              <span v-if="record.reversalScore != null" class="text-xs font-semibold">{{ record.reversalScore }}</span>
+              <span v-else class="text-[10px] text-editorial-text-muted">未评分</span>
+            </a-tooltip>
+          </template>
           <template v-else-if="column.key === 'trend'">
             <span v-if="record.originType === 'manual'" class="text-xs text-editorial-text-muted">—</span>
             <div v-else class="flex flex-col gap-0.5 leading-tight">
-              <span v-if="record.reversalScore != null" class="inline-flex items-center self-start rounded-editorial-pill border px-1.5 py-0 text-[10px] font-bold" :class="record.reversalScore >= 90 ? 'border-purple-600 bg-purple-600 text-white shadow-sm' : record.reversalScore >= 80 ? 'border-red-500 bg-red-500 text-white shadow-sm' : 'border-orange-300 bg-orange-50 text-orange-700'">{{ record.reversalScore }}</span>
+              <span v-if="record.trendScore != null" class="text-[10px] font-semibold">{{ record.trendScore }}</span>
               <span v-else class="text-[10px] text-editorial-text-muted">未评分</span>
               <a-tooltip v-if="record.trendBreakdown && getTrendBreakdownBars(record.trendBreakdown).length > 0" :mouse-enter-delay="0.3">
                 <template #title>
@@ -655,12 +643,6 @@ useTableComponent();
       <a-form layout="vertical">
         <a-form-item label="短内容标题" required>
           <a-input v-model:value="manualTitle" placeholder="输入你想写的短内容标题" />
-        </a-form-item>
-        <a-form-item label="写作形态" required>
-          <a-radio-group v-model:value="manualForm">
-            <a-radio value="tuwen">贴图</a-radio>
-            <a-radio value="duanwen">反转文</a-radio>
-          </a-radio-group>
         </a-form-item>
       </a-form>
     </a-modal>

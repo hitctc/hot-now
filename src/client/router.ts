@@ -83,7 +83,7 @@ const creativeShortSourceItemsPageMeta = {
   section: "creative",
   navLabel: "短内容素材",
   title: "短内容线 · 素材库",
-  description: "短内容线（反转贴文/短文）的热搜素材。"
+  description: "短内容线的热点素材，统一生成事实复盘与有依据的判断。"
 } as const satisfies ShellPageMeta;
 
 const creativeShortFinishedArticlesPageMeta = {

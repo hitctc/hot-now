@@ -179,7 +179,7 @@ export function updateCreativeAutomationEnabled(kind: "master" | "evaluate" | "w
   });
 }
 
-/** 调用 Hermes /api/short/write 写短内容成品（tuwen/duanwen），异步。externalId 定位素材 */
+/** 按外部标识提交短写并返回队列编号；auto 为统一策略，显式旧规格仅兼容调用。 */
 export function writeSourceItemShort(id: number, externalId: string, form: "tuwen" | "duanwen" | "auto"): Promise<WriteArticleResult> {
   return requestJson<WriteArticleResult>(`/api/creative/source-items/${id}/write-short`, {
     method: "POST",

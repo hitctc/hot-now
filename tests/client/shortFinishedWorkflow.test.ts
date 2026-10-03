@@ -1,0 +1,80 @@
+import { flushPromises, mount } from "@vue/test-utils";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import ShortFinishedArticlesPage from "../../src/client/pages/creative/ShortFinishedArticlesPage.vue";
+import ArticleDetailDrawer from "../../src/client/components/creative/LazyArticleDetailDrawer.vue";
+import * as api from "../../src/client/services/creativeApi.js";
+import * as listApi from "../../src/client/services/creativeListApi.js";
+
+/** 合成短稿保留空规格及独立评分，组件测试不连接服务或真实文章。 */
+function article(form: string | null = null): api.CreativeFinishedArticle {
+  return { id: 42, direction: "short_content", originType: "pipeline", status: "ready_for_publish", form,
+    titles: '["隔离短稿"]', humanMarkdown: "# 隔离短稿\n\n", contentMarkdown: "", sourceItemId: null,
+    coverImage: [], coverImagePrompt: null, inlineImagePrompts: {}, imagesJson: [], codeImageCards: [],
+    reversalScore: 0, trendScore: 95, trendBreakdown: null, similarityCheck: null, stepTrace: [],
+    createdAt: "2026-10-03T00:00:00Z", updatedAt: "2026-10-03T00:00:00Z", deletedAt: null,
+    pinnedAt: null, sourceName: "合成来源", pushCount: 0,
+    mode: null, thesis: null, intros: [], hooks: null, quotes: null, summary100: [], codeImageKeywords: [],
+    images: [], coverImageIndex: 0, titleIndex: 0, introIndex: 0, summaryIndex: 0,
+    anomalyReason: null, rawResponseText: null, wechatPublished: false, publishable: false,
+    needsManualReview: false, manualReviewReason: null, manualReviewReasons: [], currentStep: null,
+    stopStep: null, reasonCode: null, reasonText: null, wechatThemeId: null, wechatHtml: null,
+    pipelineVersion: null, readerTask: null, readerRelevance: null, evidencePack: null,
+    readerValuePlan: null, factSkeleton: null, oralDraft: null, titleCandidates: [], factSourceChecklist: [],
+    titleSelectionConfirmed: true, sourceTitle: null, publishedAt: null,
+    performanceDeliveredUsers: null, performanceReadUsers: null, performanceShareUsers: null,
+    performanceNewFollowers: null, performanceRewriteLevel: null, performanceTitleSnapshot: null,
+    performanceTitleGroupSnapshot: null, performanceReaderTaskSnapshot: null, performanceRecordedAt: null,
+  };
+}
+
+/** 只替换表格视觉和弹窗，保留页面请求、新建、展示单元格与关闭编排。 */
+function mountPage() {
+  return mount(ShortFinishedArticlesPage, { global: { stubs: {
+    "a-table": { props: ["columns", "dataSource"], template: '<table><thead><tr><th v-for="column in columns">{{ column.title }}</th></tr></thead><tbody><tr v-for="(record, index) in dataSource"><td v-for="column in columns"><slot name="bodyCell" :column="column" :record="record" :index="index" /></td></tr></tbody></table>' },
+    "a-spin": { template: "<div><slot /></div>" }, "a-tooltip": { template: "<div><slot /></div>" },
+    "a-modal": { props: ["open"], emits: ["ok"], template: '<div v-if="open"><slot /><button data-test="create" @click="$emit(\'ok\')">创建</button></div>' },
+    "a-button": { template: "<button><slot /></button>" },
+    "a-checkbox": true, "a-input-search": true, "a-select": true, "a-tag": true,
+    "a-form": { template: "<div><slot /></div>" }, "a-form-item": { template: "<div><slot /></div>" },
+    "a-input": { emits: ["update:value"], template: '<input data-test="title" @input="$emit(\'update:value\', $event.target.value)" />' },
+    ArticleDetailDrawer: { props: ["open", "article"], emits: ["update:open"], template: '<div v-if="open" data-test="editor"><button data-test="close" @click="$emit(\'update:open\', false)">关闭</button></div>' },
+    SourceItemDetailModal: true, CreativeCoverThumbnail: true, ArticlePushFloatWidget: true,
+  } } });
+}
+
+afterEach(() => { vi.restoreAllMocks(); localStorage.clear(); });
+
+describe("统一短内容成品流程", () => {
+  it.each(["tuwen", "duanwen", null, "", "unknown"])("不将历史form=%s归类，0分质检与95素材趋势独立显示", async (form) => {
+    vi.spyOn(listApi, "readCreativeFinishedArticles").mockResolvedValue({ items: [article(form)], total: 1, page: 1, pageSize: 30, dayCounts: [], sourceDayCounts: [] });
+    const wrapper = mountPage();
+    await flushPromises();
+    const headers = wrapper.findAll("th").map((cell) => cell.text());
+    const cells = wrapper.findAll("tbody td");
+    expect(headers).not.toContain("形态");
+    expect(wrapper.text()).not.toContain("反转文");
+    expect(wrapper.text()).not.toContain("贴图");
+    expect(cells[headers.indexOf("质检评分")]?.text()).toBe("0");
+    expect(cells[headers.indexOf("素材趋势")]?.text()).toBe("95");
+    wrapper.unmount();
+  });
+
+  it("空白人工稿不发送生成规格，创建后打开编辑器且关闭时清除当前稿", async () => {
+    vi.spyOn(listApi, "readCreativeFinishedArticles").mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 30, dayCounts: [], sourceDayCounts: [] });
+    const create = vi.spyOn(api, "createManualFinishedArticle").mockResolvedValue({ ...article(), originType: "manual", status: "manual_draft" });
+    const wrapper = mountPage();
+    await flushPromises();
+    await wrapper.findAll("button").find((button) => button.text().includes("新建短内容"))!.trigger("click");
+    await wrapper.get('[data-test="title"]').setValue("人工短稿");
+    await wrapper.get('[data-test="create"]').trigger("click");
+    await flushPromises();
+    expect(create).toHaveBeenCalledWith({ title: "人工短稿", direction: "short_content" });
+    expect(wrapper.findComponent(ArticleDetailDrawer).props("article")?.form).toBeNull();
+    expect(wrapper.find('[data-test="editor"]').exists()).toBe(true);
+    await wrapper.get('[data-test="close"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="editor"]').exists()).toBe(false);
+    expect(wrapper.findComponent(ArticleDetailDrawer).props("article")).toBeNull();
+    wrapper.unmount();
+  });
+});

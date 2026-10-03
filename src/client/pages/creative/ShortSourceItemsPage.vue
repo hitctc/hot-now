@@ -81,15 +81,8 @@ function setWritingIds(ids: Set<number>): void {
 }
 const writeModeVisible = ref(false);
 const writeModeTarget = ref<CreativeSourceItem | null>(null);
-const writeModeValue = ref<string | null>("auto");
 const writeModeThesis = ref("");
 const writeModeConfirming = ref(false);
-
-const writeModeOptions = [
-  { value: "auto", label: "自动判断 — LLM 按素材选贴图/反转文" },
-  { value: "duanwen", label: "反转文（duanwen）— 纯文字反转短文，不配图" },
-  { value: "tuwen", label: "贴图（tuwen）— 配图贴文，带配图提示词" },
-];
 
 // ─── 手动写作弹窗 ───
 const manualWriteVisible = ref(false);
@@ -97,7 +90,6 @@ const manualWriteSubmitting = ref(false);
 const manualContentType = ref<"viewpoint" | "article">("viewpoint");
 const manualTitle = ref("");
 const manualContent = ref("");
-const manualForm = ref<"auto" | "tuwen" | "duanwen">("auto");
 const manualThesis = ref("");
 
 const contentTypeOptions = [
@@ -105,12 +97,11 @@ const contentTypeOptions = [
   { value: "article" as const, label: "素材/文章", desc: "较长的原文或素材内容" },
 ];
 
-/** 打开短内容自定义写作弹窗，清除上一轮输入并恢复自动判断形态。 */
+/** 打开统一短写弹窗并清除上轮输入；素材类型不决定正文或图片规格。 */
 function openManualWriteModal(): void {
   manualContentType.value = "viewpoint";
   manualTitle.value = "";
   manualContent.value = "";
-  manualForm.value = "auto";
   manualThesis.value = "";
   manualWriteVisible.value = true;
 }
@@ -128,7 +119,7 @@ async function confirmManualWrite(): Promise<void> {
       content: manualContent.value.trim(),
       contentType: manualContentType.value,
       direction: "short_content",
-      form: manualForm.value,
+      form: "auto",
       thesis: manualThesis.value.trim() || undefined,
     });
     if (result.ok && result.sourceItemId) {
@@ -207,9 +198,9 @@ function stopTracePoll(): void {
   if (tracePollTimer) { clearInterval(tracePollTimer); tracePollTimer = null; }
 }
 
+/** 打开指定素材的写作确认框；不再选择旧文体，不改变素材或自动许可。 */
 function openWriteModeModal(item: CreativeSourceItem): void {
   writeModeTarget.value = item;
-  writeModeValue.value = "auto";
   writeModeThesis.value = "";
   writeModeVisible.value = true;
 }
@@ -309,12 +300,13 @@ function handleSearch(value: string): void {
   sourceQuery.handleSearch(value, addToHistory);
 }
 
+/** 将指定素材提交统一短写队列；只观察原编号，不把受理误报为写作完成。 */
 async function confirmWriteMode(): Promise<void> {
   const item = writeModeTarget.value;
   if (!item) return;
   writeModeConfirming.value = true;
   try {
-    const result = await writeSourceItemShort(item.id, item.externalId ?? "", (writeModeValue.value ?? "auto") as "tuwen" | "duanwen" | "auto");
+    const result = await writeSourceItemShort(item.id, item.externalId ?? "", "auto");
     if (result.ok) {
       writeModeVisible.value = false;
       addWritingId(item.id);
@@ -404,7 +396,7 @@ const pagination = computed(() => ({
     <!-- 写文章模式选择弹窗 -->
     <a-modal
       :open="writeModeVisible"
-      title="选择短内容形态"
+      title="确认短内容写作"
       :confirm-loading="writeModeConfirming"
       ok-text="开始写作"
       cancel-text="取消"
@@ -417,11 +409,7 @@ const pagination = computed(() => ({
       <div v-if="writeModeTarget" class="mb-3 text-sm text-gray-500">
         素材：{{ writeModeTarget.title.slice(0, 60) }}{{ writeModeTarget.title.length > 60 ? '...' : '' }}
       </div>
-      <a-radio-group v-model:value="writeModeValue" class="flex flex-col gap-3">
-        <a-radio v-for="opt in writeModeOptions" :key="String(opt.value)" :value="opt.value">
-          {{ opt.label }}
-        </a-radio>
-      </a-radio-group>
+      <p class="text-sm text-editorial-text-muted">讲清事件事实，再给出有依据的判断；篇幅按素材复杂度调整，图片由独立资产流程处理。</p>
     </a-modal>
 
     <!-- 手动写作弹窗 -->
@@ -467,13 +455,7 @@ const pagination = computed(() => ({
           />
         </div>
 
-        <!-- 写作模式 -->
-        <div>
-          <div class="mb-1 text-xs font-medium text-editorial-text-muted">写作模式</div>
-          <a-radio-group v-model:value="manualForm" class="flex flex-col gap-1">
-            <a-radio v-for="opt in writeModeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</a-radio>
-          </a-radio-group>
-        </div>
+        <p class="text-xs text-editorial-text-muted">统一按事实复盘与有依据的判断生成短内容，图片不决定写作类型。</p>
 
         <!-- 核心立意 -->
         <div>

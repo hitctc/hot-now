@@ -37,7 +37,7 @@ describe("manual finished article routes", () => {
     await app.close();
   });
 
-  it("requires a writing form for manual short content", async () => {
+  it("creates manual short content without inventing a writing form", async () => {
     const handle = await createTestDatabase("hot-now-manual-short-route-");
     handles.push(handle);
     const app = createServer({ db: handle.db });
@@ -48,6 +48,26 @@ describe("manual finished article routes", () => {
       payload: { title: "短内容", direction: "short_content" },
     });
 
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({ originType: "manual", status: "manual_draft", form: null });
+    await app.close();
+  });
+
+  it.each(["tuwen", "duanwen"])("preserves explicit legacy form %s", async (form) => {
+    const handle = await createTestDatabase("hot-now-manual-short-legacy-");
+    handles.push(handle);
+    const app = createServer({ db: handle.db });
+    const response = await app.inject({ method: "POST", url: "/actions/creative/finished-articles/manual", payload: { title: "兼容稿", direction: "short_content", form } });
+    expect(response.statusCode).toBe(201);
+    expect(response.json().form).toBe(form);
+    await app.close();
+  });
+
+  it.each(["unknown", "", null, 1])("rejects invalid explicit form %s", async (form) => {
+    const handle = await createTestDatabase("hot-now-manual-short-invalid-");
+    handles.push(handle);
+    const app = createServer({ db: handle.db });
+    const response = await app.inject({ method: "POST", url: "/actions/creative/finished-articles/manual", payload: { title: "非法规格", direction: "short_content", form } });
     expect(response.statusCode).toBe(400);
     expect(response.json()).toEqual({ ok: false, reason: "invalid-manual-article-type" });
     await app.close();

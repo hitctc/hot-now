@@ -21,13 +21,15 @@ const breakdown = {
 };
 
 describe("短内容成品表格展示模型", () => {
-  it("保持状态筛选和列定义的既有顺序", () => {
+  it("保持筛选和操作列，分开质检与素材趋势而不显示旧文体",  () => {
     expect(SHORT_FINISHED_STATUS_OPTIONS[0]).toEqual({ label: "全部状态", value: "" });
     expect(SHORT_FINISHED_STATUS_OPTIONS.at(-1)).toEqual({ label: "已删除", value: "soft_deleted" });
     expect(SHORT_FINISHED_COLUMNS.map((column) => column.key)).toEqual([
       "idSeq", "title", "coverImage", "status", "sourceName",
-      "trend", "similarity", "form", "timeInfo", "actions"
+      "quality", "trend", "similarity", "timeInfo", "actions"
     ]);
+    expect(SHORT_FINISHED_COLUMNS.find((column) => column.key === "quality")?.title).toBe("质检评分");
+    expect(SHORT_FINISHED_COLUMNS.find((column) => column.key === "trend")?.title).toBe("素材趋势");
   });
 
   it("按固定颜色顺序生成趋势柱并按分数生成说明", () => {

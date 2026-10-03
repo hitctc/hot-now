@@ -128,7 +128,12 @@ const heatKeywords = [
   "免费"
 ];
 
-// The scoring module owns all content signals so the list view can stay a thin mapper over DB rows.
+// 固定关键词的无状态正则只编译一次；不使用g/y标志，跨请求test不会携带匹配游标。
+const keywordPatterns = new Map([...aiKeywords, ...heatKeywords]
+  .filter(keyword => /[a-z0-9]/i.test(keyword))
+  .map(keyword => [keyword, new RegExp(`\\b${escapeRegExp(keyword)}\\b`, "i")]));
+
+/** 根据完整标题、摘要、正文与参考时钟返回评分/徽标；不写数据库，也不缓存文章结果。 */
 export function scoreContentItem(
   input: ContentScoringInput,
   options?: {
@@ -143,8 +148,9 @@ export function scoreContentItem(
   const freshnessScore = scoreFreshness(input.publishedAt, referenceTime);
   const sourceScore = scoreSourceType(sourceType);
   const completenessScore = scoreCompleteness(summary, body);
-  const aiScore = scoreKeywordSignals([title, summary, body], aiKeywords);
-  const heatScore = scoreHeatSignals([title, summary, body], freshnessScore);
+  const haystack = [title, summary, body].join(" ").toLowerCase();
+  const aiScore = scoreKeywordSignals(haystack, aiKeywords);
+  const heatScore = scoreHeatSignals(haystack, freshnessScore);
   const contentScore = clampScore(
     freshnessScore * 0.30 +
       aiScore * 0.35 +
@@ -275,9 +281,8 @@ function scoreCompleteness(summary: string, body: string): number {
   return clampScore(score);
 }
 
-function scoreKeywordSignals(texts: string[], keywords: string[]): number {
-  // A small distinct-hit counter is enough here; repeated spammy words should not inflate the score too much.
-  const haystack = texts.join(" ").toLowerCase();
+/** 对已归一化文本按固定关键词计不同命中数，重复词不增加分值。 */
+function scoreKeywordSignals(haystack: string, keywords: string[]): number {
   const hitCount = keywords.reduce((count, keyword) => count + (matchesKeyword(haystack, keyword) ? 1 : 0), 0);
 
   if (hitCount === 0) {
@@ -287,9 +292,8 @@ function scoreKeywordSignals(texts: string[], keywords: string[]): number {
   return clampScore(hitCount * 20);
 }
 
-function scoreHeatSignals(texts: string[], freshnessScore: number): number {
-  // Heat mixes headline buzz with a small freshness boost so breaking items rise quickly but not indefinitely.
-  const haystack = texts.join(" ").toLowerCase();
+/** 在同一归一化文本上计算热词命中，并保持原新鲜度加分。 */
+function scoreHeatSignals(haystack: string, freshnessScore: number): number {
   const hitCount = heatKeywords.reduce((count, keyword) => count + (matchesKeyword(haystack, keyword) ? 1 : 0), 0);
   const freshnessBonus = freshnessScore >= 90 ? 18 : freshnessScore >= 70 ? 12 : freshnessScore >= 48 ? 6 : 0;
 
@@ -341,13 +345,10 @@ function buildBadges(input: {
   return badges.slice(0, 4);
 }
 
+/** 英文数字关键词沿用词边界，中文沿用子串匹配；固定正则没有可变游标。 */
 function matchesKeyword(text: string, keyword: string): boolean {
-  // English tokens use word boundaries, while Chinese phrases fall back to a plain substring match.
-  if (/[a-z0-9]/i.test(keyword)) {
-    return new RegExp(`\\b${escapeRegExp(keyword)}\\b`, "i").test(text);
-  }
-
-  return text.includes(keyword.toLowerCase());
+  const pattern = keywordPatterns.get(keyword);
+  return pattern ? pattern.test(text) : text.includes(keyword.toLowerCase());
 }
 
 function escapeRegExp(value: string): string {

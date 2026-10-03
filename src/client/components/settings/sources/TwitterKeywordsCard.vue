@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useTableComponent } from "../../useTableComponent.js";
 import { editorialContentCardClass } from "../../content/contentCardShared";
 import type { SettingsTwitterSearchKeyword } from "../../../services/settingsApi";
 import {
@@ -27,6 +28,7 @@ const emit = defineEmits<{
   edit: [keyword: SettingsTwitterSearchKeyword];
   delete: [keyword: SettingsTwitterSearchKeyword];
 }>();
+useTableComponent();
 </script>
 
 <template>

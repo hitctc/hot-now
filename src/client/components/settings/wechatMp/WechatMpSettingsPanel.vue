@@ -50,6 +50,7 @@
 </template>
 
 <script setup lang="ts">
+import { useTableComponent } from "../../useTableComponent.js";
 import WechatMpAccountModal from "./WechatMpAccountModal.vue";
 import { useWechatMpSettingsPanel } from "./useWechatMpSettingsPanel.js";
 const {
@@ -66,6 +67,7 @@ const {
   handleDelete,
 } = useWechatMpSettingsPanel();
 
+useTableComponent();
 </script>
 
 <style scoped>

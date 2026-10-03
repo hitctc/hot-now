@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useTableComponent } from "../useTableComponent.js";
 
 import { useMonitorItemsTable } from "./useMonitorItemsTable.js";
 const {
@@ -13,6 +14,7 @@ const {
   handleTableChange,
 } = useMonitorItemsTable();
 
+useTableComponent();
 </script>
 
 <template>

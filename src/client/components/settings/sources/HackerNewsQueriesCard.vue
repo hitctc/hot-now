@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useTableComponent } from "../../useTableComponent.js";
 import { editorialContentCardClass } from "../../content/contentCardShared";
 import type { SettingsHackerNewsQuery } from "../../../services/settingsApi";
 import {
@@ -24,6 +25,7 @@ const emit = defineEmits<{
   edit: [query: SettingsHackerNewsQuery];
   delete: [query: SettingsHackerNewsQuery];
 }>();
+useTableComponent();
 </script>
 
 <template>

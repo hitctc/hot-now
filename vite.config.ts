@@ -20,7 +20,7 @@ function normalizeModuleId(id: string): string {
   return id.replaceAll("\\", "/");
 }
 
-// 先把 Vue 运行时和 Ant Design Vue 生态拆开，避免它们继续跟业务入口滚成一个超大的主 chunk。
+/** 固定共享Vue运行时，其余依赖按真实引用分包，避免工作台组件被强制合并后提前下载。 */
 export function chunkClientDependency(id: string): string | undefined {
   const normalizedId = normalizeModuleId(id);
 
@@ -32,16 +32,6 @@ export function chunkClientDependency(id: string): string | undefined {
     || normalizedId.includes("/node_modules/@vue/")
     || normalizedId.includes("/node_modules/vue-router/")) {
     return "vue-vendor";
-  }
-
-  if (normalizedId.includes("/node_modules/ant-design-vue/")
-    || normalizedId.includes("/node_modules/@ant-design")
-    || normalizedId.includes("/node_modules/@babel/runtime/")
-    || normalizedId.includes("/node_modules/@ctrl/tinycolor/")
-    || normalizedId.includes("/node_modules/async-validator/")
-    || normalizedId.includes("/node_modules/dayjs/")
-    || normalizedId.includes("/node_modules/rc-")) {
-    return "antd-vendor";
   }
 
   // 其余依赖交给构建器按引用关系分包；统一 vendor 会把仅用于编辑器的 Markdown 库拉入首屏。

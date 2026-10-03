@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useTableComponent } from "../../useTableComponent.js";
 import { editorialContentCardClass } from "../../content/contentCardShared";
 import type { SettingsBilibiliQuery } from "../../../services/settingsApi";
 import {
@@ -24,6 +25,7 @@ const emit = defineEmits<{
   edit: [query: SettingsBilibiliQuery];
   delete: [query: SettingsBilibiliQuery];
 }>();
+useTableComponent();
 </script>
 
 <template>

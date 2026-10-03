@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useTableComponent } from "../../useTableComponent.js";
 import { ref, toRefs } from "vue";
 import { message } from "ant-design-vue";
 import OperationCapabilityBadge from "../OperationCapabilityBadge.vue";
@@ -99,6 +100,7 @@ function getSourceItemDayLabel(record: CreativeSourceItem, index: number): strin
 function copyId(id: number): void {
   navigator.clipboard.writeText(`【素材id: ${id}】`).then(() => message.success("已复制"));
 }
+useTableComponent();
 </script>
 
 <template>

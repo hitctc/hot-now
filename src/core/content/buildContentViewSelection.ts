@@ -118,7 +118,7 @@ export function buildContentViewSelection(
         includeNlEvaluations
       })
     )
-    .filter((card) => !card.isBlocked);
+    .filter((card): card is RankedContentCardCandidate => card !== null);
   const rankedCards = rankedCandidates
     .filter((card) => selectedSourceKinds === null || selectedSourceKinds.has(card.sourceKind))
     .sort((left, right) => compareBySelectionOrder(viewRuleConfig, left, right));
@@ -275,7 +275,7 @@ export function collectIndependentStatsBySourceForView(
         includeNlEvaluations
       })
     )
-    .filter((card) => !card.isBlocked && sourceKindSet.has(card.sourceKind));
+    .filter((card): card is RankedContentCardCandidate => card !== null && sourceKindSet.has(card.sourceKind));
   const candidatesBySourceKind = new Map<string, RankedContentCardCandidate[]>();
 
   for (const sourceKind of sourceKinds) {
@@ -463,6 +463,7 @@ function stripInternalSelectionCard({
   return card;
 }
 
+/** 为未被现役规则屏蔽的行计算完整正文信号；屏蔽行返回null，不执行无用评分或展示解析。 */
 function buildRankedCardCandidate(
   row: ContentCardRow,
   context: {
@@ -471,7 +472,14 @@ function buildRankedCardCandidate(
     referenceTime: Date;
     includeNlEvaluations: boolean;
   }
-): RankedContentCardCandidate {
+): RankedContentCardCandidate | null {
+  // 这些规则只依赖行、时钟与配置；先判断不会改变评分、去重或来源统计的有效候选集。
+  if (shouldBlockByViewSourceScope(context.viewKey, row.sourceKind) ||
+      shouldBlockByTimeWindow(context.viewKey, row, context.referenceTime, context.viewRuleConfig) ||
+      (context.includeNlEvaluations &&
+       (normalizeNlDecision(row.baseDecision) === "block" || normalizeNlDecision(row.viewDecision) === "block"))) {
+    return null;
+  }
   const score = scoreContentItem(
     {
       title: row.title,
@@ -515,11 +523,7 @@ function buildRankedCardCandidate(
       context.includeNlEvaluations ? (row.baseScoreDelta ?? 0) + (row.viewScoreDelta ?? 0) : 0
     ),
     rankingTimestamp: row.rankingTimestamp,
-    isBlocked:
-      shouldBlockByViewSourceScope(context.viewKey, row.sourceKind) ||
-      shouldBlockByTimeWindow(context.viewKey, row, context.referenceTime, context.viewRuleConfig) ||
-      (context.includeNlEvaluations &&
-        (normalizeNlDecision(row.baseDecision) === "block" || normalizeNlDecision(row.viewDecision) === "block"))
+    isBlocked: false
   };
 }
 

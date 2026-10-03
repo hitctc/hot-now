@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useTableComponent } from "../../useTableComponent.js";
 import { editorialContentCardClass } from "../../content/contentCardShared";
 import type { SettingsTwitterAccount } from "../../../services/settingsApi";
 import {
@@ -25,6 +26,7 @@ const emit = defineEmits<{
   edit: [account: SettingsTwitterAccount];
   delete: [account: SettingsTwitterAccount];
 }>();
+useTableComponent();
 </script>
 
 <template>

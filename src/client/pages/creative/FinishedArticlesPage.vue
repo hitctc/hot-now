@@ -1,17 +1,12 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { useTableComponent } from "../../components/useTableComponent.js";
+import { computed, nextTick, ref } from "vue";
 import { message } from "ant-design-vue";
 
-import { useSearchHistory } from "../../composables/useSearchHistory.js";
-import { createLatestRequestGuard } from "../../utils/latestRequestGuard.js";
-import {
-  createLatestAbortController,
-  isAbortError
-} from "../../utils/latestAbortController.js";
+import { useFinishedArticlesQuery } from "../../components/creative/finished-articles/useFinishedArticlesQuery.js";
+import { useFinishedArticleDetail } from "../../components/creative/finished-articles/useFinishedArticleDetail.js";
 
 import {
-  readCreativeFinishedArticles,
-  readCreativeFinishedArticle,
   createManualFinishedArticle,
   toggleFinishedArticlePin,
   editFinishedArticle,
@@ -20,8 +15,6 @@ import {
   parseArticleImages,
   wechatThemeOptions,
   type CreativeFinishedArticle,
-  type FinishedArticleDayCount,
-  type SourceDayCount,
   type TrendBreakdown,
   type WechatThemeId,
   type PushLogEntry
@@ -50,53 +43,10 @@ function parseJsonArray(raw: string | string[] | null): string[] {
 
 // ─── 状态 ───
 
-const isLoading = ref(false);
-const items = ref<CreativeFinishedArticle[]>([]);
-const total = ref(0);
-const dayCounts = ref<Record<string, FinishedArticleDayCount>>({});
-const sourceDayCounts = ref<Record<string, SourceDayCount>>({});
-const currentPage = ref(1);
-const pageSize = ref(30);
-
-// 筛选条件缓存 key
-const FINISHED_FILTERS_KEY = "creative-finished-filters";
-
-// 筛选条件（从 localStorage 恢复）
-const savedFinished = (() => {
-  try {
-    const raw = localStorage.getItem(FINISHED_FILTERS_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch { return {}; }
-})();
-const searchText = ref(savedFinished.search || "");
-const statusFilter = ref<string | undefined>(savedFinished.status || undefined);
-const publishableOnly = ref(savedFinished.publishableOnly || false);
-const showDeleted = ref(savedFinished.showDeleted || false);
-
-// 筛选条件变更时持久化
-function saveFinishedFilters(): void {
-  try {
-    localStorage.setItem(FINISHED_FILTERS_KEY, JSON.stringify({
-      search: searchText.value,
-      status: statusFilter.value || "",
-      publishableOnly: publishableOnly.value,
-      showDeleted: showDeleted.value
-    }));
-  } catch { /* quota 超限等忽略 */ }
-}
-
-// 搜索历史
-const { history: searchHistory, addToHistory, removeFromHistory } = useSearchHistory("creative-finished-search-history");
-const searchDropdownRef = ref<HTMLElement | null>(null);
-const showSearchDropdown = ref(false);
-
-function onDocClick(e: MouseEvent): void {
-  if (searchDropdownRef.value && !searchDropdownRef.value.contains(e.target as Node)) {
-    showSearchDropdown.value = false;
-  }
-}
-onMounted(() => document.addEventListener("click", onDocClick));
-onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
+const { isLoading, items, total, dayCounts, sourceDayCounts, currentPage, pageSize,
+  searchText, statusFilter, publishableOnly, showDeleted, searchHistory, removeFromHistory,
+  searchDropdownRef, showSearchDropdown, loadItems, handleSearch, handleTableChange } = useFinishedArticlesQuery("article");
+const { detailArticle, detailLoading, openDetail, closeDetail, onDetailSaved } = useFinishedArticleDetail(loadItems);
 
 const statusOptions = [
   { label: "全部状态", value: "" },
@@ -115,8 +65,6 @@ const statusOptions = [
 ];
 
 // 文章详情全屏弹窗
-const detailArticle = ref<CreativeFinishedArticle | null>(null);
-const detailLoading = ref(false);
 const manualCreateOpen = ref(false);
 const manualTitle = ref("");
 const manualCreating = ref(false);
@@ -197,42 +145,6 @@ function handlePushSuccess(): void {
   loadItems();
 }
 
-// ─── 数据加载 ───
-
-const listRequests = createLatestAbortController();
-
-/** 加载当前成品页，并取消仍在等待的旧分页请求。 */
-async function loadItems(): Promise<void> {
-  const controller = listRequests.begin();
-  isLoading.value = true;
-  try {
-    const res = await readCreativeFinishedArticles({
-      direction: "article",
-      page: currentPage.value,
-      pageSize: pageSize.value,
-      status: statusFilter.value || undefined,
-      search: searchText.value || undefined,
-      publishable: publishableOnly.value ? "1" : undefined,
-      includeDeleted: showDeleted.value ? "1" : undefined,
-      signal: controller.signal
-    });
-    if (!listRequests.isCurrent(controller)) return;
-    items.value = res.items;
-    total.value = res.total;
-    dayCounts.value = Object.fromEntries((res.dayCounts ?? []).map((count) => [count.dayKey, count]));
-    sourceDayCounts.value = Object.fromEntries((res.sourceDayCounts ?? []).map((count) => [count.dayKey, count]));
-  } catch (error) {
-    if (!isAbortError(error)) throw error;
-  } finally {
-    if (listRequests.isCurrent(controller)) {
-      listRequests.finish(controller);
-      isLoading.value = false;
-    }
-  }
-}
-
-onBeforeUnmount(() => listRequests.cancel());
-
 /** 创建独立手动文章后直接打开共用详情弹窗，避免多一次列表查找。 */
 async function handleCreateManualArticle(): Promise<void> {
   const title = manualTitle.value.trim();
@@ -293,28 +205,6 @@ function getArticleDayLabel(record: CreativeFinishedArticle, index: number): str
     ? formatTableDayLabel(record.createdAt, new Date(), getArticleDayCounts(record))
     : "";
 }
-
-onMounted(() => {
-  void loadItems();
-});
-
-watch(statusFilter, () => {
-  currentPage.value = 1;
-  saveFinishedFilters();
-  void loadItems();
-});
-
-watch(publishableOnly, () => {
-  currentPage.value = 1;
-  saveFinishedFilters();
-  void loadItems();
-});
-
-watch(showDeleted, () => {
-  currentPage.value = 1;
-  saveFinishedFilters();
-  void loadItems();
-});
 
 // 审核通过：走转换 #4，标注来源为审核入口
 async function handleApproveArticle(article: CreativeFinishedArticle): Promise<void> {
@@ -409,47 +299,6 @@ async function handleRestoreArticle(article: CreativeFinishedArticle): Promise<v
   }
 }
 
-function handleSearch(value: string): void {
-  searchText.value = value;
-  currentPage.value = 1;
-  saveFinishedFilters();
-  if (value.trim()) addToHistory(value.trim());
-  showSearchDropdown.value = false;
-  void loadItems();
-}
-
-function handleTableChange(pagination: { current?: number; pageSize?: number }): void {
-  if (pagination.current) currentPage.value = pagination.current;
-  if (pagination.pageSize) pageSize.value = pagination.pageSize;
-  void loadItems();
-}
-
-// ─── 文章详情弹窗 ───
-
-const detailRequestGuard = createLatestRequestGuard();
-
-/** 点击即展示加载反馈；只接收最后一次详情响应，关闭或切换后忽略旧请求。 */
-async function openDetail(article: CreativeFinishedArticle): Promise<void> {
-  const requestId = detailRequestGuard.begin();
-  detailArticle.value = null;
-  detailLoading.value = true;
-  try {
-    const detail = await readCreativeFinishedArticle(article.id);
-    if (detailRequestGuard.isCurrent(requestId)) detailArticle.value = detail;
-  } catch {
-    if (detailRequestGuard.isCurrent(requestId)) message.error("加载文章详情失败");
-  } finally {
-    if (detailRequestGuard.isCurrent(requestId)) detailLoading.value = false;
-  }
-}
-
-/** 关闭加载或详情弹窗并使在途响应失效，不取消服务端任务。 */
-function closeDetail(): void {
-  detailRequestGuard.invalidate();
-  detailLoading.value = false;
-  detailArticle.value = null;
-}
-
 /**
  * 打开发布后效果反馈弹窗，已有数据会在弹窗中自动回填。
  */
@@ -475,19 +324,6 @@ async function openSourceItemModal(sourceItemId: number): Promise<void> {
 function closeSourceItemModal(): void {
   sourceItemModalOpen.value = false;
   sourceItemModalId.value = null;
-}
-
-// 详情弹窗保存后刷新列表，同步更新 detailArticle 以反映 DB 最新数据
-async function onDetailSaved(): Promise<void> {
-  const requestId = detailRequestGuard.begin();
-  const articleId = detailArticle.value?.id;
-  await loadItems();
-  if (!articleId || !detailRequestGuard.isCurrent(requestId)) return;
-  const latest = await readCreativeFinishedArticle(articleId);
-  // 自动保存和手动保存可能同时触发刷新，只接受最后一次详情响应。
-  if (detailRequestGuard.isCurrent(requestId) && detailArticle.value?.id === articleId) {
-    detailArticle.value = latest;
-  }
 }
 
 // ─── 格式化辅助 ───
@@ -641,6 +477,7 @@ const pagination = computed(() => ({
   showSizeChanger: true,
   showTotal: (tot: number) => `共 ${tot} 条`
 }));
+useTableComponent();
 </script>
 
 <template>

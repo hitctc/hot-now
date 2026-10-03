@@ -125,7 +125,7 @@ describe("vite client config", () => {
     });
   });
 
-  it("splits core vendors into dedicated chunks instead of leaving everything in the entry bundle", () => {
+  it("keeps Vue shared while allowing workbench dependencies to follow their actual consumers", () => {
     const viteConfig = createClientViteConfig({ command: "build" });
     const manualChunks = viteConfig.build?.rollupOptions?.output
       && !Array.isArray(viteConfig.build.rollupOptions.output)
@@ -135,8 +135,9 @@ describe("vite client config", () => {
     expect(manualChunks).toBeTypeOf("function");
     expect(manualChunks?.("/workspace/node_modules/vue/dist/vue.runtime.esm-bundler.js")).toBe("vue-vendor");
     expect(manualChunks?.("/workspace/node_modules/vue-router/dist/vue-router.mjs")).toBe("vue-vendor");
-    expect(manualChunks?.("/workspace/node_modules/ant-design-vue/es/button/index.js")).toBe("antd-vendor");
-    expect(manualChunks?.("/workspace/node_modules/@ant-design/icons-vue/es/icons/MenuOutlined.js")).toBe("antd-vendor");
+    expect(manualChunks?.("/workspace/node_modules/ant-design-vue/es/button/index.js")).toBeUndefined();
+    expect(manualChunks?.("/workspace/node_modules/@ant-design/icons-vue/es/icons/MenuOutlined.js")).toBeUndefined();
+    expect(manualChunks?.("/workspace/node_modules/ant-design-vue/es/table/index.js")).toBeUndefined();
     expect(manualChunks?.("/workspace/src/client/pages/content/AiHotPage.vue")).toBeUndefined();
     expect(viteConfig.build?.chunkSizeWarningLimit).toBe(2000);
   });

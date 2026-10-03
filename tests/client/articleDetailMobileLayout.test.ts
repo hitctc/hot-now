@@ -26,10 +26,14 @@ describe("成品文章详情弹窗移动端布局", () => {
 
   it.each(["FinishedArticlesPage", "ShortFinishedArticlesPage"])("%s 在读取前打开加载反馈，关闭时清除加载并使请求失效", (page) => {
     const source = readFileSync(resolve(process.cwd(), `src/client/pages/creative/${page}.vue`), "utf8");
-    expect(source).toMatch(/detailLoading.value = true;\s*try \{\s*const detail = await readCreativeFinishedArticle/);
+    const detailSource = readFileSync(resolve(process.cwd(), "src/client/components/creative/finished-articles/useFinishedArticleDetail.ts"), "utf8");
+    // 实现已归入详情职责，页面仍必须实际接入它，加载顺序/关闭失效合同不变。
+    expect(source).toContain("useFinishedArticleDetail(loadItems)");
+    expect(detailSource).toMatch(/detailLoading.value = true;\s*try \{\s*const detail = await readCreativeFinishedArticle/);
     expect(source).toContain(':open="detailLoading || detailArticle !== null"');
     expect(source).toContain(':loading="detailLoading"');
-    expect(source).toMatch(/function closeDetail\(\): void \{\s*detailRequestGuard.invalidate\(\);\s*detailLoading.value = false;/);
+    expect(detailSource).toContain("const requests = createLatestRequestGuard()");
+    expect(detailSource).toMatch(/function closeDetail\(\): void \{\s*requests.invalidate\(\);\s*detailLoading.value = false;/);
   });
 
   it("移动端底部关闭按钮只在窄屏显示，并走现有关闭处理", () => {

@@ -8,6 +8,7 @@ import {
   upsertContentItems
 } from "../../src/core/content/contentRepository.js";
 import { buildContentViewSelection } from "../../src/core/content/buildContentViewSelection.js";
+import * as contentScoring from "../../src/core/content/contentScoring.js";
 import { listContentView } from "../../src/core/content/listContentView.js";
 import { openDatabase } from "../../src/core/db/openDatabase.js";
 import { runMigrations } from "../../src/core/db/runMigrations.js";
@@ -29,9 +30,25 @@ describe("buildContentViewSelection", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
     while (databasesToClose.length > 0) {
       databasesToClose.pop()?.close();
     }
+  });
+
+  it("does not score rows excluded by the existing time window, while keeping eligible body signals", async () => {
+    const db = await createTestDatabase(databasesToClose);
+    const source = resolveSourceByKind(db, "openai")!;
+    upsertContentItems(db, { sourceId: source.id, items: [
+      buildItem("eligible", "2026-03-31T03:00:00.000Z"),
+      buildItem("old", "2020-01-01T00:00:00.000Z"),
+      buildItem("future", "2027-01-01T00:00:00.000Z")
+    ] });
+    const score = vi.spyOn(contentScoring, "scoreContentItem");
+    const result = buildContentViewSelection(db, "ai");
+    expect(result.visibleCards.map(card => card.title)).toEqual(["eligible"]);
+    expect(score).toHaveBeenCalledTimes(1);
+    expect(score.mock.calls[0]![0].bodyMarkdown).toBe("eligible body markdown");
   });
 
   it("returns candidate cards before limit trimming and visible cards after trimming", async () => {

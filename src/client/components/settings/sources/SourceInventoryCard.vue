@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useTableComponent } from "../../useTableComponent.js";
 import { editorialContentCardClass } from "../../content/contentCardShared";
 import type { SettingsSourceItem } from "../../../services/settingsApi";
 import {
@@ -27,6 +28,7 @@ const emit = defineEmits<{
   toggle: [source: SettingsSourceItem];
   toggleDisplayMode: [source: SettingsSourceItem];
 }>();
+useTableComponent();
 </script>
 
 <template>

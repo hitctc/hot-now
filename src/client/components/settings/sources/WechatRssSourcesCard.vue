@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useTableComponent } from "../../useTableComponent.js";
 import { editorialContentCardClass } from "../../content/contentCardShared";
 import type { SettingsWechatRssSource } from "../../../services/settingsApi";
 import {
@@ -23,6 +24,7 @@ const emit = defineEmits<{
   edit: [source: SettingsWechatRssSource];
   delete: [source: SettingsWechatRssSource];
 }>();
+useTableComponent();
 </script>
 
 <template>

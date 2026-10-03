@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useTableComponent } from "../../components/useTableComponent.js";
 import { computed, onMounted, onBeforeUnmount, ref } from "vue";
 import { message, Modal } from "ant-design-vue";
 import type { TableProps } from "ant-design-vue";
@@ -233,6 +234,7 @@ const columns: TableProps["columns"] = [
     fixed: "right",
   },
 ];
+useTableComponent();
 </script>
 
 <template>

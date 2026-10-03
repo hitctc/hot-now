@@ -193,7 +193,7 @@ AI_TIMELINE_FEED_MAX_FALLBACK_VERSIONS=10
 
 仓库内已经提供第一版部署模板：
 
-- `scripts/deploy-prod.sh`（`--check-hermes` 可通过生产服务管理器注入的环境做活动任务只读预检）
+- `scripts/deploy-prod.sh`（`--check-hermes` 做只读预检；`--wait-hermes` 在停服务前等待活动任务自然结束，鉴权均由生产服务管理器注入）
 - `scripts/pull-prod-data.sh`
 - `.deploy.local.env.example`
 - `deploy/systemd/hot-now.service`
@@ -230,6 +230,10 @@ cp .deploy.local.env.example .deploy.local.env
 ```bash
 ./scripts/deploy-prod.sh
 ```
+
+发布时需要保护 Hermes 活动任务，可使用 `./scripts/deploy-prod.sh --wait-hermes`。检查在停服务前执行；未知/失败立即停止，连续忙碌最多等待50分钟，不取消任务。该选项不重启 Hermes，普通命令不变；详细边界见部署手册。
+
+文章与素材详情在首次打开时下载。下载失败可关闭，或确认未保存内容后重新加载页面再打开；不会自动重放业务操作。文章关闭前提交当前最新版，保存失败时保留弹窗和稿件供重试。
 
 如果临时想改目标，命令前显式传入 `HOT_NOW_DEPLOY_*` 仍然会覆盖本地文件。
 

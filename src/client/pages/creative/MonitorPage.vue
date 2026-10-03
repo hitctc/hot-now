@@ -6,8 +6,8 @@ import MonitorItemsTable from "../../components/monitor/MonitorItemsTable.vue";
 import MonitorSwitches from "../../components/monitor/MonitorSwitches.vue";
 import CodexTaskQueue from "../../components/monitor/CodexTaskQueue.vue";
 import CodexConsumption from "../../components/monitor/CodexConsumption.vue";
-import SourceItemDetailModal from "../../components/creative/SourceItemDetailModal.vue";
-import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
+import SourceItemDetailModal from "../../components/creative/LazySourceItemDetailModal.vue";
+import ArticleDetailDrawer from "../../components/creative/LazyArticleDetailDrawer.vue";
 import {
   fetchWriteQueueStatus,
   readCreativeFinishedArticle,

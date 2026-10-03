@@ -29,6 +29,7 @@ export function chunkClientDependency(id: string): string | undefined {
   }
 
   if (normalizedId.includes("/node_modules/vue/")
+    || normalizedId.includes("/node_modules/@vue/")
     || normalizedId.includes("/node_modules/vue-router/")) {
     return "vue-vendor";
   }
@@ -43,7 +44,8 @@ export function chunkClientDependency(id: string): string | undefined {
     return "antd-vendor";
   }
 
-  return "vendor";
+  // 其余依赖交给构建器按引用关系分包；统一 vendor 会把仅用于编辑器的 Markdown 库拉入首屏。
+  return undefined;
 }
 
 // 这个插件只服务本地调试；生产构建不需要注入 devtools 客户端代码。

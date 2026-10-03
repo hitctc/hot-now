@@ -29,5 +29,22 @@ it("映射自动短内容外部标识和成品关联素材，不将本地编号�
     expect(status.current).toMatchObject({ source_item_id: 101, source_item_title: "平台素材" });
     expect(status.history[0].source_item_id).toBe(101);
     expect(status.queue[0].source_item_id).toBeNull();
+    expect(status.day_counts).toEqual([{ day_key: "2026-10-01", article_count: 1, source_count: 1 }]);
+
+    // Hermes 原始快照仍在缓存内，本地素材歧义和全量日期统计必须按本次读取重新裁决。
+    db.exec(`
+      INSERT INTO creative_source_items VALUES (102, 'hot-11', 'short_content', '第二来源', '另一热搜', NULL, '2026-10-02T16:30:00Z');
+      INSERT INTO creative_finished_articles VALUES (2402, 102, '2026-10-02T16:30:00Z', '2026-10-02', 'pipeline');
+    `);
+    const nextResponse = await app.inject("/api/creative/write-queue/status");
+    expect(nextResponse.statusCode).toBe(200);
+    const next = nextResponse.json();
+    expect(next.current.source_item_id).toBeNull();
+    expect(next.history.find((task: { finished_article_id: number }) => task.finished_article_id === 2401).source_item_id).toBe(101);
+    expect(next.day_counts).toEqual([
+      { day_key: "2026-10-03", article_count: 0, source_count: 1 },
+      { day_key: "2026-10-01", article_count: 1, source_count: 1 },
+    ]);
+    expect(fetch).toHaveBeenCalledTimes(1);
   } finally { await app.close(); db.close(); }
 });

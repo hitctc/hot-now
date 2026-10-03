@@ -62,8 +62,8 @@ export function useArticleAutosave(options: ArticleAutosaveOptions) {
     }
   }
 
-  const draftAutosaveQueue = createLatestAutosaveQueue(persistDraftAutosave);
-  const humanAutosaveQueue = createLatestAutosaveQueue(persistHumanAutosave);
+  const draftAutosaveQueue = createLatestAutosaveQueue(persistDraftAutosave, payload => payload.articleId);
+  const humanAutosaveQueue = createLatestAutosaveQueue(persistHumanAutosave, payload => payload.articleId);
 
   /** 清理尚未触发的防抖任务，显式保存和标题联动会先接管当前内容。 */
   function clearAutosaveTimers(): void {
@@ -73,27 +73,45 @@ export function useArticleAutosave(options: ArticleAutosaveOptions) {
 
   /** 等待已经发出的自动保存结束，并丢弃失败遗留的旧快照。 */
   async function prepareExplicitContentSave(): Promise<void> {
+    const articleId = options.getArticle()?.id;
     clearAutosaveTimers();
     await Promise.allSettled([
       draftAutosaveQueue.waitForIdle(),
       humanAutosaveQueue.waitForIdle(),
     ]);
-    draftAutosaveQueue.clearPending();
-    humanAutosaveQueue.clearPending();
+    if (articleId !== undefined) {
+      draftAutosaveQueue.clearPending(articleId);
+      humanAutosaveQueue.clearPending(articleId);
+    }
   }
 
-  /** 将左栏当前最新版交给串行队列，错误已经在持久化边界提示。 */
-  function enqueueDraftAutosave(content: string): void {
-    const articleId = options.getArticle()?.id;
+  /** 将左栏最新版交给串行队列；关闭/切换时可传原文章编号，避免父页先清空属性导致丢稿。 */
+  function enqueueDraftAutosave(content: string, articleId = options.getArticle()?.id): void {
     if (!articleId) return;
     void draftAutosaveQueue.enqueue({ articleId, content }).catch(() => {});
   }
 
-  /** 将中栏当前最新版交给串行队列，不在响应后回写 humanContent。 */
-  function enqueueHumanAutosave(content: string): void {
-    const articleId = options.getArticle()?.id;
+  /** 将中栏最新版交给串行队列；显式编号属于原编辑稿，响应不会覆盖另一篇文章或当前正文。 */
+  function enqueueHumanAutosave(content: string, articleId = options.getArticle()?.id): void {
     if (!articleId) return;
     void humanAutosaveQueue.enqueue({ articleId, content }).catch(() => {});
+  }
+
+  /** 收口当前文章的脏稿并等待确认；失败或切换文章时返回 false，让关闭方保留编辑器。 */
+  async function flushAutosaveBeforeClose(): Promise<boolean> {
+    clearAutosaveTimers();
+    const articleId = options.getArticle()?.id;
+    if (!articleId || options.isReadonly()) return true;
+    while (options.editContent.value !== options.getLastSavedContent() || options.humanContent.value !== options.getLastSavedHuman()) {
+      if (options.editContent.value !== options.getLastSavedContent()) enqueueDraftAutosave(options.editContent.value, articleId);
+      if (options.humanContent.value !== options.getLastSavedHuman()) enqueueHumanAutosave(options.humanContent.value, articleId);
+      const results = await Promise.allSettled([draftAutosaveQueue.waitForIdle(), humanAutosaveQueue.waitForIdle()]);
+      if (options.getArticle()?.id !== articleId) return false;
+      const dirty = options.editContent.value !== options.getLastSavedContent() || options.humanContent.value !== options.getLastSavedHuman();
+      if (dirty && results.some(result => result.status === "rejected")) return false;
+      // 保存期间继续输入时再次提交最新版；同一同步回合内确认后再关闭，不让重开读到未落盘稿。
+    }
+    return true;
   }
 
   // 两栏均在停止输入 5 秒后入队；定时器触发时读取当前值，避免提交闭包中的旧版本。
@@ -124,6 +142,7 @@ export function useArticleAutosave(options: ArticleAutosaveOptions) {
     lastSavedAt,
     clearAutosaveTimers,
     prepareExplicitContentSave,
+    flushAutosaveBeforeClose,
     enqueueDraftAutosave,
     enqueueHumanAutosave,
   };

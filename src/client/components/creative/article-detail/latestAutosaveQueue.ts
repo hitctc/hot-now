@@ -1,45 +1,47 @@
 export type LatestAutosaveQueue<T> = {
   enqueue(value: T): Promise<void>;
   waitForIdle(): Promise<void>;
-  clearPending(): void;
+  clearPending(identity?: unknown): void;
 };
 
 /**
- * 为单个编辑栏串行保存内容；请求进行中再次入队时只保留最新版。
- * 保存失败会留下待保存值，由下一次编辑、关闭或手动保存重新覆盖并提交。
+ * 串行保存一个编辑栏；同一文章只保留最新版，不用新文章淘汰上一文章的待保存稿。
+ * 未提供身份函数时保持原单一稿件合同；失败稿留到下一次触发，不在同次排空中无限重试。
  */
-export function createLatestAutosaveQueue<T>(save: (value: T) => Promise<void>): LatestAutosaveQueue<T> {
-  let pending: T;
-  let hasPending = false;
+export function createLatestAutosaveQueue<T>(
+  save: (value: T) => Promise<void>,
+  identify: (value: T) => unknown = () => undefined,
+): LatestAutosaveQueue<T> {
+  const pending = new Map<unknown, T>();
   let running: Promise<void> | null = null;
 
-  /** 持续取走当前最新版，前一个请求结束前不会开始下一个请求。 */
+  /** 依次保存各文章的最新版；失败不阻断另一篇待保存稿，也不能造成重试循环。 */
   async function drain(): Promise<void> {
-    while (hasPending) {
-      const current = pending;
-      hasPending = false;
+    const failed = new Map<unknown, T>();
+    let failure: unknown;
+    while (pending.size > 0) {
+      const [identity, current] = pending.entries().next().value!;
+      pending.delete(identity);
+      failed.delete(identity);
       try {
         await save(current);
       } catch (error) {
-        // 请求期间已有更新内容时继续尝试最新版；没有新版才保留失败快照等待下次触发。
-        if (hasPending) continue;
-        pending = current;
-        hasPending = true;
-        throw error;
+        // 有同一文章的更新稿时继续最新版；否则保留失败稿到本次排空之后再重试。
+        if (pending.has(identity)) continue;
+        failed.set(identity, current);
+        failure = error;
       }
     }
+    for (const [identity, value] of failed) pending.set(identity, value);
+    if (failed.size > 0) throw failure;
   }
 
-  /** 更新待保存值；已有请求运行时复用同一个排空过程。 */
+  /** 合并同一身份的待保存值；所有身份仍复用同一串行排空过程。 */
   function enqueue(value: T): Promise<void> {
-    pending = value;
-    hasPending = true;
+    pending.set(identify(value), value);
     if (running) return running;
-
     const task = drain();
-    running = task.finally(() => {
-      running = null;
-    });
+    running = task.finally(() => { running = null; });
     return running;
   }
 
@@ -48,9 +50,10 @@ export function createLatestAutosaveQueue<T>(save: (value: T) => Promise<void>):
     return running ?? Promise.resolve();
   }
 
-  /** 显式保存成功后清理失败遗留的旧快照，避免后续再次写回。 */
-  function clearPending(): void {
-    hasPending = false;
+  /** 显式保存仅清理对应文章的失败快照；未传身份时兼容原清空入口。 */
+  function clearPending(identity?: unknown): void {
+    if (identity === undefined) pending.clear();
+    else pending.delete(identity);
   }
 
   return { enqueue, waitForIdle, clearPending };

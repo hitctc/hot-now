@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, ref } from "vue";
 import { message } from "ant-design-vue";
 
 import { useSearchHistory } from "../../composables/useSearchHistory.js";
-import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
+import ArticleDetailDrawer from "../../components/creative/LazyArticleDetailDrawer.vue";
 import { resolveWritePollOutcome } from "../../utils/writePollOutcome.js";
 import SourceItemsFilterBar from "../../components/creative/source-items/SourceItemsFilterBar.vue";
 import SourceItemsTable from "../../components/creative/source-items/SourceItemsTable.vue";

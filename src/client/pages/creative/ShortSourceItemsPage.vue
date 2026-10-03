@@ -4,7 +4,7 @@ import { message } from "ant-design-vue";
 
 import { HttpError } from "../../services/http.js";
 import { useSearchHistory } from "../../composables/useSearchHistory.js";
-import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
+import ArticleDetailDrawer from "../../components/creative/LazyArticleDetailDrawer.vue";
 import SourceItemsFilterBar from "../../components/creative/source-items/SourceItemsFilterBar.vue";
 import SourceItemsTable from "../../components/creative/source-items/SourceItemsTable.vue";
 import { useSourceItemsQuery } from "../../components/creative/source-items/useSourceItemsQuery.js";

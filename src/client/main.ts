@@ -1,8 +1,8 @@
 import "ant-design-vue/dist/reset.css";
-import Antd from "ant-design-vue";
 import { createApp } from "vue";
 
 import App from "./App.vue";
+import { installClientComponents } from "./antdComponents";
 import { router } from "./router";
 import { bootstrapEditorialTheme } from "./composables/useTheme";
 import { disablePageZoom } from "./utils/disablePageZoom";
@@ -14,6 +14,6 @@ disablePageZoom();
 
 const app = createApp(App);
 
-app.use(Antd);
+installClientComponents(app);
 app.use(router);
 app.mount("#app");

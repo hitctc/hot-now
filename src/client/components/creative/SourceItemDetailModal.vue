@@ -3,50 +3,17 @@
   传入 visible + sourceItemId，内部自动加载并展示。
 -->
 <script setup lang="ts">
-import { ref, watch } from "vue";
-import { readCreativeSourceItem, type CreativeSourceItem } from "../../services/creativeApi.js";
 
-const props = defineProps<{
-  visible: boolean;
-  sourceItemId: number | null;
-}>();
+import { useSourceItemDetailModal, type SourceItemDetailModalProps, type SourceItemDetailModalEvents } from "./useSourceItemDetailModal.js";
+const props = defineProps<SourceItemDetailModalProps>();
+const emit = defineEmits<SourceItemDetailModalEvents>();
+const {
+  loading,
+  data,
+  close,
+  formatTime,
+} = useSourceItemDetailModal(props, emit);
 
-const emit = defineEmits<{
-  "update:visible": [value: boolean];
-}>();
-
-const loading = ref(false);
-const data = ref<CreativeSourceItem | null>(null);
-
-/** 打开或切换平台素材编号时读取详情；过期响应不能覆盖后来选中的素材。 */
-watch([() => props.visible, () => props.sourceItemId], async ([visible, sourceItemId], _previous, onCleanup) => {
-  let active = true;
-  onCleanup(() => { active = false; });
-  data.value = null;
-  if (!visible || !sourceItemId) { loading.value = false; return; }
-  loading.value = true;
-  try {
-    const source = await readCreativeSourceItem(sourceItemId);
-    if (active) data.value = source;
-  } catch {
-    if (active) data.value = null;
-  } finally {
-    if (active) loading.value = false;
-  }
-});
-
-function close(): void {
-  emit("update:visible", false);
-}
-
-function formatTime(value: string | null): string {
-  if (!value) return "-";
-  const fixed = /^[0-9]{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(value) && !/[Zz+\-]\d{0,4}$/.test(value)
-    ? value.replace(" ", "T") + "Z" : value;
-  const date = new Date(fixed);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
-}
 </script>
 
 <template>

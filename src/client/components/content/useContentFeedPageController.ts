@@ -1,4 +1,5 @@
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onBeforeUnmount, ref } from "vue";
+import { createLatestRequestGuard } from "../../utils/latestRequestGuard";
 import { useRoute, useRouter } from "vue-router";
 
 import { HttpError } from "../../services/http";
@@ -25,10 +26,13 @@ import { useContentPageScroll } from "./useContentPageScroll";
 import { useInfiniteLoadTrigger, VISIBLE_INFINITE_LOAD_DELAY_MS } from "./useInfiniteLoadTrigger";
 import type { ContentFeedPageConfig, ContentFeedPageReader } from "./contentFeedPageShared";
 
+/** 编排内容筛选、分页和异步读取；只允许当前请求更新页面，卸载后忽略迟到结果。 */
 export function useContentFeedPageController(options: {
   config: ContentFeedPageConfig;
   readPage: ContentFeedPageReader;
 }) {
+  const requestGuard = createLatestRequestGuard();
+  onBeforeUnmount(() => requestGuard.invalidate());
   const pageKey = options.config.pageKey;
   const isLoading = ref(true);
   const isRefreshing = ref(false);
@@ -117,7 +121,7 @@ export function useContentFeedPageController(options: {
     return [...currentCards, ...uniqueNextCards];
   }
 
-  // 页面加载支持静默刷新、触底追加和指定搜索词，排序、筛选与搜索统一走这条路径。
+  /** 读取一次筛选快照；请求身份同时保护数据、URL、持久化和加载态，旧响应不覆盖新选择。 */
   async function loadPage(payload: {
     selectedKinds?: string[];
     silent?: boolean;
@@ -125,7 +129,12 @@ export function useContentFeedPageController(options: {
     page?: number;
     append?: boolean;
   } = {}): Promise<void> {
+    const requestId = requestGuard.begin();
     const isAppendLoad = payload.append === true;
+    // 新查询接管全部加载态，避免已失效的首次/追加请求留下永久忙碌状态。
+    isLoading.value = false;
+    isRefreshing.value = false;
+    isLoadingNextPage.value = false;
 
     if (isAppendLoad) {
       isLoadingNextPage.value = true;
@@ -147,6 +156,7 @@ export function useContentFeedPageController(options: {
         page: requestedPage,
         searchKeyword: payload.searchKeyword ?? appliedSearchKeyword.value
       });
+      if (!requestGuard.isCurrent(requestId)) return;
       pageModel.value = nextModel;
       currentLoadedPage.value = nextModel.pagination?.page ?? requestedPage;
       accumulatedCards.value = isAppendLoad
@@ -156,6 +166,7 @@ export function useContentFeedPageController(options: {
       if (!isAppendLoad && nextModel.pagination && readCurrentPage() !== nextModel.pagination.page) {
         await replacePageQuery(nextModel.pagination.page);
       }
+      if (!requestGuard.isCurrent(requestId)) return;
 
       if (selectedSourceKinds.value === null) {
         const nextKinds = nextModel.sourceFilter
@@ -192,10 +203,12 @@ export function useContentFeedPageController(options: {
         writeStoredWechatRssSourceIds(nextIds, pageKey);
       }
     } catch (error) {
+      if (!requestGuard.isCurrent(requestId)) return;
       loadError.value = error instanceof HttpError && error.status === 401
         ? options.config.authErrorMessage
         : options.config.loadErrorMessage;
     } finally {
+      if (!requestGuard.isCurrent(requestId)) return;
       if (isAppendLoad) {
         isLoadingNextPage.value = false;
       } else if (payload.silent) {

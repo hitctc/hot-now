@@ -33,76 +33,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
-import { message } from "ant-design-vue";
-import { saveWechatMpAccount, type WechatMpAccountSummary } from "../../../services/settingsApi.js";
 
-const props = defineProps<{
-  open: boolean;
-  editing: WechatMpAccountSummary | null;
-}>();
+import { useWechatMpAccountModal, type WechatMpAccountModalProps, type WechatMpAccountModalEvents } from "./useWechatMpAccountModal.js";
+const props = defineProps<WechatMpAccountModalProps>();
+const emit = defineEmits<WechatMpAccountModalEvents>();
+const {
+  form,
+  saving,
+  handleSave,
+} = useWechatMpAccountModal(props, emit);
 
-const emit = defineEmits<{
-  "update:open": [value: boolean];
-  saved: [];
-}>();
-
-const form = ref({
-  name: "",
-  appId: "",
-  appSecret: "",
-  notes: "",
-  isDefault: false,
-});
-const saving = ref(false);
-
-watch(() => props.open, (val) => {
-  if (val) {
-    if (props.editing) {
-      form.value = {
-        name: props.editing.name,
-        appId: props.editing.appId,
-        appSecret: "",
-        notes: props.editing.notes ?? "",
-        isDefault: props.editing.isDefault,
-      };
-    } else {
-      form.value = { name: "", appId: "", appSecret: "", notes: "", isDefault: false };
-    }
-  }
-});
-
-async function handleSave(): Promise<void> {
-  if (!form.value.name.trim()) {
-    message.warning("请输入公众号名称");
-    return;
-  }
-  if (!form.value.appId.trim()) {
-    message.warning("请输入 AppID");
-    return;
-  }
-  if (!props.editing && !form.value.appSecret) {
-    message.warning("新增公众号时必须提供 AppSecret");
-    return;
-  }
-
-  saving.value = true;
-  try {
-    await saveWechatMpAccount({
-      id: props.editing?.id,
-      name: form.value.name.trim(),
-      appId: form.value.appId.trim(),
-      appSecret: form.value.appSecret || undefined,
-      notes: form.value.notes || undefined,
-      isDefault: form.value.isDefault,
-    });
-    message.success(props.editing ? "更新成功" : "新增成功");
-    emit("update:open", false);
-    emit("saved");
-  } catch {
-    message.error("保存失败");
-  } finally {
-    saving.value = false;
-  }
-}
 </script>

@@ -1,26 +1,13 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from "vue";
-import { fetchPlatformStats, type PlatformStats } from "../../services/monitorApi.js";
 
-const data = ref<PlatformStats | null>(null);
-const loading = ref(false);
-const error = ref("");
-let timer: ReturnType<typeof setInterval> | null = null;
+import { useMonitorPlatformStats } from "./useMonitorPlatformStats.js";
+const {
+  data,
+  loading,
+  error,
+  refresh,
+} = useMonitorPlatformStats();
 
-async function refresh(): Promise<void> {
-  loading.value = true;
-  error.value = "";
-  try {
-    data.value = await fetchPlatformStats();
-  } catch (err) {
-    error.value = "平台连接失败";
-  } finally {
-    loading.value = false;
-  }
-}
-
-onMounted(() => { refresh(); timer = setInterval(refresh, 60_000); });
-onBeforeUnmount(() => { if (timer) clearInterval(timer); });
 </script>
 
 <template>

@@ -28,10 +28,10 @@ import {
 } from "../../services/creativeApi.js";
 import { readWechatMpAccounts, type WechatMpAccountSummary } from "../../services/settingsApi.js";
 import ArticlePushFloatWidget from "../../components/creative/ArticlePushFloatWidget.vue";
-import ArticleDetailDrawer from "../../components/creative/ArticleDetailDrawer.vue";
+import ArticleDetailDrawer from "../../components/creative/LazyArticleDetailDrawer.vue";
 import CreativeCoverThumbnail from "../../components/creative/CreativeCoverThumbnail.vue";
 import ArticlePerformanceFeedbackModal from "../../components/creative/ArticlePerformanceFeedbackModal.vue";
-import SourceItemDetailModal from "../../components/creative/SourceItemDetailModal.vue";
+import SourceItemDetailModal from "../../components/creative/LazySourceItemDetailModal.vue";
 import { formatTableDayLabel, isTableDayStart, toShanghaiDayKey } from "../../components/creative/tableDayGroups.js";
 import { getStatusLabel, getAvailableActions, checkPublishConditions, getDisplayTitle, type ArticleAction } from "../../components/creative/articleStatusShared.js";
 

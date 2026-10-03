@@ -1,37 +1,16 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from "vue";
-import { fetchMonitorStats, fetchPlatformStats, type MonitorStats, type PlatformStats } from "../../services/monitorApi.js";
 
-const stats = ref<MonitorStats | null>(null);
-const platform = ref<PlatformStats | null>(null);
-const loading = ref(false);
-let timer: ReturnType<typeof setInterval> | null = null;
+import { useMonitorStatsCards } from "./useMonitorStatsCards.js";
+const {
+  stats,
+  platform,
+  loading,
+  refresh,
+  parseStepsSummary,
+  runDuration,
+  statusColorMap,
+} = useMonitorStatsCards();
 
-async function refresh(): Promise<void> {
-  loading.value = true;
-  try {
-    const [s, p] = await Promise.allSettled([fetchMonitorStats(), fetchPlatformStats()]);
-    if (s.status === "fulfilled") stats.value = s.value;
-    if (p.status === "fulfilled") platform.value = p.value;
-  } finally { loading.value = false; }
-}
-
-function parseStepsSummary(raw: string): Record<string, unknown> | null {
-  try { return JSON.parse(raw); }
-  catch { return null; }
-}
-
-function runDuration(started: string, finished: string | null): string {
-  if (!finished) return "-";
-  const ms = new Date(finished + "Z").getTime() - new Date(started + "Z").getTime();
-  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
-  return `${Math.floor(ms / 60_000)}m${Math.round((ms % 60_000) / 1000)}s`;
-}
-
-const statusColorMap: Record<string, string> = { done: "green", error: "red", running: "blue" };
-
-onMounted(() => { refresh(); timer = setInterval(refresh, 30_000); });
-onBeforeUnmount(() => { if (timer) clearInterval(timer); });
 </script>
 
 <template>

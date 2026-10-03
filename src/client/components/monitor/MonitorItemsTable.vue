@@ -1,51 +1,18 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
-import { fetchMonitorItems, type MonitorItem } from "../../services/monitorApi.js";
 
-const items = ref<MonitorItem[]>([]);
-const loading = ref(false);
-const statusFilter = ref("all");
-const currentPage = ref(1);
-const pageSize = 50;
+import { useMonitorItemsTable } from "./useMonitorItemsTable.js";
+const {
+  items,
+  loading,
+  statusFilter,
+  currentPage,
+  pageSize,
+  statusOptions,
+  agentLabels,
+  load,
+  handleTableChange,
+} = useMonitorItemsTable();
 
-const statusOptions = [
-  { label: "全部", value: "all" },
-  { label: "待评分", value: "pending_score" },
-  { label: "待趋势评分", value: "pending_trend" },
-  { label: "待写作", value: "pending_write" },
-  { label: "已写作", value: "written" },
-  { label: "已推送", value: "drafted" },
-];
-
-const agentLabels: Record<string, string> = {
-  "rss-feed": "RSS",
-  aihot: "AIHot",
-  twitter: "Twitter",
-  hackernews: "HN",
-  bilibili: "B站",
-  "wechat-rss": "WX",
-  weibo: "微博",
-};
-
-async function load(): Promise<void> {
-  loading.value = true;
-  try {
-    const res = await fetchMonitorItems({
-      status: statusFilter.value,
-      limit: pageSize,
-      offset: (currentPage.value - 1) * pageSize,
-    });
-    items.value = res.items;
-  } catch { /* 静默 */ }
-  finally { loading.value = false; }
-}
-
-function handleTableChange(pagination: { current?: number }): void {
-  if (pagination.current) currentPage.value = pagination.current;
-  load();
-}
-
-onMounted(() => load());
 </script>
 
 <template>

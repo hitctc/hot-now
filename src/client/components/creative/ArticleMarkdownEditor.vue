@@ -97,6 +97,8 @@ const props = withDefaults(defineProps<{
   modelValue: string;
   /** 外部传入的 HTML 覆盖右侧预览（如主题渲染），为空则用 Markdown 实时渲染 */
   previewHtml?: string;
+  /** 手机隐藏预览时跳过 Markdown 回退渲染；默认保持原两栏/三栏预览。 */
+  previewEnabled?: boolean;
   previewLabel?: string;
   /** 是否开启编辑区→预览区滚动同步 + 预览对应块高亮 */
   syncScroll?: boolean;
@@ -113,6 +115,7 @@ const props = withDefaults(defineProps<{
   saveStatusState?: "idle" | "saved";
 }>(), {
   previewHtml: "",
+  previewEnabled: true,
   previewLabel: "预览",
   syncScroll: true,
   humanMode: false,
@@ -146,7 +149,8 @@ md.core.ruler.push("external_links", (state) => {
 // 注入源码行号标记，预览每个块都能反查到源码行
 injectSourceLineTracking(md);
 
-const renderedHtml = computed(() => md.render(props.modelValue || ""));
+// 主题预览关闭时也跳过本地回退，否则 CSS 隐藏仍会在每次输入时解析完整 Markdown。
+const renderedHtml = computed(() => props.previewEnabled ? md.render(props.modelValue || "") : "");
 
 function onInput(e: Event): void {
   emit("update:modelValue", (e.target as HTMLTextAreaElement).value);

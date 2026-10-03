@@ -1,55 +1,19 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from "vue";
-import { fetchCodexConsumption, type CodexConsumptionItem, type CodexConsumptionResponse } from "../../services/monitorApi.js";
 
-const data = ref<CodexConsumptionResponse | null>(null);
-const loading = ref(false);
-let timer: ReturnType<typeof setInterval> | null = null;
+import { useCodexConsumption, type CodexConsumptionEvents } from "./useCodexConsumption.js";
+const emit = defineEmits<CodexConsumptionEvents>();
+const {
+  loading,
+  refresh,
+  items,
+  pendingCount,
+  nextScheduleAt,
+  scheduleInterval,
+  formatCountdown,
+  consumeConfig,
+  timeAgo,
+} = useCodexConsumption();
 
-async function refresh(): Promise<void> {
-  loading.value = true;
-  try {
-    data.value = await fetchCodexConsumption({ limit: 10 });
-  } catch { /* 静默 */ }
-  finally { loading.value = false; }
-}
-
-const items = computed(() => data.value?.items ?? []);
-const pendingCount = computed(() => data.value?.pending_count ?? 0);
-const nextScheduleAt = computed(() => data.value?.next_schedule_at);
-const scheduleInterval = computed(() => data.value?.schedule_interval_seconds);
-
-// 下次消费倒计时
-function formatCountdown(iso: string | null): string {
-  if (!iso) return "-";
-  const diff = new Date(iso).getTime() - Date.now();
-  if (diff <= 0) return "即将执行";
-  if (diff < 60_000) return `${Math.round(diff / 1000)}秒后`;
-  if (diff < 3600_000) return `${Math.round(diff / 60_000)}分钟后`;
-  return `${Math.round(diff / 3600_000)}小时后`;
-}
-
-// 消费状态配置
-const consumeConfig: Record<string, { color: string; label: string }> = {
-  success:         { color: "green",  label: "已消费" },
-  pending:         { color: "blue",   label: "待消费" },
-  failed:          { color: "red",    label: "消费失败" },
-  failed_generate: { color: "red",    label: "生图失败" },
-};
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  if (diff < 60_000) return `${Math.round(diff / 1000)}秒前`;
-  if (diff < 3600_000) return `${Math.round(diff / 60_000)}分钟前`;
-  return `${Math.round(diff / 3600_000)}小时前`;
-}
-
-const emit = defineEmits<{
-  openArticle: [articleId: number];
-}>();
-
-onMounted(() => { refresh(); timer = setInterval(refresh, 30_000); });
-onBeforeUnmount(() => { if (timer) clearInterval(timer); });
 </script>
 
 <template>

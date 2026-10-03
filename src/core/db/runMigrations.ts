@@ -21,10 +21,12 @@ import { refreshCodeImageCardsFontconfigMigration } from "./migrations/053_refre
 import { finishedArticlesCodeImageKeywordsMigration } from "./migrations/054_finished_articles_code_image_keywords.js";
 import { normalizeShortContentStatusesMigration } from "./migrations/055_normalize_short_content_statuses.js";
 import { wechatDraftPushContentTypeMigration } from "./migrations/056_wechat_draft_push_content_type.js";
+import { creativeQueueDisplayIndexesMigration } from "./migrations/057_creative_queue_display_indexes.js";
 import { applyLegacyMigrations014To047 } from "./legacyMigrations014To047.js";
 
-const schemaVersion = 56;
+const schemaVersion = 57;
 
+/** 按现役事务顺序升级传入数据库及版本记录；迁移幂等，新增外键错误使整轮回滚。 */
 export function runMigrations(db: SqliteDatabase): void {
   // Migrations stay idempotent because existing local SQLite files must be upgraded in place
   // without forcing developers to rebuild data or drop historical reports.
@@ -216,6 +218,12 @@ export function runMigrations(db: SqliteDatabase): void {
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(
       wechatDraftPushContentTypeMigration.version,
       wechatDraftPushContentTypeMigration.name
+    );
+
+    creativeQueueDisplayIndexesMigration.apply(db);
+    db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(
+      creativeQueueDisplayIndexesMigration.version,
+      creativeQueueDisplayIndexesMigration.name
     );
 
     db.pragma(`user_version = ${schemaVersion}`);

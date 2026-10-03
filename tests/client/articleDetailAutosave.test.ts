@@ -21,6 +21,45 @@ function deferred(): { promise: Promise<void>; resolve: () => void } {
 }
 
 describe("article detail autosave", () => {
+  it("跨文章仍串行保存，但不能用新文章的稿件淘汰上一文章的待保存稿", async () => {
+    const first = deferred();
+    const saved: Array<{ articleId: number; content: string }> = [];
+    const queue = createLatestAutosaveQueue(async (value: { articleId: number; content: string }) => {
+      saved.push(value);
+      if (value.content === "A旧") await first.promise;
+    }, value => value.articleId);
+    const running = queue.enqueue({ articleId: 1, content: "A旧" });
+    void queue.enqueue({ articleId: 1, content: "A最新" });
+    void queue.enqueue({ articleId: 2, content: "B最新" });
+    first.resolve();
+    await running;
+    expect(saved).toEqual([
+      { articleId: 1, content: "A旧" },
+      { articleId: 1, content: "A最新" },
+      { articleId: 2, content: "B最新" },
+    ]);
+  });
+
+  it("跨文章失败不阻断新稿，且显式保存只清理当前文章的失败稿", async () => {
+    let failA = true;
+    const saved: Array<{ articleId: number; content: string }> = [];
+    const queue = createLatestAutosaveQueue(async (value: { articleId: number; content: string }) => {
+      if (value.articleId === 1 && failA) throw new Error("A offline");
+      saved.push(value);
+    }, value => value.articleId);
+    await expect(queue.enqueue({ articleId: 1, content: "A待保存" })).rejects.toThrow("A offline");
+    await expect(queue.enqueue({ articleId: 2, content: "B已保存" })).rejects.toThrow("A offline");
+    expect(saved).toEqual([{ articleId: 2, content: "B已保存" }]);
+    queue.clearPending(2);
+    failA = false;
+    await queue.enqueue({ articleId: 2, content: "B最新" });
+    expect(saved).toEqual([
+      { articleId: 2, content: "B已保存" },
+      { articleId: 1, content: "A待保存" },
+      { articleId: 2, content: "B最新" },
+    ]);
+  });
+
   it("自动保存成功不触发父页面刷新，避免旧详情响应覆盖编辑内容", async () => {
     vi.useFakeTimers();
     const article = { id: 16212 } as CreativeFinishedArticle;

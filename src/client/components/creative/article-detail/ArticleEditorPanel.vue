@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from "vue";
+import { onBeforeUnmount, ref, watch } from "vue";
 
 import ArticleMarkdownEditor from "../ArticleMarkdownEditor.vue";
 import ArticleDetailFooter from "./ArticleDetailFooter.vue";
@@ -14,6 +14,7 @@ const props = defineProps<{
   humanContent: string;
   aiDraft: string;
   previewHtml: string;
+  previewEnabled?: boolean;
   previewLabel: string;
   previewThemeOptions: PreviewThemeOption[];
   activePreviewTheme: string;
@@ -47,11 +48,15 @@ const emit = defineEmits<{
   (event: "push"): void;
   (event: "unlock-focus-mode"): void;
   (event: "save"): void;
+  (event: "preview-visibility-change", visible: boolean): void;
 }>();
 
 const focusToolsOpen = ref(false);
 // 移动端独立全屏预览：与详情弹窗分离，编辑时不再同时展示预览。
 const mobilePreviewOpen = ref(false);
+// 父级按实际可见性计算主题预览，手机关闭预览后不继续处理隐藏 HTML。
+watch(mobilePreviewOpen, visible => emit("preview-visibility-change", visible), { immediate: true });
+watch(() => props.previewEnabled, enabled => { if (enabled === false) mobilePreviewOpen.value = false; });
 let focusToolsCloseTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** 专注模式的工具区由悬浮区域控制，延迟收起避免鼠标移入面板时闪退。 */
@@ -226,6 +231,7 @@ onBeforeUnmount(() => {
       :draft-label="isManualArticle ? '素材和草稿' : 'AI 生成的草稿'"
       :draft-placeholder="isManualArticle ? '在此收集素材和整理草稿...' : 'AI 生成的草稿（可编辑）...'"
       :preview-html="previewHtml"
+      :preview-enabled="previewEnabled"
       :preview-label="previewLabel"
       :sync-scroll="syncScrollEnabled"
       :save-status="focusMode ? (savedAtLabel || '未触发保存') : ''"
@@ -284,6 +290,7 @@ onBeforeUnmount(() => {
           :draft-label="isManualArticle ? '素材和草稿' : 'AI 生成的草稿'"
           :draft-placeholder="isManualArticle ? '在此收集素材和整理草稿...' : 'AI 生成的草稿（可编辑）...'"
           :preview-html="previewHtml"
+          :preview-enabled="previewEnabled"
           :preview-label="previewLabel"
           :sync-scroll="syncScrollEnabled"
           @update:model-value="emit('update:human-content', $event)"

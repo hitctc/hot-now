@@ -1,104 +1,18 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { Modal } from "ant-design-vue";
-import type { CreativeFinishedArticle } from "../../services/creativeApi";
-import {
-  editFinishedArticle,
-  deleteFinishedArticle,
-} from "../../services/creativeApi";
-import { getDisplayTitle } from "./articleStatusShared.js";
-import { message } from "ant-design-vue";
 
-const props = defineProps<{
-  visible: boolean;
-  article: CreativeFinishedArticle | null;
-}>();
+import { useArticleReviewModal, type ArticleReviewModalProps, type ArticleReviewModalEvents } from "./useArticleReviewModal.js";
+const props = defineProps<ArticleReviewModalProps>();
+const emit = defineEmits<ArticleReviewModalEvents>();
+const {
+  rejectReason,
+  displayTitle,
+  submitting,
+  close,
+  handleApprove,
+  handleReject,
+  handleDelete,
+} = useArticleReviewModal(props, emit);
 
-const emit = defineEmits<{
-  "update:visible": [value: boolean];
-  reviewed: [];
-}>();
-
-const rejectReason = ref("");
-
-// 展示标题：优先发布标题，无标题时回退主旨
-const displayTitle = computed(() => {
-  const article = props.article;
-  if (!article) return "";
-  const title = getDisplayTitle(article.titles, article.titleIndex);
-  return title === "无标题" && article.thesis ? article.thesis : title;
-});
-const submitting = ref(false);
-
-function close(): void {
-  rejectReason.value = "";
-  emit("update:visible", false);
-}
-
-async function handleApprove(): Promise<void> {
-  if (!props.article) return;
-  submitting.value = true;
-  try {
-    const res = await editFinishedArticle(props.article.id, {
-      status: "ready_for_publish",
-      anomalyReason: "",
-      _source: "review",
-    } as any);
-    if (res.ok) {
-      message.success("审核通过");
-      emit("reviewed");
-      close();
-    }
-  } catch {
-    message.error("操作失败");
-  } finally {
-    submitting.value = false;
-  }
-}
-
-async function handleReject(): Promise<void> {
-  if (!props.article) return;
-  submitting.value = true;
-  try {
-    const res = await editFinishedArticle(props.article.id, {
-      status: "soft_deleted",
-      anomalyReason: rejectReason.value || "审核不通过",
-    } as any);
-    if (res.ok) {
-      message.success("已标记为审核不通过");
-      emit("reviewed");
-      close();
-    }
-  } catch {
-    message.error("操作失败");
-  } finally {
-    submitting.value = false;
-  }
-}
-
-function handleDelete(): void {
-  if (!props.article) return;
-  Modal.confirm({
-    bodyStyle: { padding: '24px' },
-    title: "确认删除",
-    content: `确定要删除文章 #${props.article.id} 吗？删除后可从回收站恢复。`,
-    okText: "删除",
-    okType: "danger",
-    cancelText: "取消",
-    onOk: async () => {
-      try {
-        const res = await deleteFinishedArticle(props.article!.id);
-        if (res.ok) {
-          message.success("已删除");
-          emit("reviewed");
-          close();
-        }
-      } catch {
-        message.error("删除失败");
-      }
-    },
-  });
-}
 </script>
 
 <template>

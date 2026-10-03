@@ -38,17 +38,44 @@ echo "Deploy target: ${REMOTE_TARGET}:${DEPLOY_APP_DIR}"
 
 cd "${REPO_ROOT}"
 
-# 只读预检由服务管理器注入鉴权环境，不让智能体读取或回显生产配置。
-if [[ "${1:-}" == "--check-hermes" ]]; then
+# 只读预检由服务管理器注入鉴权环境，标准输出仅包含活动与队列数量，不回显生产配置。
+check_hermes_state() {
   ssh "${REMOTE_TARGET}" \
     "systemd-run --user --quiet --wait --pipe --property=EnvironmentFile='${DEPLOY_ENV_FILE}' node --input-type=module" \
     < "${REPO_ROOT}/scripts/hermes-preflight.mjs"
-  exit $?
-fi
-if [[ $# -gt 0 ]]; then
-  echo 'Usage: ./scripts/deploy-prod.sh [--check-hermes]' >&2
+}
+
+# 在停服务之前等待任务自然结束；失败或未知状态立即停止，不取消任务，也不无限等待。
+wait_for_hermes_idle() {
+  local state active
+  for ((attempt=1; attempt<=300; attempt++)); do
+    state="$(check_hermes_state)" || return 1
+    active="$(node -e '
+      try {
+        const state = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+        if (typeof state.active !== "boolean" || !Number.isSafeInteger(state.queueLength) || state.queueLength < 0) throw new Error();
+        process.stdout.write(String(state.active));
+      } catch { process.stderr.write("无法确认 Hermes 活动状态\n"); process.exit(1); }
+    ' <<< "${state}")" || return 1
+    echo "Hermes pre-stop check: ${state}"
+    if [[ "${active}" == "false" ]]; then return 0; fi
+    sleep 10
+  done
+  echo 'Hermes remains active after the 50-minute waiting window; deployment stopped before service stop.' >&2
+  return 1
+}
+
+WAIT_FOR_HERMES=false
+if [[ $# -gt 1 ]]; then
+  echo 'Usage: ./scripts/deploy-prod.sh [--check-hermes|--wait-hermes]' >&2
   exit 2
 fi
+case "${1:-}" in
+  --check-hermes) check_hermes_state; exit $? ;;
+  --wait-hermes) WAIT_FOR_HERMES=true ;;
+  "") ;;
+  *) echo 'Usage: ./scripts/deploy-prod.sh [--check-hermes|--wait-hermes]' >&2; exit 2 ;;
+esac
 
 echo "Building locally..."
 npm run build
@@ -78,6 +105,10 @@ rsync -az --delete \
 
 # 分步执行：先停服务释放内存 → 装 deps → 重启 → health check
 # 每步单独 SSH，避免单条命令超时丢进度
+
+if [[ "${WAIT_FOR_HERMES}" == "true" ]]; then
+  wait_for_hermes_idle
+fi
 
 echo "Stopping service to free memory for npm ci..."
 ssh "${REMOTE_TARGET}" \

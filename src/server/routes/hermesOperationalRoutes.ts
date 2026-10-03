@@ -1,3 +1,4 @@
+import { enrichWriteQueueDisplay } from "../../core/creative/creativeWriteQueueDisplayRepository.js";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import type { SqliteDatabase } from "../../core/db/openDatabase.js";
@@ -74,96 +75,7 @@ export function registerHermesOperationalRoutes(
     const data = await hermesWriteQueueStatusReader.read();
 
     // 队列终态历史从 Hermes 持久化读取；旧版本服务没有历史文件时，用本地 pipeline 成品补齐成功记录。
-    if (db) {
-      // 队列日期带必须读取数据库全量日统计，不能从有限的历史记录反推文章和素材数量。
-      const articleDayRows = db.prepare(`
-        SELECT date(datetime(created_at), '+8 hours') AS day_key, COUNT(*) AS article_count
-        FROM creative_finished_articles
-        WHERE deleted_at IS NULL
-        GROUP BY day_key
-      `).all() as Array<{ day_key: string; article_count: number }>;
-      const sourceDayRows = db.prepare(`
-        SELECT date(datetime(COALESCE(collector_timestamp, created_at)), '+8 hours') AS day_key, COUNT(*) AS source_count
-        FROM creative_source_items
-        GROUP BY day_key
-      `).all() as Array<{ day_key: string; source_count: number }>;
-      const dayCounts = new Map<string, { day_key: string; article_count: number; source_count: number }>();
-      for (const row of articleDayRows) {
-        dayCounts.set(row.day_key, { ...row, source_count: 0 });
-      }
-      for (const row of sourceDayRows) {
-        const current = dayCounts.get(row.day_key) ?? { day_key: row.day_key, article_count: 0, source_count: 0 };
-        current.source_count = row.source_count;
-        dayCounts.set(row.day_key, current);
-      }
-      data.day_counts = [...dayCounts.values()].sort((left, right) => right.day_key.localeCompare(left.day_key));
-
-      const history = Array.isArray(data.history) ? data.history as Array<Record<string, unknown>> : [];
-      const knownArticleIds = new Set(
-        history.map((task) => Number(task.finished_article_id)).filter((id) => Number.isFinite(id) && id > 0),
-      );
-      const legacyArticles = db.prepare(`
-        SELECT id, source_item_id, created_at
-        FROM creative_finished_articles
-        WHERE origin_type = 'pipeline'
-        ORDER BY datetime(created_at) DESC, id DESC
-        LIMIT 500
-      `).all() as Array<{ id: number; source_item_id: number | null; created_at: string }>;
-      for (const article of legacyArticles) {
-        if (knownArticleIds.has(article.id)) continue;
-        history.push({
-          task_id: `article-${article.id}`,
-          label: `历史成品 · #${article.id}`,
-          priority: "normal",
-          source_item_id: article.source_item_id,
-          status: "done",
-          submitted_at: article.created_at,
-          started_at: article.created_at,
-          finished_at: article.created_at,
-          finished_article_id: article.id,
-        });
-      }
-      data.history = history;
-
-      // 从队列中收集所有 source_item_id，批量查本地素材表补充标题和来源
-      const tasks = [
-        data.current,
-        ...(data.queue ?? []),
-        ...(data.recent ?? []),
-        ...(data.history ?? []),
-      ].filter(Boolean) as Array<Record<string, unknown>>;
-      // 自动短内容没有平台 ID，不能拿 Hermes 本地编号打开平台素材；历史记录从成品补回关联。
-      const articleIds = [...new Set(tasks.map((task) => Number(task.finished_article_id || task.article_id)).filter((id) => Number.isSafeInteger(id) && id > 0))];
-      const articles = articleIds.length ? db.prepare(`SELECT id, source_item_id FROM creative_finished_articles WHERE id IN (${articleIds.map(() => "?").join(",")})`).all(...articleIds) as Array<{ id: number; source_item_id: number | null }> : [];
-      const articleSources = new Map(articles.map((article) => [article.id, article.source_item_id]));
-      for (const task of tasks) {
-        if (task.source_item_id) continue;
-        const articleSource = articleSources.get(Number(task.finished_article_id || task.article_id));
-        if (articleSource) {
-          task.source_item_id = articleSource;
-        } else if (typeof task.source_external_id === "string" && task.source_external_id) {
-          const matches = db.prepare("SELECT id FROM creative_source_items WHERE external_id = ? AND direction = 'short_content' LIMIT 2").all(task.source_external_id) as Array<{ id: number }>;
-          // 外部标识有歧义时不猜测素材，避免链接指向另一来源。
-          if (matches.length === 1) task.source_item_id = matches[0]!.id;
-        }
-      }
-      const sourceItemIds = [...new Set(tasks.map((task) => Number(task.source_item_id)).filter(Boolean))];
-      if (sourceItemIds.length > 0) {
-        const placeholders = sourceItemIds.map(() => "?").join(",");
-        const rows = db.prepare(
-          `SELECT id, title, source_name FROM creative_source_items WHERE id IN (${placeholders})`
-        ).all(...sourceItemIds) as { id: number; title: string; source_name: string | null }[];
-        const lookup = new Map(rows.map((row) => [row.id, row]));
-        for (const task of tasks) {
-          const sourceItemId = Number(task.source_item_id);
-          if (sourceItemId && lookup.has(sourceItemId)) {
-            const info = lookup.get(sourceItemId)!;
-            task.source_item_title = info.title ?? null;
-            task.source_item_source_name = info.source_name ?? null;
-          }
-        }
-      }
-    }
+    if (db) enrichWriteQueueDisplay(db, data);
 
     return reply.send(data);
   });

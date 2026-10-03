@@ -192,13 +192,23 @@ export function resolveClientAssetMimeType(extension: string): string {
   return "application/javascript; charset=utf-8";
 }
 
+export const SITE_CSS_FRAGMENTS = [
+  "site.css",
+  "site.shell.fragment.css",
+  "site.content.fragment.css",
+  "site.system.fragment.css",
+  "site.login.fragment.css",
+  "site.responsive.fragment.css",
+] as const;
+
+/** 按原层叠顺序拼装唯一旧站样式响应；开发/构建路径均支持，任一片段缺失沿用原回退。 */
 export function readSiteCss() {
-  // CSS is loaded from the source tree so both tsx dev and built runtime can serve one shared stylesheet.
+  // 不插入分隔符，保持拆分前的响应字节与媒体规则优先级，浏览器无需追加请求。
   try {
-    return readFileSync(new URL("./public/site.css", import.meta.url), "utf8");
+    return SITE_CSS_FRAGMENTS.map((name) => readFileSync(new URL(`./public/${name}`, import.meta.url), "utf8")).join("");
   } catch {
     try {
-      return readFileSync(path.resolve(process.cwd(), "src/server/public/site.css"), "utf8");
+      return SITE_CSS_FRAGMENTS.map((name) => readFileSync(path.resolve(process.cwd(), "src/server/public", name), "utf8")).join("");
     } catch {
       return "body{font-family:sans-serif;background:#f8fafc;color:#0f172a;}";
     }

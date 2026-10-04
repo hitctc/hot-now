@@ -11,6 +11,22 @@ afterEach(() => {
 });
 
 describe("creative raw RSS feed route", () => {
+  it("rejects invalid direction and cursor instead of falling back to history", async () => {
+    const handle = await createTestDatabase("hot-now-rss-invalid-cursor-");
+    handles.push(handle);
+    const app = createServer({ db: handle.db, creativeApiToken: "test-token" });
+    for (const query of ["direction=invalid", "afterId=-1", "afterId=bad", "afterId=", "afterId=1.5", "afterId=9007199254740992"]) {
+      const response = await app.inject({ method: "GET", url: `/api/creative/feed/raw-rss?${query}`,
+        headers: { "x-creative-token": "test-token" } });
+      expect(response.statusCode).toBe(400);
+    }
+    const valid = await app.inject({ method: "GET", url: "/api/creative/feed/raw-rss?direction=short_content&afterId=0",
+      headers: { "x-creative-token": "test-token" } });
+    expect(valid.statusCode).toBe(200);
+    expect(valid.json()).toMatchObject({ ok: true, latestId: 0, items: [] });
+    await app.close();
+  });
+
   it("requires the creative token and returns missing RSS handoff items", async () => {
     const handle = await createTestDatabase("hot-now-creative-raw-rss-route-");
     handles.push(handle);

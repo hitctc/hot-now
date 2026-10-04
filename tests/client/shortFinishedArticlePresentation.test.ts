@@ -8,6 +8,7 @@ import {
   formatTrendBreakdown,
   formatWritingDuration,
   getShortFinishedStatusInfo,
+  getShortFinishedDomainInfo,
   getTrendBreakdownBars
 } from "../../src/client/pages/creative/shortFinishedArticlePresentation.js";
 
@@ -21,6 +22,16 @@ const breakdown = {
 };
 
 describe("短内容成品表格展示模型", () => {
+  it("仅使用新稿持久化的领域信息，历史和未知稿件不猜标签", () => {
+    expect(getShortFinishedDomainInfo([{ meta: { contentDomain: "ai", editorialFocus: "tech-ai-v1" } }])).toEqual({ label: "AI", color: "purple" });
+    expect(getShortFinishedDomainInfo([{ meta: { contentDomain: "tech_digital", editorialFocus: "tech-ai-v1" } }])).toEqual({ label: "科技数码", color: "blue" });
+    for (const domain of ["other", "unknown", "invalid", null]) {
+      expect(getShortFinishedDomainInfo([{ meta: { contentDomain: domain, editorialFocus: "tech-ai-v1" } }])).toBeNull();
+    }
+    expect(getShortFinishedDomainInfo(null)).toBeNull();
+    expect(getShortFinishedDomainInfo([{ meta: { contentDomain: "ai" } }])).toBeNull();
+  });
+
   it("保持筛选和操作列，分开质检与素材趋势而不显示旧文体",  () => {
     expect(SHORT_FINISHED_STATUS_OPTIONS[0]).toEqual({ label: "全部状态", value: "" });
     expect(SHORT_FINISHED_STATUS_OPTIONS.at(-1)).toEqual({ label: "已删除", value: "soft_deleted" });

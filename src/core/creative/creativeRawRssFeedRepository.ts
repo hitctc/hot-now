@@ -19,6 +19,7 @@ export type CreativeRawRssFeedResult = {
   items: CreativeRawRssFeedItem[];
   total: number;
   windowHours: number;
+  latestId: number;
 };
 
 const feedToSourceKind: Record<CreativeRawRssFeed, string> = {
@@ -50,12 +51,12 @@ type RawRssRow = {
 };
 
 /**
- * 读取已经进入 HotNow 普通内容池、但还没有进入创作素材库的 RSS 条目。
- * 这里是 Hermes 的采集交接读模型，不做评分、筛选或写作决策。
+ * 按长短方向读取未交接的 RSS；afterId 用于短写上线基线与增量分页，latestId 固定本次上界。
+ * 不修改素材或原采集记录，也不做评分和写作决策；短写窗口按采集时间而非文章发布时间计算。
  */
 export function listCreativeRawRssItems(
   db: SqliteDatabase,
-  options: { sourceFeed?: CreativeRawRssFeed; windowHours?: number; limit?: number } = {}
+  options: { sourceFeed?: CreativeRawRssFeed; windowHours?: number; limit?: number; direction?: "article" | "short_content"; afterId?: number } = {}
 ): CreativeRawRssFeedResult {
   const windowHours = Math.min(168, Math.max(1, Math.floor(options.windowHours ?? 48)));
   const limit = Math.min(500, Math.max(1, Math.floor(options.limit ?? 200)));
@@ -63,20 +64,32 @@ export function listCreativeRawRssItems(
     ? [feedToSourceKind[options.sourceFeed]]
     : Object.values(feedToSourceKind);
   const sourceKindPlaceholders = sourceKinds.map(() => "?").join(", ");
+  const direction = options.direction ?? "article";
+  const latestRow = db.prepare(`
+    SELECT COALESCE(MAX(ci.id), 0) AS latestId FROM content_items ci
+    JOIN content_sources cs ON cs.id = ci.source_id WHERE cs.kind IN (${sourceKindPlaceholders})
+  `).get(...sourceKinds) as { latestId: number };
+  const latestId = latestRow.latestId;
+  const timestamp = direction === "short_content"
+    ? "COALESCE(ci.fetched_at, ci.created_at)"
+    : "COALESCE(ci.published_at, ci.fetched_at, ci.created_at)";
   const contentUrl = normalizedUrlExpression.replaceAll("%s", "ci.canonical_url");
   const creativeUrl = normalizedUrlExpression.replaceAll("%s", "creative.url");
   const whereClause = `
     cs.kind IN (${sourceKindPlaceholders})
     AND ci.canonical_url IS NOT NULL
     AND TRIM(ci.canonical_url) != ''
-    AND datetime(COALESCE(ci.published_at, ci.fetched_at, ci.created_at)) >= datetime('now', ?)
+    AND datetime(${timestamp}) >= datetime('now', ?)
+    AND ci.id <= ?
+    ${options.afterId !== undefined ? "AND ci.id > ?" : ""}
     AND NOT EXISTS (
       SELECT 1
       FROM creative_source_items creative
-      WHERE ${creativeUrl} = ${contentUrl}
+      WHERE ${creativeUrl} = ${contentUrl} AND creative.direction = ?
     )
   `;
-  const params = [...sourceKinds, `-${windowHours} hours`];
+  const params = [...sourceKinds, `-${windowHours} hours`, latestId,
+    ...(options.afterId !== undefined ? [options.afterId] : []), direction];
 
   const totalRow = db
     .prepare(
@@ -107,7 +120,7 @@ export function listCreativeRawRssItems(
         FROM content_items ci
         JOIN content_sources cs ON cs.id = ci.source_id
         WHERE ${whereClause}
-        ORDER BY datetime(COALESCE(ci.published_at, ci.fetched_at, ci.created_at)) DESC, ci.id DESC
+        ORDER BY ${options.afterId !== undefined ? "ci.id ASC" : `datetime(${timestamp}) DESC, ci.id DESC`}
         LIMIT ?
       `
     )
@@ -127,6 +140,7 @@ export function listCreativeRawRssItems(
       sourceFeed: row.sourceKind === "juya" ? "juya-ai-daily" : "wechat-rss"
     })),
     total: totalRow.total,
+    latestId,
     windowHours
   };
 }

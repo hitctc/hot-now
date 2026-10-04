@@ -34,7 +34,8 @@ function mountPage() {
     "a-spin": { template: "<div><slot /></div>" }, "a-tooltip": { template: "<div><slot /></div>" },
     "a-modal": { props: ["open"], emits: ["ok"], template: '<div v-if="open"><slot /><button data-test="create" @click="$emit(\'ok\')">创建</button></div>' },
     "a-button": { template: "<button><slot /></button>" },
-    "a-checkbox": true, "a-input-search": true, "a-select": true, "a-tag": true,
+    "a-checkbox": true, "a-input-search": true, "a-select": true,
+    "a-tag": { props: ["color"], template: '<span :data-color="color"><slot /></span>' },
     "a-form": { template: "<div><slot /></div>" }, "a-form-item": { template: "<div><slot /></div>" },
     "a-input": { emits: ["update:value"], template: '<input data-test="title" @input="$emit(\'update:value\', $event.target.value)" />' },
     ArticleDetailDrawer: { props: ["open", "article"], emits: ["update:open"], template: '<div v-if="open" data-test="editor"><button data-test="close" @click="$emit(\'update:open\', false)">关闭</button></div>' },
@@ -45,6 +46,20 @@ function mountPage() {
 afterEach(() => { vi.restoreAllMocks(); localStorage.clear(); });
 
 describe("统一短内容成品流程", () => {
+  it.each([["ai", "purple", "AI"], ["tech_digital", "blue", "科技数码"]])("新稿领域%s显示文字色标且不改变状态", async (domain, color, label) => {
+    const item = article();
+    item.stepTrace = [{ step: 1, stepName: "短内容写作", status: "success",
+      meta: { editorialFocus: "tech-ai-v1", contentDomain: domain } }];
+    vi.spyOn(listApi, "readCreativeFinishedArticles").mockResolvedValue({ items: [item], total: 1, page: 1, pageSize: 30, dayCounts: [], sourceDayCounts: [] });
+    const wrapper = mountPage();
+    await flushPromises();
+    const marker = wrapper.get("[data-short-content-domain]");
+    expect(marker.attributes("data-color")).toBe(color);
+    expect(marker.text()).toBe(label);
+    expect(wrapper.text()).toContain("可推送");
+    wrapper.unmount();
+  });
+
   it.each(["tuwen", "duanwen", null, "", "unknown"])("不将历史form=%s归类，0分质检与95素材趋势独立显示", async (form) => {
     vi.spyOn(listApi, "readCreativeFinishedArticles").mockResolvedValue({ items: [article(form)], total: 1, page: 1, pageSize: 30, dayCounts: [], sourceDayCounts: [] });
     const wrapper = mountPage();
@@ -54,6 +69,7 @@ describe("统一短内容成品流程", () => {
     expect(headers).not.toContain("形态");
     expect(wrapper.text()).not.toContain("反转文");
     expect(wrapper.text()).not.toContain("贴图");
+    expect(wrapper.find("[data-short-content-domain]").exists()).toBe(false);
     expect(cells[headers.indexOf("质检评分")]?.text()).toBe("0");
     expect(cells[headers.indexOf("素材趋势")]?.text()).toBe("95");
     wrapper.unmount();

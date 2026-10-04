@@ -84,7 +84,7 @@ const SELECT_COLUMNS = `
   (SELECT COUNT(*) FROM wechat_draft_push_log WHERE article_id = creative_finished_articles.id AND status = 'success' AND (content_type = 'article' OR content_type IS NULL)) AS push_count
 ` as const;
 
-// 列表保留表格和状态判断所需字段，正文只取 51 字用于既有发布条件判断。
+// 列表正文只取 51 字；短稿另保留主写作阶段的领域版本与分类，不返回完整追踪或模型上下文。
 const LIST_SELECT_COLUMNS = `
   id,
   source_item_id,
@@ -123,7 +123,7 @@ const LIST_SELECT_COLUMNS = `
   CASE
     WHEN json_valid(step_trace)
     THEN json_array(
-      json_object(
+      json_patch(json_object(
         'startedAt',
         (
           SELECT json_extract(trace.value, '$.startedAt')
@@ -132,7 +132,14 @@ const LIST_SELECT_COLUMNS = `
           ORDER BY trace.key ASC
           LIMIT 1
         )
-      ),
+      ), CASE
+        WHEN direction = 'short_content' AND json_extract(step_trace, '$[0].meta.editorialFocus') = 'tech-ai-v1'
+        THEN json_object('meta', json_object(
+          'editorialFocus', 'tech-ai-v1',
+          'contentDomain', json_extract(step_trace, '$[0].meta.contentDomain')
+        ))
+        ELSE '{}'
+      END),
       json_object(
         'finishedAt',
         (

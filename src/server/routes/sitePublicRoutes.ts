@@ -148,6 +148,7 @@ export function registerSitePublicRoutes(context: SitePageRouteContext): void {
     return reply.send({ ok: true, total: candidates.length, items: candidates });
   });
 
+  // 鉴权后的只读 RSS 交接：方向隔离与严格增量游标防止短写抢占长素材或补投历史。
   app.get("/api/creative/feed/raw-rss", async (request, reply) => {
     if (!options.authorizeCreativeApiToken(request, reply)) {
       return;
@@ -168,9 +169,18 @@ export function registerSitePublicRoutes(context: SitePageRouteContext): void {
       return reply.code(400).send({ ok: false, reason: "invalid-source-feed" });
     }
 
+    const direction = query.direction?.trim() || "article";
+    const afterId = query.afterId !== undefined ? Number(query.afterId) : undefined;
+    // 增量游标不能静默回退为全量，否则拼错参数可能补投历史素材。
+    if (direction !== "article" && direction !== "short_content") {
+      return reply.code(400).send({ ok: false, reason: "invalid-direction" });
+    }
+    if (afterId !== undefined && (!/^\d+$/.test(query.afterId!) || !Number.isSafeInteger(afterId) || afterId < 0)) {
+      return reply.code(400).send({ ok: false, reason: "invalid-after-id" });
+    }
     const windowHours = parseBoundedInteger(query.windowHours, 48, 1, 168);
     const limit = parseBoundedInteger(query.limit, 200, 1, 500);
-    const result = listCreativeRawRssItems(db, { sourceFeed, windowHours, limit });
+    const result = listCreativeRawRssItems(db, { sourceFeed, windowHours, limit, direction, afterId });
     return reply.send({ ok: true, ...result });
   });
 }

@@ -53,6 +53,16 @@ export const SHORT_FINISHED_STATUS_OPTIONS = [
   { label: "已删除", value: "soft_deleted" }
 ];
 
+/** 只显示新策略持久保存的主领域；旧稿、其他热点和缺失分类不按标题猜测。 */
+export function getShortFinishedDomainInfo(
+  stepTrace: Array<{ meta?: Record<string, unknown> }> | null
+): { label: string; color: string } | null {
+  const meta = stepTrace?.find((step) => step.meta?.editorialFocus === "tech-ai-v1")?.meta;
+  if (meta?.contentDomain === "ai") return { label: "AI", color: "purple" };
+  if (meta?.contentDomain === "tech_digital") return { label: "科技数码", color: "blue" };
+  return null;
+}
+
 export const SHORT_FINISHED_COLUMNS = [
   { title: "ID / 序号", dataIndex: "id", key: "idSeq", width: 72, fixed: "left" as const, className: "table-day-anchor-cell" },
   { title: "标题", key: "title", width: 300 },

@@ -34,6 +34,7 @@ import {
   formatTrendBreakdown,
   formatWritingDuration,
   getShortFinishedStatusInfo,
+  getShortFinishedDomainInfo,
   getTrendBreakdownBars
 } from "./shortFinishedArticlePresentation.js";
 
@@ -457,6 +458,12 @@ useTableComponent();
                 @click="openDetail(record)"
               >{{ getDisplayTitle(record.titles, record.titleIndex) }}</span>
             </div>
+            <a-tag
+              v-if="getShortFinishedDomainInfo(record.stepTrace)"
+              :color="getShortFinishedDomainInfo(record.stepTrace)?.color"
+              class="!m-0 mt-1 !text-[10px] !leading-4"
+              data-short-content-domain
+            >{{ getShortFinishedDomainInfo(record.stepTrace)?.label }}</a-tag>
             <a-tag v-if="record.originType === 'manual'" color="purple" class="!m-0 mt-1 !text-[10px] !leading-4">手动新建</a-tag>
             <a
               v-if="record.sourceItemId"

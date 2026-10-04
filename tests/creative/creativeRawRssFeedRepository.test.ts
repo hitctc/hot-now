@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { insertCreativeSourceItem } from "../../src/core/creative/creativeSourceItemRepository.js";
+import { listCreativeSourceItems } from "../../src/core/creative/creativeSourceItemReadRepository.js";
 import { listCreativeRawRssItems } from "../../src/core/creative/creativeRawRssFeedRepository.js";
 import { resolveSourceByKind, upsertContentItems } from "../../src/core/content/contentRepository.js";
 import { type TestDatabaseHandle, createTestDatabase } from "../helpers/testDatabase.js";
@@ -12,6 +13,34 @@ afterEach(() => {
 });
 
 describe("listCreativeRawRssItems", () => {
+  it("hands AI HOT from its existing long library to short writing without changing long material", async () => {
+    const handle = await createTestDatabase("hot-now-aihot-short-handoff-");
+    handles.push(handle);
+    const now = new Date().toISOString();
+    const old = new Date(Date.now() - 10 * 86400_000).toISOString();
+    const original = insertCreativeSourceItem(handle.db, {
+      externalId: "aihot-guid-1", collectorAgent: "aihot-collector", title: "AI HOT 原文",
+      url: "https://aihot.news/items/guid-1/#rd", sourceName: "AIhot - 官方博客",
+      summary: "摘要", fullContent: "允许内联的全文", publishedAt: old, collectorTimestamp: now,
+      direction: "article"
+    });
+    insertCreativeSourceItem(handle.db, {
+      externalId: "not-aihot", collectorAgent: "manual", title: "其他素材",
+      url: "https://example.com/not-aihot", sourceName: "AIhot 假名", direction: "article"
+    });
+    const result = listCreativeRawRssItems(handle.db, { sourceFeed: "aihot", direction: "short_content", afterId: 0, limit: 1 });
+    expect(result.total).toBe(1);
+    expect(result.items[0]).toMatchObject({ id: original.id, sourceFeed: "aihot", externalId: "aihot-guid-1",
+      sourceName: "AIhot - 官方博客", fullContent: "允许内联的全文", collectorTimestamp: now });
+    expect(result.latestId).toBe(original.id);
+    expect(listCreativeRawRssItems(handle.db, { sourceFeed: "aihot", direction: "short_content", afterId: original.id }).items).toEqual([]);
+    expect(listCreativeSourceItems(handle.db, { sourceFeed: "aihot", direction: "article" }).items.map((item) => item.externalId)).toEqual(["aihot-guid-1"]);
+    insertCreativeSourceItem(handle.db, { externalId: "short-aihot", collectorAgent: "short-rss-aihot",
+      title: "AI HOT 原文", url: "https://aihot.news/items/guid-1", direction: "short_content" });
+    expect(listCreativeRawRssItems(handle.db, { sourceFeed: "aihot", direction: "short_content", afterId: 0 }).items).toEqual([]);
+    expect(listCreativeSourceItems(handle.db, { collectorAgent: "aihot-collector", direction: "article" }).total).toBe(1);
+  });
+
   it("keeps RSS available independently to long and short writing and exposes an incremental cursor", async () => {
     const handle = await createTestDatabase("hot-now-rss-directions-");
     handles.push(handle);

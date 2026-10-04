@@ -262,8 +262,10 @@ export function listCreativeSourceItems(
     params.push(cutoff);
   }
 
-  // sourceFeed：按 sourceName 前缀匹配筛选数据源
-  if (filters.sourceFeed) {
+  // AI HOT 按真实采集器识别，不能让显示名误判其他来源；旧名称筛选保持兼容。
+  if (filters.sourceFeed === "aihot") {
+    whereClauses.push("collector_agent IN ('aihot-collector', 'short-rss-aihot')");
+  } else if (filters.sourceFeed) {
     const sourceFeedNameMap: Record<string, string> = {
       "juya-ai-daily": "Juya AI Daily",
       "wechat-rss": "微信公众号："

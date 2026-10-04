@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
 
-export type CreativeRawRssFeed = "juya-ai-daily" | "wechat-rss";
+export type CreativeRawRssFeed = "juya-ai-daily" | "aihot" | "wechat-rss";
 
 export type CreativeRawRssFeedItem = {
   id: number;
@@ -22,7 +22,7 @@ export type CreativeRawRssFeedResult = {
   latestId: number;
 };
 
-const feedToSourceKind: Record<CreativeRawRssFeed, string> = {
+const feedToSourceKind: Record<Exclude<CreativeRawRssFeed, "aihot">, string> = {
   "juya-ai-daily": "juya",
   "wechat-rss": "wechat_rss"
 };
@@ -51,7 +51,8 @@ type RawRssRow = {
 };
 
 /**
- * 按长短方向读取未交接的 RSS；afterId 用于短写上线基线与增量分页，latestId 固定本次上界。
+ * 按源和长短方向读取未交接 RSS；Juya 来自普通内容池，AI HOT 来自既有长素材库。
+ * afterId/latestId 只属于所选来源的编号体系，不能跨源共用；公众号 RSS 仅保留显式兼容读取。
  * 不修改素材或原采集记录，也不做评分和写作决策；短写窗口按采集时间而非文章发布时间计算。
  */
 export function listCreativeRawRssItems(
@@ -60,9 +61,12 @@ export function listCreativeRawRssItems(
 ): CreativeRawRssFeedResult {
   const windowHours = Math.min(168, Math.max(1, Math.floor(options.windowHours ?? 48)));
   const limit = Math.min(500, Math.max(1, Math.floor(options.limit ?? 200)));
+  if (options.sourceFeed === "aihot") {
+    return listAiHotRssItems(db, { ...options, windowHours, limit });
+  }
   const sourceKinds = options.sourceFeed
     ? [feedToSourceKind[options.sourceFeed]]
-    : Object.values(feedToSourceKind);
+    : [feedToSourceKind["juya-ai-daily"]];
   const sourceKindPlaceholders = sourceKinds.map(() => "?").join(", ");
   const direction = options.direction ?? "article";
   const latestRow = db.prepare(`
@@ -145,6 +149,40 @@ export function listCreativeRawRssItems(
   };
 }
 
+/** 从 AI HOT 原采集记录只读交接全文、摘要和采集时间；不修改长素材或刷新其时间。 */
+function listAiHotRssItems(
+  db: SqliteDatabase,
+  options: { windowHours: number; limit: number; direction?: "article" | "short_content"; afterId?: number }
+): CreativeRawRssFeedResult {
+  const direction = options.direction ?? "article";
+  const originClause = "origin.collector_agent = 'aihot-collector' AND origin.direction = 'article'";
+  const latestRow = db.prepare(`SELECT COALESCE(MAX(origin.id), 0) AS latestId
+    FROM creative_source_items origin WHERE ${originClause}`).get() as { latestId: number };
+  const timestamp = direction === "short_content"
+    ? "COALESCE(origin.collector_timestamp, origin.created_at)"
+    : "COALESCE(origin.published_at, origin.collector_timestamp, origin.created_at)";
+  const originUrl = normalizedUrlExpression.replaceAll("%s", "origin.url");
+  const creativeUrl = normalizedUrlExpression.replaceAll("%s", "creative.url");
+  // AI HOT 已在长素材库中；只检查目标方向，不能因原长记录存在而阻断短交接。
+  const whereClause = `${originClause} AND origin.url IS NOT NULL AND TRIM(origin.url) != ''
+    AND datetime(${timestamp}) >= datetime('now', ?) AND origin.id <= ?
+    ${options.afterId !== undefined ? "AND origin.id > ?" : ""}
+    AND NOT EXISTS (SELECT 1 FROM creative_source_items creative
+      WHERE creative.direction = ? AND ${creativeUrl} = ${originUrl})`;
+  const params = [`-${options.windowHours} hours`, latestRow.latestId,
+    ...(options.afterId !== undefined ? [options.afterId] : []), direction];
+  const totalRow = db.prepare(`SELECT COUNT(*) AS total FROM creative_source_items origin
+    WHERE ${whereClause}`).get(...params) as { total: number };
+  const items = db.prepare(`SELECT origin.id, origin.external_id AS externalId, origin.title, origin.url,
+    origin.source_name AS sourceName, origin.summary, origin.full_content AS fullContent,
+    origin.published_at AS publishedAt, COALESCE(origin.collector_timestamp, origin.created_at) AS collectorTimestamp,
+    'aihot' AS sourceFeed FROM creative_source_items origin WHERE ${whereClause}
+    ORDER BY ${options.afterId !== undefined ? "origin.id ASC" : `datetime(${timestamp}) DESC, origin.id DESC`}
+    LIMIT ?`).all(...params, options.limit) as CreativeRawRssFeedItem[];
+  return { items, total: totalRow.total, windowHours: options.windowHours, latestId: latestRow.latestId };
+}
+
+/** 兼容读取公众号历史素材时还原显示名称；元数据不可解析时保留来源名，不修改记录。 */
 function resolveSourceName(row: RawRssRow): string {
   if (row.sourceKind !== "wechat_rss" || !row.metadataJson) {
     return row.sourceName;

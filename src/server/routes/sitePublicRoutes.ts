@@ -148,7 +148,7 @@ export function registerSitePublicRoutes(context: SitePageRouteContext): void {
     return reply.send({ ok: true, total: candidates.length, items: candidates });
   });
 
-  // 鉴权后的只读 RSS 交接：方向隔离与严格增量游标防止短写抢占长素材或补投历史。
+  // 鉴权后只读交接 Juya 与 AI HOT；短写必须选源，避免混用两种编号体系的游标。
   app.get("/api/creative/feed/raw-rss", async (request, reply) => {
     if (!options.authorizeCreativeApiToken(request, reply)) {
       return;
@@ -159,7 +159,7 @@ export function registerSitePublicRoutes(context: SitePageRouteContext): void {
 
     const query = request.query as Record<string, string | undefined>;
     const rawSourceFeed = query.sourceFeed?.trim();
-    const sourceFeed = rawSourceFeed === "juya-ai-daily" || rawSourceFeed === "wechat-rss"
+    const sourceFeed = rawSourceFeed === "juya-ai-daily" || rawSourceFeed === "aihot" || rawSourceFeed === "wechat-rss"
       ? rawSourceFeed as CreativeRawRssFeed
       : rawSourceFeed
         ? null
@@ -177,6 +177,9 @@ export function registerSitePublicRoutes(context: SitePageRouteContext): void {
     }
     if (afterId !== undefined && (!/^\d+$/.test(query.afterId!) || !Number.isSafeInteger(afterId) || afterId < 0)) {
       return reply.code(400).send({ ok: false, reason: "invalid-after-id" });
+    }
+    if (direction === "short_content" && !sourceFeed) {
+      return reply.code(400).send({ ok: false, reason: "source-feed-required-for-short" });
     }
     const windowHours = parseBoundedInteger(query.windowHours, 48, 1, 168);
     const limit = parseBoundedInteger(query.limit, 200, 1, 500);

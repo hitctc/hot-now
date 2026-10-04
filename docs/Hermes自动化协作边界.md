@@ -80,7 +80,7 @@ HotNow 不得创建平行自动化队列、重试器、计划、账号适配判�
 ### 科技数码与 AI 核心短写
 
 - 现役两个 RSS 是 Juya（`juya-ai-daily`）与 AI HOT（`aihot`），不是公众号 RSS。短写保留综合热搜，在原 `short_collection` 阶段逐源交接：Juya 读取普通内容池，AI HOT 只读 `aihot-collector` 的原长素材，不新增采集源、阶段、队列或计时器。长线仍由原 AI HOT 采集器直接入库，并仅自动交接 Juya；公众号 RSS 仅保留手动/历史兼容读取。
-- `raw-rss` 短方向必须传 `sourceFeed`，只排除目标方向已交接的 URL。Hermes 沿用 Juya 的 `short_rss_after_id`，AI HOT 独立保存 `short_rss_aihot_after_id`，两类编号不能混用。各源首次成功只定基线；之后升序分页，先入短素材再推进游标，重放不刷新原采集时间，失败不越过未落库编号。RSS 故障不阻断热搜。自动流程只写当批、不补历史；经用户明确授权的当天补交接用 `collect(started_at, today_only=True)` 按北京时间原采集日期过滤、保持去重键，不读写长期游标，评分与写作仍走原门禁和唯一队列。
+- `raw-rss` 短方向必须传 `sourceFeed`，只排除目标方向已交接的 URL。Hermes 沿用 Juya 的 `short_rss_after_id`，AI HOT 独立保存 `short_rss_aihot_after_id`，两类编号不能混用。各源首次成功只定基线；之后升序分页，先入短素材再推进游标，重放不刷新原采集时间，失败不越过未落库编号。RSS 故障不阻断热搜。自动流程只写当批、不补历史；经用户明确授权的当天补交接用 `collect(started_at, today_only=True)` 按北京时间原采集日期过滤、保持去重键，不读写长期游标，评分与写作仍走原门禁和唯一队列。实际人工执行用 Hermes 既有鉴权 `POST /api/short/run`、仅传 `{"rss_today_only":true}`，在原 tick 锁下处理当天未完成 RSS、限定编号评分，显式回推素材状态，合格项幂等合并原候选；不覆盖热搜、待确认请求或投递间隔，不把候选合并/HTTP 202 当作成稿。执行合同以 Hermes 现役 PRD 为准。
 - 来源在 `extra.source_name/source_feed` 保存，交付 RSS 原名，不伪装热搜；选题评分同一请求输出 `content_domain`（`ai/tech_digital/other/unknown`），在 `extra.content_domain` 保存，不提高分数、不降低准入门槛。沿用当批跨源事件去重。
 - 当批 ready 先按平台轮转，再每两篇核心候选穿插一篇其他热点；一侧缺失就消费另一侧。仅调整自动候选顺序，不设产量配额，不更改投递间隔、人工任务优先级或指定素材。
 - 新默认/auto 队列参数另冻结 `editorial_focus=tech-ai-v1`，写作请求同时识别主领域并对核心稿加入实际变化、用户影响和限制的视角，不编造体验或把宣传当验证结果；其他热点保持原策略。显式兼容规格与无该参数的已受理任务不切换提示词。

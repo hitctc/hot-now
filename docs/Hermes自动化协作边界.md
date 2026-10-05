@@ -23,7 +23,9 @@ HotNow 不得创建平行自动化队列、重试器、计划、账号适配判�
 
 ### 短素材评分状态
 
-Hermes正常评分后以原状态动作接口回写ready/skipped，并传onlyIfPending只推进平台仍pending的短素材；HotNow保护人工处理/写作中/完成状态，不重新判断准入。入库POST只补空字段，不代替状态同步。历史短素材有选题分但仍pending仅展示「已评分·待同步」，不按分数重分类或自动补历史写作。
+短素材score仅承载Hermes选题分，默认75入选，实际读取short_content_score_threshold；通用基础补评与爆文正常/全量重评均限定article，并在模型执行前防御性排除短素材。HotNow短素材表、详情和短成品不展示爆文分/维度，短页不传爆文筛选并清除旧偏好；长素材仍按原规则。日报继续包含短素材，短素材仅复用配置选题门槛，长素材沿用72基础分/50爆文分，不新增评分调用。
+
+Hermes正常评分后以原状态动作回写ready/skipped、selectionScore和完整停止详情；onlyIfPending仅推进平台pending，原子同步真实分数，避免入库仅补空而保留通用旧分。写作事实或质检停止用onlyIfWritable仅同步pending/ready/queued/writing，保护人工done/excluded/skipped/failed等终态；同步失败交原技术恢复预算，不冒称回写成功。原因分别来自去重、评分理由、事实检查和末次质检反馈，不将评分意见混入原摘要，不新建队列。历史无理由明确显示未记录，有分仍pending提示待同步，不批量改历史或自动补写。
 
 ### 短写事实不漂移
 

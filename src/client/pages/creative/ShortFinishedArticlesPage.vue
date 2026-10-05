@@ -395,33 +395,43 @@ useTableComponent();
       />
       <a-checkbox v-model:checked="publishableOnly">只看可发</a-checkbox>
       <a-checkbox v-model:checked="showDeleted">显示已废弃</a-checkbox>
-      <div ref="searchDropdownRef" class="relative">
-        <a-input-search
-          v-model:value="searchText"
-          placeholder="搜索标题"
-          class="!w-[360px]"
-          allow-clear
-          @search="handleSearch"
-          @change="(val: string) => { if (!val) handleSearch(''); }"
-          @focus="showSearchDropdown = searchHistory.length > 0"
-        />
-        <div
-          v-if="showSearchDropdown && searchHistory.length > 0"
-          class="absolute left-0 top-full z-50 mt-1 min-w-[280px] rounded-md border border-editorial-border bg-white shadow-lg"
-        >
+      <!-- 窄屏为刷新保留宽度，搜索框及历史随剩余空间收缩；刷新沿用当前查询，不重置分页。 -->
+      <div class="flex w-full min-w-0 items-center gap-2 sm:w-auto" data-short-finished-search-controls>
+        <div ref="searchDropdownRef" class="relative min-w-0 flex-1 sm:w-[360px] sm:flex-none">
+          <a-input-search
+            v-model:value="searchText"
+            placeholder="搜索标题"
+            class="!w-full"
+            allow-clear
+            @search="handleSearch"
+            @change="(val: string) => { if (!val) handleSearch(''); }"
+            @focus="showSearchDropdown = searchHistory.length > 0"
+          />
           <div
-            v-for="item in searchHistory"
-            :key="item"
-            class="group flex cursor-pointer items-center justify-between px-3 py-2 text-sm hover:bg-gray-50"
-            @click="handleSearch(item)"
+            v-if="showSearchDropdown && searchHistory.length > 0"
+            class="absolute left-0 top-full z-50 mt-1 w-full min-w-0 rounded-md border border-editorial-border bg-white shadow-lg"
           >
-            <span class="truncate text-editorial-text-body">{{ item }}</span>
-            <span
-              class="ml-2 flex-shrink-0 text-xs text-editorial-text-muted opacity-0 hover:text-red-500 group-hover:opacity-100"
-              @click.stop="removeFromHistory(item)"
-            >✕</span>
+            <div
+              v-for="item in searchHistory"
+              :key="item"
+              class="group flex cursor-pointer items-center justify-between px-3 py-2 text-sm hover:bg-gray-50"
+              @click="handleSearch(item)"
+            >
+              <span class="truncate text-editorial-text-body">{{ item }}</span>
+              <span
+                class="ml-2 flex-shrink-0 text-xs text-editorial-text-muted opacity-0 hover:text-red-500 group-hover:opacity-100"
+                @click.stop="removeFromHistory(item)"
+              >✕</span>
+            </div>
           </div>
         </div>
+        <a-button
+          data-short-finished-action="refresh"
+          class="shrink-0"
+          size="small"
+          :loading="isLoading"
+          @click="loadItems"
+        >刷新</a-button>
       </div>
     </div>
 

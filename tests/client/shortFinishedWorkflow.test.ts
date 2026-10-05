@@ -30,10 +30,10 @@ function article(form: string | null = null): api.CreativeFinishedArticle {
 /** 只替换表格视觉和弹窗，保留页面请求、新建、展示单元格与关闭编排。 */
 function mountPage() {
   return mount(ShortFinishedArticlesPage, { global: { stubs: {
-    "a-table": { props: ["columns", "dataSource"], template: '<table><thead><tr><th v-for="column in columns">{{ column.title }}</th></tr></thead><tbody><tr v-for="(record, index) in dataSource"><td v-for="column in columns"><slot name="bodyCell" :column="column" :record="record" :index="index" /></td></tr></tbody></table>' },
+    "a-table": { name: "ShortFinishedTableStub", props: ["columns", "dataSource", "pagination"], template: '<table><thead><tr><th v-for="column in columns">{{ column.title }}</th></tr></thead><tbody><tr v-for="(record, index) in dataSource"><td v-for="column in columns"><slot name="bodyCell" :column="column" :record="record" :index="index" /></td></tr></tbody></table>' },
     "a-spin": { template: "<div><slot /></div>" }, "a-tooltip": { template: "<div><slot /></div>" },
     "a-modal": { props: ["open"], emits: ["ok"], template: '<div v-if="open"><slot /><button data-test="create" @click="$emit(\'ok\')">创建</button></div>' },
-    "a-button": { template: "<button><slot /></button>" },
+    "a-button": { props: ["loading"], template: '<button :disabled="loading"><slot /></button>' },
     "a-checkbox": true, "a-input-search": true, "a-select": true,
     "a-tag": { props: ["color"], template: '<span :data-color="color"><slot /></span>' },
     "a-form": { template: "<div><slot /></div>" }, "a-form-item": { template: "<div><slot /></div>" },
@@ -46,6 +46,47 @@ function mountPage() {
 afterEach(() => { vi.restoreAllMocks(); localStorage.clear(); });
 
 describe("统一短内容成品流程", () => {
+  it("搜索区域在窄屏可收缩且刷新按钮位于搜索之后", async () => {
+    vi.spyOn(listApi, "readCreativeFinishedArticles").mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 30, dayCounts: [], sourceDayCounts: [] });
+    const wrapper = mountPage();
+    try {
+      await flushPromises();
+      const controls = wrapper.get("[data-short-finished-search-controls]");
+      expect(controls.classes()).toEqual(expect.arrayContaining(["w-full", "min-w-0", "sm:w-auto"]));
+      const input = controls.get("a-input-search-stub");
+      expect(input.classes()).toContain("!w-full");
+      expect(input.classes()).not.toContain("!w-[360px]");
+      expect(input.element.parentElement?.classList.contains("min-w-0")).toBe(true);
+      const refresh = controls.get('[data-short-finished-action="refresh"]');
+      expect(refresh.classes()).toContain("shrink-0");
+      expect(controls.element.lastElementChild).toBe(refresh.element);
+    } finally { wrapper.unmount(); }
+  });
+
+  it("刷新保留搜索筛选和分页，加载中反馈忙碌，成功后更新当前表格", async () => {
+    localStorage.setItem("creative-short-finished-filters", JSON.stringify({ search: "当前标题", status: "ready_for_publish", publishableOnly: true, showDeleted: true }));
+    const result = { items: [article()], total: 40, page: 1, pageSize: 30, dayCounts: [], sourceDayCounts: [] };
+    const read = vi.spyOn(listApi, "readCreativeFinishedArticles").mockResolvedValue(result);
+    const wrapper = mountPage();
+    try {
+      await flushPromises();
+      wrapper.findComponent({ name: "ShortFinishedTableStub" }).vm.$emit("change", { current: 3, pageSize: 10 });
+      await flushPromises();
+      let finish!: (value: typeof result) => void;
+      read.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+      const before = read.mock.calls.length;
+      const refresh = wrapper.get('[data-short-finished-action="refresh"]');
+      await refresh.trigger("click");
+      expect(read).toHaveBeenCalledTimes(before + 1);
+      expect(read).toHaveBeenLastCalledWith(expect.objectContaining({ direction: "short_content", page: 3, pageSize: 10, search: "当前标题", status: "ready_for_publish", publishable: "1", includeDeleted: "1" }));
+      expect(refresh.attributes("disabled")).toBeDefined();
+      finish({ ...result, page: 3, pageSize: 10, items: [{ ...article(), titles: '["刷新后的短稿"]' }] });
+      await flushPromises();
+      expect(refresh.attributes("disabled")).toBeUndefined();
+      expect(wrapper.get("tbody").text()).toContain("刷新后的短稿");
+      expect(wrapper.findComponent({ name: "ShortFinishedTableStub" }).props("pagination")).toMatchObject({ current: 3, pageSize: 10, total: 40 });
+    } finally { wrapper.unmount(); }
+  });
   it.each([["ai", "purple", "AI"], ["tech_digital", "blue", "科技数码"]])("新稿领域%s显示文字色标且不改变状态", async (domain, color, label) => {
     const item = article();
     item.stepTrace = [{ step: 1, stepName: "短内容写作", status: "success",

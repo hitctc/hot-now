@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 
 import EditorialEmptyState from "../components/content/EditorialEmptyState.vue";
@@ -19,6 +19,7 @@ const profile = ref<SettingsProfile | null>(null);
 const profileLoadState = ref<ProfileLoadState>("idle");
 const profileError = ref<string | null>(null);
 const mobileSystemDrawerOpen = ref(false);
+const mobileNav = ref<HTMLElement | null>(null);
 
 const themeOptions = [
   { label: "浅色", value: "light" },
@@ -145,16 +146,34 @@ async function loadProfileSummary(): Promise<void> {
   }
 }
 
+/** 等菜单DOM稳定后仅横向定位移动端选中项；已可见时不打断用户浏览，不滚动整页。 */
+async function revealActiveMobileTab(): Promise<void> {
+  await nextTick();
+  if (!window.matchMedia("(max-width: 900px)").matches) return;
+  const nav = mobileNav.value;
+  const active = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+  if (!nav || !active) return;
+  const viewport = nav.getBoundingClientRect();
+  const item = active.getBoundingClientRect();
+  if (viewport.width <= 0 || (item.left >= viewport.left && item.right <= viewport.right)) return;
+  nav.scrollTo({ left: Math.max(0, nav.scrollLeft + item.left - viewport.left - (viewport.width - item.width) / 2), behavior: "auto" });
+}
+
 onMounted(() => {
   void loadProfileSummary();
+  void revealActiveMobileTab();
+  window.addEventListener("resize", revealActiveMobileTab);
 });
 
 watch(
   () => route.fullPath,
   () => {
     closeMobileSystemDrawer();
+    void revealActiveMobileTab();
   }
 );
+
+watch(shouldShowCreativeMenu, () => { void revealActiveMobileTab(); });
 
 watch(mobileSystemDrawerOpen, (isOpen) => {
   syncMobileDrawerBodyScroll(isOpen);
@@ -167,6 +186,7 @@ watch(shouldShowSystemMenu, (isVisible) => {
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener("resize", revealActiveMobileTab);
   syncMobileDrawerBodyScroll(false);
 });
 </script>
@@ -180,7 +200,8 @@ onBeforeUnmount(() => {
       <div class="flex items-center gap-3">
         <div class="min-w-0 flex-1">
           <nav
-            class="flex min-w-0 flex-1 gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            ref="mobileNav"
+            class="flex min-w-0 flex-1 gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             aria-label="内容菜单"
           >
             <RouterLink
@@ -188,6 +209,7 @@ onBeforeUnmount(() => {
               :key="page.path"
               :to="page.path"
               :class="getMobileTabClasses(isActiveContentPath(page.path))"
+              :aria-current="isActiveContentPath(page.path) ? 'page' : undefined"
               :data-mobile-content-tab="page.path"
               @click="closeMobileSystemDrawer"
             >
@@ -198,6 +220,7 @@ onBeforeUnmount(() => {
                 v-for="page in creativeNavPages"
                 :key="page.path"
                 :to="page.path"
+                :aria-current="route.path === page.path ? 'page' : undefined"
                 :class="getMobileTabClasses(route.path === page.path)"
                 :data-mobile-content-tab="page.path"
                 @click="closeMobileSystemDrawer"
@@ -210,6 +233,7 @@ onBeforeUnmount(() => {
                 v-for="page in systemNavPages"
                 :key="page.key"
                 :to="page.path"
+                :aria-current="route.path === page.path ? 'page' : undefined"
                 :class="getMobileTabClasses(route.path === page.path)"
                 :data-mobile-content-tab="page.path"
                 @click="closeMobileSystemDrawer"

@@ -270,6 +270,47 @@ describe("client app shell", () => {
     }
   });
 
+  it("reveals the active mobile tab on first render and route changes without scrolling the page", async () => {
+    vi.mocked(window.matchMedia).mockImplementation((query: string) => ({ matches: query === "(max-width: 900px)", media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as MediaQueryList);
+    const scroll = vi.fn();
+    let tabLeft = 500;
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", { configurable: true, value: scroll });
+    const rect = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      return { left: this.hasAttribute("data-mobile-content-tab") ? tabLeft : 0, right: this.hasAttribute("data-mobile-content-tab") ? tabLeft + 80 : 200, width: this.hasAttribute("data-mobile-content-tab") ? 80 : 200 } as DOMRect;
+    });
+    const router = createAppRouter();
+    await router.push("/settings/profile");
+    await router.isReady();
+    const wrapper = mount(App, { global: { plugins: [Antd, router] } });
+    try {
+      await flushPromises();
+      expect(scroll).toHaveBeenCalled();
+      expect(wrapper.get('[data-mobile-content-tab="/settings/profile"]').attributes("aria-current")).toBe("page");
+      scroll.mockClear();
+      await router.push("/settings/view-rules");
+      await flushPromises();
+      expect(scroll).toHaveBeenCalled();
+      scroll.mockClear();
+      vi.mocked(window.matchMedia).mockReturnValue({ matches: false } as MediaQueryList);
+      await router.push("/settings/profile");
+      await flushPromises();
+      expect(scroll).not.toHaveBeenCalled();
+      vi.mocked(window.matchMedia).mockReturnValue({ matches: true } as MediaQueryList);
+      window.dispatchEvent(new Event("resize"));
+      await flushPromises();
+      expect(scroll).toHaveBeenCalled();
+      scroll.mockClear();
+      tabLeft = 10;
+      await router.push("/settings/view-rules");
+      await flushPromises();
+      expect(scroll).not.toHaveBeenCalled();
+    } finally {
+      wrapper.unmount();
+      rect.mockRestore();
+      delete (HTMLElement.prototype as unknown as { scrollTo?: unknown }).scrollTo;
+    }
+  });
+
   it("renders mobile workspace links and closes the system drawer after navigation", async () => {
     const router = createAppRouter();
 

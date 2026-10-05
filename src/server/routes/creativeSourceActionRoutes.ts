@@ -324,6 +324,8 @@ export function registerCreativeSourceActionRoutes(
     const body = request.body as {
       writingStatus?: unknown;
       onlyIfPending?: unknown;
+      onlyIfWritable?: unknown;
+      selectionScore?: unknown;
       stopStep?: unknown;
       stopStepName?: unknown;
       stopReason?: unknown;
@@ -349,12 +351,19 @@ export function registerCreativeSourceActionRoutes(
     if (body?.onlyIfPending !== undefined && typeof body.onlyIfPending !== "boolean") {
       return reply.code(400).send({ ok: false, reason: "invalid-pending-guard" });
     }
-    if (body?.onlyIfPending) {
+    if ((body?.onlyIfWritable !== undefined && typeof body.onlyIfWritable !== "boolean") || (body?.onlyIfPending && body?.onlyIfWritable)) {
+      return reply.code(400).send({ ok: false, reason: "invalid-writing-guard" });
+    }
+    if (body?.selectionScore !== undefined && (!body.onlyIfPending || typeof body.selectionScore !== "number" || !Number.isInteger(body.selectionScore) || body.selectionScore < 0 || body.selectionScore > 100)) {
+      return reply.code(400).send({ ok: false, reason: "invalid-selection-score" });
+    }
+    if (body?.onlyIfPending || body?.onlyIfWritable) {
       const source = findCreativeSourceItemById(db, id);
       if (!source) return reply.code(404).send({ ok: false, reason: "not-found" });
       if (source.direction !== "short_content") return reply.code(400).send({ ok: false, reason: "pending-guard-short-only" });
-      // 单进程同步读写间没有await；评估回调不能覆盖人工处理或worker推进后的状态。
-      if (source.writingStatus !== "pending") return reply.send({ ok: true, unchanged: true });
+      // 单进程同步读写间没有await；评分只推进pending，worker不覆盖人工终态。
+      const allowed = body.onlyIfPending ? ["pending"] : ["pending", "ready", "queued", "writing"];
+      if (!allowed.includes(source.writingStatus)) return reply.send({ ok: true, unchanged: true });
     }
     const updated = updateCreativeSourceItemWritingStatus(
       db,
@@ -366,7 +375,8 @@ export function registerCreativeSourceActionRoutes(
             stepName: (body.stopStepName as string).trim(),
             reason: (body.stopReason as string).trim(),
           }
-        : undefined
+        : undefined,
+      body?.selectionScore as number | undefined
     );
     if (!updated) {
       return reply.code(404).send({ ok: false, reason: "not-found" });

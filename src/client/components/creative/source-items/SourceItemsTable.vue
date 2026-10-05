@@ -51,8 +51,8 @@ const columns = [
   { title: "ID / 序号", dataIndex: "id", key: "idSeq", width: 72, fixed: "left" as const, className: "table-day-anchor-cell" },
   { title: "标题", dataIndex: "title", key: "title", width: 300 },
   { title: "来源", dataIndex: "sourceName", key: "sourceName", width: 115 },
-  { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: 72, ellipsis: true },
-  { title: "评分", key: "score", width: 90 },
+  { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: props.mode === "short_content" ? 200 : 72, ellipsis: props.mode !== "short_content" },
+  { title: props.mode === "short_content" ? "选题分" : "评分", key: "score", width: props.mode === "short_content" ? 104 : 90 },
   { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 44, align: "center" as const, ellipsis: true },
   { title: "耗时/时间", key: "timeInfo", width: 84 },
   { title: "写文章", key: "quickCopy", width: 64, ellipsis: true, fixed: "right" as const },
@@ -176,21 +176,23 @@ useTableComponent();
         </a-tooltip>
       </template>
 
-      <!-- 评分列集中展示基础评分、爆文分和可选的账号适配。 -->
+      <!-- 短素材只展示真实选题分；长素材保留基础分、爆文分和账号适配。 -->
       <template v-else-if="column.key === 'score'">
         <div class="flex flex-col gap-0.5 leading-tight">
           <div class="flex items-center gap-1">
             <span
               v-if="record.score != null"
               class="inline-flex items-center rounded-editorial-pill border border-editorial-border bg-editorial-link-active px-1.5 py-0 text-[10px] font-semibold text-editorial-text-main"
-            >{{ record.score }}</span>
+            :title="mode === 'short_content' ? '自动短写选题分；默认入选门槛75，实际以Hermes配置为准。达标不代表事实核验已通过。' : undefined"
+            >{{ mode === 'short_content' ? `选题分：${record.score}` : record.score }}</span>
+            <span v-else-if="mode === 'short_content'" class="text-[10px] text-editorial-text-muted">未评分</span>
             <span
-              v-if="record.trendScore != null"
+              v-if="mode === 'article' && record.trendScore != null"
               class="inline-flex items-center rounded-editorial-pill border px-1.5 py-0 text-[10px] font-bold"
               :class="record.trendScore >= 90 ? 'border-purple-600 bg-purple-600 text-white shadow-sm' : record.trendScore >= 80 ? 'border-red-500 bg-red-500 text-white shadow-sm' : 'border-orange-300 bg-orange-50 text-orange-700'"
             >{{ record.trendScore }}</span>
           </div>
-          <a-tooltip v-if="record.trendBreakdown && getBreakdownBars(record.trendBreakdown).length > 0" :mouse-enter-delay="0.3">
+          <a-tooltip v-if="mode === 'article' && record.trendBreakdown && getBreakdownBars(record.trendBreakdown).length > 0" :mouse-enter-delay="0.3">
             <template #title>
               <div class="text-xs leading-5">{{ formatBreakdown(record.trendBreakdown) }}</div>
             </template>
@@ -272,6 +274,10 @@ useTableComponent();
           <a-tag v-else :color="writingStatusColor(record.writingStatus)" class="!m-0">
             {{ writingStatusLabel(record.writingStatus, mode === 'short_content' ? record.score : undefined) }}
           </a-tag>
+          <div v-if="mode === 'short_content' && ['skipped', 'failed'].includes(record.writingStatus)" data-short-source-stop-reason class="w-full whitespace-normal break-words text-[10px] leading-4 text-editorial-text-muted">
+            {{ record.writingStopReason || '历史原因未记录，不能据当前分数推断' }}
+          </div>
+          <div v-else-if="mode === 'short_content' && record.writingStatus === 'ready'" class="text-[10px] leading-4 text-editorial-text-muted">已入选，等待调度；不保证最终成稿</div>
           <a-tag v-if="record.writeCount > 0" color="green" class="!m-0 !text-[11px] !py-0">{{ record.writeCount }}次</a-tag>
         </div>
       </template>

@@ -101,7 +101,7 @@ describe("统一短内容成品流程", () => {
     wrapper.unmount();
   });
 
-  it.each(["tuwen", "duanwen", null, "", "unknown"])("不将历史form=%s归类，0分质检与95素材趋势独立显示", async (form) => {
+  it.each(["tuwen", "duanwen", null, "", "unknown"])("不将历史form=%s归类，保留0分质检且不展示素材趋势", async (form) => {
     vi.spyOn(listApi, "readCreativeFinishedArticles").mockResolvedValue({ items: [article(form)], total: 1, page: 1, pageSize: 30, dayCounts: [], sourceDayCounts: [] });
     const wrapper = mountPage();
     await flushPromises();
@@ -112,7 +112,7 @@ describe("统一短内容成品流程", () => {
     expect(wrapper.text()).not.toContain("贴图");
     expect(wrapper.find("[data-short-content-domain]").exists()).toBe(false);
     expect(cells[headers.indexOf("质检评分")]?.text()).toBe("0");
-    expect(cells[headers.indexOf("素材趋势")]?.text()).toBe("95");
+    expect(headers).not.toContain("素材趋势");
     wrapper.unmount();
   });
 

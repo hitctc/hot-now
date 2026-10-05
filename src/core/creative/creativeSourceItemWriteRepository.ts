@@ -138,13 +138,14 @@ export function insertCreativeSourceItem(
 // ── Update writing status ───────────────────────────────────────────────────
 
 /**
- * 更新素材写作状态；开始新一轮写作或完成时清除上一轮停止说明。
+ * 同步状态、停止详情及可选短选题分；同一SQL原子写入，开始或完成时清除旧停止说明。
  */
 export function updateCreativeSourceItemWritingStatus(
   db: SqliteDatabase,
   id: number,
   status: CreativeSourceItemWritingStatus,
-  stopDetails?: CreativeSourceItemWritingStopDetails
+  stopDetails?: CreativeSourceItemWritingStopDetails,
+  selectionScore?: number
 ): boolean {
   let result;
   if ((status === "skipped" || status === "failed") && stopDetails) {
@@ -156,10 +157,11 @@ export function updateCreativeSourceItemWritingStatus(
              writing_stop_step_name = ?,
              writing_stop_reason = ?,
              writing_stopped_at = CURRENT_TIMESTAMP,
+             score = COALESCE(?, score),
              updated_at = CURRENT_TIMESTAMP
          WHERE id = ?`
       )
-      .run(status, stopDetails.step, stopDetails.stepName, stopDetails.reason, id);
+      .run(status, stopDetails.step, stopDetails.stepName, stopDetails.reason, selectionScore ?? null, id);
   } else if (status !== "skipped" && status !== "failed") {
     result = db
       .prepare(
@@ -169,14 +171,15 @@ export function updateCreativeSourceItemWritingStatus(
              writing_stop_step_name = NULL,
              writing_stop_reason = NULL,
              writing_stopped_at = NULL,
+             score = COALESCE(?, score),
              updated_at = CURRENT_TIMESTAMP
          WHERE id = ?`
       )
-      .run(status, id);
+      .run(status, selectionScore ?? null, id);
   } else {
     result = db
-      .prepare("UPDATE creative_source_items SET writing_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-      .run(status, id);
+      .prepare("UPDATE creative_source_items SET writing_status = ?, score = COALESCE(?, score), updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .run(status, selectionScore ?? null, id);
   }
 
   return result.changes > 0;

@@ -20,6 +20,14 @@ const baseProps = {
 };
 
 describe("SourceItemsFilterBar", () => {
+  it("短素材不展示爆文分筛选，长素材仍保留", () => {
+    const wrapper = mount(SourceItemsFilterBar, { props: { ...baseProps, mode: "short_content" }, global: { plugins: [Antd] } });
+    expect(wrapper.text()).not.toContain("爆文分");
+    wrapper.unmount();
+    const long = mount(SourceItemsFilterBar, { props: baseProps, global: { plugins: [Antd] } });
+    expect(long.text()).toContain("爆文分");
+    long.unmount();
+  });
   it("provides refresh and clear-filter actions for stale list state", async () => {
     const wrapper = mount(SourceItemsFilterBar, {
       props: baseProps,

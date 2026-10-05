@@ -31,11 +31,9 @@ import {
   SHORT_FINISHED_STATUS_OPTIONS,
   calculateWritingDuration,
   formatShortFinishedLocalTime,
-  formatTrendBreakdown,
   formatWritingDuration,
   getShortFinishedStatusInfo,
-  getShortFinishedDomainInfo,
-  getTrendBreakdownBars
+  getShortFinishedDomainInfo
 } from "./shortFinishedArticlePresentation.js";
 
 // ─── JSON 解析辅助 ───
@@ -574,32 +572,12 @@ useTableComponent();
             </a-tooltip>
           </template>
 
-          <!-- 质检按生成时标准显示；趋势来自素材，不能作为成品质检的分项。 -->
+          <!-- 成品只展示写后质检分，不展示未参与短写的素材爆文评分。 -->
           <template v-else-if="column.key === 'quality'">
             <a-tooltip title="生成时的成品质检评分；历史评分不重新计算，不预测传播效果。">
               <span v-if="record.reversalScore != null" class="text-xs font-semibold">{{ record.reversalScore }}</span>
               <span v-else class="text-[10px] text-editorial-text-muted">未评分</span>
             </a-tooltip>
-          </template>
-          <template v-else-if="column.key === 'trend'">
-            <span v-if="record.originType === 'manual'" class="text-xs text-editorial-text-muted">—</span>
-            <div v-else class="flex flex-col gap-0.5 leading-tight">
-              <span v-if="record.trendScore != null" class="text-[10px] font-semibold">{{ record.trendScore }}</span>
-              <span v-else class="text-[10px] text-editorial-text-muted">未评分</span>
-              <a-tooltip v-if="record.trendBreakdown && getTrendBreakdownBars(record.trendBreakdown).length > 0" :mouse-enter-delay="0.3">
-                <template #title>
-                  <div class="text-xs leading-5">{{ formatTrendBreakdown(record.trendBreakdown) }}</div>
-                </template>
-                <div class="flex h-2.5 w-full min-w-[80px] overflow-hidden rounded-sm">
-                  <div
-                    v-for="(bar, idx) in getTrendBreakdownBars(record.trendBreakdown)"
-                    :key="idx"
-                    :style="{ width: bar.width, backgroundColor: bar.color }"
-                    :title="bar.label"
-                  />
-                </div>
-              </a-tooltip>
-            </div>
           </template>
 
           <!-- 相似度列 -->

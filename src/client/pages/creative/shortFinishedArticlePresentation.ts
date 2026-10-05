@@ -70,7 +70,6 @@ export const SHORT_FINISHED_COLUMNS = [
   { title: "状态", key: "status", width: 100 },
   { title: "来源", key: "sourceName", width: 115 },
   { title: "质检评分", key: "quality", width: 82 },
-  { title: "素材趋势", key: "trend", width: 120, ellipsis: true },
   { title: "相似度", key: "similarity", width: 56, ellipsis: true },
   { title: "耗时/时间", key: "timeInfo", width: 130, ellipsis: true },
   { title: "操作", key: "actions", width: 86, fixed: "right" as const }

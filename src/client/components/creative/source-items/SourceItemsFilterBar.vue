@@ -86,7 +86,7 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
       :checked="props.writableOnly"
       @update:checked="emit('update:writable-only', $event)"
     >只看可写</a-checkbox>
-    <div class="flex items-center gap-1.5">
+    <div v-if="props.mode === 'article'" class="flex items-center gap-1.5">
       <span class="whitespace-nowrap text-xs text-editorial-text-muted">爆文分≥</span>
       <a-input-number
         :value="props.minTrendScore"

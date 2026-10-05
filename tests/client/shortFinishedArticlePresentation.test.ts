@@ -32,15 +32,15 @@ describe("短内容成品表格展示模型", () => {
     expect(getShortFinishedDomainInfo([{ meta: { contentDomain: "ai" } }])).toBeNull();
   });
 
-  it("保持筛选和操作列，分开质检与素材趋势而不显示旧文体",  () => {
+  it("保留质检和操作列，不显示未参与短写的素材爆文趋势",  () => {
     expect(SHORT_FINISHED_STATUS_OPTIONS[0]).toEqual({ label: "全部状态", value: "" });
     expect(SHORT_FINISHED_STATUS_OPTIONS.at(-1)).toEqual({ label: "已删除", value: "soft_deleted" });
     expect(SHORT_FINISHED_COLUMNS.map((column) => column.key)).toEqual([
       "idSeq", "title", "coverImage", "status", "sourceName",
-      "quality", "trend", "similarity", "timeInfo", "actions"
+      "quality", "similarity", "timeInfo", "actions"
     ]);
     expect(SHORT_FINISHED_COLUMNS.find((column) => column.key === "quality")?.title).toBe("质检评分");
-    expect(SHORT_FINISHED_COLUMNS.find((column) => column.key === "trend")?.title).toBe("素材趋势");
+    expect(SHORT_FINISHED_COLUMNS.some((column) => column.key === "trend")).toBe(false);
   });
 
   it("按固定颜色顺序生成趋势柱并按分数生成说明", () => {

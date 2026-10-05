@@ -41,9 +41,14 @@ function readSavedFilters(storageKey: string): SavedSourceFilters {
   }
 }
 
-/** 复用两条素材列表的查询、分页、展开详情和请求取消逻辑。 */
+/** 管理长短素材查询及分页；短页清理旧爆文筛选，不向接口传递不可见门槛。 */
 export function useSourceItemsQuery(options: SourceItemsQueryOptions) {
   const saved = readSavedFilters(options.storageKey);
+  if (options.direction === "short_content" && "minTrendScore" in saved) {
+    delete saved.minTrendScore;
+    try { localStorage.setItem(options.storageKey, JSON.stringify(saved)); }
+    catch { /* 存储不可写仍不恢复隐藏的爆文筛选。 */ }
+  }
   const isLoading = ref(false);
   const items = ref<CreativeSourceItem[]>([]);
   const total = ref(0);
@@ -76,8 +81,8 @@ export function useSourceItemsQuery(options: SourceItemsQueryOptions) {
         writingStatus: writingStatusFilter.value || "",
         sourceName: sourceNameFilter.value || "",
         search: searchText.value,
-        minTrendScore: minTrendScore.value,
       };
+      if (options.direction === "article") data.minTrendScore = minTrendScore.value;
       if (options.includeAccountFit) data.accountFitLevel = accountFitFilter.value || "";
       localStorage.setItem(options.storageKey, JSON.stringify(data));
     } catch {
@@ -101,7 +106,7 @@ export function useSourceItemsQuery(options: SourceItemsQueryOptions) {
         sourceName: sourceNameFilter.value.trim() || undefined,
         writable: writableOnly.value || undefined,
         search: searchText.value || undefined,
-        minTrendScore: minTrendScore.value ?? undefined,
+        minTrendScore: options.direction === "article" ? minTrendScore.value ?? undefined : undefined,
         signal: controller.signal,
       });
       if (!listRequests.isCurrent(controller)) return;

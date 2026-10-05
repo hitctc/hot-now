@@ -39,17 +39,20 @@ const {
             <a-descriptions-item label="来源">{{ data.sourceName || "-" }}</a-descriptions-item>
             <a-descriptions-item label="作者">{{ data.author || "-" }}</a-descriptions-item>
             <a-descriptions-item label="Agent">{{ data.collectorAgent }}</a-descriptions-item>
-            <a-descriptions-item label="评分">
+            <a-descriptions-item :label="data.direction === 'short_content' ? '短内容选题分' : '评分'">
               <span v-if="data.score != null" class="font-semibold">{{ data.score }}</span>
               <span v-else class="text-editorial-text-muted">-</span>
             </a-descriptions-item>
-            <a-descriptions-item label="爆文分">
+            <a-descriptions-item v-if="data.direction !== 'short_content'" label="爆文分">
               <span v-if="data.trendScore != null" class="font-semibold" :class="data.trendScore >= 90 ? 'text-purple-600' : data.trendScore >= 80 ? 'text-red-500' : 'text-orange-600'">{{ data.trendScore }}</span>
               <span v-else class="text-editorial-text-muted">未评分</span>
             </a-descriptions-item>
             <a-descriptions-item label="字数">{{ data.wordCount ?? "-" }}</a-descriptions-item>
             <a-descriptions-item label="语言">{{ data.language }}</a-descriptions-item>
             <a-descriptions-item label="写作状态">{{ data.writingStatus }}</a-descriptions-item>
+            <a-descriptions-item v-if="data.direction === 'short_content' && ['skipped', 'failed'].includes(data.writingStatus)" label="跳过/停止原因" :span="3">
+              <div class="whitespace-pre-wrap break-words">{{ data.writingStopReason || '历史原因未记录，不能据当前分数推断' }}</div>
+            </a-descriptions-item>
             <a-descriptions-item label="发布时间">{{ formatTime(data.publishedAt) }}</a-descriptions-item>
             <a-descriptions-item label="采集时间">{{ formatTime(data.collectorTimestamp) }}</a-descriptions-item>
             <a-descriptions-item label="标签">

@@ -39,7 +39,7 @@ export type GenerateCodeImageCardsResult = {
 
 const inFlight = new Map<number, Promise<GenerateCodeImageCardsResult>>();
 
-/** 制作单篇短内容的代码图片；同一文章并发请求只保留一个执行实例。 */
+/** 制作单篇长短成品的代码图和封面候选，不写正文；同篇并发只保留一个任务。 */
 export async function generateCodeImageCards(
   db: SqliteDatabase,
   articleId: number,
@@ -123,6 +123,7 @@ export function resolveCodeImageKeywords(articleKeywords: string[] | null, sourc
   return (fromArticle.length > 0 ? fromArticle : fromSource).slice(0, 3);
 }
 
+/** 按选中标题渲染指定文章图片并原子保存候选，保留正文和已有封面选择。 */
 async function runCodeImageCards(
   db: SqliteDatabase,
   articleId: number,
@@ -212,22 +213,17 @@ async function runCodeImageCards(
   const latest = findCreativeFinishedArticleById(db, articleId);
   if (!latest) return { ok: false, status: "failed", reason: "article-not-found-after-render" };
   const finalCards = mergeCardStates(latest.codeImageCards, rendered);
-  // 长文已有独立正文配图；制图只补封面候选，不自动改变发布正文。
-  const finalMarkdown = latest.direction === "short_content" ? mergeCodeImageMarkdown(
-    latest.humanMarkdown ?? latest.contentMarkdown,
-    latest.codeImageCards,
-    rendered,
-  ) : latest.humanMarkdown;
+  // 新短图只供下载与封面；不清理、替换旧稿已插入的图，也不触碰长文正文。
   const finalCoverImages = mergeCodeCoverCandidates(
     latest.coverImage,
     latest.coverImageIndex,
     latest.codeImageCards,
     finalCards,
+    latest.direction,
   );
   const finalSaved = editCreativeFinishedArticle(db, articleId, {
     expectedUpdatedAt: latest.updatedAt,
     codeImageCards: finalCards,
-    ...(latest.direction === "short_content" ? { humanMarkdown: finalMarkdown } : {}),
     coverImage: finalCoverImages.images,
     coverImageIndex: finalCoverImages.index,
   }, "code-image");
@@ -250,39 +246,18 @@ function mergeCardStates(base: CodeImageCard[], updates: CodeImageCard[]): CodeI
   return orderCodeImageCards([...byVariant.values()]);
 }
 
-function mergeCodeImageMarkdown(markdown: string, previous: CodeImageCard[], updates: CodeImageCard[]): string {
-  let merged = markdown;
-  const linesToInsert: string[] = [];
-  for (const update of updates) {
-    if (update.status !== "succeeded" || !update.url) continue;
-    const old = findCodeImageCard(previous, update.variant);
-    if (old?.url && merged.includes(old.url)) {
-      merged = merged.split(old.url).join(update.url);
-      continue;
-    }
-    if (!old || old.status === "failed" || old.status === "pending" || old.status === "running") {
-      linesToInsert.push(markdownLine(update.variant, update.url));
-    }
-  }
-  if (linesToInsert.length === 0) return merged;
-  return `${linesToInsert.join("\n\n")}\n\n${merged.trimStart()}`.trimEnd();
-}
-
-function markdownLine(variant: CodeImageCardVariant, url: string): string {
-  if (variant === "2.5:1") return `![封面图｜HotNow 2.5:1 横图](${url})`;
-  if (variant === "1:1") return `![配图｜HotNow 1:1 方图](${url})`;
-  return `![配图｜HotNow 3:4 竖图](${url})`;
-}
-
+/** 合并候选并返回发布索引；保留已选图片/比例，仅无选择时短内容优先方图，长文维持横图。 */
 function mergeCodeCoverCandidates(
   current: string[],
   currentIndex: number,
   previous: CodeImageCard[],
   next: CodeImageCard[],
+  direction: CreativeFinishedArticleRecord["direction"],
 ): { images: string[]; index: number } {
   const oldCodeUrls = new Set(previous.map((card) => card.url).filter((url): url is string => Boolean(url)));
   const selectedUrl = current[currentIndex] ?? null;
-  const selectedVariant = previous.find((card) => card.url === selectedUrl)?.variant;
+  // 首次制作的running卡片URL均为空，不能把空封面匹配成已选横图。
+  const selectedVariant = selectedUrl ? previous.find((card) => card.url === selectedUrl)?.variant : undefined;
   const images = current.filter((url) => !oldCodeUrls.has(url));
   const codeCards = CODE_IMAGE_CARD_VARIANTS
     .map((variant) => findCodeImageCard(next, variant))
@@ -294,7 +269,7 @@ function mergeCodeCoverCandidates(
   if (selectedUrl && images.includes(selectedUrl)) return { images, index: images.indexOf(selectedUrl) };
   const preferredVariant = selectedVariant && codeCards.some((card) => card.variant === selectedVariant)
     ? selectedVariant
-    : codeCards.find((card) => card.variant === "2.5:1")?.variant
+    : codeCards.find((card) => card.variant === (direction === "short_content" ? "1:1" : "2.5:1"))?.variant
       ?? codeCards.find((card) => card.variant === "3:4")?.variant
       ?? codeCards[0]?.variant;
   const selectedCode = codeCards.find((card) => card.variant === preferredVariant)?.url;

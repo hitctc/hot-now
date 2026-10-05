@@ -204,7 +204,7 @@ export function validateStatusTransition(
 
 // ── Edit content fields ────────────────────────────────────────────────────
 
-/** 校验人工状态转换后更新调用方指定字段；制图文案变化时同步将现有代码图片标记为过期。 */
+/** 校验状态后更新指定字段、将变化的制图文案标记过期；短正文不补候选封面，保留已有图片槽位。 */
 export function editCreativeFinishedArticle(
   db: SqliteDatabase,
   id: number,
@@ -269,7 +269,8 @@ export function editCreativeFinishedArticle(
       current.contentMarkdown,
       input.contentMarkdown,
       current.images ?? [],
-      current.coverImage,
+      // 短内容候选封面不属于正文；已有正文图片仍由Markdown槽位保留。
+      current.direction === "short_content" ? [] : current.coverImage,
       current.direction !== "short_content",
     ));
   }
@@ -281,7 +282,7 @@ export function editCreativeFinishedArticle(
         current.humanMarkdown ?? "",
         input.humanMarkdown,
         current.images ?? [],
-        current.coverImage,
+        current.direction === "short_content" ? [] : current.coverImage,
         current.direction !== "short_content",
       ));
   }

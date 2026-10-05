@@ -55,7 +55,7 @@ function statusClass(card: CodeImageCard | null): string {
     <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
       <div>
         <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">代码制图片</h3>
-        <p class="m-0 mt-1 text-[11px] text-editorial-text-muted/80">{{ article.direction === 'short_content' ? '三张图片会写入正文，也可直接下载作为封面候选。' : '三张图片仅加入封面候选，不自动插入正文；可在封面区域选用或下载后使用。' }}</p>
+        <p class="m-0 mt-1 text-[11px] text-editorial-text-muted/80">{{ article.direction === 'short_content' ? '新制图不自动插入正文；默认方图作为发布封面，也可下载或手动选择其他封面。' : '三张图片仅加入封面候选，不自动插入正文；可在封面区域选用或下载后使用。' }}</p>
       </div>
       <div v-if="!readonly" class="flex flex-wrap items-center gap-2">
         <!-- 代码图片是本地确定性渲染，不消耗外部额度，因此不限制制作次数。 -->
@@ -94,7 +94,7 @@ function statusClass(card: CodeImageCard | null): string {
               <span class="text-xs font-semibold text-editorial-text-main">{{ item.label }}</span>
               <span :class="['text-[10px]', statusClass(item.card)]">{{ statusLabel(item.card) }}</span>
             </div>
-            <div class="text-[10px] text-editorial-text-muted">{{ item.usage }} · {{ item.card?.width ?? 1500 }} × {{ item.card?.height ?? (item.key === '2.5:1' ? 600 : item.key === '1:1' ? 1500 : 2000) }}</div>
+            <div class="text-[10px] text-editorial-text-muted">{{ article.direction === 'short_content' ? (item.key === '1:1' ? '默认发布封面' : '分享与封面候选') : item.usage }} · {{ item.card?.width ?? 1500 }} × {{ item.card?.height ?? (item.key === '2.5:1' ? 600 : item.key === '1:1' ? 1500 : 2000) }}</div>
             <div v-if="item.card?.url" class="flex flex-wrap gap-2 pt-1">
               <a :href="item.card.url" :download="`hotnow-${item.key.replace(':', '-')}.png`" target="_blank" rel="noreferrer" class="text-[11px] text-editorial-link-active hover:underline">下载 PNG</a>
               <button type="button" class="text-[11px] text-editorial-link-active hover:underline" @click="emit('copy-url', item.card?.url ?? '')">复制图片地址</button>

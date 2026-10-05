@@ -140,17 +140,23 @@ function lunaJobStatusClass(job: LunaImageJob | undefined): string {
               class="relative overflow-hidden rounded-editorial-md border transition-all"
               :class="index === activeCoverIndex
                 ? 'border-editorial-accent ring-2 ring-editorial-ring'
-                : 'border-editorial-border opacity-60 hover:opacity-100 hover:border-editorial-link-active/40'"
+                : article.direction === 'short_content'
+                  ? 'border-editorial-border hover:border-editorial-link-active'
+                  : 'border-editorial-border opacity-60 hover:opacity-100 hover:border-editorial-link-active/40'"
             >
               <a-image :src="url" :alt="`封面图 ${index + 1}`" class="block w-full object-cover" loading="lazy" />
               <div
                 v-if="index === activeCoverIndex"
-                class="absolute right-1 top-1 flex items-center gap-0.5 rounded bg-editorial-accent px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm"
-              ><span class="inline-block h-3 w-3 leading-none text-center">✓</span> 发布封面</div>
+                :class="article.direction === 'short_content'
+                  ? 'absolute right-2 top-2 flex items-center gap-1 rounded bg-violet-700 px-3 py-2 text-xs font-bold text-white shadow-md'
+                  : 'absolute right-1 top-1 flex items-center gap-0.5 rounded bg-editorial-accent px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm'"
+              ><span class="inline-block h-3 w-3 leading-none text-center">✓</span> {{ article.direction === 'short_content' ? '当前发布封面' : '发布封面' }}</div>
               <div v-if="index === 0 && index !== activeCoverIndex" class="absolute left-1 top-1 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</div>
               <button
                 v-if="!readonly && index !== activeCoverIndex"
-                class="absolute right-1 bottom-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white hover:bg-black/80"
+                :class="article.direction === 'short_content'
+                  ? 'flex min-h-[44px] w-full items-center justify-center border-t border-violet-700 bg-violet-600 px-3 py-2 text-sm font-bold text-white shadow-sm hover:bg-violet-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600'
+                  : 'absolute right-1 bottom-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white hover:bg-black/80'"
                 @click.stop="emit('select-cover', index)"
               >设为发布封面</button>
             </div>

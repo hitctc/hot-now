@@ -323,6 +323,7 @@ export function registerCreativeSourceActionRoutes(
     const params = request.params as { id: string };
     const body = request.body as {
       writingStatus?: unknown;
+      onlyIfPending?: unknown;
       stopStep?: unknown;
       stopStepName?: unknown;
       stopReason?: unknown;
@@ -344,6 +345,16 @@ export function registerCreativeSourceActionRoutes(
       && body.stopReason.trim().length > 0;
     if (hasStopDetails && (!["skipped", "failed"].includes(status) || !stopDetailsValid)) {
       return reply.code(400).send({ ok: false, reason: "invalid-stop-details" });
+    }
+    if (body?.onlyIfPending !== undefined && typeof body.onlyIfPending !== "boolean") {
+      return reply.code(400).send({ ok: false, reason: "invalid-pending-guard" });
+    }
+    if (body?.onlyIfPending) {
+      const source = findCreativeSourceItemById(db, id);
+      if (!source) return reply.code(404).send({ ok: false, reason: "not-found" });
+      if (source.direction !== "short_content") return reply.code(400).send({ ok: false, reason: "pending-guard-short-only" });
+      // 单进程同步读写间没有await；评估回调不能覆盖人工处理或worker推进后的状态。
+      if (source.writingStatus !== "pending") return reply.send({ ok: true, unchanged: true });
     }
     const updated = updateCreativeSourceItemWritingStatus(
       db,

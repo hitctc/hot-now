@@ -11,6 +11,13 @@ import {
 } from "../../src/client/components/creative/source-items/sourceItemPresentation.js";
 
 describe("source item presentation", () => {
+  it("distinguishes a scored short source awaiting status sync without guessing eligibility", () => {
+    expect(writingStatusLabel("pending", 82)).toBe("已评分·待同步");
+    expect(writingStatusLabel("pending", 0)).toBe("已评分·待同步");
+    expect(writingStatusLabel("pending", null)).toBe("待评估");
+    expect(writingStatusLabel("pending")).toBe("待评估");
+    expect(writingStatusLabel("done", 82)).toBe("已写作");
+  });
   it("keeps the breakdown bar order and percentages stable", () => {
     const bars = getBreakdownBars({
       topicPower: 10,

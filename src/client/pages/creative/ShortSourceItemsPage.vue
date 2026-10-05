@@ -28,6 +28,7 @@ const detailArticle = ref<CreativeFinishedArticle | null>(null);
 
 const writingStatusOptions = [
   { label: "全部", value: "" },
+  { label: "待评估/待同步", value: "pending" },
   { label: "待写作", value: "ready" },
   { label: "不写作", value: "excluded" },
   { label: "写作中", value: "writing" },

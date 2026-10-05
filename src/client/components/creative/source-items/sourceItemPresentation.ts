@@ -90,9 +90,10 @@ export function writingStatusColor(status: string): string {
   }
 }
 
-export function writingStatusLabel(status: string): string {
+/** 返回状态文案；短素材传选题分可识别待同步，不据分数猜测准入，长素材不传分保持原语义。 */
+export function writingStatusLabel(status: string, shortScore?: number | null): string {
   switch (status) {
-    case "pending": return "待评估";
+    case "pending": return typeof shortScore === "number" && Number.isFinite(shortScore) ? "已评分·待同步" : "待评估";
     case "ready": return "待写作";
     case "queued": return "排队中";
     case "excluded": return "不写作";

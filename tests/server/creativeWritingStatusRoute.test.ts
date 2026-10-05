@@ -15,6 +15,28 @@ afterEach(() => {
 });
 
 describe("POST /actions/creative/source-items/:id/writing-status", () => {
+  it.each(["pending", "ready", "writing", "done", "excluded", "skipped"])("syncs scoring only while a short source is pending: %s", async (status) => {
+    const handle = await createTestDatabase("short-score-sync-");
+    handles.push(handle);
+    const item = insertCreativeSourceItem(handle.db, { externalId: "sync-" + status, collectorAgent: "short-test", title: "短素材", url: "https://example.com/short", direction: "short_content", writingStatus: status as "pending" | "ready" | "writing" | "done" | "excluded" | "skipped" });
+    const app = createServer({ db: handle.db, creativeApiToken: "test-token" });
+    const response = await app.inject({ method: "POST", url: `/actions/creative/source-items/${item.id}/writing-status`, headers: { "x-creative-token": "test-token" }, payload: { writingStatus: "skipped", onlyIfPending: true } });
+    expect(response.statusCode).toBe(200);
+    expect(findCreativeSourceItemById(handle.db, item.id)?.writingStatus).toBe(status === "pending" ? "skipped" : status);
+    if (status !== "pending") expect(response.json()).toMatchObject({ ok: true, unchanged: true });
+    await app.close();
+  });
+  it.each([false, "yes"])("rejects invalid guard scope/input without changing long source: %s", async (invalidFlag) => {
+    const handle = await createTestDatabase("score-guard-invalid-");
+    handles.push(handle);
+    const item = insertCreativeSourceItem(handle.db, { externalId: "long-guard", collectorAgent: "test", title: "长素材", url: "https://example.com/long" });
+    const app = createServer({ db: handle.db, creativeApiToken: "test-token" });
+    const response = await app.inject({ method: "POST", url: `/actions/creative/source-items/${item.id}/writing-status`, headers: { "x-creative-token": "test-token" }, payload: { writingStatus: "ready", onlyIfPending: invalidFlag === false ? true : invalidFlag } });
+    expect(response.statusCode).toBe(400);
+    expect(findCreativeSourceItemById(handle.db, item.id)?.writingStatus).toBe("pending");
+    await app.close();
+  });
+
   it("persists complete stop details from the creative API", async () => {
     const handle = await createTestDatabase("hot-now-writing-status-route-");
     handles.push(handle);

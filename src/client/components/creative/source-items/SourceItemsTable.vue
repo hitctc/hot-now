@@ -270,7 +270,7 @@ useTableComponent();
             </a-tag>
           </a-tooltip>
           <a-tag v-else :color="writingStatusColor(record.writingStatus)" class="!m-0">
-            {{ writingStatusLabel(record.writingStatus) }}
+            {{ writingStatusLabel(record.writingStatus, mode === 'short_content' ? record.score : undefined) }}
           </a-tag>
           <a-tag v-if="record.writeCount > 0" color="green" class="!m-0 !text-[11px] !py-0">{{ record.writeCount }}次</a-tag>
         </div>

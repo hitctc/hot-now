@@ -47,6 +47,22 @@ describe("finished page query ownership", () => {
     wrapper.unmount();
   });
 
+  it("late saved notification cannot cancel a pending detail click or leave permanent loading", async () => {
+    let resolve!: (value: any) => void;
+    vi.mocked(readCreativeFinishedArticle).mockImplementationOnce(() => new Promise(done => { resolve = done; }));
+    let state!: ReturnType<typeof useFinishedArticleDetail>;
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mount(defineComponent({ setup() { state = useFinishedArticleDetail(refresh); return () => null; } }));
+    try {
+      const pending = state.openDetail({ id: 3 } as any);
+      await state.onDetailSaved();
+      resolve({ id: 3 }); await pending;
+      expect(state.detailArticle.value?.id).toBe(3);
+      expect(state.detailLoading.value).toBe(false);
+      expect(refresh).toHaveBeenCalledTimes(1);
+    } finally { wrapper.unmount(); }
+  });
+
   it("invalidates pending detail on close and on unload without replaying an action", async () => {
     let resolve!: (value: any) => void;
     vi.mocked(readCreativeFinishedArticle).mockImplementation(() => new Promise(done => { resolve = done; }));

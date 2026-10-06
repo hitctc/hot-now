@@ -3,14 +3,14 @@ import { message } from "ant-design-vue";
 import { readCreativeFinishedArticle, type CreativeFinishedArticle } from "../../../services/creativeListApi.js";
 import { createLatestRequestGuard } from "../../../utils/latestRequestGuard.js";
 
-/** 管理一个成品页的详情身份和保存后读取；关闭只使GET失效，不取消后台任务或编辑器保存。 */
+/** 用列表刷新回调管理成品/素材页详情，返回读状态和开关/保存接口；关闭不取消后台任务或编辑器保存。 */
 export function useFinishedArticleDetail(loadItems: () => Promise<void>) {
   const detailArticle = ref<CreativeFinishedArticle | null>(null);
   const detailLoading = ref(false);
   const requests = createLatestRequestGuard();
 
-  /** 点击立即显示加载，只有当前文章读取能进入弹窗或提示失败。 */
-  async function openDetail(article: CreativeFinishedArticle): Promise<void> {
+  /** 只需成品编号即可立即显示加载；仅当前读取能进入弹窗或提示失败，不执行写操作。 */
+  async function openDetail(article: Pick<CreativeFinishedArticle, "id">): Promise<void> {
     const requestId = requests.begin();
     detailArticle.value = null;
     detailLoading.value = true;
@@ -31,12 +31,14 @@ export function useFinishedArticleDetail(loadItems: () => Promise<void>) {
     detailArticle.value = null;
   }
 
-  /** 显式保存后刷新列表，再按原编号读取；切换、关闭、卸载及较新刷新会淘汰旧响应。 */
+  /** 保存后刷新列表及当前详情；空身份的迟到通知只刷新列表，不淘汰正在打开的详情GET。 */
   async function onDetailSaved(): Promise<void> {
-    const requestId = requests.begin();
     const articleId = detailArticle.value?.id;
+    // 打开详情时暂时没有文章，旧保存通知不能占用新读取的令牌导致永久加载。
+    if (!articleId) { await loadItems(); return; }
+    const requestId = requests.begin();
     await loadItems();
-    if (!articleId || !requests.isCurrent(requestId)) return;
+    if (!requests.isCurrent(requestId)) return;
     const latest = await readCreativeFinishedArticle(articleId);
     if (requests.isCurrent(requestId) && detailArticle.value?.id === articleId) detailArticle.value = latest;
   }

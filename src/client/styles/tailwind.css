@@ -441,6 +441,14 @@ html[data-theme="dark"] .table-day-group-label {
 }
 
 @media (max-width: 767px) {
+  /* 页面/卡片左右留白保持；数据表格独立铺满屏宽，内层仍自行横向滚动。
+     所有当前数据表格都在居中的主内容区，负外边距抵消不同父层的对称留白。 */
+  main .ant-table-wrapper {
+    width: 100vw;
+    max-width: 100vw;
+    margin-inline: calc((100% - 100vw) / 2);
+  }
+
   /* 创作表格移动端首列不吸附，ID/序号及日期标签随表格横向滚动；桌面端仍固定。 */
   .table-day-anchor-cell.ant-table-cell-fix-left {
     position: relative !important;

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFinishedArticleDetail } from "../../components/creative/finished-articles/useFinishedArticleDetail.js";
 import { computed, onBeforeUnmount, ref } from "vue";
 import { message } from "ant-design-vue";
 
@@ -12,14 +13,12 @@ import { accountFitLabel } from "../../components/creative/source-items/sourceIt
 
 import {
   readCreativeSourceItem,
-  readCreativeFinishedArticle,
   updateSourceItemWritingStatus,
   writeSourceItemArticle,
   fetchWriteQueueStatus,
   submitManualWrite,
   traceSourceItem,
   type CreativeSourceItem,
-  type CreativeFinishedArticle,
   type AccountFitLevel,
 } from "../../services/creativeApi.js";
 
@@ -27,7 +26,7 @@ import {
 
 const SOURCE_FILTERS_KEY = "creative-source-filters";
 const actionPendingId = ref<number | null>(null);
-const detailArticle = ref<CreativeFinishedArticle | null>(null);
+const { detailArticle, detailLoading, openDetail, closeDetail: closeDetailDrawer } = useFinishedArticleDetail(() => loadItems());
 
 const writingStatusOptions = [
   { label: "全部", value: "" },
@@ -54,17 +53,9 @@ const accountFitOptions = [
 const { history: searchHistory, addToHistory, removeFromHistory } = useSearchHistory("creative-source-search-history");
 // ─── 成品文章弹窗 ───
 
-async function openArticleModal(articleId: number): Promise<void> {
-  try {
-    const article = await readCreativeFinishedArticle(articleId);
-    detailArticle.value = article;
-  } catch {
-    message.error("加载文章详情失败");
-  }
-}
-
-function closeDetailDrawer(): void {
-  detailArticle.value = null;
+/** 根据关联成品编号立即打开加载态，较旧响应或关闭后的响应由共享守卫丢弃。 */
+function openArticleModal(articleId: number): Promise<void> {
+  return openDetail({ id: articleId });
 }
 
 // ─── 质量状态操作 ───
@@ -440,7 +431,8 @@ const pagination = computed(() => ({
 
     <!-- 成品文章详情弹窗 -->
     <ArticleDetailDrawer
-      :open="detailArticle !== null"
+      :open="detailLoading || detailArticle !== null"
+      :loading="detailLoading"
       :article="detailArticle"
       @update:open="(val) => { if (!val) closeDetailDrawer(); }"
       @saved="loadItems"

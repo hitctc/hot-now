@@ -1,4 +1,19 @@
-import type { AccountFitLevel, TrendBreakdown } from "../../../services/creativeListApi.js";
+import type { AccountFitLevel, TrendBreakdown, SourceRanking } from "../../../services/creativeListApi.js";
+
+/** 显示已有平台来源名，兼容旧英文平台名；没有来源时明确缺失，不猜平台。 */
+export function sourcePlatformLabel(name: string | null | undefined): string {
+  const platforms: Record<string, string> = { bilibili热搜: "B站", baidu热搜: "百度", thepaper热搜: "澎湃", weibo热搜: "微博" };
+  return name ? platforms[name] ?? name : "来源未记录";
+}
+
+/** 显示首次榜单时间及位置；精选不是排名，旧热搜缺失和RSS非榜单明确区分。 */
+export function sourceRankingLabel(snapshot: SourceRanking | null | undefined, collectorAgent?: string | null): string {
+  if (!snapshot) return !collectorAgent || collectorAgent.startsWith("hotsearch-") ? "排名未记录" : "非榜单来源";
+  const capturedAt = new Date(snapshot.capturedAt);
+  const time = Number.isFinite(capturedAt.getTime()) ? new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(capturedAt).replaceAll("/", "-") : "采集时间未记录";
+  if (snapshot.kind === "selection") return `${snapshot.board} · ${time} · 非排名榜单`;
+  return `${snapshot.board} · ${time} · 第${snapshot.rank}${snapshot.kind === "listing" ? "位" : "名"}`;
+}
 
 /** 评分明细的固定展示顺序，保证不同列表的颜色和位置一致。 */
 export const breakdownDimensionOrder: Array<keyof TrendBreakdown> = [

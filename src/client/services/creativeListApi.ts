@@ -27,6 +27,13 @@ export type TrendBreakdown = {
   audienceBreadth: number;
 };
 
+export type SourceRanking = {
+  board: string;
+  rank: number | null;
+  capturedAt: string;
+  kind: "ranking" | "listing" | "selection";
+};
+
 export type CreativeSourceItem = {
   id: number;
   externalId: string;
@@ -51,6 +58,7 @@ export type CreativeSourceItem = {
   writingStopReason: string | null;
   writingStoppedAt: string | null;
   rawPayloadJson: string;
+  sourceRanking?: SourceRanking | null;
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
   accountFitLevel: AccountFitLevel | null;
@@ -200,6 +208,8 @@ export type CreativeFinishedArticle = {
   pinnedAt: string | null;
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
+  sourceRanking?: SourceRanking | null;
+  sourceCollectorAgent?: string | null;
   sourceTitle: string | null;
   sourceName: string | null;
   publishedAt: string | null;

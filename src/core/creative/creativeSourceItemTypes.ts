@@ -1,3 +1,4 @@
+import type { SourceRanking } from "./sourceRanking.js";
 import type { CreativeSourceItemWritingStatus } from "./types.js";
 
 /** 溯源结果条目。 */
@@ -60,6 +61,7 @@ export type CreativeSourceItemRecord = {
   writingStopReason: string | null;
   writingStoppedAt: string | null;
   rawPayloadJson: string;
+  sourceRanking?: SourceRanking | null;
   trendScore: number | null;
   trendBreakdown: TrendBreakdown | null;
   accountFitLevel: AccountFitLevel | null;
@@ -94,6 +96,7 @@ export type InsertCreativeSourceItemInput = {
   score?: number | null;
   publishedAt?: string | null;
   collectorTimestamp?: string | null;
+  sourceRanking?: SourceRanking;
   writingStatus?: CreativeSourceItemWritingStatus;
   trendScore?: number | null;
   trendBreakdown?: TrendBreakdown | null;

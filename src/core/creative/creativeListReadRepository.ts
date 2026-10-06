@@ -1,3 +1,4 @@
+import { SOURCE_RANKING_SQL, readSourceRanking } from "./sourceRanking.js";
 import type { SqliteDatabase } from "../db/openDatabase.js";
 import { findCreativeFinishedArticleById, listCreativeFinishedArticles } from "./creativeFinishedArticleRepository.js";
 import { findCreativeSourceItemById, listCreativeSourceItems } from "./creativeSourceItemRepository.js";
@@ -29,26 +30,28 @@ export function readCreativeSourceDetail(db: SqliteDatabase, id: number) {
   return findCreativeSourceItemById(db, id);
 }
 
-/** 读取成品列表并补齐平台素材信息；日期统计和分页全部沿用原repository语义。 */
+/** 读取成品关联展示；短成品补首次榜单快照，不改变日期、分页或长文展示语义。 */
 export function readCreativeFinishedList(db: SqliteDatabase, filters: Parameters<typeof listCreativeFinishedArticles>[1]) {
   const result = listCreativeFinishedArticles(db, filters);
   const sourceIds = [...new Set(result.items.map(article => article.sourceItemId).filter((id): id is number => id !== null))];
   if (sourceIds.length > 0) {
-    const rows = db.prepare(`SELECT id, trend_score, trend_breakdown, published_at, title, source_name FROM creative_source_items WHERE id IN (${sourceIds.map(() => "?").join(",")})`).all(...sourceIds) as Array<{ id: number; trend_score: number | null; trend_breakdown: string | null; published_at: string | null; title: string | null; source_name: string | null }>;
+    const rows = db.prepare(`SELECT id, trend_score, trend_breakdown, published_at, title, source_name, collector_agent, ${SOURCE_RANKING_SQL} AS source_ranking_json FROM creative_source_items WHERE id IN (${sourceIds.map(() => "?").join(",")})`).all(...sourceIds) as Array<{ id: number; trend_score: number | null; trend_breakdown: string | null; published_at: string | null; title: string | null; source_name: string | null; collector_agent: string; source_ranking_json: string | null }>;
     const sources = new Map(rows.map(row => [row.id, row]));
     for (const article of result.items) {
       const source = article.sourceItemId === null ? undefined : sources.get(article.sourceItemId);
       Object.assign(article, { trendScore: source?.trend_score ?? null, trendBreakdown: source?.trend_breakdown ? JSON.parse(source.trend_breakdown) : null, publishedAt: source?.published_at ?? null, sourceTitle: source?.title ?? null, sourceName: source?.source_name ?? null });
+      if (article.direction === "short_content") Object.assign(article, { sourceRanking: readSourceRanking(source?.source_ranking_json), sourceCollectorAgent: source?.collector_agent ?? null });
     }
   }
   return result;
 }
 
-/** 读取完整成品与原详情关联字段；不新增来源字段或吞掉原JSON错误。 */
+/** 读取完整成品及素材关联；仅短成品补平台、榜单快照，缺失不推断且不写业务行。 */
 export function readCreativeFinishedDetail(db: SqliteDatabase, id: number) {
   const article = findCreativeFinishedArticleById(db, id);
   if (!article) return article;
-  const source = article.sourceItemId === null ? undefined : db.prepare("SELECT trend_score, trend_breakdown, published_at, title FROM creative_source_items WHERE id = ?").get(article.sourceItemId) as { trend_score: number | null; trend_breakdown: string | null; published_at: string | null; title: string } | undefined;
+  const source = article.sourceItemId === null ? undefined : db.prepare(`SELECT trend_score, trend_breakdown, published_at, title, source_name, collector_agent, ${SOURCE_RANKING_SQL} AS source_ranking_json FROM creative_source_items WHERE id = ?`).get(article.sourceItemId) as { trend_score: number | null; trend_breakdown: string | null; published_at: string | null; title: string; source_name: string | null; collector_agent: string; source_ranking_json: string | null } | undefined;
+  if (article.direction === "short_content") Object.assign(article, { sourceName: source?.source_name ?? null, sourceRanking: readSourceRanking(source?.source_ranking_json), sourceCollectorAgent: source?.collector_agent ?? null });
   if (source) Object.assign(article, { trendScore: source.trend_score ?? null, trendBreakdown: source.trend_breakdown ? JSON.parse(source.trend_breakdown) : null, publishedAt: source.published_at ?? null, sourceTitle: source.title ?? null });
   return article;
 }

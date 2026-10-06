@@ -14,6 +14,8 @@ import {
   getBreakdownBars,
   writingStatusColor,
   writingStatusLabel,
+  sourcePlatformLabel,
+  sourceRankingLabel,
 } from "./sourceItemPresentation.js";
 
 type SourceDirection = "article" | "short_content";
@@ -50,7 +52,7 @@ const { mode, isLoading, items, pagination, expandedRowKeys, writingIds, tracing
 const columns = [
   { title: "ID / 序号", dataIndex: "id", key: "idSeq", width: 72, fixed: "left" as const, className: "table-day-anchor-cell" },
   { title: "标题", dataIndex: "title", key: "title", width: 300 },
-  { title: "来源", dataIndex: "sourceName", key: "sourceName", width: 115 },
+  { title: "来源", dataIndex: "sourceName", key: "sourceName", width: props.mode === "short_content" ? 145 : 115 },
   { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: props.mode === "short_content" ? 200 : 72, ellipsis: props.mode !== "short_content" },
   { title: props.mode === "short_content" ? "选题分" : "评分", key: "score", width: props.mode === "short_content" ? 104 : 90 },
   { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 44, align: "center" as const, ellipsis: true },
@@ -163,7 +165,11 @@ useTableComponent();
 
       <!-- 来源列 -->
       <template v-else-if="column.key === 'sourceName'">
-        <a-tooltip
+        <div v-if="mode === 'short_content'" class="flex flex-col gap-1">
+          <span class="text-xs">{{ sourcePlatformLabel(record.sourceName) }}</span>
+          <span data-short-source-ranking class="whitespace-normal break-words text-[10px] leading-4 text-editorial-text-muted" :title="record.sourceRanking?.board">{{ sourceRankingLabel(record.sourceRanking, record.collectorAgent) }}</span>
+        </div>
+        <a-tooltip v-else
           :open="overflowHover?.key === 'sourceName-' + record.id"
           :title="(record.sourceName || '').replace('微信公众号', 'WX')"
           placement="topLeft"

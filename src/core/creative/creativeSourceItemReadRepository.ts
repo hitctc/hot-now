@@ -1,3 +1,4 @@
+import { SOURCE_RANKING_SQL, readSourceRanking } from "./sourceRanking.js";
 import type { SqliteDatabase } from "../db/openDatabase.js";
 import type { CreativeSourceItemWritingStatus } from "./types.js";
 import type {
@@ -33,6 +34,7 @@ const SELECT_COLUMNS = `
   writing_stop_reason,
   writing_stopped_at,
   raw_payload_json,
+  ${SOURCE_RANKING_SQL} AS source_ranking_json,
   trend_score,
   trend_breakdown,
   account_fit_level,
@@ -50,7 +52,7 @@ const SELECT_COLUMNS = `
   (SELECT COUNT(*) FROM creative_finished_articles WHERE source_item_id = creative_source_items.id) AS write_count
 ` as const;
 
-// 列表不读取正文、原始采集包和详情 JSON；展开行再通过详情接口按需加载。
+// 列表只提取榜单小快照；不读取正文、完整采集包或其他详情JSON。
 const LIST_SELECT_COLUMNS = `
   id,
   external_id,
@@ -75,6 +77,7 @@ const LIST_SELECT_COLUMNS = `
   writing_stop_reason,
   writing_stopped_at,
   '' AS raw_payload_json,
+  ${SOURCE_RANKING_SQL} AS source_ranking_json,
   trend_score,
   trend_breakdown,
   account_fit_level,
@@ -116,6 +119,7 @@ type SourceItemRow = {
   writing_stop_reason: string | null;
   writing_stopped_at: string | null;
   raw_payload_json: string;
+  source_ranking_json: string | null;
   trend_score: number | null;
   trend_breakdown: string | null;
   account_fit_level: string | null;
@@ -133,6 +137,7 @@ type SourceItemRow = {
   write_count: number;
 };
 
+/** 映射本次读取的素材行，解析可选榜单快照；历史缺失不推断、不回写。 */
 function mapRow(row: SourceItemRow): CreativeSourceItemRecord {
   return {
     id: row.id,
@@ -158,6 +163,7 @@ function mapRow(row: SourceItemRow): CreativeSourceItemRecord {
     writingStopReason: row.writing_stop_reason,
     writingStoppedAt: row.writing_stopped_at,
     rawPayloadJson: row.raw_payload_json,
+    sourceRanking: readSourceRanking(row.source_ranking_json),
     trendScore: row.trend_score,
     trendBreakdown: row.trend_breakdown ? JSON.parse(row.trend_breakdown) : null,
     accountFitLevel: row.account_fit_level as AccountFitLevel | null,

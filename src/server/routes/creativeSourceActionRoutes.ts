@@ -1,3 +1,4 @@
+import { parseSourceRanking } from "../../core/creative/sourceRanking.js";
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
@@ -53,6 +54,10 @@ export function registerCreativeSourceActionRoutes(
       return reply.code(503).send({ ok: false, reason: "database-not-available" });
     }
 
+    const sourceRanking = parseSourceRanking(body?.sourceRanking);
+    if (body?.sourceRanking !== undefined && (!sourceRanking || body.direction !== "short_content")) {
+      return reply.code(400).send({ ok: false, reason: "invalid-source-ranking" });
+    }
     const result = insertCreativeSourceItem(db, {
       externalId,
       collectorAgent,
@@ -70,6 +75,8 @@ export function registerCreativeSourceActionRoutes(
       score: typeof body?.score === "number" ? body.score : undefined,
       publishedAt: typeof body?.publishedAt === "string" ? body.publishedAt : undefined,
       collectorTimestamp: typeof body?.collectorTimestamp === "string" ? body.collectorTimestamp : undefined,
+      // 快照仅随首次入库写入原始包；幂等回推不刷新名次和采集时段。
+      sourceRanking: sourceRanking ?? undefined,
       writingStatus: typeof body?.writingStatus === "string"
         && ["pending", "ready", "queued", "writing", "done", "skipped", "excluded", "failed"].includes(body.writingStatus)
         ? body.writingStatus as "pending" | "ready" | "queued" | "writing" | "done" | "skipped" | "excluded" | "failed"

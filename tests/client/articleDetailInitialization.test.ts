@@ -39,6 +39,15 @@ describe("article detail initialization", () => {
     wrapper.unmount();
   });
 
+  it("explicitly disables both dialog and mask motion for every detail entry", () => {
+    const wrapper = mountDrawer(true, article());
+    try {
+      const modal = wrapper.get('[data-test="close"]').element.parentElement!;
+      expect(modal.getAttribute("transition-name")).toBe("");
+      expect(modal.getAttribute("mask-transition-name")).toBe("");
+    } finally { wrapper.unmount(); }
+  });
+
   it("initializes both text panes when mounted with an already-open article", async () => {
     const wrapper = mountDrawer(true, article());
     await flushPromises();

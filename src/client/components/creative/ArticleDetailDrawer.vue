@@ -1,7 +1,10 @@
 <!-- 文章详情弹窗：展示标题/立意/摘要 + 正文编辑器（左编辑右预览），底部悬浮工具栏 -->
 <template>
+  <!-- 显式空名称禁用默认缩放和遮罩淡出；关闭不等动画，遮罩不会继续挡住下一次点击。 -->
   <a-modal
     :open="open"
+    transition-name=""
+    mask-transition-name=""
     :closable="true"
     :mask-closable="true"
     :destroy-on-close="true"

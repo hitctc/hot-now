@@ -120,7 +120,7 @@ function statusClass(card: CodeImageCard | null): string {
           <div
             v-for="item in displayCards"
             :key="item.key"
-            class="article-cover-card overflow-hidden rounded-editorial-md border bg-editorial-bg-page"
+            class="article-cover-card flex flex-col overflow-hidden rounded-editorial-md border bg-editorial-bg-page"
             :class="isCurrentCover(item.url) ? 'article-cover-card--selected' : 'border-editorial-border'"
             :aria-current="isCurrentCover(item.url) ? 'true' : undefined"
             :data-code-image-card="item.variant ?? undefined"
@@ -135,24 +135,25 @@ function statusClass(card: CodeImageCard | null): string {
               />
               <span v-else class="px-2 text-center text-xs text-editorial-text-muted">尚未生成</span>
             </div>
-            <div class="space-y-1 border-t border-editorial-border px-2 py-2">
+            <!-- 信息区撑满同排卡片，把封面控件推到底部，避免状态文案行数造成错位。 -->
+            <div class="flex flex-1 flex-col gap-1 border-t border-editorial-border px-2 py-2">
               <div class="text-xs font-semibold text-editorial-text-main">{{ item.label }}</div>
               <div v-if="item.variant" :class="['text-[10px]', statusClass(item.card)]">{{ statusLabel(item.card) }}</div>
               <div class="text-[10px] text-editorial-text-muted">{{ article.direction === 'short_content' && item.variant === '1:1' ? '默认发布封面' : item.usage }}<template v-if="item.card"> · {{ item.card.width }} × {{ item.card.height }}</template></div>
-              <div v-if="isCurrentCover(item.url)" class="article-cover-current" role="status">
+              <div v-if="item.url" class="article-cover-actions flex flex-wrap items-center gap-x-2">
+                <a :href="item.url" :download="item.variant ? `hotnow-${item.key.replace(':', '-')}.png` : ''" target="_blank" rel="noreferrer" class="inline-flex min-h-[44px] items-center text-[11px] text-editorial-link-active hover:underline">下载图片</a>
+                <button type="button" class="min-h-[44px] text-left text-[11px] text-editorial-link-active hover:underline" @click="emit('copy-url', item.url)">复制图片地址</button>
+              </div>
+              <div v-if="isCurrentCover(item.url)" class="article-cover-current mt-auto" role="status">
                 <span class="article-cover-current-icon" aria-hidden="true">✓</span>
                 <span class="article-cover-current-label">当前发布封面</span>
               </div>
               <button
                 v-else-if="!readonly && item.coverIndex >= 0"
                 type="button"
-                class="article-cover-select flex min-h-[44px] w-full items-center justify-center rounded bg-violet-600 px-2 py-1 text-xs font-bold text-white hover:bg-violet-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+                class="article-cover-select mt-auto flex min-h-[44px] w-full items-center justify-center rounded bg-violet-600 px-2 py-1 text-xs font-bold text-white hover:bg-violet-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
                 @click.stop="emit('select-cover', item.coverIndex)"
               >设为发布封面</button>
-              <div v-if="item.url" class="article-cover-actions flex flex-wrap items-center gap-x-2">
-                <a :href="item.url" :download="item.variant ? `hotnow-${item.key.replace(':', '-')}.png` : ''" target="_blank" rel="noreferrer" class="inline-flex min-h-[44px] items-center text-[11px] text-editorial-link-active hover:underline">下载图片</a>
-                <button type="button" class="min-h-[44px] text-left text-[11px] text-editorial-link-active hover:underline" @click="emit('copy-url', item.url)">复制图片地址</button>
-              </div>
             </div>
           </div>
         </div>
@@ -169,6 +170,12 @@ function statusClass(card: CodeImageCard | null): string {
   background-color: #ecfdf5;
   box-shadow: 0 0 0 3px #059669, 0 6px 14px rgb(4 120 87 / 18%);
 }
+/* 桌面状态牌与选择按钮共用高度；移动端仍由下方媒体查询统一压到44px。 */
+.article-cover-card--selected .article-cover-current,
+.article-cover-select {
+  height: 60px;
+  min-height: 60px;
+}
 /* 提高选择器权重，避免详情的旧移动端通用按钮样式把醒目标识压回小字。 */
 .article-cover-card--selected .article-cover-current {
   display: flex;
@@ -176,7 +183,6 @@ function statusClass(card: CodeImageCard | null): string {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 60px;
   padding: 8px 6px;
   border: none;
   border-radius: 6px;

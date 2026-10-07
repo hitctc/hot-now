@@ -79,7 +79,7 @@ describe("短内容封面动作", () => {
     expect(section).toMatch(/\.article-cover-current-icon\s*\{[^}]*width: 26px;[^}]*height: 26px;/);
     expect(section).not.toMatch(/position:\s*absolute/);
   });
-  it("仅手机压缩状态及下载复制操作，桌面仍保留原尺寸", () => {
+  it("手机保留44px封面控件及紧凑操作，桌面两种封面控件同为60px", () => {
     const source = readFileSync("src/client/components/creative/article-detail/CodeImageCardsSection.vue", "utf8");
     const styles = source.split("<style scoped>")[1]!.split("</style>")[0]!;
     const desktop = styles.split("@media")[0]!;
@@ -90,7 +90,7 @@ describe("短内容封面动作", () => {
     expect(mobile).toMatch(/\.article-cover-current-icon\s*\{[^}]*width: 12px;[^}]*height: 12px;/);
     expect(mobile).toMatch(/\.article-cover-current-label\s*\{[^}]*white-space: nowrap;/);
     expect(mobile).toMatch(/\.article-cover-actions > a,\s*\.article-cover-actions > button\s*\{[^}]*height: 24px;[^}]*min-height: 24px;[^}]*padding: 0;/);
-    expect(desktop).toContain("min-height: 60px;");
+    expect(desktop).toMatch(/\.article-cover-card--selected \.article-cover-current,\s*\.article-cover-select\s*\{[^}]*height: 60px;[^}]*min-height: 60px;/);
     expect(desktop).toContain("width: 26px;");
     expect(desktop).not.toContain(".article-cover-actions");
     const wrapper = mountCovers("short_content");
@@ -98,6 +98,21 @@ describe("短内容封面动作", () => {
       const actions = wrapper.get(".article-cover-actions");
       expect(actions.get("a").classes()).toContain("min-h-[44px]");
       expect(actions.get("button").classes()).toContain("min-h-[44px]");
+    } finally { wrapper.unmount(); }
+  });
+  it.each(["article", "short_content"] as const)("%s封面控件位于复制地址下方并贴齐卡片底部", direction => {
+    const wrapper = mountCovers(direction);
+    try {
+      for (const card of wrapper.findAll(".article-cover-card")) {
+        const control = card.get(".article-cover-select, .article-cover-current");
+        const actions = card.get(".article-cover-actions");
+        expect(card.classes()).toEqual(expect.arrayContaining(["flex", "flex-col"]));
+        // DOM 环境不计算实际像素；锁定末项顺序及撑满卡片后自动推底的布局约束。
+        expect(control.element.previousElementSibling).toBe(actions.element);
+        expect(control.element.parentElement?.lastElementChild).toBe(control.element);
+        expect(control.element.parentElement?.classList.contains("flex-1")).toBe(true);
+        expect(control.classes()).toContain("mt-auto");
+      }
     } finally { wrapper.unmount(); }
   });
   it("缩略图按预算缩放，不新增内部滚动或重复独立区块", () => {

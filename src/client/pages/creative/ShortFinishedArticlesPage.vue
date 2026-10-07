@@ -26,6 +26,7 @@ import ArticleDetailDrawer from "../../components/creative/LazyArticleDetailDraw
 import CreativeCoverThumbnail from "../../components/creative/CreativeCoverThumbnail.vue";
 import SourceItemDetailModal from "../../components/creative/LazySourceItemDetailModal.vue";
 import { formatTableDayLabel, isTableDayStart, toShanghaiDayKey } from "../../components/creative/tableDayGroups.js";
+import { sourceRankingLabel } from "../../components/creative/source-items/sourceItemPresentation.js";
 import { getAvailableActions, checkPublishConditions, getDisplayTitle, type ArticleAction } from "../../components/creative/articleStatusShared.js";
 import {
   SHORT_FINISHED_COLUMNS,
@@ -483,9 +484,9 @@ useTableComponent();
               :title="record.sourceTitle ? `素材 #${record.sourceItemId} ${record.sourceTitle}` : `素材 #${record.sourceItemId}`"
               @click.prevent="openSourceItemModal(record.sourceItemId)"
             >素材 #{{ record.sourceItemId }} <span v-if="record.sourceTitle">{{ record.sourceTitle }}</span></a>
-            <!-- 质检分随来源展示，保留真实零分，缺失时不借用素材评分。 -->
+            <!-- 首次榜位快照放在来源和质检之间；手动稿无榜位，历史缺失不猜排名。 -->
             <div data-title-source class="mt-1 whitespace-normal break-words text-[10px] leading-4 text-editorial-text-body">
-              来源：{{ (record.sourceName || '来源未记录').replace('微信公众号', 'WX') }}（{{ record.reversalScore != null ? `质检分：${record.reversalScore}` : '未评分' }}）
+              来源：{{ (record.sourceName || '来源未记录').replace('微信公众号', 'WX') }}<span v-if="record.originType !== 'manual'" data-short-finished-ranking :title="record.sourceRanking?.board"> · {{ sourceRankingLabel(record.sourceRanking, record.sourceCollectorAgent) }}</span>（{{ record.reversalScore != null ? `质检分：${record.reversalScore}` : '未评分' }}）
             </div>
           </template>
 

@@ -89,7 +89,7 @@ describe.each([["短内容", ShortFinishedArticlesPage], ["长文", FinishedArti
     try {
       await flushPromises();
       const title = wrapper.get('[data-column="title"]');
-      expect(title.get("[data-title-source]").text()).toBe(`来源：合成来源（${score == null ? '未评分' : `质检分：${score}`}）`);
+      expect(title.get("[data-title-source]").text()).toBe(`来源：合成来源${page === ShortFinishedArticlesPage ? ' · 排名未记录' : ''}（${score == null ? '未评分' : `质检分：${score}`}）`);
       expect(title.text()).toContain("素材 #8 完整关联素材标题");
       expect(title.get("a").classes()).not.toContain("truncate");
       expect(wrapper.find('[data-column="sourceName"]').exists()).toBe(false);
@@ -123,6 +123,36 @@ describe.each([["短内容", ShortFinishedArticlesPage], ["长文", FinishedArti
 });
 
 describe("统一短内容成品流程", () => {
+  it.each([
+    ["ranking", 3, "第3名"], ["listing", 3, "第3位"], ["selection", null, "非排名榜单"],
+  ] as const)("来源后质检分前显示%s的首次时间与真实榜位", async (kind, rank, label) => {
+    const item = { ...article(), sourceName: "微博热搜", reversalScore: 85,
+      sourceRanking: { board: "微博热搜榜", capturedAt: "2026-10-06T12:30:00+0800", kind, rank } };
+    vi.spyOn(listApi, "readCreativeFinishedArticles").mockResolvedValue({ items: [item], total: 1, page: 1, pageSize: 30, dayCounts: [], sourceDayCounts: [] });
+    const wrapper = mountPage();
+    try {
+      await flushPromises();
+      const source = wrapper.get('[data-column="title"] [data-title-source]');
+      expect(source.text()).toBe(`来源：微博热搜 · 微博热搜榜 · 10-06 12:30 · ${label}（质检分：85）`);
+      expect(source.get("[data-short-finished-ranking]").text()).toContain(label);
+      expect(source.classes()).toEqual(expect.arrayContaining(["whitespace-normal", "break-words"]));
+    } finally { wrapper.unmount(); }
+  });
+
+  it.each([["hotsearch-weibo", "排名未记录"], ["short-rss", "非榜单来源"]])("缺少快照时%s不伪造时间或排名，手动稿不附加榜位", async (agent, label) => {
+    const item = { ...article(), sourceCollectorAgent: agent, sourceRanking: null };
+    const read = vi.spyOn(listApi, "readCreativeFinishedArticles").mockResolvedValue({ items: [item], total: 1, page: 1, pageSize: 30, dayCounts: [], sourceDayCounts: [] });
+    const wrapper = mountPage();
+    try {
+      await flushPromises();
+      expect(wrapper.get("[data-title-source]").text()).toBe(`来源：合成来源 · ${label}（质检分：0）`);
+      read.mockResolvedValue({ items: [{ ...item, originType: "manual" }], total: 1, page: 1, pageSize: 30, dayCounts: [], sourceDayCounts: [] });
+      await wrapper.get('[data-short-finished-action="refresh"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find("[data-short-finished-ranking]").exists()).toBe(false);
+      expect(wrapper.get("[data-title-source]").text()).toBe("来源：合成来源（质检分：0）");
+    } finally { wrapper.unmount(); }
+  });
   it("搜索区域在窄屏可收缩且刷新按钮位于搜索之后", async () => {
     vi.spyOn(listApi, "readCreativeFinishedArticles").mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 30, dayCounts: [], sourceDayCounts: [] });
     const wrapper = mountPage();
@@ -188,7 +218,7 @@ describe("统一短内容成品流程", () => {
     expect(wrapper.text()).not.toContain("反转文");
     expect(wrapper.text()).not.toContain("贴图");
     expect(wrapper.find("[data-short-content-domain]").exists()).toBe(false);
-    expect(titleCell.get("[data-title-source]").text()).toBe("来源：合成来源（质检分：0）");
+    expect(titleCell.get("[data-title-source]").text()).toBe("来源：合成来源 · 排名未记录（质检分：0）");
     expect(headers).not.toContain("来源");
     expect(headers).not.toContain("质检评分");
     expect(headers).not.toContain("素材趋势");

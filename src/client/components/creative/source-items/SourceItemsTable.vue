@@ -52,7 +52,6 @@ const { mode, isLoading, items, pagination, expandedRowKeys, writingIds, tracing
 const columns = [
   { title: "ID / 序号", dataIndex: "id", key: "idSeq", width: 72, fixed: "left" as const, className: "table-day-anchor-cell" },
   { title: "标题", dataIndex: "title", key: "title", width: 300 },
-  { title: "来源", dataIndex: "sourceName", key: "sourceName", width: props.mode === "short_content" ? 145 : 115 },
   { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: props.mode === "short_content" ? 200 : 72, ellipsis: props.mode !== "short_content" },
   { title: props.mode === "short_content" ? "选题分" : "评分", key: "score", width: props.mode === "short_content" ? 104 : 90 },
   { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 44, align: "center" as const, ellipsis: true },
@@ -161,25 +160,11 @@ useTableComponent();
             class="inline-flex items-center rounded-editorial-pill bg-green-100 px-1.5 py-0 text-[10px] leading-none text-green-700"
           >已发布</span>
         </div>
-      </template>
-
-      <!-- 来源列 -->
-      <template v-else-if="column.key === 'sourceName'">
-        <div v-if="mode === 'short_content'" class="flex flex-col gap-1">
-          <span class="text-xs">{{ sourcePlatformLabel(record.sourceName) }}</span>
-          <span data-short-source-ranking class="whitespace-normal break-words text-[10px] leading-4 text-editorial-text-muted" :title="record.sourceRanking?.board">{{ sourceRankingLabel(record.sourceRanking, record.collectorAgent) }}</span>
+        <!-- 来源随标题展示，手机和桌面无需横移寻找；素材评分仍保留其原有口径。 -->
+        <div data-title-source class="mt-1 whitespace-normal break-words text-[10px] leading-4 text-editorial-text-body">
+          来源：{{ mode === 'short_content' ? sourcePlatformLabel(record.sourceName) : (record.sourceName || '来源未记录').replace('微信公众号', 'WX') }}
         </div>
-        <a-tooltip v-else
-          :open="overflowHover?.key === 'sourceName-' + record.id"
-          :title="(record.sourceName || '').replace('微信公众号', 'WX')"
-          placement="topLeft"
-        >
-          <span
-            class="line-clamp-3 text-[10px] leading-tight text-editorial-text-body"
-            @mouseenter="onOverflowCellEnter('sourceName-' + record.id, $event)"
-            @mouseleave="onOverflowCellLeave('sourceName-' + record.id)"
-          >{{ (record.sourceName || "-").replace("微信公众号", "WX") }}</span>
-        </a-tooltip>
+        <div v-if="mode === 'short_content'" data-short-source-ranking class="whitespace-normal break-words text-[10px] leading-4 text-editorial-text-muted" :title="record.sourceRanking?.board">{{ sourceRankingLabel(record.sourceRanking, record.collectorAgent) }}</div>
       </template>
 
       <!-- 短素材只展示真实选题分；长素材保留基础分、爆文分和账号适配。 -->

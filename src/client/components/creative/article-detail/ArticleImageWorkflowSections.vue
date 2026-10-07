@@ -143,7 +143,7 @@ function lunaJobStatusClass(job: LunaImageJob | undefined): string {
               v-if="url"
               class="article-cover-card relative overflow-hidden rounded-editorial-md border transition-all"
               :class="index === activeCoverIndex
-                ? 'border-editorial-accent ring-2 ring-editorial-ring'
+                ? 'border-emerald-600 ring-2 ring-emerald-200'
                 : article.direction === 'short_content'
                   ? 'border-editorial-border hover:border-editorial-link-active'
                   : 'border-editorial-border opacity-60 hover:opacity-100 hover:border-editorial-link-active/40'"
@@ -155,8 +155,8 @@ function lunaJobStatusClass(job: LunaImageJob | undefined): string {
                 v-if="index === activeCoverIndex"
                 class="article-cover-current"
                 :class="article.direction === 'short_content'
-                  ? 'absolute right-2 top-2 flex items-center gap-1 rounded bg-violet-700 px-3 py-2 text-xs font-bold text-white shadow-md'
-                  : 'absolute right-1 top-1 flex items-center gap-0.5 rounded bg-editorial-accent px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm'"
+                  ? 'absolute right-2 top-2 flex items-center gap-1 rounded border border-emerald-600 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 shadow-sm'
+                  : 'absolute right-1 top-1 flex items-center gap-0.5 rounded border border-emerald-600 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 shadow-sm'"
               ><span class="inline-block h-3 w-3 leading-none text-center">✓</span> {{ article.direction === 'short_content' ? '当前发布封面' : '发布封面' }}</div>
               <div v-if="index === 0 && index !== activeCoverIndex" class="absolute left-1 top-1 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</div>
               <button

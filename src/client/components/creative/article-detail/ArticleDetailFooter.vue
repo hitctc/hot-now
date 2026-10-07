@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import type { CreativeFinishedArticle } from "../../../services/creativeApi.js";
 import { getAvailableActions } from "../articleStatusShared.js";
 
-defineProps<{
+const props = defineProps<{
   article: CreativeFinishedArticle;
   readonly?: boolean;
   hideSave?: boolean;
@@ -11,6 +12,11 @@ defineProps<{
   canPush: boolean;
   missingConditions: string[];
 }>();
+
+/** 按服务端已有成功次数生成提示；不在点击或失败时自行增加计数。 */
+const pushLabel = computed(() => props.article.pushCount > 0
+  ? `推送草稿箱（${props.article.pushCount}次）`
+  : "推送草稿箱");
 
 const emit = defineEmits<{
   (event: "close"): void;
@@ -53,11 +59,11 @@ const emit = defineEmits<{
       <a-button v-if="article.deletedAt" type="primary" @click="emit('restore')">恢复</a-button>
       <a-button v-else class="article-detail-footer__desktop-only" danger @click="emit('discard')">废弃</a-button>
       <a-tooltip v-if="canPush" :mouse-enter-delay="0.5" title="自动保存正文后推送到微信公众号草稿箱">
-        <a-button :loading="saving" @click="emit('push')">推送草稿箱</a-button>
+        <a-button :loading="saving" @click="emit('push')">{{ pushLabel }}</a-button>
       </a-tooltip>
       <a-tooltip v-else-if="article.status !== 'needs_review'" :mouse-enter-delay="0.3">
         <template #title>{{ missingConditions.join('；') }}</template>
-        <a-button disabled>推送草稿箱</a-button>
+        <a-button disabled>{{ pushLabel }}</a-button>
       </a-tooltip>
     </div>
   </div>

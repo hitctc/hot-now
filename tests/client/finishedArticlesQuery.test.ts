@@ -3,7 +3,8 @@ import { defineComponent, nextTick } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useFinishedArticlesQuery } from "../../src/client/components/creative/finished-articles/useFinishedArticlesQuery";
 import { useFinishedArticleDetail } from "../../src/client/components/creative/finished-articles/useFinishedArticleDetail";
-import { readCreativeFinishedArticles, readCreativeFinishedArticle } from "../../src/client/services/creativeListApi";
+import { readCreativeFinishedArticles, readCreativeFinishedArticle, type CreativeFinishedArticle } from "../../src/client/services/creativeListApi";
+import { message } from "ant-design-vue";
 vi.mock("../../src/client/services/creativeListApi", () => ({ readCreativeFinishedArticles: vi.fn(), readCreativeFinishedArticle: vi.fn() }));
 
 /** 挂载真实查询生命周期，只暴露测试持有的引用，不替换Vue调度或取消守卫。 */
@@ -61,6 +62,42 @@ describe("finished page query ownership", () => {
       expect(state.detailLoading.value).toBe(false);
       expect(refresh).toHaveBeenCalledTimes(1);
     } finally { wrapper.unmount(); }
+  });
+
+  it.each(["close", "switch"])("push count ignores a late read after %s", async (action) => {
+    let resolve!: (value: CreativeFinishedArticle) => void;
+    vi.mocked(readCreativeFinishedArticle).mockResolvedValueOnce({ id: 1, pushCount: 0 } as CreativeFinishedArticle);
+    let state!: ReturnType<typeof useFinishedArticleDetail>;
+    const wrapper = mount(defineComponent({ setup() { state = useFinishedArticleDetail(vi.fn()); return () => null; } }));
+    try {
+      await state.openDetail({ id: 1 });
+      const old = state.detailArticle.value!;
+      vi.mocked(readCreativeFinishedArticle).mockImplementationOnce(() => new Promise(done => { resolve = done; }));
+      const pending = state.refreshPushCount(1);
+      state.closeDetail();
+      if (action === "switch") {
+        vi.mocked(readCreativeFinishedArticle).mockResolvedValueOnce({ id: 2, pushCount: 4 } as CreativeFinishedArticle);
+        await state.openDetail({ id: 2 });
+      }
+      resolve({ id: 1, pushCount: 1 } as CreativeFinishedArticle);
+      await pending;
+      expect(old.pushCount).toBe(0);
+      expect(state.detailArticle.value?.pushCount ?? null).toBe(action === "switch" ? 4 : null);
+    } finally { wrapper.unmount(); }
+  });
+
+  it("failed count refresh retains the last known count and warns without treating push as failed", async () => {
+    const warn = vi.spyOn(message, "warning").mockImplementation(() => undefined as any);
+    let state!: ReturnType<typeof useFinishedArticleDetail>;
+    const wrapper = mount(defineComponent({ setup() { state = useFinishedArticleDetail(vi.fn()); return () => null; } }));
+    try {
+      vi.mocked(readCreativeFinishedArticle).mockResolvedValueOnce({ id: 1, pushCount: 2 } as CreativeFinishedArticle);
+      await state.openDetail({ id: 1 });
+      vi.mocked(readCreativeFinishedArticle).mockRejectedValueOnce(new Error("网络失败"));
+      await state.refreshPushCount(1);
+      expect(state.detailArticle.value?.pushCount).toBe(2);
+      expect(warn).toHaveBeenCalledWith("推送已成功，但次数刷新失败，请重新打开详情查看");
+    } finally { wrapper.unmount(); warn.mockRestore(); }
   });
 
   it("invalidates pending detail on close and on unload without replaying an action", async () => {

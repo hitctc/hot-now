@@ -20,9 +20,9 @@ describe("短内容来源与榜位展示", () => {
     expect(wrapper.text()).toContain("模式A");
     wrapper.unmount();
   });
-  it("短素材来源第二行显示同一快照，长素材不增加排名行", async () => {
+  it("短素材标题列来源下方显示同一快照，长素材不增加排名行", async () => {
     const wrapper = mount(SourceItemsTable, { props: { mode: "short_content", isLoading: false, items: [{ id: 1, sourceName: "百度热搜榜", collectorAgent: "hotsearch-baidu", sourceRanking: ranking } as CreativeSourceItem], pagination: { current: 1, pageSize: 30, total: 1, showSizeChanger: true, showTotal: (n: number) => String(n) }, expandedRowKeys: [], writingIds: new Set<number>(), tracingIds: new Set<number>(), actionPendingId: null }, global: { stubs: {
-      "a-spin": { template: "<div><slot /></div>" }, "a-table": { props: ["dataSource"], template: '<div><slot v-for="record in dataSource" name="bodyCell" :record="record" :column="{key: \'sourceName\'}" /></div>' }, "a-tooltip": { template: "<div><slot /></div>" },
+      "a-spin": { template: "<div><slot /></div>" }, "a-table": { props: ["dataSource"], template: '<div><slot v-for="record in dataSource" name="bodyCell" :record="record" :column="{key: \'title\'}" /></div>' }, "a-tooltip": { template: "<div><slot /></div>" },
     } } });
     expect(wrapper.get("[data-short-source-ranking]").text()).toBe(sourceRankingLabel(ranking));
     await wrapper.setProps({ mode: "article" });

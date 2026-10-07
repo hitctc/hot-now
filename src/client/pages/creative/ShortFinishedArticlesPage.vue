@@ -54,7 +54,7 @@ function parseJsonArray(raw: string | string[] | null): string[] {
 const { isLoading, items, total, dayCounts, sourceDayCounts, currentPage, pageSize,
   searchText, statusFilter, publishableOnly, showDeleted, searchHistory, removeFromHistory,
   searchDropdownRef, showSearchDropdown, loadItems, handleSearch, handleTableChange } = useFinishedArticlesQuery("short_content");
-const { detailArticle, detailLoading, openDetail, closeDetail, onDetailSaved } = useFinishedArticleDetail(loadItems);
+const { detailArticle, detailLoading, openDetail, closeDetail, onDetailSaved, refreshPushCount } = useFinishedArticleDetail(loadItems);
 
 const statusOptions = SHORT_FINISHED_STATUS_OPTIONS;
 
@@ -132,9 +132,12 @@ async function loadWechatMpAccounts(): Promise<void> {
   } catch { /* ignore */ }
 }
 
-// 推送成功回调：刷新列表
-function handlePushSuccess(): void {
-  loadItems();
+/** 成功后刷新列表和对应详情的推送次数，保留用户继续编辑的正文。 */
+async function handlePushSuccess(): Promise<void> {
+  await Promise.all([
+    loadItems(),
+    pushConfirmArticle.value ? refreshPushCount(pushConfirmArticle.value.id) : Promise.resolve(),
+  ]);
 }
 
 // ─── 数据加载 ───
@@ -475,10 +478,14 @@ useTableComponent();
             <a-tag v-if="record.originType === 'manual'" color="purple" class="!m-0 mt-1 !text-[10px] !leading-4">手动新建</a-tag>
             <a
               v-if="record.sourceItemId"
-              class="mt-0.5 block cursor-pointer truncate text-[10px] text-editorial-link-active hover:underline"
+              class="mt-0.5 block cursor-pointer whitespace-normal break-words text-[10px] text-editorial-link-active hover:underline"
               :title="record.sourceTitle ? `素材 #${record.sourceItemId} ${record.sourceTitle}` : `素材 #${record.sourceItemId}`"
               @click.prevent="openSourceItemModal(record.sourceItemId)"
             >素材 #{{ record.sourceItemId }} <span v-if="record.sourceTitle">{{ record.sourceTitle }}</span></a>
+            <!-- 质检分随来源展示，保留真实零分，缺失时不借用素材评分。 -->
+            <div data-title-source class="mt-1 whitespace-normal break-words text-[10px] leading-4 text-editorial-text-body">
+              来源：{{ (record.sourceName || '来源未记录').replace('微信公众号', 'WX') }}（{{ record.reversalScore != null ? `质检分：${record.reversalScore}` : '未评分' }}）
+            </div>
           </template>
 
           <!-- 封面图列 -->
@@ -563,22 +570,6 @@ useTableComponent();
             >恢复</a-button>
           </template>
 
-
-          <!-- 来源列 -->
-          <template v-else-if="column.key === 'sourceName'">
-            <a-tag v-if="record.originType === 'manual'" color="purple" class="!m-0 !text-[10px]">手动新建</a-tag>
-            <a-tooltip v-else :title="(record.sourceName || '').replace('微信公众号', 'WX')" placement="topLeft" :mouse-enter-delay="0.3">
-              <span class="line-clamp-3 text-[10px] leading-tight text-editorial-text-body">{{ (record.sourceName || "-").replace("微信公众号", "WX") }}</span>
-            </a-tooltip>
-          </template>
-
-          <!-- 成品只展示写后质检分，不展示未参与短写的素材爆文评分。 -->
-          <template v-else-if="column.key === 'quality'">
-            <a-tooltip title="生成时的成品质检评分；历史评分不重新计算，不预测传播效果。">
-              <span v-if="record.reversalScore != null" class="text-xs font-semibold">{{ record.reversalScore }}</span>
-              <span v-else class="text-[10px] text-editorial-text-muted">未评分</span>
-            </a-tooltip>
-          </template>
 
           <!-- 相似度列 -->
           <template v-else-if="column.key === 'similarity'">

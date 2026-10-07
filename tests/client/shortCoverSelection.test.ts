@@ -22,12 +22,17 @@ describe("短内容封面动作", () => {
     expect(button.classes()).not.toContain("absolute");
     expect(button.element.parentElement?.classList.contains("opacity-60")).toBe(false);
     expect(wrapper.text()).toContain("当前发布封面");
+    expect(wrapper.get(".article-cover-current").classes()).toEqual(expect.arrayContaining(["border-emerald-600", "bg-emerald-50", "text-emerald-800"]));
+    expect(wrapper.get(".article-cover-current").classes()).not.toContain("bg-violet-700");
+    expect(button.classes()).toContain("bg-violet-600");
+    expect(wrapper.findAll(".article-cover-card")[1]!.classes()).toContain("border-emerald-600");
     await button.trigger("click");
     expect(wrapper.emitted("select-cover")).toEqual([[0]]);
     wrapper.unmount();
   });
   it("长内容保留原叠加小按钮和透明度，短内容只读时不能选择", () => {
     const long = mountCovers("article");
+    expect(long.get(".article-cover-current").classes()).toContain("bg-emerald-50");
     expect(long.get("button").classes()).toContain("absolute");
     expect(long.get("button").element.parentElement?.classList.contains("opacity-60")).toBe(true);
     long.unmount();

@@ -32,14 +32,14 @@ describe("短内容成品表格展示模型", () => {
     expect(getShortFinishedDomainInfo([{ meta: { contentDomain: "ai" } }])).toBeNull();
   });
 
-  it("保留质检和操作列，不显示未参与短写的素材爆文趋势",  () => {
+  it("来源和质检并入标题列，保留操作且不显示素材爆文趋势",  () => {
     expect(SHORT_FINISHED_STATUS_OPTIONS[0]).toEqual({ label: "全部状态", value: "" });
     expect(SHORT_FINISHED_STATUS_OPTIONS.at(-1)).toEqual({ label: "已删除", value: "soft_deleted" });
     expect(SHORT_FINISHED_COLUMNS.map((column) => column.key)).toEqual([
-      "idSeq", "title", "coverImage", "status", "sourceName",
-      "quality", "similarity", "timeInfo", "actions"
+      "idSeq", "title", "coverImage", "status",
+      "similarity", "timeInfo", "actions"
     ]);
-    expect(SHORT_FINISHED_COLUMNS.find((column) => column.key === "quality")?.title).toBe("质检评分");
+    expect(SHORT_FINISHED_COLUMNS.some((column) => column.key === "quality" || column.key === "sourceName")).toBe(false);
     expect(SHORT_FINISHED_COLUMNS.some((column) => column.key === "trend")).toBe(false);
   });
 

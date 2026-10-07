@@ -43,6 +43,18 @@ export function useFinishedArticleDetail(loadItems: () => Promise<void>) {
     if (requests.isCurrent(requestId) && detailArticle.value?.id === articleId) detailArticle.value = latest;
   }
 
+  /** 推送成功后只更新同篇详情的服务端次数；不重置编辑草稿，关闭或切换后丢弃迟到结果。 */
+  async function refreshPushCount(articleId: number): Promise<void> {
+    const current = detailArticle.value;
+    if (current?.id !== articleId) return;
+    try {
+      const latest = await readCreativeFinishedArticle(articleId);
+      if (detailArticle.value === current) current.pushCount = latest.pushCount;
+    } catch {
+      if (detailArticle.value === current) message.warning("推送已成功，但次数刷新失败，请重新打开详情查看");
+    }
+  }
+
   onBeforeUnmount(() => requests.invalidate());
-  return { detailArticle, detailLoading, openDetail, closeDetail, onDetailSaved };
+  return { detailArticle, detailLoading, openDetail, closeDetail, onDetailSaved, refreshPushCount };
 }

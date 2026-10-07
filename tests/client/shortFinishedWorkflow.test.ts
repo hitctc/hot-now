@@ -1,6 +1,8 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ShortFinishedArticlesPage from "../../src/client/pages/creative/ShortFinishedArticlesPage.vue";
+import FinishedArticlesPage from "../../src/client/pages/creative/FinishedArticlesPage.vue";
+import ArticlePushFloatWidget from "../../src/client/components/creative/ArticlePushFloatWidget.vue";
 import ArticleDetailDrawer from "../../src/client/components/creative/LazyArticleDetailDrawer.vue";
 import * as api from "../../src/client/services/creativeApi.js";
 import * as listApi from "../../src/client/services/creativeListApi.js";
@@ -27,10 +29,10 @@ function article(form: string | null = null): api.CreativeFinishedArticle {
   };
 }
 
-/** 只替换表格视觉和弹窗，保留页面请求、新建、展示单元格与关闭编排。 */
-function mountPage() {
-  return mount(ShortFinishedArticlesPage, { global: { stubs: {
-    "a-table": { name: "ShortFinishedTableStub", props: ["columns", "dataSource", "pagination"], template: '<table><thead><tr><th v-for="column in columns">{{ column.title }}</th></tr></thead><tbody><tr v-for="(record, index) in dataSource"><td v-for="column in columns"><slot name="bodyCell" :column="column" :record="record" :index="index" /></td></tr></tbody></table>' },
+/** 只替换长短成品表格视觉和弹窗，保留页面请求、新建、单元格与推送刷新编排。 */
+function mountPage(page = ShortFinishedArticlesPage) {
+  return mount(page, { global: { stubs: {
+    "a-table": { name: "ShortFinishedTableStub", props: ["columns", "dataSource", "pagination"], template: '<table><thead><tr><th v-for="column in columns">{{ column.title }}</th></tr></thead><tbody><tr v-for="(record, index) in dataSource"><td v-for="column in columns" :data-column="column.key"><slot name="bodyCell" :column="column" :record="record" :index="index" /></td></tr></tbody></table>' },
     "a-spin": { template: "<div><slot /></div>" }, "a-tooltip": { template: "<div><slot /></div>" },
     "a-modal": { props: ["open"], emits: ["ok"], template: '<div v-if="open"><slot /><button data-test="create" @click="$emit(\'ok\')">创建</button></div>' },
     "a-button": { props: ["loading"], template: '<button :disabled="loading"><slot /></button>' },
@@ -38,12 +40,59 @@ function mountPage() {
     "a-tag": { props: ["color"], template: '<span :data-color="color"><slot /></span>' },
     "a-form": { template: "<div><slot /></div>" }, "a-form-item": { template: "<div><slot /></div>" },
     "a-input": { emits: ["update:value"], template: '<input data-test="title" @input="$emit(\'update:value\', $event.target.value)" />' },
-    ArticleDetailDrawer: { props: ["open", "article"], emits: ["update:open"], template: '<div v-if="open" data-test="editor"><button data-test="close" @click="$emit(\'update:open\', false)">关闭</button></div>' },
-    SourceItemDetailModal: true, CreativeCoverThumbnail: true, ArticlePushFloatWidget: true,
+    ArticleDetailDrawer: { props: ["open", "article"], emits: ["update:open", "openPush"], template: '<div v-if="open" data-test="editor"><button data-test="close" @click="$emit(\'update:open\', false)">关闭</button></div>' },
+    SourceItemDetailModal: true, CreativeCoverThumbnail: true, ArticlePerformanceFeedbackModal: true,
+    ArticlePushFloatWidget: { name: "ArticlePushFloatWidget", props: ["article", "visible"], emits: ["success"], template: "<div />", methods: {
+      /** 替身只提供页面需要的重置入口，不启动真实推送。 */
+      resetState() {},
+      /** 页面首次点击仍调用该入口，测试不写公众号草稿。 */
+      startPush() {},
+    } },
   } } });
 }
 
 afterEach(() => { vi.restoreAllMocks(); localStorage.clear(); });
+
+describe.each([["短内容", ShortFinishedArticlesPage], ["长文", FinishedArticlesPage]])("%s成品标题信息与推送次数", (_label, page) => {
+  it.each([0, 85, null])("标题列集中显示来源和真实质检分%s，缺失不能用素材趋势补齐", async (score) => {
+    const item = { ...article(), sourceItemId: 8, sourceTitle: "完整关联素材标题", reversalScore: score };
+    vi.spyOn(listApi, "readCreativeFinishedArticles").mockResolvedValue({ items: [item], total: 1, page: 1, pageSize: 30, dayCounts: [], sourceDayCounts: [] });
+    const wrapper = mountPage(page);
+    try {
+      await flushPromises();
+      const title = wrapper.get('[data-column="title"]');
+      expect(title.get("[data-title-source]").text()).toBe(`来源：合成来源（${score == null ? '未评分' : `质检分：${score}`}）`);
+      expect(title.text()).toContain("素材 #8 完整关联素材标题");
+      expect(title.get("a").classes()).not.toContain("truncate");
+      expect(wrapper.find('[data-column="sourceName"]').exists()).toBe(false);
+      expect(wrapper.find('[data-column="quality"]').exists()).toBe(false);
+      await title.get("a").trigger("click");
+      expect(wrapper.findComponent(ArticleDetailDrawer).props("article")).toBeNull();
+    } finally { wrapper.unmount(); }
+  });
+
+  it("成功推送后刷新已打开详情的次数，不替换未保存正文", async () => {
+    const item = article();
+    vi.spyOn(listApi, "readCreativeFinishedArticles").mockResolvedValue({ items: [item], total: 1, page: 1, pageSize: 30, dayCounts: [], sourceDayCounts: [] });
+    const read = vi.spyOn(listApi, "readCreativeFinishedArticle").mockResolvedValue(item);
+    const wrapper = mountPage(page);
+    try {
+      await flushPromises();
+      await wrapper.get('[data-column="title"] span.cursor-pointer').trigger("click");
+      await flushPromises();
+      const editor = wrapper.findComponent(ArticleDetailDrawer);
+      const current = editor.props("article")!;
+      current.humanMarkdown = "推送期间正在编辑的正文";
+      editor.vm.$emit("openPush", current, "bauhaus");
+      await flushPromises();
+      read.mockResolvedValue({ ...item, pushCount: 2, humanMarkdown: "服务器旧正文" });
+      wrapper.findComponent(ArticlePushFloatWidget).vm.$emit("success");
+      await flushPromises();
+      expect(editor.props("article")?.pushCount).toBe(2);
+      expect(editor.props("article")?.humanMarkdown).toBe("推送期间正在编辑的正文");
+    } finally { wrapper.unmount(); }
+  });
+});
 
 describe("统一短内容成品流程", () => {
   it("搜索区域在窄屏可收缩且刷新按钮位于搜索之后", async () => {
@@ -106,12 +155,14 @@ describe("统一短内容成品流程", () => {
     const wrapper = mountPage();
     await flushPromises();
     const headers = wrapper.findAll("th").map((cell) => cell.text());
-    const cells = wrapper.findAll("tbody td");
+    const titleCell = wrapper.findAll("tbody td")[headers.indexOf("标题")]!;
     expect(headers).not.toContain("形态");
     expect(wrapper.text()).not.toContain("反转文");
     expect(wrapper.text()).not.toContain("贴图");
     expect(wrapper.find("[data-short-content-domain]").exists()).toBe(false);
-    expect(cells[headers.indexOf("质检评分")]?.text()).toBe("0");
+    expect(titleCell.get("[data-title-source]").text()).toBe("来源：合成来源（质检分：0）");
+    expect(headers).not.toContain("来源");
+    expect(headers).not.toContain("质检评分");
     expect(headers).not.toContain("素材趋势");
     wrapper.unmount();
   });

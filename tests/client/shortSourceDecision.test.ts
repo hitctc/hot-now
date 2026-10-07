@@ -5,13 +5,13 @@ import SourceItemsTable from "../../src/client/components/creative/source-items/
 import { useSourceItemsQuery } from "../../src/client/components/creative/source-items/useSourceItemsQuery.js";
 import * as api from "../../src/client/services/creativeApi.js";
 
-/** 仅渲染评分/状态单元格，隔离表格视觉和实际平台请求。 */
+/** 渲染标题、评分及状态单元格，隔离表格视觉和实际平台请求。 */
 function table(mode: "article" | "short_content", score: number | null, reason: string | null = "选题分62＜75；缺少关键事实") {
   return mount(SourceItemsTable, { props: {
-    mode, isLoading: false, items: [{ id: 1, title: "合成素材", score, trendScore: 99, writingStatus: "skipped", writingStopReason: reason, writingStopStepName: "短内容选题", writeCount: 0, createdAt: "2026-10-05T00:00:00Z" } as api.CreativeSourceItem],
+    mode, isLoading: false, items: [{ id: 1, title: "合成素材", sourceName: "微信公众号原始来源", linkedArticleId: 9, score, trendScore: 99, writingStatus: "skipped", writingStopReason: reason, writingStopStepName: "短内容选题", writeCount: 0, createdAt: "2026-10-05T00:00:00Z" } as api.CreativeSourceItem],
     pagination: { current: 1, pageSize: 30, total: 1, showSizeChanger: true, showTotal: (n: number) => String(n) }, expandedRowKeys: [], writingIds: new Set<number>(), tracingIds: new Set<number>(), actionPendingId: null,
   }, global: { stubs: {
-    "a-spin": { template: "<div><slot /></div>" }, "a-table": { props: ["columns", "dataSource"], template: '<table><thead><th v-for="col in columns">{{col.title}}</th></thead><tbody><tr v-for="record in dataSource"><td><slot name="bodyCell" :column="{key: \'score\'}" :record="record" /></td><td><slot name="bodyCell" :column="{key: \'writingStatus\'}" :record="record" /></td></tr></tbody></table>' },
+    "a-spin": { template: "<div><slot /></div>" }, "a-table": { props: ["columns", "dataSource"], template: '<table><thead><th v-for="col in columns">{{col.title}}</th></thead><tbody><tr v-for="record in dataSource"><td data-title-cell><slot name="bodyCell" :column="{key: \'title\'}" :record="record" /></td><td><slot name="bodyCell" :column="{key: \'score\'}" :record="record" /></td><td><slot name="bodyCell" :column="{key: \'writingStatus\'}" :record="record" /></td></tr></tbody></table>' },
     "a-tooltip": { template: "<div><slot /></div>" }, "a-tag": { template: "<span><slot /></span>" },
   } } });
 }
@@ -19,6 +19,21 @@ function table(mode: "article" | "short_content", score: number | null, reason: 
 afterEach(() => { vi.restoreAllMocks(); localStorage.clear(); });
 
 describe("短素材决策展示", () => {
+  it.each(["article", "short_content"] as const)("%s来源并入标题列，原素材分不冒充质检且关联事件不变", async (mode) => {
+    const wrapper = table(mode, 62);
+    try {
+      const title = wrapper.get("[data-title-cell]");
+      expect(title.text()).toContain("合成素材");
+      expect(title.text()).toContain("成品 #9");
+      expect(title.get("[data-title-source]").text()).toContain(mode === "article" ? "WX原始来源" : "微信公众号原始来源");
+      expect(wrapper.findAll("th").map(cell => cell.text())).not.toContain("来源");
+      expect(title.text()).not.toContain("质检");
+      await title.get("span.cursor-pointer").trigger("click");
+      await title.get("a").trigger("click");
+      expect(wrapper.emitted("toggle-expand")).toEqual([[1]]);
+      expect(wrapper.emitted("open-article")).toEqual([[9]]);
+    } finally { wrapper.unmount(); }
+  });
   it.each([62, 0, null])("明确展示选题分%s，隐藏无关爆文分并显示停止理由", (score) => {
     const wrapper = table("short_content", score);
     expect(wrapper.text()).toContain("选题分");

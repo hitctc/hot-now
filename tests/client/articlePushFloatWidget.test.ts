@@ -15,6 +15,8 @@ vi.mock("../../src/client/services/creativeApi.js", () => ({
   streamPushArticleToDraft: vi.fn(),
 }));
 
+import { renderWechatThemePreview } from "../../src/client/services/wechatRenderer.js";
+
 vi.mock("../../src/client/services/wechatRenderer.js", () => ({
   renderWechatThemePreview: vi.fn(() => "<p>发布正文</p>"),
 }));
@@ -74,6 +76,21 @@ describe("ArticlePushFloatWidget", () => {
     );
     expect(wrapper.emitted("success")).toHaveLength(1);
     wrapper.unmount();
+  });
+
+  it.each(["发布正文", "发布正文\n\n跪求点赞、关注，谢谢你。"])("列表入口短稿推送补结尾且已有结尾不重复：%s", async (body) => {
+    const short = { ...article, direction: "short_content", humanMarkdown: body };
+    vi.mocked(readCreativeFinishedArticle).mockResolvedValue(short);
+    vi.mocked(streamPushArticleToDraft).mockResolvedValue({ ok: true });
+    const wrapper = shallowMount(ArticlePushFloatWidget, {
+      props: { visible: true, article: short, themeId: "bauhaus", themeLabel: "包豪斯", defaultAccountName: "默认公众号" },
+      global: { stubs: { AButton: true } },
+    });
+    try {
+      await (wrapper.vm as unknown as { startPush: () => Promise<void> }).startPush();
+      expect(renderWechatThemePreview).toHaveBeenCalledWith("发布正文\n\n跪求点赞、关注，谢谢你。", "bauhaus");
+      expect(short.contentMarkdown).toBe("AI 草稿");
+    } finally { wrapper.unmount(); }
   });
 
   it("成功后收起步骤并显示5秒倒计时，到点自动关闭", async () => {

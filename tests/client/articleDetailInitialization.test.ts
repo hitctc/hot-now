@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import ArticleDetailDrawer from "../../src/client/components/creative/ArticleDetailDrawer.vue";
 import SourceItemDetailModal from "../../src/client/components/creative/SourceItemDetailModal.vue";
 import ArticleEditorPanel from "../../src/client/components/creative/article-detail/ArticleEditorPanel.vue";
+import ArticleDetailFooter from "../../src/client/components/creative/article-detail/ArticleDetailFooter.vue";
 import ArticleSupplementalSections from "../../src/client/components/creative/article-detail/ArticleSupplementalSections.vue";
 import * as api from "../../src/client/services/creativeApi.js";
 import * as renderer from "../../src/client/services/wechatRenderer.js";
@@ -53,6 +54,27 @@ describe("article detail initialization", () => {
     await flushPromises();
     expect(wrapper.findComponent(ArticleEditorPanel).props()).toMatchObject({ humanContent: "人工正文", aiDraft: "AI 正文" });
     wrapper.unmount();
+  });
+
+  it("短稿发布栏补结尾并保存，AI草稿不追加且连续保存不重复", async () => {
+    const value = { ...article(), direction: "short_content", humanMarkdown: "# 标题\n\n发布正文" };
+    const save = vi.spyOn(api, "editFinishedArticle").mockResolvedValue({ ok: true });
+    const wrapper = mountDrawer(true, value);
+    try {
+      await flushPromises();
+      expect(wrapper.findComponent(ArticleEditorPanel).props("humanContent")).toBe("# 标题\n\n发布正文\n\n跪求点赞、关注，谢谢你。");
+      expect(wrapper.findComponent(ArticleEditorPanel).props("aiDraft")).toBe("AI 正文");
+      await wrapper.setProps({ readonly: false });
+      wrapper.findComponent(ArticleDetailFooter).vm.$emit("save");
+      await flushPromises();
+      wrapper.findComponent(ArticleDetailFooter).vm.$emit("save");
+      await flushPromises();
+      expect(save).toHaveBeenCalled();
+      for (const [, fields] of save.mock.calls) {
+        expect(fields.humanMarkdown).toBe("# 标题\n\n发布正文\n\n跪求点赞、关注，谢谢你。");
+        expect(fields.contentMarkdown).not.toContain("跪求点赞");
+      }
+    } finally { wrapper.unmount(); }
   });
 
   it("saves the latest draft on close even when the parent clears the article immediately", async () => {

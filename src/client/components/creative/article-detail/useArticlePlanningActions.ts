@@ -2,6 +2,7 @@ import { computed, ref, watch, getCurrentScope, onScopeDispose, type ComputedRef
 import { message } from "ant-design-vue";
 
 import { HttpError } from "../../../services/http.js";
+import { appendShortPublishFooter } from "../shortPublishFooter.js";
 import { readManualTextTask, saveManualTextTask, waitManualTextTask, type ManualTextOperation } from "./manualTextTaskWait.js";
 import {
   editFinishedArticle,
@@ -121,13 +122,13 @@ export function useArticlePlanningActions(options: ArticlePlanningActionsOptions
     }
   }
 
-  /** 将当前抽屉状态交给纯标题同步函数，保存行为保持在组件内。 */
+  /** 同步发布标题和正文；短稿补独立结尾段，AI草稿不追加，持久化仍由原保存流程负责。 */
   function buildTitleSync(content: string): TitleSyncResult {
     return buildArticleTitleSync({
       isManualArticle: isManualArticle.value,
       titles: displayTitles.value,
       activeTitleIndex: activeTitleIndex.value,
-      humanMarkdown: content,
+      humanMarkdown: appendShortPublishFooter(content, getArticle()?.direction),
       contentMarkdown: editContent.value,
     });
   }

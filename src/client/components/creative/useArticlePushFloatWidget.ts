@@ -2,6 +2,7 @@ import { ref, reactive, computed, watch, onBeforeUnmount } from "vue";
 import type { CreativeFinishedArticle } from "../../services/creativeApi";
 import { streamPushArticleToDraft, readCreativeFinishedArticle, type PushDraftResult, type PushStepId, type PushProgressEvent, type WechatThemeId } from "../../services/creativeApi";
 import { renderWechatThemePreview } from "../../services/wechatRenderer";
+import { appendShortPublishFooter } from "./shortPublishFooter.js";
 
 export type ArticlePushFloatWidgetProps = {
   visible: boolean;
@@ -97,7 +98,7 @@ export function useArticlePushFloatWidget(props: ArticlePushFloatWidgetProps, em
     if (event.status === "done") state.detail = undefined;
   }
 
-  /** 立即启动当前文章推送，并在悬浮窗内持续更新进度与最终结果。 */
+  /** 推送最新发布正文，短稿补独立结尾段而不改AI草稿；更新浮窗进度与结果并触发原成功通知。 */
   async function startPush(): Promise<void> {
     if (!props.article || pushState.value === "pushing") return;
     cancelAutoClose();
@@ -110,7 +111,10 @@ export function useArticlePushFloatWidget(props: ArticlePushFloatWidgetProps, em
       latestArticle = await readCreativeFinishedArticle(props.article.id);
     } catch { /* 拉取失败则回退到内存中的数据 */ }
 
-    const sourceMarkdown = latestArticle.humanMarkdown ?? latestArticle.contentMarkdown;
+    const sourceMarkdown = appendShortPublishFooter(
+      latestArticle.humanMarkdown ?? latestArticle.contentMarkdown,
+      latestArticle.direction,
+    );
     const html = sourceMarkdown
       ? renderWechatThemePreview(sourceMarkdown, props.themeId)
       : undefined;

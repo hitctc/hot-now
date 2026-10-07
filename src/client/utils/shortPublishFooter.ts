@@ -18,15 +18,32 @@ export function appendShortPublishFooter(markdown: string, direction: string | u
   return `${content}\n\n${SHORT_PUBLISH_FOOTER}`;
 }
 
-/** 装饰文档末尾的独立互动段，供实时及主题预览共用；只修改传入DOM，不改变Markdown或存储。 */
+/** 将末尾互动段排成手写落款与双联字章，供实时及主题预览共用；只装饰DOM，不改原文或存储。 */
 export function styleShortPublishFooter(doc: Document): void {
   const footer = doc.body.lastElementChild;
   if (footer?.tagName !== "P" || footer.textContent?.trim() !== SHORT_PUBLISH_FOOTER) return;
   const card = doc.createElement("section");
   card.setAttribute("data-short-publish-footer", "");
-  card.setAttribute("style", "margin: 24px 0 8px; padding: 14px 16px; border: 2px solid #7c3aed; border-left: 6px solid #f59e0b; border-radius: 12px; background-color: #f5f3ff; text-align: center; box-shadow: 3px 3px 0 #ddd6fe;");
-  footer.textContent = SHORT_PUBLISH_FOOTER;
-  footer.setAttribute("style", "margin: 0; padding: 0; color: #5b21b6; background-color: transparent; font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif; font-size: 19px; font-weight: 800; line-height: 1.6; letter-spacing: 2px; text-align: center;");
+  card.setAttribute("style", "margin: 32px 0 12px; padding: 18px 0; border: none; background-color: transparent; text-align: center;");
+  const font = "-apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif";
+  footer.setAttribute("style", `display: inline-block; box-sizing: border-box; max-width: 100%; margin: 0; padding: 16px 12px 20px; border: none; border-radius: 3px; background-color: #edf3ff; background-image: linear-gradient(135deg, #ffffff 0%, #edf3ff 100%); color: #17325b; font-family: ${font}; font-size: 14px; font-weight: 400; line-height: 1.8; text-align: center; white-space: normal;`);
+  footer.textContent = "";
+  // 每段显式给定字体和颜色，避免公众号兼容处理用正文主题覆盖它们。
+  // 标点也独立成段，防止微信把顿号和句号移进相邻字章；不用弹性布局、定位或外部字体。
+  const parts = [
+    { key: "request", text: "跪求", style: "margin-right: 8px; color: #52698d; font-family: 'Kaiti SC', STKaiti, KaiTi, serif; font-size: 14px; font-weight: 400; line-height: 1.8; letter-spacing: 2px; vertical-align: 2px;" },
+    { key: "like", text: "点赞", style: `padding: 2px 10px 3px; border: 1px solid #bac9e2; border-radius: 4px; background-color: #ffffff; box-shadow: inset 0 -2px 0 #edf3ff, 0 3px 0 #bac9e2; color: #17325b; font-family: ${font}; font-size: 24px; font-weight: 800; line-height: 1.5; letter-spacing: 2px; vertical-align: 2px;` },
+    { key: "separator", text: "、", style: `padding: 0 4px; color: #52698d; font-family: ${font}; font-size: 14px; font-weight: 400; line-height: 1.8; vertical-align: -2px;` },
+    { key: "follow", text: "关注", style: `padding: 2px 10px 3px; border: 1px solid #2845b9; border-radius: 4px; background-color: #3459e6; box-shadow: inset 0 1px 0 #8098f2, 0 4px 0 #2845b9; color: #ffffff; font-family: ${font}; font-size: 24px; font-weight: 800; line-height: 1.5; letter-spacing: 2px; vertical-align: -2px;` },
+    { key: "stop", text: "。", style: `color: #17325b; font-family: ${font}; font-size: 14px; font-weight: 400; line-height: 1.8; vertical-align: -2px;` },
+  ];
+  for (const part of parts) {
+    const span = doc.createElement("span");
+    span.setAttribute("data-footer-part", part.key);
+    span.setAttribute("style", `display: inline-block; white-space: nowrap; ${part.style}`);
+    span.textContent = part.text;
+    footer.appendChild(span);
+  }
   footer.replaceWith(card);
   card.appendChild(footer);
 }

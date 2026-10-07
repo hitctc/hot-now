@@ -3,6 +3,7 @@ import { mount } from "@vue/test-utils";
 import ArticleMarkdownEditor from "../../src/client/components/creative/ArticleMarkdownEditor.vue";
 import { renderWechatThemePreview, type WechatThemeId } from "../../src/client/services/wechatRenderer.js";
 import { appendShortPublishFooter } from "../../src/client/utils/shortPublishFooter.js";
+import { makeWechatCompatible } from "../../src/core/creative/wechatFormat/wechatCompat.js";
 
 const themeIds: WechatThemeId[] = ["classic", "bauhaus", "sunset-film", "receipt", "black-gold"];
 
@@ -17,20 +18,54 @@ describe("发布结尾独立样式", () => {
       expect(wrapper.find("[data-short-publish-footer]").exists()).toBe(false);
     } finally { wrapper.unmount(); }
   });
-  it.each(themeIds)("%s主题下新结尾保持相同颜色、边框及字重", theme => {
+  it.each(themeIds)("%s主题下保留手写落款、错位双字章且去掉外框", theme => {
     const markdown = appendShortPublishFooter("# 标题\n\n正文\n\n跪求点赞、关注，谢谢你。", "short_content");
     const html = renderWechatThemePreview(markdown, theme);
     const doc = new DOMParser().parseFromString(html, "text/html");
     const card = doc.querySelector<HTMLElement>("[data-short-publish-footer]")!;
     expect(card).not.toBeNull();
     expect(card.textContent).toBe("跪求点赞、关注。");
-    expect(card.style.backgroundColor).toBe("rgb(245, 243, 255)");
-    expect(card.style.borderLeftColor).toBe("rgb(245, 158, 11)");
-    expect(card.style.borderRadius).toBe("12px");
+    expect(card.style.backgroundColor).toBe("transparent");
+    // DOM替身会把 border:none 的单项属性读成空串，直接验证实际输出的完整声明。
+    expect(card.getAttribute("style")).toMatch(/(?:^|;)\s*border: none;/);
     const text = card.querySelector("p")!;
-    expect(text.style.color).toBe("rgb(91, 33, 182)");
-    expect(text.style.fontWeight).toBe("800");
+    expect(text.style.backgroundColor).toBe("rgb(237, 243, 255)");
+    expect(text.style.maxWidth).toBe("100%");
+    const request = card.querySelector<HTMLElement>('[data-footer-part="request"]')!;
+    expect(request.style.fontFamily).toContain("Kaiti");
+    expect(request.style.fontSize).toBe("14px");
+    expect(request.style.color).toBe("rgb(82, 105, 141)");
+    const like = card.querySelector<HTMLElement>('[data-footer-part="like"]')!;
+    const follow = card.querySelector<HTMLElement>('[data-footer-part="follow"]')!;
+    expect(like.textContent).toBe("点赞");
+    expect(like.style.color).toBe("rgb(23, 50, 91)");
+    expect(like.style.backgroundColor).toBe("rgb(255, 255, 255)");
+    expect(follow.textContent).toBe("关注");
+    expect(follow.style.color).toBe("rgb(255, 255, 255)");
+    expect(follow.style.backgroundColor).toBe("rgb(52, 89, 230)");
+    expect(like.style.fontWeight).toBe("800");
+    expect(follow.style.fontSize).toBe("24px");
+    expect(like.style.verticalAlign).toBe("2px");
+    expect(follow.style.verticalAlign).toBe("-2px");
+    expect(like.style.boxShadow).toContain("inset");
+    expect(follow.style.boxShadow).toContain("inset");
+    expect(card.querySelector("a, button, img, svg")).toBeNull();
     expect(html).not.toContain("谢谢你");
+  });
+
+  it.each(themeIds)("%s公众号兼容处理保留字章、落款及标点，不依赖外部资源", async theme => {
+    const html = renderWechatThemePreview("正文\n\n跪求点赞、关注。", theme);
+    const compatible = await makeWechatCompatible(html, { skipImageBase64: true });
+    const before = new DOMParser().parseFromString(html, "text/html").querySelector("[data-short-publish-footer]")!;
+    const card = new DOMParser().parseFromString(compatible, "text/html").querySelector("[data-short-publish-footer]")!;
+    expect(card.textContent).toBe("跪求点赞、关注。");
+    for (const key of ["request", "like", "separator", "follow", "stop"]) {
+      const selector = `[data-footer-part="${key}"]`;
+      expect(card.querySelector(selector)!.getAttribute("style")).toBe(before.querySelector(selector)!.getAttribute("style"));
+    }
+    expect(card.querySelector('[data-footer-part="like"]')!.textContent).toBe("点赞");
+    expect(card.querySelector('[data-footer-part="follow"]')!.textContent).toBe("关注");
+    expect(compatible).not.toContain("data-source-line");
   });
 
   it("五个主题的结尾内联样式完全一致，正文仍各用原主题", () => {

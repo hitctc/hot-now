@@ -16,14 +16,14 @@ const article = {
   titles: '["测试标题"]', contentMarkdown: "AI 正文", humanMarkdown: "人工正文", coverImage: [],
 } as unknown as CreativeFinishedArticle;
 
-/** 组装面板所需的完整 props，避免用例只覆盖部分入参。 */
-function mountPanel(readonly = false) {
+/** 组装面板完整参数，并将主题选项直接传给面板而不是更新外层测试宿主。 */
+function mountPanel(readonly = false, previewThemeOptions = [{ key: "sunsetFilm", label: "落日胶片" }]) {
   return mountWithApp(ArticleEditorPanel, {
     props: {
       article, readonly, isManualArticle: false,
       humanContent: "人工正文", aiDraft: "AI 正文",
       previewHtml: "<p>预览正文</p>", previewLabel: "落日胶片",
-      previewThemeOptions: [{ key: "sunsetFilm", label: "落日胶片" }],
+      previewThemeOptions,
       activePreviewTheme: "sunsetFilm",
       syncScrollEnabled: true, autoFocusModeEnabled: true, savedAtLabel: "",
       focusMode: false, saving: false, wechatCopying: false, canPush: false,
@@ -65,6 +65,28 @@ describe("移动端文章详情编辑与预览", () => {
     } finally { wrapper.unmount(); }
   });
 
+  it("移动端主题单行滚动，只隐藏普通工具区的两个复制入口且桌面事件保持", async () => {
+    const wrapper = mountPanel(false, [{ key: "sunsetFilm", label: "落日胶片" }, { key: "second", label: "另一个主题" }]);
+    try {
+      const themeButtons = wrapper.get(".article-editor-themes").findAll("button");
+      expect(themeButtons).toHaveLength(2);
+      await themeButtons[1]!.trigger("click");
+      const panel = wrapper.findComponent(ArticleEditorPanel);
+      expect(panel.emitted("select-theme")).toEqual([["second"]]);
+      const copies = wrapper.get(".article-editor-actions").findAll(".article-editor-desktop-copy");
+      expect(copies.map(button => button.text())).toEqual(["复制原文", "复制纯文本"]);
+      await copies[0]!.trigger("click");
+      await copies[1]!.trigger("click");
+      expect(panel.emitted("copy-ai")).toHaveLength(1);
+      expect(panel.emitted("copy-plain")).toHaveLength(1);
+      expect(wrapper.get('[data-auto-focus-mode]').classes()).not.toContain("article-editor-desktop-copy");
+    } finally { wrapper.unmount(); }
+    const mobileStyles = styles.slice(styles.indexOf("@media (max-width: 768px)"));
+    expect(mobileStyles).toMatch(/\.article-editor-themes\s*\{[^}]*flex-wrap: nowrap;[^}]*overflow-x: auto;/);
+    expect(mobileStyles).toMatch(/\.article-editor-themes \.ant-btn\s*\{[^}]*flex: 0 0 auto;/);
+    expect(mobileStyles).toMatch(/\.article-editor-actions \.article-editor-desktop-copy\s*\{[^}]*display: none;/);
+    expect(styles.slice(0, styles.indexOf("@media (max-width: 768px)"))).not.toContain("article-editor-desktop-copy");
+  });
   it("只读详情不提供预览按钮，避免出现无意义的空预览入口", () => {
     const wrapper = mountPanel(true);
     try {

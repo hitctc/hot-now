@@ -40,6 +40,8 @@ describe("详情移动端内容与操作分层", () => {
       titleCandidateAt: () => null,
     }, global: { stubs: { "a-button": { template: "<button><slot /></button>" }, "a-input": true, "a-popconfirm": true, OperationCapabilityBadge: true } } });
     try {
+      const copySource = wrapper.get(".article-source-title-copy");
+      expect(copySource.element.parentElement?.classList.contains("article-section-heading")).toBe(true);
       const candidates = wrapper.findAll(".article-candidate");
       expect(candidates[0]!.get(".article-candidate__text").text()).toBe(title);
       expect(candidates[1]!.get(".article-candidate__text").text()).toBe(intro);
@@ -58,6 +60,7 @@ describe("详情移动端内容与操作分层", () => {
 
   it("移动端区块按钮、提示词和正文工具独立排布，三列封面完整展示且样式不外溢", () => {
     expect(mobileStyles).toMatch(/\.article-section-heading\s*\{[^}]*flex-direction: column;[^}]*align-items: stretch;/);
+    expect(mobileStyles).toMatch(/\.article-section-heading > \.ant-btn\s*\{[^}]*align-self: flex-start;[^}]*text-align: left;/);
     expect(mobileStyles).toMatch(/\.article-text-actions > span:first-child\s*\{[^}]*flex-basis: 100%;/);
     expect(mobileStyles).toMatch(/\.article-editor-actions\s*\{[^}]*display: flex;[^}]*width: 100%;/);
     expect(mobileStyles).toMatch(/\.article-cover-grid\s*\{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/);

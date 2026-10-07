@@ -378,6 +378,11 @@
   .article-detail-modal .article-section-heading .ant-btn {
     flex-shrink: 0;
   }
+  /* 单独的复制按钮不能随列布局被拉满，否则按钮文字会居中。 */
+  .article-detail-modal .article-section-heading > .ant-btn {
+    align-self: flex-start;
+    text-align: left;
+  }
   .article-detail-modal .article-candidate {
     display: grid;
     grid-template-columns: 14px minmax(0, 1fr);
@@ -429,6 +434,18 @@
   .article-detail-modal .article-editor-toolbar,
   .article-detail-modal .article-editor-themes {
     width: 100%;
+  }
+  /* 仅主题行允许横向浏览，按钮保持原宽度，不把更多主题挤到下一行。 */
+  .article-detail-modal .article-editor-themes {
+    min-width: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .article-detail-modal .article-editor-themes .ant-btn {
+    flex: 0 0 auto;
+  }
+  .article-detail-modal .article-editor-actions .article-editor-desktop-copy {
+    display: none;
   }
   .article-detail-modal .article-editor-actions {
     display: flex;

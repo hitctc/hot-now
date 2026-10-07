@@ -114,7 +114,7 @@ watch(() => props.editingTitleIndex, (index) => {
           v-if="article.sourceTitle"
           type="link"
           size="small"
-          class="!h-auto shrink-0 !px-1 !py-0 !text-[11px]"
+          class="article-source-title-copy !h-auto shrink-0 !px-1 !py-0 !text-[11px]"
           @click="emit('copy', article.sourceTitle)"
         >复制原标题</a-button>
       </div>

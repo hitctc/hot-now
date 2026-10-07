@@ -118,6 +118,7 @@
         />
 
         <ArticleShortImagePromptSection
+          :direction="article.direction"
           :prompts="article.imagePrompts ?? []"
           :readonly="props.readonly"
           @copy="copyPrompt"

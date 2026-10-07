@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useTableComponent } from "../../components/useTableComponent.js";
+import { useCreativeTableColumns } from "../../components/creative/useCreativeTableColumns.js";
 import { computed, nextTick, ref } from "vue";
 import { message } from "ant-design-vue";
 
@@ -459,7 +460,7 @@ function copyId(id: number): void {
   });
 }
 
-const columns = [
+const desktopColumns = [
   { title: "ID / 序号", dataIndex: "id", key: "idSeq", width: 72, fixed: "left" as const, className: "table-day-anchor-cell" },
   { title: "标题", key: "title", width: 300 },
   { title: "封面图", key: "coverImage", width: 70, ellipsis: true },
@@ -479,6 +480,8 @@ const pagination = computed(() => ({
   showSizeChanger: true,
   showTotal: (tot: number) => `共 ${tot} 条`
 }));
+const { columns, scrollWidth } = useCreativeTableColumns(desktopColumns, 900);
+
 useTableComponent();
 </script>
 
@@ -531,7 +534,7 @@ useTableComponent();
         :columns="columns"
         :data-source="items"
         :pagination="pagination"
-        :scroll="{ x: 900 }"
+        :scroll="{ x: scrollWidth }"
         row-key="id"
         data-article-table
         size="small"
@@ -546,7 +549,7 @@ useTableComponent();
             </div>
             <div class="flex flex-col leading-tight">
               <span class="cursor-pointer text-editorial-link-active hover:underline" @click="copyId(record.id)">{{ record.id }}</span>
-              <span class="text-[11px] text-editorial-text-muted">#{{ record.seqNumber ?? '-' }}</span>
+              <span data-table-sequence class="text-[11px] text-editorial-text-muted">#{{ record.seqNumber ?? '-' }}</span>
             </div>
           </template>
           <!-- 标题列：点击标题打开详情，点击素材链接打开来源素材弹窗，互不影响 -->

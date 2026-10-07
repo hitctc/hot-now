@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useTableComponent } from "../../useTableComponent.js";
+import { useCreativeTableColumns } from "../useCreativeTableColumns.js";
 import { ref, toRefs } from "vue";
 import { message } from "ant-design-vue";
 import OperationCapabilityBadge from "../OperationCapabilityBadge.vue";
@@ -49,7 +50,7 @@ const emit = defineEmits<{
 
 const { mode, isLoading, items, pagination, expandedRowKeys, writingIds, tracingIds, actionPendingId } = toRefs(props);
 
-const columns = [
+const desktopColumns = [
   { title: "ID / 序号", dataIndex: "id", key: "idSeq", width: 72, fixed: "left" as const, className: "table-day-anchor-cell" },
   { title: "标题", dataIndex: "title", key: "title", width: 300 },
   { title: "状态", dataIndex: "writingStatus", key: "writingStatus", width: props.mode === "short_content" ? 200 : 72, ellipsis: props.mode !== "short_content" },
@@ -58,6 +59,8 @@ const columns = [
   { title: "耗时/时间", key: "timeInfo", width: 84 },
   { title: "写文章", key: "quickCopy", width: 64, ellipsis: true, fixed: "right" as const },
 ];
+
+const { columns, scrollWidth, isMobile } = useCreativeTableColumns(desktopColumns, 1200);
 
 const overflowHover = ref<{ key: string } | null>(null);
 let overflowHoverTimer: ReturnType<typeof setTimeout> | null = null;
@@ -111,7 +114,8 @@ useTableComponent();
     :columns="columns"
     :data-source="items"
     :pagination="pagination"
-    :scroll="{ x: 1200 }"
+    :scroll="{ x: scrollWidth }"
+    :show-expand-column="!isMobile"
     :expanded-row-keys="expandedRowKeys"
     row-key="id"
     :row-class-name="getSourceItemRowClass"
@@ -128,7 +132,7 @@ useTableComponent();
         </div>
         <div class="flex flex-col leading-tight">
           <span class="cursor-pointer text-editorial-link-active hover:underline" @click="copyId(record.id)">{{ record.id }}</span>
-          <span class="text-[11px] text-editorial-text-muted">#{{ record.seqNumber ?? '-' }}</span>
+          <span data-table-sequence class="text-[11px] text-editorial-text-muted">#{{ record.seqNumber ?? '-' }}</span>
         </div>
       </template>
       <template v-if="column.key === 'title'">

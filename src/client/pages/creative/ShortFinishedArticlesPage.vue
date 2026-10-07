@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useTableComponent } from "../../components/useTableComponent.js";
+import { useCreativeTableColumns } from "../../components/creative/useCreativeTableColumns.js";
 import { computed, nextTick, ref } from "vue";
 import { message } from "ant-design-vue";
 
@@ -371,7 +372,7 @@ function copyId(id: number): void {
   });
 }
 
-const columns = SHORT_FINISHED_COLUMNS;
+const { columns, scrollWidth } = useCreativeTableColumns(SHORT_FINISHED_COLUMNS, 900);
 
 const pagination = computed(() => ({
   current: currentPage.value,
@@ -442,7 +443,7 @@ useTableComponent();
         :columns="columns"
         :data-source="items"
         :pagination="pagination"
-        :scroll="{ x: 900 }"
+        :scroll="{ x: scrollWidth }"
         row-key="id"
         data-article-table
         size="small"
@@ -457,7 +458,7 @@ useTableComponent();
             </div>
             <div class="flex flex-col leading-tight">
               <span class="cursor-pointer text-editorial-link-active hover:underline" @click="copyId(record.id)">{{ record.id }}</span>
-              <span class="text-[11px] text-editorial-text-muted">#{{ record.seqNumber ?? '-' }}</span>
+              <span data-table-sequence class="text-[11px] text-editorial-text-muted">#{{ record.seqNumber ?? '-' }}</span>
             </div>
           </template>
           <!-- 标题列：点击标题打开详情，点击素材链接打开来源素材弹窗，互不影响 -->

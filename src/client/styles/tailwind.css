@@ -449,7 +449,19 @@ html[data-theme="dark"] .table-day-group-label {
     margin-inline: calc((100% - 100vw) / 2);
   }
 
-  /* 创作表格移动端首列不吸附，ID/序号及日期标签随表格横向滚动；桌面端仍固定。 */
+  /* 手机只显示数据库ID；序号仍保留在桌面，不改变已有编号和复制行为。 */
+  :is([data-source-item-table], [data-article-table]) [data-table-sequence] {
+    display: none;
+  }
+
+  /* 56px首列留给真实ID，压缩内边距而非截断数字，标题使用首屏剩余宽度。 */
+  :is([data-source-item-table], [data-article-table]) .table-day-anchor-cell {
+    padding-inline: 6px !important;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  /* 创作表格移动端首列不吸附，ID及日期标签随表格横向滚动；桌面端仍固定。 */
   .table-day-anchor-cell.ant-table-cell-fix-left {
     position: relative !important;
     left: auto !important;

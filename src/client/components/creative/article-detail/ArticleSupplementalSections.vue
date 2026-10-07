@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { useArticleDetailSectionCollapse } from "./useArticleDetailSectionCollapse.js";
 import OperationCapabilityBadge from "../OperationCapabilityBadge.vue";
 import type { CreativeFinishedArticle } from "../../../services/creativeApi.js";
 import { formatCommentPair, parseJsonArray } from "./articleDetailPresentation.js";
 
-defineProps<{
+const props = defineProps<{
   article: CreativeFinishedArticle;
   readonly?: boolean;
   isManualArticle: boolean;
@@ -21,6 +22,8 @@ const emit = defineEmits<{
 
 /** 原图预览状态只属于展示区，关闭抽屉时会随组件销毁。 */
 const sourceCoverPreviewOpen = ref(false);
+const commentsCollapse = useArticleDetailSectionCollapse("comments", () => props.article.direction);
+const extensionsCollapse = useArticleDetailSectionCollapse("author-extensions", () => props.article.direction);
 </script>
 
 <template>
@@ -68,11 +71,12 @@ const sourceCoverPreviewOpen = ref(false);
     <div class="mb-2 flex items-center justify-between">
       <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">读者评论 + 作者回复</h3>
       <div class="flex items-center gap-2">
+        <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" :aria-expanded="!commentsCollapse.collapsed.value" @click="commentsCollapse.collapsed.value = !commentsCollapse.collapsed.value">{{ commentsCollapse.collapsed.value ? '展开' : '折叠' }}</a-button>
         <a-button v-if="article.comments?.length" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('copy', article.comments.map(formatCommentPair).join('\n\n'))">复制全部</a-button>
         <a-button v-if="!readonly" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" :loading="generatingComments" :disabled="generatingComments" @click="emit('generate-comments')">{{ generatingComments ? '排队/生成中...' : (article.comments?.length ? '重新生成评论' : '生成评论') }}</a-button><OperationCapabilityBadge v-if="!readonly" capability="model" />
       </div>
     </div>
-    <div v-if="article.comments?.length" class="flex flex-col gap-1.5">
+    <div v-if="article.comments?.length" v-show="!commentsCollapse.collapsed.value" class="flex flex-col gap-1.5">
       <div v-for="(comment, index) in article.comments" :key="index" class="rounded border border-editorial-border bg-editorial-bg-page px-2 py-1.5">
         <div class="flex items-start gap-1.5">
           <span class="shrink-0 text-[10px] font-medium text-editorial-text-muted">读者</span>
@@ -86,23 +90,24 @@ const sourceCoverPreviewOpen = ref(false);
         </div>
       </div>
     </div>
-    <p v-else class="m-0 text-[12px] leading-relaxed text-editorial-text-muted">暂无评论，点击右上「生成评论」按需补生成。</p>
+    <p v-else-if="!commentsCollapse.collapsed.value" class="m-0 text-[12px] leading-relaxed text-editorial-text-muted">暂无评论，点击右上「生成评论」按需补生成。</p>
   </section>
 
   <section v-if="!isManualArticle && (!readonly || article.authorExtensions?.length)">
     <div class="mb-2 flex items-center justify-between">
       <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">作者拓展</h3>
       <div class="flex items-center gap-2">
+        <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" :aria-expanded="!extensionsCollapse.collapsed.value" @click="extensionsCollapse.collapsed.value = !extensionsCollapse.collapsed.value">{{ extensionsCollapse.collapsed.value ? '展开' : '折叠' }}</a-button>
         <a-button v-if="article.authorExtensions?.length" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('copy', article.authorExtensions.join('\n\n'))">复制全部</a-button>
         <a-button v-if="!readonly" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" :loading="generatingAuthorExtensions" :disabled="generatingAuthorExtensions" @click="emit('generate-author-extensions')">{{ generatingAuthorExtensions ? '排队/生成中...' : (article.authorExtensions?.length ? '重新生成拓展' : '生成拓展') }}</a-button><OperationCapabilityBadge v-if="!readonly" capability="model" />
       </div>
     </div>
-    <div v-if="article.authorExtensions?.length" class="flex flex-col gap-1.5">
+    <div v-if="article.authorExtensions?.length" v-show="!extensionsCollapse.collapsed.value" class="flex flex-col gap-1.5">
       <div v-for="(extension, index) in article.authorExtensions" :key="index" class="flex items-start gap-1.5 rounded border border-editorial-border bg-editorial-bg-page px-2 py-1.5">
         <span class="flex-1 text-[12px] leading-relaxed text-editorial-text-body">{{ extension }}</span>
         <button class="shrink-0 px-2 py-1 text-[11px] text-editorial-link-active hover:underline" @click="emit('copy', extension)">复制</button>
       </div>
     </div>
-    <p v-else class="m-0 text-[12px] leading-relaxed text-editorial-text-muted">暂无作者拓展，点击右上「生成拓展」按需补生成。</p>
+    <p v-else-if="!extensionsCollapse.collapsed.value" class="m-0 text-[12px] leading-relaxed text-editorial-text-muted">暂无作者拓展，点击右上「生成拓展」按需补生成。</p>
   </section>
 </template>

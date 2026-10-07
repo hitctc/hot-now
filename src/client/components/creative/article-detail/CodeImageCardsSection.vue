@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import OperationCapabilityBadge from "../OperationCapabilityBadge.vue";
+import { useArticleDetailSectionCollapse } from "./useArticleDetailSectionCollapse.js";
 
 import type { CodeImageCard, CreativeFinishedArticle } from "../../../services/creativeApi.js";
 
@@ -29,6 +30,7 @@ const cards = computed(() => variants.map((variant) => ({
 // 只要任一比例已有图片就视为“已制作”，按钮文案据此切换；
 // 这里不再用“是否缺图”决定按钮可用性，否则三张都完成后就没有重做入口。
 const hasAnyCard = computed(() => cards.value.some(({ card }) => Boolean(card?.url)));
+const cardsCollapse = useArticleDetailSectionCollapse("code-image-cards", () => props.article.direction);
 
 /** 将单张图片状态翻译成页面可理解的短文案。 */
 function statusLabel(card: CodeImageCard | null): string {
@@ -57,7 +59,15 @@ function statusClass(card: CodeImageCard | null): string {
         <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">代码制图片</h3>
         <p class="m-0 mt-1 text-[11px] text-editorial-text-muted/80">{{ article.direction === 'short_content' ? '新制图不自动插入正文；默认方图作为发布封面，也可下载或手动选择其他封面。' : '三张图片仅加入封面候选，不自动插入正文；可在封面区域选用或下载后使用。' }}</p>
       </div>
-      <div v-if="!readonly" class="flex flex-wrap items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <a-button
+          type="link"
+          size="small"
+          class="!h-auto !px-2 !py-1 !text-[11px]"
+          :aria-expanded="!cardsCollapse.collapsed.value"
+          @click="cardsCollapse.collapsed.value = !cardsCollapse.collapsed.value"
+        >{{ cardsCollapse.collapsed.value ? '展开' : '折叠' }}</a-button>
+        <div v-if="!readonly" class="flex flex-wrap items-center gap-2">
         <!-- 代码图片是本地确定性渲染，不消耗外部额度，因此不限制制作次数。 -->
         <a-button
           size="small"
@@ -68,10 +78,11 @@ function statusClass(card: CodeImageCard | null): string {
           @click="emit('generate', 'all')"
         >{{ generating ? '制作中...' : (hasAnyCard ? '重新制作图片' : '制作图片') }}</a-button>
         <OperationCapabilityBadge capability="local" />
+        </div>
       </div>
     </div>
 
-    <a-image-preview-group>
+    <a-image-preview-group v-show="!cardsCollapse.collapsed.value">
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div
           v-for="item in cards"

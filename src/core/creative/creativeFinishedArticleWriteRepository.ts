@@ -3,6 +3,7 @@ import { updateCreativeSourceItemLinkedArticle } from "./creativeSourceItemRepos
 import { findCreativeFinishedArticleById } from "./creativeFinishedArticleReadRepository.js";
 import { mergePublishedImages } from "./creativeMarkdownImageMerge.js";
 import { normalizeFinishedArticleStatus } from "./creativeFinishedArticleStatus.js";
+import { findArticlePublicationTextIssue } from "./publicationTextGuard.js";
 import type { CodeImageCard } from "./codeImageCards.js";
 import type {
   CreativeFinishedArticleRecord,
@@ -148,7 +149,7 @@ const STATUS_TRANSITIONS: Record<string, Record<string, "publish_conditions" | "
   manual_draft:      { wechat_draft: "publish_conditions" },
 };
 
-/** 检查文章是否满足推送前置条件；手动稿只认中栏正式正文，不设置最低字数。 */
+/** 检查推送前置条件及正式稿语境；手动稿只认正式正文，不设置最低字数，不修改文章。 */
 export function checkPublishConditions(article: CreativeFinishedArticleRecord): { qualified: boolean; missing: string[] } {
   const missing: string[] = [];
   if (!article.coverImage || article.coverImage.length === 0) missing.push("缺少封面图");
@@ -166,6 +167,8 @@ export function checkPublishConditions(article: CreativeFinishedArticleRecord): 
   } else if (!article.contentMarkdown || article.contentMarkdown.length <= 50) {
     missing.push("缺少正文");
   }
+  const publicationIssue = findArticlePublicationTextIssue(article);
+  if (publicationIssue) missing.push(publicationIssue);
   return { qualified: missing.length === 0, missing };
 }
 

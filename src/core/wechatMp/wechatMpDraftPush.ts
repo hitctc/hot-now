@@ -2,6 +2,7 @@
 // 渲染 Markdown → 上传封面图 → 上传正文图片 → 替换图片 URL → 创建草稿 → 记录结果
 
 import { JSDOM } from "jsdom";
+import { findArticlePublicationTextIssue, findPublicationTextIssue } from "../creative/publicationTextGuard.js";
 import { isManualForcedRewrite, hasDraftPushStatus } from "../creative/manualForcedRewrite.js";
 import { findDefaultWechatMpAccount } from "./wechatMpAccountRepository.js";
 import { getAccessToken } from "./wechatMpAccessToken.js";
@@ -108,7 +109,7 @@ export function getArticlePushCount(db: SqliteDatabase, articleId: number): numb
   return row?.count ?? 0;
 }
 
-/** 按文章与主题推送草稿；强制稿先校验本次风险确认，再上传图片、写日志并更新状态。 */
+/** 按文章与主题推送草稿；所有稿件先检查正式文字与提交HTML，风险确认不能绕过；通过后才上传及写入。 */
 export async function pushArticleToWechatDraft(params: PushParams): Promise<DraftPushResult> {
   const { db, articleId, themeId, masterKey, onProgress } = params;
 
@@ -140,6 +141,23 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
   if (!article) {
     await onProgress?.("validate", "error");
     return { ok: false, errorCode: "article-not-found", errorMessage: "文章不存在" };
+  }
+  // 只检查真正发送的字段与HTML文字，不能信任状态、旧审稿分数或客户端风险确认。
+  let publicationIssue = findArticlePublicationTextIssue(article);
+  if (!publicationIssue && params.wechatHtml) {
+    const dom = new JSDOM(`<!DOCTYPE html><body>${params.wechatHtml}</body>`);
+    try {
+      publicationIssue = findPublicationTextIssue({
+        "渲染正文": dom.window.document.body.textContent,
+        // 图片失败显示/辅助阅读也会暴露文案，不能只检查可见文本节点。
+        "图片及辅助说明": [...dom.window.document.body.querySelectorAll("img[alt], [title], [aria-label]")]
+          .flatMap(node => [node.getAttribute("alt"), node.getAttribute("title"), node.getAttribute("aria-label")]),
+      });
+    } finally { dom.window.close(); }
+  }
+  if (publicationIssue) {
+    await onProgress?.("validate", "error");
+    return { ok: false, errorCode: "publication-text-blocked", errorMessage: publicationIssue };
   }
   if (isManualForcedRewrite(article) && params.riskConfirmed !== true) {
     await onProgress?.("validate", "error");

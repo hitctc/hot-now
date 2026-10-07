@@ -92,7 +92,7 @@ function lunaJobStatusClass(job: LunaImageJob | undefined): string {
 
 <template>
   <section>
-    <div class="mb-2 flex items-center justify-between">
+    <div class="article-section-heading mb-2 flex items-center justify-between">
       <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">封面图</h3>
       <div v-if="!readonly" class="flex flex-wrap items-center gap-3">
         <a-button
@@ -133,20 +133,23 @@ function lunaJobStatusClass(job: LunaImageJob | undefined): string {
     </div>
     <template v-if="displayCoverImages.length > 0">
       <a-image-preview-group>
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div class="article-cover-grid grid grid-cols-2 gap-3 sm:grid-cols-3">
           <template v-for="(url, index) in displayCoverImages" :key="index">
             <div
               v-if="url"
-              class="relative overflow-hidden rounded-editorial-md border transition-all"
+              class="article-cover-card relative overflow-hidden rounded-editorial-md border transition-all"
               :class="index === activeCoverIndex
                 ? 'border-editorial-accent ring-2 ring-editorial-ring'
                 : article.direction === 'short_content'
                   ? 'border-editorial-border hover:border-editorial-link-active'
                   : 'border-editorial-border opacity-60 hover:opacity-100 hover:border-editorial-link-active/40'"
             >
-              <a-image :src="url" :alt="`封面图 ${index + 1}`" class="block w-full object-cover" loading="lazy" />
+              <div class="article-cover-image">
+                <a-image :src="url" :alt="`封面图 ${index + 1}`" class="block w-full object-cover" loading="lazy" />
+              </div>
               <div
                 v-if="index === activeCoverIndex"
+                class="article-cover-current"
                 :class="article.direction === 'short_content'
                   ? 'absolute right-2 top-2 flex items-center gap-1 rounded bg-violet-700 px-3 py-2 text-xs font-bold text-white shadow-md'
                   : 'absolute right-1 top-1 flex items-center gap-0.5 rounded bg-editorial-accent px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm'"
@@ -154,6 +157,7 @@ function lunaJobStatusClass(job: LunaImageJob | undefined): string {
               <div v-if="index === 0 && index !== activeCoverIndex" class="absolute left-1 top-1 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</div>
               <button
                 v-if="!readonly && index !== activeCoverIndex"
+                class="article-cover-select"
                 :class="article.direction === 'short_content'
                   ? 'flex min-h-[44px] w-full items-center justify-center border-t border-violet-700 bg-violet-600 px-3 py-2 text-sm font-bold text-white shadow-sm hover:bg-violet-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600'
                   : 'absolute right-1 bottom-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white hover:bg-black/80'"
@@ -181,7 +185,7 @@ function lunaJobStatusClass(job: LunaImageJob | undefined): string {
   </section>
 
   <section v-if="!readonly || articleImages.length > 0 || inlineImageSlotCount > 0 || Object.keys(article.inlineImagePrompts ?? {}).length > 0 || (article.imagePrompts?.length ?? 0) > 0">
-    <div class="mb-2 flex items-center justify-between">
+    <div class="article-section-heading mb-2 flex items-center justify-between">
       <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文配图</h3>
       <div v-if="!readonly" class="flex flex-wrap items-center gap-1">
         <a-button

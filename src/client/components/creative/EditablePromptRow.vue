@@ -60,7 +60,7 @@ function saveEditing(): void {
         <a-button size="small" type="primary" @click="saveEditing">保存</a-button>
       </div>
     </div>
-    <div v-else class="flex items-start gap-1.5">
+    <div v-else class="article-text-actions flex items-start gap-1.5">
       <span class="flex-1 whitespace-pre-wrap text-[11px] leading-relaxed text-editorial-text-muted">
         <strong class="font-medium text-editorial-text-body">{{ label }}：</strong>{{ value || "尚未生成" }}
       </span>

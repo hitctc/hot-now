@@ -58,7 +58,7 @@ watch(() => props.editingTitleIndex, (index) => {
 <template>
   <!-- 手动成品只有一个标题，和中栏第一个 H1 双向同步。 -->
   <section v-if="isManualArticle">
-    <div class="mb-2 flex items-center justify-between">
+    <div class="article-section-heading mb-2 flex items-center justify-between">
       <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">文章标题</h3>
       <span class="text-[11px] text-editorial-text-muted">与中栏一级标题同步</span>
     </div>
@@ -103,7 +103,7 @@ watch(() => props.editingTitleIndex, (index) => {
       class="mb-3 rounded-editorial-sm border border-amber-200 bg-amber-50 px-3 py-2"
       data-testid="short-source-original-title"
     >
-      <div class="flex items-start justify-between gap-3">
+      <div class="article-section-heading flex items-start justify-between gap-3">
         <div class="min-w-0">
           <div class="text-[11px] font-semibold text-amber-700">素材原标题</div>
           <div class="mt-0.5 break-words text-sm leading-6 text-editorial-text-main">
@@ -120,7 +120,7 @@ watch(() => props.editingTitleIndex, (index) => {
       </div>
       <p class="mb-0 mt-1 text-[11px] text-amber-700/80">{{ article.sourceTitle ? "短内容候选只围绕原标题保守转写，不另起角度。" : "原标题缺失时按当前选中标题转写，不另起角度。" }}</p>
     </div>
-    <div class="mb-2 flex items-center justify-between">
+    <div class="article-section-heading mb-2 flex items-center justify-between">
       <div>
         <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">备选标题</h3>
         <p
@@ -146,13 +146,13 @@ watch(() => props.editingTitleIndex, (index) => {
       <li
         v-for="(title, index) in displayTitles"
         :key="index"
-        class="group/title relative flex items-center gap-3 rounded-editorial-sm border px-3 py-2 transition-colors"
+        class="article-candidate group/title relative flex items-center gap-3 rounded-editorial-sm border px-3 py-2 transition-colors"
         :class="index === activeTitleIndex
           ? 'border-editorial-accent ring-2 ring-editorial-ring'
           : 'border-editorial-border hover:border-editorial-link-active/40'"
       >
         <span class="flex-shrink-0 text-[11px] font-bold tabular-nums text-editorial-text-muted">{{ index + 1 }}</span>
-        <div v-if="editingTitleIndex === index" class="flex-1">
+        <div v-if="editingTitleIndex === index" class="article-candidate__text min-w-0 flex-1">
           <a-input
             ref="editingInputRef"
             :value="editingTitleValue"
@@ -163,8 +163,8 @@ watch(() => props.editingTitleIndex, (index) => {
             @blur="emit('save-title-edit', index)"
           />
         </div>
-        <div v-else class="flex-1">
-          <div class="flex items-center gap-2">
+        <div v-else class="article-candidate__text min-w-0 flex-1">
+          <div class="article-candidate__title flex items-center gap-2">
             <span class="text-sm leading-6 text-editorial-text-main">{{ title }}</span>
             <span
               v-if="titleCandidateAt(index)?.group_label"
@@ -177,6 +177,7 @@ watch(() => props.editingTitleIndex, (index) => {
             <p class="m-0">目标读者：{{ titleCandidateAt(index)?.target_reader }} · 标题党风险：{{ titleRiskLabel(titleCandidateAt(index)?.clickbait_risk) }}</p>
           </div>
         </div>
+        <div class="article-candidate__actions">
         <span class="flex-shrink-0 text-[10px] text-editorial-text-muted">{{ countWords(editingTitleIndex === index ? editingTitleValue : title) }}字</span>
         <span
           v-if="index === activeTitleIndex && article.titleSelectionConfirmed"
@@ -198,13 +199,14 @@ watch(() => props.editingTitleIndex, (index) => {
           @click.stop="emit('start-title-edit', index)"
         >编辑</button>
         <a-button v-if="!readonly && editingTitleIndex !== index" type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('copy', title)">复制</a-button>
+        </div>
       </li>
     </ul>
   </section>
 
   <!-- 代码图片标签：短内容制图直接使用，没有标签时也保留区域，方便判断是缺少生成结果还是显示异常。 -->
   <section data-testid="article-code-image-keywords">
-    <div class="mb-2 flex items-center justify-between">
+    <div class="article-section-heading mb-2 flex items-center justify-between">
       <div>
         <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">代码图片标签</h3>
         <p class="mb-0 mt-1 text-[11px] text-editorial-text-muted">写作阶段产出，代码图片优先使用这些标签；没有标签时图片不显示标签区域。</p>
@@ -260,7 +262,7 @@ watch(() => props.editingTitleIndex, (index) => {
 
   <!-- 核心立意（只读） -->
   <section v-if="!isManualArticle && article.thesis">
-    <div class="mb-2 flex items-center justify-between">
+    <div class="article-section-heading mb-2 flex items-center justify-between">
       <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">核心立意</h3>
       <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('copy', article.thesis!)">复制</a-button>
     </div>
@@ -269,7 +271,7 @@ watch(() => props.editingTitleIndex, (index) => {
 
   <!-- 导语（始终显示，可重新生成） -->
   <section v-if="!isManualArticle">
-    <div class="mb-2 flex items-center justify-between">
+    <div class="article-section-heading mb-2 flex items-center justify-between">
       <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">导语</h3>
       <div v-if="!readonly" class="flex items-center gap-3">
         <a-button
@@ -290,13 +292,14 @@ watch(() => props.editingTitleIndex, (index) => {
       <li
         v-for="(text, index) in displayIntros"
         :key="index"
-        class="group/intro relative flex items-center gap-3 rounded-editorial-sm border px-3 py-2 transition-colors"
+        class="article-candidate group/intro relative flex items-center gap-3 rounded-editorial-sm border px-3 py-2 transition-colors"
         :class="index === activeIntroIndex
           ? 'border-editorial-accent ring-2 ring-editorial-ring'
           : 'border-editorial-border hover:border-editorial-link-active/40'"
       >
         <span class="flex-shrink-0 text-[11px] font-bold tabular-nums text-editorial-text-muted">{{ index + 1 }}</span>
-        <span class="flex-1 text-sm leading-6 text-editorial-text-main">{{ text }}</span>
+        <span class="article-candidate__text min-w-0 flex-1 text-sm leading-6 text-editorial-text-main">{{ text }}</span>
+        <div class="article-candidate__actions">
         <span class="flex-shrink-0 text-[10px] text-editorial-text-muted">{{ countWords(text) }}字</span>
         <span
           v-if="index === activeIntroIndex"
@@ -308,13 +311,14 @@ watch(() => props.editingTitleIndex, (index) => {
           class="flex-shrink-0 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white hover:!bg-black/70"
           @click.stop="emit('select-intro', index)"
         >设为发布</button>
+        </div>
       </li>
     </ul>
   </section>
 
   <!-- 百字摘要（只读展示） -->
   <section v-if="!isManualArticle && displaySummaries.length > 0">
-    <div class="mb-2 flex items-center justify-between">
+    <div class="article-section-heading mb-2 flex items-center justify-between">
       <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">百字摘要 <span class="font-normal text-[11px] text-editorial-text-muted/60">{{ charCount(displaySummaries[0]) }}字</span></h3>
       <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('copy', displaySummaries[0] ?? '')">复制</a-button>
     </div>

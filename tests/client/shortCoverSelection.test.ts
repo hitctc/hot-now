@@ -35,6 +35,18 @@ describe("短内容封面动作", () => {
     expect(readonly.find("button").exists()).toBe(false);
     readonly.unmount();
   });
+  it("三列布局保留三个及更多封面候选，不改变候选编号和预览入口", async () => {
+    const wrapper = mountCovers("short_content");
+    try {
+      await wrapper.setProps({ displayCoverImages: ["/wide.png", "/square.png", "/portrait.png"] });
+      expect(wrapper.get(".article-cover-grid").findAll(".article-cover-card")).toHaveLength(3);
+      expect(wrapper.findAll(".article-cover-image")).toHaveLength(3);
+      await wrapper.setProps({ displayCoverImages: ["/wide.png", "/square.png", "/portrait.png", "/uploaded.png"] });
+      expect(wrapper.findAll(".article-cover-card")).toHaveLength(4);
+      await wrapper.findAll(".article-cover-select")[2]!.trigger("click");
+      expect(wrapper.emitted("select-cover")).toEqual([[3]]);
+    } finally { wrapper.unmount(); }
+  });
   it("短内容说明不再宣称写入正文，方图标为默认封面；长内容用途保持", () => {
     for (const direction of ["short_content", "article"] as const) {
       const wrapper = mount(CodeImageCardsSection, { props: { article: { direction, codeImageCards: [] } as unknown as CreativeFinishedArticle, generating: false, readonly: true }, global: { stubs: { "a-image-preview-group": { template: "<div><slot /></div>" } } } });

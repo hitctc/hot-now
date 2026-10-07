@@ -28,7 +28,7 @@ const extensionsCollapse = useArticleDetailSectionCollapse("author-extensions", 
 
 <template>
   <section v-if="!isManualArticle && parseJsonArray(article.hooks).length > 0">
-    <div class="mb-2 flex items-center justify-between">
+    <div class="article-section-heading mb-2 flex items-center justify-between">
       <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">开头钩子</h3>
       <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('copy', parseJsonArray(article.hooks).join('\n'))">复制全部</a-button>
     </div>
@@ -36,7 +36,7 @@ const extensionsCollapse = useArticleDetailSectionCollapse("author-extensions", 
       <li
         v-for="(hook, index) in parseJsonArray(article.hooks)"
         :key="index"
-        class="group flex items-start gap-3 rounded-editorial-sm bg-editorial-panel/40 px-3 py-2"
+        class="article-text-actions group flex items-start gap-3 rounded-editorial-sm bg-editorial-panel/40 px-3 py-2"
       >
         <span class="flex-1 text-sm leading-6 text-editorial-text-body">{{ hook }}</span>
         <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px] opacity-0 group-hover:opacity-100" @click="emit('copy', hook)">复制</a-button>
@@ -45,7 +45,7 @@ const extensionsCollapse = useArticleDetailSectionCollapse("author-extensions", 
   </section>
 
   <section v-if="!isManualArticle && parseJsonArray(article.quotes).length > 0">
-    <div class="mb-2 flex items-center justify-between">
+    <div class="article-section-heading mb-2 flex items-center justify-between">
       <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">可摘句</h3>
       <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('copy', parseJsonArray(article.quotes).join('\n'))">复制全部</a-button>
     </div>
@@ -56,7 +56,7 @@ const extensionsCollapse = useArticleDetailSectionCollapse("author-extensions", 
 
   <!-- 素材原图保留外链展示，不转存到本地。 -->
   <section v-if="!isManualArticle && sourceCoverUrl">
-    <div class="mb-2 flex items-center justify-between">
+    <div class="article-section-heading mb-2 flex items-center justify-between">
       <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">素材原图</h3>
       <a :href="sourceCoverUrl" target="_blank" rel="noopener noreferrer" class="text-[11px] text-editorial-link-active hover:underline">在新标签打开原图</a>
     </div>
@@ -68,7 +68,7 @@ const extensionsCollapse = useArticleDetailSectionCollapse("author-extensions", 
   </section>
 
   <section v-if="!isManualArticle && (!readonly || article.comments?.length)">
-    <div class="mb-2 flex items-center justify-between">
+    <div class="article-section-heading mb-2 flex items-center justify-between">
       <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">读者评论 + 作者回复</h3>
       <div class="flex items-center gap-2">
         <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" :aria-expanded="!commentsCollapse.collapsed.value" @click="commentsCollapse.collapsed.value = !commentsCollapse.collapsed.value">{{ commentsCollapse.collapsed.value ? '展开' : '折叠' }}</a-button>
@@ -78,12 +78,12 @@ const extensionsCollapse = useArticleDetailSectionCollapse("author-extensions", 
     </div>
     <div v-if="article.comments?.length" v-show="!commentsCollapse.collapsed.value" class="flex flex-col gap-1.5">
       <div v-for="(comment, index) in article.comments" :key="index" class="rounded border border-editorial-border bg-editorial-bg-page px-2 py-1.5">
-        <div class="flex items-start gap-1.5">
+        <div class="article-comment-row flex items-start gap-1.5">
           <span class="shrink-0 text-[10px] font-medium text-editorial-text-muted">读者</span>
           <span class="flex-1 text-[12px] leading-relaxed text-editorial-text-body">{{ comment.reader }}</span>
           <button class="shrink-0 px-2 py-1 text-[11px] text-editorial-link-active hover:underline" @click="emit('copy', comment.reader)">复制</button>
         </div>
-        <div class="mt-1 flex items-start gap-1.5">
+        <div class="article-comment-row mt-1 flex items-start gap-1.5">
           <span class="shrink-0 text-[10px] font-medium text-editorial-text-muted">作者</span>
           <span class="flex-1 text-[12px] leading-relaxed text-editorial-text-body">{{ comment.author_reply }}</span>
           <button class="shrink-0 px-2 py-1 text-[11px] text-editorial-link-active hover:underline" @click="emit('copy', comment.author_reply)">复制</button>
@@ -94,7 +94,7 @@ const extensionsCollapse = useArticleDetailSectionCollapse("author-extensions", 
   </section>
 
   <section v-if="!isManualArticle && (!readonly || article.authorExtensions?.length)">
-    <div class="mb-2 flex items-center justify-between">
+    <div class="article-section-heading mb-2 flex items-center justify-between">
       <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">作者拓展</h3>
       <div class="flex items-center gap-2">
         <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" :aria-expanded="!extensionsCollapse.collapsed.value" @click="extensionsCollapse.collapsed.value = !extensionsCollapse.collapsed.value">{{ extensionsCollapse.collapsed.value ? '展开' : '折叠' }}</a-button>
@@ -103,7 +103,7 @@ const extensionsCollapse = useArticleDetailSectionCollapse("author-extensions", 
       </div>
     </div>
     <div v-if="article.authorExtensions?.length" v-show="!extensionsCollapse.collapsed.value" class="flex flex-col gap-1.5">
-      <div v-for="(extension, index) in article.authorExtensions" :key="index" class="flex items-start gap-1.5 rounded border border-editorial-border bg-editorial-bg-page px-2 py-1.5">
+      <div v-for="(extension, index) in article.authorExtensions" :key="index" class="article-text-actions flex items-start gap-1.5 rounded border border-editorial-border bg-editorial-bg-page px-2 py-1.5">
         <span class="flex-1 text-[12px] leading-relaxed text-editorial-text-body">{{ extension }}</span>
         <button class="shrink-0 px-2 py-1 text-[11px] text-editorial-link-active hover:underline" @click="emit('copy', extension)">复制</button>
       </div>

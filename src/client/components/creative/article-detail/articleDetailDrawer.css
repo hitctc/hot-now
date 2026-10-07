@@ -324,8 +324,149 @@
   display: none;
 }
 
+/* 包装候选操作只用于移动端分层，桌面仍按原来的单行弹性布局排布。 */
+.article-detail-modal .article-candidate__actions,
+.article-detail-modal .article-editor-actions {
+  display: contents;
+}
+
 /* ─── 移动端适配 ─── */
 @media (max-width: 768px) {
+  /* 完整标题、紧凑元信息、关联素材分层，不靠截断文字压缩高度。 */
+  .article-detail-modal .article-detail-header {
+    padding-right: 28px;
+    gap: 4px 8px;
+    line-height: 1.5;
+  }
+  .article-detail-modal .article-detail-header__title {
+    order: 0;
+    flex-basis: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .article-detail-modal .article-detail-header__id { order: 1; }
+  .article-detail-modal .article-detail-header__source {
+    order: 2;
+    flex-basis: auto;
+    margin-bottom: 0;
+    min-width: 0;
+  }
+  .article-detail-modal .article-detail-header__pipeline { order: 2; }
+  .article-detail-modal .article-detail-header__time { order: 3; }
+  .article-detail-modal .article-detail-header__related {
+    order: 4;
+    flex-basis: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* 区块标题与操作分行；按钮自己换行，不能继续挤占文字宽度。 */
+  .article-detail-modal .article-section-heading {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .article-detail-modal .article-section-heading > * {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+  .article-detail-modal .article-section-heading > div:last-child {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .article-detail-modal .article-section-heading .ant-btn {
+    flex-shrink: 0;
+  }
+  .article-detail-modal .article-candidate {
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr);
+    align-items: start;
+    gap: 6px 8px;
+  }
+  .article-detail-modal .article-candidate__text {
+    overflow-wrap: anywhere;
+  }
+  .article-detail-modal .article-candidate__title {
+    flex-wrap: wrap;
+  }
+  .article-detail-modal .article-candidate__title > span:first-child {
+    flex-basis: 100%;
+  }
+  .article-detail-modal .article-candidate__actions {
+    grid-column: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .article-detail-modal .article-text-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .article-detail-modal .article-text-actions > span:first-child {
+    flex-basis: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .article-detail-modal .article-text-actions > .ant-btn {
+    opacity: 1;
+  }
+  .article-detail-modal .article-comment-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 4px 6px;
+  }
+  .article-detail-modal .article-comment-row > span:nth-child(2) {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .article-detail-modal .article-comment-row > button {
+    grid-column: 2;
+    justify-self: start;
+    padding-left: 0;
+  }
+  .article-detail-modal .article-editor-toolbar,
+  .article-detail-modal .article-editor-themes {
+    width: 100%;
+  }
+  .article-detail-modal .article-editor-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+  }
+
+  /* 三列候选用等尺寸框完整展示不同长宽比，点击仍可预览原图。 */
+  .article-detail-modal .article-cover-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .article-detail-modal .article-cover-image {
+    aspect-ratio: 1;
+    background: white;
+  }
+  .article-detail-modal .article-cover-image .ant-image,
+  .article-detail-modal .article-cover-image .ant-image-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  .article-detail-modal .article-cover-current,
+  .article-detail-modal .article-cover-select {
+    position: static;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    width: 100%;
+    min-height: 44px;
+    padding: 4px 2px;
+    border-radius: 0;
+    font-size: 11px;
+    line-height: 1.4;
+  }
   .article-detail-modal .ant-modal-body {
     padding: 12px !important;
   }

@@ -83,15 +83,15 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="mb-2 flex items-center justify-between" data-editor-title>
+  <div class="article-section-heading mb-2 flex items-center justify-between" data-editor-title>
     <div class="flex items-center gap-2">
       <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文</h3>
       <span v-if="savedAtLabel" class="text-[11px] font-medium text-green-600">{{ savedAtLabel }}</span>
     </div>
     <template v-if="!readonly">
       <!-- 窄屏允许换行：横向滚动条会被误认为弹窗布局错误，且与本弹窗只需纵向滚动不符。 -->
-      <div class="flex flex-wrap items-center gap-2">
-        <div class="flex flex-wrap gap-1">
+      <div class="article-editor-toolbar flex flex-wrap items-center gap-2">
+        <div class="article-editor-themes flex flex-wrap gap-1">
           <a-button
             v-for="option in previewThemeOptions"
             :key="option.key"
@@ -101,6 +101,7 @@ onBeforeUnmount(() => {
             @click="emit('select-theme', option.key)"
           >{{ option.label }}</a-button>
         </div>
+        <div class="article-editor-actions flex flex-wrap items-center gap-2">
         <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('copy-ai')">复制原文</a-button>
         <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('copy-plain')">复制纯文本</a-button>
         <a-button type="link" size="small" class="!h-auto !px-2 !py-1 !text-[11px]" @click="emit('toggle-sync-scroll')">{{ syncScrollEnabled ? '同步滚动：开' : '同步滚动：关' }}</a-button>
@@ -114,6 +115,7 @@ onBeforeUnmount(() => {
           data-mobile-preview-trigger
           @click="mobilePreviewOpen = true"
         >预览</a-button>
+        </div>
       </div>
     </template>
   </div>

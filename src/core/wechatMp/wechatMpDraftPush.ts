@@ -2,6 +2,7 @@
 // 渲染 Markdown → 上传封面图 → 上传正文图片 → 替换图片 URL → 创建草稿 → 记录结果
 
 import { JSDOM } from "jsdom";
+import { isManualForcedRewrite, hasDraftPushStatus } from "../creative/manualForcedRewrite.js";
 import { findDefaultWechatMpAccount } from "./wechatMpAccountRepository.js";
 import { getAccessToken } from "./wechatMpAccessToken.js";
 import {
@@ -34,6 +35,7 @@ interface PushParams {
   wechatHtml?: string;
   masterKey: string;
   onProgress?: PushProgressCallback;
+  riskConfirmed?: boolean;
 }
 
 // 下载远程图片，返回 Buffer
@@ -106,7 +108,7 @@ export function getArticlePushCount(db: SqliteDatabase, articleId: number): numb
   return row?.count ?? 0;
 }
 
-/** 根据文章 ID 和微信主题推送草稿；上传图片、写入推送日志并更新文章状态，返回推送结果。 */
+/** 按文章与主题推送草稿；强制稿先校验本次风险确认，再上传图片、写日志并更新状态。 */
 export async function pushArticleToWechatDraft(params: PushParams): Promise<DraftPushResult> {
   const { db, articleId, themeId, masterKey, onProgress } = params;
 
@@ -139,10 +141,11 @@ export async function pushArticleToWechatDraft(params: PushParams): Promise<Draf
     await onProgress?.("validate", "error");
     return { ok: false, errorCode: "article-not-found", errorMessage: "文章不存在" };
   }
-  const allowedStatuses = article.originType === "manual"
-    ? ["manual_draft", "wechat_draft"]
-    : ["ready_for_publish", "wechat_draft"];
-  if (!allowedStatuses.includes(article.status)) {
+  if (isManualForcedRewrite(article) && params.riskConfirmed !== true) {
+    await onProgress?.("validate", "error");
+    return { ok: false, errorCode: "risk-confirmation-required", errorMessage: "人工强制重写稿需在推送浮窗确认事实与质检风险" };
+  }
+  if (!hasDraftPushStatus(article)) {
     await onProgress?.("validate", "error");
     return { ok: false, errorCode: "invalid-status", errorMessage: `当前状态「${article.status}」不允许推送` };
   }

@@ -7,6 +7,7 @@ import { readManualTextTask, runManualModelTask } from "./article-detail/manualT
 import { useArticlePlanningActions, type PreviewThemeKey } from "./article-detail/useArticlePlanningActions.js";
 import { syncArticleEditorContent } from "./article-detail/articleDetailContentSync.js";
 import { checkPublishConditions } from "./articleStatusShared.js";
+import { hasDraftPushStatus } from "../../../core/creative/manualForcedRewrite.js";
 import { editFinishedArticle, readCreativeSourceItem, deleteFinishedArticle, restoreFinishedArticle, generateComments, generateAuthorExtensions, generateFinishedArticleCodeImages, type CreativeFinishedArticle, type WechatThemeId } from "../../services/creativeApi.js";
 import { renderWechatThemePreview } from "../../services/wechatRenderer.js";
 import { formatRelativeTime, parseJsonArray } from "./article-detail/articleDetailPresentation.js";
@@ -619,9 +620,7 @@ export function useArticleDetailDrawer(props: ArticleDetailDrawerProps, emit: <K
     void articleChangeTick.value;
     const article = props.article;
     if (!article) return false;
-    const allowed = article.originType === "manual"
-      ? article.status === "manual_draft" || article.status === "wechat_draft"
-      : article.status === "ready_for_publish" || article.status === "wechat_draft";
+    const allowed = hasDraftPushStatus(article);
     if (!allowed) return false;
     return checkPublishConditions(article).qualified;
   });
@@ -631,9 +630,7 @@ export function useArticleDetailDrawer(props: ArticleDetailDrawerProps, emit: <K
     const article = props.article;
     if (!article) return [];
     const missing: string[] = [];
-    const allowed = article.originType === "manual"
-      ? article.status === "manual_draft" || article.status === "wechat_draft"
-      : article.status === "ready_for_publish" || article.status === "wechat_draft";
+    const allowed = hasDraftPushStatus(article);
     if (!allowed) missing.push("状态不允许推送");
     missing.push(...checkPublishConditions(article).missing);
     return missing;

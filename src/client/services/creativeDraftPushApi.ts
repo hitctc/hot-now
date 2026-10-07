@@ -24,17 +24,18 @@ export type PushProgressEvent = {
   errorMessage?: string;
 };
 
-/** SSE 流式推送文章到微信草稿箱，逐条返回进度事件，最终返回 PushDraftResult */
+/** 流式推送草稿并返回进度与结果；riskConfirmed 仅传递本次人工风险确认，不变更审核标记。 */
 export async function streamPushArticleToDraft(
   id: number,
   themeId: WechatThemeId,
   wechatHtml: string | undefined,
   onProgress: (event: PushProgressEvent) => void,
+  riskConfirmed?: boolean,
 ): Promise<PushDraftResult> {
   const response = await fetch(`/api/creative/finished-articles/${id}/push-draft`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ themeId, wechatHtml }),
+    body: JSON.stringify({ themeId, wechatHtml, ...(riskConfirmed === true ? { riskConfirmed } : {}) }),
   });
 
   if (!response.ok) throw new Error(`HTTP ${response.status}`);

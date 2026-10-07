@@ -57,7 +57,7 @@ const desktopColumns = [
   { title: props.mode === "short_content" ? "选题分" : "评分", key: "score", width: props.mode === "short_content" ? 104 : 90 },
   { title: "Agent", dataIndex: "collectorAgent", key: "collectorAgent", width: 44, align: "center" as const, ellipsis: true },
   { title: "耗时/时间", key: "timeInfo", width: 84 },
-  { title: "写文章", key: "quickCopy", width: 64, ellipsis: true, fixed: "right" as const },
+  { title: "写文章", key: "quickCopy", width: 64, ellipsis: false, fixed: "right" as const },
 ];
 
 const { columns, scrollWidth, isMobile } = useCreativeTableColumns(desktopColumns, 1200);
@@ -282,10 +282,10 @@ useTableComponent();
         <a-button
           type="link"
           size="small"
-          class="!p-0 !text-[11px]"
+          class="!h-auto !whitespace-normal break-words !p-0 !text-[11px] !leading-4"
           :disabled="writingIds.has(record.id)"
           @click="emit('write', record)"
-        >{{ writingIds.has(record.id) ? "写作中..." : (mode === "article" ? "写文章" : "写短内容") }}</a-button>
+        >{{ writingIds.has(record.id) ? "写作中" : (mode === "article" ? "写文章" : "写短内容") }}</a-button>
         <OperationCapabilityBadge capability="model" />
       </template>
     </template>

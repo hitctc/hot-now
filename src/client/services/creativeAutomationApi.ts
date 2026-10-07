@@ -197,6 +197,11 @@ export function readWriteQueueTaskResult(taskId: string): Promise<{ success: boo
   return requestJson(`/api/creative/write-queue/result?taskId=${encodeURIComponent(taskId)}`);
 }
 
+/** 显式确认后重写原内容阻断任务；Hermes 决定资格并复用原请求收据，客户端不绕过调度。 */
+export function forceRewriteQueueTask(taskId: string): Promise<{ success: boolean; task_id?: string; error?: string }> {
+  return requestJson("/api/creative/write-queue/force-rewrite", { method: "POST", body: JSON.stringify({ taskId, confirmed: true }) });
+}
+
 // ─── 写作队列状态 ───
 
 export type WriteQueueTask = {
@@ -208,6 +213,7 @@ export type WriteQueueTask = {
   task_kind?: string;
   cancel_requested?: boolean;
   result_retained?: boolean;
+  can_force_rewrite?: boolean;
   retained_result_id?: string;
   status: "writing" | "queued" | "done" | "stopped" | "failed";
   submitted_at: string;

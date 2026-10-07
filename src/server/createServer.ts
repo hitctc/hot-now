@@ -422,7 +422,8 @@ export type ServerDeps = {
     articleId: number,
     themeId: string,
     wechatHtml?: string,
-    onProgress?: (step: string, status: "running" | "done" | "error", detail?: string) => void | Promise<void>
+    onProgress?: (step: string, status: "running" | "done" | "error", detail?: string) => void | Promise<void>,
+    riskConfirmed?: boolean
   ) => Promise<{ ok: boolean; mediaId?: string; errorCode?: string; errorMessage?: string; hint?: string; pushCount?: number }>;
   pushDailyDigestToWechatDraft?: (
     digestId: number,

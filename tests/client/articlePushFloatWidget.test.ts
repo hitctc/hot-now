@@ -34,6 +34,28 @@ afterEach(() => {
 });
 
 describe("ArticlePushFloatWidget", () => {
+  it("强制稿在现有浮窗确认一次后才推送，普通稿流程不增加确认", async () => {
+    const forced = { ...article, status: "needs_review", manualReviewReason: "人工强制重写 · 待人工审核", manualReviewReasons: ["原任务 original：事实复核失败", "本次质检未通过"] };
+    vi.mocked(readCreativeFinishedArticle).mockResolvedValue(forced);
+    vi.mocked(streamPushArticleToDraft).mockResolvedValue({ ok: true });
+    const wrapper = shallowMount(ArticlePushFloatWidget, {
+      props: { visible: true, article: forced, themeId: "bauhaus", themeLabel: "包豪斯", defaultAccountName: "默认公众号" },
+      global: { stubs: { AButton: { template: '<button @click="$emit(\'click\')"><slot /></button>' } } },
+    });
+    try {
+      await (wrapper.vm as unknown as { startPush: () => Promise<void> }).startPush();
+      expect(streamPushArticleToDraft).not.toHaveBeenCalled();
+      expect(wrapper.text()).toContain("原任务 original：事实复核失败");
+      expect(wrapper.text()).toContain("本次质检未通过");
+      const confirm = wrapper.findAll("button").find((button) => button.text() === "确认风险并推送")!;
+      await confirm.trigger("click");
+      await flushPromises();
+      expect(streamPushArticleToDraft).toHaveBeenCalledExactlyOnceWith(article.id, "bauhaus", "<p>发布正文</p>", expect.any(Function), true);
+      expect(forced.manualReviewReason).toBe("人工强制重写 · 待人工审核");
+      expect(wrapper.find("[data-forced-push-confirm]").exists()).toBe(false);
+    } finally { wrapper.unmount(); }
+  });
+
   it("悬浮进度窗贴齐视口右下角且在窄屏内不溢出", () => {
     const source = readFileSync(
       resolve(process.cwd(), "src/client/components/creative/ArticlePushFloatWidget.vue"),
@@ -44,6 +66,10 @@ describe("ArticlePushFloatWidget", () => {
     expect(source).toMatch(/border-radius: 10px 0 0 0;/);
     expect(source).toMatch(/max-height: 100vh;/);
     expect(source).toMatch(/padding: 10px;/);
+    const queue = readFileSync(resolve(process.cwd(), "src/client/components/creative/WriteQueueStatus.vue"), "utf8");
+    expect(queue).toMatch(/\.write-queue-float\s*\{[^}]*bottom: 0;/);
+    expect(queue).not.toContain("top: 50%;");
+    expect(Number(source.match(/z-index: (\d+);/)![1])).toBeGreaterThan(Number(queue.match(/z-index: (\d+);/)![1]));
   });
 
   it("不显示二次确认，并可由首次点击直接启动推送", async () => {

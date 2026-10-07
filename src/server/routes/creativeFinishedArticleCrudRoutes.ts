@@ -16,9 +16,10 @@ import {
   togglePublishable,
   toggleWechatPublished,
 } from "../../core/creative/creativeFinishedArticleRepository.js";
+import { findManualForcedRewriteDelivery } from "../../core/creative/manualForcedRewriteRepository.js";
 import type { CreativeFinishedArticleRouteContext } from "./creativeFinishedArticleRouteShared.js";
 
-/** 注册成品文章的Crud路由，保持既有 HTTP 契约。 */
+/** 注册成品写入及状态路由；强制稿重复交付恢复已有编号，其他请求沿用现役合同。 */
 export function registerCreativeFinishedArticleCrudRoutes(context: CreativeFinishedArticleRouteContext): void {
   const { app, options, db } = context;
 
@@ -56,6 +57,10 @@ export function registerCreativeFinishedArticleCrudRoutes(context: CreativeFinis
       });
     }
 
+    const forcedDeliveryId = findManualForcedRewriteDelivery(db, sourceItem.id, body ?? {});
+    if (forcedDeliveryId !== undefined) {
+      return reply.code(201).send({ id: forcedDeliveryId, sourceItemId: sourceItem.id, created: false });
+    }
     const existing = findCreativeFinishedArticleBySourceItemId(db, sourceItem.id);
     const allowDuplicate = body?.allowDuplicate === true;
     if (existing && !allowDuplicate) {

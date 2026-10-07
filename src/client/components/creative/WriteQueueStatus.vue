@@ -10,6 +10,10 @@ import ArticleDetailDrawer from "./LazyArticleDetailDrawer.vue";
 import SourceItemDetailModal from "./LazySourceItemDetailModal.vue";
 import { useWriteQueueStatus } from "./useWriteQueueStatus.js";
 const {
+  forceRewriteTarget,
+  forceRewriting,
+  requestForceRewrite,
+  confirmForceRewrite,
   cancellingTaskId,
   retainedResultOpen,
   retainedResultText,
@@ -136,6 +140,7 @@ const {
                 <button v-if="task.source_item_id" class="write-queue-link" @click.stop="openSourceItem(task.source_item_id)">素材 #{{ task.source_item_id }}</button>
                 <button v-if="task.finished_article_id" class="write-queue-link" :disabled="articleDetailLoading" @click.stop="openArticleDetail(task.finished_article_id)">成品 #{{ task.finished_article_id }}</button>
                 <span class="min-w-0 flex-1 truncate">{{ task.source_item_title || task.label }}</span>
+                <button v-if="task.can_force_rewrite" class="write-queue-link" @click.stop="requestForceRewrite(task)">强制重写</button>
                 <button v-if="task.result_retained" class="write-queue-link" @click.stop="viewRetainedResult(task)">查看保留结果</button>
               </div>
               <div class="mt-0.5 text-[9px] text-editorial-text-muted">
@@ -155,6 +160,11 @@ const {
         </div>
       </template>
 
+      <a-modal :open="Boolean(forceRewriteTarget)" title="确认强制重写" ok-text="确认风险并重写" :confirm-loading="forceRewriting" :z-index="2000" @ok="confirmForceRewrite" @cancel="forceRewriteTarget = null">
+        <p>原阻断：{{ forceRewriteTarget?.reason_text || forceRewriteTarget?.error }}</p>
+        <p>事实核验和质检仍执行；未通过也会生成新稿并保留“人工强制重写 · 待人工审核”标记。技术错误仍停止，原任务和已有成品不覆盖。</p>
+        <p>不会自动推送；推送到公众号草稿箱前需在现有浮窗确认风险。</p>
+      </a-modal>
       <a-modal v-model:open="retainedResultOpen" title="保留的生成结果（只读，不调用模型）" :footer="null" width="min(900px, 95vw)">
         <pre class="max-h-[70dvh] overflow-auto whitespace-pre-wrap break-words text-xs">{{ retainedResultText }}</pre>
       </a-modal>
@@ -177,8 +187,9 @@ const {
 .write-queue-float {
   position: fixed;
   right: 0;
-  top: 50%;
-  transform: translateY(-50%);
+  bottom: 0;
+  max-height: 100dvh;
+  overflow-y: auto;
   z-index: 1900;
   min-width: 32px;
   max-width: 320px;

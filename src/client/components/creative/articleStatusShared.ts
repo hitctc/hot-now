@@ -3,6 +3,7 @@
  * 前后端共用同一套规则，列表页和详情页都从这里取。
  */
 
+import { hasDraftPushStatus, isManualForcedRewrite } from "../../../core/creative/manualForcedRewrite.js";
 import { parseArticleImages, type CreativeFinishedArticle } from "../../services/creativeApi.js";
 
 // ─── 状态标签 ───
@@ -93,10 +94,10 @@ export type ArticleAction =
 
 /**
  * 根据当前状态和文章数据，返回可用操作列表。
- * 列表页和详情页的按钮都从这里取。
+ * 列表页和详情页的按钮都从这里取；强制稿不新增独立审核或标记流程。
  */
 export function getAvailableActions(article: CreativeFinishedArticle): ArticleAction[] {
-  if (article.originType === "manual") return [];
+  if (article.originType === "manual" || isManualForcedRewrite(article)) return [];
   const status = article.status;
   const actions: ArticleAction[] = [];
 
@@ -116,10 +117,7 @@ export function getAvailableActions(article: CreativeFinishedArticle): ArticleAc
   return actions;
 }
 
-/** 手动稿无需“标记可推送”，满足条件后可直接推送或再次推送。 */
+/** 手动稿和强制待审核稿无需额外标记，满足内容条件后进入现役推送入口，风险另行确认。 */
 export function canDirectlyPush(article: CreativeFinishedArticle): boolean {
-  const statuses = article.originType === "manual"
-    ? ["manual_draft", "wechat_draft"]
-    : ["ready_for_publish", "wechat_draft"];
-  return statuses.includes(article.status) && checkPublishConditions(article).qualified;
+  return hasDraftPushStatus(article) && checkPublishConditions(article).qualified;
 }

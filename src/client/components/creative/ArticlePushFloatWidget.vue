@@ -4,6 +4,10 @@ import { useArticlePushFloatWidget, type ArticlePushFloatWidgetProps, type Artic
 const props = defineProps<ArticlePushFloatWidgetProps>();
 const emit = defineEmits<ArticlePushFloatWidgetEvents>();
 const {
+  needsRiskConfirmation,
+  riskReasons,
+  MANUAL_FORCED_REWRITE_MARKER,
+  confirmRiskAndPush,
   STEP_DEFS,
   pushState,
   pushResult,
@@ -35,6 +39,14 @@ defineExpose({ isPushing, resetState, startPush });
       <div v-if="article" class="push-float-info">
         <div class="push-float-info-title">{{ getPublishTitle(article) }}</div>
         <div v-if="!isDone || !pushResult?.ok" class="push-float-info-meta">{{ defaultAccountName || '未配置' }} · {{ themeLabel }}</div>
+      </div>
+
+      <!-- 强制稿只在此浮窗确认一次；普通稿沿用点击后直接推送。 -->
+      <div v-if="pushState === 'idle' && needsRiskConfirmation" class="mb-2 space-y-2 text-[11px] text-orange-700" data-forced-push-confirm>
+        <strong>{{ MANUAL_FORCED_REWRITE_MARKER }}</strong>
+        <p v-for="reason in riskReasons" :key="reason" class="m-0 whitespace-pre-wrap break-words">{{ reason }}</p>
+        <p class="m-0">事实或质检曾未通过，请自行核实。本次仅确认推送风险，不视为审核通过。</p>
+        <a-button size="small" type="primary" @click="confirmRiskAndPush">确认风险并推送</a-button>
       </div>
 
       <!-- 推送进度 -->

@@ -40,22 +40,24 @@ export function registerHermesOperationalRoutes(
     }
   });
 
-  for (const action of ["cancel", "result"] as const) {
-    app.route({ method: action === "cancel" ? "POST" : "GET", url: `/api/creative/write-queue/${action}`,
-      /** 代理单任务取消或私有产物读取；只接受编号，不接受本地路径。 */
+  for (const action of ["cancel", "result", "force-rewrite"] as const) {
+    app.route({ method: action === "result" ? "GET" : "POST", url: `/api/creative/write-queue/${action}`,
+      /** 代理单任务取消、结果读取或确认后的强制重写；只传编号与确认意图，不持有调度规则。 */
       handler: async (request, reply) => {
         if (options.readSession(request, reply) === undefined) return;
-        const taskId = (action === "cancel" ? request.body : request.query) as { taskId?: unknown } | undefined;
+        const taskId = (action === "result" ? request.query : request.body) as { taskId?: unknown } | undefined;
         if (typeof taskId?.taskId !== "string" || !taskId.taskId || taskId.taskId.length > 128) {
           return reply.code(400).send({ success: false, error: "无效任务编号" });
         }
+        const confirmed = (request.body as { confirmed?: unknown } | undefined)?.confirmed === true;
+        if (action === "force-rewrite" && !confirmed) return reply.code(400).send({ success: false, error: "请确认强制重写风险" });
         const base = process.env.HERMES_API_BASE_URL;
         const token = process.env.HERMES_API_TOKEN;
         if (!base || !token) return reply.code(503).send({ success: false, error: "Hermes 未配置" });
         try {
           const response = await fetch(`${base.replace(/\/+$/, "")}/api/write-queue/${action}${action === "result" ? `?taskId=${encodeURIComponent(taskId.taskId)}` : ""}`, {
-            method: action === "cancel" ? "POST" : "GET", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-            ...(action === "cancel" ? { body: JSON.stringify({ taskId: taskId.taskId }) } : {}), signal: AbortSignal.timeout(10_000),
+            method: action === "result" ? "GET" : "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            ...(action !== "result" ? { body: JSON.stringify({ taskId: taskId.taskId, ...(action === "force-rewrite" ? { confirmed, requestId: (request.body as { requestId?: unknown }).requestId } : {}) }) } : {}), signal: AbortSignal.timeout(10_000),
           });
           return reply.code(response.status >= 500 ? 502 : response.status).send(await response.json());
         } catch { return reply.code(502).send({ success: false, error: "任务服务暂不可达，请查询原编号" }); }

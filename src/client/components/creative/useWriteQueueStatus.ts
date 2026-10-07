@@ -4,13 +4,35 @@ import { createLatestRequestGuard } from "../../utils/latestRequestGuard.js";
 import { toShanghaiDayKey } from "./tableDayGroups.js";
 import { describeLunaStatus, describeQueuedTask, describeCurrentTask } from "./writeQueueStatusPresentation.js";
 import { message } from "ant-design-vue";
-import { cancelWriteQueueTask, readWriteQueueTaskResult } from "../../services/creativeApi.js";
+import { cancelWriteQueueTask, readWriteQueueTaskResult, forceRewriteQueueTask } from "../../services/creativeApi.js";
 
 
 
 /** 管理全局队列观察、展开状态与关联详情读取；返回展示状态与动作，集中维护原请求、错误处理和生命周期副作用。 */
 export function useWriteQueueStatus() {
 
+
+  const forceRewriteTarget = ref<WriteQueueTask | null>(null);
+  const forceRewriting = ref(false);
+
+  /** 展示原阻断与放行范围；只有 Hermes 明确允许的内容阻断任务可进入确认。 */
+  function requestForceRewrite(task: WriteQueueTask): void {
+    if (task.can_force_rewrite) forceRewriteTarget.value = task;
+  }
+
+  /** 确认后提交原编号的新人工任务；重复请求由 Hermes 收据去重，保留原记录和成品。 */
+  async function confirmForceRewrite(): Promise<void> {
+    if (!forceRewriteTarget.value || forceRewriting.value) return;
+    forceRewriting.value = true;
+    try {
+      const result = await forceRewriteQueueTask(forceRewriteTarget.value.task_id);
+      if (!result.success) throw new Error(result.error || "提交失败");
+      message.success("强制重写已进入人工队列，新稿将保留待人工审核标记");
+      forceRewriteTarget.value = null;
+      await refresh();
+    } catch (error) { message.error(error instanceof Error ? error.message : "提交结果未知，请查询原编号后重试"); }
+    finally { forceRewriting.value = false; }
+  }
 
   const cancellingTaskId = ref<string | null>(null);
   const retainedResultOpen = ref(false);
@@ -212,6 +234,10 @@ export function useWriteQueueStatus() {
   });
 
   return {
+    forceRewriteTarget,
+    forceRewriting,
+    requestForceRewrite,
+    confirmForceRewrite,
     cancellingTaskId,
     retainedResultOpen,
     retainedResultText,

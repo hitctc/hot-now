@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { hasDraftPushStatus, isManualForcedRewrite, manualForcedRewriteRisks, MANUAL_FORCED_REWRITE_MARKER } from "../../../core/creative/manualForcedRewrite.js";
 import { useTableComponent } from "../../components/useTableComponent.js";
 import { useCreativeTableColumns } from "../../components/creative/useCreativeTableColumns.js";
 import { computed, nextTick, ref } from "vue";
@@ -87,23 +88,19 @@ const defaultAccountName = computed(() => {
   return def?.name ?? '';
 });
 
-// 推送前置条件检查：文章必须标题、封面图、正文齐全 + 处于可推送/已推送状态
+/** 校验内容与推送状态；强制待审核稿只在推送浮窗确认风险，不另做审核。 */
 function canPush(article: CreativeFinishedArticle | null): boolean {
   if (!article) return false;
-  const allowed = article.originType === "manual"
-    ? article.status === "manual_draft" || article.status === "wechat_draft"
-    : article.status === "ready_for_publish" || article.status === "wechat_draft";
+  const allowed = hasDraftPushStatus(article);
   if (!allowed) return false;
   return checkPublishConditions(article).qualified;
 }
 
-// 返回不满足推送条件的原因列表，用于 hover 提示
+/** 返回内容与状态缺口用于按钮提示，不写入审核状态。 */
 function getMissingConditions(article: CreativeFinishedArticle | null): string[] {
   if (!article) return ['文章不存在'];
   const missing: string[] = [];
-  const allowed = article.originType === "manual"
-    ? article.status === "manual_draft" || article.status === "wechat_draft"
-    : article.status === "ready_for_publish" || article.status === "wechat_draft";
+  const allowed = hasDraftPushStatus(article);
   if (!allowed) missing.push('状态不允许推送');
   missing.push(...checkPublishConditions(article).missing);
   return missing;
@@ -470,6 +467,9 @@ useTableComponent();
                 class="line-clamp-2 cursor-pointer text-[13px] leading-tight font-medium text-editorial-text-main transition-colors hover:text-editorial-link-active"
                 @click="openDetail(record)"
               >{{ getDisplayTitle(record.titles, record.titleIndex) }}</span>
+              <a-tooltip v-if="isManualForcedRewrite(record)" :title="manualForcedRewriteRisks(record).join('\n')">
+                <div class="mt-1 whitespace-normal text-[10px] text-orange-700" data-forced-rewrite-marker>{{ MANUAL_FORCED_REWRITE_MARKER }}</div>
+              </a-tooltip>
             </div>
             <a-tag
               v-if="getShortFinishedDomainInfo(record.stepTrace)"

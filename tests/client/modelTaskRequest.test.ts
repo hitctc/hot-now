@@ -11,6 +11,25 @@ afterEach(() => {
 });
 
 describe("模型任务提交响应丢失", () => {
+  it("强制重写按原任务保存编号，响应丢失和重开均不重复受理", async () => {
+    const forcedPath = "/api/creative/write-queue/force-rewrite";
+    const init = { method: "POST", body: JSON.stringify({ taskId: "blocked-task", confirmed: true }) };
+    const fetch = vi.spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(new TypeError("响应丢失"))
+      .mockImplementation(async () => new Response(JSON.stringify({ success: true, task_id: "forced-task", status: "queued" }), { status: 202 }));
+    await expect(requestModelTask(forcedPath, init)).rejects.toThrow("响应丢失");
+    const first = JSON.parse(String(fetch.mock.calls[0]![1]?.body));
+    expect(first.requestId).toMatch(/^\d{13}-[0-9a-f]{32}$/);
+    vi.resetModules();
+    const restored = await import("../../src/client/services/modelTaskRequest.js");
+    await restored.requestModelTask(forcedPath, init);
+    await restored.requestModelTask(forcedPath, init);
+    expect(JSON.parse(String(fetch.mock.calls[1]![1]?.body))).toEqual(first);
+    expect(JSON.parse(String(fetch.mock.calls[2]![1]?.body))).toEqual(first);
+    expect(localStorage.getItem("hotnow:model-request:forced-rewrite:blocked-task")).toBe(first.requestId);
+    localStorage.removeItem("hotnow:model-request:forced-rewrite:blocked-task");
+  });
+
   it("网络失败后保留原请求编号，受理后也保留直到观察到终态", async () => {
     const fetch = vi.spyOn(globalThis, "fetch")
       .mockRejectedValueOnce(new TypeError("网络中断"))

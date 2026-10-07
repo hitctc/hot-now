@@ -1,6 +1,6 @@
 import type { CreativeFinishedArticleRouteContext } from "./creativeFinishedArticleRouteShared.js";
 
-/** 注册成品文章的Publish路由，保持既有 HTTP 契约。 */
+/** 注册草稿推送与历史查询；鉴权后把本次风险确认交核心校验，保持进度流合同。 */
 export function registerCreativeFinishedArticlePublishRoutes(context: CreativeFinishedArticleRouteContext): void {
   const { app, options } = context;
 
@@ -15,7 +15,7 @@ export function registerCreativeFinishedArticlePublishRoutes(context: CreativeFi
     }
 
     const params = request.params as { id: string };
-    const body = request.body as { themeId?: string; wechatHtml?: string } | undefined;
+    const body = request.body as { themeId?: string; wechatHtml?: string; riskConfirmed?: boolean } | undefined;
     const id = parseInt(params.id, 10);
     const themeId = body?.themeId ?? "bauhaus";
     const wechatHtml = body?.wechatHtml;
@@ -48,7 +48,7 @@ export function registerCreativeFinishedArticlePublishRoutes(context: CreativeFi
     };
 
     try {
-      const result = await options.pushArticleToWechatDraft(id, themeId, wechatHtml, onProgress);
+      const result = await options.pushArticleToWechatDraft(id, themeId, wechatHtml, onProgress, body?.riskConfirmed === true);
       if (result.ok) {
         sendEvent({ step: "complete", status: "done", mediaId: result.mediaId, pushCount: result.pushCount });
       } else {

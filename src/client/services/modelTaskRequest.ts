@@ -6,8 +6,9 @@ const aliases: Record<string, string> = { "regen-intro": "intro", "regen-title":
   "generate-cover-prompt": "cover-prompts", "generate-inline-prompts": "inline-prompts" };
 const memory = new Map<string, string>();
 
-/** 仅匹配已接入幂等合同的人工文案入口；不对保存、上传或普通请求加隐式重试。 */
+/** 匹配已接入幂等合同的人工模型入口；不对保存、上传或普通请求加隐式重试。 */
 function requestKey(path: string): string | null {
+  if (path === "/api/creative/write-queue/force-rewrite") return `${PREFIX}forced-rewrite:`;
   if (path === "/api/creative/daily-digests/generate") return `${PREFIX}daily:`;
   const match = path.match(/^\/api\/creative\/finished-articles\/(\d+)\/(?:manual-text\/)?([^/]+)$/);
   if (!match) return null;
@@ -30,13 +31,14 @@ export function clearDailyDigestRequest(date?: string): void {
   try { localStorage.removeItem(key); } catch { /* 只清理本功能的请求元数据。 */ }
 }
 
-/** 提交前持久保存请求编号；默认日报以首次编号时间固定北京时间素材日期，跨零点重放不换参数。 */
+/** 提交前持久保存请求编号；强制重写按原任务隔离，默认日报固定首次北京时间素材日期，重放不换参数。 */
 export async function requestModelTask<T>(path: string, init?: RequestInit): Promise<T> {
   let key = requestKey(path);
   // 普通请求保持原调用参数，不让模型任务包装改变 GET 等既有接口合同。
   if (!key || init?.method !== "POST") return init === undefined ? requestJson<T>(path) : requestJson<T>(path, init);
   const payload = init.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
   if (key === `${PREFIX}daily:`) key += String(payload.date || "yesterday");
+  if (key === `${PREFIX}forced-rewrite:`) key += String(payload.taskId || "");
   let requestId = memory.get(key);
   try { requestId = localStorage.getItem(key) || requestId; } catch { /* 不读取凭据或文案，仅请求编号。 */ }
   if (!requestId) {
@@ -50,9 +52,9 @@ export async function requestModelTask<T>(path: string, init?: RequestInit): Pro
   }
   try {
     const result = await requestJson<T>(path, { ...init, body: JSON.stringify({ ...payload, requestId }) });
-    const response = result as { taskId?: string; status?: string; ok?: boolean };
+    const response = result as { taskId?: string; task_id?: string; status?: string; ok?: boolean };
     // 受理响应不清编号：即使页面在保存 taskId 前关闭，下次也能重放同一个提交。
-    if (!response.taskId || ["done", "failed", "stopped"].includes(response.status || "")) {
+    if (!(response.taskId || response.task_id) || ["done", "failed", "stopped"].includes(response.status || "")) {
       memory.delete(key);
       try { localStorage.removeItem(key); } catch { /* 内存映射已清理。 */ }
     }

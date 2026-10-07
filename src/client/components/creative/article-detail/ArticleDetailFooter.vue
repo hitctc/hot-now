@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import type { CreativeFinishedArticle } from "../../../services/creativeApi.js";
 import { getAvailableActions } from "../articleStatusShared.js";
+import { isManualForcedRewrite } from "../../../../core/creative/manualForcedRewrite.js";
 
 const props = defineProps<{
   article: CreativeFinishedArticle;
@@ -47,7 +48,7 @@ const emit = defineEmits<{
     <div class="article-detail-footer__divider" />
 
     <div class="article-detail-footer__group footer-group--flow">
-      <a-button v-if="article.status === 'needs_review'" @click="emit('review')">审核</a-button>
+      <a-button v-if="article.status === 'needs_review' && !isManualForcedRewrite(article)" @click="emit('review')">审核</a-button>
       <a-button v-if="getAvailableActions(article).some((action) => action.type === 'mark_publishable')" @click="emit('mark-publishable')">标记可推送</a-button>
       <a-tooltip
         v-else-if="getAvailableActions(article).some((action) => action.type === 'mark_publishable_disabled')"

@@ -2,6 +2,7 @@ import { ref, reactive, computed, watch, onBeforeUnmount } from "vue";
 import type { CreativeFinishedArticle } from "../../services/creativeApi";
 import { streamPushArticleToDraft, readCreativeFinishedArticle, type PushDraftResult, type PushStepId, type PushProgressEvent, type WechatThemeId } from "../../services/creativeApi";
 import { renderWechatThemePreview } from "../../services/wechatRenderer";
+import { isManualForcedRewrite, manualForcedRewriteRisks, MANUAL_FORCED_REWRITE_MARKER } from "../../../core/creative/manualForcedRewrite.js";
 import { appendShortPublishFooter } from "../../utils/shortPublishFooter.js";
 
 export type ArticlePushFloatWidgetProps = {
@@ -32,6 +33,18 @@ export function useArticlePushFloatWidget(props: ArticlePushFloatWidgetProps, em
   ];
 
   type StepStatus = "pending" | "running" | "done" | "error";
+
+  const riskArticle = ref<CreativeFinishedArticle | null>(props.article);
+  const riskConfirmed = ref(false);
+  const needsRiskConfirmation = computed(() => isManualForcedRewrite(riskArticle.value));
+  const riskReasons = computed(() => manualForcedRewriteRisks(riskArticle.value));
+
+  /** 在原推送浮窗完成本次风险确认后直接推送，不保存审核通过，也不再弹第二次确认。 */
+  async function confirmRiskAndPush(): Promise<void> {
+    if (pushState.value !== "idle") return;
+    riskConfirmed.value = true;
+    await startPush();
+  }
 
   const pushState = ref<"idle" | "pushing" | "done">("idle");
   const pushResult = ref<PushDraftResult | null>(null);
@@ -64,6 +77,8 @@ export function useArticlePushFloatWidget(props: ArticlePushFloatWidgetProps, em
   function resetState(): void {
     cancelAutoClose();
     pushState.value = "idle";
+    riskArticle.value = props.article;
+    riskConfirmed.value = false;
     pushResult.value = null;
     STEP_DEFS.forEach((s) => { stepStates[s.id] = { status: "pending" }; });
   }
@@ -98,7 +113,7 @@ export function useArticlePushFloatWidget(props: ArticlePushFloatWidgetProps, em
     if (event.status === "done") state.detail = undefined;
   }
 
-  /** 推送最新发布正文，短稿补独立结尾段而不改AI草稿；更新浮窗进度与结果并触发原成功通知。 */
+  /** 读取最新发布正文；强制稿留在原浮窗确认风险，确认后流式推送，普通稿仍直接推送。 */
   async function startPush(): Promise<void> {
     if (!props.article || pushState.value === "pushing") return;
     cancelAutoClose();
@@ -111,6 +126,12 @@ export function useArticlePushFloatWidget(props: ArticlePushFloatWidgetProps, em
       latestArticle = await readCreativeFinishedArticle(props.article.id);
     } catch { /* 拉取失败则回退到内存中的数据 */ }
 
+    riskArticle.value = latestArticle;
+    if (isManualForcedRewrite(latestArticle) && !riskConfirmed.value) {
+      pushState.value = "idle";
+      return;
+    }
+
     const sourceMarkdown = appendShortPublishFooter(
       latestArticle.humanMarkdown ?? latestArticle.contentMarkdown,
       latestArticle.direction,
@@ -120,7 +141,8 @@ export function useArticlePushFloatWidget(props: ArticlePushFloatWidgetProps, em
       : undefined;
 
     try {
-      const result = await streamPushArticleToDraft(latestArticle.id, props.themeId, html, handleProgressEvent);
+      const result = await streamPushArticleToDraft(latestArticle.id, props.themeId, html, handleProgressEvent,
+        ...(isManualForcedRewrite(latestArticle) ? [riskConfirmed.value] : []));
       pushResult.value = result;
       pushState.value = "done";
       if (result.ok) {
@@ -145,6 +167,10 @@ export function useArticlePushFloatWidget(props: ArticlePushFloatWidgetProps, em
   const failedStepTitle = computed(() => STEP_DEFS.find((step) => stepStates[step.id].status === "error")?.title || "推送");
 
   return {
+    needsRiskConfirmation,
+    riskReasons,
+    MANUAL_FORCED_REWRITE_MARKER,
+    confirmRiskAndPush,
     STEP_DEFS,
     pushState,
     pushResult,

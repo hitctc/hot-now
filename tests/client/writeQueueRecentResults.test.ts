@@ -71,9 +71,7 @@ describe("写作队列最近逐篇结果", () => {
     const source = readFileSync("src/client/components/creative/WriteQueueStatus.vue", "utf8");
     expect(source).toMatch(/\.write-queue-float\s*\{[^}]*right: 0;[^}]*border-radius: 8px 0 0 8px;/);
     expect(source).toMatch(/\.write-queue-dot-btn\s*\{[^}]*border-radius: 8px 0 0 8px;/);
-    for (const selector of ["close", "refresh"]) {
-      expect(source).toMatch(new RegExp(`\\.write-queue-${selector}\\s*\\{[^}]*width: 44px;[^}]*height: 44px;`));
-    }
+    expect(source).toMatch(/\.write-queue-control\s*\{[^}]*width: 44px;[^}]*height: 44px;[^}]*border: 1px solid #e5e7eb;/);
     expect(source).toMatch(/\.write-queue-cancel-current\s*\{[^}]*align-self: flex-start;[^}]*text-align: left;/);
   });
 
@@ -88,6 +86,11 @@ describe("写作队列最近逐篇结果", () => {
       await flushPromises();
       const refresh = document.body.querySelector<HTMLButtonElement>(".write-queue-refresh")!;
       expect(refresh.getAttribute("aria-label")).toBe("刷新文章队列");
+      const headerActions = document.body.querySelector(".write-queue-header-actions")!;
+      expect([...headerActions.children].map(button => button.getAttribute("aria-label"))).toEqual(["刷新文章队列", "收起文章队列"]);
+      expect(headerActions.closest(".write-queue-header")).not.toBeNull();
+      expect([...headerActions.children].every(button => button.classList.contains("write-queue-control"))).toBe(true);
+      expect(document.body.querySelector(".write-queue-footer button")).toBeNull();
       refresh.click();
       await flushPromises();
       expect(read).toHaveBeenCalledTimes(2);
@@ -101,6 +104,38 @@ describe("写作队列最近逐篇结果", () => {
       close.click();
       await wrapper.vm.$nextTick();
       expect(document.body.querySelector(".write-queue-dot-btn")).not.toBeNull();
+    } finally { wrapper.unmount(); }
+  });
+  it("移动端限制动态视口高度，多状态只在中间滚动且头尾操作保持可见", async () => {
+    const source = readFileSync("src/client/components/creative/WriteQueueStatus.vue", "utf8");
+    // DOM 测试不计算手机实际像素，断言动态高度、安全区及唯一内容滚动区的约束。
+    expect(source).toMatch(/\.write-queue-float\s*\{[^}]*display: flex;[^}]*flex-direction: column;[^}]*overflow: hidden;/);
+    expect(source).toMatch(/\.write-queue-body\s*\{[^}]*flex: 1 1 auto;[^}]*min-height: 0;[^}]*overflow-y: auto;/);
+    const mobile = source.split("@media (max-width: 768px)")[1] ?? "";
+    expect(mobile).toContain("100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 8px");
+    expect(mobile).toContain("bottom: env(safe-area-inset-bottom, 0px)");
+    expect(mobile).toMatch(/\.write-queue-list,\s*\.write-queue-history\s*\{[^}]*max-height: none;[^}]*overflow-y: visible;/);
+    expect(source).toMatch(/\.write-queue-header\s*\{[^}]*flex-shrink: 0;/);
+    expect(source).toMatch(/\.write-queue-footer\s*\{[^}]*flex-shrink: 0;/);
+    window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
+    vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue({ ...queueStatus,
+      current: { ...queueStatus.recent[1]!, status: "writing" },
+      queue: Array.from({ length: 30 }, (_, index) => ({ ...queueStatus.recent[1]!, task_id: `pending-${index}`, status: "queued" as const })), queue_length: 30,
+      history: Array.from({ length: 40 }, (_, index) => ({ ...queueStatus.recent[0]!, task_id: `failed-${index}`, error: `Luna 调用失败：${"详细错误说明".repeat(30)}` })),
+      status_delayed: true, status_message: "状态延迟，仍保留上次任务",
+    });
+    const wrapper = mount(WriteQueueStatus, { attachTo: document.body, global: { stubs: { SourceItemDetailModal: true, ArticleDetailDrawer: true } } });
+    try {
+      await flushPromises();
+      const body = document.body.querySelector(".write-queue-body")!;
+      for (const selector of [".write-queue-current", ".write-queue-list", ".write-queue-history", ".write-queue-delay"]) {
+        expect(body.querySelector(selector)).not.toBeNull();
+      }
+      expect(body.previousElementSibling?.classList.contains("write-queue-header")).toBe(true);
+      expect(body.nextElementSibling?.classList.contains("write-queue-footer")).toBe(true);
+      expect(body.textContent).toContain("Luna 调用失败");
+      expect(body.querySelectorAll(".write-queue-task")).toHaveLength(30);
+      expect(body.querySelectorAll(".write-queue-history-item")).toHaveLength(40);
     } finally { wrapper.unmount(); }
   });
   it("刷新后恢复上次的展开状态，再折叠后仍保持折叠", async () => {

@@ -66,9 +66,14 @@ const {
       <template v-else>
         <div class="write-queue-header">
           <span class="text-xs font-semibold text-editorial-text-body">Luna 文章队列</span>
-          <button type="button" class="write-queue-close" aria-label="收起文章队列" @click="toggleExpand">✕</button>
+          <div class="write-queue-header-actions">
+            <button type="button" class="write-queue-control write-queue-refresh" aria-label="刷新文章队列" :aria-busy="loading" :disabled="loading" @click.stop="refresh">{{ loading ? "…" : "↻" }}</button>
+            <button type="button" class="write-queue-control write-queue-close" aria-label="收起文章队列" @click="toggleExpand">✕</button>
+          </div>
         </div>
 
+        <!-- 只滚动任务内容，刷新、收起和统计不随长记录移出可视区。 -->
+        <div class="write-queue-body">
         <!-- 当前任务 -->
         <div v-if="data.current" class="write-queue-current">
           <div class="flex flex-wrap items-center gap-x-1 gap-y-0">
@@ -153,10 +158,11 @@ const {
           </section>
         </div>
 
-        <!-- 统计 + 刷新 -->
+        </div>
+
+        <!-- 固定统计栏 -->
         <div class="write-queue-footer">
           <span class="text-[10px] text-editorial-text-muted">完成 {{ data.stats.total_completed }} · 失败 {{ data.stats.total_failed }}</span>
-          <button type="button" class="write-queue-refresh" aria-label="刷新文章队列" :aria-busy="loading" :disabled="loading" @click.stop="refresh">{{ loading ? "…" : "↻" }}</button>
         </div>
       </template>
 
@@ -188,11 +194,15 @@ const {
   position: fixed;
   right: 0;
   bottom: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  max-height: 100vh;
   max-height: 100dvh;
-  overflow-y: auto;
+  overflow: hidden;
   z-index: 1900;
   min-width: 32px;
-  max-width: 320px;
+  max-width: min(320px, 100vw);
   /* 与屏幕右边缘接合，只保留左侧圆角，展开态也不留边缘空隙。 */
   border-radius: 8px 0 0 8px;
   border: 1px solid #e5e7eb;
@@ -236,19 +246,26 @@ const {
 }
 .write-queue-header {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   padding: 6px 8px 4px;
   border-bottom: 1px solid #f0f0f0;
 }
-.write-queue-close {
+.write-queue-header-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+}
+/* 两个头部操作共用尺寸、边框和交互样式，只保留不同图标与行为。 */
+.write-queue-control {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   width: 44px;
   height: 44px;
-  border: none;
+  border: 1px solid #e5e7eb;
   border-radius: 6px;
   background: none;
   font-size: 18px;
@@ -257,7 +274,15 @@ const {
   padding: 0;
   line-height: 1;
 }
-.write-queue-close:hover { color: #374151; }
+.write-queue-control:hover:not(:disabled) { background: #f3f4f6; color: #374151; }
+.write-queue-control:disabled { opacity: 0.5; cursor: not-allowed; }
+/* 必须允许中间弹性项缩小到内容高度以下，否则长记录仍会撑破整个浮窗。 */
+.write-queue-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 .write-queue-current {
   display: flex;
   flex-direction: column;
@@ -343,29 +368,26 @@ const {
 }
 .write-queue-footer {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   padding: 4px 8px 6px;
   border-top: 1px solid #f5f5f5;
 }
-.write-queue-refresh {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  border: 1px solid #e5e7eb;
-  background: none;
-  border-radius: 6px;
-  padding: 0;
-  font-size: 22px;
-  cursor: pointer;
-  color: #6b7280;
-  line-height: 1;
+@media (max-width: 768px) {
+  /* 动态视口适应浏览器工具栏伸缩，安全区给刘海和底部手势条留出空间。 */
+  .write-queue-float {
+    bottom: env(safe-area-inset-bottom, 0px);
+    max-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 8px);
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 8px);
+  }
+  /* 手机只保留中间一个滚动区，避免排队与历史各自滚动时难以到达后续内容。 */
+  .write-queue-list,
+  .write-queue-history {
+    max-height: none;
+    overflow-y: visible;
+  }
 }
-.write-queue-refresh:hover:not(:disabled) { background: #f3f4f6; }
-.write-queue-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* 浮窗内的 Modal 弹窗 z-index 必须高于浮窗自身(1900) */
 .source-item-detail-modal .ant-modal-wrap { z-index: 1950 !important; }

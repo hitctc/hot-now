@@ -149,7 +149,7 @@ function statusClass(card: CodeImageCard | null): string {
                 class="article-cover-select flex min-h-[44px] w-full items-center justify-center rounded bg-violet-600 px-2 py-1 text-xs font-bold text-white hover:bg-violet-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
                 @click.stop="emit('select-cover', item.coverIndex)"
               >设为发布封面</button>
-              <div v-if="item.url" class="flex flex-wrap items-center gap-x-2">
+              <div v-if="item.url" class="article-cover-actions flex flex-wrap items-center gap-x-2">
                 <a :href="item.url" :download="item.variant ? `hotnow-${item.key.replace(':', '-')}.png` : ''" target="_blank" rel="noreferrer" class="inline-flex min-h-[44px] items-center text-[11px] text-editorial-link-active hover:underline">下载图片</a>
                 <button type="button" class="min-h-[44px] text-left text-[11px] text-editorial-link-active hover:underline" @click="emit('copy-url', item.url)">复制图片地址</button>
               </div>
@@ -213,5 +213,45 @@ function statusClass(card: CodeImageCard | null): string {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+@media (max-width: 768px) {
+  /* 三列窄卡片不为勾选另起一行；与相邻设封面按钮等高，桌面仍使用大号标识。 */
+  .article-cover-card--selected .article-cover-current,
+  .article-cover-select {
+    height: 44px;
+    min-height: 44px;
+  }
+  .article-cover-card--selected .article-cover-current {
+    flex-wrap: nowrap;
+    gap: 2px;
+    padding: 4px 1px;
+    font-size: clamp(9px, 2.6vw, 11px);
+  }
+  .article-cover-current-icon {
+    width: 12px;
+    height: 12px;
+    font-size: 9px;
+  }
+  .article-cover-current-label {
+    white-space: nowrap;
+  }
+  /* 次要操作保留两行完整文案和24px点击区，避免两个44px操作把卡片撑高。 */
+  .article-cover-actions {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 0;
+  }
+  .article-cover-actions > a,
+  .article-cover-actions > button {
+    display: flex;
+    align-items: center;
+    height: 24px;
+    min-height: 24px;
+    padding: 0;
+    font-size: 10px;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
 }
 </style>

@@ -79,6 +79,27 @@ describe("短内容封面动作", () => {
     expect(section).toMatch(/\.article-cover-current-icon\s*\{[^}]*width: 26px;[^}]*height: 26px;/);
     expect(section).not.toMatch(/position:\s*absolute/);
   });
+  it("仅手机压缩状态及下载复制操作，桌面仍保留原尺寸", () => {
+    const source = readFileSync("src/client/components/creative/article-detail/CodeImageCardsSection.vue", "utf8");
+    const styles = source.split("<style scoped>")[1]!.split("</style>")[0]!;
+    const desktop = styles.split("@media")[0]!;
+    const mobile = styles.match(/@media \(max-width: 768px\) \{([\s\S]*)\}/)?.[1] ?? "";
+    // DOM替身不计算真实手机排版，锁定媒体查询约束；实际窄屏效果仍需浏览器验收。
+    expect(mobile).toMatch(/\.article-cover-card--selected \.article-cover-current,\s*\.article-cover-select\s*\{[^}]*height: 44px;[^}]*min-height: 44px;/);
+    expect(mobile).toMatch(/\.article-cover-card--selected \.article-cover-current\s*\{[^}]*flex-wrap: nowrap;[^}]*font-size: clamp\(9px, 2\.6vw, 11px\);/);
+    expect(mobile).toMatch(/\.article-cover-current-icon\s*\{[^}]*width: 12px;[^}]*height: 12px;/);
+    expect(mobile).toMatch(/\.article-cover-current-label\s*\{[^}]*white-space: nowrap;/);
+    expect(mobile).toMatch(/\.article-cover-actions > a,\s*\.article-cover-actions > button\s*\{[^}]*height: 24px;[^}]*min-height: 24px;[^}]*padding: 0;/);
+    expect(desktop).toContain("min-height: 60px;");
+    expect(desktop).toContain("width: 26px;");
+    expect(desktop).not.toContain(".article-cover-actions");
+    const wrapper = mountCovers("short_content");
+    try {
+      const actions = wrapper.get(".article-cover-actions");
+      expect(actions.get("a").classes()).toContain("min-h-[44px]");
+      expect(actions.get("button").classes()).toContain("min-h-[44px]");
+    } finally { wrapper.unmount(); }
+  });
   it("缩略图按预算缩放，不新增内部滚动或重复独立区块", () => {
     const section = readFileSync("src/client/components/creative/article-detail/CodeImageCardsSection.vue", "utf8");
     expect(section).toContain("height: min(160px, calc(min(440px, 60vh) / 2))");

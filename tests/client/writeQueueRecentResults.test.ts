@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import { flushPromises, mount } from "@vue/test-utils";
 
 import WriteQueueStatus from "../../src/client/components/creative/WriteQueueStatus.vue";
@@ -35,6 +36,42 @@ afterEach(() => {
 });
 
 describe("写作队列最近逐篇结果", () => {
+  it("所有屏幕贴齐右边缘且右侧无圆角，关闭刷新点击区变大，当前取消靠左", () => {
+    const source = readFileSync("src/client/components/creative/WriteQueueStatus.vue", "utf8");
+    expect(source).toMatch(/\.write-queue-float\s*\{[^}]*right: 0;[^}]*border-radius: 8px 0 0 8px;/);
+    expect(source).toMatch(/\.write-queue-dot-btn\s*\{[^}]*border-radius: 8px 0 0 8px;/);
+    for (const selector of ["close", "refresh"]) {
+      expect(source).toMatch(new RegExp(`\\.write-queue-${selector}\\s*\\{[^}]*width: 44px;[^}]*height: 44px;`));
+    }
+    expect(source).toMatch(/\.write-queue-cancel-current\s*\{[^}]*align-self: flex-start;[^}]*text-align: left;/);
+  });
+
+  it("放大后的刷新和关闭沿用原动作，左侧取消只提交当前任务编号", async () => {
+    window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
+    const read = vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue({
+      ...queueStatus, current: { ...queueStatus.recent[1]!, task_id: "current-to-cancel", status: "writing" },
+    });
+    const cancel = vi.spyOn(creativeApi, "cancelWriteQueueTask").mockResolvedValue({ success: true, status: "cancelling" });
+    const wrapper = mount(WriteQueueStatus, { attachTo: document.body, global: { stubs: { SourceItemDetailModal: true, ArticleDetailDrawer: true } } });
+    try {
+      await flushPromises();
+      const refresh = document.body.querySelector<HTMLButtonElement>(".write-queue-refresh")!;
+      expect(refresh.getAttribute("aria-label")).toBe("刷新文章队列");
+      refresh.click();
+      await flushPromises();
+      expect(read).toHaveBeenCalledTimes(2);
+      document.body.querySelector<HTMLButtonElement>(".write-queue-cancel-current")!.click();
+      await flushPromises();
+      expect(cancel).toHaveBeenCalledWith("current-to-cancel");
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(read).toHaveBeenCalledTimes(3);
+      const close = document.body.querySelector<HTMLButtonElement>(".write-queue-close")!;
+      expect(close.getAttribute("aria-label")).toBe("收起文章队列");
+      close.click();
+      await wrapper.vm.$nextTick();
+      expect(document.body.querySelector(".write-queue-dot-btn")).not.toBeNull();
+    } finally { wrapper.unmount(); }
+  });
   it("刷新后恢复上次的展开状态，再折叠后仍保持折叠", async () => {
     vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue(queueStatus);
     // 仅重新挂载浮层模拟刷新，避免测试把服务端队列状态当作界面偏好来源。

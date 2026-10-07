@@ -62,7 +62,7 @@ const {
       <template v-else>
         <div class="write-queue-header">
           <span class="text-xs font-semibold text-editorial-text-body">Luna 文章队列</span>
-          <button class="write-queue-close" @click="toggleExpand">✕</button>
+          <button type="button" class="write-queue-close" aria-label="收起文章队列" @click="toggleExpand">✕</button>
         </div>
 
         <!-- 当前任务 -->
@@ -84,7 +84,7 @@ const {
           <div v-if="data.current.started_at" class="mt-0.5 text-[10px] font-medium tabular-nums text-blue-500">
             任务已耗时 {{ formatElapsed(data.current.started_at) }}（含等待）<template v-if="data.run_started_at"> · 队列 {{ formatElapsed(data.run_started_at) }}</template>
           </div>
-          <button class="write-queue-link" :disabled="Boolean(cancellingTaskId) || data.current.cancel_requested" @click.stop="cancelTask(data.current)">
+          <button type="button" class="write-queue-link write-queue-cancel-current" :disabled="Boolean(cancellingTaskId) || data.current.cancel_requested" @click.stop="cancelTask(data.current)">
             {{ data.current.cancel_requested ? '等待安全取消' : '取消任务' }}
           </button>
         </div>
@@ -151,7 +151,7 @@ const {
         <!-- 统计 + 刷新 -->
         <div class="write-queue-footer">
           <span class="text-[10px] text-editorial-text-muted">完成 {{ data.stats.total_completed }} · 失败 {{ data.stats.total_failed }}</span>
-          <button class="write-queue-refresh" :disabled="loading" @click.stop="refresh">{{ loading ? "…" : "↻" }}</button>
+          <button type="button" class="write-queue-refresh" aria-label="刷新文章队列" :aria-busy="loading" :disabled="loading" @click.stop="refresh">{{ loading ? "…" : "↻" }}</button>
         </div>
       </template>
 
@@ -176,14 +176,16 @@ const {
 <style>
 .write-queue-float {
   position: fixed;
-  right: 12px;
+  right: 0;
   top: 50%;
   transform: translateY(-50%);
   z-index: 1900;
   min-width: 32px;
   max-width: 320px;
-  border-radius: 8px;
+  /* 与屏幕右边缘接合，只保留左侧圆角，展开态也不留边缘空隙。 */
+  border-radius: 8px 0 0 8px;
   border: 1px solid #e5e7eb;
+  border-right: 0;
   background: #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
@@ -191,13 +193,13 @@ const {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: none;
   background: none;
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: 8px 0 0 8px;
 }
 .write-queue-dot-btn:hover {
   background: #f3f4f6;
@@ -229,12 +231,19 @@ const {
   border-bottom: 1px solid #f0f0f0;
 }
 .write-queue-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
   border: none;
+  border-radius: 6px;
   background: none;
-  font-size: 11px;
-  color: #9ca3af;
+  font-size: 18px;
+  color: #6b7280;
   cursor: pointer;
-  padding: 0 2px;
+  padding: 0;
   line-height: 1;
 }
 .write-queue-close:hover { color: #374151; }
@@ -284,6 +293,13 @@ const {
   cursor: pointer;
   font-size: inherit;
 }
+/* 当前任务容器是纵向弹性布局，取消按钮不拉满宽度，文字才能靠左。 */
+.write-queue-cancel-current {
+  align-self: flex-start;
+  text-align: left;
+  margin-top: 4px;
+  font-size: 11px;
+}
 .write-queue-link:hover { text-decoration: underline; }
 .write-queue-link:disabled { cursor: wait; opacity: 0.5; }
 .write-queue-task {
@@ -322,11 +338,17 @@ const {
   border-top: 1px solid #f5f5f5;
 }
 .write-queue-refresh {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
   border: 1px solid #e5e7eb;
   background: none;
-  border-radius: 3px;
-  padding: 1px 5px;
-  font-size: 11px;
+  border-radius: 6px;
+  padding: 0;
+  font-size: 22px;
   cursor: pointer;
   color: #6b7280;
   line-height: 1;

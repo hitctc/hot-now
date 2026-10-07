@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import EditablePromptRow from "../EditablePromptRow.vue";
 import OperationCapabilityBadge from "../OperationCapabilityBadge.vue";
+import { useArticleDetailSectionCollapse } from "./useArticleDetailSectionCollapse.js";
 import {
   extractImageUrl,
   type ArticleImageEntry,
@@ -9,7 +10,7 @@ import {
   type LunaImageTarget,
 } from "../../../services/creativeApi.js";
 
-defineProps<{
+const props = defineProps<{
   article: CreativeFinishedArticle;
   readonly?: boolean;
   articleImages: ArticleImageEntry[];
@@ -38,6 +39,9 @@ const emit = defineEmits<{
   (event: "save-inline-prompt", key: string, value: string): void;
   (event: "generate-luna-image", target: LunaImageTarget, imageIndex?: number): void;
 }>();
+
+// 收起配图区不卸载提示词编辑器，避免丢掉用户还未保存的草稿。
+const inlineImagesCollapse = useArticleDetailSectionCollapse("inline-images", () => props.article.direction);
 
 /** 每个提示词只映射一个独立 Luna 任务，避免把封面和正文合并成批处理。 */
 function lunaJobFor(
@@ -187,6 +191,8 @@ function lunaJobStatusClass(job: LunaImageJob | undefined): string {
   <section v-if="!readonly || articleImages.length > 0 || inlineImageSlotCount > 0 || Object.keys(article.inlineImagePrompts ?? {}).length > 0 || (article.imagePrompts?.length ?? 0) > 0">
     <div class="article-section-heading mb-2 flex items-center justify-between">
       <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">正文配图</h3>
+      <div class="flex flex-wrap items-center gap-1">
+        <a-button type="link" size="small" :aria-expanded="!inlineImagesCollapse.collapsed.value" data-inline-images-collapse @click="inlineImagesCollapse.collapsed.value = !inlineImagesCollapse.collapsed.value">{{ inlineImagesCollapse.collapsed.value ? '展开' : '折叠' }}</a-button>
       <div v-if="!readonly" class="flex flex-wrap items-center gap-1">
         <a-button
           type="link"
@@ -224,7 +230,9 @@ function lunaJobStatusClass(job: LunaImageJob | undefined): string {
           </span>
         </template>
       </div>
+      </div>
     </div>
+    <div v-show="!inlineImagesCollapse.collapsed.value" data-inline-images-content>
     <template v-if="articleImages.length > 0">
       <a-image-preview-group>
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -268,5 +276,6 @@ function lunaJobStatusClass(job: LunaImageJob | undefined): string {
         </div>
       </div>
     </template>
+    </div>
   </section>
 </template>

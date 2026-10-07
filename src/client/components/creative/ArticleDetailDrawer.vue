@@ -86,12 +86,14 @@
         <ArticleSimilaritySection
           :is-manual-article="isManualArticle"
           :article-id="article.id"
+          :direction="article.direction"
           :similarity-check="article.similarityCheck"
         />
 
         <!-- 写作流程时间线 -->
         <StepTraceTimeline
           v-if="!isManualArticle"
+          :direction="article.direction"
           :step-trace="article?.stepTrace ?? null"
           :stop-step="article?.stopStep"
           :reason-text="article?.reasonText"

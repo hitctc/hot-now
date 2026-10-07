@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useArticleDetailSectionCollapse } from "./useArticleDetailSectionCollapse.js";
 import { riskDimClass } from "./articleDetailPresentation.js";
 
 type SimilarityCheck = {
@@ -32,8 +33,11 @@ type SimilarityCheck = {
 const props = defineProps<{
   isManualArticle: boolean;
   articleId?: number;
+  direction?: string;
   similarityCheck?: Record<string, unknown> | null;
 }>();
+
+const similarityCollapse = useArticleDetailSectionCollapse("similarity", () => props.direction);
 
 /** 将服务端的宽泛 JSON 收窄为仅供展示的相似度结构。 */
 const similarity = computed<SimilarityCheck | null>(() => {
@@ -60,11 +64,12 @@ const llmActionLabel = computed(() => {
 
 <template>
   <section v-if="!isManualArticle && similarityCheck">
-    <div class="mb-2">
+    <div class="article-section-heading mb-2 flex items-center justify-between">
       <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">相似度检测</h3>
+      <a-button type="link" size="small" :aria-expanded="!similarityCollapse.collapsed.value" data-similarity-collapse @click="similarityCollapse.collapsed.value = !similarityCollapse.collapsed.value">{{ similarityCollapse.collapsed.value ? '展开' : '折叠' }}</a-button>
     </div>
     <template v-if="similarity">
-      <div class="grid grid-cols-3 gap-3">
+      <div v-show="!similarityCollapse.collapsed.value" data-similarity-content class="grid grid-cols-3 gap-3">
         <div class="space-y-2">
           <div class="rounded border border-editorial-border bg-editorial-bg-page px-3 py-2 text-xs space-y-1">
             <div class="font-medium text-editorial-text-body mb-1">总览</div>
@@ -138,9 +143,10 @@ const llmActionLabel = computed(() => {
     </template>
   </section>
   <section v-else-if="!isManualArticle && similarityCheck === null && articleId">
-    <div class="mb-2">
+    <div class="article-section-heading mb-2 flex items-center justify-between">
       <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">相似度检测</h3>
+      <a-button type="link" size="small" :aria-expanded="!similarityCollapse.collapsed.value" data-similarity-collapse @click="similarityCollapse.collapsed.value = !similarityCollapse.collapsed.value">{{ similarityCollapse.collapsed.value ? '展开' : '折叠' }}</a-button>
     </div>
-    <div class="text-xs text-editorial-text-muted">未检测</div>
+    <div v-show="!similarityCollapse.collapsed.value" data-similarity-content class="text-xs text-editorial-text-muted">未检测</div>
   </section>
 </template>

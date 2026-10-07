@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useArticleDetailSectionCollapse } from "./article-detail/useArticleDetailSectionCollapse.js";
 import {
   CheckCircleFilled,
   CloseCircleFilled,
@@ -11,11 +12,13 @@ import type { StepTraceEntry } from "../../services/creativeApi";
 
 const props = defineProps<{
   stepTrace: StepTraceEntry[] | null;
+  direction?: string;
   stopStep?: number | null;
   reasonText?: string | null;
 }>();
 
 const expandedSteps = ref<Set<number>>(new Set());
+const flowCollapse = useArticleDetailSectionCollapse("writing-flow", () => props.direction);
 
 // 从 stepTrace 计算总写作耗时：首步 startedAt → 末步 finishedAt
 const totalDuration = computed((): number | null => {
@@ -245,14 +248,15 @@ function formatHumanWritingUsage(usage: unknown): string {
 
 <template>
   <section v-if="stepTrace && stepTrace.length > 0">
-    <div class="mb-2 flex items-center justify-between">
+    <div class="article-section-heading mb-2 flex items-center justify-between">
       <div class="flex items-center gap-2">
         <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">写作流程</h3>
         <span v-if="totalDuration != null" class="text-[11px] text-editorial-text-muted">总耗时 {{ formatDuration(totalDuration) }}</span>
       </div>
-      <span v-if="stepTrace.filter(s => s.status === 'success').length === stepTrace.length" class="text-[11px] text-green-500">
-        全部完成
-      </span>
+      <div class="flex items-center gap-2">
+        <span v-if="stepTrace.filter(s => s.status === 'success').length === stepTrace.length" class="text-[11px] text-green-500">全部完成</span>
+        <a-button type="link" size="small" :aria-expanded="!flowCollapse.collapsed.value" data-writing-flow-collapse @click="flowCollapse.collapsed.value = !flowCollapse.collapsed.value">{{ flowCollapse.collapsed.value ? '展开' : '折叠' }}</a-button>
+      </div>
     </div>
 
     <!-- 中止信息 -->
@@ -260,8 +264,8 @@ function formatHumanWritingUsage(usage: unknown): string {
       ⏹ 流程中止于 Step {{ stopStep }}：{{ reasonText }}
     </div>
 
-    <!-- 时间线 -->
-    <div class="space-y-0">
+    <!-- 只隐藏步骤详情，中止提示和总体状态仍常驻，避免折叠后漏看失败原因。 -->
+    <div v-show="!flowCollapse.collapsed.value" data-writing-flow-content class="space-y-0">
       <div
         v-for="(entry, idx) in stepTrace"
         :key="entry.step"

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from "vue";
+import { Tag as ATag } from "ant-design-vue";
 import OperationCapabilityBadge from "../OperationCapabilityBadge.vue";
 import type { ArticleTitleCandidate, CreativeFinishedArticle } from "../../../services/creativeApi.js";
 import { charCount, countWords, formatAnomalyReason, formatReviewReason, titleRiskLabel } from "./articleDetailPresentation.js";
@@ -251,11 +252,13 @@ watch(() => props.editingTitleIndex, (index) => {
       </div>
     </div>
     <div v-if="(article.codeImageKeywords?.length ?? 0) > 0" class="flex flex-wrap gap-2">
-      <span
+      <a-tag
         v-for="keyword in article.codeImageKeywords"
         :key="keyword"
-        class="rounded-full bg-editorial-surface-muted px-2.5 py-1 text-xs text-editorial-text-main"
-      >{{ keyword }}</span>
+        color="purple"
+        data-code-image-keyword
+        class="!m-0 max-w-full !rounded-full !whitespace-normal break-words !px-2.5 !py-1"
+      >{{ keyword }}</a-tag>
     </div>
     <p v-else class="m-0 rounded-editorial-sm border border-dashed border-editorial-border px-3 py-2 text-xs text-editorial-text-muted">暂无标签：可点击“生成标签”让 Hermes 重新提取。代码图片会省略标签区域，不会用标题拆词代替。</p>
   </section>

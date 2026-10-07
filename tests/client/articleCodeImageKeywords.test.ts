@@ -75,6 +75,13 @@ describe("成品详情代码图片标签", () => {
     expect(section.text()).toContain("AI监管");
     expect(section.text()).toContain("算力供给");
     expect(section.text()).not.toContain("暂无标签");
+    const tags = section.findAll('[data-code-image-keyword]');
+    expect(tags.map(tag => tag.text())).toEqual(["AI监管", "算力供给"]);
+    for (const tag of tags) {
+      expect(tag.classes()).toContain("ant-tag");
+      expect(tag.classes()).toContain("ant-tag-purple");
+      expect(tag.classes()).toContain("!rounded-full");
+    }
   });
 
   it("没有标签时仍然展示区域并提供生成入口", () => {

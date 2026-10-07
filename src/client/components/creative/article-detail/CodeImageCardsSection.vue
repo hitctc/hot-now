@@ -121,7 +121,8 @@ function statusClass(card: CodeImageCard | null): string {
             v-for="item in displayCards"
             :key="item.key"
             class="article-cover-card overflow-hidden rounded-editorial-md border bg-editorial-bg-page"
-            :class="isCurrentCover(item.url) ? 'border-emerald-600 ring-2 ring-emerald-200' : 'border-editorial-border'"
+            :class="isCurrentCover(item.url) ? 'article-cover-card--selected' : 'border-editorial-border'"
+            :aria-current="isCurrentCover(item.url) ? 'true' : undefined"
             :data-code-image-card="item.variant ?? undefined"
           >
             <div class="article-cover-image flex items-center justify-center bg-white">
@@ -138,7 +139,10 @@ function statusClass(card: CodeImageCard | null): string {
               <div class="text-xs font-semibold text-editorial-text-main">{{ item.label }}</div>
               <div v-if="item.variant" :class="['text-[10px]', statusClass(item.card)]">{{ statusLabel(item.card) }}</div>
               <div class="text-[10px] text-editorial-text-muted">{{ article.direction === 'short_content' && item.variant === '1:1' ? '默认发布封面' : item.usage }}<template v-if="item.card"> · {{ item.card.width }} × {{ item.card.height }}</template></div>
-              <div v-if="isCurrentCover(item.url)" class="article-cover-current flex min-h-[44px] items-center justify-center rounded border border-emerald-600 bg-emerald-50 px-2 py-1 text-center text-xs font-bold text-emerald-800">✓ 当前发布封面</div>
+              <div v-if="isCurrentCover(item.url)" class="article-cover-current" role="status">
+                <span class="article-cover-current-icon" aria-hidden="true">✓</span>
+                <span class="article-cover-current-label">当前发布封面</span>
+              </div>
               <button
                 v-else-if="!readonly && item.coverIndex >= 0"
                 type="button"
@@ -159,6 +163,47 @@ function statusClass(card: CodeImageCard | null): string {
 </template>
 
 <style scoped>
+/* 选中状态同时依靠粗框、实色标识与勾选，不遮住缩略图，也不降低其他候选的可读性。 */
+.article-cover-card.article-cover-card--selected {
+  border-color: #047857;
+  background-color: #ecfdf5;
+  box-shadow: 0 0 0 3px #059669, 0 6px 14px rgb(4 120 87 / 18%);
+}
+/* 提高选择器权重，避免详情的旧移动端通用按钮样式把醒目标识压回小字。 */
+.article-cover-card--selected .article-cover-current {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 60px;
+  padding: 8px 6px;
+  border: none;
+  border-radius: 6px;
+  background-color: #047857;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+  text-align: center;
+}
+.article-cover-current-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  color: #047857;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+}
+.article-cover-current-label {
+  max-width: 100%;
+}
 /* 给缩略图留固定预算；等高完整缩放，操作及额外候选由详情外层自然滚动，不裁切也不内滚。 */
 .article-cover-image {
   height: min(160px, calc(min(440px, 60vh) / 2));

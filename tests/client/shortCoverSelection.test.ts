@@ -56,6 +56,29 @@ describe("短内容封面动作", () => {
       expect(wrapper.emitted("generate-cover-prompt")).toEqual([[]]);
     } finally { wrapper.unmount(); localStorage.clear(); }
   });
+  it.each(["article", "short_content"] as const)("%s当前封面高亮随索引切换，重复候选及只读时仍只有一个标识", async direction => {
+    const wrapper = mountCovers(direction);
+    try {
+      expect(wrapper.findAll('[aria-current="true"]')).toHaveLength(1);
+      expect(wrapper.findAll(".article-cover-card")[1]!.attributes("aria-current")).toBe("true");
+      await wrapper.setProps({ activeCoverIndex: 0 });
+      expect(wrapper.findAll(".article-cover-card")[0]!.classes()).toContain("article-cover-card--selected");
+      expect(wrapper.findAll(".article-cover-card")[1]!.classes()).not.toContain("article-cover-card--selected");
+      expect(wrapper.findAll(".article-cover-current")).toHaveLength(1);
+      await wrapper.setProps({ readonly: true, displayCoverImages: ["/wide.png", "/square.png", "/square.png"], activeCoverIndex: 2 });
+      expect(wrapper.findAll(".article-cover-card")).toHaveLength(2);
+      expect(wrapper.findAll('[aria-current="true"]')).toHaveLength(1);
+      expect(wrapper.findAll(".article-cover-card")[1]!.get(".article-cover-current-label").text()).toBe("当前发布封面");
+      expect(wrapper.find(".article-cover-select").exists()).toBe(false);
+    } finally { wrapper.unmount(); }
+  });
+  it("当前封面使用粗绿框、深绿白字与大勾选，不遮盖缩略图", () => {
+    const section = readFileSync("src/client/components/creative/article-detail/CodeImageCardsSection.vue", "utf8");
+    expect(section).toContain("box-shadow: 0 0 0 3px #059669");
+    expect(section).toMatch(/\.article-cover-card--selected \.article-cover-current\s*\{[^}]*background-color: #047857;[^}]*color: #ffffff;[^}]*font-weight: 800;/);
+    expect(section).toMatch(/\.article-cover-current-icon\s*\{[^}]*width: 26px;[^}]*height: 26px;/);
+    expect(section).not.toMatch(/position:\s*absolute/);
+  });
   it("缩略图按预算缩放，不新增内部滚动或重复独立区块", () => {
     const section = readFileSync("src/client/components/creative/article-detail/CodeImageCardsSection.vue", "utf8");
     expect(section).toContain("height: min(160px, calc(min(440px, 60vh) / 2))");
@@ -72,17 +95,18 @@ describe("短内容封面动作", () => {
     expect(button.classes()).not.toContain("absolute");
     expect(button.element.parentElement?.classList.contains("opacity-60")).toBe(false);
     expect(wrapper.text()).toContain("当前发布封面");
-    expect(wrapper.get(".article-cover-current").classes()).toEqual(expect.arrayContaining(["border-emerald-600", "bg-emerald-50", "text-emerald-800"]));
-    expect(wrapper.get(".article-cover-current").classes()).not.toContain("bg-violet-700");
+    expect(wrapper.get(".article-cover-current").attributes("role")).toBe("status");
+    expect(wrapper.get(".article-cover-current-icon").text()).toBe("✓");
+    expect(wrapper.get(".article-cover-current-icon").attributes("aria-hidden")).toBe("true");
     expect(button.classes()).toContain("bg-violet-600");
-    expect(wrapper.findAll(".article-cover-card")[1]!.classes()).toContain("border-emerald-600");
+    expect(wrapper.findAll(".article-cover-card")[1]!.classes()).toContain("article-cover-card--selected");
     await button.trigger("click");
     expect(wrapper.emitted("select-cover")).toEqual([[0]]);
     wrapper.unmount();
   });
   it("长短内容共用常驻封面选择，只读时不能选择或制作", () => {
     const long = mountCovers("article");
-    expect(long.get(".article-cover-current").classes()).toContain("bg-emerald-50");
+    expect(long.get('[aria-current="true"]').classes()).toContain("article-cover-card--selected");
     expect(long.get(".article-cover-select").classes()).not.toContain("absolute");
     expect(long.get(".article-cover-select").classes()).toContain("min-h-[44px]");
     long.unmount();

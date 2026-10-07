@@ -4,6 +4,7 @@
 
 import MarkdownIt from "markdown-it";
 import { injectSourceLineTracking } from "./mdSourceLines.js";
+import { styleShortPublishFooter } from "../utils/shortPublishFooter.js";
 
 // ── 主题定义 ──
 
@@ -211,6 +212,7 @@ injectSourceLineTracking(md);
 
 // ── 主题样式注入 ──
 
+/** 将指定主题注入正文，末尾固定互动文案使用主题之外的内联样式；返回预览和推送共用HTML，无存储副作用。 */
 function applyTheme(html: string, themeId: WechatThemeId): string {
   const theme = themes[themeId];
   if (!theme) throw new Error(`Unknown theme: ${themeId}`);
@@ -303,6 +305,9 @@ function applyTheme(html: string, themeId: WechatThemeId): string {
     }
   }
 
+  // 在所有主题及参考来源处理之后装饰结尾，避免主题把固定文案改成普通段落或灰字。
+  styleShortPublishFooter(doc);
+
   // 用 container 样式包裹
   const container = doc.createElement("div");
   container.setAttribute("style", style.container);
@@ -313,6 +318,7 @@ function applyTheme(html: string, themeId: WechatThemeId): string {
 
 // ── 公开接口 ──
 
+/** 将Markdown转换为选定主题的内联HTML，固定结尾样式不随主题变化；供预览、复制和草稿推送复用。 */
 export function renderWechatThemePreview(
   markdown: string,
   themeId: WechatThemeId

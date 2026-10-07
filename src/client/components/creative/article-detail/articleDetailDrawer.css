@@ -454,13 +454,12 @@
     width: 100%;
   }
 
-  /* 三列候选用等尺寸框完整展示不同长宽比，点击仍可预览原图。 */
+  /* 合并图片区保留三列，小图完整缩放；不另设滚动区，点击仍预览原图。 */
   .article-detail-modal .article-cover-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
   }
   .article-detail-modal .article-cover-image {
-    aspect-ratio: 1;
     background: white;
   }
   .article-detail-modal .article-cover-image .ant-image,

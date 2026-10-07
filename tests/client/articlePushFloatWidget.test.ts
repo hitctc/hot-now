@@ -78,7 +78,7 @@ describe("ArticlePushFloatWidget", () => {
     wrapper.unmount();
   });
 
-  it.each(["发布正文", "发布正文\n\n跪求点赞、关注，谢谢你。"])("列表入口短稿推送补结尾且已有结尾不重复：%s", async (body) => {
+  it.each(["发布正文", "发布正文\n\n跪求点赞、关注，谢谢你。", "发布正文\n\n跪求点赞、关注。"])("列表入口短稿推送补结尾且已有结尾不重复：%s", async (body) => {
     const short = { ...article, direction: "short_content", humanMarkdown: body };
     vi.mocked(readCreativeFinishedArticle).mockResolvedValue(short);
     vi.mocked(streamPushArticleToDraft).mockResolvedValue({ ok: true });
@@ -88,7 +88,7 @@ describe("ArticlePushFloatWidget", () => {
     });
     try {
       await (wrapper.vm as unknown as { startPush: () => Promise<void> }).startPush();
-      expect(renderWechatThemePreview).toHaveBeenCalledWith("发布正文\n\n跪求点赞、关注，谢谢你。", "bauhaus");
+      expect(renderWechatThemePreview).toHaveBeenCalledWith("发布正文\n\n跪求点赞、关注。", "bauhaus");
       expect(short.contentMarkdown).toBe("AI 草稿");
     } finally { wrapper.unmount(); }
   });

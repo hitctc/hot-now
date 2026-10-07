@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { appendShortPublishFooter } from "../../src/client/components/creative/shortPublishFooter.js";
+import { appendShortPublishFooter } from "../../src/client/utils/shortPublishFooter.js";
 
-const footer = "跪求点赞、关注，谢谢你。";
+const footer = "跪求点赞、关注。";
 
 describe("短成品发布结尾", () => {
   it("正文后留一个空行，重复拼接不会增加结尾", () => {
@@ -9,6 +9,9 @@ describe("短成品发布结尾", () => {
     expect(result).toBe(`# 标题\n\n发布正文\n\n${footer}`);
     expect(appendShortPublishFooter(result, "short_content")).toBe(result);
     expect(appendShortPublishFooter(`发布正文\n${footer}\n`, "short_content")).toBe(`发布正文\n\n${footer}`);
+  });
+  it("旧结尾及重复的新旧结尾统一换为一次新文案", () => {
+    expect(appendShortPublishFooter("发布正文\n\n跪求点赞、关注，谢谢你。\n\n跪求点赞、关注。", "short_content")).toBe(`发布正文\n\n${footer}`);
   });
   it.each(["article", undefined, "unknown"])("%s正文保持原样", direction => {
     const input = "正文\n\n\n";

@@ -1,5 +1,5 @@
 import type { Ref } from "vue";
-import { appendShortPublishFooter } from "../shortPublishFooter.js";
+import { appendShortPublishFooter } from "../../../utils/shortPublishFooter.js";
 
 import type { CreativeFinishedArticle } from "../../../services/creativeApi.js";
 

@@ -2,7 +2,7 @@ import { computed, ref, watch, getCurrentScope, onScopeDispose, type ComputedRef
 import { message } from "ant-design-vue";
 
 import { HttpError } from "../../../services/http.js";
-import { appendShortPublishFooter } from "../shortPublishFooter.js";
+import { appendShortPublishFooter } from "../../../utils/shortPublishFooter.js";
 import { readManualTextTask, saveManualTextTask, waitManualTextTask, type ManualTextOperation } from "./manualTextTaskWait.js";
 import {
   editFinishedArticle,

@@ -62,7 +62,7 @@ describe("article detail initialization", () => {
     const wrapper = mountDrawer(true, value);
     try {
       await flushPromises();
-      expect(wrapper.findComponent(ArticleEditorPanel).props("humanContent")).toBe("# 标题\n\n发布正文\n\n跪求点赞、关注，谢谢你。");
+      expect(wrapper.findComponent(ArticleEditorPanel).props("humanContent")).toBe("# 标题\n\n发布正文\n\n跪求点赞、关注。");
       expect(wrapper.findComponent(ArticleEditorPanel).props("aiDraft")).toBe("AI 正文");
       await wrapper.setProps({ readonly: false });
       wrapper.findComponent(ArticleDetailFooter).vm.$emit("save");
@@ -71,7 +71,7 @@ describe("article detail initialization", () => {
       await flushPromises();
       expect(save).toHaveBeenCalled();
       for (const [, fields] of save.mock.calls) {
-        expect(fields.humanMarkdown).toBe("# 标题\n\n发布正文\n\n跪求点赞、关注，谢谢你。");
+        expect(fields.humanMarkdown).toBe("# 标题\n\n发布正文\n\n跪求点赞、关注。");
         expect(fields.contentMarkdown).not.toContain("跪求点赞");
       }
     } finally { wrapper.unmount(); }

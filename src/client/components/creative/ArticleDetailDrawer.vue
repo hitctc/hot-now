@@ -111,14 +111,6 @@
           @generate-author-extensions="handleGenerateAuthorExtensions"
         />
 
-        <CodeImageCardsSection
-          :article="article"
-          :readonly="props.readonly"
-          :generating="codeImagesGenerating"
-          @generate="handleGenerateCodeImages"
-          @copy-url="copyCodeImageUrl"
-        />
-
         <ArticleShortImagePromptSection
           :direction="article.direction"
           :prompts="article.imagePrompts ?? []"
@@ -134,6 +126,7 @@
           :article-images="articleImages"
           :display-cover-images="displayCoverImages"
           :active-cover-index="activeCoverIndex"
+          :code-images-generating="codeImagesGenerating"
           :inline-image-slot-count="inlineImageSlotCount"
           :total-image-slot-count="totalImageSlotCount"
           :cover-prompt-generating="coverPromptGenerating"
@@ -148,6 +141,8 @@
           @generate-cover-prompt="handleGenerateCoverPrompt"
           @upload-cover="handleUploadCover"
           @select-cover="selectCoverImage"
+          @generate-code-images="handleGenerateCodeImages"
+          @copy-code-image-url="copyCodeImageUrl"
           @save-cover-prompt="saveCoverPrompt"
           @generate-inline-prompts="handleGenerateInlinePrompts"
           @upload-inline="handleUploadInlineImage"
@@ -225,7 +220,6 @@ import ArticleEditorPanel from "./article-detail/ArticleEditorPanel.vue";
 import ArticlePlanningSections from "./article-detail/ArticlePlanningSections.vue";
 import ArticleSimilaritySection from "./article-detail/ArticleSimilaritySection.vue";
 import ArticleSupplementalSections from "./article-detail/ArticleSupplementalSections.vue";
-import CodeImageCardsSection from "./article-detail/CodeImageCardsSection.vue";
 import ArticleImageWorkflowSections from "./article-detail/ArticleImageWorkflowSections.vue";
 import ArticleShortImagePromptSection from "./article-detail/ArticleShortImagePromptSection.vue";
 import ArticleDetailFooter from "./article-detail/ArticleDetailFooter.vue";

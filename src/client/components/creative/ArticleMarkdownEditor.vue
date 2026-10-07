@@ -92,6 +92,7 @@
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import MarkdownIt from "markdown-it";
 import { injectSourceLineTracking } from "../../services/mdSourceLines.js";
+import { SHORT_PUBLISH_FOOTER, styleShortPublishFooter } from "../../utils/shortPublishFooter.js";
 
 const props = withDefaults(defineProps<{
   modelValue: string;
@@ -149,8 +150,15 @@ md.core.ruler.push("external_links", (state) => {
 // 注入源码行号标记，预览每个块都能反查到源码行
 injectSourceLineTracking(md);
 
-// 主题预览关闭时也跳过本地回退，否则 CSS 隐藏仍会在每次输入时解析完整 Markdown。
-const renderedHtml = computed(() => props.previewEnabled ? md.render(props.modelValue || "") : "");
+/** 仅在预览可见时解析正文；实时预览的独立结尾与主题预览一致，无结尾时不额外解析DOM。 */
+const renderedHtml = computed(() => {
+  if (!props.previewEnabled) return "";
+  const html = md.render(props.modelValue || "");
+  if (!html.includes(SHORT_PUBLISH_FOOTER)) return html;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  styleShortPublishFooter(doc);
+  return doc.body.innerHTML;
+});
 
 function onInput(e: Event): void {
   emit("update:modelValue", (e.target as HTMLTextAreaElement).value);

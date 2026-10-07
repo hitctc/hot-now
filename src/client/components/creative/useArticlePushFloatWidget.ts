@@ -2,7 +2,7 @@ import { ref, reactive, computed, watch, onBeforeUnmount } from "vue";
 import type { CreativeFinishedArticle } from "../../services/creativeApi";
 import { streamPushArticleToDraft, readCreativeFinishedArticle, type PushDraftResult, type PushStepId, type PushProgressEvent, type WechatThemeId } from "../../services/creativeApi";
 import { renderWechatThemePreview } from "../../services/wechatRenderer";
-import { appendShortPublishFooter } from "./shortPublishFooter.js";
+import { appendShortPublishFooter } from "../../utils/shortPublishFooter.js";
 
 export type ArticlePushFloatWidgetProps = {
   visible: boolean;

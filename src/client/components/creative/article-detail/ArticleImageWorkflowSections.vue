@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import EditablePromptRow from "../EditablePromptRow.vue";
+import CodeImageCardsSection from "./CodeImageCardsSection.vue";
 import OperationCapabilityBadge from "../OperationCapabilityBadge.vue";
 import { useArticleDetailSectionCollapse } from "./useArticleDetailSectionCollapse.js";
 import {
@@ -16,6 +17,7 @@ const props = defineProps<{
   articleImages: ArticleImageEntry[];
   displayCoverImages: string[];
   activeCoverIndex: number;
+  codeImagesGenerating?: boolean;
   inlineImageSlotCount: number;
   totalImageSlotCount: number;
   coverPromptGenerating: boolean;
@@ -28,6 +30,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  (event: "generate-code-images", mode: "missing" | "all"): void;
+  (event: "copy-code-image-url", url: string): void;
   (event: "copy-prompt", value: string): void;
   (event: "prompt-dirty", key: string, dirty: boolean): void;
   (event: "generate-cover-prompt"): void;
@@ -95,9 +99,17 @@ function lunaJobStatusClass(job: LunaImageJob | undefined): string {
 </script>
 
 <template>
-  <section>
-    <div class="article-section-heading mb-2 flex items-center justify-between">
-      <h3 class="m-0 text-sm font-semibold text-editorial-text-muted">封面图</h3>
+  <CodeImageCardsSection
+    :article="article"
+    :readonly="readonly"
+    :generating="codeImagesGenerating ?? false"
+    :display-cover-images="displayCoverImages"
+    :active-cover-index="activeCoverIndex"
+    @generate="emit('generate-code-images', $event)"
+    @copy-url="emit('copy-code-image-url', $event)"
+    @select-cover="emit('select-cover', $event)"
+  >
+    <template #actions>
       <div v-if="!readonly" class="flex flex-wrap items-center gap-3">
         <a-button
           type="link"
@@ -134,59 +146,21 @@ function lunaJobStatusClass(job: LunaImageJob | undefined): string {
           >{{ lunaJobStatusLabel(lunaJobFor(lunaImageJobs, 'cover')) }}</span>
         </span>
       </div>
-    </div>
-    <template v-if="displayCoverImages.length > 0">
-      <a-image-preview-group>
-        <div class="article-cover-grid grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <template v-for="(url, index) in displayCoverImages" :key="index">
-            <div
-              v-if="url"
-              class="article-cover-card relative overflow-hidden rounded-editorial-md border transition-all"
-              :class="index === activeCoverIndex
-                ? 'border-emerald-600 ring-2 ring-emerald-200'
-                : article.direction === 'short_content'
-                  ? 'border-editorial-border hover:border-editorial-link-active'
-                  : 'border-editorial-border opacity-60 hover:opacity-100 hover:border-editorial-link-active/40'"
-            >
-              <div class="article-cover-image">
-                <a-image :src="url" :alt="`封面图 ${index + 1}`" class="block w-full object-cover" loading="lazy" />
-              </div>
-              <div
-                v-if="index === activeCoverIndex"
-                class="article-cover-current"
-                :class="article.direction === 'short_content'
-                  ? 'absolute right-2 top-2 flex items-center gap-1 rounded border border-emerald-600 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 shadow-sm'
-                  : 'absolute right-1 top-1 flex items-center gap-0.5 rounded border border-emerald-600 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 shadow-sm'"
-              ><span class="inline-block h-3 w-3 leading-none text-center">✓</span> {{ article.direction === 'short_content' ? '当前发布封面' : '发布封面' }}</div>
-              <div v-if="index === 0 && index !== activeCoverIndex" class="absolute left-1 top-1 rounded bg-black/40 px-1 py-0.5 text-[10px] text-white">最新</div>
-              <button
-                v-if="!readonly && index !== activeCoverIndex"
-                class="article-cover-select"
-                :class="article.direction === 'short_content'
-                  ? 'flex min-h-[44px] w-full items-center justify-center border-t border-violet-700 bg-violet-600 px-3 py-2 text-sm font-bold text-white shadow-sm hover:bg-violet-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600'
-                  : 'absolute right-1 bottom-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white hover:bg-black/80'"
-                @click.stop="emit('select-cover', index)"
-              >设为发布封面</button>
-            </div>
-          </template>
-        </div>
-      </a-image-preview-group>
     </template>
-    <div v-else class="flex items-center justify-center rounded-editorial-md border border-dashed border-editorial-border bg-editorial-bg-page px-4 py-6 text-xs text-editorial-text-muted">
-      暂无封面图，请先在外部生图后上传
-    </div>
-    <EditablePromptRow
-      class="mt-1.5"
-      label="封面 Prompt"
-      :value="article.coverImagePrompt ?? ''"
-      :readonly="readonly"
-      :regenerating="coverPromptGenerating"
-      @copy="emit('copy-prompt', $event)"
-      @save="emit('save-cover-prompt', $event)"
-      @regenerate="emit('generate-cover-prompt')"
-      @dirty-change="emit('prompt-dirty', 'cover', $event)"
-    />
-  </section>
+    <template #prompt>
+      <EditablePromptRow
+        class="mt-1.5"
+        label="封面 Prompt"
+        :value="article.coverImagePrompt ?? ''"
+        :readonly="readonly"
+        :regenerating="coverPromptGenerating"
+        @copy="emit('copy-prompt', $event)"
+        @save="emit('save-cover-prompt', $event)"
+        @regenerate="emit('generate-cover-prompt')"
+        @dirty-change="emit('prompt-dirty', 'cover', $event)"
+      />
+    </template>
+  </CodeImageCardsSection>
 
   <section v-if="!readonly || articleImages.length > 0 || inlineImageSlotCount > 0 || Object.keys(article.inlineImagePrompts ?? {}).length > 0 || (article.imagePrompts?.length ?? 0) > 0">
     <div class="article-section-heading mb-2 flex items-center justify-between">

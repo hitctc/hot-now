@@ -18,7 +18,7 @@ describe("发布结尾独立样式", () => {
       expect(wrapper.find("[data-short-publish-footer]").exists()).toBe(false);
     } finally { wrapper.unmount(); }
   });
-  it.each(themeIds)("%s主题下保留手写落款、错位双字章且去掉外框", theme => {
+  it.each(themeIds)("%s主题下跪求是大字主标题，保留宣言海报的强对比和层次", theme => {
     const markdown = appendShortPublishFooter("# 标题\n\n正文\n\n跪求点赞、关注，谢谢你。", "short_content");
     const html = renderWechatThemePreview(markdown, theme);
     const doc = new DOMParser().parseFromString(html, "text/html");
@@ -29,31 +29,36 @@ describe("发布结尾独立样式", () => {
     // DOM替身会把 border:none 的单项属性读成空串，直接验证实际输出的完整声明。
     expect(card.getAttribute("style")).toMatch(/(?:^|;)\s*border: none;/);
     const text = card.querySelector("p")!;
-    expect(text.style.backgroundColor).toBe("rgb(237, 243, 255)");
+    expect(text.style.backgroundColor).toBe("rgb(23, 32, 57)");
     expect(text.style.maxWidth).toBe("100%");
+    expect(text.style.width).toBe("270px");
+    expect(text.style.borderRadius).toBe("0");
+    expect(text.style.boxShadow).toContain("6px 6px");
     const request = card.querySelector<HTMLElement>('[data-footer-part="request"]')!;
-    expect(request.style.fontFamily).toContain("Kaiti");
-    expect(request.style.fontSize).toBe("14px");
-    expect(request.style.color).toBe("rgb(82, 105, 141)");
+    expect(request.textContent).toBe("跪求");
+    expect(request.style.fontFamily).not.toContain("Kaiti");
+    expect(request.style.fontSize).toBe("36px");
+    expect(request.style.fontWeight).toBe("900");
+    expect(request.style.color).toBe("rgb(23, 32, 57)");
+    expect(request.style.backgroundColor).toBe("rgb(255, 91, 121)");
+    expect(request.nextElementSibling?.tagName).toBe("BR");
     const like = card.querySelector<HTMLElement>('[data-footer-part="like"]')!;
     const follow = card.querySelector<HTMLElement>('[data-footer-part="follow"]')!;
     expect(like.textContent).toBe("点赞");
-    expect(like.style.color).toBe("rgb(23, 50, 91)");
-    expect(like.style.backgroundColor).toBe("rgb(255, 255, 255)");
+    expect(like.style.color).toBe("rgb(255, 255, 255)");
     expect(follow.textContent).toBe("关注");
-    expect(follow.style.color).toBe("rgb(255, 255, 255)");
-    expect(follow.style.backgroundColor).toBe("rgb(52, 89, 230)");
+    expect(follow.style.color).toBe("rgb(255, 157, 177)");
     expect(like.style.fontWeight).toBe("800");
-    expect(follow.style.fontSize).toBe("24px");
-    expect(like.style.verticalAlign).toBe("2px");
-    expect(follow.style.verticalAlign).toBe("-2px");
-    expect(like.style.boxShadow).toContain("inset");
-    expect(follow.style.boxShadow).toContain("inset");
+    expect(like.style.fontSize).toBe("26px");
+    expect(follow.style.fontSize).toBe("26px");
+    expect(like.style.borderBottomWidth).toBe("4px");
+    expect(follow.style.borderBottomWidth).toBe("4px");
+    expect(parseInt(request.style.fontSize)).toBeGreaterThan(parseInt(like.style.fontSize));
     expect(card.querySelector("a, button, img, svg")).toBeNull();
     expect(html).not.toContain("谢谢你");
   });
 
-  it.each(themeIds)("%s公众号兼容处理保留字章、落款及标点，不依赖外部资源", async theme => {
+  it.each(themeIds)("%s公众号兼容处理保留大字标题、海报层次及标点，不依赖外部资源", async theme => {
     const html = renderWechatThemePreview("正文\n\n跪求点赞、关注。", theme);
     const compatible = await makeWechatCompatible(html, { skipImageBase64: true });
     const before = new DOMParser().parseFromString(html, "text/html").querySelector("[data-short-publish-footer]")!;

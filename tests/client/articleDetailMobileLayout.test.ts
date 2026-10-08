@@ -43,6 +43,12 @@ describe("成品文章详情弹窗移动端布局", () => {
     expect(drawerSource).toContain('@close="handleClose"');
   });
 
+  it("详情弹窗右上角关闭按钮与文章队列关闭按钮同为44像素方形点击区", () => {
+    const queueStyles = readFileSync(resolve(process.cwd(), "src/client/components/creative/WriteQueueStatus.vue"), "utf8");
+    expect(styles).toMatch(/\.article-detail-modal \.ant-modal-close\s*\{[^}]*width: 44px;[^}]*height: 44px;/);
+    expect(queueStyles).toMatch(/\.write-queue-control\s*\{[^}]*width: 44px;[^}]*height: 44px;/);
+  });
+
   it("所有屏幕的关闭按钮文字在按钮内部水平和垂直居中", () => {
     const sharedStyles = styles.slice(0, styles.indexOf("@media (max-width: 768px)"));
     expect(sharedStyles).toMatch(/\.article-detail-footer \.article-detail-footer__close\s*\{[^}]*align-items: center;[^}]*justify-content: center;/);

@@ -137,6 +137,29 @@
   /* 清掉 antd 默认外边距：三段结构应背靠背，靠背景与阴影区分而不是留缝。 */
   margin-bottom: 0 !important;
 }
+.article-detail-modal .ant-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  color: #6b7280;
+}
+.article-detail-modal .ant-modal-close-x {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+  line-height: 1;
+}
+.article-detail-modal .ant-modal-close:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
 .article-detail-modal .ant-modal-body {
   background: #ffffff;
   flex: 1;

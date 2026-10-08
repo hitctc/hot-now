@@ -78,6 +78,21 @@ describe("parseJuyaIssue", () => {
     );
   });
 
+  it.each(["h2", "h3"])("兼容 %s 条目详情标题，摘要和正文不串入下一条", async heading => {
+    const xml = `<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><item><title>2026-10-08</title><content:encoded><![CDATA[
+      <h2>概览</h2><h3>要闻</h3><ul>
+        <li>条目一 <a href="https://example.com/one">↗</a> <code>#1</code></li>
+        <li>条目二 <a href="https://example.com/two">↗</a> <code>#2</code></li>
+      </ul><hr><h2>要闻</h2>
+      <${heading}>条目一 <code>#1</code></${heading}><blockquote><p>条目一摘要</p></blockquote><p>条目一正文</p>
+      <${heading}>条目二 <code>#2</code></${heading}><blockquote><p>条目二摘要</p></blockquote><p>条目二正文</p>
+    ]]></content:encoded></item></channel></rss>`;
+    const issue = await parseJuyaIssue(xml);
+    expect(issue.items).toHaveLength(2);
+    expect(issue.items[0]).toMatchObject({ summary: "条目一摘要", contentHtml: "条目一摘要\n\n条目一正文" });
+    expect(issue.items[1]).toMatchObject({ summary: "条目二摘要", contentHtml: "条目二摘要\n\n条目二正文" });
+  });
+
   it("extracts per-item summaries from the detailed article sections", async () => {
     const xml = `<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><item><title>2026-04-01</title><link>https://example.com/issue</link><content:encoded><![CDATA[
       <h2>概览</h2>

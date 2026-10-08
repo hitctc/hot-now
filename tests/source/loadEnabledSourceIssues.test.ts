@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { mkdtemp } from "node:fs/promises";
 import os from "node:os";
+import { createServer } from "node:http";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { openDatabase } from "../../src/core/db/openDatabase.js";
@@ -15,6 +16,36 @@ describe("loadEnabledSourceIssues", () => {
     vi.restoreAllMocks();
     while (databasesToClose.length > 0) {
       databasesToClose.pop()?.close();
+    }
+  });
+
+  it("Juya 首次连接中断后仍能重试并加载当天条目", async () => {
+    vi.unstubAllGlobals();
+    const xml = await readFile("tests/fixtures/juya-rss.xml", "utf8");
+    let requests = 0;
+    const server = createServer((request, response) => {
+      // 模拟生产连接失败，第二次才返回 RSS；不是替换项目内部请求函数。
+      if (++requests === 1) { request.socket.destroy(); return; }
+      response.end(xml);
+    });
+    await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address() as { port: number };
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-juya-retry-"));
+    const db = openDatabase(path.join(tempDir, "hot-now.sqlite"));
+    databasesToClose.push(db);
+    runMigrations(db);
+    seedInitialData(db, { username: "admin", password: "bootstrap-password" });
+    db.prepare("UPDATE content_sources SET is_enabled = CASE WHEN kind = 'juya' THEN 1 ELSE 0 END").run();
+    db.prepare("UPDATE content_sources SET rss_url = ? WHERE kind = 'juya'").run(`http://localhost:${address.port}/rss.xml`);
+    try {
+      const issues = await loadEnabledSourceIssues(db);
+      expect(issues[0]).toMatchObject({ sourceKind: "juya", date: "2026-03-26" });
+      expect(issues[0].items).toHaveLength(2);
+      expect(issues.failures).toEqual([]);
+      expect(requests).toBe(2);
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>(resolve => server.close(() => resolve()));
     }
   });
 

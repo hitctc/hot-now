@@ -1,5 +1,6 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
 import { parseArticleFeed } from "./parseArticleFeed.js";
+import { fetchJuyaRss } from "./fetchJuyaRss.js";
 import { hasBuiltinSourceAdapter, sourceAdapters } from "./sourceAdapters.js";
 import { resolveRuntimeSourcePriority, toRuntimeArticleSourceDefinition } from "./sourceRuntimeMetadata.js";
 import type { LoadedIssue, SourceKind } from "./types.js";
@@ -71,6 +72,7 @@ export async function loadEnabledSourceIssues(db: SqliteDatabase): Promise<Loade
   return Object.assign(loadedIssues, { failures });
 }
 
+/** 根据来源选择解析器并读取 RSS；Juya 使用局部 IPv4 与有限重试，其他来源保持原请求方式。 */
 async function loadEnabledSourceIssue(source: EnabledSourceRow): Promise<LoadedIssue> {
   const adapter = readSourceAdapter(source);
   const normalizedRssUrl = source.rss_url?.trim();
@@ -79,7 +81,7 @@ async function loadEnabledSourceIssue(source: EnabledSourceRow): Promise<LoadedI
     throw new Error(`Content source ${source.kind} does not have an rss_url`);
   }
 
-  const response = await fetch(normalizedRssUrl);
+  const response = source.kind === "juya" ? await fetchJuyaRss(normalizedRssUrl) : await fetch(normalizedRssUrl);
 
   // The loader stays strict about 200-only responses so one broken source does not silently
   // masquerade as fresh content in the merged digest run.

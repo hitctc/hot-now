@@ -38,8 +38,7 @@ export type RunCollectionCycleResult = {
   mailStatus: string;
 };
 
-// This runs the collection-side pipeline end to end and persists the same report artifacts
-// as the digest flow, but intentionally leaves mail delivery for a later phase.
+/** 采集启用来源并保存报告、内容和素材，不发邮件；运行记录保留单源失败原因，避免整体完成掩盖漏采。 */
 export async function runCollectionCycle(
   config: RuntimeConfig,
   trigger: DailyReportTrigger,
@@ -74,7 +73,8 @@ export async function runCollectionCycle(
             sourceKinds: issues.map((issue) => issue.sourceKind),
             sourceCount: issues.length,
             sourceFailureCount: sourceFailures.length,
-            failedSourceKinds: sourceFailures.map((failure) => failure.kind)
+            failedSourceKinds: sourceFailures.map((failure) => failure.kind),
+            sourceFailures
           })
         })
       )
@@ -121,7 +121,8 @@ export async function runCollectionCycle(
       degraded: report.meta.degraded,
       topicCount: report.meta.topicCount,
       sourceFailureCount: sourceFailures.length,
-      failedSourceKinds: sourceFailures.map((failure) => failure.kind)
+      failedSourceKinds: sourceFailures.map((failure) => failure.kind),
+      sourceFailures
     });
 
     if (runtimeDeps.db && collectionRunId != null) {
@@ -135,6 +136,7 @@ export async function runCollectionCycle(
             sourceCount: issues.length,
             sourceFailureCount: sourceFailures.length,
             failedSourceKinds: sourceFailures.map((failure) => failure.kind),
+            sourceFailures,
             itemCount: enrichedItems.length,
             degraded: report.meta.degraded,
             mailStatus: collectionMailStatus
@@ -177,6 +179,7 @@ export async function runCollectionCycle(
             sourceCount: issues.length,
             sourceFailureCount: sourceFailures.length,
             failedSourceKinds: sourceFailures.map((failure) => failure.kind),
+            sourceFailures,
             error: error instanceof Error ? error.message : "unknown"
           })
         });
@@ -187,26 +190,29 @@ export async function runCollectionCycle(
   }
 }
 
-// Each source item gets a fetched article result so topic clustering can keep degraded entries in the run.
+/** Juya 已提供正文时直接复用，避免外站超时拖住已获取的素材；缺正文或其他来源仍沿用原文抓取。 */
 async function enrichItem(
   item: LoadedIssue["items"][number],
-  fetchArticle: (url: string) => Promise<ArticleResult>
+  fetchArticle: (url: string) => Promise<ArticleResult>,
+  sourceKind: LoadedIssue["sourceKind"]
 ): Promise<EnrichedCollectedItem> {
+  if (sourceKind === "juya" && item.contentHtml?.trim()) {
+    return { ...item, article: { ok: true, url: item.sourceUrl, title: item.title, text: item.contentHtml } };
+  }
   return {
     ...item,
     article: await fetchArticle(item.sourceUrl)
   };
 }
 
-// Each enabled issue is enriched independently so one source can still contribute even if a
-// sibling source has a degraded article fetch.
+/** 为单期条目补齐正文结果，Juya 优先使用 RSS 正文；其他来源的正文与降级语义保持不变。 */
 export async function enrichIssue(
   issue: LoadedIssue,
   fetchArticle: (url: string) => Promise<ArticleResult>
 ): Promise<EnrichedIssue> {
   return {
     ...issue,
-    items: await Promise.all(issue.items.map((item) => enrichItem(item, fetchArticle)))
+    items: await Promise.all(issue.items.map((item) => enrichItem(item, fetchArticle, issue.sourceKind)))
   };
 }
 

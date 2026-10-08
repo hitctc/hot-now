@@ -5,6 +5,7 @@ import type { SqliteDatabase } from "../db/openDatabase.js";
 import { fetchAndExtractArticle, type ArticleResult } from "../fetch/extractArticle.js";
 import { persistCollectedItems, enrichIssue, type EnrichedIssue } from "../pipeline/runCollectionCycle.js";
 import { parseJuyaIssue } from "./parseJuyaIssue.js";
+import { fetchJuyaRss } from "./fetchJuyaRss.js";
 import type { LoadedIssue } from "./types.js";
 
 export type JuyaCollectionResult = {
@@ -13,7 +14,7 @@ export type JuyaCollectionResult = {
   reason?: string;
 };
 
-// 独立采集只复用解析 + 持久化逻辑，跳过聚类、日报和邮件，避免为了单源补数据拖累其他来源。
+/** 独立采集 Juya 并持久化内容与素材；与定时采集共用 IPv4、超时重试，不生成日报或发送邮件。 */
 export async function runJuyaCollection(
   db: SqliteDatabase,
   options?: { fetchArticle?: (url: string) => Promise<ArticleResult> }
@@ -27,11 +28,11 @@ export async function runJuyaCollection(
     return { ok: false, itemCount: 0, reason: "juya-rss-url-empty" };
   }
 
-  let response: Response;
+  let response: Awaited<ReturnType<typeof fetchJuyaRss>>;
   try {
-    response = await fetch(rssUrl);
-  } catch {
-    return { ok: false, itemCount: 0, reason: "juya-fetch-failed" };
+    response = await fetchJuyaRss(rssUrl);
+  } catch (error) {
+    return { ok: false, itemCount: 0, reason: `juya-fetch-failed: ${error instanceof Error ? error.message : "unknown"}` };
   }
   if (response.status !== 200) {
     return { ok: false, itemCount: 0, reason: `juya-http-${response.status}` };

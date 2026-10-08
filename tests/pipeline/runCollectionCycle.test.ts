@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { openDatabase } from "../../src/core/db/openDatabase.js";
 import { runMigrations } from "../../src/core/db/runMigrations.js";
-import { runCollectionCycle, type RunCollectionCycleDeps } from "../../src/core/pipeline/runCollectionCycle.js";
+import { enrichIssue, runCollectionCycle, type RunCollectionCycleDeps } from "../../src/core/pipeline/runCollectionCycle.js";
 import { seedInitialData } from "../../src/core/db/seedInitialData.js";
 import { createTwitterAccount } from "../../src/core/twitter/twitterAccountRepository.js";
 import type { RuntimeConfig } from "../../src/core/types/appConfig.js";
@@ -46,6 +46,46 @@ function makeConfig(rootDir: string): RuntimeConfig {
 }
 
 describe("runCollectionCycle", () => {
+  it("Juya 已有 RSS 正文时无需再次访问原文站点", async () => {
+    const fetchArticle = vi.fn().mockRejectedValue(new Error("原文站点连接超时"));
+    const issue = await enrichIssue({
+      date: "2026-10-08", issueUrl: "https://daily.juya.uk/issues/2026-10-08/",
+      sourceKind: "juya", sourceType: "aggregator", sourcePriority: 70,
+      items: [{ rank: 1, category: "要闻", title: "RSS 标题", sourceUrl: "https://example.com/news", contentHtml: "RSS 提供的完整中文正文" }],
+    }, fetchArticle);
+    expect(issue.items[0].article).toMatchObject({ ok: true, title: "RSS 标题", text: "RSS 提供的完整中文正文" });
+    expect(fetchArticle).not.toHaveBeenCalled();
+  });
+
+  it("其他来源即使带 RSS 内容也保留原文抓取行为", async () => {
+    const fetchArticle = vi.fn().mockResolvedValue({ ok: true, url: "https://example.com/news", title: "原文标题", text: "原文正文" });
+    const issue = await enrichIssue({
+      date: "2026-10-08", issueUrl: "https://example.com/rss.xml",
+      sourceKind: "openai", sourceType: "official", sourcePriority: 95,
+      items: [{ rank: 1, category: "要闻", title: "RSS 标题", sourceUrl: "https://example.com/news", contentHtml: "RSS 摘要" }],
+    }, fetchArticle);
+    expect(issue.items[0].article).toMatchObject({ text: "原文正文" });
+  });
+
+  it("采集整体完成时仍在报告元数据和运行记录中保留单源失败原因", async () => {
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-source-failure-"));
+    const db = createTestDatabase(path.join(rootDir, "hot-now.sqlite"));
+    const failures = [{ kind: "juya", reason: "Juya RSS 请求失败：RSS_TIMEOUT（已尝试 3 次）" }];
+    try {
+      await runCollectionCycle(makeConfig(rootDir), "scheduled", {
+        db,
+        loadEnabledSourceIssues: vi.fn().mockResolvedValue(Object.assign([{
+          date: "2026-10-08", issueUrl: "https://openai.com/news/", sourceKind: "openai", sourceType: "official", sourcePriority: 95, items: [],
+        }], { failures })),
+      });
+      const meta = JSON.parse(await readFile(path.join(rootDir, "2026-10-08", "run-meta.json"), "utf8"));
+      expect(meta.sourceFailures).toEqual(failures);
+      const run = db.prepare("SELECT status, notes FROM collection_runs ORDER BY id DESC LIMIT 1").get() as { status: string; notes: string };
+      expect(run.status).toBe("completed");
+      expect(JSON.parse(run.notes).sourceFailures).toEqual(failures);
+    } finally { db.close(); }
+  });
+
   it("keeps the juya feed title even when article extraction returns a different page title", async () => {
     const rootDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-collection-"));
     const config = makeConfig(rootDir);

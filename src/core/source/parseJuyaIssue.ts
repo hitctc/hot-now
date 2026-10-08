@@ -77,12 +77,11 @@ export async function parseJuyaIssue(feedXml: string): Promise<DailyIssue> {
   };
 }
 
+/** 按条目编号提取摘要，兼容旧 h2 与现役 h3 详情标题，不把整期正文混成一个摘要。 */
 function collectDetailedSummaries($: cheerio.CheerioAPI): Map<number, string> {
   const summariesByRank = new Map<number, string>();
 
-  // Each detailed section starts at an h2 heading, so we only need to read the nearby blockquote
-  // or the first body paragraphs instead of flattening the whole issue page into one summary blob.
-  $("h2").each((_, element) => {
+  $("h2, h3").each((_, element) => {
     const headingText = normalizeText($(element).text());
 
     if (!headingText || headingText === "概览") {
@@ -95,7 +94,7 @@ function collectDetailedSummaries($: cheerio.CheerioAPI): Map<number, string> {
       return;
     }
 
-    const sectionNodes = $(element).nextUntil("h2");
+    const sectionNodes = $(element).nextUntil("h2, h3");
     const summary = extractSectionSummary($, sectionNodes);
 
     if (summary) {
@@ -106,12 +105,11 @@ function collectDetailedSummaries($: cheerio.CheerioAPI): Map<number, string> {
   return summariesByRank;
 }
 
-// 收集每个条目详情区块的完整正文（blockquote + 全部段落文本）
-// Juya RSS 的详情区块是人工筛选整理的中文内容，质量优于从原始 URL 重新抓取
+/** 按编号收集详情摘要及全部正文段落；遇到下个 h2/h3 即停止，避免当前分栏结构串入下一条。 */
 function collectDetailedContents($: cheerio.CheerioAPI): Map<number, string> {
   const contentsByRank = new Map<number, string>();
 
-  $("h2").each((_, element) => {
+  $("h2, h3").each((_, element) => {
     const headingText = normalizeText($(element).text());
 
     if (!headingText || headingText === "概览") {
@@ -124,7 +122,7 @@ function collectDetailedContents($: cheerio.CheerioAPI): Map<number, string> {
       return;
     }
 
-    const sectionNodes = $(element).nextUntil("h2");
+    const sectionNodes = $(element).nextUntil("h2, h3");
     const parts: string[] = [];
 
     sectionNodes.filter("blockquote, p").each((_, el) => {

@@ -28,7 +28,7 @@ describe("发布结尾独立样式", () => {
     expect(card.style.backgroundColor).toBe("transparent");
     // DOM替身会把 border:none 的单项属性读成空串，直接验证实际输出的完整声明。
     expect(card.getAttribute("style")).toMatch(/(?:^|;)\s*border: none;/);
-    const text = card.querySelector("p")!;
+    const text = card.querySelector<HTMLElement>("[data-footer-panel]")!;
     expect(text.style.backgroundColor).toBe("rgb(23, 32, 57)");
     expect(text.style.maxWidth).toBe("100%");
     expect(text.style.width).toBe("270px");
@@ -64,6 +64,8 @@ describe("发布结尾独立样式", () => {
     const before = new DOMParser().parseFromString(html, "text/html").querySelector("[data-short-publish-footer]")!;
     const card = new DOMParser().parseFromString(compatible, "text/html").querySelector("[data-short-publish-footer]")!;
     expect(card.textContent).toBe("跪求点赞、关注。");
+    // 微信草稿解析对 section 末尾的 p 不稳定，确保最终提交结构避开该组合。
+    expect(card.lastElementChild?.tagName).not.toBe("P");
     for (const key of ["request", "like", "separator", "follow", "stop"]) {
       const selector = `[data-footer-part="${key}"]`;
       expect(card.querySelector(selector)!.getAttribute("style")).toBe(before.querySelector(selector)!.getAttribute("style"));

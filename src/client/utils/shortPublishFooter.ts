@@ -25,9 +25,11 @@ export function styleShortPublishFooter(doc: Document): void {
   const card = doc.createElement("section");
   card.setAttribute("data-short-publish-footer", "");
   card.setAttribute("style", "margin: 32px 0 12px; padding: 12px 8px 18px; border: none; background-color: transparent; text-align: center;");
+  // 草稿接口对 section 末尾的 p 处理不稳定，改用嵌套 section 承载卡片，避免结尾整段丢失。
+  const panel = doc.createElement("section");
+  panel.setAttribute("data-footer-panel", "");
   const font = "-apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif";
-  footer.setAttribute("style", `display: inline-block; box-sizing: border-box; width: 270px; max-width: 100%; margin: 0; padding: 18px 18px 22px; border: none; border-radius: 0; background-color: #172039; color: #ffffff; box-shadow: 6px 6px 0 #ff5b79; font-family: ${font}; font-size: 26px; font-weight: 800; line-height: 1.6; text-align: left; white-space: normal;`);
-  footer.textContent = "";
+  panel.setAttribute("style", `display: inline-block; box-sizing: border-box; width: 270px; max-width: 100%; margin: 0; padding: 18px 18px 22px; border: none; border-radius: 0; background-color: #172039; color: #ffffff; box-shadow: 6px 6px 0 #ff5b79; font-family: ${font}; font-size: 26px; font-weight: 800; line-height: 1.6; text-align: left; white-space: normal;`);
   // 每段显式给定字体和颜色，避免公众号兼容处理用正文主题覆盖它们。
   // 标点独立成段，避免兼容处理将其并入重点词；普通换行代替定位或弹性布局。
   // 标题带的切角是可降级的渐变，渐变和阴影被微信移除时，实色与大字仍成立。
@@ -43,9 +45,9 @@ export function styleShortPublishFooter(doc: Document): void {
     span.setAttribute("data-footer-part", part.key);
     span.setAttribute("style", `display: inline-block; white-space: nowrap; ${part.style}`);
     span.textContent = part.text;
-    footer.appendChild(span);
-    if (part.key === "request") footer.appendChild(doc.createElement("br"));
+    panel.appendChild(span);
+    if (part.key === "request") panel.appendChild(doc.createElement("br"));
   }
   footer.replaceWith(card);
-  card.appendChild(footer);
+  card.appendChild(panel);
 }

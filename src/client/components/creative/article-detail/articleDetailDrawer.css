@@ -319,9 +319,11 @@
   /* 同理清掉 antd 默认外边距，避免正文与操作栏之间出现空白缝隙。 */
   margin-top: 0 !important;
 }
-/* 关闭入口仅补给底部操作区，桌面端继续使用弹窗右上角关闭按钮。 */
-.article-detail-footer .article-detail-footer__mobile-close {
-  display: none;
+/* 两端都提供底部关闭入口，与保存相邻；文字居中沿用原移动端表现。 */
+.article-detail-footer .article-detail-footer__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* 包装候选操作只用于移动端分层，桌面仍按原来的单行弹性布局排布。 */
@@ -497,11 +499,6 @@
     flex-wrap: nowrap !important;
     overflow-x: auto;
     gap: 8px !important;
-  }
-  .article-detail-footer .article-detail-footer__mobile-close {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
   }
   /* 复制和废弃在桌面端保留，移动端不占底部操作栏宽度。 */
   .article-detail-footer .article-detail-footer__desktop-only {

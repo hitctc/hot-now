@@ -36,14 +36,16 @@ describe("成品文章详情弹窗移动端布局", () => {
     expect(detailSource).toMatch(/function closeDetail\(\): void \{\s*requests.invalidate\(\);\s*detailLoading.value = false;/);
   });
 
-  it("移动端底部关闭按钮只在窄屏显示，并走现有关闭处理", () => {
-    expect(styles).toMatch(/\.article-detail-footer \.article-detail-footer__mobile-close\s*\{[^}]*display: none;/);
-    expect(mobileStyles).toMatch(/\.article-detail-footer \.article-detail-footer__mobile-close\s*\{[^}]*display: inline-flex;/);
+  it("电脑和移动端都显示底部关闭按钮，并走现有关闭处理", () => {
+    const sharedStyles = styles.slice(0, styles.indexOf("@media (max-width: 768px)"));
+    expect(sharedStyles).toMatch(/\.article-detail-footer \.article-detail-footer__close\s*\{[^}]*display: inline-flex;/);
+    expect(styles).not.toMatch(/\.article-detail-footer \.article-detail-footer__close\s*\{[^}]*display: none;/);
     expect(drawerSource).toContain('@close="handleClose"');
   });
 
-  it("移动端关闭按钮文字在按钮内部水平和垂直居中", () => {
-    expect(mobileStyles).toMatch(/\.article-detail-footer \.article-detail-footer__mobile-close\s*\{[^}]*align-items: center;[^}]*justify-content: center;/);
+  it("所有屏幕的关闭按钮文字在按钮内部水平和垂直居中", () => {
+    const sharedStyles = styles.slice(0, styles.indexOf("@media (max-width: 768px)"));
+    expect(sharedStyles).toMatch(/\.article-detail-footer \.article-detail-footer__close\s*\{[^}]*align-items: center;[^}]*justify-content: center;/);
   });
 
   it("只在移动端隐藏复制格式和废弃，桌面端保留两个操作", () => {
@@ -86,11 +88,12 @@ describe("成品文章详情弹窗移动端布局", () => {
     });
     const buttons = wrapper.findAll("button");
     expect(buttons.slice(0, 2).map((button) => button.text())).toEqual(["关闭", "保存"]);
+    expect(wrapper.find(".article-detail-footer__close").exists()).toBe(true);
     await buttons[0]?.trigger("click");
     expect(wrapper.emitted("close")).toHaveLength(1);
     expect(wrapper.emitted("save")).toBeUndefined();
     await wrapper.setProps({ hideSave: true });
-    expect(wrapper.find(".article-detail-footer__mobile-close").exists()).toBe(false);
+    expect(wrapper.find(".article-detail-footer__close").exists()).toBe(false);
     wrapper.unmount();
   });
 

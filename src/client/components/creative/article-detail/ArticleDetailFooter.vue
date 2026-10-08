@@ -36,7 +36,7 @@ const emit = defineEmits<{
   <div v-if="!readonly" class="article-detail-footer">
     <!-- 编辑操作直接生效；确认型操作仍交给父抽屉弹二次确认。 -->
     <div class="article-detail-footer__group footer-group--edit">
-      <a-button v-if="!hideSave" class="article-detail-footer__mobile-close" @click="emit('close')">关闭</a-button>
+      <a-button v-if="!hideSave" class="article-detail-footer__close" @click="emit('close')">关闭</a-button>
       <a-tooltip v-if="!hideSave" :mouse-enter-delay="0.5" title="保存正文内容到数据库">
         <a-button :loading="saving" @click="emit('save')">保存</a-button>
       </a-tooltip>

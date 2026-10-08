@@ -428,7 +428,6 @@ useTableComponent();
         <a-button
           data-short-finished-action="refresh"
           class="shrink-0"
-          size="small"
           :loading="isLoading"
           @click="loadItems"
         >刷新</a-button>

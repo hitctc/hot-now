@@ -165,6 +165,9 @@ describe("统一短内容成品流程", () => {
       expect(input.classes()).not.toContain("!w-[360px]");
       expect(input.element.parentElement?.classList.contains("min-w-0")).toBe(true);
       const refresh = controls.get('[data-short-finished-action="refresh"]');
+      const create = wrapper.findAll("button").find((button) => button.text().includes("新建短内容"))!;
+      expect(refresh.attributes("size")).toBe(create.attributes("size"));
+      expect(refresh.attributes("size")).toBeUndefined();
       expect(refresh.classes()).toContain("shrink-0");
       expect(controls.element.lastElementChild).toBe(refresh.element);
     } finally { wrapper.unmount(); }

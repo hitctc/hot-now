@@ -4,6 +4,7 @@ import { message } from "ant-design-vue";
 import {
   readCreativeSourceItems,
   readCreativeSourceItem,
+  readShortWriteSchedule,
   type AccountFitLevel,
   type CreativeSourceItem,
 } from "../../../services/creativeApi.js";
@@ -110,7 +111,34 @@ export function useSourceItemsQuery(options: SourceItemsQueryOptions) {
         signal: controller.signal,
       });
       if (!listRequests.isCurrent(controller)) return;
-      items.value = response.items;
+      let visibleItems = response.items;
+      if (options.direction === "short_content") {
+        try {
+          const schedule = await readShortWriteSchedule();
+          if (!listRequests.isCurrent(controller)) return;
+          const positions = new Map(schedule.candidates.map((candidate) => [candidate.item_id, candidate.position]));
+          const replaced = new Map(schedule.replaced.map((item) => [item.item_id, item.replaced_at]));
+          visibleItems = response.items.map((item) => ({
+            ...item,
+            shortWriteSchedule: item.writingStatus !== "ready"
+              ? null
+              : !schedule.batch_started_at
+                ? { kind: "waiting-batch" }
+                : schedule.pending_item_id === item.id
+                  ? { kind: "pending" }
+                  : positions.has(item.id)
+                    ? { kind: "candidate", position: positions.get(item.id)! }
+                    : !schedule.prepared
+                    ? { kind: "preparing" }
+                    : replaced.has(item.id)
+                      ? { kind: "replaced", replacedAt: replaced.get(item.id)! }
+                      : { kind: "not-current" },
+          }));
+        } catch {
+          // Hermes 调度快照不可用时不从 ready 状态推断候选或替换原因。
+        }
+      }
+      items.value = visibleItems;
       loadedDetailIds.clear();
       for (const id of expandedRowKeys.value) {
         void loadSourceItemDetail(id).catch(() => collapseExpandedRow(id));

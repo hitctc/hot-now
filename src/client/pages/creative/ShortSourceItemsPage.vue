@@ -28,7 +28,7 @@ const { detailArticle, detailLoading, openDetail, closeDetail: closeDetailDrawer
 const writingStatusOptions = [
   { label: "全部", value: "" },
   { label: "待评估/待同步", value: "pending" },
-  { label: "待写作", value: "ready" },
+  { label: "已入选", value: "ready" },
   { label: "不写作", value: "excluded" },
   { label: "写作中", value: "writing" },
   { label: "已写作", value: "done" },

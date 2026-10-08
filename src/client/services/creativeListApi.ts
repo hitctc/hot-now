@@ -53,6 +53,7 @@ export type CreativeSourceItem = {
   publishedAt: string | null;
   collectorTimestamp: string | null;
   writingStatus: string;
+  shortWriteSchedule?: { kind: "candidate"; position: number } | { kind: "replaced"; replacedAt: string } | { kind: "not-current" } | { kind: "preparing" } | { kind: "pending" } | { kind: "waiting-batch" } | null;
   writingStopStep: number | null;
   writingStopStepName: string | null;
   writingStopReason: string | null;
@@ -285,6 +286,17 @@ export function readCreativeSourceItems(params?: {
 /** 读取单条素材的完整字段。 */
 export function readCreativeSourceItem(id: number): Promise<CreativeSourceItem> {
   return requestJson<CreativeSourceItem>(`/api/creative/source-items/${id}`);
+}
+
+/** 读取 Hermes 当前短写候选名次及最近批次替换记录；服务端不可达时由调用方降级展示。 */
+export function readShortWriteSchedule(): Promise<{
+  batch_started_at: string | null;
+  prepared: boolean;
+  pending_item_id: number | null;
+  candidates: { item_id: number; position: number }[];
+  replaced: { item_id: number; replaced_at: string }[];
+}> {
+  return requestJson("/api/creative/short-write-schedule");
 }
 
 /** 读取素材来源名称，供列表筛选器复用。 */

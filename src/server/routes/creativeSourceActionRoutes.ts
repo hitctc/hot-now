@@ -94,6 +94,13 @@ export function registerCreativeSourceActionRoutes(
     });
   });
 
+  // ─── Hermes 短写调度快照代理：候选名次与替换记录只由 Hermes 判定 ───
+  app.get("/api/creative/short-write-schedule", async (request, reply) => {
+    if (!options.authorizeSession(request, reply)) return;
+    const result = await callHermesAutomation("/api/short/write-schedule", "GET");
+    return reply.code(result.status).send(result.data);
+  });
+
   // ─── Hermes 自动化状态与控制代理：HotNow 不保存自动化业务状态 ───
   app.get("/api/creative/automation/status", async (request, reply) => {
     if (!options.authorizeSession(request, reply)) return;

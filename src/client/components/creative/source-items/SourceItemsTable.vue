@@ -267,12 +267,20 @@ useTableComponent();
             </a-tag>
           </a-tooltip>
           <a-tag v-else :color="writingStatusColor(record.writingStatus)" class="!m-0">
-            {{ writingStatusLabel(record.writingStatus, mode === 'short_content' ? record.score : undefined) }}
+            {{ mode === 'short_content' && record.writingStatus === 'ready' ? '已入选' : writingStatusLabel(record.writingStatus, mode === 'short_content' ? record.score : undefined) }}
           </a-tag>
           <div v-if="mode === 'short_content' && ['skipped', 'failed'].includes(record.writingStatus)" data-short-source-stop-reason class="w-full whitespace-normal break-words text-[10px] leading-4 text-editorial-text-muted">
             {{ record.writingStopReason || '历史原因未记录，不能据当前分数推断' }}
           </div>
-          <div v-else-if="mode === 'short_content' && record.writingStatus === 'ready'" class="text-[10px] leading-4 text-editorial-text-muted">已入选，等待调度；不保证最终成稿</div>
+          <div v-else-if="mode === 'short_content' && record.writingStatus === 'ready'" class="text-[10px] leading-4 text-editorial-text-muted">
+            <template v-if="record.shortWriteSchedule?.kind === 'candidate'">当前批次候选 · 第 {{ record.shortWriteSchedule.position }} 位</template>
+            <template v-else-if="record.shortWriteSchedule?.kind === 'waiting-batch'">等待短内容采集形成候选</template>
+            <template v-else-if="record.shortWriteSchedule?.kind === 'pending'">自动投递状态确认中</template>
+            <template v-else-if="record.shortWriteSchedule?.kind === 'preparing'">当前批次候选仍在整理中</template>
+            <template v-else-if="record.shortWriteSchedule?.kind === 'replaced'">已被新批次替换 · 当前不再自动投递 · {{ formatPublishedAt(record.shortWriteSchedule.replacedAt) }}</template>
+            <template v-else-if="record.shortWriteSchedule?.kind === 'not-current'">不在当前批次候选中 · 历史素材不会自动补写</template>
+            <template v-else>调度状态暂不可用</template>
+          </div>
           <a-tag v-if="record.writeCount > 0" color="green" class="!m-0 !text-[11px] !py-0">{{ record.writeCount }}次</a-tag>
         </div>
       </template>

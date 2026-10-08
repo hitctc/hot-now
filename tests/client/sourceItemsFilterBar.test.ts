@@ -42,6 +42,18 @@ describe("SourceItemsFilterBar", () => {
     expect(wrapper.emitted("clear-filters")).toHaveLength(1);
   });
 
+  it("uses the default button height consistently for all filter actions", () => {
+    const wrapper = mount(SourceItemsFilterBar, {
+      props: baseProps,
+      global: { plugins: [Antd] },
+    });
+    const actions = wrapper.findAll("[data-source-items-filter-action]");
+
+    expect(actions).toHaveLength(4);
+    for (const action of actions) expect(action.classes()).not.toContain("ant-btn-sm");
+    wrapper.unmount();
+  });
+
   it("hides clear-filter action when no filters are active", () => {
     const wrapper = mount(SourceItemsFilterBar, {
       props: { ...baseProps, hasActiveFilters: false },

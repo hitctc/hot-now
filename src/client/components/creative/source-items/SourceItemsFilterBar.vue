@@ -99,7 +99,7 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
         @update:value="emit('update:min-trend-score', $event)"
         @press-enter="emit('apply-trend-score')"
       />
-      <a-button type="primary" size="small" @click="emit('apply-trend-score')">搜索</a-button>
+      <a-button data-source-items-filter-action="trend-search" type="primary" @click="emit('apply-trend-score')">搜索</a-button>
     </div>
     <div ref="searchDropdownRef" class="relative">
       <a-input-search
@@ -130,19 +130,17 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
         </div>
       </div>
     </div>
-    <a-button type="primary" size="small" @click="emit('manual-write')">
+    <a-button data-source-items-filter-action="manual-write" type="primary" @click="emit('manual-write')">
       <span class="mr-1">✏️</span>自定义写作
     </a-button>
     <a-button
       data-source-items-filter-action="refresh"
-      size="small"
       :loading="props.isLoading"
       @click="emit('refresh')"
     >刷新</a-button>
     <a-button
       data-source-items-filter-action="clear-filters"
       v-if="props.hasActiveFilters"
-      size="small"
       @click="emit('clear-filters')"
     >清除筛选</a-button>
   </div>

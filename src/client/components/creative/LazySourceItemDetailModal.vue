@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { defineAsyncComponent, defineComponent, h, ref, watch } from "vue";
+import DetailModuleLoading from "./DetailModuleLoading.vue";
 
 defineOptions({ inheritAttrs: false });
 const props = defineProps<{ visible: boolean; sourceItemId: number | null }>();
@@ -11,11 +12,14 @@ watch(() => props.visible, visible => { if (visible) activated.value = true; }, 
 const modal = defineAsyncComponent({
     loader: () => import("./SourceItemDetailModal.vue"),
     delay: 0,
-    loadingComponent: defineComponent({ setup: () => () => props.visible ? h("div", { role: "status", class: "fixed inset-0 z-[1100] grid place-items-center bg-black/30 text-white" }, ["正在加载素材详情…", h("button", { onClick: () => emit("update:visible", false) }, "关闭")]) : null }),
-    errorComponent: defineComponent({ setup: () => () => props.visible ? h("div", { role: "alert", class: "fixed inset-0 z-[1100] grid place-items-center bg-black/30" }, [
-      h("button", { class: "rounded bg-white px-4 py-3", onClick: retryModal }, "素材详情加载失败，重新加载页面后再打开"),
-      h("button", { class: "rounded bg-white px-4 py-3", onClick: () => emit("update:visible", false) }, "关闭"),
-    ]) : null }),
+    loadingComponent: defineComponent({
+      /** 下载期间沿用素材弹窗尺寸与层级，避免文章内打开时被文章弹窗遮住。 */
+      setup: () => () => h(DetailModuleLoading, { open: props.visible, kind: "source", onClose: () => emit("update:visible", false) }),
+    }),
+    errorComponent: defineComponent({
+      /** 下载失败仍保留可关闭的外壳，重载继续由确认流程处理。 */
+      setup: () => () => h(DetailModuleLoading, { open: props.visible, kind: "source", error: true, onClose: () => emit("update:visible", false), onRetry: retryModal }),
+    }),
 });
 
 /** 动态导入失败可能留在浏览器模块缓存；确认后重载页面，不自动重放任何业务动作。 */

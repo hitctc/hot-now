@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { defineAsyncComponent, defineComponent, h, ref, watch } from "vue";
 import type { CreativeFinishedArticle, WechatThemeId } from "../../services/creativeApi.js";
+import DetailModuleLoading from "./DetailModuleLoading.vue";
 
 defineOptions({ inheritAttrs: false });
 const props = defineProps<{ open: boolean; article: CreativeFinishedArticle | null; readonly?: boolean; loading?: boolean }>();
@@ -17,11 +18,14 @@ watch(() => props.open, open => { if (open) activated.value = true; }, { immedia
 const drawer = defineAsyncComponent({
     loader: () => import("./ArticleDetailDrawer.vue"),
     delay: 0,
-    loadingComponent: defineComponent({ setup: () => () => props.open ? h("div", { role: "status", class: "fixed inset-0 z-[1100] grid place-items-center bg-black/30 text-white" }, ["正在加载文章编辑器…", h("button", { onClick: () => emit("update:open", false) }, "关闭")]) : null }),
-    errorComponent: defineComponent({ setup: () => () => props.open ? h("div", { role: "alert", class: "fixed inset-0 z-[1100] grid place-items-center bg-black/30" }, [
-      h("button", { class: "rounded bg-white px-4 py-3", onClick: retryDrawer }, "编辑器加载失败，重新加载页面后再打开"),
-      h("button", { class: "rounded bg-white px-4 py-3", onClick: () => emit("update:open", false) }, "关闭"),
-    ]) : null }),
+    loadingComponent: defineComponent({
+      /** 下载期间沿用全屏文章外壳；关闭只通知父页，不触发正文操作。 */
+      setup: () => () => h(DetailModuleLoading, { open: props.open, kind: "article", onClose: () => emit("update:open", false) }),
+    }),
+    errorComponent: defineComponent({
+      /** 下载失败仍保留可关闭的外壳，重载继续由确认流程处理。 */
+      setup: () => () => h(DetailModuleLoading, { open: props.open, kind: "article", error: true, onClose: () => emit("update:open", false), onRetry: retryDrawer }),
+    }),
 });
 
 /** 动态导入失败可能留在浏览器模块缓存；确认后重载页面，不自动重放任何业务动作。 */

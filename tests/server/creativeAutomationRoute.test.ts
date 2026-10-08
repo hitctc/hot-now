@@ -71,7 +71,7 @@ describe("creative automation Hermes proxy", () => {
   it("短写候选快照只代理 Hermes 提供的顺位和替换记录", async () => {
     vi.stubEnv("HERMES_API_BASE_URL", "https://hermes.test");
     vi.stubEnv("HERMES_API_TOKEN", "token");
-    const payload = { success: true, batch_started_at: "2026-10-05T00:00:00+08:00", prepared: true, pending_item_id: null, candidates: [{ item_id: 7, position: 2 }], replaced: [] };
+    const payload = { success: true, batch_started_at: "2026-10-05T00:00:00+08:00", prepared: true, pending_item_id: null, candidates: [{ item_id: 7, position: 2 }], replaced: [], short_write_tasks: [{ source_external_id: "feed-7", task_kind: "short_content_auto", status: "writing", phase_name: "短内容写作" }] };
     const fetchMock = vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const app = createServer({});

@@ -118,22 +118,39 @@ export function useSourceItemsQuery(options: SourceItemsQueryOptions) {
           if (!listRequests.isCurrent(controller)) return;
           const positions = new Map(schedule.candidates.map((candidate) => [candidate.item_id, candidate.position]));
           const replaced = new Map(schedule.replaced.map((item) => [item.item_id, item.replaced_at]));
-          visibleItems = response.items.map((item) => ({
-            ...item,
-            shortWriteSchedule: item.writingStatus !== "ready"
-              ? null
-              : !schedule.batch_started_at
-                ? { kind: "waiting-batch" }
-                : schedule.pending_item_id === item.id
-                  ? { kind: "pending" }
-                  : positions.has(item.id)
-                    ? { kind: "candidate", position: positions.get(item.id)! }
-                    : !schedule.prepared
-                    ? { kind: "preparing" }
-                    : replaced.has(item.id)
-                      ? { kind: "replaced", replacedAt: replaced.get(item.id)! }
-                      : { kind: "not-current" },
-          }));
+          const queueTasks = new Map((schedule.short_write_tasks ?? []).map((task) => [task.source_external_id, task]));
+          visibleItems = response.items.map((item) => {
+            const task = queueTasks.get(item.externalId);
+            return {
+              ...item,
+              shortWriteSchedule: task
+                ? {
+                    kind: "task" as const,
+                    taskKind: task.task_kind,
+                    status: task.status,
+                    queuePosition: task.queue_position,
+                    phaseName: task.phase_name,
+                    stopStepName: task.stop_step_name,
+                    reasonText: task.reason_text,
+                    error: task.error,
+                    finishedArticleId: task.finished_article_id,
+                    cancelRequested: task.cancel_requested,
+                  }
+                : item.writingStatus !== "ready"
+                  ? null
+                  : !schedule.batch_started_at
+                    ? { kind: "waiting-batch" as const }
+                    : schedule.pending_item_id === item.id
+                      ? { kind: "pending" as const }
+                      : positions.has(item.id)
+                        ? { kind: "candidate" as const, position: positions.get(item.id)! }
+                        : !schedule.prepared
+                          ? { kind: "preparing" as const }
+                          : replaced.has(item.id)
+                            ? { kind: "replaced" as const, replacedAt: replaced.get(item.id)! }
+                            : { kind: "not-current" as const },
+            };
+          });
         } catch {
           // Hermes 调度快照不可用时不从 ready 状态推断候选或替换原因。
         }

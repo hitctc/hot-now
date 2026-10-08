@@ -105,6 +105,18 @@ export function writingStatusColor(status: string): string {
   }
 }
 
+/** 将Hermes唯一写作队列状态转换为素材列表标签，不从素材状态反推队列状态。 */
+export function shortWriteTaskStatusLabel(status: string): string {
+  switch (status) {
+    case "queued": return "排队中";
+    case "writing": return "写作中";
+    case "done": return "已写作";
+    case "failed": return "技术失败";
+    case "stopped": return "已停止";
+    default: return "已投递";
+  }
+}
+
 /** 返回状态文案；短素材传选题分可识别待同步，不据分数猜测准入，长素材不传分保持原语义。 */
 export function writingStatusLabel(status: string, shortScore?: number | null): string {
   switch (status) {

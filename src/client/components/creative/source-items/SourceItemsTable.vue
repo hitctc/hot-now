@@ -15,6 +15,7 @@ import {
   getBreakdownBars,
   writingStatusColor,
   writingStatusLabel,
+  shortWriteTaskStatusLabel,
   sourcePlatformLabel,
   sourceRankingLabel,
 } from "./sourceItemPresentation.js";
@@ -267,18 +268,23 @@ useTableComponent();
             </a-tag>
           </a-tooltip>
           <a-tag v-else :color="writingStatusColor(record.writingStatus)" class="!m-0">
-            {{ mode === 'short_content' && record.writingStatus === 'ready' ? '已入选' : writingStatusLabel(record.writingStatus, mode === 'short_content' ? record.score : undefined) }}
+            {{ mode === 'short_content' && record.writingStatus === 'ready' && record.shortWriteSchedule?.kind === 'task' ? shortWriteTaskStatusLabel(record.shortWriteSchedule.status) : (mode === 'short_content' && record.writingStatus === 'ready' ? '已入选' : writingStatusLabel(record.writingStatus, mode === 'short_content' ? record.score : undefined)) }}
           </a-tag>
           <div v-if="mode === 'short_content' && ['skipped', 'failed'].includes(record.writingStatus)" data-short-source-stop-reason class="w-full whitespace-normal break-words text-[10px] leading-4 text-editorial-text-muted">
             {{ record.writingStopReason || '历史原因未记录，不能据当前分数推断' }}
           </div>
-          <div v-else-if="mode === 'short_content' && record.writingStatus === 'ready'" class="text-[10px] leading-4 text-editorial-text-muted">
-            <template v-if="record.shortWriteSchedule?.kind === 'candidate'">当前批次候选 · 第 {{ record.shortWriteSchedule.position }} 位</template>
+          <div v-else-if="mode === 'short_content' && (record.writingStatus === 'ready' || record.shortWriteSchedule?.kind === 'task')" class="text-[10px] leading-4 text-editorial-text-muted">
+            <template v-if="record.shortWriteSchedule?.kind === 'task' && record.shortWriteSchedule.status === 'queued'">{{ record.shortWriteSchedule.taskKind === 'short_content_auto' ? '自动短写' : '人工短写' }}已排队<span v-if="record.shortWriteSchedule.queuePosition"> · 队列第 {{ record.shortWriteSchedule.queuePosition }} 位</span></template>
+            <template v-else-if="record.shortWriteSchedule?.kind === 'task' && record.shortWriteSchedule.status === 'writing'">{{ record.shortWriteSchedule.taskKind === 'short_content_auto' ? '自动短写' : '人工短写' }}写作中<span v-if="record.shortWriteSchedule.phaseName"> · {{ record.shortWriteSchedule.phaseName }}</span><span v-if="record.shortWriteSchedule.cancelRequested"> · 已请求停止</span></template>
+            <template v-else-if="record.shortWriteSchedule?.kind === 'task' && record.shortWriteSchedule.status === 'done'">短写任务已完成<span v-if="record.shortWriteSchedule.finishedArticleId"> · 成品 #{{ record.shortWriteSchedule.finishedArticleId }}</span></template>
+            <template v-else-if="record.shortWriteSchedule?.kind === 'task' && ['failed', 'stopped'].includes(record.shortWriteSchedule.status)">{{ record.shortWriteSchedule.status === 'failed' ? '短写任务失败' : '短写任务已停止' }}<span v-if="record.shortWriteSchedule.stopStepName"> · {{ record.shortWriteSchedule.stopStepName }}</span><span v-if="record.shortWriteSchedule.reasonText || record.shortWriteSchedule.error"> · {{ record.shortWriteSchedule.reasonText || record.shortWriteSchedule.error }}</span></template>
+            <template v-else-if="record.shortWriteSchedule?.kind === 'task'">短写任务状态 · {{ record.shortWriteSchedule.status || '暂不可用' }}</template>
+            <template v-else-if="record.shortWriteSchedule?.kind === 'candidate'">当前批次候选 · 第 {{ record.shortWriteSchedule.position }} 位</template>
             <template v-else-if="record.shortWriteSchedule?.kind === 'waiting-batch'">等待短内容采集形成候选</template>
             <template v-else-if="record.shortWriteSchedule?.kind === 'pending'">自动投递状态确认中</template>
             <template v-else-if="record.shortWriteSchedule?.kind === 'preparing'">当前批次候选仍在整理中</template>
             <template v-else-if="record.shortWriteSchedule?.kind === 'replaced'">已被新批次替换 · 当前不再自动投递 · {{ formatPublishedAt(record.shortWriteSchedule.replacedAt) }}</template>
-            <template v-else-if="record.shortWriteSchedule?.kind === 'not-current'">不在当前批次候选中 · 历史素材不会自动补写</template>
+            <template v-else-if="record.shortWriteSchedule?.kind === 'not-current'">当前批次外 · 无可追溯的投递记录</template>
             <template v-else>调度状态暂不可用</template>
           </div>
           <a-tag v-if="record.writeCount > 0" color="green" class="!m-0 !text-[11px] !py-0">{{ record.writeCount }}次</a-tag>

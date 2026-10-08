@@ -53,7 +53,7 @@ export type CreativeSourceItem = {
   publishedAt: string | null;
   collectorTimestamp: string | null;
   writingStatus: string;
-  shortWriteSchedule?: { kind: "candidate"; position: number } | { kind: "replaced"; replacedAt: string } | { kind: "not-current" } | { kind: "preparing" } | { kind: "pending" } | { kind: "waiting-batch" } | null;
+  shortWriteSchedule?: { kind: "candidate"; position: number } | { kind: "replaced"; replacedAt: string } | { kind: "not-current" } | { kind: "preparing" } | { kind: "pending" } | { kind: "waiting-batch" } | { kind: "task"; taskKind: "short_content" | "short_content_auto"; status: string; queuePosition?: number; phaseName?: string; stopStepName?: string; reasonText?: string; error?: string; finishedArticleId?: number; cancelRequested?: boolean } | null;
   writingStopStep: number | null;
   writingStopStepName: string | null;
   writingStopReason: string | null;
@@ -288,13 +288,14 @@ export function readCreativeSourceItem(id: number): Promise<CreativeSourceItem> 
   return requestJson<CreativeSourceItem>(`/api/creative/source-items/${id}`);
 }
 
-/** 读取 Hermes 当前短写候选名次及最近批次替换记录；服务端不可达时由调用方降级展示。 */
+/** 读取 Hermes 当前短写候选、替换记录和唯一队列任务状态；服务端不可达时由调用方降级展示。 */
 export function readShortWriteSchedule(): Promise<{
   batch_started_at: string | null;
   prepared: boolean;
   pending_item_id: number | null;
   candidates: { item_id: number; position: number }[];
   replaced: { item_id: number; replaced_at: string }[];
+  short_write_tasks?: { source_external_id: string; task_kind: "short_content" | "short_content_auto"; status: string; queue_position?: number; phase_name?: string; stop_step_name?: string; reason_text?: string; error?: string; finished_article_id?: number; cancel_requested?: boolean }[];
 }> {
   return requestJson("/api/creative/short-write-schedule");
 }

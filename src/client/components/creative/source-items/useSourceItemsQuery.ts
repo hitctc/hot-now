@@ -42,7 +42,7 @@ function readSavedFilters(storageKey: string): SavedSourceFilters {
   }
 }
 
-/** 管理长短素材查询及分页；短页清理旧爆文筛选，不向接口传递不可见门槛。 */
+/** 管理长短素材查询及分页；短页清理旧爆文筛选，并按外部编号关联 Hermes 排期。 */
 export function useSourceItemsQuery(options: SourceItemsQueryOptions) {
   const saved = readSavedFilters(options.storageKey);
   if (options.direction === "short_content" && "minTrendScore" in saved) {
@@ -91,7 +91,7 @@ export function useSourceItemsQuery(options: SourceItemsQueryOptions) {
     }
   }
 
-  /** 加载摘要列表，并取消仍在等待的旧分页/筛选请求。 */
+  /** 加载当前摘要列表并淘汰旧请求；短素材只按外部编号合并 Hermes 状态，不从 ready 推断排期。 */
   async function loadItems(): Promise<void> {
     const controller = listRequests.begin();
     isLoading.value = true;
@@ -116,8 +116,14 @@ export function useSourceItemsQuery(options: SourceItemsQueryOptions) {
         try {
           const schedule = await readShortWriteSchedule();
           if (!listRequests.isCurrent(controller)) return;
-          const positions = new Map(schedule.candidates.map((candidate) => [candidate.item_id, candidate.position]));
-          const replaced = new Map(schedule.replaced.map((item) => [item.item_id, item.replaced_at]));
+          const positions = new Map<string, number>();
+          for (const candidate of schedule.candidates) {
+            if (candidate.source_external_id) positions.set(candidate.source_external_id, candidate.position);
+          }
+          const replaced = new Map<string, string>();
+          for (const item of schedule.replaced) {
+            if (item.source_external_id) replaced.set(item.source_external_id, item.replaced_at);
+          }
           const queueTasks = new Map((schedule.short_write_tasks ?? []).map((task) => [task.source_external_id, task]));
           visibleItems = response.items.map((item) => {
             const task = queueTasks.get(item.externalId);
@@ -138,17 +144,17 @@ export function useSourceItemsQuery(options: SourceItemsQueryOptions) {
                   }
                 : item.writingStatus !== "ready"
                   ? null
-                  : !schedule.batch_started_at
-                    ? { kind: "waiting-batch" as const }
-                    : schedule.pending_item_id === item.id
-                      ? { kind: "pending" as const }
-                      : positions.has(item.id)
-                        ? { kind: "candidate" as const, position: positions.get(item.id)! }
+                  : schedule.pending_source_external_id === item.externalId
+                    ? { kind: "pending" as const, position: positions.get(item.externalId) }
+                    : positions.has(item.externalId)
+                      ? { kind: "candidate" as const, position: positions.get(item.externalId)! }
+                      : !schedule.batch_started_at
+                        ? { kind: "waiting-batch" as const }
                         : !schedule.prepared
                           ? { kind: "preparing" as const }
-                          : replaced.has(item.id)
-                            ? { kind: "replaced" as const, replacedAt: replaced.get(item.id)! }
-                            : { kind: "not-current" as const },
+                          : replaced.has(item.externalId)
+                            ? { kind: "replaced" as const, replacedAt: replaced.get(item.externalId)! }
+                            : { kind: "not-scheduled" as const },
             };
           });
         } catch {

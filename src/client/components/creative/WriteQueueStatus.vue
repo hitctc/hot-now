@@ -547,18 +547,21 @@ const {
   border-top: 1px solid #f5f5f5;
 }
 @media (min-width: 901px) {
+  /* 短队列时侧栏贴合内容，长队列才受视口高度限制，避免空白撑在统计栏前。 */
   .write-queue-float--embedded {
     position: sticky;
     top: 0;
     right: auto;
     bottom: auto;
+    align-self: flex-start;
     flex: 0 0 var(--write-queue-width);
     width: var(--write-queue-width);
     max-width: none;
-    height: 100dvh;
+    height: auto;
     max-height: 100dvh;
     border-radius: 8px 0 0 8px;
   }
+  .write-queue-float--embedded .write-queue-body { flex: 0 1 auto; }
   .write-queue-float--embedded.write-queue-float--collapsed {
     position: fixed;
     top: 50%;

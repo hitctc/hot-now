@@ -285,6 +285,7 @@ describe("写作队列最近逐篇结果", () => {
     const embedded = source.match(/\.write-queue-float--embedded\s*\{([^}]*)\}/)?.[1] ?? "";
     expect(embedded).toMatch(/^\s*height: 100dvh;$/m);
     expect(embedded).toContain("max-height: 100dvh;");
+    expect(source).toMatch(/\.write-queue-float--embedded \.write-queue-history\s*\{[^}]*max-height: none;/);
     expect(source).toMatch(/\.write-queue-body\s*\{[^}]*flex: 1 1 auto;[^}]*min-height: 0;[^}]*overflow-y: auto;/);
   });
 

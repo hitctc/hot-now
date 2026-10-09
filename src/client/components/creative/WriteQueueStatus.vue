@@ -560,6 +560,8 @@ const {
     max-height: 100dvh;
     border-radius: 8px 0 0 8px;
   }
+  /* 嵌入时让历史记录自然展开，由外层队列内容区统一滚动。 */
+  .write-queue-float--embedded .write-queue-history { max-height: none; }
   .write-queue-float--embedded.write-queue-float--collapsed {
     position: fixed;
     top: 50%;

@@ -28,6 +28,8 @@ function createEmptyContentPage(pageKey: ContentPageKey): ContentPageModel {
 
 const settingsApiMocks = vi.hoisted(() => ({
   readSettingsProfile: vi.fn(),
+  readWriteQueuePreferences: vi.fn(),
+  saveWriteQueuePreferences: vi.fn(),
   readSettingsViewRules: vi.fn(),
   readSettingsSources: vi.fn(),
   saveViewRuleConfig: vi.fn(),
@@ -61,6 +63,8 @@ vi.mock("../../src/client/services/http", async () => {
 
 describe("client app shell", () => {
   beforeEach(() => {
+    settingsApiMocks.readWriteQueuePreferences.mockResolvedValue({ preferences: null });
+    settingsApiMocks.saveWriteQueuePreferences.mockImplementation(async (preferences: unknown) => ({ ok: true, preferences }));
     settingsApiMocks.readSettingsProfile.mockResolvedValue({
       username: "admin",
       displayName: "系统管理员",

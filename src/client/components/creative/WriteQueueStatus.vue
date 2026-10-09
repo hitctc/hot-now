@@ -1,6 +1,6 @@
 <!--
-  WriteQueueStatus.vue — 全局写作队列状态浮标
-  折叠态：仅显示呼吸圆点（蓝色=有任务，灰色=空闲）
+  WriteQueueStatus.vue — 全局写作队列浮窗；桌面端可嵌入页面右侧
+  折叠态：悬浮模式显示状态圆点，嵌入模式显示右侧窄标签
   展开态：当前任务 + 排队列表 + 统计，素材 ID 可点击弹出详情
   15 秒自动刷新 + 手动刷新
 -->
@@ -9,6 +9,7 @@ import { Modal as AModal } from "ant-design-vue";
 import ArticleDetailDrawer from "./LazyArticleDetailDrawer.vue";
 import SourceItemDetailModal from "./LazySourceItemDetailModal.vue";
 import { useWriteQueueStatus } from "./useWriteQueueStatus.js";
+import { writeQueueWidths } from "../../../core/auth/userPreferences.js";
 const {
   forceRewriteTarget,
   forceRewriting,
@@ -23,6 +24,9 @@ const {
   statusReceivedAt,
   loading,
   expanded,
+  embedded,
+  queueWidth,
+  preferencesReady,
   elapsedNow,
   formatElapsed,
   modalVisible,
@@ -30,6 +34,8 @@ const {
   hasActiveWork,
   refresh,
   toggleExpand,
+  toggleEmbedded,
+  setQueueWidth,
   openSourceItem,
   articleDetailOpen,
   articleDetail,
@@ -54,8 +60,13 @@ const {
 </script>
 
 <template>
-  <Teleport to="body">
-    <div v-if="data" class="write-queue-float">
+  <Teleport to="body" :disabled="embedded">
+    <div
+      v-if="data && preferencesReady"
+      class="write-queue-float"
+      :class="{ 'write-queue-float--embedded': embedded, 'write-queue-float--collapsed': !expanded }"
+      :style="embedded ? { '--write-queue-width': `${queueWidth}px` } : undefined"
+    >
       <!-- 折叠态：呼吸圆点 -->
       <button
         v-if="!expanded"
@@ -74,9 +85,22 @@ const {
         <div class="write-queue-header">
           <span class="text-xs font-semibold text-editorial-text-body">Luna 文章队列</span>
           <div class="write-queue-header-actions">
+            <button type="button" class="write-queue-control write-queue-dock-toggle" :aria-label="embedded ? '取消右侧嵌入' : '嵌入到页面右侧'" :title="embedded ? '取消右侧嵌入' : '嵌入到页面右侧'" :aria-pressed="embedded" @click.stop="toggleEmbedded">{{ embedded ? "⇥" : "⇤" }}</button>
             <button type="button" class="write-queue-control write-queue-refresh" aria-label="刷新文章队列" :aria-busy="loading" :disabled="loading" @click.stop="refresh">{{ loading ? "…" : "↻" }}</button>
             <button type="button" class="write-queue-control write-queue-close" aria-label="收起文章队列" @click="toggleExpand">✕</button>
           </div>
+        </div>
+
+        <div v-if="embedded" class="write-queue-width-picker" aria-label="文章队列侧栏宽度">
+          <span>宽度</span>
+          <button
+            v-for="width in writeQueueWidths"
+            :key="width"
+            type="button"
+            :data-queue-width="width"
+            :aria-pressed="queueWidth === width"
+            @click.stop="setQueueWidth(width)"
+          >{{ width }}px</button>
         </div>
 
         <!-- 只滚动任务内容，刷新、收起和统计不随长记录移出可视区。 -->
@@ -316,6 +340,33 @@ const {
   flex-shrink: 0;
   gap: 4px;
 }
+.write-queue-width-picker {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid #f0f0f0;
+  padding: 4px 8px;
+  color: #6b7280;
+  font-size: 10px;
+}
+.write-queue-width-picker button {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  background: #fff;
+  padding: 3px 1px;
+  color: #6b7280;
+  font-size: 10px;
+  cursor: pointer;
+}
+.write-queue-width-picker button[aria-pressed="true"] {
+  border-color: #1677ff;
+  background: #eff6ff;
+  color: #1677ff;
+}
+.write-queue-width-picker button:hover { background: #f3f4f6; }
 /* 两个头部操作共用尺寸、边框和交互样式，只保留不同图标与行为。 */
 .write-queue-control {
   display: flex;
@@ -494,6 +545,35 @@ const {
   justify-content: space-between;
   padding: 4px 8px 6px;
   border-top: 1px solid #f5f5f5;
+}
+@media (min-width: 901px) {
+  .write-queue-float--embedded {
+    position: sticky;
+    top: 0;
+    right: auto;
+    bottom: auto;
+    flex: 0 0 var(--write-queue-width);
+    width: var(--write-queue-width);
+    max-width: none;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 8px 0 0 8px;
+  }
+  .write-queue-float--embedded.write-queue-float--collapsed {
+    position: fixed;
+    top: 50%;
+    right: 0;
+    bottom: auto;
+    flex: none;
+    width: 32px;
+    height: 40px;
+    transform: translateY(-50%);
+  }
+  .write-queue-float--embedded .write-queue-width-picker button { white-space: nowrap; }
+}
+@media (max-width: 900px) {
+  .write-queue-dock-toggle,
+  .write-queue-width-picker { display: none; }
 }
 @media (max-width: 768px) {
   /* 动态视口适应浏览器工具栏伸缩，安全区给刘海和底部手势条留出空间。 */

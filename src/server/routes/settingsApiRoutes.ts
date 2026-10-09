@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { SaveProviderSettingsInput, SaveProviderSettingsResult, UpdateProviderSettingsActivationResult } from "../../core/llm/providerSettingsRepository.js";
+import { isWriteQueuePreferences, type WriteQueuePreferences } from "../../core/auth/userPreferences.js";
 
 export type SettingsApiSession = { username: string; displayName: string; role: string; issuedAt: number; expiresAt: number } | null;
 
@@ -12,6 +13,8 @@ export type SettingsApiRouteOptions = {
   > | { ok: true; ruleKey: "ai" | "hot" } | { ok: false; reason: string };
   readSources: () => Promise<unknown>;
   readProfile: (session: SettingsApiSession) => Promise<unknown>;
+  readWriteQueuePreferences?: () => Promise<WriteQueuePreferences | null> | WriteQueuePreferences | null;
+  saveWriteQueuePreferences?: (preferences: WriteQueuePreferences) => Promise<void> | void;
   verifyLogin?: (username: string, password: string) => Promise<unknown> | unknown;
   updatePassword?: (newPassword: string) => Promise<void>;
   readAiTimelineAdmin: (request: FastifyRequest) => Promise<unknown>;
@@ -85,6 +88,37 @@ export function registerSettingsApiRoutes(
     }
 
     return reply.send({ profile: await options.readProfile(session) });
+  });
+
+  /** 读取当前登录账号的队列布局偏好；首次登录返回 null 供前端迁移旧展开状态。 */
+  app.get("/api/settings/write-queue-preferences", async (request, reply) => {
+    if (options.readSession(request, reply) === undefined) return;
+    if (!options.readWriteQueuePreferences) {
+      return reply.code(503).send({ ok: false, reason: "write-queue-preferences-unavailable" });
+    }
+
+    return reply.send({ preferences: await options.readWriteQueuePreferences() });
+  });
+
+  /** 校验并保存当前账号的队列布局偏好；未登录、档位非法或存储失败时返回明确错误。 */
+  app.put("/api/settings/write-queue-preferences", async (request, reply) => {
+    if (options.readSession(request, reply) === undefined) return;
+    if (!options.saveWriteQueuePreferences) {
+      return reply.code(503).send({ ok: false, reason: "write-queue-preferences-unavailable" });
+    }
+
+    const body = request.body as unknown;
+    if (!isWriteQueuePreferences(body)) {
+      return reply.code(400).send({ ok: false, reason: "invalid-write-queue-preferences" });
+    }
+
+    try {
+      await options.saveWriteQueuePreferences(body);
+      return reply.send({ ok: true, preferences: body });
+    } catch (error) {
+      request.log.error(error, "Save write queue preferences failed");
+      return reply.code(500).send({ ok: false, reason: "write-queue-preferences-save-failed" });
+    }
   });
 
   app.put("/api/settings/profile/password", async (request, reply) => {

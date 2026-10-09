@@ -1,5 +1,9 @@
 import path from "node:path";
 import { hashPassword, verifyPassword } from "../core/auth/passwords.js";
+import {
+  readWriteQueuePreferences as readQueuePreferencesFromDb,
+  saveWriteQueuePreferences as saveQueuePreferencesToDb,
+} from "../core/auth/userPreferencesRepository.js";
 import { readAiTimelineFeedFile, readAiTimelineFeedPageModel } from "../core/aiTimeline/aiTimelineFeedFile.js";
 import { buildContentPageModel } from "../core/content/buildContentPageModel.js";
 import { listContentView as listContentCards } from "../core/content/listContentView.js";
@@ -496,6 +500,9 @@ export function createRuntimeServerDeps(input: RuntimeServerDepsInput): ServerDe
     triggerManualWeiboTrendingCollect: input.triggerManualWeiboTrendingCollect,
     triggerManualJuyaCollect: input.triggerManualJuyaCollect,
   getCurrentUserProfile: async () => getCurrentUserProfile(),
+  // Keep account preference JSON parsing and merging inside the existing SQLite repository boundary.
+  readWriteQueuePreferences: () => readQueuePreferencesFromDb(db),
+  saveWriteQueuePreferences: (preferences) => saveQueuePreferencesToDb(db, preferences),
   updatePassword: async (newPassword: string) => {
     const newHash = hashPassword(newPassword);
     db.prepare("UPDATE user_profile SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1").run(newHash);

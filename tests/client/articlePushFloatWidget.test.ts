@@ -67,8 +67,10 @@ describe("ArticlePushFloatWidget", () => {
     expect(source).toMatch(/max-height: 100vh;/);
     expect(source).toMatch(/padding: 10px;/);
     const queue = readFileSync(resolve(process.cwd(), "src/client/components/creative/WriteQueueStatus.vue"), "utf8");
-    expect(queue).toMatch(/\.write-queue-float\s*\{[^}]*bottom: 0;/);
-    expect(queue).not.toContain("top: 50%;");
+    const floatingQueueStyles = queue.match(/\.write-queue-float\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(floatingQueueStyles).toContain("bottom: 0;");
+    expect(floatingQueueStyles).not.toContain("top:");
+    expect(queue).toMatch(/\.write-queue-float--embedded\.write-queue-float--collapsed\s*\{[^}]*top: 50%;/);
     expect(Number(source.match(/z-index: (\d+);/)![1])).toBeGreaterThan(Number(queue.match(/z-index: (\d+);/)![1]));
   });
 

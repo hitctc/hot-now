@@ -5,6 +5,8 @@ import { toShanghaiDayKey } from "./tableDayGroups.js";
 import { describeLunaStatus, describeQueuedTask, describeCurrentTask } from "./writeQueueStatusPresentation.js";
 import { message } from "ant-design-vue";
 import { cancelWriteQueueTask, readWriteQueueTaskResult, forceRewriteQueueTask } from "../../services/creativeApi.js";
+import { readWriteQueuePreferences, saveWriteQueuePreferences } from "../../services/settingsApi.js";
+import { writeQueueWidths, type WriteQueuePreferences, type WriteQueueWidth } from "../../../core/auth/userPreferences.js";
 
 
 
@@ -63,7 +65,7 @@ export function useWriteQueueStatus() {
 
   const QUEUE_EXPANDED_KEY = "hot-now-write-queue-expanded";
 
-  /** 读取上次的界面偏好；存储不可用或没有记录时默认折叠，不影响队列数据加载。 */
+  /** 读取旧版浏览器展开状态；存储不可用或没有记录时沿用原来的默认折叠行为。 */
   function readExpandedPreference(): boolean {
     try {
       return localStorage.getItem(QUEUE_EXPANDED_KEY) === "1";
@@ -72,12 +74,62 @@ export function useWriteQueueStatus() {
     }
   }
 
+  const expanded = ref(readExpandedPreference());
+  const embedded = ref(false);
+  const queueWidth = ref<WriteQueueWidth>(350);
+  const preferencesReady = ref(false);
+  let preferenceWriteRequest: Promise<unknown> = Promise.resolve();
+
+  /** 同步旧浏览器键值，保证账号服务短暂不可用时仍保留当前设备的展开状态。 */
+  function writeLegacyExpandedPreference(): void {
+    try {
+      localStorage.setItem(QUEUE_EXPANDED_KEY, expanded.value ? "1" : "0");
+    } catch {
+      // 浏览器禁用本地存储时，仍可使用并同步本次页面状态。
+    }
+  }
+
+  /** 把已加载的账号偏好应用到浮窗；首次访问沿用本地展开状态并以悬浮模式和 350px 初始化。 */
+  async function loadQueuePreferences(): Promise<void> {
+    try {
+      const result = await readWriteQueuePreferences();
+      if (result.preferences) {
+        embedded.value = result.preferences.embedded;
+        queueWidth.value = result.preferences.width;
+        expanded.value = result.preferences.expanded;
+        writeLegacyExpandedPreference();
+      } else {
+        embedded.value = false;
+        queueWidth.value = 350;
+        preferencesReady.value = true;
+        persistQueuePreferences();
+      }
+    } catch {
+      message.warning("文章队列偏好暂未同步，当前页面仍可使用");
+    } finally {
+      preferencesReady.value = true;
+    }
+  }
+
+  /** 按顺序保存完整偏好快照，避免快速切换时较早的网络请求覆盖最新选择。 */
+  function persistQueuePreferences(): void {
+    if (!preferencesReady.value) return;
+    writeLegacyExpandedPreference();
+    const preferences: WriteQueuePreferences = {
+      embedded: embedded.value,
+      width: queueWidth.value,
+      expanded: expanded.value,
+    };
+    const request = preferenceWriteRequest.catch(() => undefined).then(() => saveWriteQueuePreferences(preferences));
+    preferenceWriteRequest = request;
+    void request.catch(() => message.warning("文章队列偏好未能保存到账号，请稍后重试"));
+  }
+
   const data = ref<WriteQueueStatusType | null>(null);
   const shortWriteSchedule = ref<ShortWriteSchedule | null>(null);
   const shortWriteScheduleDelayed = ref(false);
   const statusReceivedAt = ref(Date.now());
   const loading = ref(false);
-  const expanded = ref(readExpandedPreference());
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let refreshRequest: Promise<void> | null = null;
 
@@ -244,14 +296,23 @@ export function useWriteQueueStatus() {
     if (!document.hidden) void refresh();
   }
 
-  /** 切换浮层并保存展开状态；浏览器拒绝写入时仍允许本次操作。 */
+  /** 展开或收起队列并同步账号偏好；收起嵌入栏时保留嵌入模式与宽度。 */
   function toggleExpand(): void {
     expanded.value = !expanded.value;
-    try {
-      localStorage.setItem(QUEUE_EXPANDED_KEY, expanded.value ? "1" : "0");
-    } catch {
-      // 无法持久化时只维持当前页面的展开状态。
-    }
+    persistQueuePreferences();
+  }
+
+  /** 在浮窗与右侧嵌入栏之间切换，不改变当前展开状态和已选宽度。 */
+  function toggleEmbedded(): void {
+    embedded.value = !embedded.value;
+    persistQueuePreferences();
+  }
+
+  /** 只接受预设宽度，防止模板或外部事件写入非支持档位。 */
+  function setQueueWidth(value: number): void {
+    if (!writeQueueWidths.some((width) => width === value)) return;
+    queueWidth.value = value as WriteQueueWidth;
+    persistQueuePreferences();
   }
 
   /** 用平台素材编号打开现有只读详情，不提交写作请求。 */
@@ -331,6 +392,7 @@ export function useWriteQueueStatus() {
   }
 
   onMounted(() => {
+    void loadQueuePreferences();
     void refresh();
     pollTimer = setInterval(refreshWhenVisible, 15_000);
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -363,6 +425,9 @@ export function useWriteQueueStatus() {
     statusReceivedAt,
     loading,
     expanded,
+    embedded,
+    queueWidth,
+    preferencesReady,
     elapsedNow,
     formatElapsed,
     modalVisible,
@@ -370,6 +435,8 @@ export function useWriteQueueStatus() {
     hasActiveWork,
     refresh,
     toggleExpand,
+    toggleEmbedded,
+    setQueueWidth,
     openSourceItem,
     articleDetailOpen,
     articleDetail,

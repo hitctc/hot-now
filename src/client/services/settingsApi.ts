@@ -1,4 +1,5 @@
 import { HttpError, requestJson } from "./http";
+import type { WriteQueuePreferences } from "../../core/auth/userPreferences.js";
 import type {
   AiTimelineEventRecord,
   AiTimelineImportanceLevel,
@@ -16,6 +17,10 @@ export type SettingsProfile = {
 
 export type SettingsProfileResponse = {
   profile: SettingsProfile | null;
+};
+
+export type WriteQueuePreferencesResponse = {
+  preferences: WriteQueuePreferences | null;
 };
 
 export type SettingsProviderKind = "deepseek" | "minimax" | "kimi";
@@ -616,6 +621,21 @@ export async function readSettingsProfile(): Promise<SettingsProfile | null> {
 
     throw error;
   }
+}
+
+/** 读取当前账号的队列布局偏好；没有服务端记录时返回 null 供首次迁移本地展开状态。 */
+export function readWriteQueuePreferences(): Promise<WriteQueuePreferencesResponse> {
+  return requestJson<WriteQueuePreferencesResponse>("/api/settings/write-queue-preferences");
+}
+
+/** 保存当前账号的队列布局偏好；失败时由调用方保留未同步提示。 */
+export function saveWriteQueuePreferences(
+  preferences: WriteQueuePreferences,
+): Promise<{ ok: true; preferences: WriteQueuePreferences }> {
+  return requestJson<{ ok: true; preferences: WriteQueuePreferences }>("/api/settings/write-queue-preferences", {
+    method: "PUT",
+    body: JSON.stringify(preferences),
+  });
 }
 
 export function updatePassword(

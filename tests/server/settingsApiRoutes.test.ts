@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { createServer } from "../../src/server/createServer.js";
+import { createServer, type ServerDeps } from "../../src/server/createServer.js";
+import type { WriteQueuePreferences } from "../../src/core/auth/userPreferences.js";
 
 function pickCookieValue(setCookieHeader: string | string[] | undefined) {
   const raw = Array.isArray(setCookieHeader) ? setCookieHeader[0] : setCookieHeader;
@@ -11,7 +12,10 @@ function pickCookieValue(setCookieHeader: string | string[] | undefined) {
   return raw.split(";")[0] ?? null;
 }
 
-function createAuthenticatedServer() {
+/** 构造带登录态的设置路由测试服务，并可注入队列偏好读写端口。 */
+function createAuthenticatedServer(
+  preferenceDeps: Pick<ServerDeps, "readWriteQueuePreferences" | "saveWriteQueuePreferences"> = {},
+) {
   return createServer({
     config: {
       collectionSchedule: {
@@ -222,7 +226,8 @@ function createAuthenticatedServer() {
       displayName: "系统管理员",
       role: "admin",
       email: "admin@example.com"
-    })
+    }),
+    ...preferenceDeps,
   } as never);
 }
 
@@ -237,6 +242,53 @@ async function loginAndGetCookie(app: ReturnType<typeof createServer>) {
 }
 
 describe("settings api routes", () => {
+  it("reads and saves queue layout preferences for the signed-in account", async () => {
+    const preferences: WriteQueuePreferences = { embedded: true, width: 450, expanded: true };
+    const readPreferences = vi.fn(() => preferences);
+    const savePreferences = vi.fn();
+    const app = createAuthenticatedServer({
+      readWriteQueuePreferences: readPreferences,
+      saveWriteQueuePreferences: savePreferences,
+    });
+    const cookie = await loginAndGetCookie(app);
+    const headers = { cookie: cookie ?? "" };
+
+    const read = await app.inject({ method: "GET", url: "/api/settings/write-queue-preferences", headers });
+    expect(read.statusCode).toBe(200);
+    expect(read.json()).toEqual({ preferences });
+
+    const save = await app.inject({
+      method: "PUT",
+      url: "/api/settings/write-queue-preferences",
+      headers,
+      payload: preferences,
+    });
+    expect(save.statusCode).toBe(200);
+    expect(save.json()).toEqual({ ok: true, preferences });
+    expect(savePreferences).toHaveBeenCalledWith(preferences);
+  });
+
+  it("rejects invalid queue widths and anonymous preference updates", async () => {
+    const savePreferences = vi.fn();
+    const app = createAuthenticatedServer({ saveWriteQueuePreferences: savePreferences });
+    const cookie = await loginAndGetCookie(app);
+
+    const invalid = await app.inject({
+      method: "PUT",
+      url: "/api/settings/write-queue-preferences",
+      headers: { cookie: cookie ?? "" },
+      payload: { embedded: true, width: 375, expanded: true },
+    });
+    const anonymous = await app.inject({
+      method: "PUT",
+      url: "/api/settings/write-queue-preferences",
+      payload: { embedded: true, width: 350, expanded: true },
+    });
+
+    expect(invalid.statusCode).toBe(400);
+    expect(anonymous.statusCode).toBe(401);
+    expect(savePreferences).not.toHaveBeenCalled();
+  });
   it("returns the view-rules workbench model for logged-in users", async () => {
     const app = createAuthenticatedServer();
     const cookie = await loginAndGetCookie(app);

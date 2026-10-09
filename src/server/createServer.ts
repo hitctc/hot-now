@@ -49,6 +49,7 @@ import type { ContentViewSelectionOptions } from "../core/content/buildContentVi
 import type { ContentCardView, ContentViewKey } from "../core/content/listContentView.js";
 import type { AiTimelineListQuery, AiTimelinePageModel } from "../core/aiTimeline/aiTimelineTypes.js";
 import type { SaveFeedbackPoolEntryInput, SaveFeedbackPoolEntryResult } from "../core/feedback/feedbackPoolRepository.js";
+import type { WriteQueuePreferences } from "../core/auth/userPreferences.js";
 import type {
   SaveProviderSettingsInput,
   SaveProviderSettingsResult,
@@ -417,6 +418,8 @@ export type ServerDeps = {
   triggerManualWeiboTrendingCollect?: () => Promise<ManualWeiboTrendingCollectResult>;
   triggerManualJuyaCollect?: () => Promise<ManualJuyaCollectResult>;
   getCurrentUserProfile?: () => Promise<CurrentUserProfile | null> | CurrentUserProfile | null;
+  readWriteQueuePreferences?: () => Promise<WriteQueuePreferences | null> | WriteQueuePreferences | null;
+  saveWriteQueuePreferences?: (preferences: WriteQueuePreferences) => Promise<void> | void;
   updatePassword?: (newPassword: string) => Promise<void>;
   pushArticleToWechatDraft?: (
     articleId: number,
@@ -574,6 +577,8 @@ export function createServer(deps: ServerDeps = {}) {
     saveContentFilterRule: deps.saveContentFilterRule,
     readSources: () => readSettingsSourcesApiData(deps),
     readProfile: (session) => readSettingsProfileApiData(deps, session),
+    readWriteQueuePreferences: deps.readWriteQueuePreferences,
+    saveWriteQueuePreferences: deps.saveWriteQueuePreferences,
     verifyLogin: authConfig?.verifyLogin,
     updatePassword: deps.updatePassword,
     readAiTimelineAdmin: (request) => readSettingsAiTimelineAdminApiData(deps, request),

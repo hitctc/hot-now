@@ -5,6 +5,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import WriteQueueStatus from "../../src/client/components/creative/WriteQueueStatus.vue";
 import MonitorPage from "../../src/client/pages/creative/MonitorPage.vue";
 import * as creativeApi from "../../src/client/services/creativeApi.js";
+import * as settingsApi from "../../src/client/services/settingsApi.js";
 
 const queueStatus = {
   current: null,
@@ -39,6 +40,8 @@ const EMPTY_SHORT_WRITE_SCHEDULE = {
 beforeEach(() => {
   window.localStorage.removeItem(QUEUE_EXPANDED_KEY);
   vi.spyOn(creativeApi, "readShortWriteSchedule").mockResolvedValue(EMPTY_SHORT_WRITE_SCHEDULE);
+  vi.spyOn(settingsApi, "readWriteQueuePreferences").mockResolvedValue({ preferences: null });
+  vi.spyOn(settingsApi, "saveWriteQueuePreferences").mockImplementation(async (preferences) => ({ ok: true, preferences }));
 });
 afterEach(() => {
   vi.restoreAllMocks();
@@ -46,6 +49,67 @@ afterEach(() => {
 });
 
 describe("写作队列最近逐篇结果", () => {
+  it("首次迁移沿用浏览器展开状态并保存账号偏好", async () => {
+    window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
+    vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue(queueStatus);
+    const wrapper = mount(WriteQueueStatus, { attachTo: document.body, global: { stubs: { SourceItemDetailModal: true, ArticleDetailDrawer: true } } });
+    try {
+      await flushPromises();
+      expect(document.body.querySelector(".write-queue-header")).not.toBeNull();
+      expect(settingsApi.saveWriteQueuePreferences).toHaveBeenCalledWith({ embedded: false, width: 350, expanded: true });
+    } finally { wrapper.unmount(); }
+  });
+
+  it("刷新按钮左侧的入口可切换悬浮与右侧嵌入", async () => {
+    vi.spyOn(settingsApi, "readWriteQueuePreferences").mockResolvedValue({
+      preferences: { embedded: false, width: 350, expanded: true },
+    });
+    vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue(queueStatus);
+    const wrapper = mount(WriteQueueStatus, { attachTo: document.body, global: { stubs: { SourceItemDetailModal: true, ArticleDetailDrawer: true } } });
+    try {
+      await flushPromises();
+      const dockButton = document.body.querySelector<HTMLButtonElement>(".write-queue-dock-toggle");
+      expect(dockButton?.nextElementSibling?.classList.contains("write-queue-refresh")).toBe(true);
+      expect(dockButton?.getAttribute("aria-label")).toBe("嵌入到页面右侧");
+
+      dockButton?.click();
+      await flushPromises();
+      expect(document.body.querySelector(".write-queue-float--embedded")).not.toBeNull();
+      expect(settingsApi.saveWriteQueuePreferences).toHaveBeenLastCalledWith({ embedded: true, width: 350, expanded: true });
+
+      document.body.querySelector<HTMLButtonElement>(".write-queue-dock-toggle")?.click();
+      await flushPromises();
+      expect(document.body.querySelector(".write-queue-float--embedded")).toBeNull();
+      expect(settingsApi.saveWriteQueuePreferences).toHaveBeenLastCalledWith({ embedded: false, width: 350, expanded: true });
+    } finally { wrapper.unmount(); }
+  });
+
+  it("账号偏好控制嵌入宽度，收起后保留嵌入模式并可恢复", async () => {
+    vi.spyOn(settingsApi, "readWriteQueuePreferences").mockResolvedValue({
+      preferences: { embedded: true, width: 450, expanded: true },
+    });
+    vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue(queueStatus);
+    const wrapper = mount(WriteQueueStatus, { attachTo: document.body, global: { stubs: { SourceItemDetailModal: true, ArticleDetailDrawer: true } } });
+    try {
+      await flushPromises();
+      const panel = document.body.querySelector<HTMLElement>(".write-queue-float--embedded");
+      expect(panel?.parentElement).not.toBe(document.body);
+      expect(panel?.style.getPropertyValue("--write-queue-width")).toBe("450px");
+      expect(panel?.querySelectorAll("[data-queue-width]")).toHaveLength(4);
+
+      panel?.querySelector<HTMLButtonElement>('[data-queue-width="550"]')?.click();
+      await flushPromises();
+      expect(panel?.style.getPropertyValue("--write-queue-width")).toBe("550px");
+      expect(settingsApi.saveWriteQueuePreferences).toHaveBeenLastCalledWith({ embedded: true, width: 550, expanded: true });
+
+      panel?.querySelector<HTMLButtonElement>(".write-queue-close")?.click();
+      await wrapper.vm.$nextTick();
+      expect(document.body.querySelector(".write-queue-float--embedded.write-queue-float--collapsed")).not.toBeNull();
+      document.body.querySelector<HTMLButtonElement>(".write-queue-dot-btn")?.click();
+      await wrapper.vm.$nextTick();
+      expect(document.body.querySelector(".write-queue-float--embedded.write-queue-float--collapsed")).toBeNull();
+    } finally { wrapper.unmount(); }
+  });
   it("完整展示当前批次未入队候选，保持原顺位并在刷新后替换新批次内容", async () => {
     window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
     const readSchedule = vi.spyOn(creativeApi, "readShortWriteSchedule")
@@ -196,9 +260,10 @@ describe("写作队列最近逐篇结果", () => {
       const refresh = document.body.querySelector<HTMLButtonElement>(".write-queue-refresh")!;
       expect(refresh.getAttribute("aria-label")).toBe("刷新文章队列");
       const headerActions = document.body.querySelector(".write-queue-header-actions")!;
-      expect([...headerActions.children].map(button => button.getAttribute("aria-label"))).toEqual(["刷新文章队列", "收起文章队列"]);
+      expect([...headerActions.children].map(button => button.getAttribute("aria-label"))).toEqual(["嵌入到页面右侧", "刷新文章队列", "收起文章队列"]);
       expect(headerActions.closest(".write-queue-header")).not.toBeNull();
       expect([...headerActions.children].every(button => button.classList.contains("write-queue-control"))).toBe(true);
+      expect(headerActions.children[0]?.nextElementSibling).toBe(refresh);
       expect(document.body.querySelector(".write-queue-footer button")).toBeNull();
       refresh.click();
       await flushPromises();
@@ -220,6 +285,9 @@ describe("写作队列最近逐篇结果", () => {
     // DOM 测试不计算手机实际像素，断言动态高度、安全区及唯一内容滚动区的约束。
     expect(source).toMatch(/\.write-queue-float\s*\{[^}]*display: flex;[^}]*flex-direction: column;[^}]*overflow: hidden;/);
     expect(source).toMatch(/\.write-queue-body\s*\{[^}]*flex: 1 1 auto;[^}]*min-height: 0;[^}]*overflow-y: auto;/);
+    expect(source).toContain('<Teleport to="body" :disabled="embedded">');
+    expect(source).toMatch(/@media \(min-width: 901px\)\s*\{[^}]*\.write-queue-float--embedded\s*\{[^}]*flex: 0 0 var\(--write-queue-width\);[^}]*width: var\(--write-queue-width\);/);
+    expect(source).toMatch(/@media \(max-width: 900px\)\s*\{\s*\.write-queue-dock-toggle,\s*\.write-queue-width-picker\s*\{\s*display: none;/);
     const mobile = source.split("@media (max-width: 768px)")[1] ?? "";
     expect(mobile).toContain("100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 8px");
     expect(mobile).toContain("bottom: env(safe-area-inset-bottom, 0px)");

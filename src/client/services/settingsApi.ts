@@ -23,6 +23,18 @@ export type WriteQueuePreferencesResponse = {
   preferences: WriteQueuePreferences | null;
 };
 
+export type SettingsApiAccessToken = {
+  id: number;
+  name: string;
+  tokenPrefix: string;
+  createdAt: string;
+  expiresAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+};
+
+export type SettingsApiAccessTokenCreation = SettingsApiAccessToken & { token: string };
+
 export type SettingsProviderKind = "deepseek" | "minimax" | "kimi";
 
 export type SettingsProviderSettingsSummary = {
@@ -621,6 +633,25 @@ export async function readSettingsProfile(): Promise<SettingsProfile | null> {
 
     throw error;
   }
+}
+
+/** 列出当前管理员已签发的 API 凭证元数据，不会返回凭证明文。 */
+export async function readSettingsApiAccessTokens(): Promise<SettingsApiAccessToken[]> {
+  const response = await requestJson<{ tokens: SettingsApiAccessToken[] }>("/api/settings/access-tokens");
+  return response.tokens;
+}
+
+/** 为当前管理员签发一年期凭证；明文只在本次创建响应中返回。 */
+export function createSettingsApiAccessToken(name: string): Promise<{ token: SettingsApiAccessTokenCreation }> {
+  return requestJson<{ token: SettingsApiAccessTokenCreation }>("/api/settings/access-tokens", {
+    method: "POST",
+    body: JSON.stringify({ name })
+  });
+}
+
+/** 立即撤销指定凭证；撤销后所有后续 Bearer 请求都会被拒绝。 */
+export function revokeSettingsApiAccessToken(id: number): Promise<{ ok: true }> {
+  return requestJson<{ ok: true }>(`/api/settings/access-tokens/${id}`, { method: "DELETE" });
 }
 
 /** 读取当前账号的队列布局偏好；没有服务端记录时返回 null 供首次迁移本地展开状态。 */

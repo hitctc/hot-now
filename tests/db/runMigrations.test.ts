@@ -9,6 +9,8 @@ import { wechatDraftPushContentTypeMigration } from "../../src/core/db/migration
 import { seedInitialData } from "../../src/core/db/seedInitialData.js";
 
 const expectedTables = [
+  "admin_api_access_token_reminders",
+  "admin_api_access_tokens",
   "collection_runs",
   "content_feedback",
   "content_items",
@@ -101,7 +103,7 @@ describe("runMigrations", () => {
     expect(rows.map((row) => row.name)).toEqual([...expectedTables, "schema_migrations"].sort());
 
     const schemaVersion = db.pragma("user_version", { simple: true }) as number;
-    expect(schemaVersion).toBe(57);
+    expect(schemaVersion).toBe(58);
 
     const appliedMigrations = db
       .prepare(
@@ -170,7 +172,8 @@ describe("runMigrations", () => {
       { version: 54, name: "054_finished_articles_code_image_keywords" },
       { version: 55, name: "055_normalize_short_content_statuses" },
       { version: 56, name: "056_wechat_draft_push_content_type" },
-      { version: 57, name: "057_creative_queue_display_indexes" }
+      { version: 57, name: "057_creative_queue_display_indexes" },
+      { version: 58, name: "058_admin_api_access_tokens" }
     ]);
 
     expect(db.prepare("PRAGMA table_info(wechat_draft_push_log)").all()).toEqual(
@@ -692,7 +695,7 @@ describe("runMigrations", () => {
     expect(evidenceTable).toBeTruthy();
     expect(sourceRunsTable).toBeTruthy();
     expect(notificationsTable).toBeTruthy();
-    expect(db.pragma("user_version", { simple: true })).toBe(57);
+    expect(db.pragma("user_version", { simple: true })).toBe(58);
 
     // daily_digests 表验证
     const digestTable = db

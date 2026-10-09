@@ -49,6 +49,29 @@ describe("settingsApi", () => {
     expect(requestJson).toHaveBeenCalledWith("/api/settings/sources");
   });
 
+  it("uses the authenticated API access-token lifecycle routes", async () => {
+    const {
+      createSettingsApiAccessToken,
+      readSettingsApiAccessTokens,
+      revokeSettingsApiAccessToken
+    } = await import("../../src/client/services/settingsApi");
+    requestJson
+      .mockResolvedValueOnce({ tokens: [] })
+      .mockResolvedValueOnce({ token: { id: 4, token: "one-time" } })
+      .mockResolvedValueOnce({ ok: true });
+
+    await readSettingsApiAccessTokens();
+    await createSettingsApiAccessToken("MacBook");
+    await revokeSettingsApiAccessToken(4);
+
+    expect(requestJson).toHaveBeenNthCalledWith(1, "/api/settings/access-tokens");
+    expect(requestJson).toHaveBeenNthCalledWith(2, "/api/settings/access-tokens", {
+      method: "POST",
+      body: JSON.stringify({ name: "MacBook" })
+    });
+    expect(requestJson).toHaveBeenNthCalledWith(3, "/api/settings/access-tokens/4", { method: "DELETE" });
+  });
+
   it("reads the content filter workbench from the view-rules api", async () => {
     const { readSettingsViewRules } = await import("../../src/client/services/settingsApi");
 

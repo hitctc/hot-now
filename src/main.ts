@@ -10,13 +10,20 @@ import { checkpointWal } from "./core/db/sqliteHealth.js";
 import { fetchAndExtractArticle } from "./core/fetch/extractArticle.js";
 import { runHackerNewsCollection } from "./core/hackernews/runHackerNewsCollection.js";
 import { sendDailyEmail } from "./core/mail/sendDailyEmail.js";
+import { runApiAccessTokenExpiryReminderCycle } from "./core/notifications/runApiAccessTokenExpiryReminderCycle.js";
 import { runAiTimelineAlertCycle } from "./core/notifications/runAiTimelineAlertCycle.js";
 import { LatestReportEmailError, sendLatestReportEmail } from "./core/pipeline/sendLatestReportEmail.js";
 import { runCollectionCycle } from "./core/pipeline/runCollectionCycle.js";
 import type { DailyReportTrigger } from "./core/report/buildDailyReport.js";
 import { installGracefulShutdown } from "./core/runtime/installGracefulShutdown.js";
 import { createRunLock } from "./core/runtime/runLock.js";
-import { startAiTimelineAlertScheduler, startCollectionScheduler, startMailScheduler, startWechatRssScheduler } from "./core/scheduler/startScheduler.js";
+import {
+  startAiTimelineAlertScheduler,
+  startApiAccessTokenExpiryReminderScheduler,
+  startCollectionScheduler,
+  startMailScheduler,
+  startWechatRssScheduler
+} from "./core/scheduler/startScheduler.js";
 import { loadEnabledSourceIssues } from "./core/source/loadEnabledSourceIssues.js";
 import { runJuyaCollection } from "./core/source/runJuyaCollection.js";
 import { runTwitterAccountCollection } from "./core/twitter/runTwitterAccountCollection.js";
@@ -57,6 +64,7 @@ const hackerNewsLock = createRunLock();
 const bilibiliLock = createRunLock();
 const weiboLock = createRunLock();
 const juyaLock = createRunLock();
+const apiTokenExpiryLock = createRunLock();
 // Collection runs now stop after report generation so recurring fetches no longer send mail as a side effect.
 async function runCollectionTask(triggerType: DailyReportTrigger) {
   return await runCollectionCycle(config, triggerType, {
@@ -260,6 +268,22 @@ const mailScheduler = remoteApiOrigin ? null : startMailScheduler(config, async 
   }
 });
 
+// Security reminders run independently of Hermes business gates and share the configured SMTP sender.
+const apiAccessTokenExpiryReminderScheduler = remoteApiOrigin
+  ? null
+  : startApiAccessTokenExpiryReminderScheduler(async () => {
+      try {
+        await apiTokenExpiryLock.runExclusive(async () => {
+          const result = await runApiAccessTokenExpiryReminderCycle(db, config);
+          if (result.sentCount > 0) {
+            app.log.info({ sentCount: result.sentCount }, "API access token expiry reminders sent");
+          }
+        });
+      } catch (error) {
+        app.log.error(error, "API access token expiry reminder cycle failed");
+      }
+    });
+
 const aiTimelineAlertScheduler = remoteApiOrigin ? null : startAiTimelineAlertScheduler(config, async () => {
   try {
     if (!(await isHermesAutomationAllowed("reminders")) || !(await isHermesAutomationAllowed("notifications"))) {
@@ -295,10 +319,10 @@ installGracefulShutdown({
     info: (context, message) => app.log.info(context, message),
     error: (context, message) => app.log.error(context, message)
   },
-  scheduledTasks: [collectionScheduler, mailScheduler, aiTimelineAlertScheduler, wechatRssScheduler],
+  scheduledTasks: [collectionScheduler, mailScheduler, apiAccessTokenExpiryReminderScheduler, aiTimelineAlertScheduler, wechatRssScheduler],
   waitForIdle: async () => {
-    // 当前版本只需要等采集、发信和 S 级提醒任务收口，LLM 相关运行时已经不再参与主链路。
-    while (lock.isRunning() || aiTimelineAlertLock.isRunning()) {
+    // 等待采集、AI 提醒和凭证到期邮件结束，避免关闭 SQLite 时中断提醒记账。
+    while (lock.isRunning() || aiTimelineAlertLock.isRunning() || apiTokenExpiryLock.isRunning()) {
       await wait(100);
     }
   },

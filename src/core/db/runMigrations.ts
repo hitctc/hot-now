@@ -22,9 +22,10 @@ import { finishedArticlesCodeImageKeywordsMigration } from "./migrations/054_fin
 import { normalizeShortContentStatusesMigration } from "./migrations/055_normalize_short_content_statuses.js";
 import { wechatDraftPushContentTypeMigration } from "./migrations/056_wechat_draft_push_content_type.js";
 import { creativeQueueDisplayIndexesMigration } from "./migrations/057_creative_queue_display_indexes.js";
+import { adminApiAccessTokensMigration } from "./migrations/058_admin_api_access_tokens.js";
 import { applyLegacyMigrations014To047 } from "./legacyMigrations014To047.js";
 
-const schemaVersion = 57;
+const schemaVersion = 58;
 
 /** 按现役事务顺序升级传入数据库及版本记录；迁移幂等，新增外键错误使整轮回滚。 */
 export function runMigrations(db: SqliteDatabase): void {
@@ -224,6 +225,12 @@ export function runMigrations(db: SqliteDatabase): void {
     db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(
       creativeQueueDisplayIndexesMigration.version,
       creativeQueueDisplayIndexesMigration.name
+    );
+
+    adminApiAccessTokensMigration.apply(db);
+    db.prepare(`INSERT INTO schema_migrations (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING`).run(
+      adminApiAccessTokensMigration.version,
+      adminApiAccessTokensMigration.name
     );
 
     db.pragma(`user_version = ${schemaVersion}`);

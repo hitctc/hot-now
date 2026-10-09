@@ -1,11 +1,18 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { SaveProviderSettingsInput, SaveProviderSettingsResult, UpdateProviderSettingsActivationResult } from "../../core/llm/providerSettingsRepository.js";
 import { isWriteQueuePreferences, type WriteQueuePreferences } from "../../core/auth/userPreferences.js";
+import type { ApiAccessTokenRecord } from "../../core/auth/apiAccessTokenRepository.js";
 
 export type SettingsApiSession = { username: string; displayName: string; role: string; issuedAt: number; expiresAt: number } | null;
 
 export type SettingsApiRouteOptions = {
   readSession: (request: FastifyRequest, reply: FastifyReply) => SettingsApiSession | undefined;
+  readInteractiveSession: (request: FastifyRequest, reply: FastifyReply) => SettingsApiSession | undefined;
+  apiTokens?: {
+    list: (ownerUsername: string) => ApiAccessTokenRecord[];
+    create: (ownerUsername: string, name: string) => ApiAccessTokenRecord & { token: string };
+    revoke: (id: number, ownerUsername: string) => boolean;
+  };
   authorizeStateAction: (request: FastifyRequest, reply: FastifyReply) => boolean;
   readViewRules: () => Promise<unknown>;
   saveContentFilterRule?: (input: { ruleKey: string; toggles: unknown; weights: unknown }) => Promise<
@@ -88,6 +95,52 @@ export function registerSettingsApiRoutes(
     }
 
     return reply.send({ profile: await options.readProfile(session) });
+  });
+
+  /** 仅向管理员 Cookie 会话返回当前账号的凭证元数据，不泄露摘要或明文。 */
+  app.get("/api/settings/access-tokens", async (request, reply) => {
+    const session = readAdminSettingsApiSession(options, request, reply);
+    if (!session) return;
+    if (!options.apiTokens) return reply.code(503).send({ ok: false, reason: "api-access-tokens-unavailable" });
+
+    return reply.send({ tokens: options.apiTokens.list(session.username) });
+  });
+
+  /** 为管理员签发一年期凭证；本次响应是明文唯一展示机会。 */
+  app.post("/api/settings/access-tokens", async (request, reply) => {
+    const session = readAdminSettingsApiSession(options, request, reply);
+    if (!session) return;
+    if (!options.apiTokens) return reply.code(503).send({ ok: false, reason: "api-access-tokens-unavailable" });
+
+    const body = request.body as { name?: unknown } | undefined;
+    const name = typeof body?.name === "string" ? body.name.trim() : "";
+    if (!name || name.length > 64 || /[\u0000-\u001f\u007f]/.test(name)) {
+      return reply.code(400).send({ ok: false, reason: "invalid-api-access-token-name" });
+    }
+
+    try {
+      return reply.code(201).send({ token: options.apiTokens.create(session.username, name) });
+    } catch (error) {
+      request.log.error(error, "Create API access token failed");
+      return reply.code(500).send({ ok: false, reason: "api-access-token-create-failed" });
+    }
+  });
+
+  /** 只撤销当前账号名下的凭证，避免管理员跨账号修改凭证。 */
+  app.delete("/api/settings/access-tokens/:id", async (request, reply) => {
+    const session = readAdminSettingsApiSession(options, request, reply);
+    if (!session) return;
+    if (!options.apiTokens) return reply.code(503).send({ ok: false, reason: "api-access-tokens-unavailable" });
+
+    const id = Number((request.params as { id?: string }).id);
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      return reply.code(400).send({ ok: false, reason: "invalid-api-access-token-id" });
+    }
+    if (!options.apiTokens.revoke(id, session.username)) {
+      return reply.code(404).send({ ok: false, reason: "api-access-token-not-found" });
+    }
+
+    return reply.send({ ok: true });
   });
 
   /** 读取当前登录账号的队列布局偏好；首次登录返回 null 供前端迁移旧展开状态。 */
@@ -296,6 +349,21 @@ export function registerSettingsApiRoutes(
     await options.deleteProviderSettings(providerKind);
     return reply.send({ ok: true });
   });
+}
+
+/** 凭证管理只接受管理员 Cookie 会话；API token 即使有全权限也不能管理其他 token。 */
+function readAdminSettingsApiSession(
+  options: SettingsApiRouteOptions,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Exclude<SettingsApiSession, null> | undefined {
+  const session = options.readInteractiveSession(request, reply);
+  if (!session) return undefined;
+  if (session.role !== "admin") {
+    reply.code(403).send({ ok: false, reason: "admin-required" });
+    return undefined;
+  }
+  return session;
 }
 
 /** 仅接受当前配置仓储支持的供应商标识。 */

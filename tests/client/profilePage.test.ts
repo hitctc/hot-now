@@ -12,13 +12,17 @@ vi.mock("../../src/client/services/settingsApi", async () => {
 
   return {
     ...actual,
-    readSettingsProfile: vi.fn()
+    readSettingsProfile: vi.fn(),
+    readSettingsApiAccessTokens: vi.fn(),
+    createSettingsApiAccessToken: vi.fn(),
+    revokeSettingsApiAccessToken: vi.fn()
   };
 });
 
 describe("ProfilePage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(settingsApi.readSettingsApiAccessTokens).mockResolvedValue([]);
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: vi.fn().mockImplementation((query: string) => ({
@@ -54,6 +58,40 @@ describe("ProfilePage", () => {
     expect(wrapper.get("[data-profile-field='email']").text()).toBe("admin@example.com");
     expect(wrapper.get("[data-profile-field='username']").text()).toBe("admin");
     expect(wrapper.get("[data-profile-field='session-status']").text()).toContain("已登录");
+  });
+
+  it("shows a newly issued token only after the create action", async () => {
+    vi.mocked(settingsApi.readSettingsProfile).mockResolvedValue({
+      username: "admin",
+      displayName: "系统管理员",
+      role: "admin",
+      email: "admin@example.com",
+      loggedIn: true
+    });
+    const plainToken = "hn_live_test-token-that-is-shown-once";
+    vi.mocked(settingsApi.createSettingsApiAccessToken).mockResolvedValue({
+      token: {
+        id: 8,
+        name: "MacBook",
+        tokenPrefix: "hn_live_test",
+        createdAt: "2026-10-09T08:00:00.000Z",
+        expiresAt: "2027-10-09T08:00:00.000Z",
+        lastUsedAt: null,
+        revokedAt: null,
+        token: plainToken
+      }
+    });
+
+    const wrapper = mountWithApp(ProfilePage);
+    await flushPromises();
+    expect(wrapper.text()).not.toContain(plainToken);
+
+    await wrapper.get("[data-api-token-create]").trigger("click");
+    await flushPromises();
+
+    expect(settingsApi.createSettingsApiAccessToken).toHaveBeenCalledWith("MacBook");
+    expect(wrapper.get("[data-api-token-issued]").text()).toContain(plainToken);
+    expect(wrapper.get("[data-api-token-issued]").text()).toContain("security add-generic-password");
   });
 
   it("renders the shared editorial empty state when the profile payload is empty", async () => {

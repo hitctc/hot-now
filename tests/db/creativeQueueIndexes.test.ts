@@ -29,7 +29,7 @@ it("queue covering indexes preserve date parsing, ordering, rows and repeated mi
     expect(articlePlan.some(row => row.detail.includes("COVERING INDEX idx_creative_finished_articles_queue_history_cover"))).toBe(true);
     runMigrations(db);
     expect([hash(db.prepare(sourceSql).all()), hash(db.prepare(articleSql).all())]).toEqual(before);
-    expect(db.pragma("user_version", { simple: true })).toBe(57);
+    expect(db.pragma("user_version", { simple: true })).toBe(58);
     expect(db.pragma("quick_check")).toEqual([{ quick_check: "ok" }]);
     expect(db.prepare("SELECT COUNT(*) AS count FROM creative_source_items").get()).toEqual({ count: 4 });
     expect(db.prepare("SELECT COUNT(*) AS count FROM creative_finished_articles").get()).toEqual({ count: 4 });

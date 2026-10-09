@@ -1,4 +1,5 @@
 import Fastify, { LogController } from "fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import {
   installPerformanceMonitoring,
   resolveSlowRequestThreshold
@@ -20,10 +21,11 @@ import { registerSitePageRoutes, readSettingsAiTimelineAdminApiData } from "./ro
 import { registerAiTimelineRoutes } from "./routes/aiTimelineRoutes.js";
 import { registerRemoteApiProxy } from "./remoteApiProxy.js";
 import {
-  ensureManualActionAuthorized,
-  ensureStateActionAuthorized,
+  ensureManualActionAuthorized as ensureManualActionAuthorizedBase,
+  ensureStateActionAuthorized as ensureStateActionAuthorizedBase,
   readAuthenticatedSession,
-  readSettingsApiSession,
+  readInteractiveSettingsApiSession,
+  readSettingsApiSession as readSettingsApiSessionBase,
   validateCreativeApiToken,
 } from "./createServerSession.js";
 import {
@@ -50,6 +52,10 @@ import type { ContentCardView, ContentViewKey } from "../core/content/listConten
 import type { AiTimelineListQuery, AiTimelinePageModel } from "../core/aiTimeline/aiTimelineTypes.js";
 import type { SaveFeedbackPoolEntryInput, SaveFeedbackPoolEntryResult } from "../core/feedback/feedbackPoolRepository.js";
 import type { WriteQueuePreferences } from "../core/auth/userPreferences.js";
+import type {
+  ApiAccessTokenPrincipal,
+  ApiAccessTokenRecord
+} from "../core/auth/apiAccessTokenRepository.js";
 import type {
   SaveProviderSettingsInput,
   SaveProviderSettingsResult,
@@ -457,6 +463,12 @@ export type ServerDeps = {
       | "searchKeyword"
     >
   ) => Promise<ContentPageModel> | ContentPageModel;
+  apiTokens?: {
+    authenticate: (token: string) => ApiAccessTokenPrincipal | null;
+    list: (ownerUsername: string) => ApiAccessTokenRecord[];
+    create: (ownerUsername: string, name: string) => ApiAccessTokenRecord & { token: string };
+    revoke: (id: number, ownerUsername: string) => boolean;
+  };
   auth?: {
     requireLogin: boolean;
     sessionSecret: string;
@@ -485,6 +497,26 @@ export function createServer(deps: ServerDeps = {}) {
   const authEnabled = authConfig?.requireLogin === true;
   const db = deps.db;
   const creativeApiToken = deps.creativeApiToken;
+  const readApiToken = deps.apiTokens?.authenticate;
+  // Bind the optional admin token lookup once so every existing session-gated API keeps one policy.
+  const readSettingsApiSession = (
+    request: FastifyRequest,
+    reply: FastifyReply,
+    enabled: boolean,
+    secret: string
+  ) => readSettingsApiSessionBase(request, reply, enabled, secret, readApiToken);
+  const ensureStateActionAuthorized = (
+    request: FastifyRequest,
+    reply: FastifyReply,
+    enabled: boolean,
+    secret: string
+  ) => ensureStateActionAuthorizedBase(request, reply, enabled, secret, readApiToken);
+  const ensureManualActionAuthorized = (
+    request: FastifyRequest,
+    reply: FastifyReply,
+    enabled: boolean,
+    secret: string
+  ) => ensureManualActionAuthorizedBase(request, reply, enabled, secret, readApiToken);
   const creativeImageDir = deps.creativeImageDir;
   if (deps.remoteApiOrigin) {
     registerRemoteApiProxy(app, {
@@ -570,6 +602,9 @@ export function createServer(deps: ServerDeps = {}) {
     readSession: (request, reply) => (
       readSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? "")
     ),
+    readInteractiveSession: (request, reply) =>
+      readInteractiveSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? ""),
+    apiTokens: deps.apiTokens,
     authorizeStateAction: (request, reply) => (
       ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")
     ),
@@ -599,7 +634,8 @@ export function createServer(deps: ServerDeps = {}) {
       authEnabled,
       authConfig?.sessionSecret ?? "",
       deps.isRunning?.() ?? false,
-      deps.triggerManualCollect ?? deps.triggerManualRun
+      deps.triggerManualCollect ?? deps.triggerManualRun,
+      readApiToken
     ),
     sendLatestEmail: (request, reply) => handleManualSendLatestEmailAction(
       request,
@@ -607,7 +643,8 @@ export function createServer(deps: ServerDeps = {}) {
       authEnabled,
       authConfig?.sessionSecret ?? "",
       deps.isRunning?.() ?? false,
-      deps.triggerManualSendLatestEmail
+      deps.triggerManualSendLatestEmail,
+      readApiToken
     ),
     collectTwitterAccounts: (request, reply) => handleManualTwitterCollectAction(
       request,
@@ -615,7 +652,8 @@ export function createServer(deps: ServerDeps = {}) {
       authEnabled,
       authConfig?.sessionSecret ?? "",
       deps.isRunning?.() ?? false,
-      deps.triggerManualTwitterCollect
+      deps.triggerManualTwitterCollect,
+      readApiToken
     ),
     collectTwitterKeywords: (request, reply) => handleManualTwitterKeywordCollectAction(
       request,
@@ -623,7 +661,8 @@ export function createServer(deps: ServerDeps = {}) {
       authEnabled,
       authConfig?.sessionSecret ?? "",
       deps.isRunning?.() ?? false,
-      deps.triggerManualTwitterKeywordCollect
+      deps.triggerManualTwitterKeywordCollect,
+      readApiToken
     ),
     collectHackerNews: (request, reply) => handleManualHackerNewsCollectAction(
       request,
@@ -631,7 +670,8 @@ export function createServer(deps: ServerDeps = {}) {
       authEnabled,
       authConfig?.sessionSecret ?? "",
       deps.isRunning?.() ?? false,
-      deps.triggerManualHackerNewsCollect
+      deps.triggerManualHackerNewsCollect,
+      readApiToken
     ),
     collectBilibili: (request, reply) => handleManualBilibiliCollectAction(
       request,
@@ -639,7 +679,8 @@ export function createServer(deps: ServerDeps = {}) {
       authEnabled,
       authConfig?.sessionSecret ?? "",
       deps.isRunning?.() ?? false,
-      deps.triggerManualBilibiliCollect
+      deps.triggerManualBilibiliCollect,
+      readApiToken
     ),
     collectWechatRss: (request, reply) => handleManualWechatRssCollectAction(
       request,
@@ -647,7 +688,8 @@ export function createServer(deps: ServerDeps = {}) {
       authEnabled,
       authConfig?.sessionSecret ?? "",
       deps.isRunning?.() ?? false,
-      deps.triggerManualWechatRssCollect
+      deps.triggerManualWechatRssCollect,
+      readApiToken
     ),
     collectWeibo: (request, reply) => handleManualWeiboTrendingCollectAction(
       request,
@@ -655,14 +697,16 @@ export function createServer(deps: ServerDeps = {}) {
       authEnabled,
       authConfig?.sessionSecret ?? "",
       deps.isRunning?.() ?? false,
-      deps.triggerManualWeiboTrendingCollect
+      deps.triggerManualWeiboTrendingCollect,
+      readApiToken
     ),
     collectJuya: (request, reply) => handleManualJuyaCollectAction(
       request,
       reply,
       authEnabled,
       authConfig?.sessionSecret ?? "",
-      deps.triggerManualJuyaCollect
+      deps.triggerManualJuyaCollect,
+      readApiToken
     ),
     authorizeManualAction: (request, reply) => ensureManualActionAuthorized(
       request,

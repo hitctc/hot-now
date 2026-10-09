@@ -8,6 +8,7 @@ import { runDailyDigest } from "../../src/core/pipeline/runDailyDigest.js";
 import { createRunLock } from "../../src/core/runtime/runLock.js";
 import {
   startAiTimelineAlertScheduler,
+  startApiAccessTokenExpiryReminderScheduler,
   startCollectionScheduler,
   startMailScheduler
 } from "../../src/core/scheduler/startScheduler.js";
@@ -112,6 +113,21 @@ describe("startMailScheduler", () => {
     const result = startMailScheduler(config, vi.fn());
 
     expect(scheduleMock).toHaveBeenCalledWith("0 10 * * *", expect.any(Function), {
+      timezone: "Asia/Shanghai"
+    });
+    expect(result).toBe(task);
+  });
+});
+
+describe("startApiAccessTokenExpiryReminderScheduler", () => {
+  it("checks expiry notifications daily at 09:00 China time", () => {
+    const scheduleMock = vi.mocked(cron.schedule);
+    const task = { stop: vi.fn() } as never;
+    scheduleMock.mockReturnValue(task);
+
+    const result = startApiAccessTokenExpiryReminderScheduler(vi.fn());
+
+    expect(scheduleMock).toHaveBeenCalledWith("0 9 * * *", expect.any(Function), {
       timezone: "Asia/Shanghai"
     });
     expect(result).toBe(task);

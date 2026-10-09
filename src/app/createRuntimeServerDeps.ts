@@ -1,6 +1,12 @@
 import path from "node:path";
 import { hashPassword, verifyPassword } from "../core/auth/passwords.js";
 import {
+  authenticateApiAccessToken,
+  createApiAccessToken,
+  listApiAccessTokens,
+  revokeApiAccessToken
+} from "../core/auth/apiAccessTokenRepository.js";
+import {
   readWriteQueuePreferences as readQueuePreferencesFromDb,
   saveWriteQueuePreferences as saveQueuePreferencesToDb,
 } from "../core/auth/userPreferencesRepository.js";
@@ -416,6 +422,13 @@ export function createRuntimeServerDeps(input: RuntimeServerDepsInput): ServerDe
     sessionSecret: config.auth.sessionSecret,
     sessionTtlSeconds: config.auth.sessionTtlSeconds,
     verifyLogin
+  },
+  // Persist one-time-issued admin credentials as hashes and bind their owner to the active profile.
+  apiTokens: {
+    authenticate: (token) => authenticateApiAccessToken(db, token),
+    list: (ownerUsername) => listApiAccessTokens(db, ownerUsername),
+    create: (ownerUsername, name) => createApiAccessToken(db, ownerUsername, name),
+    revoke: (id, ownerUsername) => revokeApiAccessToken(db, id, ownerUsername)
   },
     isRunning: input.isRunning,
   getContentPageModel: async (pageKey, options) =>

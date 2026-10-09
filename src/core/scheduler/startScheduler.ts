@@ -28,6 +28,11 @@ export function startMailScheduler(config: RuntimeConfig, run: () => Promise<voi
   });
 }
 
+// API credential expiry notifications are system-security mail and run independently of Hermes business jobs.
+export function startApiAccessTokenExpiryReminderScheduler(run: () => Promise<void>): ScheduledTask {
+  return cron.schedule("0 9 * * *", run, { timezone: "Asia/Shanghai" });
+}
+
 // AI timeline alerts poll one small feed file and only notify previously unseen S-level events.
 export function startAiTimelineAlertScheduler(config: RuntimeConfig, run: () => Promise<void>): ScheduledTask | null {
   if (!config.aiTimelineAlerts.enabled) {

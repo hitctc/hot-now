@@ -51,6 +51,7 @@ const status = {
     shortWritePacingSupported: true,
     shortWriteMode: "paced",
     shortWriteBatchSize: 1,
+    shortWriteCycleCount: 8,
     shortCollectionInterval: 60,
     shortWriteInterval: 7.5,
     timezone: "Asia/Shanghai",
@@ -127,24 +128,34 @@ describe("MonitorSwitches 每轮长文计划", () => {
     expect(long.text()).not.toContain("短内容采集间隔");
     expect(short.text()).toContain("短内容采集间隔");
     expect(short.text()).toContain("单篇投递间隔");
+    expect(short.text()).toContain("每采集周期最多写作篇数");
+    expect(short.text()).toContain("人工任务不计入上限且保持高优先级");
     expect(short.text()).not.toContain("基础评分阈值");
     expect(short.text()).not.toContain("每轮自动短内容数量");
+    const countRow = wrapper.get('[data-testid="config-shortWriteCycleCount"]');
+    countRow.findComponent(InputNumber).vm.$emit("change", 10);
+    await countRow.get("button").trigger("click");
+    await flushPromises();
+    expect(serviceMocks.updateCreativeAutomationControl).toHaveBeenCalledWith({ config: { auto_write_short_cycle_count: 10 } });
+
     const row = wrapper.get('[data-testid="config-shortWriteInterval"]');
-    row.findComponent(InputNumber).vm.$emit("change", 7.5);
+    row.findComponent(InputNumber).vm.$emit("change", 3);
     await row.get("button").trigger("click");
     await flushPromises();
-    expect(serviceMocks.updateCreativeAutomationControl).toHaveBeenCalledWith({ config: { interval_short_write: 7.5 } });
+    expect(serviceMocks.updateCreativeAutomationControl).toHaveBeenLastCalledWith({ config: { interval_short_write: 3 } });
     wrapper.unmount();
   });
 
   it("旧 Hermes 尚不支持逐篇规则时不允许提交小数间隔", async () => {
     serviceMocks.fetchCreativeAutomationStatus.mockResolvedValue({
-      ...structuredClone(status), config: { ...status.config, shortWritePacingSupported: false, shortWriteMode: "batch", shortWriteInterval: 60, shortWriteBatchSize: 6 },
+      ...structuredClone(status), config: { ...status.config, shortWritePacingSupported: false, shortWriteMode: "batch", shortWriteInterval: 60, shortWriteBatchSize: 6, shortWriteCycleCount: undefined },
     });
     const wrapper = mount(MonitorSwitches, { global: { plugins: [Antd] } });
     await flushPromises();
     const row = wrapper.get('[data-testid="config-shortWriteInterval"]');
     expect(row.get("button").attributes("disabled")).toBeDefined();
+    const countRow = wrapper.get('[data-testid="config-shortWriteCycleCount"]');
+    expect(countRow.get("button").attributes("disabled")).toBeDefined();
     expect(wrapper.get('[data-testid="short-write-config"]').text()).toContain("版本尚未生效");
     expect(serviceMocks.updateCreativeAutomationControl).not.toHaveBeenCalled();
     wrapper.unmount();

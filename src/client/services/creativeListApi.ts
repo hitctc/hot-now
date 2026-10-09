@@ -298,17 +298,41 @@ export type ShortWriteScheduleCandidate = {
   source_item_source_name?: string | null;
 };
 
+export type ShortWriteScheduleTask = {
+  task_id?: string;
+  source_external_id: string;
+  task_kind: "short_content" | "short_content_auto";
+  status: string;
+  submitted_at?: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  batch_started_at?: string | null;
+  collection_interval_minutes?: number | null;
+  queue_position?: number;
+  phase_name?: string;
+  stop_step_name?: string;
+  reason_text?: string;
+  error?: string;
+  finished_article_id?: number;
+  cancel_requested?: boolean;
+};
+
 export type ShortWriteSchedule = {
   batch_started_at: string | null;
+  batch_collection_interval_minutes?: number;
+  batch_period_ends_at?: string | null;
+  cycle_submitted_count?: number;
+  cycle_write_limit?: number;
+  cycle_remaining_slots?: number;
   prepared: boolean;
   pending_item_id: number | null;
   candidates: ShortWriteScheduleCandidate[];
   replaced: { item_id: number; source_external_id?: string; replaced_at: string }[];
   pending_source_external_id?: string | null;
-  short_write_tasks?: { source_external_id: string; task_kind: "short_content" | "short_content_auto"; status: string; queue_position?: number; phase_name?: string; stop_step_name?: string; reason_text?: string; error?: string; finished_article_id?: number; cancel_requested?: boolean }[];
+  short_write_tasks?: ShortWriteScheduleTask[];
 };
 
-/** 读取 Hermes 当前短写候选、替换记录和唯一队列任务状态；服务端不可达时由调用方降级展示。 */
+/** 读取 Hermes 短写候选、周期边界/篇数、替换记录和唯一队列状态；不可达时由调用方降级展示。 */
 export function readShortWriteSchedule(): Promise<ShortWriteSchedule> {
   return requestJson("/api/creative/short-write-schedule");
 }

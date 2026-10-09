@@ -43,7 +43,8 @@ export function useMonitorSwitches() {
   ] as const;
   const shortConfigDefinitions = [
     { key: "shortCollectionInterval", backendKey: "interval_short_collection", label: "短内容采集间隔（分钟）", description: "采集后评分形成当前批次候选；默认 60 分钟，不随每篇写作重复采集", type: "number" as const, min: 1, max: 1440 },
-    { key: "shortWriteInterval", backendKey: "interval_short_write", label: "单篇投递间隔（分钟）", description: "建议 7.5 分钟，每次最多一篇；支持小数，不保证届时立即开写", type: "number" as const, min: 1, max: 1440 },
+    { key: "shortWriteCycleCount", backendKey: "auto_write_short_cycle_count", label: "每采集周期最多写作篇数", description: "统计 Hermes 已受理的自动短写任务，范围 1–20；剩余候选按下一批替换规则处理", type: "number" as const, min: 1, max: 20 },
+    { key: "shortWriteInterval", backendKey: "interval_short_write", label: "单篇投递间隔（分钟）", description: "每次最多投递一篇；支持小数，实际开写仍受队列与人工任务优先级影响", type: "number" as const, min: 1, max: 1440 },
   ] as const;
   const configDefinitions = [...longConfigDefinitions, ...shortConfigDefinitions] as const;
 
@@ -148,6 +149,7 @@ export function useMonitorSwitches() {
       baseScoreThreshold: status.config.baseScoreThreshold,
       trendScoreThreshold: status.config.trendScoreThreshold,
       shortCollectionInterval: status.config.shortCollectionInterval,
+      shortWriteCycleCount: status.config.shortWriteCycleCount,
       shortWriteInterval: status.config.shortWriteInterval,
     };
   }
@@ -221,12 +223,16 @@ export function useMonitorSwitches() {
     }
   }
 
-  /** 保存选中的长文参数或短内容间隔；只有 Hermes 已支持逐篇模式时才允许启用小数间隔。 */
+  /** 保存长短内容参数；只在 Hermes 提供相应节奏字段时提交逐篇间隔或周期篇数上限。 */
   async function saveConfig(definition: (typeof configDefinitions)[number]): Promise<void> {
     const value = configDraft.value[definition.key];
     if (value === undefined || value === "") return;
     if (definition.key === "shortWriteInterval" && !automation.value?.config.shortWritePacingSupported) {
       message.warning("Hermes 逐篇调度版本尚未生效，暂不能保存小数间隔");
+      return;
+    }
+    if (definition.key === "shortWriteCycleCount" && automation.value?.config.shortWriteCycleCount == null) {
+      message.warning("Hermes 尚未提供每采集周期篇数配置，暂不能保存");
       return;
     }
     configDirty.value = definition.key;

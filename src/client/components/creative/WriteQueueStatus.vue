@@ -41,7 +41,10 @@ const {
   shortWriteSchedule,
   shortWriteScheduleDelayed,
   pendingShortWriteCandidates,
-  formatShortBatchTime,
+  shortWritePeriodGroups,
+  visibleCurrentTask,
+  visibleQueueTasks,
+  formatShortBatchPeriod,
   statusLabel,
   describeLunaStatus,
   describeQueuedTask,
@@ -79,26 +82,26 @@ const {
         <!-- 只滚动任务内容，刷新、收起和统计不随长记录移出可视区。 -->
         <div class="write-queue-body">
         <!-- 当前任务 -->
-        <div v-if="data.current" class="write-queue-current">
+        <div v-if="visibleCurrentTask" class="write-queue-current">
           <div class="flex flex-wrap items-center gap-x-1 gap-y-0">
             <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500 shrink-0" />
-            <button v-if="data.current.source_item_id" type="button" class="write-queue-link write-queue-id" @click.stop="openSourceItem(data.current.source_item_id)">素材 #{{ data.current.source_item_id }}</button>
-            <span class="text-[11px] text-blue-800 break-all">{{ data.current.source_item_title || data.current.label }}</span>
+            <button v-if="visibleCurrentTask.source_item_id" type="button" class="write-queue-link write-queue-id" @click.stop="openSourceItem(visibleCurrentTask.source_item_id)">素材 #{{ visibleCurrentTask.source_item_id }}</button>
+            <span class="text-[11px] text-blue-800 break-all">{{ visibleCurrentTask.source_item_title || visibleCurrentTask.label }}</span>
           </div>
-          <div v-if="data.current.source_item_source_name" class="mt-0.5 text-[10px] text-blue-400 truncate">{{ data.current.source_item_source_name }}</div>
+          <div v-if="visibleCurrentTask.source_item_source_name" class="mt-0.5 text-[10px] text-blue-400 truncate">{{ visibleCurrentTask.source_item_source_name }}</div>
           <div class="mt-1 text-[11px] font-medium text-blue-700" data-testid="queue-current-state">
-            {{ describeCurrentTask(data.current, data.luna, elapsedNow, statusReceivedAt) }}
+            {{ describeCurrentTask(visibleCurrentTask, data.luna, elapsedNow, statusReceivedAt) }}
           </div>
-          <div v-if="data.current.phase_name && data.current.phase_name !== '等待 Luna'" class="mt-1 text-[11px] font-medium text-blue-700">
-            当前阶段：{{ data.current.phase_name }}
-            <template v-if="data.current.image_total"> · 图片 {{ data.current.image_index || 0 }}/{{ data.current.image_total }}</template>
-            <template v-if="data.current.retry_count"> · 重试 {{ data.current.retry_count }}/1</template>
+          <div v-if="visibleCurrentTask.phase_name && visibleCurrentTask.phase_name !== '等待 Luna'" class="mt-1 text-[11px] font-medium text-blue-700">
+            当前阶段：{{ visibleCurrentTask.phase_name }}
+            <template v-if="visibleCurrentTask.image_total"> · 图片 {{ visibleCurrentTask.image_index || 0 }}/{{ visibleCurrentTask.image_total }}</template>
+            <template v-if="visibleCurrentTask.retry_count"> · 重试 {{ visibleCurrentTask.retry_count }}/1</template>
           </div>
-          <div v-if="data.current.started_at" class="mt-0.5 text-[10px] font-medium tabular-nums text-blue-500">
-            任务已耗时 {{ formatElapsed(data.current.started_at) }}（含等待）<template v-if="data.run_started_at"> · 队列 {{ formatElapsed(data.run_started_at) }}</template>
+          <div v-if="visibleCurrentTask.started_at" class="mt-0.5 text-[10px] font-medium tabular-nums text-blue-500">
+            任务已耗时 {{ formatElapsed(visibleCurrentTask.started_at) }}（含等待）<template v-if="data.run_started_at"> · 队列 {{ formatElapsed(data.run_started_at) }}</template>
           </div>
-          <button type="button" class="write-queue-link write-queue-cancel-current" :disabled="Boolean(cancellingTaskId) || data.current.cancel_requested" @click.stop="cancelTask(data.current)">
-            {{ data.current.cancel_requested ? '等待安全取消' : '取消任务' }}
+          <button type="button" class="write-queue-link write-queue-cancel-current" :disabled="Boolean(cancellingTaskId) || visibleCurrentTask.cancel_requested" @click.stop="cancelTask(visibleCurrentTask)">
+            {{ visibleCurrentTask.cancel_requested ? '等待安全取消' : '取消任务' }}
           </button>
         </div>
 
@@ -107,8 +110,8 @@ const {
         </div>
 
         <!-- 排队列表 -->
-        <div v-if="data.queue.length > 0" class="write-queue-list">
-          <div v-for="task in data.queue" :key="task.task_id">
+        <div v-if="visibleQueueTasks.length > 0" class="write-queue-list">
+          <div v-for="task in visibleQueueTasks" :key="task.task_id">
           <div class="write-queue-task">
             <button v-if="task.source_item_id" type="button" class="write-queue-link write-queue-id" @click.stop="openSourceItem(task.source_item_id)">素材 #{{ task.source_item_id }}</button>
             <span class="flex-1 truncate text-[11px] text-editorial-text-body">{{ task.source_item_title || task.label }}</span>
@@ -129,35 +132,54 @@ const {
           class="write-queue-idle"
         >队列空闲</div>
 
-        <!-- Hermes 当前批次的自动候选不等于实际队列，保留候选顺位并完整显示标题。 -->
+        <!-- 自动短写按 Hermes 采集周期分组；人工和其他实际队列任务仍留在上方。 -->
         <div v-if="shortWriteSchedule || shortWriteScheduleDelayed" class="write-queue-candidates" data-testid="queue-short-write-candidates">
-          <div class="write-queue-candidate-heading">
-            <span>待写作候选（自动）</span>
-            <span v-if="shortWriteSchedule?.batch_started_at">批次 {{ formatShortBatchTime(shortWriteSchedule.batch_started_at) }}</span>
-          </div>
           <div v-if="shortWriteScheduleDelayed" class="write-queue-candidate-delay">
             {{ shortWriteSchedule ? "排期状态延迟，保留上次候选快照" : "自动候选状态暂不可用" }}
           </div>
           <template v-if="shortWriteSchedule">
-            <div v-for="candidate in pendingShortWriteCandidates" :key="candidate.source_external_id || candidate.item_id" class="write-queue-candidate">
-              <div class="write-queue-candidate-row">
-                <button v-if="candidate.hotnow_source_item_id" type="button" class="write-queue-link write-queue-id" @click.stop="openSourceItem(candidate.hotnow_source_item_id)">素材 #{{ candidate.hotnow_source_item_id }}</button>
-                <span class="write-queue-candidate-title">{{ candidate.source_item_title || "素材标题暂不可用" }}</span>
-                <span class="write-queue-candidate-position">
-                  {{ (candidate.source_external_id && candidate.source_external_id === shortWriteSchedule.pending_source_external_id)
-                    || (shortWriteSchedule.pending_item_id != null && candidate.item_id === shortWriteSchedule.pending_item_id)
-                    ? `投递确认中 · 候选第 ${candidate.position} 位`
-                    : `自动候选 · 第 ${candidate.position} 位` }}
-                </span>
+            <section v-for="group in shortWritePeriodGroups" :key="group.batchStartedAt" class="write-queue-period-group" data-testid="queue-short-write-period">
+              <div class="write-queue-candidate-heading">
+                <span>{{ group.isCurrent ? "当前自动短写周期" : "自动短写周期" }}</span>
+                <span>{{ formatShortBatchPeriod(group.batchStartedAt, group.collectionIntervalMinutes, group.periodEndsAt) }}</span>
               </div>
-              <div v-if="candidate.source_item_source_name" class="write-queue-candidate-source">{{ candidate.source_item_source_name }}</div>
-              <div v-else-if="!candidate.hotnow_source_item_id && candidate.source_external_id" class="write-queue-candidate-source">素材关联暂不可用 · {{ candidate.source_external_id }}</div>
-            </div>
-            <div v-if="pendingShortWriteCandidates.length === 0" class="write-queue-candidate-empty">
-              <template v-if="!shortWriteSchedule.prepared && shortWriteSchedule.batch_started_at">当前批次候选仍在整理中</template>
-              <template v-else-if="shortWriteSchedule.candidates.length > 0">本批次候选已进入上方实际队列</template>
-              <template v-else>当前批次暂无自动待写候选</template>
-            </div>
+              <div v-if="group.isCurrent && shortWriteSchedule.cycle_write_limit != null" class="write-queue-period-count">
+                本周期已受理 {{ shortWriteSchedule.cycle_submitted_count ?? 0 }}/{{ shortWriteSchedule.cycle_write_limit }} 篇
+                <template v-if="shortWriteSchedule.cycle_remaining_slots === 0 && group.candidates.length">· 已达上限，剩余候选按下批次替换规则处理</template>
+              </div>
+              <div v-for="entry in group.tasks" :key="entry.task.task_id" class="write-queue-candidate">
+                <div class="write-queue-candidate-row">
+                  <button v-if="entry.task.source_item_id" type="button" class="write-queue-link write-queue-id" @click.stop="openSourceItem(entry.task.source_item_id)">素材 #{{ entry.task.source_item_id }}</button>
+                  <span class="write-queue-candidate-title">{{ entry.task.source_item_title || entry.task.label }}</span>
+                  <span class="write-queue-candidate-position">
+                    {{ entry.task.status === "writing" ? "正在写作" : entry.queuePosition ? `实际队列第 ${entry.queuePosition} 位` : "实际队列中 · 待写作" }}
+                  </span>
+                  <button class="write-queue-link" :disabled="Boolean(cancellingTaskId)" @click.stop="cancelTask(entry.task)">取消</button>
+                </div>
+                <div v-if="entry.task.source_item_source_name" class="write-queue-candidate-source">{{ entry.task.source_item_source_name }}</div>
+                <div class="write-queue-candidate-source">{{ entry.task.status === "writing" ? describeCurrentTask(entry.task, data?.luna, elapsedNow, statusReceivedAt) : describeQueuedTask(entry.task, data?.luna, elapsedNow) }}</div>
+              </div>
+              <div v-for="candidate in group.candidates" :key="candidate.source_external_id || candidate.item_id" class="write-queue-candidate">
+                <div class="write-queue-candidate-row">
+                  <button v-if="candidate.hotnow_source_item_id" type="button" class="write-queue-link write-queue-id" @click.stop="openSourceItem(candidate.hotnow_source_item_id)">素材 #{{ candidate.hotnow_source_item_id }}</button>
+                  <span class="write-queue-candidate-title">{{ candidate.source_item_title || "素材标题暂不可用" }}</span>
+                  <span class="write-queue-candidate-position">
+                    {{ (candidate.source_external_id && candidate.source_external_id === shortWriteSchedule.pending_source_external_id)
+                      || (shortWriteSchedule.pending_item_id != null && candidate.item_id === shortWriteSchedule.pending_item_id)
+                      ? `投递确认中 · 候选第 ${candidate.position} 位`
+                      : `自动候选 · 第 ${candidate.position} 位` }}
+                  </span>
+                </div>
+                <div v-if="candidate.source_item_source_name" class="write-queue-candidate-source">{{ candidate.source_item_source_name }}</div>
+                <div v-else-if="!candidate.hotnow_source_item_id && candidate.source_external_id" class="write-queue-candidate-source">素材关联暂不可用 · {{ candidate.source_external_id }}</div>
+              </div>
+              <div v-if="group.tasks.length === 0 && group.candidates.length === 0" class="write-queue-candidate-empty">
+                <template v-if="group.isCurrent && !shortWriteSchedule.prepared">当前批次候选仍在整理中</template>
+                <template v-else-if="group.isCurrent && shortWriteSchedule.candidates.length > 0">本批次候选已进入上方实际队列</template>
+                <template v-else-if="group.isCurrent">当前周期暂无待写或正在写作的自动短写任务</template>
+              </div>
+            </section>
+            <div v-if="shortWritePeriodGroups.length === 0" class="write-queue-candidate-empty">当前没有待写作或正在写作的自动短内容</div>
           </template>
           <div v-else class="write-queue-candidate-empty">尚未读取到自动候选</div>
         </div>
@@ -357,6 +379,11 @@ const {
   border-top: 1px solid #f3f4f6;
   padding: 5px 8px 2px;
 }
+.write-queue-period-group + .write-queue-period-group {
+  margin-top: 6px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 5px;
+}
 .write-queue-candidate-heading {
   display: flex;
   justify-content: space-between;
@@ -365,6 +392,12 @@ const {
   color: #6b7280;
   font-size: 10px;
   font-weight: 600;
+}
+.write-queue-period-count {
+  margin-bottom: 4px;
+  color: #6b7280;
+  font-size: 9px;
+  overflow-wrap: anywhere;
 }
 .write-queue-candidate {
   margin-bottom: 4px;

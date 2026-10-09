@@ -115,13 +115,76 @@ export function useWriteQueueStatus() {
     const activeExternalIds = new Set(activeTasks
       .map((task) => task.source_external_id)
       .filter((id): id is string => Boolean(id)));
-    const activeSourceIds = new Set(activeTasks
-      .map((task) => task.source_item_id)
-      .filter((id): id is number => typeof id === "number"));
     return candidates.filter((candidate) =>
-      !(candidate.source_external_id && activeExternalIds.has(candidate.source_external_id))
-      && !(candidate.hotnow_source_item_id && activeSourceIds.has(candidate.hotnow_source_item_id)));
+      !(candidate.source_external_id && activeExternalIds.has(candidate.source_external_id)));
   });
+
+  /** 把候选与已受理且仍活动的自动短写按 Hermes 批次归组；人工任务仍留在实际队列。 */
+  const shortWritePeriodGroups = computed(() => {
+    type PeriodTask = { task: WriteQueueTask; queuePosition?: number };
+    type PeriodGroup = {
+      batchStartedAt: string;
+      collectionIntervalMinutes: number;
+      periodEndsAt?: string | null;
+      isCurrent: boolean;
+      candidates: typeof pendingShortWriteCandidates.value;
+      tasks: PeriodTask[];
+    };
+    const schedule = shortWriteSchedule.value;
+    if (!schedule) return [];
+    const groups = new Map<string, PeriodGroup>();
+    /** 同一批次只创建一个分组；只有当前批次附带尚未入队候选。 */
+    const ensureGroup = (batchStartedAt: string, interval: number, isCurrent: boolean, periodEndsAt?: string | null): PeriodGroup => {
+      const existing = groups.get(batchStartedAt);
+      if (existing) return existing;
+      const group: PeriodGroup = {
+        batchStartedAt,
+        collectionIntervalMinutes: interval,
+        periodEndsAt,
+        isCurrent,
+        candidates: isCurrent ? pendingShortWriteCandidates.value : [],
+        tasks: [],
+      };
+      groups.set(batchStartedAt, group);
+      return group;
+    };
+
+    if (schedule.batch_started_at) {
+      ensureGroup(
+        schedule.batch_started_at,
+        schedule.batch_collection_interval_minutes ?? 60,
+        true,
+        schedule.batch_period_ends_at,
+      );
+    }
+    const taskBatches = new Map<string, NonNullable<ShortWriteSchedule["short_write_tasks"]>[number]>();
+    for (const task of schedule.short_write_tasks ?? []) {
+      if (task.task_id && task.batch_started_at) taskBatches.set(task.task_id, task);
+    }
+    const activeTasks = [data.value?.current, ...(data.value?.queue ?? [])]
+      .filter((task): task is WriteQueueTask => task !== null && task !== undefined);
+    for (const task of activeTasks) {
+      if (task.task_kind !== "short_content_auto" || (task.status !== "queued" && task.status !== "writing")) continue;
+      const batch = taskBatches.get(task.task_id);
+      if (!batch?.batch_started_at) continue;
+      const group = ensureGroup(
+        batch.batch_started_at,
+        batch.collection_interval_minutes ?? schedule.batch_collection_interval_minutes ?? 60,
+        batch.batch_started_at === schedule.batch_started_at,
+        batch.batch_started_at === schedule.batch_started_at ? schedule.batch_period_ends_at : null,
+      );
+      group.tasks.push({ task, queuePosition: batch.queue_position });
+    }
+    return [...groups.values()].sort((left, right) => right.batchStartedAt.localeCompare(left.batchStartedAt));
+  });
+
+  /** 已按周期显示的自动短写从普通当前任务/队列列表移除，避免重复出现。 */
+  const groupedShortWriteTaskIds = computed(() => new Set(shortWritePeriodGroups.value.flatMap((group) => group.tasks.map(({ task }) => task.task_id))));
+  const visibleCurrentTask = computed(() => {
+    const task = data.value?.current ?? null;
+    return task && !groupedShortWriteTaskIds.value.has(task.task_id) ? task : null;
+  });
+  const visibleQueueTasks = computed(() => (data.value?.queue ?? []).filter((task) => !groupedShortWriteTaskIds.value.has(task.task_id)));
 
   /** 合并队列与当前短写批次刷新；短写接口失败时保留上次快照并明确标记延迟。 */
   function refresh(): Promise<void> {
@@ -153,19 +216,22 @@ export function useWriteQueueStatus() {
     return refreshRequest;
   }
 
-  /** 将 Hermes 批次时间按北京时间展示，不把候选时间解释成预计开写时间。 */
-  function formatShortBatchTime(value: string | null | undefined): string {
+  /** 把采集批次的起止时间按北京时间显示为范围，不将其解释成实际开写承诺。 */
+  function formatShortBatchPeriod(value: string | null | undefined, intervalMinutes: number, endValue?: string | null): string {
     if (!value) return "";
-    const timestamp = Date.parse(value);
-    if (!Number.isFinite(timestamp)) return value;
-    return new Intl.DateTimeFormat("zh-CN", {
+    const start = Date.parse(value);
+    if (!Number.isFinite(start)) return value;
+    const end = endValue ? Date.parse(endValue) : start + intervalMinutes * 60_000;
+    if (!Number.isFinite(end)) return value;
+    const formatter = new Intl.DateTimeFormat("zh-CN", {
       timeZone: "Asia/Shanghai",
       month: "2-digit",
       day: "2-digit",
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
-    }).format(timestamp);
+    });
+    return `${formatter.format(start)}–${formatter.format(end)}`;
   }
 
   /** 仅在页面可见时执行定时刷新。 */
@@ -290,7 +356,10 @@ export function useWriteQueueStatus() {
     shortWriteSchedule,
     shortWriteScheduleDelayed,
     pendingShortWriteCandidates,
-    formatShortBatchTime,
+    shortWritePeriodGroups,
+    visibleCurrentTask,
+    visibleQueueTasks,
+    formatShortBatchPeriod,
     statusReceivedAt,
     loading,
     expanded,

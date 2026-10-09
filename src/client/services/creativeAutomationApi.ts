@@ -125,6 +125,8 @@ export type CreativeAutomationStatus = {
     shortWritePacingSupported?: boolean;
     shortWriteMode?: "batch" | "paced";
     shortWriteBatchSize: number;
+    /** 每个短内容采集批次最多受理的自动写作篇数。 */
+    shortWriteCycleCount?: number;
     shortCollectionInterval: number;
     shortWriteInterval: number;
     timezone: string;

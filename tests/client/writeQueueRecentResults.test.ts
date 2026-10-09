@@ -70,7 +70,7 @@ describe("写作队列最近逐篇结果", () => {
       });
     vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue({
       ...queueStatus,
-      current: { ...queueStatus.recent[1]!, task_id: "current-task", status: "writing", source_external_id: "current-external" },
+      current: { ...queueStatus.recent[1]!, task_id: "current-task", status: "writing", source_item_id: 201, source_external_id: "current-external" },
       queue: [{ ...queueStatus.recent[1]!, task_id: "queued-task", status: "queued", source_item_id: 202, source_external_id: "already-queued", source_item_title: "已在实际队列中的标题" }],
       queue_length: 1,
     });
@@ -94,6 +94,54 @@ describe("写作队列最近逐篇结果", () => {
       expect(readSchedule).toHaveBeenCalledTimes(2);
       expect(body.textContent).toContain("新时段更新后的候选内容");
       expect(body.textContent).not.toContain("仍待写的下一条候选");
+    } finally { wrapper.unmount(); }
+  });
+
+  it("按采集时间段合并当批候选和自动排队/写作任务，人工任务仍留在高优先级队列展示", async () => {
+    window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
+    const batchStartedAt = "2026-10-08T09:00:00+08:00";
+    vi.spyOn(creativeApi, "readShortWriteSchedule").mockResolvedValue({
+      batch_started_at: batchStartedAt,
+      batch_collection_interval_minutes: 60,
+      batch_period_ends_at: "2026-10-08T10:00:00+08:00",
+      cycle_submitted_count: 1,
+      cycle_write_limit: 10,
+      cycle_remaining_slots: 9,
+      prepared: true,
+      pending_item_id: null,
+      candidates: [{ item_id: 910, source_external_id: "pending-item", position: 1, hotnow_source_item_id: 210, source_item_title: "本周期待写候选" }],
+      replaced: [],
+      short_write_tasks: [{ task_id: "auto-writing", source_external_id: "writing-item", task_kind: "short_content_auto", status: "writing", batch_started_at: batchStartedAt, collection_interval_minutes: 60 }],
+    });
+    vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue({
+      ...queueStatus,
+      current: {
+        ...queueStatus.recent[1]!, task_id: "auto-writing", priority: "normal", source_item_id: 211,
+        source_external_id: "writing-item", task_kind: "short_content_auto", status: "writing",
+        source_item_title: "本周期正在写作素材",
+      },
+      queue: [{
+        ...queueStatus.recent[1]!, task_id: "manual-short", priority: "high", source_item_id: 212,
+        task_kind: "short_content", status: "queued", source_item_title: "人工短内容任务",
+      }],
+      queue_length: 1,
+    });
+    const wrapper = mount(WriteQueueStatus, { attachTo: document.body,
+      global: { stubs: { SourceItemDetailModal: true, ArticleDetailDrawer: true } } });
+    try {
+      await flushPromises();
+      const body = document.body.querySelector(".write-queue-body")!;
+      const periods = body.querySelectorAll('[data-testid="queue-short-write-period"]');
+      expect(periods).toHaveLength(1);
+      expect(periods[0]!.textContent).toContain("10/08 09:00–10/08 10:00");
+      expect(periods[0]!.textContent).toContain("本周期已受理 1/10 篇");
+      expect(periods[0]!.textContent).toContain("本周期正在写作素材");
+      expect(periods[0]!.textContent).toContain("正在写作");
+      expect(periods[0]!.textContent).toContain("本周期待写候选");
+      expect(periods[0]!.querySelector("button.write-queue-link")?.textContent).toContain("素材 #211");
+      expect(body.querySelector(".write-queue-current")).toBeNull();
+      expect(body.querySelector(".write-queue-list")?.textContent).toContain("人工短内容任务");
+      expect(body.textContent).not.toContain("批次 10/08 09:00");
     } finally { wrapper.unmount(); }
   });
 

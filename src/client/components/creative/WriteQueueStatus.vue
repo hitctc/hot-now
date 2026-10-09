@@ -175,7 +175,10 @@ const {
                 <div class="write-queue-candidate-row">
                   <button v-if="entry.task.source_item_id" type="button" class="write-queue-link write-queue-id" @click.stop="openSourceItem(entry.task.source_item_id)">素材 #{{ entry.task.source_item_id }}</button>
                   <span class="write-queue-candidate-title">{{ entry.task.source_item_title || entry.task.label }}</span>
-                  <span class="write-queue-candidate-position">
+                  <span
+                    class="write-queue-candidate-position"
+                    :class="{ 'write-queue-candidate-position--writing': entry.task.status === 'writing' }"
+                  >
                     {{ entry.task.status === "writing" ? "正在写作" : entry.queuePosition ? `实际队列第 ${entry.queuePosition} 位` : "实际队列中 · 待写作" }}
                   </span>
                   <button class="write-queue-link" :disabled="Boolean(cancellingTaskId)" @click.stop="cancelTask(entry.task)">取消</button>
@@ -477,6 +480,29 @@ const {
   color: #6b7280;
   font-size: 9px;
   overflow-wrap: anywhere;
+}
+.write-queue-candidate-position--writing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #60a5fa;
+  border-radius: 999px;
+  background: #dbeafe;
+  padding: 2px 7px;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.write-queue-candidate-position--writing::before {
+  content: "";
+  display: block;
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: #2563eb;
 }
 .write-queue-candidate-delay {
   margin-bottom: 4px;

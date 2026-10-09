@@ -201,6 +201,11 @@ describe("写作队列最近逐篇结果", () => {
       expect(periods[0]!.textContent).toContain("本周期已受理 1/10 篇");
       expect(periods[0]!.textContent).toContain("本周期正在写作素材");
       expect(periods[0]!.textContent).toContain("正在写作");
+      expect(periods[0]!.querySelectorAll(".write-queue-candidate-position--writing")).toHaveLength(1);
+      expect(periods[0]!.querySelector(".write-queue-candidate-position--writing")?.textContent).toBe("正在写作");
+      const queueSource = readFileSync("src/client/components/creative/WriteQueueStatus.vue", "utf8");
+      expect(queueSource).toMatch(/\.write-queue-candidate-position--writing\s*\{[^}]*background: #dbeafe;[^}]*color: #1d4ed8;[^}]*font-size: 11px;[^}]*font-weight: 700;/);
+      expect(queueSource).toContain(".write-queue-candidate-position--writing::before");
       expect(periods[0]!.textContent).toContain("本周期待写候选");
       expect(periods[0]!.querySelector("button.write-queue-link")?.textContent).toContain("素材 #211");
       expect(body.querySelector(".write-queue-current")).toBeNull();

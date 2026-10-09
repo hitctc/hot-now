@@ -18,6 +18,18 @@ describe("发布结尾独立样式", () => {
       expect(wrapper.find("[data-short-publish-footer]").exists()).toBe(false);
     } finally { wrapper.unmount(); }
   });
+  it.each([
+    "正文\n\n跪求\n点赞、关注。",
+    "正文\n\n跪求\n\n点赞、关注。",
+  ])("尾注被拆行或拆段后，公众号兼容处理仍保留唯一卡片：%s", async markdown => {
+    const html = await makeWechatCompatible(renderWechatThemePreview(markdown, "bauhaus"), { skipImageBase64: true });
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const cards = doc.querySelectorAll("[data-short-publish-footer]");
+    expect(cards).toHaveLength(1);
+    expect(cards[0].textContent).toBe("跪求点赞、关注。");
+    expect(doc.body.textContent?.replace(/\s/g, "")).toBe("正文跪求点赞、关注。");
+  });
+
   it.each(themeIds)("%s主题下跪求是大字主标题，保留宣言海报的强对比和层次", theme => {
     const markdown = appendShortPublishFooter("# 标题\n\n正文\n\n跪求点赞、关注，谢谢你。", "short_content");
     const html = renderWechatThemePreview(markdown, theme);

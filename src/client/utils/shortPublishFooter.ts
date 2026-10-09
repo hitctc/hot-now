@@ -5,9 +5,8 @@ const LEGACY_SHORT_PUBLISH_FOOTER = "跪求点赞、关注，谢谢你。";
 export function appendShortPublishFooter(markdown: string, direction: string | undefined): string {
   if (direction !== "short_content") return markdown;
   const trimmed = markdown.trimEnd();
-  const lines = trimmed.split(/\r?\n/);
-  while ([SHORT_PUBLISH_FOOTER, LEGACY_SHORT_PUBLISH_FOOTER, ""].includes(lines.at(-1)?.trim() ?? "") && lines.length > 0) lines.pop();
-  const content = lines.join("\n").trimEnd();
+  // 旧稿可能把尾注拆成硬换行或独立段落；先统一去重，再补回唯一标准文案。
+  const content = trimmed.replace(/(?:跪求\s*点赞、关注(?:，谢谢你)?。\s*)+$/u, "").trimEnd();
   // 与手动发布门禁保持相同空稿边界，结尾文案不能替代真实正文。
   const body = content
     .replace(/^!\[封面图[^\]]*\]\([^)]+\)\s*$/gm, "")
@@ -18,10 +17,23 @@ export function appendShortPublishFooter(markdown: string, direction: string | u
   return `${content}\n\n${SHORT_PUBLISH_FOOTER}`;
 }
 
-/** 将末尾互动段排成大字宣言海报，供实时及主题预览共用；只装饰DOM，不改原文或存储。 */
+/** 将末尾互动段排成大字宣言海报，支持尾注被 Markdown 拆成多段；只改预览 DOM，不改原文或存储。 */
 export function styleShortPublishFooter(doc: Document): void {
-  const footer = doc.body.lastElementChild;
-  if (footer?.tagName !== "P" || footer.textContent?.trim() !== SHORT_PUBLISH_FOOTER) return;
+  const expected = SHORT_PUBLISH_FOOTER.replace(/\s/g, "");
+  const paragraphs: HTMLParagraphElement[] = [];
+  let combined = "";
+  let cursor = doc.body.lastElementChild;
+  while (cursor?.tagName === "P" && paragraphs.length < 4) {
+    const text = (cursor.textContent ?? "").replace(/\s/g, "");
+    const candidate = `${text}${combined}`;
+    if (!expected.endsWith(candidate)) break;
+    paragraphs.unshift(cursor as HTMLParagraphElement);
+    combined = candidate;
+    if (combined === expected) break;
+    cursor = cursor.previousElementSibling;
+  }
+  if (combined !== expected) return;
+  const footer = paragraphs[0];
   const card = doc.createElement("section");
   card.setAttribute("data-short-publish-footer", "");
   card.setAttribute("style", "margin: 32px 0 12px; padding: 12px 8px 18px; border: none; background-color: transparent; text-align: center;");
@@ -49,5 +61,6 @@ export function styleShortPublishFooter(doc: Document): void {
     if (part.key === "request") panel.appendChild(doc.createElement("br"));
   }
   footer.replaceWith(card);
+  paragraphs.slice(1).forEach(paragraph => paragraph.remove());
   card.appendChild(panel);
 }

@@ -10,6 +10,12 @@ describe("短成品发布结尾", () => {
     expect(appendShortPublishFooter(result, "short_content")).toBe(result);
     expect(appendShortPublishFooter(`发布正文\n${footer}\n`, "short_content")).toBe(`发布正文\n\n${footer}`);
   });
+  it.each([
+    "正文\n\n跪求\n点赞、关注。",
+    "正文\n\n跪求\n\n点赞、关注。",
+  ])("分行或分段的尾注统一合并为一次标准文案：%s", input => {
+    expect(appendShortPublishFooter(input, "short_content")).toBe(`正文\n\n${footer}`);
+  });
   it("旧结尾及重复的新旧结尾统一换为一次新文案", () => {
     expect(appendShortPublishFooter("发布正文\n\n跪求点赞、关注，谢谢你。\n\n跪求点赞、关注。", "short_content")).toBe(`发布正文\n\n${footer}`);
   });

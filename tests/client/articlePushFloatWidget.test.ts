@@ -121,6 +121,20 @@ describe("ArticlePushFloatWidget", () => {
     } finally { wrapper.unmount(); }
   });
 
+  it("推送入口将拆行尾注合并为单份标准文案", async () => {
+    const short = { ...article, direction: "short_content", humanMarkdown: "发布正文\n\n跪求\n点赞、关注。" };
+    vi.mocked(readCreativeFinishedArticle).mockResolvedValue(short);
+    vi.mocked(streamPushArticleToDraft).mockResolvedValue({ ok: true });
+    const wrapper = shallowMount(ArticlePushFloatWidget, {
+      props: { visible: true, article: short, themeId: "bauhaus", themeLabel: "包豪斯", defaultAccountName: "默认公众号" },
+      global: { stubs: { AButton: true } },
+    });
+    try {
+      await (wrapper.vm as unknown as { startPush: () => Promise<void> }).startPush();
+      expect(renderWechatThemePreview).toHaveBeenCalledWith("发布正文\n\n跪求点赞、关注。", "bauhaus");
+    } finally { wrapper.unmount(); }
+  });
+
   it("成功后收起步骤并显示5秒倒计时，到点自动关闭", async () => {
     vi.useFakeTimers();
     vi.mocked(readCreativeFinishedArticle).mockResolvedValue(article);

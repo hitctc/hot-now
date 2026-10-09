@@ -230,6 +230,23 @@ export function useWriteQueueStatus() {
     return [...groups.values()].sort((left, right) => right.batchStartedAt.localeCompare(left.batchStartedAt));
   });
 
+  const shortWriteCycleRecords = computed(() => [...(shortWriteSchedule.value?.periods ?? [])].reverse());
+
+  /** 按素材来源给短写候选和周期统计生成一致标签。 */
+  function sourceLaneLabel(lane?: string): string {
+    if (lane === "aihot") return "AI HOT";
+    if (lane === "juya") return "Juya";
+    return "热搜";
+  }
+
+  /** 将间隔冷却和共享资源等待原因翻译为队列侧栏可读状态。 */
+  function describeShortWriteWait(): string {
+    const wait = shortWriteSchedule.value?.wait_state;
+    if (!wait) return "";
+    if (wait.status === "waiting_interval") return `${sourceLaneLabel(wait.lane)}间隔冷却中，约剩 ${Math.ceil((wait.remaining_seconds ?? 0) / 60)} 分钟`;
+    return wait.reason || (wait.status === "waiting_model_resource" ? "等待模型资源" : "等待写作队列");
+  }
+
   /** 已按周期显示的自动短写从普通当前任务/队列列表移除，避免重复出现。 */
   const groupedShortWriteTaskIds = computed(() => new Set(shortWritePeriodGroups.value.flatMap((group) => group.tasks.map(({ task }) => task.task_id))));
   const visibleCurrentTask = computed(() => {
@@ -419,6 +436,9 @@ export function useWriteQueueStatus() {
     shortWriteScheduleDelayed,
     pendingShortWriteCandidates,
     shortWritePeriodGroups,
+    shortWriteCycleRecords,
+    sourceLaneLabel,
+    describeShortWriteWait,
     visibleCurrentTask,
     visibleQueueTasks,
     formatShortBatchPeriod,

@@ -51,9 +51,10 @@ const status = {
     shortWritePacingSupported: true,
     shortWriteMode: "paced",
     shortWriteBatchSize: 1,
-    shortWriteCycleCount: 8,
+    shortWriteCycleCount: 5,
     shortCollectionInterval: 60,
-    shortWriteInterval: 7.5,
+    shortWriteInterval: 1,
+    shortRssWriteInterval: 1,
     timezone: "Asia/Shanghai",
   },
   dailyPlan: {
@@ -127,22 +128,46 @@ describe("MonitorSwitches 每轮长文计划", () => {
     expect(long.text()).toContain("每轮自动长文槽位");
     expect(long.text()).not.toContain("短内容采集间隔");
     expect(short.text()).toContain("短内容采集间隔");
-    expect(short.text()).toContain("单篇投递间隔");
-    expect(short.text()).toContain("每采集周期最多写作篇数");
-    expect(short.text()).toContain("人工任务不计入上限且保持高优先级");
+    expect(short.text()).toContain("热搜单篇写作间隔");
+    expect(short.text()).toContain("AI HOT / Juya 单篇写作间隔");
+    expect(short.text()).toContain("热搜每采集周期最多写作篇数");
+    expect(short.text()).toContain("RSS 不计入热搜上限");
     expect(short.text()).not.toContain("基础评分阈值");
     expect(short.text()).not.toContain("每轮自动短内容数量");
     const countRow = wrapper.get('[data-testid="config-shortWriteCycleCount"]');
-    countRow.findComponent(InputNumber).vm.$emit("change", 10);
+    countRow.findComponent(InputNumber).vm.$emit("change", 5);
     await countRow.get("button").trigger("click");
     await flushPromises();
-    expect(serviceMocks.updateCreativeAutomationControl).toHaveBeenCalledWith({ config: { auto_write_short_cycle_count: 10 } });
+    expect(serviceMocks.updateCreativeAutomationControl).toHaveBeenCalledWith({ config: { auto_write_short_cycle_count: 5 } });
 
     const row = wrapper.get('[data-testid="config-shortWriteInterval"]');
     row.findComponent(InputNumber).vm.$emit("change", 3);
     await row.get("button").trigger("click");
     await flushPromises();
     expect(serviceMocks.updateCreativeAutomationControl).toHaveBeenLastCalledWith({ config: { interval_short_write: 3 } });
+
+    const rssRow = wrapper.get('[data-testid="config-shortRssWriteInterval"]');
+    rssRow.findComponent(InputNumber).vm.$emit("change", 4);
+    await rssRow.get("button").trigger("click");
+    await flushPromises();
+    expect(serviceMocks.updateCreativeAutomationControl).toHaveBeenLastCalledWith({ config: { interval_short_rss_write: 4 } });
+    wrapper.unmount();
+  });
+
+  it("在监控面板显示共享模型资源占用和优先级等待者", async () => {
+    serviceMocks.fetchCreativeAutomationStatus.mockResolvedValue({
+      ...structuredClone(status),
+      queue: {
+        current: null, queue_length: 0, queue: [], stats: { total_submitted: 0, total_completed: 0, total_failed: 0 },
+        luna: { status: "running", active: true, kind: "model_call", task_type: "short_score", label: "趋势评分", waiting_count: 1,
+          waiters: [{ request_id: "manual-1", priority: "manual", label: "手动写作" }] },
+      },
+    });
+    const wrapper = mount(MonitorSwitches, { global: { plugins: [Antd] } });
+    await flushPromises();
+    const resource = wrapper.get('[data-testid="model-resource-status"]');
+    expect(resource.text()).toContain("趋势评分");
+    expect(resource.text()).toContain("手动优先");
     wrapper.unmount();
   });
 

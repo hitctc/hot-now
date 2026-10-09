@@ -129,6 +129,7 @@ export type CreativeAutomationStatus = {
     shortWriteCycleCount?: number;
     shortCollectionInterval: number;
     shortWriteInterval: number;
+    shortRssWriteInterval?: number;
     timezone: string;
   };
   dailyPlan: DailyPlanView;
@@ -266,6 +267,18 @@ export type WriteQueueStatus = {
   luna?: {
     status: "idle" | "running" | string;
     active: boolean;
+    waiting_count?: number;
+    waiters?: Array<{
+      request_id: string;
+      kind?: string;
+      priority: "manual" | "model_operation" | "automatic_write" | string;
+      task_id?: string;
+      source_item_id?: number;
+      label?: string;
+      phase?: string;
+      task_type?: string;
+      requested_at?: string;
+    }>;
     available?: boolean;
     paused?: boolean;
     remaining_seconds?: number;
@@ -277,6 +290,7 @@ export type WriteQueueStatus = {
     source_item_id?: number;
     article_id?: number;
     label?: string;
+    task_type?: string;
     phase?: string;
     started_at?: string;
   };

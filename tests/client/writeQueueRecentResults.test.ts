@@ -503,6 +503,42 @@ describe("写作队列最近逐篇结果", () => {
     } finally { wrapper.unmount(); }
   });
 
+  it("展示热搜上限、RSS 分源结转与模型占用等待历史", async () => {
+    window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
+    vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue({
+      ...queueStatus,
+      luna: { status: "running", active: true, kind: "model_call", task_type: "short_score", label: "素材评分",
+        waiting_count: 1, waiters: [{ request_id: "manual-1", priority: "manual", label: "手动写作" }] },
+    });
+    vi.spyOn(creativeApi, "readShortWriteSchedule").mockResolvedValue({
+      batch_started_at: "2026-10-09T10:00:00+08:00", batch_collection_interval_minutes: 60,
+      prepared: true, pending_item_id: null, candidates: [
+        { item_id: 901, source_external_id: "short-rss-aihot-1", lane: "aihot", position: 1,
+          hotnow_source_item_id: 201, source_item_title: "AI HOT 待写素材" },
+      ], replaced: [], cycle_submitted_count: 2, cycle_write_limit: 5,
+      hot_summary: { accepted_count: 2, limit: 5, success_count: 1, failed_count: 1 },
+      rss_breakdown: {
+        aihot: { new_count: 3, carry_in_count: 4, total_count: 7, pending_count: 2, success_count: 1, failed_count: 1, items: [] },
+        juya: { new_count: 2, carry_in_count: 1, total_count: 3, pending_count: 2, success_count: 1, failed_count: 0, items: [] },
+      },
+      periods: [{ started_at: "2026-10-09T10:00:00+08:00", collection_interval_minutes: 60,
+        hot_accepted_count: 2, written: { hot: 1, aihot: 1, juya: 1 }, failed: { hot: 1, aihot: 1, juya: 0 } }],
+      wait_state: { status: "waiting_interval", lane: "aihot", remaining_seconds: 30 },
+    });
+    const wrapper = mount(WriteQueueStatus, { attachTo: document.body,
+      global: { stubs: { SourceItemDetailModal: true, ArticleDetailDrawer: true } } });
+    try {
+      await flushPromises();
+      const summary = document.body.querySelector('[data-testid="queue-short-write-summary"]')?.textContent ?? "";
+      expect(summary).toContain("热搜已受理 2/5");
+      expect(summary).toContain("AI HOT：结转 4 + 新增 3");
+      expect(summary).toContain("等待模型资源 1 项");
+      expect(summary).toContain("手动优先");
+      expect(document.body.querySelector('[data-testid="queue-short-write-cycle-history"]')?.textContent).toContain("写成 热搜 1 / AI HOT 1 / Juya 1");
+      expect(document.body.textContent).toContain("AI HOT 待写素材");
+    } finally { wrapper.unmount(); }
+  });
+
   it("监控页持续展示逐篇终态而不是任务结束后只显示空闲", async () => {
     vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue(queueStatus);
     const wrapper = mount(MonitorPage, {

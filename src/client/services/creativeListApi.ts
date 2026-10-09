@@ -291,6 +291,7 @@ export function readCreativeSourceItem(id: number): Promise<CreativeSourceItem> 
 export type ShortWriteScheduleCandidate = {
   item_id: number;
   source_external_id?: string;
+  lane?: "hot" | "aihot" | "juya" | string;
   position: number;
   /** HotNow 按外部编号唯一匹配得到的平台素材编号；不能回退使用 Hermes item_id。 */
   hotnow_source_item_id?: number | null;
@@ -301,6 +302,8 @@ export type ShortWriteScheduleCandidate = {
 export type ShortWriteScheduleTask = {
   task_id?: string;
   source_external_id: string;
+  source_item_id?: number | null;
+  lane?: "hot" | "aihot" | "juya" | string;
   task_kind: "short_content" | "short_content_auto";
   status: string;
   submitted_at?: string;
@@ -317,6 +320,18 @@ export type ShortWriteScheduleTask = {
   cancel_requested?: boolean;
 };
 
+export type ShortWritePeriod = {
+  started_at: string;
+  ended_at?: string | null;
+  collection_interval_minutes?: number;
+  hot_accepted_count?: number;
+  rss_new?: Record<string, number>;
+  rss_carry_in?: Record<string, number>;
+  written?: Record<string, number>;
+  failed?: Record<string, number>;
+  rss_carry_out?: Record<string, number>;
+};
+
 export type ShortWriteSchedule = {
   batch_started_at: string | null;
   batch_collection_interval_minutes?: number;
@@ -330,9 +345,22 @@ export type ShortWriteSchedule = {
   replaced: { item_id: number; source_external_id?: string; replaced_at: string }[];
   pending_source_external_id?: string | null;
   short_write_tasks?: ShortWriteScheduleTask[];
+  hot_summary?: { accepted_count: number; limit: number; success_count: number; failed_count: number };
+  rss_breakdown?: Record<string, {
+    new_count: number;
+    carry_in_count: number;
+    total_count: number;
+    pending_count: number;
+    success_count: number;
+    failed_count: number;
+    items: Array<ShortWriteScheduleCandidate | ShortWriteScheduleTask>;
+  }>;
+  periods?: ShortWritePeriod[];
+  wait_state?: { status: string; lane?: string; reason?: string; eligible_at?: string; remaining_seconds?: number; resource?: Record<string, unknown> } | null;
+  model_resource?: Record<string, unknown> | null;
 };
 
-/** 读取 Hermes 短写候选、周期边界/篇数、替换记录和唯一队列状态；不可达时由调用方降级展示。 */
+/** 读取 Hermes 短写候选、周期来源计数、资源等待与唯一队列状态；不可达时由调用方降级展示。 */
 export function readShortWriteSchedule(): Promise<ShortWriteSchedule> {
   return requestJson("/api/creative/short-write-schedule");
 }

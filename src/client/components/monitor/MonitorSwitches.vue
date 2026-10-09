@@ -50,6 +50,12 @@ const {
 
     <a-spin :spinning="loading && !automation">
       <a-alert :type="statusSummary.type" :message="statusSummary.text" show-icon class="!mb-3 !py-1.5 !text-xs" />
+      <div class="mb-3 rounded border border-editorial-border bg-editorial-bg-page px-2.5 py-1.5 text-[10px] leading-4 text-editorial-text-muted" data-testid="model-resource-status">
+        <div v-if="automation?.queue?.luna?.active">模型资源占用：{{ automation.queue.luna.label || automation.queue.luna.kind || "模型任务" }}<span v-if="automation.queue.luna.task_type"> · {{ automation.queue.luna.task_type }}</span></div>
+        <div v-else>模型资源当前空闲</div>
+        <div v-if="(automation?.queue?.luna?.waiting_count ?? 0) > 0">等待模型资源 {{ automation?.queue?.luna?.waiting_count }} 项</div>
+        <div v-for="waiter in automation?.queue?.luna?.waiters ?? []" :key="waiter.request_id">{{ waiter.label || waiter.kind || waiter.task_type || "模型任务" }} · {{ waiter.priority === "manual" ? "手动优先" : waiter.priority === "model_operation" ? "评分/模型操作优先于自动写作" : "自动短写等待" }}</div>
+      </div>
 
       <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-editorial-text-muted">总模式</div>
       <div class="mb-4 flex items-center gap-2 rounded border border-editorial-border px-2.5 py-2">
@@ -145,12 +151,12 @@ const {
             <div class="text-xs font-medium text-editorial-text-body">{{ definition.label }}</div>
             <div class="text-[10px] text-editorial-text-muted/70">{{ definition.description }}</div>
           </div>
-          <a-input-number :value="draftValue(definition.key)" :min="definition.min" :max="definition.max" :step="definition.key === 'shortWriteInterval' ? 0.5 : 1" size="small" class="!w-20" :disabled="saving === definition.key || (definition.key === 'shortWriteInterval' && !automation?.config.shortWritePacingSupported) || (definition.key === 'shortWriteCycleCount' && automation?.config.shortWriteCycleCount == null)" @change="(value: number | null) => { if (value !== null) configDraft[definition.key] = value; }" />
-          <a-button size="small" :loading="saving === definition.key" :disabled="(definition.key === 'shortWriteInterval' && !automation?.config.shortWritePacingSupported) || (definition.key === 'shortWriteCycleCount' && automation?.config.shortWriteCycleCount == null)" @click="saveConfig(definition)">保存</a-button>
+          <a-input-number :value="draftValue(definition.key)" :min="definition.min" :max="definition.max" :step="definition.key.includes('Interval') ? 0.5 : 1" size="small" class="!w-20" :disabled="saving === definition.key || (definition.key.includes('Interval') && !automation?.config.shortWritePacingSupported) || (definition.key === 'shortWriteCycleCount' && automation?.config.shortWriteCycleCount == null)" @change="(value: number | null) => { if (value !== null) configDraft[definition.key] = value; }" />
+          <a-button size="small" :loading="saving === definition.key" :disabled="(definition.key.includes('Interval') && !automation?.config.shortWritePacingSupported) || (definition.key === 'shortWriteCycleCount' && automation?.config.shortWriteCycleCount == null)" @click="saveConfig(definition)">保存</a-button>
         </div>
         <div class="rounded bg-editorial-bg-page px-2.5 py-1.5 text-[10px] leading-5 text-editorial-text-muted">
-          <template v-if="automation?.config.shortWriteMode === 'paced'">当前为逐篇模式：每个采集周期最多受理 {{ automation.config.shortWriteCycleCount ?? '—' }} 篇自动短写，每次最多投递 1 篇；已有自动短内容排队或执行中时不追加。达到上限后剩余候选按下批次替换规则处理，人工任务不计入上限且保持高优先级。分钟调度可能延后投递，不承诺准点开写。</template>
-          <template v-else-if="automation?.config.shortWritePacingSupported">当前仍为批量模式：{{ automation.config.shortWriteInterval }} 分钟最多 {{ automation.config.shortWriteBatchSize }} 篇。调整单篇投递间隔并保存后启用逐篇模式，上方周期篇数上限届时生效；旧任务不取消。</template>
+          <template v-if="automation?.config.shortWriteMode === 'paced'">逐篇调度已启用：每个采集周期最多受理 {{ automation.config.shortWriteCycleCount ?? '—' }} 篇热搜；随后处理 AI HOT 与 Juya RSS，RSS 不计入热搜上限。热搜与 RSS 各自从上一同类任务结束后计时，冷却结束仍须等待手动任务和已排队模型操作。未写完的 RSS 素材跨周期结转；失败与阻断单独记录，不计为写成。</template>
+          <template v-else-if="automation?.config.shortWritePacingSupported">当前仍为批量模式。保存任一写作间隔后启用逐篇调度；旧任务不取消。</template>
           <template v-else>Hermes 逐篇调度版本尚未生效，旧批量规则继续运行；请在确认活动任务安全后完成 Hermes 服务更新。</template>
         </div>
       </div>

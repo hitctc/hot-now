@@ -48,6 +48,9 @@ const {
   shortWriteScheduleDelayed,
   pendingShortWriteCandidates,
   shortWritePeriodGroups,
+  shortWriteCycleRecords,
+  sourceLaneLabel,
+  describeShortWriteWait,
   visibleCurrentTask,
   visibleQueueTasks,
   formatShortBatchPeriod,
@@ -162,6 +165,21 @@ const {
             {{ shortWriteSchedule ? "排期状态延迟，保留上次候选快照" : "自动候选状态暂不可用" }}
           </div>
           <template v-if="shortWriteSchedule">
+            <div class="rounded border border-blue-100 bg-blue-50 px-2 py-1 text-[10px] leading-4 text-editorial-text-muted" data-testid="queue-short-write-summary">
+              <div>热搜已受理 {{ shortWriteSchedule.hot_summary?.accepted_count ?? shortWriteSchedule.cycle_submitted_count ?? 0 }}/{{ shortWriteSchedule.hot_summary?.limit ?? shortWriteSchedule.cycle_write_limit ?? 5 }} · 写成 {{ shortWriteSchedule.hot_summary?.success_count ?? 0 }} · 失败/阻断 {{ shortWriteSchedule.hot_summary?.failed_count ?? 0 }}</div>
+              <div v-for="lane in ['aihot', 'juya']" :key="lane">
+                {{ sourceLaneLabel(lane) }}：结转 {{ shortWriteSchedule.rss_breakdown?.[lane]?.carry_in_count ?? 0 }} + 新增 {{ shortWriteSchedule.rss_breakdown?.[lane]?.new_count ?? 0 }} · 待写 {{ shortWriteSchedule.rss_breakdown?.[lane]?.pending_count ?? 0 }} · 写成 {{ shortWriteSchedule.rss_breakdown?.[lane]?.success_count ?? 0 }} · 失败/阻断 {{ shortWriteSchedule.rss_breakdown?.[lane]?.failed_count ?? 0 }}
+              </div>
+              <div v-if="shortWriteSchedule.wait_state" class="text-amber-700">排程等待：{{ describeShortWriteWait() }}</div>
+              <div v-if="data.luna?.active">模型资源占用：{{ data.luna.label || data.luna.kind || '模型任务' }}<span v-if="data.luna.task_type"> · {{ data.luna.task_type }}</span></div>
+              <div v-if="(data.luna?.waiting_count ?? 0) > 0">等待模型资源 {{ data.luna?.waiting_count }} 项</div>
+              <div v-for="waiter in data.luna?.waiters ?? []" :key="waiter.request_id" class="text-amber-700">模型等待：{{ waiter.label || waiter.kind || waiter.task_type || '模型任务' }} · {{ waiter.priority === 'manual' ? '手动优先' : waiter.priority === 'model_operation' ? '评分/模型操作' : '自动写作' }}</div>
+            </div>
+            <div v-if="shortWriteCycleRecords.length" class="space-y-0.5 rounded border border-gray-100 px-2 py-1 text-[9px] text-editorial-text-muted" data-testid="queue-short-write-cycle-history">
+              <div v-for="period in shortWriteCycleRecords.slice(0, 8)" :key="period.started_at">
+                {{ formatShortBatchPeriod(period.started_at, period.collection_interval_minutes ?? 60, period.ended_at) }} · 热搜受理 {{ period.hot_accepted_count ?? 0 }} · 写成 热搜 {{ period.written?.hot ?? 0 }} / AI HOT {{ period.written?.aihot ?? 0 }} / Juya {{ period.written?.juya ?? 0 }} · 失败 {{ (period.failed?.hot ?? 0) + (period.failed?.aihot ?? 0) + (period.failed?.juya ?? 0) }}
+              </div>
+            </div>
             <section v-for="group in shortWritePeriodGroups" :key="group.batchStartedAt" class="write-queue-period-group" data-testid="queue-short-write-period">
               <div class="write-queue-candidate-heading">
                 <span>{{ group.isCurrent ? "当前自动短写周期" : "自动短写周期" }}</span>
@@ -189,6 +207,7 @@ const {
               <div v-for="candidate in group.candidates" :key="candidate.source_external_id || candidate.item_id" class="write-queue-candidate">
                 <div class="write-queue-candidate-row">
                   <button v-if="candidate.hotnow_source_item_id" type="button" class="write-queue-link write-queue-id" @click.stop="openSourceItem(candidate.hotnow_source_item_id)">素材 #{{ candidate.hotnow_source_item_id }}</button>
+                  <span class="rounded bg-gray-100 px-1 text-[9px] text-gray-500">{{ sourceLaneLabel(candidate.lane) }}</span>
                   <span class="write-queue-candidate-title">{{ candidate.source_item_title || "素材标题暂不可用" }}</span>
                   <span class="write-queue-candidate-position">
                     {{ (candidate.source_external_id && candidate.source_external_id === shortWriteSchedule.pending_source_external_id)

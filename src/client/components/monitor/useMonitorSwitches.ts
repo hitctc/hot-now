@@ -26,8 +26,8 @@ export function useMonitorSwitches() {
     { key: "base_scoring", description: "基础评分、趋势评分和基础筛选" },
     { key: "account_fit", description: "账号适配评估；失败按退避上限重试" },
     { key: "long_write", description: "周期槽位自动长文；仅接受账号适配=high且双评分达标的素材" },
-    { key: "short_collection", description: "采集短内容热搜并入库；不启动写作" },
-    { key: "short_write", description: "当前采集批次逐篇投递，已有自动短任务时不追加" },
+    { key: "short_collection", description: "采集普通热搜并入库；AI HOT 与 Juya RSS 单独入库" },
+    { key: "short_write", description: "每周期热搜优先最多 5 篇，再写 AI HOT / Juya RSS；RSS 未完成素材结转" },
     { key: "images", description: "自动写作中的 Luna 图片生成许可" },
     { key: "daily_digest", description: "自动日报" },
     { key: "reminders", description: "自动提醒" },
@@ -43,8 +43,9 @@ export function useMonitorSwitches() {
   ] as const;
   const shortConfigDefinitions = [
     { key: "shortCollectionInterval", backendKey: "interval_short_collection", label: "短内容采集间隔（分钟）", description: "采集后评分形成当前批次候选；默认 60 分钟，不随每篇写作重复采集", type: "number" as const, min: 1, max: 1440 },
-    { key: "shortWriteCycleCount", backendKey: "auto_write_short_cycle_count", label: "每采集周期最多写作篇数", description: "统计 Hermes 已受理的自动短写任务，范围 1–20；剩余候选按下一批替换规则处理", type: "number" as const, min: 1, max: 20 },
-    { key: "shortWriteInterval", backendKey: "interval_short_write", label: "单篇投递间隔（分钟）", description: "每次最多投递一篇；支持小数，实际开写仍受队列与人工任务优先级影响", type: "number" as const, min: 1, max: 1440 },
+    { key: "shortWriteCycleCount", backendKey: "auto_write_short_cycle_count", label: "热搜每采集周期最多写作篇数", description: "只限制普通热搜，范围 1–5；AI HOT 与 Juya RSS 不计入此上限", type: "number" as const, min: 1, max: 5 },
+    { key: "shortWriteInterval", backendKey: "interval_short_write", label: "热搜单篇写作间隔（分钟）", description: "从上一篇热搜任务结束后计时；支持 1–1440 分钟", type: "number" as const, min: 1, max: 1440 },
+    { key: "shortRssWriteInterval", backendKey: "interval_short_rss_write", label: "AI HOT / Juya 单篇写作间隔（分钟）", description: "从上一篇 RSS 写作任务结束后计时；与热搜间隔独立", type: "number" as const, min: 1, max: 1440 },
   ] as const;
   const configDefinitions = [...longConfigDefinitions, ...shortConfigDefinitions] as const;
 
@@ -151,6 +152,7 @@ export function useMonitorSwitches() {
       shortCollectionInterval: status.config.shortCollectionInterval,
       shortWriteCycleCount: status.config.shortWriteCycleCount,
       shortWriteInterval: status.config.shortWriteInterval,
+      shortRssWriteInterval: status.config.shortRssWriteInterval ?? 1,
     };
   }
 
@@ -227,8 +229,8 @@ export function useMonitorSwitches() {
   async function saveConfig(definition: (typeof configDefinitions)[number]): Promise<void> {
     const value = configDraft.value[definition.key];
     if (value === undefined || value === "") return;
-    if (definition.key === "shortWriteInterval" && !automation.value?.config.shortWritePacingSupported) {
-      message.warning("Hermes 逐篇调度版本尚未生效，暂不能保存小数间隔");
+    if ((definition.key === "shortWriteInterval" || definition.key === "shortRssWriteInterval") && !automation.value?.config.shortWritePacingSupported) {
+      message.warning("Hermes 逐篇调度版本尚未生效，暂不能保存写作间隔");
       return;
     }
     if (definition.key === "shortWriteCycleCount" && automation.value?.config.shortWriteCycleCount == null) {

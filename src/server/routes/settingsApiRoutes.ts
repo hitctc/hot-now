@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { SaveProviderSettingsInput, SaveProviderSettingsResult, UpdateProviderSettingsActivationResult } from "../../core/llm/providerSettingsRepository.js";
 import { isWriteQueuePreferences, type WriteQueuePreferences } from "../../core/auth/userPreferences.js";
 import type { ApiAccessTokenRecord } from "../../core/auth/apiAccessTokenRepository.js";
+import type { DailySourceMaterialCount } from "../../core/creative/sourceMaterialStatsRepository.js";
 
 export type SettingsApiSession = { username: string; displayName: string; role: string; issuedAt: number; expiresAt: number } | null;
 
@@ -13,6 +14,7 @@ export type SettingsApiRouteOptions = {
     create: (ownerUsername: string, name: string) => ApiAccessTokenRecord & { token: string };
     revoke: (id: number, ownerUsername: string) => boolean;
   };
+  readSourceMaterialStats?: (fromDate: string, toDate: string) => DailySourceMaterialCount[];
   authorizeStateAction: (request: FastifyRequest, reply: FastifyReply) => boolean;
   readViewRules: () => Promise<unknown>;
   saveContentFilterRule?: (input: { ruleKey: string; toggles: unknown; weights: unknown }) => Promise<
@@ -85,6 +87,31 @@ export function registerSettingsApiRoutes(
     }
 
     return reply.send(await options.readSources());
+  });
+
+  /** 返回管理员可见的 Juya 与 AI HOT 每日计数，不传输素材正文。 */
+  app.get("/api/settings/source-material-stats", async (request, reply) => {
+    const session = options.readSession(request, reply);
+    if (session === undefined) return;
+    if (!session) return reply.code(401).send({ ok: false, reason: "unauthorized" });
+    if (session.role !== "admin") return reply.code(403).send({ ok: false, reason: "admin-required" });
+
+    const query = request.query as Record<string, unknown>;
+    const fromDate = typeof query.from === "string" ? query.from.trim() : "";
+    const toDate = typeof query.to === "string" ? query.to.trim() : "";
+    if (!isValidSourceStatsDateRange(fromDate, toDate)) {
+      return reply.code(400).send({ ok: false, reason: "invalid-date-range" });
+    }
+    if (!options.readSourceMaterialStats) {
+      return reply.code(503).send({ ok: false, reason: "source-material-stats-unavailable" });
+    }
+
+    return reply.send({
+      from: fromDate,
+      to: toDate,
+      timezone: "Asia/Shanghai",
+      days: options.readSourceMaterialStats(fromDate, toDate)
+    });
   });
 
   app.get("/api/settings/profile", async (request, reply) => {
@@ -349,6 +376,17 @@ export function registerSettingsApiRoutes(
     await options.deleteProviderSettings(providerKind);
     return reply.send({ ok: true });
   });
+}
+
+/** 日期范围必须是有效的北京时间自然日，且最多包含 31 天。 */
+function isValidSourceStatsDateRange(fromDate: string, toDate: string): boolean {
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  if (!datePattern.test(fromDate) || !datePattern.test(toDate)) return false;
+  const start = Date.parse(`${fromDate}T00:00:00.000Z`);
+  const end = Date.parse(`${toDate}T00:00:00.000Z`);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return false;
+  if (new Date(start).toISOString().slice(0, 10) !== fromDate || new Date(end).toISOString().slice(0, 10) !== toDate) return false;
+  return end - start <= 30 * 24 * 60 * 60 * 1000;
 }
 
 /** 凭证管理只接受管理员 Cookie 会话；API token 即使有全权限也不能管理其他 token。 */

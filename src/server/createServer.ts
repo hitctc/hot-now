@@ -52,6 +52,7 @@ import type { ContentCardView, ContentViewKey } from "../core/content/listConten
 import type { AiTimelineListQuery, AiTimelinePageModel } from "../core/aiTimeline/aiTimelineTypes.js";
 import type { SaveFeedbackPoolEntryInput, SaveFeedbackPoolEntryResult } from "../core/feedback/feedbackPoolRepository.js";
 import type { WriteQueuePreferences } from "../core/auth/userPreferences.js";
+import { readDailySourceMaterialCounts } from "../core/creative/sourceMaterialStatsRepository.js";
 import type {
   ApiAccessTokenPrincipal,
   ApiAccessTokenRecord
@@ -605,6 +606,9 @@ export function createServer(deps: ServerDeps = {}) {
     readInteractiveSession: (request, reply) =>
       readInteractiveSettingsApiSession(request, reply, authEnabled, authConfig?.sessionSecret ?? ""),
     apiTokens: deps.apiTokens,
+    readSourceMaterialStats: db
+      ? (fromDate, toDate) => readDailySourceMaterialCounts(db, fromDate, toDate)
+      : undefined,
     authorizeStateAction: (request, reply) => (
       ensureStateActionAuthorized(request, reply, authEnabled, authConfig?.sessionSecret ?? "")
     ),

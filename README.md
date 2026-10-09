@@ -168,6 +168,14 @@ bash scripts/hotnow-api.sh GET /api/settings/sources
 
 写操作可以用 `--data-file <JSON 文件>` 提供请求体。脚本从 macOS 钥匙串通过管道读取 token，不将 token 放入进程参数或输出；只允许固定生产域名和 API 路径。凭证到期前 30、14、7 天会向 `MAIL_TO` 发送提醒，固定在北京时间每天 09:00 检查，与日报邮件开关无关；提醒邮件不包含 token。
 
+管理员凭证可读取最近素材日计数接口；日期按北京时间闭区间统计，最多 31 天，仅返回每日数量：
+
+```bash
+bash scripts/hotnow-api.sh GET '/api/settings/source-material-stats?from=2026-10-07&to=2026-10-09'
+```
+
+Juya 按 `content_sources.kind = juya` 和 `fetched_at` 计数；AI HOT 按 `collector_agent = aihot-collector` 和 `collector_timestamp` 计数，不返回素材正文。
+
 ## 配置
 
 - `config/hot-now.config.json`：服务端口、`collectionSchedule` 采集周期、`mailSchedule` 发信时间、`aiTimelineAlerts` S 级事件提醒周期和通道开关、`manualActions` 手动动作开关、报告目录，以及兼容旧逻辑的 `source.rssUrl`

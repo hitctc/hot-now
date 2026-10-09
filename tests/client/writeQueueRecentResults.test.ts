@@ -280,13 +280,12 @@ describe("写作队列最近逐篇结果", () => {
       expect(document.body.querySelector(".write-queue-dot-btn")).not.toBeNull();
     } finally { wrapper.unmount(); }
   });
-  it("桌面嵌入侧栏随队列内容收缩，并将长内容限制在视口内", () => {
+  it("桌面嵌入侧栏填满视口，队列区使用剩余高度滚动", () => {
     const source = readFileSync("src/client/components/creative/WriteQueueStatus.vue", "utf8");
     const embedded = source.match(/\.write-queue-float--embedded\s*\{([^}]*)\}/)?.[1] ?? "";
-    expect(embedded).toContain("align-self: flex-start;");
-    expect(embedded).toContain("height: auto;");
+    expect(embedded).toMatch(/^\s*height: 100dvh;$/m);
     expect(embedded).toContain("max-height: 100dvh;");
-    expect(source).toMatch(/\.write-queue-float--embedded \.write-queue-body\s*\{[^}]*flex: 0 1 auto;/);
+    expect(source).toMatch(/\.write-queue-body\s*\{[^}]*flex: 1 1 auto;[^}]*min-height: 0;[^}]*overflow-y: auto;/);
   });
 
   it("移动端限制动态视口高度，多状态只在中间滚动且头尾操作保持可见", async () => {

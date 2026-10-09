@@ -29,10 +29,12 @@ describe("source material stats API", () => {
   });
 
   it("requires an admin session and returns daily counts without material payloads", async () => {
-    insertTestContentItem(handle.db, {
+    const juyaItemId = insertTestContentItem(handle.db, {
       fetchedAt: "2026-10-06T16:00:00.000Z",
       canonicalUrl: "https://example.com/juya-stat"
     });
+    handle.db.prepare("UPDATE content_items SET created_at = ? WHERE id = ?")
+      .run("2026-10-06T16:00:00.000Z", juyaItemId);
     const token = createApiAccessToken(handle.db, "admin", "stats test");
 
     const unauthorized = await app.inject({
@@ -62,9 +64,9 @@ describe("source material stats API", () => {
       to: "2026-10-09",
       timezone: "Asia/Shanghai",
       days: [
-        { date: "2026-10-07", juyaRssCount: 1, aiHotCount: 0 },
-        { date: "2026-10-08", juyaRssCount: 0, aiHotCount: 0 },
-        { date: "2026-10-09", juyaRssCount: 0, aiHotCount: 0 }
+        { date: "2026-10-07", juyaRssCount: 1, juyaNewCount: 1, aiHotCount: 0 },
+        { date: "2026-10-08", juyaRssCount: 0, juyaNewCount: 0, aiHotCount: 0 },
+        { date: "2026-10-09", juyaRssCount: 0, juyaNewCount: 0, aiHotCount: 0 }
       ]
     });
   });

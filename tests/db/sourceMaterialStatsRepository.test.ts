@@ -16,10 +16,15 @@ describe("sourceMaterialStatsRepository", () => {
   });
 
   it("groups Juya fetched time and AI HOT collector time by Beijing date", () => {
-    insertTestContentItem(handle.db, { fetchedAt: "2026-10-06T16:00:00.000Z", canonicalUrl: "https://example.com/juya-7" });
-    insertTestContentItem(handle.db, { fetchedAt: "2026-10-07T16:10:00.000Z", canonicalUrl: "https://example.com/juya-8" });
-    insertTestContentItem(handle.db, { fetchedAt: "2026-10-08T16:30:00.000Z", canonicalUrl: "https://example.com/juya-9" });
-    insertTestContentItem(handle.db, { fetchedAt: "2026-10-09T16:10:00.000Z", canonicalUrl: "https://example.com/juya-outside" });
+    const juya7 = insertTestContentItem(handle.db, { fetchedAt: "2026-10-08T16:00:00.000Z", canonicalUrl: "https://example.com/juya-7" });
+    const juya8 = insertTestContentItem(handle.db, { fetchedAt: "2026-10-07T16:10:00.000Z", canonicalUrl: "https://example.com/juya-8" });
+    const juya9 = insertTestContentItem(handle.db, { fetchedAt: "2026-10-08T16:30:00.000Z", canonicalUrl: "https://example.com/juya-9" });
+    const juyaOutside = insertTestContentItem(handle.db, { fetchedAt: "2026-10-09T16:10:00.000Z", canonicalUrl: "https://example.com/juya-outside" });
+    const setCreatedAt = handle.db.prepare("UPDATE content_items SET created_at = ? WHERE id = ?");
+    setCreatedAt.run("2026-10-06T16:00:00.000Z", juya7);
+    setCreatedAt.run("2026-10-07T16:10:00.000Z", juya8);
+    setCreatedAt.run("2026-10-08T16:30:00.000Z", juya9);
+    setCreatedAt.run("2026-10-09T16:10:00.000Z", juyaOutside);
     insertTestContentItem(handle.db, {
       sourceKind: "openai",
       fetchedAt: "2026-10-07T16:10:00.000Z",
@@ -43,9 +48,9 @@ describe("sourceMaterialStatsRepository", () => {
     insertAiHot("other-agent", "other-collector", "2026-10-07T16:00:00.000Z");
 
     expect(readDailySourceMaterialCounts(handle.db, "2026-10-07", "2026-10-09")).toEqual([
-      { date: "2026-10-07", juyaRssCount: 1, aiHotCount: 2 },
-      { date: "2026-10-08", juyaRssCount: 1, aiHotCount: 0 },
-      { date: "2026-10-09", juyaRssCount: 1, aiHotCount: 1 }
+      { date: "2026-10-07", juyaRssCount: 0, juyaNewCount: 1, aiHotCount: 2 },
+      { date: "2026-10-08", juyaRssCount: 1, juyaNewCount: 1, aiHotCount: 0 },
+      { date: "2026-10-09", juyaRssCount: 2, juyaNewCount: 1, aiHotCount: 1 }
     ]);
   });
 });

@@ -3,6 +3,7 @@ import type { SqliteDatabase } from "../db/openDatabase.js";
 export type DailySourceMaterialCount = {
   date: string;
   juyaRssCount: number;
+  juyaNewCount: number;
   aiHotCount: number;
 };
 
@@ -20,25 +21,32 @@ export function readDailySourceMaterialCounts(
       WHERE cs.kind = 'juya' AND ci.fetched_at IS NOT NULL
         AND date(datetime(ci.fetched_at), '+8 hours') BETWEEN ? AND ?
       UNION ALL
+      SELECT date(datetime(ci.created_at), '+8 hours') AS day, 'juya-new' AS source
+      FROM content_items ci
+      JOIN content_sources cs ON cs.id = ci.source_id
+      WHERE cs.kind = 'juya' AND ci.created_at IS NOT NULL
+        AND date(datetime(ci.created_at), '+8 hours') BETWEEN ? AND ?
+      UNION ALL
       SELECT date(datetime(item.collector_timestamp), '+8 hours') AS day, 'aihot' AS source
       FROM creative_source_items item
       WHERE item.collector_agent = 'aihot-collector' AND item.collector_timestamp IS NOT NULL
         AND date(datetime(item.collector_timestamp), '+8 hours') BETWEEN ? AND ?
     ) GROUP BY day, source
-  `).all(fromDate, toDate, fromDate, toDate) as Array<{
+  `).all(fromDate, toDate, fromDate, toDate, fromDate, toDate) as Array<{
     day: string;
-    source: "juya" | "aihot";
+    source: "juya" | "juya-new" | "aihot";
     item_count: number;
   }>;
   const counts = new Map<string, DailySourceMaterialCount>();
   for (const date of listDateRange(fromDate, toDate)) {
-    counts.set(date, { date, juyaRssCount: 0, aiHotCount: 0 });
+    counts.set(date, { date, juyaRssCount: 0, juyaNewCount: 0, aiHotCount: 0 });
   }
 
   for (const row of rows) {
     const count = counts.get(row.day);
     if (!count) continue;
     if (row.source === "juya") count.juyaRssCount = row.item_count;
+    else if (row.source === "juya-new") count.juyaNewCount = row.item_count;
     else count.aiHotCount = row.item_count;
   }
 

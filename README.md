@@ -174,7 +174,7 @@ bash scripts/hotnow-api.sh GET /api/settings/sources
 bash scripts/hotnow-api.sh GET '/api/settings/source-material-stats?from=2026-10-07&to=2026-10-09'
 ```
 
-Juya 按 `content_sources.kind = juya` 和 `fetched_at` 计数；AI HOT 按 `collector_agent = aihot-collector` 和 `collector_timestamp` 计数，不返回素材正文。
+Juya 按 `content_sources.kind = juya` 返回 `juyaRssCount`（当日抓取/刷新记录数）和 `juyaNewCount`（按首次入库 `created_at` 统计的新增唯一记录数）；AI HOT 按 `collector_agent = aihot-collector` 和 `collector_timestamp` 计数。不返回素材正文。
 
 ## 配置
 

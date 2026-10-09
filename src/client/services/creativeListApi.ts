@@ -288,16 +288,28 @@ export function readCreativeSourceItem(id: number): Promise<CreativeSourceItem> 
   return requestJson<CreativeSourceItem>(`/api/creative/source-items/${id}`);
 }
 
-/** 读取 Hermes 当前短写候选、替换记录和唯一队列任务状态；服务端不可达时由调用方降级展示。 */
-export function readShortWriteSchedule(): Promise<{
+export type ShortWriteScheduleCandidate = {
+  item_id: number;
+  source_external_id?: string;
+  position: number;
+  /** HotNow 按外部编号唯一匹配得到的平台素材编号；不能回退使用 Hermes item_id。 */
+  hotnow_source_item_id?: number | null;
+  source_item_title?: string | null;
+  source_item_source_name?: string | null;
+};
+
+export type ShortWriteSchedule = {
   batch_started_at: string | null;
   prepared: boolean;
   pending_item_id: number | null;
-  candidates: { item_id: number; source_external_id?: string; position: number }[];
+  candidates: ShortWriteScheduleCandidate[];
   replaced: { item_id: number; source_external_id?: string; replaced_at: string }[];
   pending_source_external_id?: string | null;
   short_write_tasks?: { source_external_id: string; task_kind: "short_content" | "short_content_auto"; status: string; queue_position?: number; phase_name?: string; stop_step_name?: string; reason_text?: string; error?: string; finished_article_id?: number; cancel_requested?: boolean }[];
-}> {
+};
+
+/** 读取 Hermes 当前短写候选、替换记录和唯一队列任务状态；服务端不可达时由调用方降级展示。 */
+export function readShortWriteSchedule(): Promise<ShortWriteSchedule> {
   return requestJson("/api/creative/short-write-schedule");
 }
 

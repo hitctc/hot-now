@@ -8,6 +8,57 @@ type QueueDisplaySnapshot = {
   day_counts?: Array<{ day_key: string; article_count: number; source_count: number }>;
 };
 
+/** 按唯一外部编号补齐短写候选的 HotNow 素材标题和平台编号，不改变 Hermes 排期。 */
+export function enrichShortWriteScheduleDisplay(
+  db: SqliteDatabase,
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!Array.isArray(data.candidates)) return data;
+  const candidates = data.candidates.filter((candidate): candidate is Record<string, unknown> =>
+    typeof candidate === "object" && candidate !== null && !Array.isArray(candidate),
+  );
+  const externalIds = [...new Set(candidates
+    .map((candidate) => candidate.source_external_id)
+    .filter((id): id is string => typeof id === "string" && id.length > 0))];
+  const sources = new Map<string, { id: number; title: string; sourceName: string | null } | null>();
+
+  // 外部编号可能因历史数据重复；只有唯一短素材才关联平台 ID 和可点击标题。
+  for (let start = 0; start < externalIds.length; start += 400) {
+    const ids = externalIds.slice(start, start + 400);
+    const rows = db.prepare(`
+      SELECT external_id, COUNT(*) AS match_count, MIN(id) AS source_id,
+             MAX(title) AS title, MAX(source_name) AS source_name
+      FROM creative_source_items
+      WHERE external_id IN (${ids.map(() => "?").join(",")}) AND direction = 'short_content'
+      GROUP BY external_id
+    `).all(...ids) as Array<{
+      external_id: string;
+      match_count: number;
+      source_id: number;
+      title: string;
+      source_name: string | null;
+    }>;
+    for (const row of rows) {
+      sources.set(row.external_id, row.match_count === 1
+        ? { id: row.source_id, title: row.title, sourceName: row.source_name }
+        : null);
+    }
+  }
+
+  data.candidates = candidates.map((candidate) => {
+    const externalId = candidate.source_external_id;
+    if (typeof externalId !== "string") return candidate;
+    const source = sources.get(externalId);
+    return {
+      ...candidate,
+      hotnow_source_item_id: source?.id ?? null,
+      source_item_title: source?.title ?? null,
+      source_item_source_name: source?.sourceName ?? null,
+    };
+  });
+  return data;
+}
+
 /** 补齐队列展示的北京时间统计、历史成品和平台素材关联；修改调用方拥有的快照，不修改任务或数据库。 */
 export function enrichWriteQueueDisplay<T extends QueueDisplaySnapshot>(db: SqliteDatabase, data: T): T {
   // 队列日期带必须读取数据库全量日统计，不能从有限的历史记录反推文章和素材数量。

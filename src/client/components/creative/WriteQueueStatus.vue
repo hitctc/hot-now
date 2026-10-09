@@ -38,6 +38,10 @@ const {
   closeArticleDetail,
   historyGroups,
   formatHistoryDate,
+  shortWriteSchedule,
+  shortWriteScheduleDelayed,
+  pendingShortWriteCandidates,
+  formatShortBatchTime,
   statusLabel,
   describeLunaStatus,
   describeQueuedTask,
@@ -124,6 +128,39 @@ const {
           v-if="!data.status_unavailable && !data.current && data.queue.length === 0"
           class="write-queue-idle"
         >队列空闲</div>
+
+        <!-- Hermes 当前批次的自动候选不等于实际队列，保留候选顺位并完整显示标题。 -->
+        <div v-if="shortWriteSchedule || shortWriteScheduleDelayed" class="write-queue-candidates" data-testid="queue-short-write-candidates">
+          <div class="write-queue-candidate-heading">
+            <span>待写作候选（自动）</span>
+            <span v-if="shortWriteSchedule?.batch_started_at">批次 {{ formatShortBatchTime(shortWriteSchedule.batch_started_at) }}</span>
+          </div>
+          <div v-if="shortWriteScheduleDelayed" class="write-queue-candidate-delay">
+            {{ shortWriteSchedule ? "排期状态延迟，保留上次候选快照" : "自动候选状态暂不可用" }}
+          </div>
+          <template v-if="shortWriteSchedule">
+            <div v-for="candidate in pendingShortWriteCandidates" :key="candidate.source_external_id || candidate.item_id" class="write-queue-candidate">
+              <div class="write-queue-candidate-row">
+                <button v-if="candidate.hotnow_source_item_id" type="button" class="write-queue-link write-queue-id" @click.stop="openSourceItem(candidate.hotnow_source_item_id)">素材 #{{ candidate.hotnow_source_item_id }}</button>
+                <span class="write-queue-candidate-title">{{ candidate.source_item_title || "素材标题暂不可用" }}</span>
+                <span class="write-queue-candidate-position">
+                  {{ (candidate.source_external_id && candidate.source_external_id === shortWriteSchedule.pending_source_external_id)
+                    || (shortWriteSchedule.pending_item_id != null && candidate.item_id === shortWriteSchedule.pending_item_id)
+                    ? `投递确认中 · 候选第 ${candidate.position} 位`
+                    : `自动候选 · 第 ${candidate.position} 位` }}
+                </span>
+              </div>
+              <div v-if="candidate.source_item_source_name" class="write-queue-candidate-source">{{ candidate.source_item_source_name }}</div>
+              <div v-else-if="!candidate.hotnow_source_item_id && candidate.source_external_id" class="write-queue-candidate-source">素材关联暂不可用 · {{ candidate.source_external_id }}</div>
+            </div>
+            <div v-if="pendingShortWriteCandidates.length === 0" class="write-queue-candidate-empty">
+              <template v-if="!shortWriteSchedule.prepared && shortWriteSchedule.batch_started_at">当前批次候选仍在整理中</template>
+              <template v-else-if="shortWriteSchedule.candidates.length > 0">本批次候选已进入上方实际队列</template>
+              <template v-else>当前批次暂无自动待写候选</template>
+            </div>
+          </template>
+          <div v-else class="write-queue-candidate-empty">尚未读取到自动候选</div>
+        </div>
 
         <div v-if="data.luna && !(data.current && (data.luna.paused || data.luna.available === false))" class="mt-2 rounded bg-gray-50 px-2 py-1 text-[10px] text-editorial-text-muted" data-testid="queue-luna-state">
           Luna：{{ describeLunaStatus(data.luna, elapsedNow, statusReceivedAt) }}
@@ -314,6 +351,57 @@ const {
   font-size: 10px;
   font-weight: 600;
 }
+.write-queue-candidates {
+  max-height: 220px;
+  overflow-y: auto;
+  border-top: 1px solid #f3f4f6;
+  padding: 5px 8px 2px;
+}
+.write-queue-candidate-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 3px;
+  color: #6b7280;
+  font-size: 10px;
+  font-weight: 600;
+}
+.write-queue-candidate {
+  margin-bottom: 4px;
+  border-radius: 4px;
+  background: #f9fafb;
+  padding: 4px 5px;
+}
+.write-queue-candidate-row {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 3px 5px;
+  font-size: 10px;
+}
+.write-queue-candidate-title {
+  min-width: 0;
+  flex: 1 1 100%;
+  color: #374151;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.write-queue-candidate-position,
+.write-queue-candidate-source,
+.write-queue-candidate-empty,
+.write-queue-candidate-delay {
+  color: #6b7280;
+  font-size: 9px;
+  overflow-wrap: anywhere;
+}
+.write-queue-candidate-delay {
+  margin-bottom: 4px;
+  color: #b45309;
+}
+.write-queue-candidate-empty {
+  padding: 4px 0;
+  text-align: center;
+}
 .write-queue-history-item {
   margin-bottom: 3px;
   border-radius: 4px;
@@ -381,8 +469,9 @@ const {
     max-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 8px);
     max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 8px);
   }
-  /* 手机只保留中间一个滚动区，避免排队与历史各自滚动时难以到达后续内容。 */
+  /* 手机只保留中间一个滚动区，避免队列、候选和历史嵌套滚动导致后续内容难以到达。 */
   .write-queue-list,
+  .write-queue-candidates,
   .write-queue-history {
     max-height: none;
     overflow-y: visible;

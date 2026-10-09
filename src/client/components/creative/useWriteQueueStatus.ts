@@ -1,5 +1,5 @@
 import { ref, onMounted, onBeforeUnmount, computed } from "vue";
-import { fetchWriteQueueStatus, readCreativeFinishedArticle, type WriteQueueStatus as WriteQueueStatusType, type WriteQueueTask, type CreativeFinishedArticle } from "../../services/creativeApi.js";
+import { fetchWriteQueueStatus, readShortWriteSchedule, readCreativeFinishedArticle, type ShortWriteSchedule, type WriteQueueStatus as WriteQueueStatusType, type WriteQueueTask, type CreativeFinishedArticle } from "../../services/creativeApi.js";
 import { createLatestRequestGuard } from "../../utils/latestRequestGuard.js";
 import { toShanghaiDayKey } from "./tableDayGroups.js";
 import { describeLunaStatus, describeQueuedTask, describeCurrentTask } from "./writeQueueStatusPresentation.js";
@@ -73,6 +73,8 @@ export function useWriteQueueStatus() {
   }
 
   const data = ref<WriteQueueStatusType | null>(null);
+  const shortWriteSchedule = ref<ShortWriteSchedule | null>(null);
+  const shortWriteScheduleDelayed = ref(false);
   const statusReceivedAt = ref(Date.now());
   const loading = ref(false);
   const expanded = ref(readExpandedPreference());
@@ -105,11 +107,27 @@ export function useWriteQueueStatus() {
     return data.value.current !== null || data.value.queue_length > 0;
   });
 
-  /** 合并刷新并记录倒计时基准；降级缓存沿用原采集时间，避免旧状态重新获得完整冷却时间。 */
+  /** 当前 Hermes 实际队列已显示的素材不再重复列入自动候选，顺位仍采用原候选快照。 */
+  const pendingShortWriteCandidates = computed(() => {
+    const candidates = shortWriteSchedule.value?.candidates ?? [];
+    const activeTasks = [data.value?.current, ...(data.value?.queue ?? [])]
+      .filter((task): task is WriteQueueTask => task !== null && task !== undefined);
+    const activeExternalIds = new Set(activeTasks
+      .map((task) => task.source_external_id)
+      .filter((id): id is string => Boolean(id)));
+    const activeSourceIds = new Set(activeTasks
+      .map((task) => task.source_item_id)
+      .filter((id): id is number => typeof id === "number"));
+    return candidates.filter((candidate) =>
+      !(candidate.source_external_id && activeExternalIds.has(candidate.source_external_id))
+      && !(candidate.hotnow_source_item_id && activeSourceIds.has(candidate.hotnow_source_item_id)));
+  });
+
+  /** 合并队列与当前短写批次刷新；短写接口失败时保留上次快照并明确标记延迟。 */
   function refresh(): Promise<void> {
     if (refreshRequest) return refreshRequest;
     loading.value = true;
-    refreshRequest = fetchWriteQueueStatus()
+    const queueRequest = fetchWriteQueueStatus()
       .then((status) => {
         data.value = status;
         const cachedAt = status.status_cached_at ? Date.parse(status.status_cached_at) : NaN;
@@ -117,12 +135,37 @@ export function useWriteQueueStatus() {
       })
       .catch(() => {
         // 服务端无法提供降级状态时保留当前显示，避免浮标闪烁。
+      });
+    const scheduleRequest = readShortWriteSchedule()
+      .then((schedule) => {
+        shortWriteSchedule.value = schedule;
+        shortWriteScheduleDelayed.value = false;
       })
+      .catch(() => {
+        shortWriteScheduleDelayed.value = true;
+      });
+    refreshRequest = Promise.all([queueRequest, scheduleRequest])
+      .then(() => undefined)
       .finally(() => {
         loading.value = false;
         refreshRequest = null;
       });
     return refreshRequest;
+  }
+
+  /** 将 Hermes 批次时间按北京时间展示，不把候选时间解释成预计开写时间。 */
+  function formatShortBatchTime(value: string | null | undefined): string {
+    if (!value) return "";
+    const timestamp = Date.parse(value);
+    if (!Number.isFinite(timestamp)) return value;
+    return new Intl.DateTimeFormat("zh-CN", {
+      timeZone: "Asia/Shanghai",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(timestamp);
   }
 
   /** 仅在页面可见时执行定时刷新。 */
@@ -244,6 +287,10 @@ export function useWriteQueueStatus() {
     cancelTask,
     viewRetainedResult,
     data,
+    shortWriteSchedule,
+    shortWriteScheduleDelayed,
+    pendingShortWriteCandidates,
+    formatShortBatchTime,
     statusReceivedAt,
     loading,
     expanded,

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { findCreativeSourceItemById } from "../../src/core/creative/creativeSourceItemRepository.js";
+import { findCreativeSourceItemById, insertCreativeSourceItem } from "../../src/core/creative/creativeSourceItemRepository.js";
 import { createServer } from "../../src/server/createServer.js";
 import { createTestDatabase, type TestDatabaseHandle } from "../helpers/testDatabase.js";
 
@@ -65,6 +65,64 @@ describe("creative automation Hermes proxy", () => {
     expect(dailyPlan.statusCode).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(fetchMock.mock.calls[2][0]).toBe("https://hermes.test/api/automation/daily-plan/run");
+    await app.close();
+  });
+
+  it("短写候选快照按外部编号补齐 HotNow 素材标题和本地编号", async () => {
+    vi.stubEnv("HERMES_API_BASE_URL", "https://hermes.test");
+    vi.stubEnv("HERMES_API_TOKEN", "token");
+    const handle = await createTestDatabase("hot-now-short-write-schedule-");
+    handles.push(handle);
+    const source = insertCreativeSourceItem(handle.db, {
+      externalId: "feed-7",
+      collectorAgent: "short-test",
+      title: "完整的自动短写候选标题",
+      url: "https://example.com/feed-7",
+      sourceName: "候选来源",
+      direction: "short_content",
+    });
+    for (const collectorAgent of ["short-test-a", "short-test-b"]) {
+      insertCreativeSourceItem(handle.db, {
+        externalId: "ambiguous-feed",
+        collectorAgent,
+        title: `歧义素材-${collectorAgent}`,
+        url: `https://example.com/${collectorAgent}`,
+        direction: "short_content",
+      });
+    }
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      batch_started_at: "2026-10-05T00:00:00+08:00",
+      prepared: true,
+      candidates: [
+        { item_id: 16562, source_external_id: "feed-7", position: 1 },
+        { item_id: 16563, source_external_id: "ambiguous-feed", position: 2 },
+      ],
+      replaced: [],
+      short_write_tasks: [],
+    }), { status: 200 })));
+    const app = createServer({ db: handle.db });
+
+    const response = await app.inject({ method: "GET", url: "/api/creative/short-write-schedule" });
+
+    expect(response.json().candidates).toEqual([
+      {
+        item_id: 16562,
+        source_external_id: "feed-7",
+        position: 1,
+        hotnow_source_item_id: source.id,
+        source_item_title: "完整的自动短写候选标题",
+        source_item_source_name: "候选来源",
+      },
+      {
+        item_id: 16563,
+        source_external_id: "ambiguous-feed",
+        position: 2,
+        hotnow_source_item_id: null,
+        source_item_title: null,
+        source_item_source_name: null,
+      },
+    ]);
+    expect(response.json().candidates[0].hotnow_source_item_id).not.toBe(16562);
     await app.close();
   });
 

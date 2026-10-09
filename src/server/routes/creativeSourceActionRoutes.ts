@@ -1,4 +1,5 @@
 import { parseSourceRanking } from "../../core/creative/sourceRanking.js";
+import { enrichShortWriteScheduleDisplay } from "../../core/creative/creativeWriteQueueDisplayRepository.js";
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
@@ -98,6 +99,7 @@ export function registerCreativeSourceActionRoutes(
   app.get("/api/creative/short-write-schedule", async (request, reply) => {
     if (!options.authorizeSession(request, reply)) return;
     const result = await callHermesAutomation("/api/short/write-schedule", "GET");
+    if (db) enrichShortWriteScheduleDisplay(db, result.data);
     return reply.code(result.status).send(result.data);
   });
 

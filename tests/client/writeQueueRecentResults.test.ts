@@ -29,13 +29,74 @@ const queueStatus = {
 };
 
 const QUEUE_EXPANDED_KEY = "hot-now-write-queue-expanded";
-beforeEach(() => window.localStorage.removeItem(QUEUE_EXPANDED_KEY));
+const EMPTY_SHORT_WRITE_SCHEDULE = {
+  batch_started_at: null,
+  prepared: false,
+  pending_item_id: null,
+  candidates: [],
+  replaced: [],
+};
+beforeEach(() => {
+  window.localStorage.removeItem(QUEUE_EXPANDED_KEY);
+  vi.spyOn(creativeApi, "readShortWriteSchedule").mockResolvedValue(EMPTY_SHORT_WRITE_SCHEDULE);
+});
 afterEach(() => {
   vi.restoreAllMocks();
   window.localStorage.removeItem(QUEUE_EXPANDED_KEY);
 });
 
 describe("写作队列最近逐篇结果", () => {
+  it("完整展示当前批次未入队候选，保持原顺位并在刷新后替换新批次内容", async () => {
+    window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
+    const readSchedule = vi.spyOn(creativeApi, "readShortWriteSchedule")
+      .mockResolvedValueOnce({
+        batch_started_at: "2026-10-08T09:00:00+08:00",
+        prepared: true,
+        pending_item_id: 901,
+        pending_source_external_id: "pending-external",
+        candidates: [
+          { item_id: 901, source_external_id: "pending-external", position: 1, hotnow_source_item_id: 201, source_item_title: "这是一整条待写作标题，不能被截断", source_item_source_name: "来源甲" },
+          { item_id: 902, source_external_id: "already-queued", position: 2, hotnow_source_item_id: 202, source_item_title: "已在实际队列中的标题" },
+          { item_id: 903, source_external_id: "next-external", position: 3, hotnow_source_item_id: 203, source_item_title: "仍待写的下一条候选" },
+        ],
+        replaced: [],
+      })
+      .mockResolvedValueOnce({
+        batch_started_at: "2026-10-08T10:00:00+08:00",
+        prepared: true,
+        pending_item_id: null,
+        candidates: [{ item_id: 904, source_external_id: "new-batch", position: 1, hotnow_source_item_id: 204, source_item_title: "新时段更新后的候选内容" }],
+        replaced: [],
+      });
+    vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue({
+      ...queueStatus,
+      current: { ...queueStatus.recent[1]!, task_id: "current-task", status: "writing", source_external_id: "current-external" },
+      queue: [{ ...queueStatus.recent[1]!, task_id: "queued-task", status: "queued", source_item_id: 202, source_external_id: "already-queued", source_item_title: "已在实际队列中的标题" }],
+      queue_length: 1,
+    });
+    const wrapper = mount(WriteQueueStatus, { attachTo: document.body,
+      global: { stubs: { SourceItemDetailModal: true, ArticleDetailDrawer: true } } });
+    try {
+      await flushPromises();
+      const body = document.body.querySelector(".write-queue-body")!;
+      const candidates = body.querySelector('[data-testid="queue-short-write-candidates"]')!;
+      expect(candidates.textContent).toContain("这是一整条待写作标题，不能被截断");
+      expect(candidates.textContent).toContain("仍待写的下一条候选");
+      expect(candidates.textContent).toContain("投递确认中 · 候选第 1 位");
+      expect(candidates.textContent).toContain("自动候选 · 第 3 位");
+      expect(candidates.textContent).not.toContain("已在实际队列中的标题");
+      expect(body.querySelectorAll(".write-queue-candidate")).toHaveLength(2);
+      expect(body.querySelector(".write-queue-list")!.compareDocumentPosition(candidates) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(candidates.compareDocumentPosition(body.querySelector(".write-queue-history")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+      document.body.querySelector<HTMLButtonElement>(".write-queue-refresh")!.click();
+      await flushPromises();
+      expect(readSchedule).toHaveBeenCalledTimes(2);
+      expect(body.textContent).toContain("新时段更新后的候选内容");
+      expect(body.textContent).not.toContain("仍待写的下一条候选");
+    } finally { wrapper.unmount(); }
+  });
+
   it("只有 Hermes 允许的内容阻断记录提供强制重写，确认后只投递原编号", async () => {
     window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
     vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue({ ...queueStatus, history: [
@@ -114,7 +175,7 @@ describe("写作队列最近逐篇结果", () => {
     const mobile = source.split("@media (max-width: 768px)")[1] ?? "";
     expect(mobile).toContain("100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 8px");
     expect(mobile).toContain("bottom: env(safe-area-inset-bottom, 0px)");
-    expect(mobile).toMatch(/\.write-queue-list,\s*\.write-queue-history\s*\{[^}]*max-height: none;[^}]*overflow-y: visible;/);
+    expect(mobile).toMatch(/\.write-queue-list,\s*\.write-queue-candidates,\s*\.write-queue-history\s*\{[^}]*max-height: none;[^}]*overflow-y: visible;/);
     expect(source).toMatch(/\.write-queue-header\s*\{[^}]*flex-shrink: 0;/);
     expect(source).toMatch(/\.write-queue-footer\s*\{[^}]*flex-shrink: 0;/);
     window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");

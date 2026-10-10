@@ -165,12 +165,42 @@ const {
             {{ shortWriteSchedule ? "排期状态延迟，保留上次候选快照" : "自动候选状态暂不可用" }}
           </div>
           <template v-if="shortWriteSchedule">
-            <div class="rounded border border-blue-100 bg-blue-50 px-2 py-1 text-[10px] leading-4 text-editorial-text-muted" data-testid="queue-short-write-summary">
-              <div>热搜已受理 {{ shortWriteSchedule.hot_summary?.accepted_count ?? shortWriteSchedule.cycle_submitted_count ?? 0 }}/{{ shortWriteSchedule.hot_summary?.limit ?? shortWriteSchedule.cycle_write_limit ?? 5 }} · 写成 {{ shortWriteSchedule.hot_summary?.success_count ?? 0 }} · 失败/阻断 {{ shortWriteSchedule.hot_summary?.failed_count ?? 0 }}</div>
-              <div v-for="lane in ['aihot', 'juya']" :key="lane">
-                {{ sourceLaneLabel(lane) }}：结转 {{ shortWriteSchedule.rss_breakdown?.[lane]?.carry_in_count ?? 0 }} + 新增 {{ shortWriteSchedule.rss_breakdown?.[lane]?.new_count ?? 0 }} · 待写 {{ shortWriteSchedule.rss_breakdown?.[lane]?.pending_count ?? 0 }} · 写成 {{ shortWriteSchedule.rss_breakdown?.[lane]?.success_count ?? 0 }} · 失败/阻断 {{ shortWriteSchedule.rss_breakdown?.[lane]?.failed_count ?? 0 }}
-              </div>
-              <div v-if="shortWriteSchedule.wait_state" class="text-amber-700">排程等待：{{ describeShortWriteWait() }}</div>
+            <div class="rounded border border-blue-100 bg-blue-50 px-2 py-1 text-editorial-text-muted" data-testid="queue-short-write-summary">
+              <table class="w-full table-fixed border-collapse text-[10px] leading-[14px]" data-testid="queue-short-write-summary-table">
+                <colgroup>
+                  <col style="width: 18%">
+                  <col style="width: 30%">
+                  <col style="width: 13%">
+                  <col style="width: 13%">
+                  <col style="width: 26%">
+                </colgroup>
+                <thead class="text-[9px] leading-3">
+                  <tr class="border-b border-blue-100">
+                    <th class="py-0 text-left font-medium">来源</th>
+                    <th class="whitespace-nowrap py-0 text-center font-medium">受理/结转+新增</th>
+                    <th class="whitespace-nowrap py-0 text-center font-medium">待写</th>
+                    <th class="whitespace-nowrap py-0 text-center font-medium">写成</th>
+                    <th class="whitespace-nowrap py-0 text-center font-medium">失败/阻断</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="border-t border-blue-100/70">
+                    <td class="py-0 font-medium text-editorial-text-body">热搜</td>
+                    <td class="py-0 text-center tabular-nums">{{ shortWriteSchedule.hot_summary?.accepted_count ?? shortWriteSchedule.cycle_submitted_count ?? 0 }}/{{ shortWriteSchedule.hot_summary?.limit ?? shortWriteSchedule.cycle_write_limit ?? 5 }}</td>
+                    <td class="py-0 text-center text-gray-400">—</td>
+                    <td class="py-0 text-center tabular-nums text-green-700">{{ shortWriteSchedule.hot_summary?.success_count ?? 0 }}</td>
+                    <td class="py-0 text-center tabular-nums text-red-600">{{ shortWriteSchedule.hot_summary?.failed_count ?? 0 }}</td>
+                  </tr>
+                  <tr v-for="lane in ['aihot', 'juya']" :key="lane" class="border-t border-blue-100/70">
+                    <td class="py-0 font-medium text-editorial-text-body">{{ sourceLaneLabel(lane) }}</td>
+                    <td class="py-0 text-center tabular-nums">{{ shortWriteSchedule.rss_breakdown?.[lane]?.carry_in_count ?? 0 }} + {{ shortWriteSchedule.rss_breakdown?.[lane]?.new_count ?? 0 }}</td>
+                    <td class="py-0 text-center tabular-nums">{{ shortWriteSchedule.rss_breakdown?.[lane]?.pending_count ?? 0 }}</td>
+                    <td class="py-0 text-center tabular-nums text-green-700">{{ shortWriteSchedule.rss_breakdown?.[lane]?.success_count ?? 0 }}</td>
+                    <td class="py-0 text-center tabular-nums text-red-600">{{ shortWriteSchedule.rss_breakdown?.[lane]?.failed_count ?? 0 }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div v-if="shortWriteSchedule.wait_state" class="mt-1 text-amber-700">排程等待：{{ describeShortWriteWait() }}</div>
               <div v-if="data.luna?.active">模型资源占用：{{ data.luna.label || data.luna.kind || '模型任务' }}<span v-if="data.luna.task_type"> · {{ data.luna.task_type }}</span></div>
               <div v-if="(data.luna?.waiting_count ?? 0) > 0">等待模型资源 {{ data.luna?.waiting_count }} 项</div>
               <div v-for="waiter in data.luna?.waiters ?? []" :key="waiter.request_id" class="text-amber-700">模型等待：{{ waiter.label || waiter.kind || waiter.task_type || '模型任务' }} · {{ waiter.priority === 'manual' ? '手动优先' : waiter.priority === 'model_operation' ? '评分/模型操作' : '自动写作' }}</div>

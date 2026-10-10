@@ -529,11 +529,21 @@ describe("写作队列最近逐篇结果", () => {
       global: { stubs: { SourceItemDetailModal: true, ArticleDetailDrawer: true } } });
     try {
       await flushPromises();
-      const summary = document.body.querySelector('[data-testid="queue-short-write-summary"]')?.textContent ?? "";
-      expect(summary).toContain("热搜已受理 2/5");
-      expect(summary).toContain("AI HOT：结转 4 + 新增 3");
-      expect(summary).toContain("等待模型资源 1 项");
-      expect(summary).toContain("手动优先");
+      const summary = document.body.querySelector('[data-testid="queue-short-write-summary"]')!;
+      const summaryTable = summary.querySelector("table");
+      expect(summaryTable?.className).toContain("table-fixed");
+      expect([...summaryTable?.querySelectorAll("thead th") ?? []].map((cell) => cell.textContent?.trim())).toEqual([
+        "来源", "受理/结转+新增", "待写", "写成", "失败/阻断",
+      ]);
+      expect([...summaryTable?.querySelectorAll("tbody tr") ?? []].map((row) =>
+        [...row.querySelectorAll("td")].map((cell) => cell.textContent?.trim()),
+      )).toEqual([
+        ["热搜", "2/5", "—", "1", "1"],
+        ["AI HOT", "4 + 3", "2", "1", "1"],
+        ["Juya", "1 + 2", "2", "1", "0"],
+      ]);
+      expect(document.body.textContent).toContain("等待模型资源 1 项");
+      expect(document.body.textContent).toContain("手动优先");
       const cycleHistory = document.body.querySelector('[data-testid="queue-short-write-cycle-history"]');
       expect(document.body.querySelector('[data-testid="write-queue-history"]')?.contains(cycleHistory)).toBe(true);
       expect(cycleHistory?.className).toContain("max-h-32");

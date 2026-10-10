@@ -39,7 +39,7 @@ export type GenerateCodeImageCardsResult = {
 
 const inFlight = new Map<number, Promise<GenerateCodeImageCardsResult>>();
 
-/** 制作单篇长短成品的代码图和封面候选，不写正文；同篇并发只保留一个任务。 */
+/** 制作单篇长短成品的代码图和封面候选；短内容成功图片写入人工正文，同篇并发只保留一个任务。 */
 export async function generateCodeImageCards(
   db: SqliteDatabase,
   articleId: number,
@@ -123,7 +123,7 @@ export function resolveCodeImageKeywords(articleKeywords: string[] | null, sourc
   return (fromArticle.length > 0 ? fromArticle : fromSource).slice(0, 3);
 }
 
-/** 按选中标题渲染指定文章图片并原子保存候选，保留正文和已有封面选择。 */
+/** 按选中标题渲染图片并原子保存；短内容同步人工正文中的图片链接，同时保留已选封面。 */
 async function runCodeImageCards(
   db: SqliteDatabase,
   articleId: number,
@@ -213,7 +213,10 @@ async function runCodeImageCards(
   const latest = findCreativeFinishedArticleById(db, articleId);
   if (!latest) return { ok: false, status: "failed", reason: "article-not-found-after-render" };
   const finalCards = mergeCardStates(latest.codeImageCards, rendered);
-  // 新短图只供下载与封面；不清理、替换旧稿已插入的图，也不触碰长文正文。
+  // 短内容发布栏展示生成的图片；复用最新已保存正文，AI 草稿和长文正文保持不变。
+  const finalMarkdown = latest.direction === "short_content"
+    ? mergeCodeImageMarkdown(latest.humanMarkdown ?? latest.contentMarkdown, latest.codeImageCards, rendered)
+    : undefined;
   const finalCoverImages = mergeCodeCoverCandidates(
     latest.coverImage,
     latest.coverImageIndex,
@@ -224,6 +227,7 @@ async function runCodeImageCards(
   const finalSaved = editCreativeFinishedArticle(db, articleId, {
     expectedUpdatedAt: latest.updatedAt,
     codeImageCards: finalCards,
+    ...(finalMarkdown !== undefined ? { humanMarkdown: finalMarkdown } : {}),
     coverImage: finalCoverImages.images,
     coverImageIndex: finalCoverImages.index,
   }, "code-image");
@@ -244,6 +248,32 @@ function mergeCardStates(base: CodeImageCard[], updates: CodeImageCard[]): CodeI
   const byVariant = new Map(base.map((card) => [card.variant, card]));
   for (const update of updates) byVariant.set(update.variant, update);
   return orderCodeImageCards([...byVariant.values()]);
+}
+
+/** 把成功代码图插入短内容人工正文；重做替换旧链接，并补入本次重新生成的图片。 */
+function mergeCodeImageMarkdown(markdown: string, previous: CodeImageCard[], updates: CodeImageCard[]): string {
+  let merged = markdown;
+  const linesToInsert: string[] = [];
+  for (const update of updates) {
+    if (update.status !== "succeeded" || !update.url) continue;
+    const old = findCodeImageCard(previous, update.variant);
+    if (old?.url && merged.includes(old.url)) {
+      merged = merged.split(old.url).join(update.url);
+      continue;
+    }
+    if (!old || old.status === "failed" || old.status === "pending" || old.status === "running") {
+      linesToInsert.push(markdownLine(update.variant, update.url));
+    }
+  }
+  if (linesToInsert.length === 0) return merged;
+  return `${linesToInsert.join("\n\n")}\n\n${merged.trimStart()}`.trimEnd();
+}
+
+/** 给三种图片比例生成清晰的公众号正文替代文字。 */
+function markdownLine(variant: CodeImageCardVariant, url: string): string {
+  if (variant === "2.5:1") return `![封面图｜HotNow 2.5:1 横图](${url})`;
+  if (variant === "1:1") return `![配图｜HotNow 1:1 方图](${url})`;
+  return `![配图｜HotNow 3:4 竖图](${url})`;
 }
 
 /** 合并候选并返回发布索引；保留已选图片/比例，仅无选择时短内容优先方图，长文维持横图。 */

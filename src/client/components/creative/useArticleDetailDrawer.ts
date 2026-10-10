@@ -105,7 +105,7 @@ export function useArticleDetailDrawer(props: ArticleDetailDrawerProps, emit: <K
 
   const codeImagesGenerating = ref(false);
 
-  /** 本地制作当前成品的三比例代码图，同步图片及封面候选；长文不插入正文。 */
+  /** 本地制作当前成品的三比例代码图，同步短内容人工正文与封面候选；长文正文保持不变。 */
   async function handleGenerateCodeImages(mode: "missing" | "all"): Promise<void> {
     if (!props.article) return;
     codeImagesGenerating.value = true;

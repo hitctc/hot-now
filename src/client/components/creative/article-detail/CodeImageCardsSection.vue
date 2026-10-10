@@ -88,7 +88,7 @@ function statusClass(card: CodeImageCard | null): string {
         <h3 class="m-0 flex flex-wrap items-center gap-2 text-sm font-semibold text-editorial-text-muted">配图与封面
           <span v-if="hasStaleCard" data-code-image-stale-notice role="status" class="rounded bg-orange-50 px-2 py-0.5 text-[11px] font-medium text-orange-700">内容已变化，建议重新制作</span>
         </h3>
-        <p class="m-0 mt-1 text-[11px] text-editorial-text-muted/80">{{ article.direction === 'short_content' ? '新制图不自动插入正文；默认方图作为发布封面，也可下载或手动选择其他封面。' : '三张图片仅加入封面候选，不自动插入正文；可在这里选用公众号主封面或下载。' }}</p>
+        <p class="m-0 mt-1 text-[11px] text-editorial-text-muted/80">{{ article.direction === 'short_content' ? '成功生成的图片会立即插入人工转写（发布内容）；默认方图作为封面，也可下载或手动选择其他封面。' : '三张图片仅加入封面候选，不自动插入正文；可在这里选用公众号主封面或下载。' }}</p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <a-button

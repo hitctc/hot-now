@@ -397,7 +397,7 @@ describe("短内容代码制图", () => {
     expect(saved.coverImage?.[saved.coverImageIndex]).toBe("https://example.com/existing-cover.png");
   });
 
-  it.each(["article", "short_content"] as const)("%s首次制图保留空人工正文，长文默认横图而短内容默认方图", async (direction) => {
+  it.each(["article", "short_content"] as const)("%s首次制图按方向维护发布正文，长文默认横图而短内容默认方图", async (direction) => {
     const handle = await createTestDatabase("code-cover-default-");
     handles.push(handle);
     const imageDir = await mkdtemp(path.join(os.tmpdir(), "code-cover-default-"));
@@ -405,30 +405,33 @@ describe("短内容代码制图", () => {
     const article = insertCreativeFinishedArticle(handle.db, { direction, titles: ["默认封面"], contentMarkdown: "正文与手工图片\n\n![手工图](https://example.com/manual.png)" });
     await generateCodeImageCards(handle.db, article.id, { imageDir });
     const saved = findCreativeFinishedArticleById(handle.db, article.id)!;
-    expect(saved.humanMarkdown).toBeNull();
     expect(saved.contentMarkdown).toBe(article.contentMarkdown);
     expect(saved.coverImage[saved.coverImageIndex]).toBe(saved.codeImageCards.find(card => card.variant === (direction === "short_content" ? "1:1" : "2.5:1"))!.url);
-    // 首次制作后的正文保存不能把新短内容封面补回，长文继续原自动合并。
+    if (direction === "short_content") {
+      expect(saved.humanMarkdown).toContain(article.contentMarkdown);
+      for (const card of saved.codeImageCards) expect(saved.humanMarkdown).toContain(`](${card.url})`);
+    } else {
+      expect(saved.humanMarkdown).toBeNull();
+    }
+    // 短内容再次制图会重新填入生成图片；长文继续原封面候选逻辑。
     const editedBody = "保存后的正文\n\n![手工图](https://example.com/manual.png)";
     editCreativeFinishedArticle(handle.db, article.id, { contentMarkdown: editedBody, humanMarkdown: editedBody });
     const edited = findCreativeFinishedArticleById(handle.db, article.id)!;
     if (direction === "short_content") {
       expect(edited.contentMarkdown).toBe(editedBody);
-      expect(edited.humanMarkdown).toBe(editedBody);
-      // 模拟存量已插图短稿，显式重制也不能清理正文或改成方图。
-      const oldBody = `${article.contentMarkdown}\n\n${saved.codeImageCards.map(card => `![HotNow旧图](${card.url})`).join("\n\n")}`;
-      editCreativeFinishedArticle(handle.db, article.id, { humanMarkdown: oldBody, coverImageIndex: 0 });
+      const coverCard = saved.codeImageCards.find((card) => card.variant === "2.5:1")!;
+      expect(edited.humanMarkdown).toContain(`](${coverCard.url})`);
       await generateCodeImageCards(handle.db, article.id, { imageDir, mode: "all" });
       const regenerated = findCreativeFinishedArticleById(handle.db, article.id)!;
-      expect(regenerated.humanMarkdown).toBe(oldBody);
-      expect(regenerated.coverImage[regenerated.coverImageIndex]).toBe(regenerated.codeImageCards.find(card => card.variant === "2.5:1")!.url);
+      for (const card of regenerated.codeImageCards) expect(regenerated.humanMarkdown).toContain(`](${card.url})`);
+      expect(regenerated.coverImage[regenerated.coverImageIndex]).toBe(regenerated.codeImageCards.find(card => card.variant === "1:1")!.url);
     } else {
       expect(edited.contentMarkdown).toContain("![封面图]");
       expect(edited.humanMarkdown).toContain("![封面图]");
     }
   });
 
-  it("新短内容制作三图仅存候选、默认方图且不改变正文，重做保留手选封面", async () => {
+  it("新短内容制作三图插入人工正文、默认方图且重做替换图片链接", async () => {
     const handle = await createTestDatabase("hot-now-code-image-");
     handles.push(handle);
     const imageDir = await mkdtemp(path.join(os.tmpdir(), "hot-now-code-image-files-"));
@@ -465,7 +468,8 @@ describe("短内容代码制图", () => {
     expect(saved.coverImage).toHaveLength(3);
     expect(saved.coverImage?.[saved.coverImageIndex]).toBe(saved.codeImageCards.find((card) => card.variant === "1:1")!.url);
     expect(saved.contentMarkdown).toBe(article.contentMarkdown);
-    expect(saved.humanMarkdown).toBe(article.humanMarkdown);
+    expect(saved.humanMarkdown).not.toBe(article.humanMarkdown);
+    for (const card of saved.codeImageCards) expect(saved.humanMarkdown).toContain(`](${card.url})`);
     // 用户随后选择横图；重做应沿用所选比例，而非每次强制方图。
     const chosenWideIndex = saved.coverImage.indexOf(saved.codeImageCards.find((card) => card.variant === "2.5:1")!.url!);
     expect(editCreativeFinishedArticle(handle.db, article.id, { coverImageIndex: chosenWideIndex }).ok).toBe(true);
@@ -541,7 +545,9 @@ describe("短内容代码制图", () => {
     });
     expect(repeat.status).toBe("succeeded");
     const repeated = findCreativeFinishedArticleById(handle.db, article.id)!;
-    expect(repeated.humanMarkdown).toBe(article.humanMarkdown);
+    for (const card of repeated.codeImageCards) {
+      expect((repeated.humanMarkdown?.split(card.url!).length ?? 0) - 1).toBe(1);
+    }
     expect(repeated.coverImage[repeated.coverImageIndex]).toBe(repeated.codeImageCards.find((card) => card.variant === "2.5:1")!.url);
 
     expect(editCreativeFinishedArticle(handle.db, article.id, {

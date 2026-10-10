@@ -52,14 +52,14 @@
 - 常用入口：
   - 安装：`npm install`
   - 标准开发：`npm run dev`
-  - 完全离线开发：`npm run dev:local`
+  - 本地后端/数据库开发：`npm run dev:local`
   - 客户端：`npm run dev:client`
   - 客户端构建：`npm run build:client`
   - 完整构建：`npm run build`
   - 客户端类型检查：`npm run typecheck:client`
   - 测试：`npm run test`
   - 数据库检查：`npm run db:check`
-- `npm run dev` 默认把 `/api/*`、`/actions/*`、登录和登出代理到正式站点；页面保存、发布和图片操作可能直接修改生产数据。需要纯本地数据库时必须使用 `npm run dev:local`。
+- `npm run dev` 默认把 `/api/*`、`/actions/*`、登录和登出代理到正式站点；页面保存、发布和图片操作可能直接修改生产数据。使用本地后端时运行 `npm run dev:local`，它会关闭 HotNow 正式站点 API 代理，但不隔绝采集、提醒调度或手动操作产生的外部网络请求。启动前确认 `HOT_NOW_DATABASE_FILE`（含根目录 `.env` 覆盖）不指向生产 live 数据库；排查生产数据只能使用拉取到本地的副本。
 - 本地排查生产数据只能使用 `./scripts/pull-prod-data.sh` 拉取副本，再通过 `./scripts/dev-prod-sync.sh` 启动；不得让开发进程直接读取服务器 live 数据。
 - 数据库损坏先执行 `npm run db:check`，恢复使用 `npm run db:restore -- <snapshot-file>`；不要直接覆盖 live SQLite。
 

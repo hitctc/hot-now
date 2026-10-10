@@ -3,12 +3,24 @@
 set -euo pipefail
 
 mode="${1:-standard}"
+database_file_override="${HOT_NOW_DATABASE_FILE-}"
+database_file_was_set="${+HOT_NOW_DATABASE_FILE}"
+report_dir_override="${HOT_NOW_REPORT_DATA_DIR-}"
+report_dir_was_set="${+HOT_NOW_REPORT_DATA_DIR}"
 
 # npm run dev 现在只认根目录 .env，避免双文件并存时到底哪份生效变得不透明。
 if [ -f .env ]; then
   set -a
   . ./.env
   set +a
+fi
+
+# Preserve caller-provided paths so dev-prod-sync can target its pulled local snapshot.
+if [ "${database_file_was_set}" = "1" ]; then
+  export HOT_NOW_DATABASE_FILE="${database_file_override}"
+fi
+if [ "${report_dir_was_set}" = "1" ]; then
+  export HOT_NOW_REPORT_DATA_DIR="${report_dir_override}"
 fi
 
 if [ -f .env.local ]; then

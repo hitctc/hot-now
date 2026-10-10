@@ -7,7 +7,7 @@ import { makeWechatCompatible } from "../../src/core/creative/wechatFormat/wecha
 
 const themeIds: WechatThemeId[] = ["classic", "bauhaus", "sunset-film", "receipt", "black-gold"];
 
-describe("发布结尾独立样式", () => {
+describe("简洁发布结尾样式", () => {
   it("实时预览与主题使用完全相同的结尾样式，关闭预览时跳过渲染", async () => {
     const modelValue = "正文\n\n跪求点赞、关注。";
     const wrapper = mount(ArticleMarkdownEditor, { props: { modelValue, syncScroll: false } });
@@ -21,69 +21,47 @@ describe("发布结尾独立样式", () => {
   it.each([
     "正文\n\n跪求\n点赞、关注。",
     "正文\n\n跪求\n\n点赞、关注。",
-  ])("尾注被拆行或拆段后，公众号兼容处理仍保留唯一卡片：%s", async markdown => {
+  ])("尾注被拆行或拆段后，公众号兼容处理仍保留一个普通段落：%s", async markdown => {
     const html = await makeWechatCompatible(renderWechatThemePreview(markdown, "bauhaus"), { skipImageBase64: true });
     const doc = new DOMParser().parseFromString(html, "text/html");
-    const cards = doc.querySelectorAll("[data-short-publish-footer]");
-    expect(cards).toHaveLength(1);
-    expect(cards[0].textContent).toBe("跪求点赞、关注。");
+    const footer = doc.querySelector("p[data-short-publish-footer]");
+    expect(doc.querySelectorAll("[data-short-publish-footer]")).toHaveLength(1);
+    expect(footer?.textContent).toBe("跪求点赞、关注。");
+    expect(footer?.querySelector("section, div, table")).toBeNull();
     expect(doc.body.textContent?.replace(/\s/g, "")).toBe("正文跪求点赞、关注。");
   });
 
-  it.each(themeIds)("%s主题下跪求是大字主标题，保留宣言海报的强对比和层次", theme => {
+  it.each(themeIds)("%s主题使用同一套普通段落样式，文字仍与正文区分", theme => {
     const markdown = appendShortPublishFooter("# 标题\n\n正文\n\n跪求点赞、关注，谢谢你。", "short_content");
     const html = renderWechatThemePreview(markdown, theme);
     const doc = new DOMParser().parseFromString(html, "text/html");
-    const card = doc.querySelector<HTMLElement>("[data-short-publish-footer]")!;
-    expect(card).not.toBeNull();
-    expect(card.textContent).toBe("跪求点赞、关注。");
-    expect(card.style.backgroundColor).toBe("transparent");
-    // DOM替身会把 border:none 的单项属性读成空串，直接验证实际输出的完整声明。
-    expect(card.getAttribute("style")).toMatch(/(?:^|;)\s*border: none;/);
-    const text = card.querySelector<HTMLElement>("[data-footer-panel]")!;
-    expect(text.style.backgroundColor).toBe("rgb(23, 32, 57)");
-    expect(text.style.maxWidth).toBe("100%");
-    expect(text.style.width).toBe("270px");
-    expect(text.style.borderRadius).toBe("0");
-    expect(text.style.boxShadow).toContain("6px 6px");
-    const request = card.querySelector<HTMLElement>('[data-footer-part="request"]')!;
+    const footer = doc.querySelector<HTMLParagraphElement>("p[data-short-publish-footer]")!;
+    const request = footer.querySelector<HTMLElement>('[data-footer-part="request"]')!;
+    const body = footer.querySelector<HTMLElement>('[data-footer-part="body"]')!;
+    expect(footer.textContent).toBe("跪求点赞、关注。");
+    expect(footer.style.textAlign).toBe("center");
+    expect(footer.style.fontSize).toBe("18px");
+    expect(footer.style.fontWeight).toBe("700");
+    expect(footer.style.borderTop).toContain("solid");
+    expect(footer.style.borderBottom).toContain("solid");
     expect(request.textContent).toBe("跪求");
-    expect(request.style.fontFamily).not.toContain("Kaiti");
-    expect(request.style.fontSize).toBe("36px");
-    expect(request.style.fontWeight).toBe("900");
-    expect(request.style.color).toBe("rgb(23, 32, 57)");
-    expect(request.style.backgroundColor).toBe("rgb(255, 91, 121)");
-    expect(request.nextElementSibling?.tagName).toBe("BR");
-    const like = card.querySelector<HTMLElement>('[data-footer-part="like"]')!;
-    const follow = card.querySelector<HTMLElement>('[data-footer-part="follow"]')!;
-    expect(like.textContent).toBe("点赞");
-    expect(like.style.color).toBe("rgb(255, 255, 255)");
-    expect(follow.textContent).toBe("关注");
-    expect(follow.style.color).toBe("rgb(255, 157, 177)");
-    expect(like.style.fontWeight).toBe("800");
-    expect(like.style.fontSize).toBe("26px");
-    expect(follow.style.fontSize).toBe("26px");
-    expect(like.style.borderBottomWidth).toBe("4px");
-    expect(follow.style.borderBottomWidth).toBe("4px");
-    expect(parseInt(request.style.fontSize)).toBeGreaterThan(parseInt(like.style.fontSize));
-    expect(card.querySelector("a, button, img, svg")).toBeNull();
-    expect(html).not.toContain("谢谢你");
+    expect(request.style.color).toBe(body.style.color);
+    expect(body.textContent).toBe("点赞、关注。");
+    expect(footer.outerHTML).not.toMatch(/linear-gradient|box-shadow|data-footer-panel|谢谢你/);
   });
 
-  it.each(themeIds)("%s公众号兼容处理保留大字标题、海报层次及标点，不依赖外部资源", async theme => {
+  it.each(themeIds)("%s公众号兼容处理后仍是简单段落且强调色保留", async theme => {
     const html = renderWechatThemePreview("正文\n\n跪求点赞、关注。", theme);
     const compatible = await makeWechatCompatible(html, { skipImageBase64: true });
-    const before = new DOMParser().parseFromString(html, "text/html").querySelector("[data-short-publish-footer]")!;
-    const card = new DOMParser().parseFromString(compatible, "text/html").querySelector("[data-short-publish-footer]")!;
-    expect(card.textContent).toBe("跪求点赞、关注。");
-    // 微信草稿解析对 section 末尾的 p 不稳定，确保最终提交结构避开该组合。
-    expect(card.lastElementChild?.tagName).not.toBe("P");
-    for (const key of ["request", "like", "separator", "follow", "stop"]) {
-      const selector = `[data-footer-part="${key}"]`;
-      expect(card.querySelector(selector)!.getAttribute("style")).toBe(before.querySelector(selector)!.getAttribute("style"));
-    }
-    expect(card.querySelector('[data-footer-part="like"]')!.textContent).toBe("点赞");
-    expect(card.querySelector('[data-footer-part="follow"]')!.textContent).toBe("关注");
+    const before = new DOMParser().parseFromString(html, "text/html").querySelector("p[data-short-publish-footer]")!;
+    const footer = new DOMParser().parseFromString(compatible, "text/html").querySelector("p[data-short-publish-footer]")!;
+    expect(footer.textContent).toBe("跪求点赞、关注。");
+    expect(footer.querySelector("section, div, table")).toBeNull();
+    expect(footer.getAttribute("style")).toContain("border-top");
+    expect(footer.querySelector('[data-footer-part="request"]')!.getAttribute("style")).toContain("color: #b34c57; font-weight: 800;");
+    expect(footer.querySelector('[data-footer-part="body"]')!.getAttribute("style")).toContain("color: #b34c57;");
+    expect(before.querySelector('[data-footer-part="request"]')!.getAttribute("style")).toContain("color: #b34c57; font-weight: 800;");
+    expect(before.querySelector('[data-footer-part="body"]')!.getAttribute("style")).toContain("color: #b34c57;");
     expect(compatible).not.toContain("data-source-line");
   });
 

@@ -17,7 +17,7 @@ export function appendShortPublishFooter(markdown: string, direction: string | u
   return `${content}\n\n${SHORT_PUBLISH_FOOTER}`;
 }
 
-/** 将匹配到的末尾互动文案整理为带留白、细分隔线和重点色的普通段落；只改预览 DOM，不改原文或存储。 */
+/** 将末尾互动文案整理为单段可编辑文字，仅保留居中、强调色和加粗；只改预览 DOM，不改原文或存储。 */
 export function styleShortPublishFooter(doc: Document): void {
   const expected = SHORT_PUBLISH_FOOTER.replace(/\s/g, "");
   const paragraphs: HTMLParagraphElement[] = [];
@@ -33,19 +33,10 @@ export function styleShortPublishFooter(doc: Document): void {
     cursor = cursor.previousElementSibling;
   }
   if (combined !== expected) return;
-  const font = "-apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif";
   const footer = doc.createElement("p");
   footer.setAttribute("data-short-publish-footer", "");
-  footer.setAttribute("style", `margin: 28px 0 12px; padding: 12px 8px; border-top: 1px solid #e1e5ec; border-bottom: 1px solid #e1e5ec; color: #364152; font-family: ${font}; font-size: 18px; font-weight: 700; line-height: 1.8; text-align: center;`);
-  const request = doc.createElement("span");
-  request.setAttribute("data-footer-part", "request");
-  request.setAttribute("style", "color: #b34c57; font-weight: 800;");
-  request.textContent = "跪求";
-  const body = doc.createElement("span");
-  body.setAttribute("data-footer-part", "body");
-  body.setAttribute("style", "color: #b34c57;");
-  body.textContent = "点赞、关注。";
-  footer.append(request, body);
+  footer.setAttribute("style", "margin: 16px 0; color: #b34c57; font-weight: 700; text-align: center;");
+  footer.textContent = SHORT_PUBLISH_FOOTER;
   paragraphs[0].replaceWith(footer);
   paragraphs.slice(1).forEach(paragraph => paragraph.remove());
 }

@@ -31,37 +31,33 @@ describe("简洁发布结尾样式", () => {
     expect(doc.body.textContent?.replace(/\s/g, "")).toBe("正文跪求点赞、关注。");
   });
 
-  it.each(themeIds)("%s主题使用同一套普通段落样式，文字仍与正文区分", theme => {
+  it.each(themeIds)("%s主题使用单段可编辑结尾，只保留基础文字样式", theme => {
     const markdown = appendShortPublishFooter("# 标题\n\n正文\n\n跪求点赞、关注，谢谢你。", "short_content");
     const html = renderWechatThemePreview(markdown, theme);
     const doc = new DOMParser().parseFromString(html, "text/html");
     const footer = doc.querySelector<HTMLParagraphElement>("p[data-short-publish-footer]")!;
-    const request = footer.querySelector<HTMLElement>('[data-footer-part="request"]')!;
-    const body = footer.querySelector<HTMLElement>('[data-footer-part="body"]')!;
     expect(footer.textContent).toBe("跪求点赞、关注。");
+    expect(footer.children).toHaveLength(0);
     expect(footer.style.textAlign).toBe("center");
-    expect(footer.style.fontSize).toBe("18px");
+    expect(footer.style.color).toBe("rgb(179, 76, 87)");
     expect(footer.style.fontWeight).toBe("700");
-    expect(footer.style.borderTop).toContain("solid");
-    expect(footer.style.borderBottom).toContain("solid");
-    expect(request.textContent).toBe("跪求");
-    expect(request.style.color).toBe(body.style.color);
-    expect(body.textContent).toBe("点赞、关注。");
-    expect(footer.outerHTML).not.toMatch(/linear-gradient|box-shadow|data-footer-panel|谢谢你/);
+    expect(footer.style.borderTop).toBe("");
+    expect(footer.style.borderBottom).toBe("");
+    expect(footer.style.padding).toBe("");
+    expect(footer.outerHTML).not.toMatch(/linear-gradient|box-shadow|data-footer-part|谢谢你/);
   });
 
-  it.each(themeIds)("%s公众号兼容处理后仍是简单段落且强调色保留", async theme => {
+  it.each(themeIds)("%s公众号兼容处理后仍保留单段文字和基础样式", async theme => {
     const html = renderWechatThemePreview("正文\n\n跪求点赞、关注。", theme);
     const compatible = await makeWechatCompatible(html, { skipImageBase64: true });
-    const before = new DOMParser().parseFromString(html, "text/html").querySelector("p[data-short-publish-footer]")!;
-    const footer = new DOMParser().parseFromString(compatible, "text/html").querySelector("p[data-short-publish-footer]")!;
+    const footer = new DOMParser().parseFromString(compatible, "text/html").querySelector<HTMLParagraphElement>("p[data-short-publish-footer]")!;
     expect(footer.textContent).toBe("跪求点赞、关注。");
-    expect(footer.querySelector("section, div, table")).toBeNull();
-    expect(footer.getAttribute("style")).toContain("border-top");
-    expect(footer.querySelector('[data-footer-part="request"]')!.getAttribute("style")).toContain("color: #b34c57; font-weight: 800;");
-    expect(footer.querySelector('[data-footer-part="body"]')!.getAttribute("style")).toContain("color: #b34c57;");
-    expect(before.querySelector('[data-footer-part="request"]')!.getAttribute("style")).toContain("color: #b34c57; font-weight: 800;");
-    expect(before.querySelector('[data-footer-part="body"]')!.getAttribute("style")).toContain("color: #b34c57;");
+    expect(footer.children).toHaveLength(0);
+    expect(footer.style.textAlign).toBe("center");
+    expect(footer.style.color).toBe("rgb(179, 76, 87)");
+    expect(footer.style.fontWeight).toBe("700");
+    expect(footer.style.borderTop).toBe("");
+    expect(footer.style.borderBottom).toBe("");
     expect(compatible).not.toContain("data-source-line");
   });
 

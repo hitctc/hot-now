@@ -186,6 +186,7 @@ fi
 echo "Starting backend server on http://127.0.0.1:${server_port}..."
 tsx watch src/main.ts &
 server_pid=$!
+echo "HotNow 短内容页面入口（登录后访问）：http://127.0.0.1:${server_port}/creative/short-finished-articles"
 
 while true; do
   if [ -n "${resolver_pid}" ] && ! kill -0 "${resolver_pid}" 2>/dev/null; then

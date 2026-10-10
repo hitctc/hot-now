@@ -87,7 +87,7 @@ npm run dev:client
 npm run dev:local
 ```
 
-`dev:local` 用于完全离线的本地数据库开发：它会清除正式 API 代理环境变量，再启动本地数据服务。需要直接操作正式数据时使用 `npm run dev`，不要使用 `dev:local`。
+`dev:local` 用于完全离线的本地数据库开发：它会清除正式 API 代理环境变量，再启动本地数据服务。启动输出中的 `35173/client/` 是 Vite 客户端资源地址；业务页面通过后端地址访问，默认短内容页面为 `http://127.0.0.1:3030/creative/short-finished-articles`（启动日志会打印实际入口，端口可由 `PORT` 覆盖）。本地列表只读取当前设备的 SQLite，不会自动加载生产成品；需要预览结尾样式时，可在页面点“新建短内容”创建一条本地测试稿。需要直接操作正式数据时使用 `npm run dev`，不要使用 `dev:local`。
 
 QQ 邮箱这里要填的是 SMTP 授权码，不是网页登录密码。
 

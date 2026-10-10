@@ -617,7 +617,17 @@ describe("写作队列最近逐篇结果", () => {
         ["AI HOT", "4 + 3", "2", "1", "1"],
         ["Juya", "1 + 2", "2", "1", "0"],
       ]);
-      expect(document.body.textContent).toContain("等待模型资源 1 项");
+      const occupancy = summary.querySelector<HTMLElement>('[data-testid="queue-model-resource-occupancy"]')!;
+      expect(occupancy.textContent).toContain("模型资源占用");
+      expect(occupancy.textContent).toContain("素材评分");
+      expect(occupancy.textContent).toContain("short_score");
+      expect(occupancy.querySelector("span")?.className).toContain("bg-violet-700");
+      expect(occupancy.querySelector("span:nth-child(2)")?.className).toContain("text-violet-900");
+      expect(occupancy.querySelector("span:nth-child(3)")?.className).toContain("bg-indigo-100");
+      const waiting = summary.querySelector<HTMLElement>('[data-testid="queue-model-resource-waiting"]')!;
+      expect(waiting.textContent?.replace(/\s/g, "")).toContain("等待模型资源1项");
+      expect(waiting.className).toContain("bg-amber-50");
+      expect(waiting.querySelector("strong")?.className).toContain("bg-amber-200");
       expect(document.body.textContent).toContain("手动优先");
       const cycleHistory = document.body.querySelector('[data-testid="queue-short-write-cycle-history"]');
       expect(document.body.querySelector('[data-testid="write-queue-history"]')?.contains(cycleHistory)).toBe(true);

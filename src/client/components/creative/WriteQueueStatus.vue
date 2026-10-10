@@ -250,8 +250,15 @@ onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbars));
                 </tbody>
               </table>
               <div v-if="shortWriteSchedule.wait_state" class="mt-1 text-amber-700">排程等待：{{ describeShortWriteWait() }}</div>
-              <div v-if="data.luna?.active">模型资源占用：{{ data.luna.label || data.luna.kind || '模型任务' }}<span v-if="data.luna.task_type"> · {{ data.luna.task_type }}</span></div>
-              <div v-if="(data.luna?.waiting_count ?? 0) > 0">等待模型资源 {{ data.luna?.waiting_count }} 项</div>
+              <div v-if="data.luna?.active" class="mt-2 flex flex-wrap items-center gap-1.5 rounded border border-violet-200 bg-violet-50 px-2 py-1 text-[10px]" data-testid="queue-model-resource-occupancy">
+                <span class="rounded bg-violet-700 px-1.5 py-0.5 font-semibold text-white">模型资源占用</span>
+                <span class="font-semibold text-violet-900">{{ data.luna.label || data.luna.kind || '模型任务' }}</span>
+                <span v-if="data.luna.task_type" class="rounded bg-indigo-100 px-1.5 py-0.5 font-mono font-semibold text-indigo-800">{{ data.luna.task_type }}</span>
+              </div>
+              <div v-if="(data.luna?.waiting_count ?? 0) > 0" class="mt-1 flex flex-wrap items-center gap-1 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] text-amber-900" data-testid="queue-model-resource-waiting">
+                <span class="font-semibold">等待模型资源</span>
+                <strong class="rounded bg-amber-200 px-1.5 py-0.5 text-amber-950">{{ data.luna?.waiting_count }} 项</strong>
+              </div>
               <div v-for="waiter in data.luna?.waiters ?? []" :key="waiter.request_id" class="text-amber-700">模型等待：{{ waiter.label || waiter.kind || waiter.task_type || '模型任务' }} · {{ waiter.priority === 'manual' ? '手动优先' : waiter.priority === 'model_operation' ? '评分/模型操作' : '自动写作' }}</div>
             </div>
             <section v-for="group in shortWritePeriodGroups" :key="group.batchStartedAt" class="write-queue-period-group" data-testid="queue-short-write-period">

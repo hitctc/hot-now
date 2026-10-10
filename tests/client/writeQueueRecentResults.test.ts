@@ -108,6 +108,7 @@ describe("写作队列最近逐篇结果", () => {
       ]);
       expect(widthSelect.props("popupClassName")).toBe("write-queue-width-dropdown");
       expect(widthSelect.props("dropdownStyle")).toEqual({ zIndex: 2100 });
+      expect(readFileSync("src/client/components/creative/WriteQueueStatus.vue", "utf8")).toMatch(/\.write-queue-width-select\.ant-select-single \.ant-select-selector \.ant-select-selection-item\s*\{[^}]*font-size: 12px;/);
 
       widthSelect.vm.$emit("change", 550);
       await flushPromises();

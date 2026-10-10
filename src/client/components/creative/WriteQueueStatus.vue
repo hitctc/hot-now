@@ -513,6 +513,9 @@ onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbars));
 .write-queue-width-select .ant-select-selector {
   border-radius: 6px !important;
 }
+.write-queue-width-select.ant-select-single .ant-select-selector .ant-select-selection-item {
+  font-size: 12px;
+}
 .write-queue-width-dropdown .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
   background: #eff6ff;
   color: #1677ff;

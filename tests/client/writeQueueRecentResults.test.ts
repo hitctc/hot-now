@@ -536,11 +536,11 @@ describe("写作队列最近逐篇结果", () => {
       expect(summary).toContain("手动优先");
       const cycleHistory = document.body.querySelector('[data-testid="queue-short-write-cycle-history"]');
       expect(document.body.querySelector('[data-testid="write-queue-history"]')?.contains(cycleHistory)).toBe(true);
-      expect(cycleHistory?.querySelector("h5")?.textContent).toContain("10/09 10:00");
       expect([...cycleHistory?.querySelectorAll("h6") ?? []].map((heading) => heading.textContent)).toEqual(["受理", "写成", "失败"]);
       expect(cycleHistory?.querySelector(".grid")).toBeNull();
-      expect(cycleHistory?.textContent).toContain("共 2");
-      expect(cycleHistory?.textContent).toContain("AI HOT 1");
+      expect(document.body.querySelector('[data-testid="queue-short-write-cycle-accepted"]')?.textContent).toContain("10/09 10:00");
+      expect(document.body.querySelector('[data-testid="queue-short-write-cycle-written"]')?.textContent).toContain("热搜 1 / AI HOT 1 / Juya 1");
+      expect(document.body.querySelector('[data-testid="queue-short-write-cycle-failed"]')?.textContent).toContain("10/09 10:00–10/09 11:00 2");
       expect(document.body.textContent).toContain("AI HOT 待写素材");
     } finally { wrapper.unmount(); }
   });

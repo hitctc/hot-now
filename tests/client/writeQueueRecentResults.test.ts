@@ -69,6 +69,10 @@ describe("写作队列最近逐篇结果", () => {
     try {
       await flushPromises();
       const dockButton = document.body.querySelector<HTMLButtonElement>(".write-queue-dock-toggle");
+      const widthSelect = document.body.querySelector<HTMLSelectElement>(".write-queue-width-select");
+      expect(widthSelect?.value).toBe("350");
+      expect(widthSelect?.nextElementSibling).toBe(dockButton);
+      expect(document.body.querySelector(".write-queue-width-picker")).toBeNull();
       expect(dockButton?.nextElementSibling?.classList.contains("write-queue-refresh")).toBe(true);
       expect(dockButton?.getAttribute("aria-label")).toBe("嵌入到页面右侧");
 
@@ -95,9 +99,12 @@ describe("写作队列最近逐篇结果", () => {
       const panel = document.body.querySelector<HTMLElement>(".write-queue-float--embedded");
       expect(panel?.parentElement).not.toBe(document.body);
       expect(panel?.style.getPropertyValue("--write-queue-width")).toBe("450px");
-      expect(panel?.querySelectorAll("[data-queue-width]")).toHaveLength(4);
+      const widthSelect = panel?.querySelector<HTMLSelectElement>(".write-queue-width-select")!;
+      expect(widthSelect.value).toBe("450");
+      expect(widthSelect.options).toHaveLength(4);
 
-      panel?.querySelector<HTMLButtonElement>('[data-queue-width="550"]')?.click();
+      widthSelect.value = "550";
+      widthSelect.dispatchEvent(new Event("change", { bubbles: true }));
       await flushPromises();
       expect(panel?.style.getPropertyValue("--write-queue-width")).toBe("550px");
       expect(settingsApi.saveWriteQueuePreferences).toHaveBeenLastCalledWith({ embedded: true, width: 550, expanded: true });
@@ -150,6 +157,11 @@ describe("写作队列最近逐篇结果", () => {
       expect(candidates.textContent).toContain("自动候选 · 第 3 位");
       expect(candidates.textContent).not.toContain("已在实际队列中的标题");
       expect(body.querySelectorAll(".write-queue-candidate")).toHaveLength(2);
+      const pendingCandidate = [...body.querySelectorAll<HTMLElement>(".write-queue-candidate")].find((candidate) => candidate.textContent?.includes("投递确认中"))!;
+      const pendingPosition = pendingCandidate.querySelector(".write-queue-candidate-position");
+      const pendingPlatform = [...pendingCandidate.querySelectorAll(".write-queue-candidate-source")].find((source) => source.textContent === "来源甲");
+      expect(pendingPosition?.parentElement?.classList.contains("write-queue-candidate-row")).toBe(true);
+      expect(pendingPlatform?.parentElement).toBe(pendingPosition?.parentElement);
       expect(body.querySelector(".write-queue-list")!.compareDocumentPosition(candidates) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(candidates.compareDocumentPosition(body.querySelector(".write-queue-history")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
@@ -182,7 +194,7 @@ describe("写作队列最近逐篇结果", () => {
       current: {
         ...queueStatus.recent[1]!, task_id: "auto-writing", priority: "normal", source_item_id: 211,
         source_external_id: "writing-item", task_kind: "short_content_auto", status: "writing",
-        source_item_title: "本周期正在写作素材",
+        source_item_title: "本周期正在写作素材", source_item_source_name: "来源甲",
       },
       queue: [{
         ...queueStatus.recent[1]!, task_id: "manual-short", priority: "high", source_item_id: 212,
@@ -203,6 +215,11 @@ describe("写作队列最近逐篇结果", () => {
       expect(periods[0]!.textContent).toContain("正在写作");
       expect(periods[0]!.querySelectorAll(".write-queue-candidate-position--writing")).toHaveLength(1);
       expect(periods[0]!.querySelector(".write-queue-candidate-position--writing")?.textContent).toBe("正在写作");
+      const writingCandidate = periods[0]!.querySelector<HTMLElement>(".write-queue-candidate")!;
+      const writingPosition = writingCandidate.querySelector(".write-queue-candidate-position--writing");
+      const writingPlatform = [...writingCandidate.querySelectorAll(".write-queue-candidate-source")].find((source) => source.textContent === "来源甲");
+      expect(writingPlatform?.parentElement).toBe(writingPosition?.parentElement);
+      expect(writingPosition?.parentElement?.classList.contains("write-queue-candidate-row")).toBe(true);
       const queueSource = readFileSync("src/client/components/creative/WriteQueueStatus.vue", "utf8");
       expect(queueSource).toMatch(/\.write-queue-candidate-position--writing\s*\{[^}]*background: #dbeafe;[^}]*color: #1d4ed8;[^}]*font-size: 11px;[^}]*font-weight: 700;/);
       expect(queueSource).toContain(".write-queue-candidate-position--writing::before");
@@ -265,10 +282,11 @@ describe("写作队列最近逐篇结果", () => {
       const refresh = document.body.querySelector<HTMLButtonElement>(".write-queue-refresh")!;
       expect(refresh.getAttribute("aria-label")).toBe("刷新文章队列");
       const headerActions = document.body.querySelector(".write-queue-header-actions")!;
-      expect([...headerActions.children].map(button => button.getAttribute("aria-label"))).toEqual(["嵌入到页面右侧", "刷新文章队列", "收起文章队列"]);
+      expect(headerActions.children[0]?.tagName).toBe("SELECT");
+      expect([...headerActions.children].slice(1).map(button => button.getAttribute("aria-label"))).toEqual(["嵌入到页面右侧", "刷新文章队列", "收起文章队列"]);
       expect(headerActions.closest(".write-queue-header")).not.toBeNull();
-      expect([...headerActions.children].every(button => button.classList.contains("write-queue-control"))).toBe(true);
-      expect(headerActions.children[0]?.nextElementSibling).toBe(refresh);
+      expect([...headerActions.children].slice(1).every(button => button.classList.contains("write-queue-control"))).toBe(true);
+      expect(headerActions.children[1]?.nextElementSibling).toBe(refresh);
       expect(document.body.querySelector(".write-queue-footer button")).toBeNull();
       refresh.click();
       await flushPromises();
@@ -374,7 +392,7 @@ describe("写作队列最近逐篇结果", () => {
     expect(source).toMatch(/\.write-queue-body\s*\{[^}]*height: 100%;[^}]*min-height: 0;[^}]*overflow-y: auto;/);
     expect(source).toContain('<Teleport to="body" :disabled="embedded">');
     expect(source).toMatch(/@media \(min-width: 901px\)\s*\{[^}]*\.write-queue-float--embedded\s*\{[^}]*flex: 0 0 var\(--write-queue-width\);[^}]*width: var\(--write-queue-width\);/);
-    expect(source).toMatch(/@media \(max-width: 900px\)\s*\{\s*\.write-queue-dock-toggle,\s*\.write-queue-width-picker\s*\{\s*display: none;/);
+    expect(source).toMatch(/@media \(max-width: 900px\)\s*\{\s*\.write-queue-dock-toggle,\s*\.write-queue-width-select\s*\{\s*display: none;/);
     const mobile = source.split("@media (max-width: 768px)")[1] ?? "";
     expect(mobile).toContain("100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 8px");
     expect(mobile).toContain("bottom: env(safe-area-inset-bottom, 0px)");

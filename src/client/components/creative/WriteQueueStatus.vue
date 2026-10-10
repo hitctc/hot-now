@@ -107,6 +107,13 @@ onMounted(() => {
 });
 onUpdated(syncQueueScrollbars);
 onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbars));
+
+/** 读取宽度下拉框的像素值并沿用账号偏好保存逻辑，不改变当前嵌入状态。 */
+function handleQueueWidthChange(event: Event): void {
+  const select = event.currentTarget;
+  if (!(select instanceof HTMLSelectElement)) return;
+  setQueueWidth(Number(select.value));
+}
 </script>
 
 <template>
@@ -135,22 +142,13 @@ onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbars));
         <div class="write-queue-header">
           <span class="text-xs font-semibold text-editorial-text-body">Luna 文章队列</span>
           <div class="write-queue-header-actions">
+            <select class="write-queue-width-select" :value="queueWidth" aria-label="文章队列宽度" title="调整文章队列宽度" @change="handleQueueWidthChange">
+              <option v-for="width in writeQueueWidths" :key="width" :value="width">{{ width }}px</option>
+            </select>
             <button type="button" class="write-queue-control write-queue-dock-toggle" :aria-label="embedded ? '取消右侧嵌入' : '嵌入到页面右侧'" :title="embedded ? '取消右侧嵌入' : '嵌入到页面右侧'" :aria-pressed="embedded" @click.stop="toggleEmbedded">{{ embedded ? "⇥" : "⇤" }}</button>
             <button type="button" class="write-queue-control write-queue-refresh" aria-label="刷新文章队列" :aria-busy="loading" :disabled="loading" @click.stop="refresh">{{ loading ? "…" : "↻" }}</button>
             <button type="button" class="write-queue-control write-queue-close" aria-label="收起文章队列" @click="toggleExpand">✕</button>
           </div>
-        </div>
-
-        <div v-if="embedded" class="write-queue-width-picker" aria-label="文章队列侧栏宽度">
-          <span>宽度</span>
-          <button
-            v-for="width in writeQueueWidths"
-            :key="width"
-            type="button"
-            :data-queue-width="width"
-            :aria-pressed="queueWidth === width"
-            @click.stop="setQueueWidth(width)"
-          >{{ width }}px</button>
         </div>
 
         <!-- 只滚动任务内容，刷新、收起和统计不随长记录移出可视区。 -->
@@ -280,9 +278,9 @@ onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbars));
                   >
                     {{ entry.task.status === "writing" ? "正在写作" : entry.queuePosition ? `实际队列第 ${entry.queuePosition} 位` : "实际队列中 · 待写作" }}
                   </span>
+                  <span v-if="entry.task.source_item_source_name" class="write-queue-candidate-source">{{ entry.task.source_item_source_name }}</span>
                   <button class="write-queue-link" :disabled="Boolean(cancellingTaskId)" @click.stop="cancelTask(entry.task)">取消</button>
                 </div>
-                <div v-if="entry.task.source_item_source_name" class="write-queue-candidate-source">{{ entry.task.source_item_source_name }}</div>
                 <div class="write-queue-candidate-source">{{ entry.task.status === "writing" ? describeCurrentTask(entry.task, data?.luna, elapsedNow, statusReceivedAt) : describeQueuedTask(entry.task, data?.luna, elapsedNow) }}</div>
               </div>
               <div v-for="candidate in group.candidates" :key="candidate.source_external_id || candidate.item_id" class="write-queue-candidate">
@@ -296,9 +294,9 @@ onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbars));
                       ? `投递确认中 · 候选第 ${candidate.position} 位`
                       : `自动候选 · 第 ${candidate.position} 位` }}
                   </span>
+                  <span v-if="candidate.source_item_source_name" class="write-queue-candidate-source">{{ candidate.source_item_source_name }}</span>
                 </div>
-                <div v-if="candidate.source_item_source_name" class="write-queue-candidate-source">{{ candidate.source_item_source_name }}</div>
-                <div v-else-if="!candidate.hotnow_source_item_id && candidate.source_external_id" class="write-queue-candidate-source">素材关联暂不可用 · {{ candidate.source_external_id }}</div>
+                <div v-if="!candidate.source_item_source_name && !candidate.hotnow_source_item_id && candidate.source_external_id" class="write-queue-candidate-source">素材关联暂不可用 · {{ candidate.source_external_id }}</div>
               </div>
               <div v-if="group.tasks.length === 0 && group.candidates.length === 0" class="write-queue-candidate-empty">
                 <template v-if="group.isCurrent && !shortWriteSchedule.prepared">当前批次候选仍在整理中</template>
@@ -501,33 +499,23 @@ onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbars));
   flex-shrink: 0;
   gap: 4px;
 }
-.write-queue-width-picker {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 4px;
-  border-bottom: 1px solid #f0f0f0;
-  padding: 4px 8px;
-  color: #6b7280;
-  font-size: 10px;
-}
-.write-queue-width-picker button {
-  flex: 1 1 0;
-  min-width: 0;
+.write-queue-width-select {
+  box-sizing: border-box;
+  flex: 0 0 76px;
+  width: 76px;
+  height: 44px;
   border: 1px solid #e5e7eb;
-  border-radius: 4px;
+  border-radius: 6px;
   background: #fff;
-  padding: 3px 1px;
-  color: #6b7280;
-  font-size: 10px;
+  padding: 0 5px;
+  color: #4b5563;
+  font-size: 11px;
   cursor: pointer;
 }
-.write-queue-width-picker button[aria-pressed="true"] {
-  border-color: #1677ff;
-  background: #eff6ff;
-  color: #1677ff;
+.write-queue-width-select:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 1px;
 }
-.write-queue-width-picker button:hover { background: #f3f4f6; }
 /* 两个头部操作共用尺寸、边框和交互样式，只保留不同图标与行为。 */
 .write-queue-control {
   display: flex;
@@ -811,11 +799,10 @@ onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbars));
     height: 40px;
     transform: translateY(-50%);
   }
-  .write-queue-float--embedded .write-queue-width-picker button { white-space: nowrap; }
 }
 @media (max-width: 900px) {
   .write-queue-dock-toggle,
-  .write-queue-width-picker { display: none; }
+  .write-queue-width-select { display: none; }
 }
 @media (max-width: 768px) {
   /* 动态视口适应浏览器工具栏伸缩，安全区给刘海和底部手势条留出空间。 */

@@ -175,11 +175,6 @@ const {
               <div v-if="(data.luna?.waiting_count ?? 0) > 0">等待模型资源 {{ data.luna?.waiting_count }} 项</div>
               <div v-for="waiter in data.luna?.waiters ?? []" :key="waiter.request_id" class="text-amber-700">模型等待：{{ waiter.label || waiter.kind || waiter.task_type || '模型任务' }} · {{ waiter.priority === 'manual' ? '手动优先' : waiter.priority === 'model_operation' ? '评分/模型操作' : '自动写作' }}</div>
             </div>
-            <div v-if="shortWriteCycleRecords.length" class="space-y-0.5 rounded border border-gray-100 px-2 py-1 text-[9px] text-editorial-text-muted" data-testid="queue-short-write-cycle-history">
-              <div v-for="period in shortWriteCycleRecords.slice(0, 8)" :key="period.started_at">
-                {{ formatShortBatchPeriod(period.started_at, period.collection_interval_minutes ?? 60, period.ended_at) }} · 热搜受理 {{ period.hot_accepted_count ?? 0 }} · 写成 热搜 {{ period.written?.hot ?? 0 }} / AI HOT {{ period.written?.aihot ?? 0 }} / Juya {{ period.written?.juya ?? 0 }} · 失败 {{ (period.failed?.hot ?? 0) + (period.failed?.aihot ?? 0) + (period.failed?.juya ?? 0) }}
-              </div>
-            </div>
             <section v-for="group in shortWritePeriodGroups" :key="group.batchStartedAt" class="write-queue-period-group" data-testid="queue-short-write-period">
               <div class="write-queue-candidate-heading">
                 <span>{{ group.isCurrent ? "当前自动短写周期" : "自动短写周期" }}</span>
@@ -235,10 +230,33 @@ const {
         </div>
 
         <!-- 持久化终态历史：按北京时间 00:00–23:59 分组，服务重启后仍可查看。 -->
-        <div v-if="historyGroups.length" class="write-queue-history mt-2 border-t border-gray-100 pt-1" data-testid="write-queue-history">
+        <div v-if="historyGroups.length || shortWriteCycleRecords.length" class="write-queue-history mt-2 border-t border-gray-100 pt-1" data-testid="write-queue-history">
           <div class="mb-1 flex items-center justify-between text-[10px] font-medium text-editorial-text-muted">
             <span>写作记录（最近结果）</span>
             <span>北京时间 00:00–23:59</span>
+          </div>
+          <div v-if="shortWriteCycleRecords.length" class="space-y-1" data-testid="queue-short-write-cycle-history">
+            <section v-for="period in shortWriteCycleRecords.slice(0, 8)" :key="period.started_at" class="rounded border border-gray-100 px-2 py-1.5 text-[9px] text-editorial-text-muted">
+              <h5 class="mb-1 text-[10px] font-semibold text-editorial-text">{{ formatShortBatchPeriod(period.started_at, period.collection_interval_minutes ?? 60, period.ended_at) }}</h5>
+              <div class="grid grid-cols-3 gap-2">
+                <div>
+                  <h6 class="mb-0.5 font-medium text-editorial-text-muted">受理</h6>
+                  <div>热搜 {{ period.hot_accepted_count ?? 0 }}</div>
+                </div>
+                <div>
+                  <h6 class="mb-0.5 font-medium text-editorial-text-muted">写成</h6>
+                  <div>热搜 {{ period.written?.hot ?? 0 }}</div>
+                  <div>AI HOT {{ period.written?.aihot ?? 0 }}</div>
+                  <div>Juya {{ period.written?.juya ?? 0 }}</div>
+                </div>
+                <div>
+                  <h6 class="mb-0.5 font-medium text-editorial-text-muted">失败</h6>
+                  <div>热搜 {{ period.failed?.hot ?? 0 }}</div>
+                  <div>AI HOT {{ period.failed?.aihot ?? 0 }}</div>
+                  <div>Juya {{ period.failed?.juya ?? 0 }}</div>
+                </div>
+              </div>
+            </section>
           </div>
           <section v-for="group in historyGroups" :key="group.date" class="write-queue-day-group">
             <h4 class="write-queue-day-label">{{ formatHistoryDate(group.date, group.items) }}</h4>

@@ -534,7 +534,11 @@ describe("写作队列最近逐篇结果", () => {
       expect(summary).toContain("AI HOT：结转 4 + 新增 3");
       expect(summary).toContain("等待模型资源 1 项");
       expect(summary).toContain("手动优先");
-      expect(document.body.querySelector('[data-testid="queue-short-write-cycle-history"]')?.textContent).toContain("写成 热搜 1 / AI HOT 1 / Juya 1");
+      const cycleHistory = document.body.querySelector('[data-testid="queue-short-write-cycle-history"]');
+      expect(document.body.querySelector('[data-testid="write-queue-history"]')?.contains(cycleHistory)).toBe(true);
+      expect(cycleHistory?.querySelector("h5")?.textContent).toContain("10/09 10:00");
+      expect([...cycleHistory?.querySelectorAll("h6") ?? []].map((heading) => heading.textContent)).toEqual(["受理", "写成", "失败"]);
+      expect(cycleHistory?.textContent).toContain("AI HOT 1");
       expect(document.body.textContent).toContain("AI HOT 待写素材");
     } finally { wrapper.unmount(); }
   });

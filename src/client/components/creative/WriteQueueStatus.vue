@@ -236,24 +236,20 @@ const {
             <span>北京时间 00:00–23:59</span>
           </div>
           <div v-if="shortWriteCycleRecords.length" class="space-y-1" data-testid="queue-short-write-cycle-history">
-            <section v-for="period in shortWriteCycleRecords.slice(0, 8)" :key="period.started_at" class="rounded border border-gray-100 px-2 py-1.5 text-[9px] text-editorial-text-muted">
+            <section v-for="period in shortWriteCycleRecords.slice(0, 8)" :key="period.started_at" class="border-b border-gray-100 py-1 text-[9px] text-editorial-text-muted">
               <h5 class="mb-1 text-[10px] font-semibold text-editorial-text">{{ formatShortBatchPeriod(period.started_at, period.collection_interval_minutes ?? 60, period.ended_at) }}</h5>
-              <div class="grid grid-cols-3 gap-2">
+              <div class="space-y-1">
                 <div>
-                  <h6 class="mb-0.5 font-medium text-editorial-text-muted">受理</h6>
-                  <div>热搜 {{ period.hot_accepted_count ?? 0 }}</div>
+                  <h6 class="font-medium text-editorial-text-muted">受理</h6>
+                  <p class="m-0">热搜 {{ period.hot_accepted_count ?? 0 }}</p>
                 </div>
                 <div>
-                  <h6 class="mb-0.5 font-medium text-editorial-text-muted">写成</h6>
-                  <div>热搜 {{ period.written?.hot ?? 0 }}</div>
-                  <div>AI HOT {{ period.written?.aihot ?? 0 }}</div>
-                  <div>Juya {{ period.written?.juya ?? 0 }}</div>
+                  <h6 class="font-medium text-editorial-text-muted">写成</h6>
+                  <p class="m-0">热搜 {{ period.written?.hot ?? 0 }} / AI HOT {{ period.written?.aihot ?? 0 }} / Juya {{ period.written?.juya ?? 0 }}</p>
                 </div>
                 <div>
-                  <h6 class="mb-0.5 font-medium text-editorial-text-muted">失败</h6>
-                  <div>热搜 {{ period.failed?.hot ?? 0 }}</div>
-                  <div>AI HOT {{ period.failed?.aihot ?? 0 }}</div>
-                  <div>Juya {{ period.failed?.juya ?? 0 }}</div>
+                  <h6 class="font-medium text-editorial-text-muted">失败</h6>
+                  <p class="m-0">共 {{ (period.failed?.hot ?? 0) + (period.failed?.aihot ?? 0) + (period.failed?.juya ?? 0) }}（热搜 {{ period.failed?.hot ?? 0 }} / AI HOT {{ period.failed?.aihot ?? 0 }} / Juya {{ period.failed?.juya ?? 0 }}）</p>
                 </div>
               </div>
             </section>

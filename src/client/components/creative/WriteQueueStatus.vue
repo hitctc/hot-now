@@ -5,6 +5,7 @@
   15 秒自动刷新 + 手动刷新
 -->
 <script setup lang="ts">
+import { computed, onMounted, onUnmounted, onUpdated, ref } from "vue";
 import { Modal as AModal } from "ant-design-vue";
 import ArticleDetailDrawer from "./LazyArticleDetailDrawer.vue";
 import SourceItemDetailModal from "./LazySourceItemDetailModal.vue";
@@ -60,6 +61,39 @@ const {
   describeCurrentTask,
 } = useWriteQueueStatus();
 
+const queueBodyRef = ref<HTMLDivElement | null>(null);
+const queueScrollMetrics = ref({ scrollTop: 0, clientHeight: 0, scrollHeight: 0 });
+const queueScrollbarThumbStyle = computed(() => {
+  const { scrollTop, clientHeight, scrollHeight } = queueScrollMetrics.value;
+  if (clientHeight <= 0 || scrollHeight <= clientHeight) return { top: "0%", height: "100%" };
+
+  const thumbHeight = Math.min(100, Math.max(16 / clientHeight * 100, clientHeight / scrollHeight * 100));
+  const maxThumbTop = 100 - thumbHeight;
+  const top = Math.max(0, Math.min(maxThumbTop, scrollTop / (scrollHeight - clientHeight) * maxThumbTop));
+  return { top: `${top}%`, height: `${thumbHeight}%` };
+});
+
+/** 读取队列主滚动区尺寸和位置，供常驻滑轨显示，不改变原生滚动行为。 */
+function syncQueueScrollbar(): void {
+  const body = queueBodyRef.value;
+  if (!body) return;
+
+  const next = {
+    scrollTop: body.scrollTop,
+    clientHeight: body.clientHeight,
+    scrollHeight: body.scrollHeight,
+  };
+  const current = queueScrollMetrics.value;
+  if (current.scrollTop === next.scrollTop && current.clientHeight === next.clientHeight && current.scrollHeight === next.scrollHeight) return;
+  queueScrollMetrics.value = next;
+}
+
+onMounted(() => {
+  syncQueueScrollbar();
+  window.addEventListener("resize", syncQueueScrollbar);
+});
+onUpdated(syncQueueScrollbar);
+onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbar));
 </script>
 
 <template>
@@ -107,7 +141,8 @@ const {
         </div>
 
         <!-- 只滚动任务内容，刷新、收起和统计不随长记录移出可视区。 -->
-        <div class="write-queue-body">
+        <div class="write-queue-body-shell">
+        <div ref="queueBodyRef" class="write-queue-body" @scroll="syncQueueScrollbar">
         <!-- 当前任务 -->
         <div v-if="visibleCurrentTask" class="write-queue-current">
           <div class="flex flex-wrap items-center gap-x-1 gap-y-0">
@@ -308,7 +343,15 @@ const {
             </div>
           </section>
         </div>
-
+        </div>
+        <div
+          v-if="queueScrollMetrics.scrollHeight > queueScrollMetrics.clientHeight"
+          class="write-queue-scrollbar"
+          data-testid="queue-scrollbar"
+          aria-hidden="true"
+        >
+          <div class="write-queue-scrollbar-thumb" :style="queueScrollbarThumbStyle" />
+        </div>
         </div>
 
         <!-- 固定统计栏 -->
@@ -478,12 +521,38 @@ const {
 .write-queue-float ::-webkit-scrollbar-thumb:hover {
   background-color: #2563eb;
 }
+/* 外层保留主滚动区的高度；绝对定位的指示轨道不参与内容布局。 */
+.write-queue-body-shell {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
 /* 必须允许中间弹性项缩小到内容高度以下，否则长记录仍会撑破整个浮窗。 */
 .write-queue-body {
-  flex: 1 1 auto;
+  height: 100%;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+.write-queue-scrollbar {
+  position: absolute;
+  z-index: 2;
+  top: 4px;
+  right: 2px;
+  bottom: 4px;
+  width: 4px;
+  border-radius: 4px;
+  background: #f3f4f6;
+  pointer-events: none;
+}
+.write-queue-scrollbar-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  min-height: 16px;
+  border-radius: 4px;
+  background: #60a5fa;
 }
 .write-queue-current {
   display: flex;

@@ -285,6 +285,34 @@ describe("写作队列最近逐篇结果", () => {
       expect(document.body.querySelector(".write-queue-dot-btn")).not.toBeNull();
     } finally { wrapper.unmount(); }
   });
+  it("队列主滚动区常驻显示4px指示轨道并同步滑块位置", async () => {
+    window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
+    vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue(queueStatus);
+    const wrapper = mount(WriteQueueStatus, { attachTo: document.body, global: { stubs: { SourceItemDetailModal: true, ArticleDetailDrawer: true } } });
+    try {
+      await flushPromises();
+      const body = document.body.querySelector<HTMLElement>(".write-queue-body")!;
+      // JSDOM 无法呈现系统原生滚动条，直接锁定独立滑轨在无悬停时存在并跟随真实滚动位置。
+      Object.defineProperties(body, {
+        clientHeight: { configurable: true, value: 200 },
+        scrollHeight: { configurable: true, value: 1000 },
+        scrollTop: { configurable: true, writable: true, value: 0 },
+      });
+      body.dispatchEvent(new Event("scroll"));
+      await wrapper.vm.$nextTick();
+      const rail = document.body.querySelector<HTMLElement>('[data-testid="queue-scrollbar"]')!;
+      const thumb = rail.querySelector<HTMLElement>(".write-queue-scrollbar-thumb")!;
+      expect(rail.getAttribute("aria-hidden")).toBe("true");
+      expect(thumb.style.height).toBe("20%");
+      expect(thumb.style.top).toBe("0%");
+
+      body.scrollTop = 400;
+      body.dispatchEvent(new Event("scroll"));
+      await wrapper.vm.$nextTick();
+      expect(thumb.style.top).toBe("40%");
+    } finally { wrapper.unmount(); }
+  });
+
   it("桌面嵌入侧栏填满视口，队列区使用剩余高度滚动", () => {
     const source = readFileSync("src/client/components/creative/WriteQueueStatus.vue", "utf8");
     const embedded = source.match(/\.write-queue-float--embedded\s*\{([^}]*)\}/)?.[1] ?? "";
@@ -298,14 +326,16 @@ describe("写作队列最近逐篇结果", () => {
     expect(embedded).toMatch(/^\s*height: 100dvh;$/m);
     expect(embedded).toContain("max-height: 100dvh;");
     expect(source).toMatch(/\.write-queue-float--embedded \.write-queue-history\s*\{[^}]*max-height: none;/);
-    expect(source).toMatch(/\.write-queue-body\s*\{[^}]*flex: 1 1 auto;[^}]*min-height: 0;[^}]*overflow-y: auto;/);
+    expect(source).toMatch(/\.write-queue-body-shell\s*\{[^}]*flex: 1 1 auto;[^}]*min-height: 0;/);
+    expect(source).toMatch(/\.write-queue-body\s*\{[^}]*height: 100%;[^}]*min-height: 0;[^}]*overflow-y: auto;/);
   });
 
   it("移动端限制动态视口高度，多状态只在中间滚动且头尾操作保持可见", async () => {
     const source = readFileSync("src/client/components/creative/WriteQueueStatus.vue", "utf8");
     // DOM 测试不计算手机实际像素，断言动态高度、安全区及唯一内容滚动区的约束。
     expect(source).toMatch(/\.write-queue-float\s*\{[^}]*display: flex;[^}]*flex-direction: column;[^}]*overflow: hidden;/);
-    expect(source).toMatch(/\.write-queue-body\s*\{[^}]*flex: 1 1 auto;[^}]*min-height: 0;[^}]*overflow-y: auto;/);
+    expect(source).toMatch(/\.write-queue-body-shell\s*\{[^}]*flex: 1 1 auto;[^}]*min-height: 0;/);
+    expect(source).toMatch(/\.write-queue-body\s*\{[^}]*height: 100%;[^}]*min-height: 0;[^}]*overflow-y: auto;/);
     expect(source).toContain('<Teleport to="body" :disabled="embedded">');
     expect(source).toMatch(/@media \(min-width: 901px\)\s*\{[^}]*\.write-queue-float--embedded\s*\{[^}]*flex: 0 0 var\(--write-queue-width\);[^}]*width: var\(--write-queue-width\);/);
     expect(source).toMatch(/@media \(max-width: 900px\)\s*\{\s*\.write-queue-dock-toggle,\s*\.write-queue-width-picker\s*\{\s*display: none;/);
@@ -329,8 +359,10 @@ describe("写作队列最近逐篇结果", () => {
       for (const selector of [".write-queue-current", ".write-queue-list", ".write-queue-history", ".write-queue-delay"]) {
         expect(body.querySelector(selector)).not.toBeNull();
       }
-      expect(body.previousElementSibling?.classList.contains("write-queue-header")).toBe(true);
-      expect(body.nextElementSibling?.classList.contains("write-queue-footer")).toBe(true);
+      const bodyShell = body.parentElement!;
+      expect(bodyShell.classList.contains("write-queue-body-shell")).toBe(true);
+      expect(bodyShell.previousElementSibling?.classList.contains("write-queue-header")).toBe(true);
+      expect(bodyShell.nextElementSibling?.classList.contains("write-queue-footer")).toBe(true);
       expect(body.textContent).toContain("Luna 调用失败");
       expect(body.querySelectorAll(".write-queue-task")).toHaveLength(30);
       expect(body.querySelectorAll(".write-queue-history-item")).toHaveLength(40);

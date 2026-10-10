@@ -541,7 +541,13 @@ describe("写作队列最近逐篇结果", () => {
       expect([...cycleHistory?.querySelectorAll("thead th") ?? []].map((heading) => heading.textContent)).toEqual([
         "时段", "热搜受理", "写成（热搜 / AI HOT / Juya）", "失败",
       ]);
-      expect(cycleHistory?.querySelector("table")?.className).toContain("min-w-[560px]");
+      const cycleTable = cycleHistory?.querySelector("table");
+      expect(cycleTable?.className).toContain("w-max");
+      expect(cycleTable?.className).not.toContain("w-full");
+      expect(cycleTable?.className).not.toContain("min-w-[560px]");
+      const cells = [...cycleTable?.querySelectorAll("th, td") ?? []];
+      expect(cells.length).toBeGreaterThan(0);
+      expect(cells.every((cell) => cell.className.includes("px-[3px]"))).toBe(true);
       const cycleRow = cycleHistory?.querySelector("tbody tr");
       expect(cycleRow?.textContent).toContain("10/09 10:00–10/09 11:00");
       expect(cycleRow?.textContent).toContain("1 / 1 / 1");

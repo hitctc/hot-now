@@ -237,21 +237,21 @@ const {
           </div>
           <!-- 限制周期表格高度并在内部滚动，避免历史记录挤占队列其他内容。 -->
           <div v-if="shortWriteCycleRecords.length" class="max-h-32 overflow-auto rounded border border-gray-100" data-testid="queue-short-write-cycle-history">
-            <table class="min-w-[560px] w-full border-collapse text-left text-[9px] text-editorial-text-muted">
+            <table class="w-max border-collapse text-left text-[9px] text-editorial-text-muted">
               <thead class="sticky top-0 z-10 bg-gray-50">
                 <tr>
-                  <th scope="col" class="whitespace-nowrap px-2 py-1 font-semibold">时段</th>
-                  <th scope="col" class="whitespace-nowrap px-2 py-1 font-semibold">热搜受理</th>
-                  <th scope="col" class="whitespace-nowrap px-2 py-1 font-semibold">写成（热搜 / AI HOT / Juya）</th>
-                  <th scope="col" class="whitespace-nowrap px-2 py-1 font-semibold">失败</th>
+                  <th scope="col" class="whitespace-nowrap px-[3px] py-1 font-semibold">时段</th>
+                  <th scope="col" class="whitespace-nowrap px-[3px] py-1 font-semibold">热搜受理</th>
+                  <th scope="col" class="whitespace-nowrap px-[3px] py-1 font-semibold">写成（热搜 / AI HOT / Juya）</th>
+                  <th scope="col" class="whitespace-nowrap px-[3px] py-1 font-semibold">失败</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="period in shortWriteCycleRecords.slice(0, 8)" :key="period.started_at" class="border-t border-gray-100">
-                  <td class="whitespace-nowrap px-2 py-1">{{ formatShortBatchPeriod(period.started_at, period.collection_interval_minutes ?? 60, period.ended_at) }}</td>
-                  <td class="whitespace-nowrap px-2 py-1">{{ period.hot_accepted_count ?? 0 }}</td>
-                  <td class="whitespace-nowrap px-2 py-1">{{ period.written?.hot ?? 0 }} / {{ period.written?.aihot ?? 0 }} / {{ period.written?.juya ?? 0 }}</td>
-                  <td class="whitespace-nowrap px-2 py-1">{{ (period.failed?.hot ?? 0) + (period.failed?.aihot ?? 0) + (period.failed?.juya ?? 0) }}</td>
+                  <td class="whitespace-nowrap px-[3px] py-1">{{ formatShortBatchPeriod(period.started_at, period.collection_interval_minutes ?? 60, period.ended_at) }}</td>
+                  <td class="whitespace-nowrap px-[3px] py-1">{{ period.hot_accepted_count ?? 0 }}</td>
+                  <td class="whitespace-nowrap px-[3px] py-1">{{ period.written?.hot ?? 0 }} / {{ period.written?.aihot ?? 0 }} / {{ period.written?.juya ?? 0 }}</td>
+                  <td class="whitespace-nowrap px-[3px] py-1">{{ (period.failed?.hot ?? 0) + (period.failed?.aihot ?? 0) + (period.failed?.juya ?? 0) }}</td>
                 </tr>
               </tbody>
             </table>

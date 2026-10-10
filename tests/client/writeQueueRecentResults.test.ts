@@ -285,31 +285,67 @@ describe("写作队列最近逐篇结果", () => {
       expect(document.body.querySelector(".write-queue-dot-btn")).not.toBeNull();
     } finally { wrapper.unmount(); }
   });
-  it("队列主滚动区常驻显示4px指示轨道并同步滑块位置", async () => {
+  it("文章队列各滚动区默认显示4px指示轨道并同步滑块位置", async () => {
     window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
-    vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue(queueStatus);
+    vi.spyOn(creativeApi, "readShortWriteSchedule").mockResolvedValue({
+      ...EMPTY_SHORT_WRITE_SCHEDULE,
+      batch_started_at: "2026-10-09T10:00:00+08:00",
+      prepared: true,
+      candidates: Array.from({ length: 20 }, (_, index) => ({
+        item_id: index + 1,
+        source_external_id: `candidate-${index + 1}`,
+        position: index + 1,
+        source_item_title: `自动短写候选 ${index + 1}`,
+      })),
+      periods: Array.from({ length: 8 }, (_, index) => ({
+        started_at: `2026-10-${String(9 - Math.floor(index / 24)).padStart(2, "0")}T${String(10 - index).padStart(2, "0")}:00:00+08:00`,
+        collection_interval_minutes: 60,
+        hot_accepted_count: index + 1,
+      })),
+    });
+    vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue({
+      ...queueStatus,
+      history: Array.from({ length: 40 }, (_, index) => ({
+        ...queueStatus.recent[0]!,
+        task_id: `history-${index}`,
+        finished_at: `2026-10-09T${String(index % 24).padStart(2, "0")}:00:00+08:00`,
+      })),
+    });
     const wrapper = mount(WriteQueueStatus, { attachTo: document.body, global: { stubs: { SourceItemDetailModal: true, ArticleDetailDrawer: true } } });
     try {
       await flushPromises();
-      const body = document.body.querySelector<HTMLElement>(".write-queue-body")!;
-      // JSDOM 无法呈现系统原生滚动条，直接锁定独立滑轨在无悬停时存在并跟随真实滚动位置。
-      Object.defineProperties(body, {
-        clientHeight: { configurable: true, value: 200 },
-        scrollHeight: { configurable: true, value: 1000 },
-        scrollTop: { configurable: true, writable: true, value: 0 },
+      const regions = [
+        [".write-queue-body", "queue-scrollbar"],
+        [".write-queue-candidates", "queue-candidates-scrollbar"],
+        [".write-queue-history", "queue-history-scrollbar"],
+        ["[data-testid=\"queue-short-write-cycle-history\"]", "queue-cycle-history-scrollbar"],
+      ] as const;
+      const elements = regions.map(([selector]) => document.body.querySelector<HTMLElement>(selector)!);
+      // JSDOM 不绘制系统滚动条；模拟真实溢出，确认每个独立区域在无悬停时都有滑轨。
+      for (const element of elements) {
+        Object.defineProperties(element, {
+          clientHeight: { configurable: true, value: 100 },
+          scrollHeight: { configurable: true, value: 500 },
+          scrollTop: { configurable: true, writable: true, value: 0 },
+        });
+      }
+      elements[0]!.dispatchEvent(new Event("scroll"));
+      await wrapper.vm.$nextTick();
+      const thumbs = regions.map(([, testId]) => {
+        const rail = document.body.querySelector<HTMLElement>(`[data-testid="${testId}"]`)!;
+        expect(rail.getAttribute("aria-hidden")).toBe("true");
+        const thumb = rail.querySelector<HTMLElement>(".write-queue-scrollbar-thumb")!;
+        expect(thumb.style.height).toBe("20%");
+        expect(thumb.style.top).toBe("0%");
+        return thumb;
       });
-      body.dispatchEvent(new Event("scroll"));
-      await wrapper.vm.$nextTick();
-      const rail = document.body.querySelector<HTMLElement>('[data-testid="queue-scrollbar"]')!;
-      const thumb = rail.querySelector<HTMLElement>(".write-queue-scrollbar-thumb")!;
-      expect(rail.getAttribute("aria-hidden")).toBe("true");
-      expect(thumb.style.height).toBe("20%");
-      expect(thumb.style.top).toBe("0%");
 
-      body.scrollTop = 400;
-      body.dispatchEvent(new Event("scroll"));
+      elements.forEach((element) => {
+        element.scrollTop = 200;
+        element.dispatchEvent(new Event("scroll"));
+      });
       await wrapper.vm.$nextTick();
-      expect(thumb.style.top).toBe("40%");
+      for (const thumb of thumbs) expect(thumb.style.top).toBe("40%");
     } finally { wrapper.unmount(); }
   });
 

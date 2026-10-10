@@ -5,7 +5,7 @@
   15 秒自动刷新 + 手动刷新
 -->
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, onUpdated, ref } from "vue";
+import { onMounted, onUnmounted, onUpdated, ref } from "vue";
 import { Modal as AModal } from "ant-design-vue";
 import ArticleDetailDrawer from "./LazyArticleDetailDrawer.vue";
 import SourceItemDetailModal from "./LazySourceItemDetailModal.vue";
@@ -61,39 +61,52 @@ const {
   describeCurrentTask,
 } = useWriteQueueStatus();
 
+type QueueScrollMetrics = { scrollTop: number; clientHeight: number; scrollHeight: number };
 const queueBodyRef = ref<HTMLDivElement | null>(null);
-const queueScrollMetrics = ref({ scrollTop: 0, clientHeight: 0, scrollHeight: 0 });
-const queueScrollbarThumbStyle = computed(() => {
-  const { scrollTop, clientHeight, scrollHeight } = queueScrollMetrics.value;
+const queueScrollMetrics = ref<QueueScrollMetrics>({ scrollTop: 0, clientHeight: 0, scrollHeight: 0 });
+const candidatesScrollRef = ref<HTMLDivElement | null>(null);
+const candidatesScrollMetrics = ref<QueueScrollMetrics>({ scrollTop: 0, clientHeight: 0, scrollHeight: 0 });
+const historyScrollRef = ref<HTMLDivElement | null>(null);
+const historyScrollMetrics = ref<QueueScrollMetrics>({ scrollTop: 0, clientHeight: 0, scrollHeight: 0 });
+const cycleHistoryScrollRef = ref<HTMLDivElement | null>(null);
+const cycleHistoryScrollMetrics = ref<QueueScrollMetrics>({ scrollTop: 0, clientHeight: 0, scrollHeight: 0 });
+const queueScrollRegions = [
+  { element: queueBodyRef, metrics: queueScrollMetrics },
+  { element: candidatesScrollRef, metrics: candidatesScrollMetrics },
+  { element: historyScrollRef, metrics: historyScrollMetrics },
+  { element: cycleHistoryScrollRef, metrics: cycleHistoryScrollMetrics },
+] as const;
+
+/** 计算滑块尺寸和位置；即使系统隐藏原生滚动条，常驻指示条仍准确反映滚动进度。 */
+function getScrollbarThumbStyle(metrics: QueueScrollMetrics) {
+  const { scrollTop, clientHeight, scrollHeight } = metrics;
   if (clientHeight <= 0 || scrollHeight <= clientHeight) return { top: "0%", height: "100%" };
 
   const thumbHeight = Math.min(100, Math.max(16 / clientHeight * 100, clientHeight / scrollHeight * 100));
   const maxThumbTop = 100 - thumbHeight;
   const top = Math.max(0, Math.min(maxThumbTop, scrollTop / (scrollHeight - clientHeight) * maxThumbTop));
   return { top: `${top}%`, height: `${thumbHeight}%` };
-});
+}
 
-/** 读取队列主滚动区尺寸和位置，供常驻滑轨显示，不改变原生滚动行为。 */
-function syncQueueScrollbar(): void {
-  const body = queueBodyRef.value;
-  if (!body) return;
-
-  const next = {
-    scrollTop: body.scrollTop,
-    clientHeight: body.clientHeight,
-    scrollHeight: body.scrollHeight,
-  };
-  const current = queueScrollMetrics.value;
-  if (current.scrollTop === next.scrollTop && current.clientHeight === next.clientHeight && current.scrollHeight === next.scrollHeight) return;
-  queueScrollMetrics.value = next;
+/** 同步各自独立滚动区的尺寸和位置；只读取 DOM 并更新装饰滑块，不接管滚动输入。 */
+function syncQueueScrollbars(): void {
+  for (const region of queueScrollRegions) {
+    const element = region.element.value;
+    const next = element
+      ? { scrollTop: element.scrollTop, clientHeight: element.clientHeight, scrollHeight: element.scrollHeight }
+      : { scrollTop: 0, clientHeight: 0, scrollHeight: 0 };
+    const current = region.metrics.value;
+    if (current.scrollTop === next.scrollTop && current.clientHeight === next.clientHeight && current.scrollHeight === next.scrollHeight) continue;
+    region.metrics.value = next;
+  }
 }
 
 onMounted(() => {
-  syncQueueScrollbar();
-  window.addEventListener("resize", syncQueueScrollbar);
+  syncQueueScrollbars();
+  window.addEventListener("resize", syncQueueScrollbars);
 });
-onUpdated(syncQueueScrollbar);
-onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbar));
+onUpdated(syncQueueScrollbars);
+onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbars));
 </script>
 
 <template>
@@ -142,7 +155,7 @@ onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbar));
 
         <!-- 只滚动任务内容，刷新、收起和统计不随长记录移出可视区。 -->
         <div class="write-queue-body-shell">
-        <div ref="queueBodyRef" class="write-queue-body" @scroll="syncQueueScrollbar">
+        <div ref="queueBodyRef" class="write-queue-body" @scroll="syncQueueScrollbars">
         <!-- 当前任务 -->
         <div v-if="visibleCurrentTask" class="write-queue-current">
           <div class="flex flex-wrap items-center gap-x-1 gap-y-0">
@@ -195,7 +208,8 @@ onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbar));
         >队列空闲</div>
 
         <!-- 自动短写按 Hermes 采集周期分组；人工和其他实际队列任务仍留在上方。 -->
-        <div v-if="shortWriteSchedule || shortWriteScheduleDelayed" class="write-queue-candidates" data-testid="queue-short-write-candidates">
+        <div v-if="shortWriteSchedule || shortWriteScheduleDelayed" class="write-queue-scroll-shell">
+        <div ref="candidatesScrollRef" class="write-queue-candidates" data-testid="queue-short-write-candidates" @scroll="syncQueueScrollbars">
           <div v-if="shortWriteScheduleDelayed" class="write-queue-candidate-delay">
             {{ shortWriteSchedule ? "排期状态延迟，保留上次候选快照" : "自动候选状态暂不可用" }}
           </div>
@@ -289,19 +303,30 @@ onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbar));
           </template>
           <div v-else class="write-queue-candidate-empty">尚未读取到自动候选</div>
         </div>
+        <div
+          v-if="candidatesScrollMetrics.scrollHeight > candidatesScrollMetrics.clientHeight"
+          class="write-queue-scrollbar"
+          data-testid="queue-candidates-scrollbar"
+          aria-hidden="true"
+        >
+          <div class="write-queue-scrollbar-thumb" :style="getScrollbarThumbStyle(candidatesScrollMetrics)" />
+        </div>
+        </div>
 
         <div v-if="data.luna && !(data.current && (data.luna.paused || data.luna.available === false))" class="mt-2 rounded bg-gray-50 px-2 py-1 text-[10px] text-editorial-text-muted" data-testid="queue-luna-state">
           Luna：{{ describeLunaStatus(data.luna, elapsedNow, statusReceivedAt) }}
         </div>
 
         <!-- 持久化终态历史：按北京时间 00:00–23:59 分组，服务重启后仍可查看。 -->
-        <div v-if="historyGroups.length || shortWriteCycleRecords.length" class="write-queue-history mt-2 border-t border-gray-100 pt-1" data-testid="write-queue-history">
+        <div v-if="historyGroups.length || shortWriteCycleRecords.length" class="write-queue-scroll-shell">
+        <div ref="historyScrollRef" class="write-queue-history mt-2 border-t border-gray-100 pt-1" data-testid="write-queue-history" @scroll="syncQueueScrollbars">
           <div class="mb-1 flex items-center justify-between text-[10px] font-medium text-editorial-text-muted">
             <span>写作记录（最近结果）</span>
             <span>北京时间 00:00–23:59</span>
           </div>
           <!-- 限制周期表格高度并在内部滚动，避免历史记录挤占队列其他内容。 -->
-          <div v-if="shortWriteCycleRecords.length" class="max-h-32 overflow-auto rounded border border-gray-100" data-testid="queue-short-write-cycle-history">
+          <div v-if="shortWriteCycleRecords.length" class="write-queue-scroll-shell">
+          <div ref="cycleHistoryScrollRef" class="max-h-32 overflow-auto rounded border border-gray-100" data-testid="queue-short-write-cycle-history" @scroll="syncQueueScrollbars">
             <table class="w-max border-collapse text-left text-[9px] text-editorial-text-muted">
               <thead class="sticky top-0 z-10 bg-gray-50">
                 <tr>
@@ -320,6 +345,15 @@ onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbar));
                 </tr>
               </tbody>
             </table>
+          </div>
+          <div
+            v-if="cycleHistoryScrollMetrics.scrollHeight > cycleHistoryScrollMetrics.clientHeight"
+            class="write-queue-scrollbar"
+            data-testid="queue-cycle-history-scrollbar"
+            aria-hidden="true"
+          >
+            <div class="write-queue-scrollbar-thumb" :style="getScrollbarThumbStyle(cycleHistoryScrollMetrics)" />
+          </div>
           </div>
           <section v-for="group in historyGroups" :key="group.date" class="write-queue-day-group">
             <h4 class="write-queue-day-label">{{ formatHistoryDate(group.date, group.items) }}</h4>
@@ -343,6 +377,15 @@ onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbar));
             </div>
           </section>
         </div>
+        <div
+          v-if="historyScrollMetrics.scrollHeight > historyScrollMetrics.clientHeight"
+          class="write-queue-scrollbar"
+          data-testid="queue-history-scrollbar"
+          aria-hidden="true"
+        >
+          <div class="write-queue-scrollbar-thumb" :style="getScrollbarThumbStyle(historyScrollMetrics)" />
+        </div>
+        </div>
         </div>
         <div
           v-if="queueScrollMetrics.scrollHeight > queueScrollMetrics.clientHeight"
@@ -350,7 +393,7 @@ onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbar));
           data-testid="queue-scrollbar"
           aria-hidden="true"
         >
-          <div class="write-queue-scrollbar-thumb" :style="queueScrollbarThumbStyle" />
+          <div class="write-queue-scrollbar-thumb" :style="getScrollbarThumbStyle(queueScrollMetrics)" />
         </div>
         </div>
 
@@ -501,7 +544,8 @@ onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbar));
 .write-queue-float .write-queue-body,
 .write-queue-float .write-queue-list,
 .write-queue-float .write-queue-history,
-.write-queue-float .write-queue-candidates {
+.write-queue-float .write-queue-candidates,
+.write-queue-float [data-testid="queue-short-write-cycle-history"] {
   scrollbar-width: thin;
   scrollbar-color: #60a5fa #f3f4f6;
   scrollbar-gutter: stable;
@@ -521,9 +565,13 @@ onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbar));
 .write-queue-float ::-webkit-scrollbar-thumb:hover {
   background-color: #2563eb;
 }
-/* 外层保留主滚动区的高度；绝对定位的指示轨道不参与内容布局。 */
+/* 滑轨叠在滚动区外壳上，不参与内容布局，也不随内部内容一起滚动。 */
+.write-queue-scroll-shell,
 .write-queue-body-shell {
   position: relative;
+}
+/* 外层保留主滚动区的高度；绝对定位的指示轨道不参与内容布局。 */
+.write-queue-body-shell {
   flex: 1 1 auto;
   min-height: 0;
 }

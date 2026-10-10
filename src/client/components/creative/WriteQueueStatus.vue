@@ -454,6 +454,30 @@ const {
 }
 .write-queue-control:hover:not(:disabled) { background: #f3f4f6; color: #374151; }
 .write-queue-control:disabled { opacity: 0.5; cursor: not-allowed; }
+/* 只为队列内部滚动区预留窄滑轨，并用常态高亮避免依赖悬停才看见滚动位置。 */
+.write-queue-float .write-queue-body,
+.write-queue-float .write-queue-list,
+.write-queue-float .write-queue-history,
+.write-queue-float .write-queue-candidates {
+  scrollbar-width: thin;
+  scrollbar-color: #60a5fa #f3f4f6;
+  scrollbar-gutter: stable;
+}
+.write-queue-float ::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.write-queue-float ::-webkit-scrollbar-track {
+  border-radius: 4px;
+  background-color: #f3f4f6;
+}
+.write-queue-float ::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background-color: #60a5fa;
+}
+.write-queue-float ::-webkit-scrollbar-thumb:hover {
+  background-color: #2563eb;
+}
 /* 必须允许中间弹性项缩小到内容高度以下，否则长记录仍会撑破整个浮窗。 */
 .write-queue-body {
   flex: 1 1 auto;

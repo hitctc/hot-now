@@ -289,7 +289,12 @@ describe("写作队列最近逐篇结果", () => {
     const source = readFileSync("src/client/components/creative/WriteQueueStatus.vue", "utf8");
     const embedded = source.match(/\.write-queue-float--embedded\s*\{([^}]*)\}/)?.[1] ?? "";
     const candidates = source.match(/^\s*\.write-queue-candidates\s*\{([^}]*)\}/m)?.[1] ?? "";
+    const scrollbar = source.match(/\.write-queue-float ::-webkit-scrollbar\s*\{([^}]*)\}/)?.[1] ?? "";
     expect(candidates).toMatch(/max-height:\s*320px;/);
+    expect(scrollbar).toMatch(/width:\s*4px;/);
+    expect(source).toMatch(/\.write-queue-float ::-webkit-scrollbar-track\s*\{[^}]*background-color: #f3f4f6;/);
+    expect(source).toMatch(/\.write-queue-float ::-webkit-scrollbar-thumb\s*\{[^}]*background-color: #60a5fa;/);
+    expect(source).toMatch(/\.write-queue-float \.write-queue-body,[\s\S]*?scrollbar-width: thin;[\s\S]*?scrollbar-color: #60a5fa #f3f4f6;[\s\S]*?scrollbar-gutter: stable;/);
     expect(embedded).toMatch(/^\s*height: 100dvh;$/m);
     expect(embedded).toContain("max-height: 100dvh;");
     expect(source).toMatch(/\.write-queue-float--embedded \.write-queue-history\s*\{[^}]*max-height: none;/);

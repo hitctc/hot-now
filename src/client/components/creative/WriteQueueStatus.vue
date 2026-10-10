@@ -6,7 +6,7 @@
 -->
 <script setup lang="ts">
 import { onMounted, onUnmounted, onUpdated, ref } from "vue";
-import { Modal as AModal } from "ant-design-vue";
+import { Modal as AModal, Select as ASelect } from "ant-design-vue";
 import ArticleDetailDrawer from "./LazyArticleDetailDrawer.vue";
 import SourceItemDetailModal from "./LazySourceItemDetailModal.vue";
 import { useWriteQueueStatus } from "./useWriteQueueStatus.js";
@@ -76,6 +76,12 @@ const queueScrollRegions = [
   { element: historyScrollRef, metrics: historyScrollMetrics },
   { element: cycleHistoryScrollRef, metrics: cycleHistoryScrollMetrics },
 ] as const;
+const queueWidthOptions = writeQueueWidths.map((width) => ({ value: width, label: `${width}px` }));
+
+/** 接受 Ant Select 返回的宽度值；仅数值选项可以更新并持久化文章队列宽度。 */
+function handleQueueWidthChange(value: unknown): void {
+  if (typeof value === "number") setQueueWidth(value);
+}
 
 /** 计算滑块尺寸和位置；即使系统隐藏原生滚动条，常驻指示条仍准确反映滚动进度。 */
 function getScrollbarThumbStyle(metrics: QueueScrollMetrics) {
@@ -107,13 +113,6 @@ onMounted(() => {
 });
 onUpdated(syncQueueScrollbars);
 onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbars));
-
-/** 读取宽度下拉框的像素值并沿用账号偏好保存逻辑，不改变当前嵌入状态。 */
-function handleQueueWidthChange(event: Event): void {
-  const select = event.currentTarget;
-  if (!(select instanceof HTMLSelectElement)) return;
-  setQueueWidth(Number(select.value));
-}
 </script>
 
 <template>
@@ -142,9 +141,16 @@ function handleQueueWidthChange(event: Event): void {
         <div class="write-queue-header">
           <span class="text-xs font-semibold text-editorial-text-body">Luna 文章队列</span>
           <div class="write-queue-header-actions">
-            <select class="write-queue-width-select" :value="queueWidth" aria-label="文章队列宽度" title="调整文章队列宽度" @change="handleQueueWidthChange">
-              <option v-for="width in writeQueueWidths" :key="width" :value="width">{{ width }}px</option>
-            </select>
+            <ASelect
+              class="write-queue-width-select"
+              :value="queueWidth"
+              :options="queueWidthOptions"
+              aria-label="文章队列宽度"
+              title="调整文章队列宽度"
+              :dropdown-style="{ zIndex: 2100 }"
+              popup-class-name="write-queue-width-dropdown"
+              @change="handleQueueWidthChange"
+            />
             <button type="button" class="write-queue-control write-queue-dock-toggle" :aria-label="embedded ? '取消右侧嵌入' : '嵌入到页面右侧'" :title="embedded ? '取消右侧嵌入' : '嵌入到页面右侧'" :aria-pressed="embedded" @click.stop="toggleEmbedded">{{ embedded ? "⇥" : "⇤" }}</button>
             <button type="button" class="write-queue-control write-queue-refresh" aria-label="刷新文章队列" :aria-busy="loading" :disabled="loading" @click.stop="refresh">{{ loading ? "…" : "↻" }}</button>
             <button type="button" class="write-queue-control write-queue-close" aria-label="收起文章队列" @click="toggleExpand">✕</button>
@@ -497,24 +503,20 @@ function handleQueueWidthChange(event: Event): void {
 .write-queue-header-actions {
   display: flex;
   flex-shrink: 0;
+  align-items: center;
   gap: 4px;
 }
 .write-queue-width-select {
-  box-sizing: border-box;
-  flex: 0 0 76px;
-  width: 76px;
-  height: 44px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: #fff;
-  padding: 0 5px;
-  color: #4b5563;
-  font-size: 11px;
-  cursor: pointer;
+  flex: 0 0 82px;
+  width: 82px;
 }
-.write-queue-width-select:focus-visible {
-  outline: 2px solid #93c5fd;
-  outline-offset: 1px;
+.write-queue-width-select .ant-select-selector {
+  border-radius: 6px !important;
+}
+.write-queue-width-dropdown .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+  background: #eff6ff;
+  color: #1677ff;
+  font-weight: 600;
 }
 /* 两个头部操作共用尺寸、边框和交互样式，只保留不同图标与行为。 */
 .write-queue-control {

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Select as ASelect } from "ant-design-vue";
 import { readFileSync } from "node:fs";
 import { flushPromises, mount } from "@vue/test-utils";
 
@@ -69,8 +70,8 @@ describe("写作队列最近逐篇结果", () => {
     try {
       await flushPromises();
       const dockButton = document.body.querySelector<HTMLButtonElement>(".write-queue-dock-toggle");
-      const widthSelect = document.body.querySelector<HTMLSelectElement>(".write-queue-width-select");
-      expect(widthSelect?.value).toBe("350");
+      const widthSelect = document.body.querySelector<HTMLElement>(".write-queue-width-select");
+      expect(widthSelect?.textContent).toContain("350px");
       expect(widthSelect?.nextElementSibling).toBe(dockButton);
       expect(document.body.querySelector(".write-queue-width-picker")).toBeNull();
       expect(dockButton?.nextElementSibling?.classList.contains("write-queue-refresh")).toBe(true);
@@ -99,12 +100,16 @@ describe("写作队列最近逐篇结果", () => {
       const panel = document.body.querySelector<HTMLElement>(".write-queue-float--embedded");
       expect(panel?.parentElement).not.toBe(document.body);
       expect(panel?.style.getPropertyValue("--write-queue-width")).toBe("450px");
-      const widthSelect = panel?.querySelector<HTMLSelectElement>(".write-queue-width-select")!;
-      expect(widthSelect.value).toBe("450");
-      expect(widthSelect.options).toHaveLength(4);
+      const widthSelect = wrapper.findComponent(ASelect);
+      expect(widthSelect.props("value")).toBe(450);
+      expect(widthSelect.props("options")).toEqual([
+        { value: 250, label: "250px" }, { value: 350, label: "350px" },
+        { value: 450, label: "450px" }, { value: 550, label: "550px" },
+      ]);
+      expect(widthSelect.props("popupClassName")).toBe("write-queue-width-dropdown");
+      expect(widthSelect.props("dropdownStyle")).toEqual({ zIndex: 2100 });
 
-      widthSelect.value = "550";
-      widthSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      widthSelect.vm.$emit("change", 550);
       await flushPromises();
       expect(panel?.style.getPropertyValue("--write-queue-width")).toBe("550px");
       expect(settingsApi.saveWriteQueuePreferences).toHaveBeenLastCalledWith({ embedded: true, width: 550, expanded: true });
@@ -282,7 +287,7 @@ describe("写作队列最近逐篇结果", () => {
       const refresh = document.body.querySelector<HTMLButtonElement>(".write-queue-refresh")!;
       expect(refresh.getAttribute("aria-label")).toBe("刷新文章队列");
       const headerActions = document.body.querySelector(".write-queue-header-actions")!;
-      expect(headerActions.children[0]?.tagName).toBe("SELECT");
+      expect(headerActions.children[0]?.classList.contains("ant-select")).toBe(true);
       expect([...headerActions.children].slice(1).map(button => button.getAttribute("aria-label"))).toEqual(["嵌入到页面右侧", "刷新文章队列", "收起文章队列"]);
       expect(headerActions.closest(".write-queue-header")).not.toBeNull();
       expect([...headerActions.children].slice(1).every(button => button.classList.contains("write-queue-control"))).toBe(true);

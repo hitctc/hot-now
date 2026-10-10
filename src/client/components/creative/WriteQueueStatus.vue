@@ -11,6 +11,7 @@ import ArticleDetailDrawer from "./LazyArticleDetailDrawer.vue";
 import SourceItemDetailModal from "./LazySourceItemDetailModal.vue";
 import { useWriteQueueStatus } from "./useWriteQueueStatus.js";
 import { writeQueueWidths } from "../../../core/auth/userPreferences.js";
+import { labelFactReviewCategory } from "./writeQueueStatusPresentation.js";
 const {
   forceRewriteTarget,
   forceRewriting,
@@ -384,6 +385,9 @@ onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbars));
               </div>
               <div v-if="task.status !== 'done'" class="mt-0.5 break-words text-red-500">
                 {{ task.stop_step_name || task.phase_name || "执行" }}：{{ task.reason_text || task.error || "未提供失败原因" }}
+              </div>
+              <div v-if="task.reason_category" class="mt-0.5 text-[10px] text-amber-700">
+                复核结论：{{ labelFactReviewCategory(task.reason_category) }}
               </div>
             </div>
           </section>

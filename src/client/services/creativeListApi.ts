@@ -53,7 +53,7 @@ export type CreativeSourceItem = {
   publishedAt: string | null;
   collectorTimestamp: string | null;
   writingStatus: string;
-  shortWriteSchedule?: { kind: "candidate"; position: number } | { kind: "replaced"; replacedAt: string } | { kind: "not-scheduled" } | { kind: "preparing" } | { kind: "pending"; position?: number } | { kind: "waiting-batch" } | { kind: "task"; taskKind: "short_content" | "short_content_auto"; status: string; queuePosition?: number; phaseName?: string; stopStepName?: string; reasonText?: string; error?: string; finishedArticleId?: number; cancelRequested?: boolean } | null;
+  shortWriteSchedule?: { kind: "candidate"; position: number } | { kind: "replaced"; replacedAt: string } | { kind: "not-scheduled" } | { kind: "preparing" } | { kind: "pending"; position?: number } | { kind: "waiting-batch" } | { kind: "task"; taskKind: "short_content" | "short_content_auto"; status: string; queuePosition?: number; phaseName?: string; stopStepName?: string; reasonText?: string; reasonCategory?: string; error?: string; finishedArticleId?: number; cancelRequested?: boolean } | null;
   writingStopStep: number | null;
   writingStopStepName: string | null;
   writingStopReason: string | null;
@@ -315,6 +315,7 @@ export type ShortWriteScheduleTask = {
   phase_name?: string;
   stop_step_name?: string;
   reason_text?: string;
+  reason_category?: string;
   error?: string;
   finished_article_id?: number;
   cancel_requested?: boolean;

@@ -4,6 +4,7 @@ import { useCreativeTableColumns } from "../useCreativeTableColumns.js";
 import { ref, toRefs } from "vue";
 import { message } from "ant-design-vue";
 import OperationCapabilityBadge from "../OperationCapabilityBadge.vue";
+import { labelFactReviewCategory } from "../writeQueueStatusPresentation.js";
 
 import type { CreativeSourceItem } from "../../../services/creativeApi.js";
 import { formatTableDayLabel, isTableDayStart } from "../tableDayGroups.js";
@@ -277,7 +278,7 @@ useTableComponent();
             <template v-if="record.shortWriteSchedule?.kind === 'task' && record.shortWriteSchedule.status === 'queued'">{{ record.shortWriteSchedule.taskKind === 'short_content_auto' ? '自动短写' : '人工短写' }}已排队<span v-if="record.shortWriteSchedule.queuePosition"> · 队列第 {{ record.shortWriteSchedule.queuePosition }} 位</span></template>
             <template v-else-if="record.shortWriteSchedule?.kind === 'task' && record.shortWriteSchedule.status === 'writing'">{{ record.shortWriteSchedule.taskKind === 'short_content_auto' ? '自动短写' : '人工短写' }}写作中<span v-if="record.shortWriteSchedule.phaseName"> · {{ record.shortWriteSchedule.phaseName }}</span><span v-if="record.shortWriteSchedule.cancelRequested"> · 已请求停止</span></template>
             <template v-else-if="record.shortWriteSchedule?.kind === 'task' && record.shortWriteSchedule.status === 'done'">短写任务已完成<span v-if="record.shortWriteSchedule.finishedArticleId"> · 成品 #{{ record.shortWriteSchedule.finishedArticleId }}</span></template>
-            <template v-else-if="record.shortWriteSchedule?.kind === 'task' && ['failed', 'stopped'].includes(record.shortWriteSchedule.status)">{{ record.shortWriteSchedule.status === 'failed' ? '短写任务失败' : '短写任务已停止' }}<span v-if="record.shortWriteSchedule.stopStepName"> · {{ record.shortWriteSchedule.stopStepName }}</span><span v-if="record.shortWriteSchedule.reasonText || record.shortWriteSchedule.error"> · {{ record.shortWriteSchedule.reasonText || record.shortWriteSchedule.error }}</span></template>
+            <template v-else-if="record.shortWriteSchedule?.kind === 'task' && ['failed', 'stopped'].includes(record.shortWriteSchedule.status)">{{ record.shortWriteSchedule.status === 'failed' ? '短写任务失败' : '短写任务已停止' }}<span v-if="record.shortWriteSchedule.stopStepName"> · {{ record.shortWriteSchedule.stopStepName }}</span><span v-if="record.shortWriteSchedule.reasonText || record.shortWriteSchedule.error"> · {{ record.shortWriteSchedule.reasonText || record.shortWriteSchedule.error }}<span v-if="record.shortWriteSchedule.reasonCategory"> · 复核结论：{{ labelFactReviewCategory(record.shortWriteSchedule.reasonCategory) }}</span></span></template>
             <template v-else-if="record.shortWriteSchedule?.kind === 'task'">短写任务状态 · {{ record.shortWriteSchedule.status || '暂不可用' }}</template>
             <template v-else-if="record.shortWriteSchedule?.kind === 'candidate'">后续自动候选 · 第 {{ record.shortWriteSchedule.position }} 位</template>
             <template v-else-if="record.shortWriteSchedule?.kind === 'waiting-batch'">等待短内容采集形成候选</template>

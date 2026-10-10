@@ -138,6 +138,7 @@ export function useSourceItemsQuery(options: SourceItemsQueryOptions) {
                     phaseName: task.phase_name,
                     stopStepName: task.stop_step_name,
                     reasonText: task.reason_text,
+                    reasonCategory: task.reason_category,
                     error: task.error,
                     finishedArticleId: task.finished_article_id,
                     cancelRequested: task.cancel_requested,

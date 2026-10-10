@@ -8,6 +8,7 @@ import CodexTaskQueue from "../../components/monitor/CodexTaskQueue.vue";
 import CodexConsumption from "../../components/monitor/CodexConsumption.vue";
 import SourceItemDetailModal from "../../components/creative/LazySourceItemDetailModal.vue";
 import ArticleDetailDrawer from "../../components/creative/LazyArticleDetailDrawer.vue";
+import { labelFactReviewCategory } from "../../components/creative/writeQueueStatusPresentation.js";
 import {
   fetchWriteQueueStatus,
   readCreativeFinishedArticle,
@@ -173,6 +174,7 @@ onBeforeUnmount(() => {
             <div v-if="task.status !== 'done'" class="mt-0.5 break-words text-red-500">
               {{ task.stop_step_name || task.phase_name || "执行" }}：{{ task.reason_text || task.error || "未提供失败原因" }}
             </div>
+            <div v-if="task.reason_category" class="mt-0.5 text-amber-700">复核结论：{{ labelFactReviewCategory(task.reason_category) }}</div>
           </div>
         </div>
       </template>

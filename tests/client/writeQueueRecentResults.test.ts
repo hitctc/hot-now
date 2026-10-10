@@ -240,7 +240,7 @@ describe("写作队列最近逐篇结果", () => {
   it("只有 Hermes 允许的内容阻断记录提供强制重写，确认后只投递原编号", async () => {
     window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
     vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue({ ...queueStatus, history: [
-      { ...queueStatus.recent[0]!, task_id: "blocked-content", status: "stopped", can_force_rewrite: true, reason_text: "事实复核未通过" },
+      { ...queueStatus.recent[0]!, task_id: "blocked-content", status: "stopped", can_force_rewrite: true, reason_text: "素材中的具体细节未获来源支持", reason_category: "supplemental_unavailable" },
       { ...queueStatus.recent[0]!, task_id: "technical-failure", can_force_rewrite: false },
     ] });
     const force = vi.spyOn(creativeApi, "forceRewriteQueueTask").mockResolvedValue({ success: true, task_id: "new-manual" });
@@ -249,6 +249,7 @@ describe("写作队列最近逐篇结果", () => {
       await flushPromises();
       const buttons = [...document.body.querySelectorAll<HTMLButtonElement>("button")].filter((button) => button.textContent === "强制重写");
       expect(buttons).toHaveLength(1);
+      expect(document.body.textContent).toContain("复核结论：本次未取得补充来源（不等于事件不实）");
       buttons[0]!.click();
       await flushPromises();
       expect(force).not.toHaveBeenCalled();
@@ -265,6 +266,7 @@ describe("写作队列最近逐篇结果", () => {
     expect(source).toMatch(/key: "quickCopy"[^\n]*ellipsis: false/);
     expect(source).toContain("!h-auto !whitespace-normal break-words");
     expect(source).toContain('writingIds.has(record.id) ? "写作中"');
+    expect(source).toContain("labelFactReviewCategory(record.shortWriteSchedule.reasonCategory)");
     expect(source).not.toContain('"写作中..."');
   });
 

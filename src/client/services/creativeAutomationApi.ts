@@ -225,6 +225,7 @@ export type WriteQueueTask = {
   stop_step?: number;
   stop_step_name?: string;
   reason_text?: string;
+  reason_category?: string;
   error?: string;
   phase?: "writing" | "images" | string;
   phase_order?: number;

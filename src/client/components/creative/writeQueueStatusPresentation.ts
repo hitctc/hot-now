@@ -2,6 +2,19 @@ import type { WriteQueueStatus, WriteQueueTask } from "../../services/creativeAp
 
 type LunaStatus = WriteQueueStatus["luna"];
 
+const factReviewCategoryLabels: Record<string, string> = {
+  supplemental_supported: "补证找到支持",
+  supplemental_conflict: "补充来源存在冲突（不等于事件不实）",
+  supplemental_unavailable: "本次未取得补充来源（不等于事件不实）",
+  supplemental_insufficient: "补充来源不足（不等于事件不实）",
+  core_fact_conflict: "核心事实冲突",
+};
+
+/** 将Hermes事实复核类别转成不会把“未找到证据”误读为“新闻不实”的页面文案。 */
+export function labelFactReviewCategory(category?: string): string | null {
+  return category ? factReviewCategoryLabels[category] ?? "事实复核需处理" : null;
+}
+
 /** 将非负剩余秒数转成中文时长，供约略倒计时展示，不代表实际执行承诺。 */
 function duration(seconds: number): string {
   const value = Math.max(0, Math.ceil(seconds));

@@ -288,6 +288,8 @@ describe("写作队列最近逐篇结果", () => {
   it("桌面嵌入侧栏填满视口，队列区使用剩余高度滚动", () => {
     const source = readFileSync("src/client/components/creative/WriteQueueStatus.vue", "utf8");
     const embedded = source.match(/\.write-queue-float--embedded\s*\{([^}]*)\}/)?.[1] ?? "";
+    const candidates = source.match(/^\s*\.write-queue-candidates\s*\{([^}]*)\}/m)?.[1] ?? "";
+    expect(candidates).toMatch(/max-height:\s*320px;/);
     expect(embedded).toMatch(/^\s*height: 100dvh;$/m);
     expect(embedded).toContain("max-height: 100dvh;");
     expect(source).toMatch(/\.write-queue-float--embedded \.write-queue-history\s*\{[^}]*max-height: none;/);

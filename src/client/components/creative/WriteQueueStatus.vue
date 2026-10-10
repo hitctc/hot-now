@@ -493,7 +493,7 @@ const {
   font-weight: 600;
 }
 .write-queue-candidates {
-  max-height: 220px;
+  max-height: 320px;
   overflow-y: auto;
   border-top: 1px solid #f3f4f6;
   padding: 5px 8px 2px;

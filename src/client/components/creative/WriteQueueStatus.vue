@@ -235,32 +235,26 @@ const {
             <span>写作记录（最近结果）</span>
             <span>北京时间 00:00–23:59</span>
           </div>
-          <!-- 按阶段各占一行并列出周期结果，避免每个周期重复展开挤占队列面板高度。 -->
-          <div v-if="shortWriteCycleRecords.length" class="space-y-0.5 text-[9px] text-editorial-text-muted" data-testid="queue-short-write-cycle-history">
-            <div class="flex gap-1" data-testid="queue-short-write-cycle-accepted">
-              <h6 class="shrink-0 font-semibold text-editorial-text-muted">受理</h6>
-              <div class="min-w-0 flex-1">
-                <span v-for="(period, index) in shortWriteCycleRecords.slice(0, 8)" :key="period.started_at">
-                  <span v-if="index > 0"> · </span>{{ formatShortBatchPeriod(period.started_at, period.collection_interval_minutes ?? 60, period.ended_at) }} 热搜 {{ period.hot_accepted_count ?? 0 }}
-                </span>
-              </div>
-            </div>
-            <div class="flex gap-1" data-testid="queue-short-write-cycle-written">
-              <h6 class="shrink-0 font-semibold text-editorial-text-muted">写成</h6>
-              <div class="min-w-0 flex-1">
-                <span v-for="(period, index) in shortWriteCycleRecords.slice(0, 8)" :key="period.started_at">
-                  <span v-if="index > 0"> · </span>{{ formatShortBatchPeriod(period.started_at, period.collection_interval_minutes ?? 60, period.ended_at) }} 热搜 {{ period.written?.hot ?? 0 }} / AI HOT {{ period.written?.aihot ?? 0 }} / Juya {{ period.written?.juya ?? 0 }}
-                </span>
-              </div>
-            </div>
-            <div class="flex gap-1" data-testid="queue-short-write-cycle-failed">
-              <h6 class="shrink-0 font-semibold text-editorial-text-muted">失败</h6>
-              <div class="min-w-0 flex-1">
-                <span v-for="(period, index) in shortWriteCycleRecords.slice(0, 8)" :key="period.started_at">
-                  <span v-if="index > 0"> · </span>{{ formatShortBatchPeriod(period.started_at, period.collection_interval_minutes ?? 60, period.ended_at) }} {{ (period.failed?.hot ?? 0) + (period.failed?.aihot ?? 0) + (period.failed?.juya ?? 0) }}
-                </span>
-              </div>
-            </div>
+          <!-- 限制周期表格高度并在内部滚动，避免历史记录挤占队列其他内容。 -->
+          <div v-if="shortWriteCycleRecords.length" class="max-h-32 overflow-auto rounded border border-gray-100" data-testid="queue-short-write-cycle-history">
+            <table class="min-w-[560px] w-full border-collapse text-left text-[9px] text-editorial-text-muted">
+              <thead class="sticky top-0 z-10 bg-gray-50">
+                <tr>
+                  <th scope="col" class="whitespace-nowrap px-2 py-1 font-semibold">时段</th>
+                  <th scope="col" class="whitespace-nowrap px-2 py-1 font-semibold">热搜受理</th>
+                  <th scope="col" class="whitespace-nowrap px-2 py-1 font-semibold">写成（热搜 / AI HOT / Juya）</th>
+                  <th scope="col" class="whitespace-nowrap px-2 py-1 font-semibold">失败</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="period in shortWriteCycleRecords.slice(0, 8)" :key="period.started_at" class="border-t border-gray-100">
+                  <td class="whitespace-nowrap px-2 py-1">{{ formatShortBatchPeriod(period.started_at, period.collection_interval_minutes ?? 60, period.ended_at) }}</td>
+                  <td class="whitespace-nowrap px-2 py-1">{{ period.hot_accepted_count ?? 0 }}</td>
+                  <td class="whitespace-nowrap px-2 py-1">{{ period.written?.hot ?? 0 }} / {{ period.written?.aihot ?? 0 }} / {{ period.written?.juya ?? 0 }}</td>
+                  <td class="whitespace-nowrap px-2 py-1">{{ (period.failed?.hot ?? 0) + (period.failed?.aihot ?? 0) + (period.failed?.juya ?? 0) }}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
           <section v-for="group in historyGroups" :key="group.date" class="write-queue-day-group">
             <h4 class="write-queue-day-label">{{ formatHistoryDate(group.date, group.items) }}</h4>

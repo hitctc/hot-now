@@ -344,7 +344,7 @@ onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbars));
                 <tr>
                   <th scope="col" class="whitespace-nowrap px-[3px] py-1 font-semibold">时段</th>
                   <th scope="col" class="whitespace-nowrap px-[3px] py-1 font-semibold">热搜受理</th>
-                  <th scope="col" class="whitespace-nowrap px-[3px] py-1 font-semibold">写成（热搜 / AI HOT / Juya）</th>
+                  <th scope="col" class="px-[3px] py-1 text-center font-semibold leading-tight"><span class="block whitespace-nowrap">写成</span><span class="block whitespace-nowrap text-[8px] font-normal">（热搜/AI HOT/Juya）</span></th>
                   <th scope="col" class="whitespace-nowrap px-[3px] py-1 font-semibold">失败</th>
                 </tr>
               </thead>

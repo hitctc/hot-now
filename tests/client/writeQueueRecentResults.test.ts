@@ -659,9 +659,13 @@ describe("写作队列最近逐篇结果", () => {
       expect(document.body.querySelector('[data-testid="write-queue-history"]')?.contains(cycleHistory)).toBe(true);
       expect(cycleHistory?.className).toContain("max-h-32");
       expect(cycleHistory?.className).toContain("overflow-auto");
-      expect([...cycleHistory?.querySelectorAll("thead th") ?? []].map((heading) => heading.textContent)).toEqual([
-        "时段", "热搜受理", "写成（热搜 / AI HOT / Juya）", "失败",
+      expect([...cycleHistory?.querySelectorAll("thead th") ?? []].map((heading) => heading.textContent?.replace(/\s+/g, "").trim())).toEqual([
+        "时段", "热搜受理", "写成（热搜/AIHOT/Juya）", "失败",
       ]);
+      const writtenHeader = cycleHistory?.querySelector("thead th:nth-child(3)");
+      expect(writtenHeader?.querySelectorAll("span")).toHaveLength(2);
+      expect(writtenHeader?.querySelector("span:first-child")?.textContent).toBe("写成");
+      expect(writtenHeader?.querySelector("span:last-child")?.textContent).toBe("（热搜/AI HOT/Juya）");
       const cycleTable = cycleHistory?.querySelector("table");
       expect(cycleTable?.className).toContain("w-max");
       expect(cycleTable?.className).not.toContain("w-full");

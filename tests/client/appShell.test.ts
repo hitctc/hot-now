@@ -201,6 +201,39 @@ describe("client app shell", () => {
     );
   });
 
+  it("collapses the desktop sidebar into first-character links and restores it on expand", async () => {
+    const router = createAppRouter();
+    await router.push("/settings/profile");
+    await router.isReady();
+
+    const wrapper = mount(App, { global: { plugins: [Antd, router] } });
+    await flushPromises();
+
+    const sidebar = wrapper.get("[data-workspace-sidebar]");
+    const toggle = wrapper.get("[data-sidebar-collapse-toggle]");
+    expect(sidebar.classes()).toContain("min-[901px]:w-[180px]");
+    expect(toggle.attributes("aria-label")).toBe("收起侧栏");
+
+    await toggle.trigger("click");
+
+    expect(sidebar.classes()).toContain("min-[901px]:w-[64px]");
+    expect(toggle.attributes("aria-label")).toBe("展开侧栏");
+    expect(wrapper.get('[data-shell-nav-link="/ai-new"]').text().trim()).toBe("A");
+    expect(wrapper.get('[data-shell-nav-link="/ai-new"]').attributes("aria-label")).toBe("AI 新讯");
+    expect(wrapper.get('[data-shell-nav-link="/ai-new"]').attributes("title")).toBe("AI 新讯");
+    expect(wrapper.get('[data-shell-nav-link="/creative/short-source-items"]').text().trim()).toBe("短");
+    expect(wrapper.find("[data-workspace-brand-logo]").exists()).toBe(true);
+    expect(wrapper.get("[data-shell-content-menu-section]").find("p").exists()).toBe(false);
+    expect(wrapper.find("[data-shell-sidebar-footer]").exists()).toBe(false);
+
+    await toggle.trigger("click");
+
+    expect(sidebar.classes()).toContain("min-[901px]:w-[180px]");
+    expect(wrapper.get('[data-shell-nav-link="/ai-new"]').text().trim()).toBe("AI 新讯");
+    expect(wrapper.find("[data-shell-sidebar-footer]").exists()).toBe(true);
+    wrapper.unmount();
+  });
+
   it("keeps shell navigation highlights in a light workspace style instead of the old accented panel treatment", async () => {
     const router = createAppRouter();
 

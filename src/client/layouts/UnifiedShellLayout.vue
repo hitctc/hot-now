@@ -20,6 +20,7 @@ const profileLoadState = ref<ProfileLoadState>("idle");
 const profileError = ref<string | null>(null);
 const mobileSystemDrawerOpen = ref(false);
 const mobileNav = ref<HTMLElement | null>(null);
+const sidebarCollapsed = ref(false);
 
 const themeOptions = [
   { label: "浅色", value: "light" },
@@ -54,14 +55,19 @@ function isActiveContentPath(path: string): boolean {
   return route.path === path || (path === "/ai-new" && route.path === "/");
 }
 
-// 导航选中态直接靠 Tailwind class 切换，不再依赖 a-menu 的内部选中结构。
-function getShellNavLinkClasses(isActive: boolean): string[] {
+// 导航选中态由 Tailwind class 控制；收起时将链接压缩为居中的首字入口。
+function getShellNavLinkClasses(isActive: boolean, isCollapsed: boolean): string[] {
   return [
-    "group flex min-w-0 select-none flex-col gap-1 rounded-editorial-sm px-3 py-2 text-left no-underline transition duration-150 ease-out",
+    `group flex min-w-0 select-none flex-col gap-1 rounded-editorial-sm py-2 text-left no-underline transition duration-150 ease-out ${isCollapsed ? "items-center px-0" : "items-start px-3"}`,
     isActive
       ? "bg-editorial-link-active text-editorial-text-main"
       : "text-editorial-text-body hover:bg-editorial-link-active hover:text-editorial-text-main hover:no-underline"
   ];
+}
+
+// 切换桌面侧栏的展开状态；不改变路由，也不影响移动端导航。
+function toggleSidebar(): void {
+  sidebarCollapsed.value = !sidebarCollapsed.value;
 }
 
 // 移动端顶部 tab 只保留更紧凑的 pill 形态， active 态依旧从同一份路由判断里拿。
@@ -268,13 +274,27 @@ onBeforeUnmount(() => {
     </div>
 
     <aside
-      class="sticky top-0 hidden h-[100dvh] w-[180px] flex-none flex-col overflow-y-auto border-r border-editorial-border bg-editorial-sidebar px-2 py-3 min-[901px]:flex min-[901px]:w-[180px]"
+      class="sticky top-0 hidden h-[100dvh] w-[180px] flex-none flex-col overflow-y-auto border-r border-editorial-border bg-editorial-sidebar px-2 py-3 transition-[width] duration-200 min-[901px]:flex"
+      :class="sidebarCollapsed ? 'min-[901px]:w-[64px]' : 'min-[901px]:w-[180px]'"
       data-workspace-sidebar
       data-shell-nav-rail
     >
-      <div class="flex min-h-0 flex-1 flex-col gap-3">
+      <button
+        type="button"
+        class="mb-2 flex h-7 w-7 shrink-0 items-center justify-center self-end rounded-editorial-sm text-sm text-editorial-text-muted transition hover:bg-editorial-link-active hover:text-editorial-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editorial-accent"
+        data-sidebar-collapse-toggle
+        :aria-expanded="sidebarCollapsed ? 'false' : 'true'"
+        aria-controls="workspace-sidebar-content"
+        :aria-label="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
+        :title="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
+        @click="toggleSidebar"
+      >
+        {{ sidebarCollapsed ? "›" : "‹" }}
+      </button>
+      <div id="workspace-sidebar-content" class="flex min-h-0 flex-1 flex-col gap-3">
         <section
-          class="editorial-spotlight-card shrink-0 overflow-hidden px-3 py-2"
+          class="editorial-spotlight-card shrink-0 overflow-hidden"
+          :class="sidebarCollapsed ? 'px-1 py-2' : 'px-3 py-2'"
           data-workspace-brand
           data-shell-brand-stage
         >
@@ -282,14 +302,14 @@ onBeforeUnmount(() => {
             class="pointer-events-none absolute inset-x-5 top-0 h-20 rounded-full bg-[radial-gradient(circle,_rgba(122,162,255,0.32),_transparent_72%)] blur-2xl"
             aria-hidden="true"
           />
-          <div class="relative z-[1] flex items-center gap-3">
+          <div class="relative z-[1] flex items-center gap-3" :class="sidebarCollapsed ? 'justify-center' : ''">
             <img
               :src="shellLogoSrc"
               alt="HotNow logo"
               class="h-9 w-9 shrink-0 rounded-[8px] object-cover"
               data-workspace-brand-logo
             />
-            <div class="min-w-0">
+            <div v-if="!sidebarCollapsed" class="min-w-0">
               <p class="m-0 text-[18px] font-semibold tracking-[-0.03em] text-editorial-text-main">HotNow</p>
               <p class="mt-0.5 text-xs font-medium text-editorial-text-body">热讯平台</p>
             </div>
@@ -297,7 +317,7 @@ onBeforeUnmount(() => {
         </section>
 
         <section class="flex shrink-0 flex-col gap-1" data-shell-content-menu-section>
-          <p class="px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
+          <p v-if="!sidebarCollapsed" class="px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
             内容菜单
           </p>
           <nav class="flex flex-col gap-1" aria-label="内容菜单">
@@ -305,16 +325,19 @@ onBeforeUnmount(() => {
               v-for="page in contentNavPages"
               :key="page.path"
               :to="page.path"
-              :class="getShellNavLinkClasses(isActiveContentPath(page.path))"
+              :class="getShellNavLinkClasses(isActiveContentPath(page.path), sidebarCollapsed)"
               :data-shell-nav-link="page.path"
+              :aria-label="page.navLabel"
+              :title="sidebarCollapsed ? page.navLabel : undefined"
             >
-              <span class="text-sm font-medium leading-5">{{ page.navLabel }}</span>
+              <span v-if="sidebarCollapsed" class="flex h-8 w-8 items-center justify-center text-sm font-semibold">{{ page.navLabel.slice(0, 1) }}</span>
+              <span v-else class="text-sm font-medium leading-5">{{ page.navLabel }}</span>
             </RouterLink>
           </nav>
         </section>
 
         <section v-if="shouldShowCreativeMenu" class="flex shrink-0 flex-col gap-1" data-shell-creative-menu-section>
-          <p class="px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
+          <p v-if="!sidebarCollapsed" class="px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
             内容创作
           </p>
           <nav class="flex flex-col gap-1" aria-label="内容创作">
@@ -322,16 +345,19 @@ onBeforeUnmount(() => {
               v-for="page in creativeNavPages"
               :key="page.key"
               :to="page.path"
-              :class="getShellNavLinkClasses(route.path === page.path)"
+              :class="getShellNavLinkClasses(route.path === page.path, sidebarCollapsed)"
               :data-shell-nav-link="page.path"
+              :aria-label="page.navLabel"
+              :title="sidebarCollapsed ? page.navLabel : undefined"
             >
-              <span class="text-sm font-medium leading-5">{{ page.navLabel }}</span>
+              <span v-if="sidebarCollapsed" class="flex h-8 w-8 items-center justify-center text-sm font-semibold">{{ page.navLabel.slice(0, 1) }}</span>
+              <span v-else class="text-sm font-medium leading-5">{{ page.navLabel }}</span>
             </RouterLink>
           </nav>
         </section>
 
         <section v-if="shouldShowSystemMenu" class="flex shrink-0 flex-col gap-1" data-shell-system-menu-section>
-          <p class="px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
+          <p v-if="!sidebarCollapsed" class="px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-editorial-text-muted">
             系统菜单
           </p>
           <nav class="flex flex-col gap-1" aria-label="系统菜单">
@@ -339,15 +365,18 @@ onBeforeUnmount(() => {
               v-for="page in systemNavPages"
               :key="page.key"
               :to="page.path"
-              :class="getShellNavLinkClasses(route.path === page.path)"
+              :class="getShellNavLinkClasses(route.path === page.path, sidebarCollapsed)"
               :data-shell-nav-link="page.path"
+              :aria-label="page.navLabel"
+              :title="sidebarCollapsed ? page.navLabel : undefined"
             >
-              <span class="text-sm font-medium leading-5">{{ page.navLabel }}</span>
+              <span v-if="sidebarCollapsed" class="flex h-8 w-8 items-center justify-center text-sm font-semibold">{{ page.navLabel.slice(0, 1) }}</span>
+              <span v-else class="text-sm font-medium leading-5">{{ page.navLabel }}</span>
             </RouterLink>
           </nav>
         </section>
 
-        <div class="mt-auto flex shrink-0 flex-col gap-3 pt-2" data-shell-sidebar-footer>
+        <div v-if="!sidebarCollapsed" class="mt-auto flex shrink-0 flex-col gap-3 pt-2" data-shell-sidebar-footer>
           <section
             class="rounded-editorial-md border border-editorial-border bg-editorial-panel px-3 py-3"
             data-shell-theme-toggle
@@ -498,7 +527,7 @@ onBeforeUnmount(() => {
                 v-for="page in systemNavPages"
                 :key="page.key"
                 :to="page.path"
-                :class="getShellNavLinkClasses(route.path === page.path)"
+                :class="getShellNavLinkClasses(route.path === page.path, false)"
                 :data-mobile-drawer-link="page.path"
                 :data-shell-nav-link="page.path"
                 @click="closeMobileSystemDrawer"

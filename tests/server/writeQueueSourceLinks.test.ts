@@ -3,9 +3,11 @@ import Fastify from "fastify";
 import { afterEach, expect, it, vi } from "vitest";
 import { registerHermesOperationalRoutes } from "../../src/server/routes/hermesOperationalRoutes.js";
 
-afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 it("映射自动短内容外部标识和成品关联素材，不将本地编号当作平台编号", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-01T12:00:00Z"));
   const db = new Database(":memory:");
   db.exec(`
     CREATE TABLE creative_source_items (id INTEGER PRIMARY KEY, external_id TEXT, direction TEXT, title TEXT, source_name TEXT, collector_timestamp TEXT, created_at TEXT);
@@ -18,7 +20,7 @@ it("映射自动短内容外部标识和成品关联素材，不将本地编号�
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
     current: { task_id: "auto", source_item_id: null, source_external_id: "hot-11", task_kind: "short_content_auto" },
     queue: [{ task_id: "unknown", source_item_id: null, source_external_id: "missing" }],
-    history: [{ task_id: "done", source_item_id: null, finished_article_id: 2401 }], stats: {}, queue_length: 1,
+    history: [{ task_id: "done", source_item_id: null, finished_article_id: 2401, finished_at: "2026-10-01T11:00:00Z" }], stats: {}, queue_length: 1,
   }))));
   const app = Fastify();
   registerHermesOperationalRoutes(app, { db, readSession: () => ({}) });

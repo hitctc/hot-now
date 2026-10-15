@@ -1,4 +1,5 @@
 import type { SqliteDatabase } from "../db/openDatabase.js";
+import { selectWriteQueueHistory, WRITE_QUEUE_HISTORY_WINDOW_MS } from "./writeQueueHistory.js";
 
 type QueueDisplaySnapshot = {
   current: unknown | null;
@@ -59,7 +60,7 @@ export function enrichShortWriteScheduleDisplay(
   return data;
 }
 
-/** 补齐队列展示的北京时间统计、历史成品和平台素材关联；修改调用方拥有的快照，不修改任务或数据库。 */
+/** 补齐全部24小时终态、北京时间日统计及素材关联；只修改调用方快照，不修改任务或数据库。 */
 export function enrichWriteQueueDisplay<T extends QueueDisplaySnapshot>(db: SqliteDatabase, data: T): T {
   // 队列日期带必须读取数据库全量日统计，不能从有限的历史记录反推文章和素材数量。
   const articleDayRows = db.prepare(`
@@ -84,7 +85,11 @@ export function enrichWriteQueueDisplay<T extends QueueDisplaySnapshot>(db: Sqli
   }
   data.day_counts = [...dayCounts.values()].sort((left, right) => right.day_key.localeCompare(left.day_key));
 
-  const history = Array.isArray(data.history) ? data.history as Array<Record<string, unknown>> : [];
+  const now = Date.now();
+  const history = selectWriteQueueHistory({
+    history: (data.history ?? []) as Array<Record<string, unknown>>,
+    recent: (data.recent ?? []) as Array<Record<string, unknown>>,
+  }, now);
   const knownArticleIds = new Set(
     history.map((task) => Number(task.finished_article_id)).filter((id) => Number.isFinite(id) && id > 0),
   );
@@ -92,9 +97,9 @@ export function enrichWriteQueueDisplay<T extends QueueDisplaySnapshot>(db: Sqli
     SELECT id, source_item_id, created_at
     FROM creative_finished_articles
     WHERE origin_type = 'pipeline'
+      AND julianday(created_at) BETWEEN julianday(?) AND julianday(?)
     ORDER BY datetime(created_at) DESC, id DESC
-    LIMIT 500
-  `).all() as Array<{ id: number; source_item_id: number | null; created_at: string }>;
+  `).all(new Date(now - WRITE_QUEUE_HISTORY_WINDOW_MS).toISOString(), new Date(now).toISOString()) as Array<{ id: number; source_item_id: number | null; created_at: string }>;
   for (const article of legacyArticles) {
     if (knownArticleIds.has(article.id)) continue;
     history.push({
@@ -109,7 +114,9 @@ export function enrichWriteQueueDisplay<T extends QueueDisplaySnapshot>(db: Sqli
       finished_article_id: article.id,
     });
   }
-  data.history = history;
+  // 两个兼容字段均返回完整时间窗口，旧页面读取recent也不会被50条上限截断。
+  data.history = selectWriteQueueHistory({ history }, now);
+  data.recent = data.history;
 
   // 从队列中收集所有 source_item_id，批量查本地素材表补充标题和来源
   const tasks = [

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from "vue";
+import { ref, onMounted, onBeforeUnmount, computed } from "vue";
+import { selectWriteQueueHistory } from "../../../core/creative/writeQueueHistory.js";
 import MonitorStatsCards from "../../components/monitor/MonitorStatsCards.vue";
 import MonitorRunsTable from "../../components/monitor/MonitorRunsTable.vue";
 import MonitorItemsTable from "../../components/monitor/MonitorItemsTable.vue";
@@ -23,6 +24,8 @@ let queueRefreshRequest: Promise<void> | null = null;
 
 // 实时耗时计时驱动（每秒刷新）
 const elapsedNow = ref(Date.now());
+/** 与全局队列共用实时24小时口径，监控页不再只截取前10条。 */
+const recentQueueTasks = computed(() => selectWriteQueueHistory(queueData.value, elapsedNow.value));
 let elapsedTimer: ReturnType<typeof setInterval> | null = null;
 
 /** 将 ISO 时间戳格式化为已耗时 "X分X秒" */
@@ -160,9 +163,9 @@ onBeforeUnmount(() => {
         <div v-if="queueData.luna" class="mt-1 text-[10px] text-editorial-text-muted">
           Luna：{{ queueData.luna.paused ? `暂停 · ${queueData.luna.reason || "等待恢复探测"}` : (queueData.luna.active ? `执行中 · ${queueData.luna.label || queueData.luna.kind || "任务"}` : "空闲") }}
         </div>
-        <div v-if="queueData.recent?.length" class="mt-3 border-t border-gray-100 pt-2" data-testid="monitor-write-queue-recent">
-          <div class="mb-1 text-[11px] font-medium text-editorial-text-muted">最近逐篇结果</div>
-          <div v-for="task in queueData.recent.slice(0, 10)" :key="`${task.task_id}-${task.finished_at}`" class="mb-1 rounded border border-gray-100 bg-gray-50 px-3 py-1.5 text-[11px]">
+        <div v-if="recentQueueTasks.length" class="mt-3 max-h-80 overflow-y-auto border-t border-gray-100 pt-2" data-testid="monitor-write-queue-recent">
+          <div class="mb-1 text-[11px] font-medium text-editorial-text-muted">最近24小时逐篇结果</div>
+          <div v-for="task in recentQueueTasks" :key="`${task.task_id}-${task.finished_at}`" class="mb-1 rounded border border-gray-100 bg-gray-50 px-3 py-1.5 text-[11px]">
             <div class="flex flex-wrap items-center gap-2">
               <span :class="task.status === 'done' ? 'text-green-600' : task.status === 'stopped' ? 'text-amber-600' : 'text-red-600'">
                 {{ task.status === "done" ? "成功" : task.status === "stopped" ? "已阻断" : "失败" }}

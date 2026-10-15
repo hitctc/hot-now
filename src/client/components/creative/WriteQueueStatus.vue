@@ -329,12 +329,12 @@ onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbars));
           Luna：{{ describeLunaStatus(data.luna, elapsedNow, statusReceivedAt) }}
         </div>
 
-        <!-- 持久化终态历史：按北京时间 00:00–23:59 分组，服务重启后仍可查看。 -->
+        <!-- 滚动24小时内全部终态，按北京时间分日；不按条数或周期数截断。 -->
         <div v-if="historyGroups.length || shortWriteCycleRecords.length" class="write-queue-scroll-shell">
         <div ref="historyScrollRef" class="write-queue-history mt-2 border-t border-gray-100 pt-1" data-testid="write-queue-history" @scroll="syncQueueScrollbars">
           <div class="mb-1 flex items-center justify-between text-[10px] font-medium text-editorial-text-muted">
             <span>写作记录（最近结果）</span>
-            <span>北京时间 00:00–23:59</span>
+            <span>最近24小时 · 北京时间</span>
           </div>
           <!-- 限制周期表格高度并在内部滚动，避免历史记录挤占队列其他内容。 -->
           <div v-if="shortWriteCycleRecords.length" class="write-queue-scroll-shell">
@@ -349,7 +349,7 @@ onUnmounted(() => window.removeEventListener("resize", syncQueueScrollbars));
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="period in shortWriteCycleRecords.slice(0, 8)" :key="period.started_at" class="border-t border-gray-100">
+                <tr v-for="period in shortWriteCycleRecords" :key="period.started_at" class="border-t border-gray-100">
                   <td class="whitespace-nowrap px-[3px] py-1">{{ formatShortBatchPeriod(period.started_at, period.collection_interval_minutes ?? 60, period.ended_at) }}</td>
                   <td class="whitespace-nowrap px-[3px] py-1">{{ period.hot_accepted_count ?? 0 }}</td>
                   <td class="whitespace-nowrap px-[3px] py-1">{{ period.written?.hot ?? 0 }} / {{ period.written?.aihot ?? 0 }} / {{ period.written?.juya ?? 0 }}</td>

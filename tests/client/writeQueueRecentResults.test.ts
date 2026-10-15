@@ -30,6 +30,18 @@ const queueStatus = {
   ],
 };
 
+/** 构造超过旧50条限制的24小时完整历史，recent故意只给前50条，覆盖兼容与去重。 */
+function fullDayQueueStatus() {
+  const now = Date.now();
+  const history = Array.from({ length: 106 }, (_, index) => ({
+    ...queueStatus.recent[index % 2]!,
+    task_id: `full-day-${index}`,
+    source_item_title: `完整记录 ${index}`,
+    finished_at: new Date(now - (index === 105 ? 23 * 60 : index * 10) * 60_000).toISOString(),
+  }));
+  return { ...queueStatus, history, recent: history.slice(0, 50) };
+}
+
 const QUEUE_EXPANDED_KEY = "hot-now-write-queue-expanded";
 const EMPTY_SHORT_WRITE_SCHEDULE = {
   batch_started_at: null,
@@ -39,17 +51,54 @@ const EMPTY_SHORT_WRITE_SCHEDULE = {
   replaced: [],
 };
 beforeEach(() => {
+  // 所有固定样例使用同一可控时钟；只模拟Date，保留组件轮询和flushPromises的真实计时器。
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-08-20T12:00:00+08:00"));
   window.localStorage.removeItem(QUEUE_EXPANDED_KEY);
   vi.spyOn(creativeApi, "readShortWriteSchedule").mockResolvedValue(EMPTY_SHORT_WRITE_SCHEDULE);
   vi.spyOn(settingsApi, "readWriteQueuePreferences").mockResolvedValue({ preferences: null });
   vi.spyOn(settingsApi, "saveWriteQueuePreferences").mockImplementation(async (preferences) => ({ ok: true, preferences }));
 });
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   window.localStorage.removeItem(QUEUE_EXPANDED_KEY);
 });
 
 describe("写作队列最近逐篇结果", () => {
+  it("完整显示超过50条的24小时终态和超过8个周期，不丢失23小时前结果", async () => {
+    window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
+    vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue(fullDayQueueStatus());
+    vi.mocked(creativeApi.readShortWriteSchedule).mockResolvedValue({ ...EMPTY_SHORT_WRITE_SCHEDULE,
+      periods: Array.from({ length: 25 }, (_, index) => ({
+        started_at: new Date(Date.now() - (25 - index) * 3_600_000).toISOString(),
+        collection_interval_minutes: 60, hot_accepted_count: index,
+      })),
+    });
+    const wrapper = mount(WriteQueueStatus, { attachTo: document.body, global: { stubs: { SourceItemDetailModal: true, ArticleDetailDrawer: true } } });
+    try {
+      await flushPromises();
+      expect(document.body.querySelectorAll(".write-queue-history-item")).toHaveLength(106);
+      expect(document.body.querySelector(".write-queue-history")?.textContent).toContain("完整记录 105");
+      expect(document.body.querySelectorAll('[data-testid="queue-short-write-cycle-history"] tbody tr')).toHaveLength(24);
+    } finally { wrapper.unmount(); }
+  });
+
+  it("监控页显示同一完整24小时窗口，不截取前10条", async () => {
+    vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue(fullDayQueueStatus());
+    const wrapper = mount(MonitorPage, { global: { stubs: {
+      MonitorStatsCards: true, MonitorRunsTable: true, MonitorItemsTable: true, MonitorSwitches: true,
+      CodexTaskQueue: true, CodexConsumption: true, SourceItemDetailModal: true, ArticleDetailDrawer: true,
+    } } });
+    try {
+      await flushPromises();
+      const results = wrapper.get('[data-testid="monitor-write-queue-recent"]');
+      expect(results.findAll(".rounded")).toHaveLength(106);
+      expect(results.text()).toContain("最近24小时逐篇结果");
+      expect(results.text()).toContain("完整记录 105");
+    } finally { wrapper.unmount(); }
+  });
+
   it("首次迁移沿用浏览器展开状态并保存账号偏好", async () => {
     window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
     vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue(queueStatus);
@@ -312,6 +361,7 @@ describe("写作队列最近逐篇结果", () => {
     } finally { wrapper.unmount(); }
   });
   it("文章队列各滚动区默认显示4px指示轨道并同步滑块位置", async () => {
+    vi.setSystemTime(new Date("2026-10-09T23:30:00+08:00"));
     window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
     vi.spyOn(creativeApi, "readShortWriteSchedule").mockResolvedValue({
       ...EMPTY_SHORT_WRITE_SCHEDULE,
@@ -411,6 +461,7 @@ describe("写作队列最近逐篇结果", () => {
     vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue({ ...queueStatus,
       current: { ...queueStatus.recent[1]!, status: "writing" },
       queue: Array.from({ length: 30 }, (_, index) => ({ ...queueStatus.recent[1]!, task_id: `pending-${index}`, status: "queued" as const })), queue_length: 30,
+      recent: [],
       history: Array.from({ length: 40 }, (_, index) => ({ ...queueStatus.recent[0]!, task_id: `failed-${index}`, error: `Luna 调用失败：${"详细错误说明".repeat(30)}` })),
       status_delayed: true, status_message: "状态延迟，仍保留上次任务",
     });
@@ -493,7 +544,8 @@ describe("写作队列最近逐篇结果", () => {
     wrapper.unmount();
   });
 
-  it("按北京时间分组历史记录并可打开成品详情", async () => {
+  it("在滚动24小时内按北京时间分组历史记录并可打开成品详情", async () => {
+    vi.setSystemTime(new Date("2026-08-21T00:30:00+08:00"));
     vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue({
       ...queueStatus,
       recent: [],
@@ -517,10 +569,10 @@ describe("写作队列最近逐篇结果", () => {
     document.body.querySelector<HTMLButtonElement>(".write-queue-dot-btn")?.click();
     await wrapper.vm.$nextTick();
 
-    expect(document.body.textContent).toContain("北京时间 00:00–23:59");
+    expect(document.body.textContent).toContain("最近24小时 · 北京时间");
     expect(document.body.textContent).toContain("2026-08-21（周五） · 文章 41 · 素材 259");
     expect(document.body.textContent).toContain("2026-08-20（周四） · 文章 38 · 素材 180");
-    expect(document.body.textContent).toContain("2026-08-19");
+    expect(document.body.textContent).not.toContain("2026-08-19");
     const articleLink = [...document.body.querySelectorAll<HTMLButtonElement>(".write-queue-link")]
       .find((button) => button.textContent?.includes("成品 #2401"));
     expect(articleLink).toBeTruthy();
@@ -605,6 +657,7 @@ describe("写作队列最近逐篇结果", () => {
   });
 
   it("展示热搜上限、RSS 分源结转与模型占用等待历史", async () => {
+    vi.setSystemTime(new Date("2026-10-09T12:00:00+08:00"));
     window.localStorage.setItem(QUEUE_EXPANDED_KEY, "1");
     vi.spyOn(creativeApi, "fetchWriteQueueStatus").mockResolvedValue({
       ...queueStatus,

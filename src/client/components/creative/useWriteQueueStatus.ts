@@ -2,6 +2,7 @@ import { ref, onMounted, onBeforeUnmount, computed } from "vue";
 import { fetchWriteQueueStatus, readShortWriteSchedule, readCreativeFinishedArticle, type ShortWriteSchedule, type WriteQueueStatus as WriteQueueStatusType, type WriteQueueTask, type CreativeFinishedArticle } from "../../services/creativeApi.js";
 import { createLatestRequestGuard } from "../../utils/latestRequestGuard.js";
 import { toShanghaiDayKey } from "./tableDayGroups.js";
+import { isInWriteQueueHistoryWindow, selectWriteQueueHistory } from "../../../core/creative/writeQueueHistory.js";
 import { describeLunaStatus, describeQueuedTask, describeCurrentTask } from "./writeQueueStatusPresentation.js";
 import { message } from "ant-design-vue";
 import { cancelWriteQueueTask, readWriteQueueTaskResult, forceRewriteQueueTask } from "../../services/creativeApi.js";
@@ -230,7 +231,10 @@ export function useWriteQueueStatus() {
     return [...groups.values()].sort((left, right) => right.batchStartedAt.localeCompare(left.batchStartedAt));
   });
 
-  const shortWriteCycleRecords = computed(() => [...(shortWriteSchedule.value?.periods ?? [])].reverse());
+  /** 取结束时间仍在24小时内的全部周期，未结束周期采用开始时间；仅过滤展示，不改变调度。 */
+  const shortWriteCycleRecords = computed(() => [...(shortWriteSchedule.value?.periods ?? [])]
+    .filter((period) => isInWriteQueueHistoryWindow(period.ended_at || period.started_at, elapsedNow.value))
+    .reverse());
 
   /** 按素材来源给短写候选和周期统计生成一致标签。 */
   function sourceLaneLabel(lane?: string): string {
@@ -377,8 +381,9 @@ export function useWriteQueueStatus() {
     return task.finished_at || task.started_at || task.submitted_at;
   }
 
+  /** 以实时钟筛选全部24小时终态，再按北京时间分日；旧快照到期后也不继续显示。 */
   const historyGroups = computed(() => {
-    const tasks = data.value?.history?.length ? data.value.history : (data.value?.recent ?? []);
+    const tasks = selectWriteQueueHistory(data.value, elapsedNow.value);
     const groups = new Map<string, WriteQueueTask[]>();
     for (const task of tasks) {
       const key = toShanghaiDayKey(historyTime(task)) ?? "unknown";

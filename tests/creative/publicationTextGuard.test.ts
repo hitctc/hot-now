@@ -6,6 +6,14 @@ import { checkPublishConditions } from "../../src/core/creative/creativeFinished
 const dirty = "但现有证据只是搜索页面抓取内容，不能确认这是统一的官方安排。";
 
 describe("读者侧发布字段", () => {
+  // 内部资料口径在正式稿/标题都须拦截；真实主体披露边界不扩大为关键词封禁。
+  it.each(["模型主打低成本，但素材未提供具体对比数据。", "根据提供的素材，无法确认具体效果。", "摘要中没有展开部署方式。"])("拒绝内部素材口径：%s", body => {
+    expect(findPublicationTextIssue({ body })).toContain("发布稿语境");
+    expect(findArticlePublicationTextIssue({ titles: ["功能开放"], humanMarkdown: body })).toContain("发布稿语境");
+  });
+  it.each(["厂商称成本更低，但未公布对比对象和测试条件。", "公司发布视频素材管理工具。", "工具根据提供的素材生成图片。", "论文摘要中没有列出样本数量，正文列出了具体人数。"])("保留来源边界和正常报道：%s", body => {
+    expect(findPublicationTextIssue({ body })).toBeNull();
+  });
   it.each(["警方披露，该公司通过抓取搜索页面收集个人信息。", "现有证据支持法院的判决，其他争议仍需依法审理。", "据国务院办公厅通知，相关假期按日历安排。"])("不封禁合法事件报道：%s", body => {
     expect(findPublicationTextIssue({ body })).toBeNull();
   });
